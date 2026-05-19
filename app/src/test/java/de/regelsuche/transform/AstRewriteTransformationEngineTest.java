@@ -24,6 +24,20 @@ class AstRewriteTransformationEngineTest {
     }
 
     @Test
+    void appliesRulesRecursivelyInsideLargerExpressions() {
+        List<Transformation> transformations = engine.transform("w + x * (y + z)");
+
+        assertHasTransformation(transformations, "ast_distribute_left", "w + x * y + x * z");
+    }
+
+    @Test
+    void factorsCommonSubtreesStructurally() {
+        List<Transformation> transformations = engine.transform("(a + b) * c + (a + b) * d");
+
+        assertHasTransformation(transformations, "ast_factor_common_left", "(a + b) * (c + d)");
+    }
+
+    @Test
     void combinesPowersWithoutQuadraticAnalyzerFallbacks() {
         List<Transformation> transformations = engine.transform("z^2 * z^3");
 
@@ -35,6 +49,13 @@ class AstRewriteTransformationEngineTest {
         List<Transformation> transformations = engine.transform("(y + z)*(y + z)");
 
         assertHasTransformation(transformations, "ast_expand_binomial_square_product", "y ^ 2 + 2 * y * z + z ^ 2");
+    }
+
+    @Test
+    void rewritesPowerOfPowerWithoutChangingFormatterAssociativity() {
+        List<Transformation> transformations = engine.transform("(x^2)^3");
+
+        assertHasTransformation(transformations, "ast_power_of_power", "x ^ 6");
     }
 
     @Test

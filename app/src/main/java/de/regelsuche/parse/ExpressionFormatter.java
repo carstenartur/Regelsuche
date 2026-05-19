@@ -33,7 +33,7 @@ public final class ExpressionFormatter {
         BinaryOperator operator = binaryExpr.operator();
         int precedence = operator.precedence();
 
-        String left = format(binaryExpr.left(), precedence);
+        String left = format(binaryExpr.left(), precedence + (operator == BinaryOperator.POW ? 1 : 0));
         String right = format(binaryExpr.right(), precedence + (operator == BinaryOperator.POW ? -1 : 0));
         String value = left + " " + operator.symbol() + " " + right;
         if (precedence < parentPrecedence) {

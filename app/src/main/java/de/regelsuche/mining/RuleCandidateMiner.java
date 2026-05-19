@@ -69,8 +69,7 @@ public class RuleCandidateMiner {
         private RuleCandidate toCandidate(KnownRuleRepository knownRules) {
             double average = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).average().orElse(0);
             int maximum = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).max().orElse(0);
-            boolean equivalenceVerified = paths.stream().allMatch(path -> path.equivalenceEvidence().contains("simplify")
-                || path.equivalenceEvidence().contains("matching normalized"));
+            boolean equivalenceVerified = paths.stream().allMatch(SuccessfulTransformationPath::equivalenceVerified);
             return new RuleCandidate(
                 leftPattern,
                 rightPattern,

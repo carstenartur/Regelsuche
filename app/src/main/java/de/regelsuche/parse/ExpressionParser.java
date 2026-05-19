@@ -68,29 +68,37 @@ public class ExpressionParser {
     }
 
     private Expr parseTermInternal(Cursor cursor) {
-        Expr result = parsePower(cursor);
+        Expr result = parseUnary(cursor);
         while (true) {
             cursor.skipWhitespace();
             if (cursor.consume('*')) {
-                result = new BinaryExpr(result, BinaryOperator.MUL, parsePower(cursor));
+                result = new BinaryExpr(result, BinaryOperator.MUL, parseUnary(cursor));
             } else if (cursor.consume('/')) {
-                result = new BinaryExpr(result, BinaryOperator.DIV, parsePower(cursor));
+                result = new BinaryExpr(result, BinaryOperator.DIV, parseUnary(cursor));
             } else {
                 return result;
             }
         }
     }
 
+    private Expr parseUnary(Cursor cursor) {
+        cursor.skipWhitespace();
+        if (cursor.consume('-')) {
+            return new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, parseUnary(cursor));
+        }
+        return parsePower(cursor);
+    }
+
     private Expr parsePower(Cursor cursor) {
-        Expr left = parseFactor(cursor);
+        Expr left = parsePrimary(cursor);
         cursor.skipWhitespace();
         if (cursor.consume('^')) {
-            return new BinaryExpr(left, BinaryOperator.POW, parsePower(cursor));
+            return new BinaryExpr(left, BinaryOperator.POW, parseUnary(cursor));
         }
         return left;
     }
 
-    private Expr parseFactor(Cursor cursor) {
+    private Expr parsePrimary(Cursor cursor) {
         cursor.skipWhitespace();
         if (cursor.consume('(')) {
             Expr inner = parseExpression(cursor);
@@ -99,9 +107,6 @@ public class ExpressionParser {
                 throw new IllegalArgumentException("Missing closing ')' at position " + cursor.position());
             }
             return inner;
-        }
-        if (cursor.consume('-')) {
-            return new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, parseFactor(cursor));
         }
         if (cursor.peekDigit()) {
             return parseNumber(cursor);

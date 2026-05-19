@@ -10,11 +10,11 @@ import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -27,7 +27,7 @@ public class RuleDiscoveryService {
     private final RuleCandidateMiner miner;
     private final RuleCandidateListener listener;
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
-    private final Set<String> announcedCandidateHashes = new HashSet<>();
+    private final Set<String> announcedCandidateHashes = ConcurrentHashMap.newKeySet();
 
     public RuleDiscoveryService(
         AlgebraicExampleGenerator exampleGenerator,
@@ -73,6 +73,7 @@ public class RuleDiscoveryService {
                         List.of(transformation.rule()),
                         before,
                         after,
+                        equivalent,
                         equivalenceService.evidence(expression, target),
                         Map.of("variable", "x")
                     ));

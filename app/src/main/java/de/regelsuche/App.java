@@ -11,17 +11,24 @@ import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.SimplificationSuccess;
 import de.regelsuche.search.TransformationSearchService;
 import de.regelsuche.transform.SymPyTransformationEngine;
+import java.util.Arrays;
 import java.util.Optional;
 
 public class App {
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("Usage: <term|equation|system> <expression>");
+            printUsage();
             return;
         }
 
-        InputType type = InputType.valueOf(args[0].trim().toUpperCase());
-        String expression = args[1];
+        InputType type;
+        try {
+            type = InputType.valueOf(args[0].trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            printUsage();
+            return;
+        }
+        String expression = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
 
         try (ExpressionGraphStore store = createStore()) {
             TransformationSearchService service = new TransformationSearchService(
@@ -52,5 +59,10 @@ public class App {
             return new Neo4jExpressionGraphStore(uri, user, password);
         }
         return new InMemoryExpressionGraphStore();
+    }
+
+    private static void printUsage() {
+        System.out.println("Usage: <term|equation|system> <expression>");
+        System.out.println("Valid input types: term, equation, system");
     }
 }

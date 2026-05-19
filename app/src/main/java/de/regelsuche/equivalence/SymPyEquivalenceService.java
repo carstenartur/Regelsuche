@@ -2,11 +2,15 @@ package de.regelsuche.equivalence;
 
 import de.regelsuche.algebra.QuadraticAnalyzer;
 import de.regelsuche.algebra.QuadraticCoefficients;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import java.util.Optional;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
 public class SymPyEquivalenceService implements EquivalenceService {
+    private final ExpressionParser parser = new ExpressionParser();
+
     @Override
     public boolean areEquivalent(String leftExpression, String rightExpression) {
         Boolean symPyResult = trySymPy(leftExpression, rightExpression);
@@ -26,13 +30,20 @@ public class SymPyEquivalenceService implements EquivalenceService {
     }
 
     private Boolean trySymPy(String leftExpression, String rightExpression) {
-        String left = escape(toSymPyPowerSyntax(leftExpression));
-        String right = escape(toSymPyPowerSyntax(rightExpression));
+        String left;
+        String right;
+        try {
+            left = escape(toSymPyPowerSyntax(ExpressionFormatter.format(parser.parseTerm(leftExpression))));
+            right = escape(toSymPyPowerSyntax(ExpressionFormatter.format(parser.parseTerm(rightExpression))));
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
         String script = "import sympy as sp\n"
-            + "lhs = sp.sympify('" + left + "')\n"
-            + "rhs = sp.sympify('" + right + "')\n"
+            + "from sympy.parsing.sympy_parser import parse_expr\n"
+            + "lhs = parse_expr('" + left + "', evaluate=False)\n"
+            + "rhs = parse_expr('" + right + "', evaluate=False)\n"
             + "sp.simplify(lhs - rhs) == 0";
-        try (Context context = Context.newBuilder("python").allowAllAccess(true).build()) {
+        try (Context context = Context.newBuilder("python").build()) {
             Value value = context.eval("python", script);
             return value.asBoolean();
         } catch (RuntimeException | LinkageError ignored) {

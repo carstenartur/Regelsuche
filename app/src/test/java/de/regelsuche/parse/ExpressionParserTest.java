@@ -28,4 +28,16 @@ class ExpressionParserTest {
         assertEquals("x + 1 = 2", ExpressionFormatter.format(parsed.equations().get(0)));
         assertEquals("y - 1 = 0", ExpressionFormatter.format(parsed.equations().get(1)));
     }
+
+    @Test
+    void exponentiationBindsTighterThanUnaryMinus() {
+        assertEquals("0 - x ^ 2", ExpressionFormatter.format(parser.parseTerm("-x^2")));
+        assertEquals("(0 - x) ^ 2", ExpressionFormatter.format(parser.parseTerm("(-x)^2")));
+    }
+
+    @Test
+    void formatsNestedPowersWithoutChangingAssociativity() {
+        assertEquals("(x ^ 2) ^ 3", ExpressionFormatter.format(parser.parseTerm("(x^2)^3")));
+        assertEquals("x ^ 2 ^ 3", ExpressionFormatter.format(parser.parseTerm("x^2^3")));
+    }
 }

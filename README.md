@@ -1,10 +1,18 @@
 # Regelsuche
 
+[![CI/CD](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/coverage/badge.json)](https://carstenartur.github.io/Regelsuche/coverage/)
+[![Tests](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/tests/badge.json)](https://carstenartur.github.io/Regelsuche/tests/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![SBOM](https://img.shields.io/badge/SBOM-CycloneDX-informational?logo=owasp&style=flat)](https://github.com/carstenartur/Regelsuche/dependency-graph/sbom)
+[![GitHub release](https://img.shields.io/github/v/release/carstenartur/Regelsuche?style=flat-square)](https://github.com/carstenartur/Regelsuche/releases)
+
 Gradle-basiertes Java-Projekt für regelbasierte Ausdrucksumformungen mit:
 
 - Eingabe von Termen, Gleichungen und Gleichungssystemen
 - Parsing in einen abstrakten Syntaxbaum (AST)
-- SymPy-Integration über GraalVM Polyglot (mit lokalem Fallback)
+- AST-Rewrite-Engine mit lokalen, strukturellen Umformungsregeln
+- Optionale SymPy-Integration über GraalVM Polyglot als zusätzliche Transformations- und Äquivalenzquelle
 - Neo4j-Graphmodell (Knoten: Ausdrücke, Kanten: Umformungen)
 - Heuristischer Suchbegrenzung (Suchtiefe, besuchte Ausdrücke)
 - Hintergrundausführung der Umformungssuche
@@ -20,6 +28,19 @@ Gradle-basiertes Java-Projekt für regelbasierte Ausdrucksumformungen mit:
 ./gradlew :app:run --args='term "x + 0"'
 ```
 
+## Tests
+
+```bash
+./gradlew test
+```
+
+Die Tests dokumentieren bewusst die Stärken des AST-Ansatzes:
+
+- `AstRewriteTransformationEngineTest` zeigt lokale Rewrites an beliebigen und verschachtelten Teilbäumen.
+- `ExpressionParserTest` schützt Operatorpräzedenz und Formatierung, insbesondere Unary-Minus und verschachtelte Potenzen.
+- `RuleCandidateMinerTest` prüft, dass Kandidaten aus validierten Pfaden und nicht aus bekannten Regelnamen entstehen.
+- `AppTest` deckt robuste CLI-Fehlerbehandlung ab.
+
 Optionaler Neo4j-Store per Umgebungsvariablen:
 
 - `NEO4J_URI`
@@ -32,12 +53,39 @@ Die Anwendung akzeptiert Terme, Gleichungen und Gleichungssysteme als Strings.
 Terme nutzen explizite Multiplikation, z. B. `x^2 + 2*x + 1`.
 Gleichungen werden mit `=` getrennt, Gleichungssysteme mit `;` oder Zeilenumbrüchen.
 
+## AST-Rewrite-Engine
+
+Die Klasse `AstRewriteTransformationEngine` implementiert `TransformationEngine`
+und wendet `RewriteRule`-Instanzen rekursiv auf jeden Teilbaum eines Ausdrucks
+an. Dadurch entstehen Suchgraph-Kanten aus allgemeinen lokalen Regeln, statt aus
+hart codierten quadratischen Sonderfällen.
+
+Das Pattern-System bindet strukturelle Platzhalter an beliebige AST-Teilbäume:
+
+- `PatternExpr.var("A")` bindet einen Teilbaum und erzwingt bei Wiederholung dieselbe Struktur.
+- `PatternExpr.op(ADD, A, B)` beschreibt Operator-Muster.
+- `PatternRewriteRule` instanziiert Zielmuster aus den gefundenen Bindings.
+
+Aktuell enthaltene Basisregeln decken neutrale Elemente, Null-Regeln,
+Dopplungen, Potenzkombination, Distribution, Ausklammern und strukturelle
+Binom-Expansion ab. Beispiele:
+
+- `w + x*(y + z) -> w + x*y + x*z` durch rekursive Distribution in einem Teilbaum
+- `(a + b)*c + (a + b)*d -> (a + b)*(c + d)` durch strukturelles Ausklammern
+- `(x^2)^3 -> x^6` mit korrekt geklammerter Potenzformatierung
+- `(y + z)*(y + z) -> y^2 + 2*y*z + z^2` ohne Beschränkung auf die Variable `x`
+
+Quadratische Analyzer dürfen weiterhin für Scoring, Äquivalenz-Fallbacks, Tests
+und bekannte Baselines existieren. Sie werden aber nicht als direkte
+Transformationslogik in `SymPyTransformationEngine` verwendet.
+
 ## Suche und Graph
 
-Die Transformationssuche erzeugt aus jedem Ausdruck Folgezustände, etwa durch
-Expandieren, Faktorisieren, Sortieren, Zusammenfassen oder quadratische
-Ergänzung. Jeder Ausdruckszustand wird als Knoten gespeichert, jede angewendete
-Umformung als gerichtete Kante mit Regelname, Tiefe und Score-Verbesserung.
+Die Transformationssuche erzeugt aus jedem Ausdruck Folgezustände primär durch
+lokale AST-Rewrite-Regeln. Regeln werden nicht nur am Wurzelausdruck, sondern
+rekursiv an jedem Teilbaum ausprobiert. Jeder Ausdruckszustand wird als Knoten
+gespeichert, jede angewendete Umformung als gerichtete Kante mit Regelname,
+Tiefe und Score-Verbesserung.
 Der Speicher kann lokal im Arbeitsspeicher oder über Neo4j erfolgen.
 
 Der Suchraum wird durch Heuristiken begrenzt, insbesondere maximale Suchtiefe
@@ -54,9 +102,11 @@ Ausdrücke werden anhand einer Score-Struktur bewertet:
 - Verschachtelungstiefe
 - Bonus für erkannte Strukturen wie Quadrat-, Produkt- oder Faktorform
 
-Äquivalenz wird über SymPy geprüft (`simplify(lhs - rhs) == 0`). Falls die
-Python-Laufzeit nicht verfügbar ist, gibt es eine lokale Normalisierung für die
-unterstützten quadratischen Muster.
+Äquivalenz wird über SymPy geprüft (`simplify(lhs - rhs) == 0`). Die
+GraalVM-Polyglot-Ausführung verwendet keinen Host-All-Access-Kontext; Eingaben
+werden vor der Übergabe durch den eigenen Parser auf die unterstützte
+Ausdrucksgrammatik begrenzt. Falls die Python-Laufzeit nicht verfügbar ist, gibt
+es eine lokale Normalisierung für die unterstützten quadratischen Muster.
 
 ## Regel-Kandidaten
 

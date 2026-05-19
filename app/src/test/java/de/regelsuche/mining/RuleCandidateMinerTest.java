@@ -98,6 +98,24 @@ class RuleCandidateMinerTest {
     }
 
     @Test
+    void equivalenceVerifiedUsesPathBooleanInsteadOfEvidenceText() {
+        ExpressionScorer scorer = new ExpressionScorer();
+        List<SuccessfulTransformationPath> paths = List.of(
+            verifiedPath("x + 1", "1 + x", scorer),
+            verifiedPath("x + 3", "3 + x", scorer),
+            verifiedPath("x + 5", "5 + x", scorer)
+        );
+
+        List<RuleCandidate> candidates = new RuleCandidateMiner(
+            new KnownRuleRepository(),
+            (leftExpression, rightExpression) -> true
+        ).mine(paths);
+
+        assertFalse(candidates.isEmpty());
+        assertTrue(candidates.stream().allMatch(RuleCandidate::equivalenceVerified));
+    }
+
+    @Test
     void discoveryServiceRunsAsynchronouslyAndDeduplicatesEvents() {
         List<RuleCandidateDiscoveredEvent> events = new ArrayList<>();
         EquivalenceService testEquivalence = new EquivalenceService() {
@@ -166,6 +184,20 @@ class RuleCandidateMinerTest {
 
     private ExpressionPair pair(String source, String target) {
         return new ExpressionPair(source, target);
+    }
+
+    private SuccessfulTransformationPath verifiedPath(String source, String target, ExpressionScorer scorer) {
+        return new SuccessfulTransformationPath(
+            source,
+            target,
+            List.of(source, target),
+            List.of("test_commute"),
+            scorer.score(source),
+            scorer.score(target),
+            true,
+            "equivalent",
+            Map.of("variable", "x")
+        );
     }
 
     private record ExpressionPair(String source, String target) {
