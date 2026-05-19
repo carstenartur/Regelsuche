@@ -1,5 +1,7 @@
 package de.regelsuche.mining;
 
+import java.util.List;
+
 public record RuleCandidate(
     String leftPattern,
     String rightPattern,
@@ -9,7 +11,11 @@ public record RuleCandidate(
     boolean equivalenceVerified,
     boolean generalizationPlausible,
     boolean containsFreeParameters,
+    List<String> parameterRelations,
     RuleStatus status,
     String canonicalHash
 ) {
+    public RuleCandidate {
+        parameterRelations = List.copyOf(parameterRelations);
+    }
 }

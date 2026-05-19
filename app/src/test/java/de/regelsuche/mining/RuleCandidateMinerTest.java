@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.example.AlgebraicExampleGenerator;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
@@ -11,61 +12,89 @@ import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.transform.SymPyTransformationEngine;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class RuleCandidateMinerTest {
     @Test
-    void reconstructsFirstBinomialFormulaFromConcreteExamples() {
-        List<RuleCandidate> candidates = discoverFrom(List.of(
+    void discoversFirstBinomialFormulaByGeneralizationOnly() {
+        RuleCandidate candidate = requireCandidate(discoverFrom(List.of(
             "x^2 + 2*x + 1",
             "x^2 + 6*x + 9",
             "x^2 + 10*x + 25"
-        ));
+        )), "x^2 + 2*A*x + A^2", "(x + A)^2");
 
-        RuleCandidate candidate = requireCandidate(candidates, "x^2 + 2*a*x + a^2", "(x + a)^2");
         assertEquals(3, candidate.examplesCount());
         assertEquals(RuleStatus.MATCHES_KNOWN_RULE, candidate.status());
         assertTrue(candidate.equivalenceVerified());
+        assertTrue(candidate.parameterRelations().containsAll(List.of("N1 = 2*A", "N2 = A^2")));
     }
 
     @Test
-    void reconstructsSecondBinomialFormulaFromConcreteExamples() {
-        List<RuleCandidate> candidates = discoverFrom(List.of(
+    void discoversSecondBinomialFormulaByGeneralizationOnly() {
+        RuleCandidate candidate = requireCandidate(discoverFrom(List.of(
             "x^2 - 2*x + 1",
             "x^2 - 6*x + 9",
             "x^2 - 10*x + 25"
-        ));
+        )), "x^2 - 2*A*x + A^2", "(x - A)^2");
 
-        RuleCandidate candidate = requireCandidate(candidates, "x^2 - 2*a*x + a^2", "(x - a)^2");
         assertEquals(3, candidate.examplesCount());
         assertEquals(RuleStatus.MATCHES_KNOWN_RULE, candidate.status());
-        assertTrue(candidate.containsFreeParameters());
+        assertTrue(candidate.parameterRelations().containsAll(List.of("N1 = 2*A", "N2 = A^2", "N3 = -A")));
     }
 
     @Test
-    void reconstructsThirdBinomialFormulaFromConcreteExamples() {
-        List<RuleCandidate> candidates = discoverFrom(List.of(
+    void discoversDifferenceOfSquaresByGeneralizationOnly() {
+        RuleCandidate candidate = requireCandidate(discoverFrom(List.of(
             "(x + 1)*(x - 1)",
             "(x + 3)*(x - 3)",
             "(x + 5)*(x - 5)"
-        ));
+        )), "(x + A)*(x - A)", "x^2 - A^2");
 
-        RuleCandidate candidate = requireCandidate(candidates, "(a + b)*(a - b)", "a^2 - b^2");
         assertEquals(3, candidate.examplesCount());
         assertEquals(RuleStatus.MATCHES_KNOWN_RULE, candidate.status());
+        assertTrue(candidate.parameterRelations().containsAll(List.of("N1 = A", "N2 = -A", "N3 = -A^2")));
     }
 
     @Test
-    void reconstructsQuadraticCompletionFromConcreteExamples() {
-        List<RuleCandidate> candidates = discoverFrom(List.of(
+    void discoversQuadraticCompletionByGeneralizationOnly() {
+        RuleCandidate candidate = requireCandidate(discoverFrom(List.of(
             "x^2 + 2*x",
             "x^2 + 6*x",
             "x^2 + 10*x"
-        ));
+        )), "x^2 + 2*A*x", "(x + A)^2 - A^2");
 
-        RuleCandidate candidate = requireCandidate(candidates, "x^2 + 2*a*x", "(x + a)^2 - a^2");
         assertEquals(3, candidate.examplesCount());
         assertEquals(RuleStatus.MATCHES_KNOWN_RULE, candidate.status());
+        assertTrue(candidate.parameterRelations().containsAll(List.of("N1 = 2*A", "N3 = -A^2")));
+    }
+
+    @Test
+    void doesNotAcceptCoincidentalPatternWithOnlyTwoExamples() {
+        List<RuleCandidate> candidates = discoverFrom(List.of(
+            "x^2 + 2*x + 1",
+            "x^2 + 6*x + 9"
+        ));
+
+        assertTrue(candidates.isEmpty());
+    }
+
+    @Test
+    void rejectsCandidateThatFailsFreshValidationExamples() {
+        EquivalenceService rejectingValidation = new EquivalenceService() {
+            @Override
+            public boolean areEquivalent(String leftExpression, String rightExpression) {
+                return false;
+            }
+        };
+
+        List<RuleCandidate> candidates = new RuleCandidateMiner(new KnownRuleRepository(), rejectingValidation).mine(pathsFrom(List.of(
+            "x^2 + 2*x + 1",
+            "x^2 + 6*x + 9",
+            "x^2 + 10*x + 25"
+        )));
+
+        assertTrue(candidates.isEmpty());
     }
 
     @Test
@@ -98,6 +127,10 @@ class RuleCandidateMinerTest {
     }
 
     private List<RuleCandidate> discoverFrom(List<String> expressions) {
+        return new RuleCandidateMiner(new KnownRuleRepository()).mine(pathsFrom(expressions));
+    }
+
+    private List<SuccessfulTransformationPath> pathsFrom(List<String> expressions) {
         SymPyTransformationEngine engine = new SymPyTransformationEngine();
         SymPyEquivalenceService equivalence = new SymPyEquivalenceService();
         ExpressionScorer scorer = new ExpressionScorer();
@@ -113,11 +146,11 @@ class RuleCandidateMinerTest {
                     scorer.score(expression),
                     scorer.score(transformation.transformedExpression()),
                     equivalence.evidence(expression, transformation.transformedExpression()),
-                    java.util.Map.of("variable", "x")
+                    Map.of("variable", "x")
                 ))
                 .filter(path -> path.scoreImprovement() > 0)
                 .forEach(paths::add);
         }
-        return new RuleCandidateMiner(new KnownRuleRepository()).mine(paths);
+        return paths;
     }
 }
