@@ -108,12 +108,13 @@ Tiefe und Score-Verbesserung. Der Graph speichert konkrete Suchpfade und nicht
 nur Endergebnisse.
 
 Die Suche läuft über eine `SearchStrategy`-Schnittstelle. Implementiert sind
-`BestFirstSearchStrategy` und `BeamSearchStrategy`; einfache BFS ist nicht mehr
-die zentrale Suchlogik. Ein Zustand enthält Ausdruck, Tiefe, Score, Pfad,
+`BestFirstSearchStrategy`, `BeamSearchStrategy`, `RandomMonteCarloSearchStrategy`
+und eine A*-ähnliche `AStarSearchStrategy`; einfache BFS ist nicht mehr die
+zentrale Suchlogik. Ein Zustand enthält Ausdruck, Tiefe, Score, Pfad,
 angewendete Regel-IDs, Anzahl expandierender Schritte und kanonischen Hash.
 Bewertet werden u. a. Ausdruckskomplexität, AST-Größe, Operatoranzahl,
-Verschachtelung, bisherige Tiefe, expandierende Schritte und Expansion ohne
-Verbesserung.
+Verschachtelung, bisherige Tiefe, expandierende Schritte, Regelvielfalt und
+Expansion ohne Verbesserung.
 
 Der Suchraum wird durch Heuristiken begrenzt: maximale Suchtiefe, maximale Anzahl
 besuchter Strukturen, maximale AST-Größenzunahme pro Schritt, keine Wiederholung
@@ -121,7 +122,15 @@ derselben Regel auf demselben kanonischen Teilbaum im selben Pfad, maximale
 Anzahl expandierender Schritte und maximale Kandidaten pro Zustand. Das ist
 notwendig, weil algebraisch äquivalente Umformungen sehr schnell zyklische oder
 exponentiell wachsende Suchräume bilden.
-Der Speicher kann lokal im Arbeitsspeicher oder über Neo4j erfolgen.
+Der Speicher kann lokal im Arbeitsspeicher oder über Neo4j erfolgen. Graph-Kanten
+speichern neben Quelle, Ziel, Tiefe und Verbesserung auch konkrete Pfad-IDs,
+kanonische Hashes, Scores, Regelart, Regelkosten, Komplexitätsrisiko,
+Äquivalenz-Metadaten und Validierungsstatus.
+
+`SearchBenchmark` vergleicht Strategien über Metriken wie explorierte Zustände,
+beste Verbesserung, kürzeste Verbesserungstiefe, expandierende Schritte und
+Regelvielfalt. Diese Benchmarks sind bewusst leichtgewichtig und dienen dazu,
+Suchqualität und Suchraumexplosion reproduzierbar sichtbar zu machen.
 
 
 ## Normalform und Kanonisierung
@@ -149,15 +158,25 @@ Ausdrücke werden anhand einer Score-Struktur bewertet:
 - Verschachtelungstiefe
 - Bonus für erkannte Strukturen wie Quadrat-, Produkt- oder Faktorform
 
-Äquivalenz wird über SymPy geprüft (`simplify(lhs - rhs) == 0`). Die
+Äquivalenz wird primär über SymPy geprüft (`simplify(lhs - rhs) == 0`). Die
 GraalVM-Polyglot-Ausführung verwendet keinen Host-All-Access-Kontext; Eingaben
 werden vor der Übergabe durch den eigenen Parser auf die unterstützte
-Ausdrucksgrammatik begrenzt. Falls die Python-Laufzeit nicht verfügbar ist, gibt
-es eine lokale Normalisierung für die unterstützten quadratischen Muster.
+Ausdrucksgrammatik begrenzt. Falls die Python-Laufzeit nicht verfügbar ist,
+werden deterministische numerische Stichproben und die lokale Normalisierung für
+unterstützte quadratische Muster verwendet.
+
+`RewriteRuleValidationService` validiert konkrete Rewrite-Anwendungen gegen das
+`EquivalenceService`. Zusammen mit `RandomExpressionGenerator` entstehen
+property-artige Tests: viele zufällige algebraische Ausdrücke werden erzeugt,
+alle erreichbaren Rewrite-Schritte werden geprüft, und die Kanonisierung muss
+bedeutungserhaltend sein. Diese Tests sind keine formalen Beweise, erhöhen aber
+die systematische Abdeckung der Regelkorrektheit.
 
 ## Regel-Kandidaten
 
-Der Beispielgenerator erzeugt viele konkrete quadratische Testausdrücke, z. B.:
+Der Beispielgenerator erzeugt viele konkrete Testausdrücke. Er deckt weiterhin
+quadratische Muster ab und enthält zusätzlich mehrvariable und höhergradige
+Polynomformen, z. B.:
 
 - `(x + a)^2`
 - `(x - a)^2`
@@ -195,6 +214,17 @@ Testinstanzen mit bisher nicht genutzten Zahlenwerten und prüft sie mit dem
 `EquivalenceService`. Kandidaten, die diese Validierung nicht bestehen, werden
 verworfen.
 
+Jeder Kandidat trägt zusätzlich einen `CandidateProofStatus`:
+
+- `OBSERVED`: aus Suchpfaden beobachtet, aber noch nicht frisch validiert
+- `VALIDATED_BY_EXAMPLES`: an zusätzlichen Beispielen validiert
+- `SYMBOLICALLY_VERIFIED`: durch symbolische CAS-Prüfung bestätigt
+- `FORMALLY_PROVED`: reserviert für spätere SMT-/Theorem-Prover-Anbindung
+
+Der aktuelle Code erreicht je nach Umgebung und Muster `VALIDATED_BY_EXAMPLES`
+oder `SYMBOLICALLY_VERIFIED`; `FORMALLY_PROVED` ist bewusst noch ein zukünftiger
+Integrationspunkt.
+
 Anti-Duplikation erfolgt durch kanonisierte Variablennamen und einen Hash des
 abstrahierten Musters. Wenn ein neuer Kandidat entdeckt wird, erzeugt die
 asynchrone Suche ein `RuleCandidateDiscoveredEvent`.
@@ -227,3 +257,24 @@ an neuen Beispielen validiert werden.**
 Das System kann Regel-Kandidaten plausibel rekonstruieren, garantiert aber
 nicht, dass ein Kandidat mathematisch neu oder vollständig allgemein bewiesen
 ist. Die Baseline dient nur dem Vergleich und der Statusmeldung.
+
+## Forschungsplattform und Grenzen
+
+Der Prototyp ist zu einer belastbareren Forschungsplattform erweitert worden:
+
+- Property-artige Rewrite-Validierung gegen viele deterministisch zufällige
+  Ausdrücke
+- Zufallsgenerator für algebraische Ausdrücke und höhergradige Polynom-Beispiele
+- CAS-/SymPy-Validierung mit numerischem Fallback, wenn SymPy nicht verfügbar ist
+- mehrere Suchstrategien inklusive Best-First, Beam, Random/Monte-Carlo und A*
+- Proof-Status-Lifecycle für Regelkandidaten
+- Graph-Persistenz vollständiger Suchpfad-Metadaten
+- reproduzierbare Suchbenchmarks für Qualität und Explosion
+
+Die Grenzen bleiben explizit:
+
+- Suche ist heuristisch und nicht vollständig.
+- Kandidaten sind keine bewiesenen neuen Regeln.
+- Beispielvalidierung kann Fehler finden, ersetzt aber keinen Beweis.
+- Symbolische CAS-Prüfung ist stärker, aber noch kein formaler Theorem-Prover.
+- `FORMALLY_PROVED` erfordert eine spätere SMT- oder Theorem-Prover-Anbindung.

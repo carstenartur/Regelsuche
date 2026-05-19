@@ -26,6 +26,7 @@ class RuleCandidateMinerTest {
 
         assertEquals(3, candidate.examplesCount());
         assertEquals(RuleStatus.MATCHES_KNOWN_RULE, candidate.status());
+        assertTrue(candidate.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal());
         assertTrue(candidate.equivalenceVerified());
         assertTrue(candidate.parameterRelations().containsAll(List.of("N1 = 2*A", "N2 = A^2")));
     }
@@ -46,7 +47,16 @@ class RuleCandidateMinerTest {
         ), "x^2 + 2*A*x + A^2", "(x + A)^2");
 
         assertEquals(RuleStatus.MATCHES_KNOWN_RULE, candidate.status());
+        assertTrue(candidate.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal());
         assertTrue(candidate.generalizationPlausible());
+    }
+
+    @Test
+    void exampleGeneratorCoversMultipleVariablesAndHigherDegreePolynomials() {
+        List<String> examples = new AlgebraicExampleGenerator().generateSmallIntegerExamples(1, 2);
+
+        assertTrue(examples.stream().anyMatch(example -> example.contains("y")));
+        assertTrue(examples.stream().anyMatch(example -> example.contains("^3") || example.contains("^4")));
     }
 
     @Test

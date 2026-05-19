@@ -1,6 +1,7 @@
 package de.regelsuche.search;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.graph.GraphSnapshot;
@@ -37,6 +38,9 @@ class TransformationSearchServiceTest {
         GraphSnapshot snapshot = service.getGraphSnapshot();
         assertTrue(snapshot.nodes().contains("x + 0"));
         assertTrue(snapshot.nodes().contains("x"));
+        assertFalse(snapshot.edges().isEmpty());
+        assertFalse(snapshot.edges().getFirst().canonicalHash().isBlank());
+        assertTrue(snapshot.edges().getFirst().scoreBefore() > snapshot.edges().getFirst().scoreAfter());
         service.shutdown();
     }
 
