@@ -1,5 +1,7 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.algebra.QuadraticAnalyzer;
+import de.regelsuche.algebra.QuadraticCoefficients;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
@@ -18,9 +20,43 @@ public class SymPyTransformationEngine implements TransformationEngine {
     public List<Transformation> transform(String expression) {
         Set<Transformation> transformations = new LinkedHashSet<>();
         transformations.addAll(astRewriteFallback.transform(expression));
+        transformations.addAll(tryQuadraticFallback(expression));
         List<Transformation> symPyResults = trySymPy(expression);
         transformations.addAll(symPyResults);
         return new ArrayList<>(transformations);
+    }
+
+    private List<Transformation> tryQuadraticFallback(String expression) {
+        String normalizedInput;
+        try {
+            normalizedInput = ExpressionFormatter.format(parser.parseTerm(expression));
+        } catch (IllegalArgumentException ex) {
+            return List.of();
+        }
+        return QuadraticAnalyzer.analyzePolynomial(normalizedInput)
+            .filter(QuadraticCoefficients::isMonic)
+            .filter(coefficients -> coefficients.linear() % 2 == 0)
+            .filter(coefficients -> {
+                int value = coefficients.linear() / 2;
+                return coefficients.constant() == value * value;
+            })
+            .map(coefficients -> {
+                int value = coefficients.linear() / 2;
+                String candidate = toProjectSyntax(QuadraticAnalyzer.formatPerfectSquare(coefficients.variable(), value));
+                if (candidate.equals(normalizedInput)) {
+                    return List.<Transformation>of();
+                }
+                return List.of(new Transformation(
+                    "quadratic_perfect_square_factor",
+                    candidate,
+                    RewriteKind.FACTOR,
+                    false,
+                    -4,
+                    true,
+                    "quadratic_perfect_square_factor:" + candidate
+                ));
+            })
+            .orElseGet(List::of);
     }
 
     private List<Transformation> trySymPy(String expression) {

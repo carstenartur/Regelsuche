@@ -72,7 +72,7 @@ class RuleCandidateMinerTest {
                     && candidate.rightPattern().equals("(x + A)^2")
                     && candidate.status() == RuleStatus.MATCHES_KNOWN_RULE
                     && candidate.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()
-            ));
+            ), () -> "Expected first binomial rule candidate in " + candidates);
         } finally {
             service.shutdown();
         }
