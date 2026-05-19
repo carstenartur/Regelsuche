@@ -1,0 +1,29 @@
+plugins {
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.neo4j.driver:neo4j-java-driver:5.28.5'
+    implementation 'org.graalvm.polyglot:polyglot:24.2.1'
+
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    mainClass = 'de.regelsuche.App'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
