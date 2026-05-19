@@ -1,35 +1,41 @@
 package de.regelsuche.mining;
 
 import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.parse.ExpressionFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public class CandidateValidator {
-    private static final List<Integer> CANDIDATE_VALUES = List.of(2, 4, 6, 7, 8, 9, 10);
     private final EquivalenceService equivalenceService;
     private final RulePatternParser patternParser;
     private final RulePatternInstantiator patternInstantiator;
+    private final FreshBindingGenerator freshBindingGenerator;
+    private final ParameterRelationEvaluator parameterRelationEvaluator;
 
     public CandidateValidator(EquivalenceService equivalenceService) {
-        this(equivalenceService, new RulePatternParser(), new RulePatternInstantiator());
+        this(
+            equivalenceService,
+            new RulePatternParser(),
+            new RulePatternInstantiator(),
+            new FreshBindingGenerator(),
+            new ParameterRelationEvaluator()
+        );
     }
 
     CandidateValidator(
         EquivalenceService equivalenceService,
         RulePatternParser patternParser,
-        RulePatternInstantiator patternInstantiator
+        RulePatternInstantiator patternInstantiator,
+        FreshBindingGenerator freshBindingGenerator,
+        ParameterRelationEvaluator parameterRelationEvaluator
     ) {
         this.equivalenceService = equivalenceService;
         this.patternParser = patternParser;
         this.patternInstantiator = patternInstantiator;
+        this.freshBindingGenerator = freshBindingGenerator;
+        this.parameterRelationEvaluator = parameterRelationEvaluator;
     }
 
     public boolean validate(GeneralizedPattern pattern) {
@@ -54,8 +60,13 @@ public class CandidateValidator {
         Set<String> placeholders = new LinkedHashSet<>();
         collectPlaceholders(leftPattern, placeholders);
         collectPlaceholders(rightPattern, placeholders);
-        for (int value : freshValues(pattern)) {
-            Map<String, Expr> bindings = bindings(placeholders, value);
+        Set<String> independentPlaceholders = independentPlaceholders(placeholders, pattern.parameterRelations());
+        for (Map<String, Integer> baseBindings : freshBindingGenerator.generate(independentPlaceholders)) {
+            Map<String, Expr> bindings = parameterRelationEvaluator.completeBindings(
+                placeholders,
+                baseBindings,
+                pattern.parameterRelations()
+            );
             String left = ExpressionFormatter.format(patternInstantiator.instantiate(leftPattern, bindings));
             String right = ExpressionFormatter.format(patternInstantiator.instantiate(rightPattern, bindings));
             if (!equivalenceService.areEquivalent(left, right)) {
@@ -65,29 +76,10 @@ public class CandidateValidator {
         return true;
     }
 
-    private List<Integer> freshValues(GeneralizedPattern pattern) {
-        Set<Integer> used = new HashSet<>();
-        pattern.placeholderValues().values().forEach(values -> values.forEach(value -> used.add(Math.abs(value))));
-        List<Integer> fresh = new ArrayList<>();
-        for (int candidate : CANDIDATE_VALUES) {
-            if (!used.contains(candidate)) {
-                fresh.add(candidate);
-            }
-            if (fresh.size() == 3) {
-                return fresh;
-            }
-        }
-        return List.of(11, 12, 13);
-    }
-
-    private Map<String, Expr> bindings(Set<String> placeholders, int value) {
-        Map<String, Expr> bindings = new HashMap<>();
-        int offset = 0;
-        for (String placeholder : placeholders) {
-            bindings.put(placeholder, new NumberExpr(value + offset));
-            offset++;
-        }
-        return bindings;
+    private Set<String> independentPlaceholders(Set<String> placeholders, java.util.List<String> parameterRelations) {
+        Set<String> independent = new LinkedHashSet<>(placeholders);
+        independent.removeAll(parameterRelationEvaluator.relationTargets(parameterRelations));
+        return independent;
     }
 
     private void collectPlaceholders(RulePatternNode node, Set<String> placeholders) {

@@ -21,10 +21,16 @@ public final class ExpressionFormatter {
 
     private static String format(Expr expr, int parentPrecedence) {
         if (expr instanceof NumberExpr numberExpr) {
+            String formatted;
             if (Math.rint(numberExpr.value()) == numberExpr.value()) {
-                return Long.toString((long) numberExpr.value());
+                formatted = Long.toString((long) numberExpr.value());
+            } else {
+                formatted = Double.toString(numberExpr.value());
             }
-            return Double.toString(numberExpr.value());
+            if (numberExpr.value() < 0 && parentPrecedence > 0) {
+                return "(" + formatted + ")";
+            }
+            return formatted;
         }
         if (expr instanceof VariableExpr variableExpr) {
             return variableExpr.name();

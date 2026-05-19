@@ -1,7 +1,12 @@
 package de.regelsuche.graph;
 
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.mining.RuleCandidate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.GraphDatabase;
@@ -86,6 +91,97 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
                 ));
             }
             return new GraphSnapshot(nodes, edges);
+        }
+    }
+
+    @Override
+    public void saveDiscoveredTransformation(DiscoveredTransformation transformation) {
+        try (Session session = driver.session()) {
+            session.run(
+                "MERGE (start:Expression {value: $original}) "
+                    + "SET start.canonicalHash = $canonicalHash, start.score = $originalScore "
+                    + "MERGE (end:Expression {value: $improved}) "
+                    + "SET end.canonicalHash = $canonicalHash, end.score = $improvedScore "
+                    + "MERGE (path:TransformationPath {id: $id}) "
+                    + "SET path.discoveredAt = $discoveredAt, path.totalImprovement = $totalImprovement, "
+                    + "path.status = $status, path.canonicalHash = $canonicalHash "
+                    + "MERGE (path)-[:STARTS_WITH]->(start) "
+                    + "MERGE (path)-[:ENDS_WITH]->(end)",
+                Map.of(
+                    "id", transformation.id(),
+                    "original", transformation.originalExpression(),
+                    "improved", transformation.improvedExpression(),
+                    "originalScore", transformation.originalScore().weightedTotal(),
+                    "improvedScore", transformation.improvedScore().weightedTotal(),
+                    "discoveredAt", transformation.discoveredAt().toString(),
+                    "totalImprovement", transformation.totalImprovement(),
+                    "status", transformation.validationStatus().name(),
+                    "canonicalHash", transformation.canonicalHash()
+                )
+            );
+            for (TransformationStep step : transformation.steps()) {
+                session.run(
+                    "MATCH (path:TransformationPath {id: $pathId}) "
+                        + "MERGE (from:Expression {value: $before}) "
+                        + "MERGE (to:Expression {value: $after}) "
+                        + "MERGE (step:TransformationStep {pathId: $pathId, index: $index}) "
+                        + "SET step.ruleId = $ruleId, step.ruleKind = $ruleKind, step.explanation = $explanation, "
+                        + "step.scoreBefore = $scoreBefore, step.scoreAfter = $scoreAfter, "
+                        + "step.equivalencePreserving = $equivalencePreserving "
+                        + "MERGE (path)-[:HAS_STEP]->(step) "
+                        + "MERGE (step)-[:FROM]->(from) "
+                        + "MERGE (step)-[:TO]->(to)",
+                    Map.of(
+                        "pathId", transformation.id(),
+                        "index", step.index(),
+                        "before", step.beforeExpression(),
+                        "after", step.afterExpression(),
+                        "ruleId", step.ruleId(),
+                        "ruleKind", step.ruleKind().name(),
+                        "explanation", step.explanation(),
+                        "scoreBefore", step.scoreBefore(),
+                        "scoreAfter", step.scoreAfter(),
+                        "equivalencePreserving", step.equivalencePreserving()
+                    )
+                );
+            }
+        }
+    }
+
+    @Override
+    public void saveRuleCandidate(RuleCandidate candidate) {
+        try (Session session = driver.session()) {
+            session.run(
+                "MERGE (candidate:RuleCandidate {canonicalHash: $canonicalHash}) "
+                    + "SET candidate.leftPattern = $leftPattern, candidate.rightPattern = $rightPattern, "
+                    + "candidate.proofStatus = $proofStatus, candidate.status = $status",
+                Map.of(
+                    "canonicalHash", candidate.canonicalHash(),
+                    "leftPattern", candidate.leftPattern(),
+                    "rightPattern", candidate.rightPattern(),
+                    "proofStatus", candidate.proofStatus().name(),
+                    "status", candidate.status().name()
+                )
+            );
+        }
+    }
+
+    @Override
+    public void saveReusableRule(ReusableRule rule) {
+        try (Session session = driver.session()) {
+            session.run(
+                "MERGE (rule:ReusableRule {id: $id}) "
+                    + "SET rule.leftPattern = $leftPattern, rule.rightPattern = $rightPattern, "
+                    + "rule.status = $status, rule.proofStatus = $proofStatus, rule.createdAt = $createdAt",
+                Map.of(
+                    "id", rule.id(),
+                    "leftPattern", rule.leftPattern(),
+                    "rightPattern", rule.rightPattern(),
+                    "status", rule.knownRuleStatus().name(),
+                    "proofStatus", rule.proofStatus().name(),
+                    "createdAt", rule.createdAt().toString()
+                )
+            );
         }
     }
 
