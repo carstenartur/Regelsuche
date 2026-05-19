@@ -34,9 +34,10 @@ class DiscoveryPersistenceExportTest {
     void exportsTransformationPathAsMarkdown() {
         String markdown = new DefaultTransformationExportService().exportMarkdown(List.of(sampleTransformation()));
 
-        assertTrue(markdown.contains("### Gefundene Umformung"));
+        assertTrue(markdown.contains("# Gefundene Umformungen"));
+        assertTrue(markdown.contains("## 1. (x+3)^2 → x^2+6*x+9"));
         assertTrue(markdown.contains("\\rightarrow"));
-        assertTrue(markdown.contains("Status: VALIDATED_BY_EXAMPLES"));
+        assertTrue(markdown.contains("#### Status\nVALIDATED_BY_EXAMPLES"));
     }
 
     @Test
@@ -98,7 +99,7 @@ class DiscoveryPersistenceExportTest {
             List.of(sampleRule())
         );
 
-        Map<String, Object> parsed = new JsonParser(json).parseObject();
+        Map<String, Object> parsed = new de.regelsuche.json.JsonReader(json).readObject();
         List<?> transformations = (List<?>) parsed.get("transformations");
         List<?> reusableRules = (List<?>) parsed.get("reusableRules");
 

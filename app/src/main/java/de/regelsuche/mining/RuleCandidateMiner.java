@@ -84,6 +84,11 @@ public class RuleCandidateMiner {
             double average = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).average().orElse(0);
             int maximum = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).max().orElse(0);
             boolean equivalenceVerified = paths.stream().allMatch(SuccessfulTransformationPath::equivalenceVerified);
+            List<String> supportingIds = paths.stream()
+                .map(SuccessfulTransformationPath::id)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
             return new RuleCandidate(
                 leftPattern,
                 rightPattern,
@@ -96,7 +101,8 @@ public class RuleCandidateMiner {
                 parameterRelations,
                 knownRules.statusFor(leftPattern, rightPattern),
                 proofStatus,
-                hash
+                hash,
+                supportingIds
             );
         }
     }

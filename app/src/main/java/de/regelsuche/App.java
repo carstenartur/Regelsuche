@@ -1,5 +1,6 @@
 package de.regelsuche;
 
+import de.regelsuche.cli.CliRouter;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.GraphSnapshot;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
@@ -12,10 +13,25 @@ import de.regelsuche.search.SimplificationSuccess;
 import de.regelsuche.search.TransformationSearchService;
 import de.regelsuche.transform.SymPyTransformationEngine;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Optional;
 
 public class App {
     public static void main(String[] args) {
+        if (args.length == 0) {
+            printUsage();
+            return;
+        }
+
+        String firstArg = args[0].trim();
+        if (CliRouter.isSubcommand(firstArg)) {
+            int exit = new CliRouter().run(args);
+            if (exit != 0) {
+                System.exit(exit);
+            }
+            return;
+        }
+
         if (args.length < 2) {
             printUsage();
             return;
@@ -23,7 +39,7 @@ public class App {
 
         InputType type;
         try {
-            type = InputType.valueOf(args[0].trim().toUpperCase());
+            type = InputType.valueOf(firstArg.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
             printUsage();
             return;
@@ -62,7 +78,13 @@ public class App {
     }
 
     private static void printUsage() {
-        System.out.println("Usage: <term|equation|system> <expression>");
+        System.out.println("Usage:");
+        System.out.println("  <term|equation|system> <expression>");
+        System.out.println("  discover [--min N] [--max N] [--export json,markdown,mermaid,latex,inventory] [--dir PATH]");
+        System.out.println("  transform <expression>");
+        System.out.println("  inventory list");
+        System.out.println("  inventory export --format json [--dir PATH]");
+        System.out.println("  path show <pathId> --format markdown|latex|mermaid|json");
         System.out.println("Valid input types: term, equation, system");
     }
 }
