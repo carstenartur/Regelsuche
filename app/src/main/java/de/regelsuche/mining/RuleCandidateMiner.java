@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 public class RuleCandidateMiner {
-    private static final int MIN_EXAMPLES = 3;
     private final KnownRuleRepository knownRules;
     private final PatternGeneralizer patternGeneralizer;
     private final CandidateValidator validator;
@@ -24,6 +23,13 @@ public class RuleCandidateMiner {
     }
 
     public List<RuleCandidate> mine(List<SuccessfulTransformationPath> paths) {
+        return mine(paths, DiscoverySettings.defaults());
+    }
+
+    public List<RuleCandidate> mine(List<SuccessfulTransformationPath> paths, DiscoverySettings settings) {
+        DiscoverySettings effective = settings == null ? DiscoverySettings.defaults() : settings;
+        int minExamples = Math.max(1, effective.minExamplesPerCandidate());
+        CandidateProofStatus minReusableStatus = effective.minReusableStatus();
         Map<String, List<SuccessfulTransformationPath>> clusters = new LinkedHashMap<>();
         for (SuccessfulTransformationPath path : paths) {
             clusters.computeIfAbsent(patternGeneralizer.skeleton(path), key -> new ArrayList<>()).add(path);
@@ -31,7 +37,7 @@ public class RuleCandidateMiner {
 
         Map<String, CandidateBucket> buckets = new LinkedHashMap<>();
         for (List<SuccessfulTransformationPath> cluster : clusters.values()) {
-            if (cluster.size() < MIN_EXAMPLES) {
+            if (cluster.size() < minExamples) {
                 continue;
             }
             patternGeneralizer.generalize(cluster)
@@ -51,7 +57,12 @@ public class RuleCandidateMiner {
                 });
         }
 
-        return buckets.values().stream().map(bucket -> bucket.toCandidate(knownRules)).toList();
+        return buckets.values().stream()
+            .filter(bucket -> bucket.paths.size() >= minExamples)
+            .filter(bucket -> minReusableStatus == null
+                || bucket.proofStatus.ordinal() >= minReusableStatus.ordinal())
+            .map(bucket -> bucket.toCandidate(knownRules))
+            .toList();
     }
 
     private static final class CandidateBucket {
@@ -84,6 +95,11 @@ public class RuleCandidateMiner {
             double average = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).average().orElse(0);
             int maximum = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).max().orElse(0);
             boolean equivalenceVerified = paths.stream().allMatch(SuccessfulTransformationPath::equivalenceVerified);
+            List<String> supportingIds = paths.stream()
+                .map(SuccessfulTransformationPath::id)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
             return new RuleCandidate(
                 leftPattern,
                 rightPattern,
@@ -96,7 +112,8 @@ public class RuleCandidateMiner {
                 parameterRelations,
                 knownRules.statusFor(leftPattern, rightPattern),
                 proofStatus,
-                hash
+                hash,
+                supportingIds
             );
         }
     }

@@ -72,6 +72,10 @@ public class BeamSearchStrategy implements SearchStrategy {
                     path.add(nextExpression);
                     List<String> appliedRuleIds = new ArrayList<>(current.appliedRuleIds());
                     appliedRuleIds.add(transformation.rule());
+                    List<RewriteKind> appliedRuleKinds = new ArrayList<>(current.appliedRuleKinds());
+                    appliedRuleKinds.add(transformation.kind());
+                    List<Boolean> equivalenceFlags = new ArrayList<>(current.equivalencePreservingFlags());
+                    equivalenceFlags.add(transformation.equivalencePreservingByConstruction());
                     SearchState nextState = new SearchState(
                         nextExpression,
                         current.depth() + 1,
@@ -87,7 +91,9 @@ public class BeamSearchStrategy implements SearchStrategy {
                         transformation.mayIncreaseComplexity(),
                         transformation.estimatedCostDelta(),
                         transformation.equivalencePreservingByConstruction(),
-                        improvement
+                        improvement,
+                        appliedRuleKinds,
+                        equivalenceFlags
                     );
                     if (visited.contains(stateKey(nextState))) {
                         continue;

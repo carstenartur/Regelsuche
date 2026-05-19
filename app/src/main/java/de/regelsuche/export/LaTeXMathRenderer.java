@@ -2,7 +2,7 @@ package de.regelsuche.export;
 
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
-import java.util.stream.Collectors;
+import java.util.List;
 
 public class LaTeXMathRenderer implements MathRenderer {
     @Override
@@ -12,20 +12,41 @@ public class LaTeXMathRenderer implements MathRenderer {
 
     @Override
     public String renderStep(TransformationStep step) {
-        return toLatex(step.beforeExpression()) + " \\rightarrow " + toLatex(step.afterExpression());
+        return toLatex(step.beforeExpression()) + " &\\rightarrow " + toLatex(step.afterExpression());
     }
 
     @Override
     public String renderPath(DiscoveredTransformation path) {
-        String steps = path.steps().stream().map(this::renderStep).collect(Collectors.joining(" \\\\n"));
-        return "\\begin{align*}\n"
-            + steps + "\\\\\n"
-            + "\\text{Score: } " + path.originalScore().weightedTotal() + " &\\rightarrow " + path.improvedScore().weightedTotal() + "\\\\\n"
-            + "\\text{Status: } " + path.validationStatus() + "\n"
-            + "\\end{align*}";
+        StringBuilder body = new StringBuilder();
+        body.append("\\begin{align*}\n");
+        List<TransformationStep> steps = path.steps();
+        if (steps.isEmpty()) {
+            body.append(toLatex(path.originalExpression()))
+                .append(" &\\rightarrow ")
+                .append(toLatex(path.improvedExpression()))
+                .append("\\\\\n");
+        } else {
+            body.append(toLatex(steps.get(0).beforeExpression()))
+                .append(" &\\rightarrow ")
+                .append(toLatex(steps.get(0).afterExpression()))
+                .append("\\\\\n");
+            for (int i = 1; i < steps.size(); i++) {
+                body.append("        &\\rightarrow ")
+                    .append(toLatex(steps.get(i).afterExpression()))
+                    .append("\\\\\n");
+            }
+        }
+        body.append("\\end{align*}\n");
+        body.append("\\textbf{Score:} ")
+            .append(path.originalScore().weightedTotal())
+            .append(" \\to ")
+            .append(path.improvedScore().weightedTotal())
+            .append("\\\\\n");
+        body.append("\\textbf{Status:} ").append(path.validationStatus());
+        return body.toString();
     }
 
     private String toLatex(String expression) {
-        return expression.replace("*", "\\cdot ").replace("^", "^");
+        return expression.replace("*", " \\cdot ");
     }
 }
