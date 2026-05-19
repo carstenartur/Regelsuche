@@ -127,6 +127,30 @@ class RuleCandidateMinerTest {
     }
 
     @Test
+    void candidateValidatorInstantiatesPatternsThroughAst() {
+        CandidateValidator validator = new CandidateValidator(new SymPyEquivalenceService());
+
+        assertTrue(validator.validate(new GeneralizedPattern(
+            "A*A + 2 * A + A^3 + A*B - A",
+            "A^2 + A + A^3 + B*A",
+            Map.of("A", List.of(1, 3, 5), "B", List.of(2, 4, 6)),
+            List.of("synthetic test relation")
+        )));
+        assertTrue(validator.validate(new GeneralizedPattern(
+            "(A)^2",
+            "A*A",
+            Map.of("A", List.of(1, 3, 5)),
+            List.of("synthetic test relation")
+        )));
+        assertTrue(validator.validate(new GeneralizedPattern(
+            "-A",
+            "0 - A",
+            Map.of("A", List.of(1, 3, 5)),
+            List.of("synthetic test relation")
+        )));
+    }
+
+    @Test
     void equivalenceVerifiedUsesPathBooleanInsteadOfEvidenceText() {
         ExpressionScorer scorer = new ExpressionScorer();
         List<SuccessfulTransformationPath> paths = List.of(
