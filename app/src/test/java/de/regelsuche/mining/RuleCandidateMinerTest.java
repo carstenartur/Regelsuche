@@ -10,6 +10,7 @@ import de.regelsuche.example.AlgebraicExampleGenerator;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.SymPyTransformationEngine;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,32 @@ class RuleCandidateMinerTest {
         assertEquals(RuleStatus.MATCHES_KNOWN_RULE, candidate.status());
         assertTrue(candidate.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal());
         assertTrue(candidate.generalizationPlausible());
+    }
+
+    @Test
+    void discoversKnownBinomialRuleFromSearchPaths() {
+        RuleDiscoveryService service = new RuleDiscoveryService(
+            new AlgebraicExampleGenerator(),
+            new SymPyTransformationEngine(),
+            new SymPyEquivalenceService(),
+            new ExpressionScorer(),
+            new InMemoryExpressionGraphStore(),
+            new RuleCandidateMiner(new KnownRuleRepository()),
+            event -> {}
+        );
+
+        try {
+            List<RuleCandidate> candidates = service.discover(1, 5);
+
+            assertTrue(candidates.stream().anyMatch(candidate ->
+                candidate.leftPattern().equals("x^2 + 2*A*x + A^2")
+                    && candidate.rightPattern().equals("(x + A)^2")
+                    && candidate.status() == RuleStatus.MATCHES_KNOWN_RULE
+                    && candidate.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()
+            ));
+        } finally {
+            service.shutdown();
+        }
     }
 
     @Test
