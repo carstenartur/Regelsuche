@@ -127,6 +127,53 @@ speichern neben Quelle, Ziel, Tiefe und Verbesserung auch konkrete Pfad-IDs,
 kanonische Hashes, Scores, Regelart, Regelkosten, Komplexitätsrisiko,
 Äquivalenz-Metadaten und Validierungsstatus.
 
+Gefundene Verbesserungen können zusätzlich als vollständige
+`DiscoveredTransformation` gespeichert werden. Eine solche Entdeckung enthält
+Ausgangsausdruck, verbesserten Ausdruck, vollständige `TransformationStep`-Liste,
+Scores vor/nach der Umformung, Gesamtverbesserung, Proof-Status,
+Entdeckungszeitpunkt und kanonischen Hash. Ein `TransformationStep` beschreibt
+einen einzelnen Rechenschritt mit Vorher-/Nachher-Ausdruck, angewendeter Regel,
+`RewriteKind`, Scores und Erklärung. Dadurch lässt sich nicht nur das Ergebnis,
+sondern der gesamte mathematische Rechenweg nachvollziehen.
+
+`RuleCandidate` beschreibt weiterhin einen aus Beispielen geminten abstrakten
+Regelkandidaten inklusive Parameterrelationen und Validierungsstatus.
+`ReusableRule` ist dagegen ein dauerhaft gespeicherter Regelvorratseintrag, der
+aus ausreichend validierten Kandidaten entstehen kann. In den Regelvorrat werden
+nur Regeln übernommen, die mindestens den konfigurierten Proof-Status erreichen
+und genügend unterstützende Beispiele bzw. Verbesserungssignal besitzen.
+
+Der Regelvorrat kann über `RuleInventoryRepository` im Speicher oder in Neo4j
+geführt werden. Optional können wiederverwendbare Regeln über
+`InventoryBackedRewriteRuleProvider` als Rewrite-Regeln aktiviert werden:
+
+```properties
+regelsuche.rules.inventory.enabled=true
+regelsuche.rules.inventory.minProofStatus=VALIDATED_BY_EXAMPLES
+```
+
+Aktiviert werden nur Regeln mit ausreichendem Proof-Status, eindeutiger ID, ohne
+Konflikt mit bestehenden Regeln und ohne offensichtliches Suchraumexplosionsrisiko.
+
+## Mathematische Darstellung und Export
+
+`MathRenderer` stellt Ausdrücke, einzelne Schritte und vollständige
+Umformungswege dar. Implementiert sind Plain-Text-, Markdown- und LaTeX-Renderer.
+`TransformationExportService` exportiert nachvollziehbare Entdeckungen als:
+
+- `exports/discovered-transformations.md`
+- `exports/rule-inventory.json`
+- `exports/transformation-graph.mmd`
+
+Markdown- und LaTeX-Ausgaben zeigen Ausgang, Rechenweg, Verbesserung, Score und
+Status. Der Mermaid-Export visualisiert die konkreten Schritte als Graph, z. B.
+`A["(x+3)^2"] -->|power_to_product| B["(x+3)(x+3)"]`.
+
+Für spätere UI-/API-Schichten existieren DTOs und Query-Services für alle
+gefundenen Verbesserungen, beste Verbesserungen, Verbesserungen zu einem
+Ausdruck, Rechenwege, Regelkandidaten, wiederverwendbare Regeln und
+Graphansichten einzelner Pfade.
+
 `SearchBenchmark` vergleicht Strategien über Metriken wie explorierte Zustände,
 beste Verbesserung, kürzeste Verbesserungstiefe, expandierende Schritte und
 Regelvielfalt. Diese Benchmarks sind bewusst leichtgewichtig und dienen dazu,
