@@ -26,8 +26,8 @@ public class SymPyEquivalenceService implements EquivalenceService {
     }
 
     private Boolean trySymPy(String leftExpression, String rightExpression) {
-        String left = escape(leftExpression);
-        String right = escape(rightExpression);
+        String left = escape(toSymPyPowerSyntax(leftExpression));
+        String right = escape(toSymPyPowerSyntax(rightExpression));
         String script = "import sympy as sp\n"
             + "lhs = sp.sympify('" + left + "')\n"
             + "rhs = sp.sympify('" + right + "')\n"
@@ -42,5 +42,9 @@ public class SymPyEquivalenceService implements EquivalenceService {
 
     private String escape(String expression) {
         return expression.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    private String toSymPyPowerSyntax(String expression) {
+        return expression.replace("^", "**");
     }
 }

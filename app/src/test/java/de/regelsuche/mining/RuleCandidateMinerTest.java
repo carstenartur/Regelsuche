@@ -9,7 +9,7 @@ import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.example.AlgebraicExampleGenerator;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.scoring.ExpressionScorer;
-import de.regelsuche.transform.SymPyTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -19,9 +19,9 @@ class RuleCandidateMinerTest {
     @Test
     void discoversFirstBinomialFormulaByGeneralizationOnly() {
         RuleCandidate candidate = requireCandidate(discoverFrom(List.of(
-            "x^2 + 2*x + 1",
-            "x^2 + 6*x + 9",
-            "x^2 + 10*x + 25"
+            pair("x^2 + 2*x + 1", "(x + 1)^2"),
+            pair("x^2 + 6*x + 9", "(x + 3)^2"),
+            pair("x^2 + 10*x + 25", "(x + 5)^2")
         )), "x^2 + 2*A*x + A^2", "(x + A)^2");
 
         assertEquals(3, candidate.examplesCount());
@@ -33,9 +33,9 @@ class RuleCandidateMinerTest {
     @Test
     void discoversSecondBinomialFormulaByGeneralizationOnly() {
         RuleCandidate candidate = requireCandidate(discoverFrom(List.of(
-            "x^2 - 2*x + 1",
-            "x^2 - 6*x + 9",
-            "x^2 - 10*x + 25"
+            pair("x^2 - 2*x + 1", "(x - 1)^2"),
+            pair("x^2 - 6*x + 9", "(x - 3)^2"),
+            pair("x^2 - 10*x + 25", "(x - 5)^2")
         )), "x^2 - 2*A*x + A^2", "(x - A)^2");
 
         assertEquals(3, candidate.examplesCount());
@@ -46,9 +46,9 @@ class RuleCandidateMinerTest {
     @Test
     void discoversDifferenceOfSquaresByGeneralizationOnly() {
         RuleCandidate candidate = requireCandidate(discoverFrom(List.of(
-            "(x + 1)*(x - 1)",
-            "(x + 3)*(x - 3)",
-            "(x + 5)*(x - 5)"
+            pair("(x + 1)*(x - 1)", "x^2 - 1"),
+            pair("(x + 3)*(x - 3)", "x^2 - 9"),
+            pair("(x + 5)*(x - 5)", "x^2 - 25")
         )), "(x + A)*(x - A)", "x^2 - A^2");
 
         assertEquals(3, candidate.examplesCount());
@@ -59,9 +59,9 @@ class RuleCandidateMinerTest {
     @Test
     void discoversQuadraticCompletionByGeneralizationOnly() {
         RuleCandidate candidate = requireCandidate(discoverFrom(List.of(
-            "x^2 + 2*x",
-            "x^2 + 6*x",
-            "x^2 + 10*x"
+            pair("x^2 + 2*x", "(x + 1)^2 - 1"),
+            pair("x^2 + 6*x", "(x + 3)^2 - 9"),
+            pair("x^2 + 10*x", "(x + 5)^2 - 25")
         )), "x^2 + 2*A*x", "(x + A)^2 - A^2");
 
         assertEquals(3, candidate.examplesCount());
@@ -72,8 +72,8 @@ class RuleCandidateMinerTest {
     @Test
     void doesNotAcceptCoincidentalPatternWithOnlyTwoExamples() {
         List<RuleCandidate> candidates = discoverFrom(List.of(
-            "x^2 + 2*x + 1",
-            "x^2 + 6*x + 9"
+            pair("x^2 + 2*x + 1", "(x + 1)^2"),
+            pair("x^2 + 6*x + 9", "(x + 3)^2")
         ));
 
         assertTrue(candidates.isEmpty());
@@ -89,9 +89,9 @@ class RuleCandidateMinerTest {
         };
 
         List<RuleCandidate> candidates = new RuleCandidateMiner(new KnownRuleRepository(), rejectingValidation).mine(pathsFrom(List.of(
-            "x^2 + 2*x + 1",
-            "x^2 + 6*x + 9",
-            "x^2 + 10*x + 25"
+            pair("x^2 + 2*x + 1", "(x + 1)^2"),
+            pair("x^2 + 6*x + 9", "(x + 3)^2"),
+            pair("x^2 + 10*x + 25", "(x + 5)^2")
         )));
 
         assertTrue(candidates.isEmpty());
@@ -100,13 +100,29 @@ class RuleCandidateMinerTest {
     @Test
     void discoveryServiceRunsAsynchronouslyAndDeduplicatesEvents() {
         List<RuleCandidateDiscoveredEvent> events = new ArrayList<>();
+        EquivalenceService testEquivalence = new EquivalenceService() {
+            @Override
+            public boolean areEquivalent(String leftExpression, String rightExpression) {
+                return true;
+            }
+
+            @Override
+            public String evidence(String leftExpression, String rightExpression) {
+                return "matching normalized test equivalence";
+            }
+        };
         RuleDiscoveryService service = new RuleDiscoveryService(
-            new AlgebraicExampleGenerator(),
-            new SymPyTransformationEngine(),
-            new SymPyEquivalenceService(),
+            new AlgebraicExampleGenerator() {
+                @Override
+                public List<String> generateSmallIntegerExamples(int min, int max) {
+                    return List.of("(x + 1)*(x + 1)", "(x + 2)*(x + 2)", "(x + 3)*(x + 3)");
+                }
+            },
+            new AstRewriteTransformationEngine(),
+            testEquivalence,
             new ExpressionScorer(),
             new InMemoryExpressionGraphStore(),
-            new RuleCandidateMiner(new KnownRuleRepository()),
+            new RuleCandidateMiner(new KnownRuleRepository(), testEquivalence),
             events::add
         );
 
@@ -126,31 +142,32 @@ class RuleCandidateMinerTest {
             .orElseThrow(() -> new AssertionError("Missing candidate " + leftPattern + " -> " + rightPattern));
     }
 
-    private List<RuleCandidate> discoverFrom(List<String> expressions) {
-        return new RuleCandidateMiner(new KnownRuleRepository()).mine(pathsFrom(expressions));
+    private List<RuleCandidate> discoverFrom(List<ExpressionPair> pairs) {
+        return new RuleCandidateMiner(new KnownRuleRepository(), new SymPyEquivalenceService()).mine(pathsFrom(pairs));
     }
 
-    private List<SuccessfulTransformationPath> pathsFrom(List<String> expressions) {
-        SymPyTransformationEngine engine = new SymPyTransformationEngine();
-        SymPyEquivalenceService equivalence = new SymPyEquivalenceService();
+    private List<SuccessfulTransformationPath> pathsFrom(List<ExpressionPair> pairs) {
         ExpressionScorer scorer = new ExpressionScorer();
         List<SuccessfulTransformationPath> paths = new ArrayList<>();
-        for (String expression : expressions) {
-            engine.transform(expression).stream()
-                .filter(transformation -> equivalence.areEquivalent(expression, transformation.transformedExpression()))
-                .map(transformation -> new SuccessfulTransformationPath(
-                    expression,
-                    transformation.transformedExpression(),
-                    List.of(expression, transformation.transformedExpression()),
-                    List.of(transformation.rule()),
-                    scorer.score(expression),
-                    scorer.score(transformation.transformedExpression()),
-                    equivalence.evidence(expression, transformation.transformedExpression()),
-                    Map.of("variable", "x")
-                ))
-                .filter(path -> path.scoreImprovement() > 0)
-                .forEach(paths::add);
+        for (ExpressionPair pair : pairs) {
+            paths.add(new SuccessfulTransformationPath(
+                pair.source(),
+                pair.target(),
+                List.of(pair.source(), pair.target()),
+                List.of("test_concrete_transformation"),
+                scorer.score(pair.source()),
+                scorer.score(pair.target()),
+                "matching normalized quadratic coefficients",
+                Map.of("variable", "x")
+            ));
         }
         return paths;
+    }
+
+    private ExpressionPair pair(String source, String target) {
+        return new ExpressionPair(source, target);
+    }
+
+    private record ExpressionPair(String source, String target) {
     }
 }
