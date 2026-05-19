@@ -152,7 +152,8 @@ class RuleCandidateMinerTest {
         public ExpressionScore score(String expression) {
             ExpressionScore score = super.score(expression);
             int weightedTotal = score.weightedTotal();
-            if (expression.contains(") ^ 2")) {
+            String normalized = expression.replaceAll("\\s+", "");
+            if (normalized.contains(")^2")) {
                 weightedTotal += 30;
             }
             return new ExpressionScore(weightedTotal, 0, 0, 0, 0);

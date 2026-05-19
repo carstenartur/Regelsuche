@@ -18,7 +18,6 @@ import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.TransformationEngine;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -117,7 +116,6 @@ public class RuleDiscoveryService {
         SearchHeuristic discoveryHeuristic = discoverySettings.includeNonImprovingEquivalentPaths()
             ? new SearchHeuristic(7, 1500, 1, 10, 200, 200)
             : new SearchHeuristic(7, 400, 1, 5, 120, 25);
-        Map<String, Integer> pathSequence = new HashMap<>();
         for (String expression : exampleGenerator.generateSmallIntegerExamples(min, max)) {
             String root = canonicalizer.canonicalize(expression);
             ExpressionScore before = expressionScorer.score(root);
@@ -158,8 +156,7 @@ public class RuleDiscoveryService {
                 if (!improving && !discoverySettings.includeNonImprovingEquivalentPaths()) {
                     continue;
                 }
-                int sequence = pathSequence.merge(root, 1, Integer::sum);
-                String pathId = stablePathId(root, sequence, state);
+                String pathId = stablePathId(root, state);
                 paths.add(new SuccessfulTransformationPath(
                     pathId,
                     root,
@@ -175,7 +172,7 @@ public class RuleDiscoveryService {
                 graphStore.saveDiscoveredTransformation(toDiscovered(pathId, root, state, before));
             }
         }
-        List<RuleCandidate> candidates = miner.mine(paths);
+        List<RuleCandidate> candidates = miner.mine(paths, discoverySettings);
         for (RuleCandidate candidate : candidates) {
             graphStore.saveRuleCandidate(candidate);
             if (announcedCandidateHashes.add(candidate.canonicalHash())) {
@@ -185,9 +182,18 @@ public class RuleDiscoveryService {
         return candidates;
     }
 
-    private String stablePathId(String root, int sequence, SearchState state) {
-        String key = root + "::" + sequence + "::" + state.canonicalHash();
-        return "path-" + Integer.toHexString(key.hashCode());
+    private String stablePathId(String root, SearchState state) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(root).append('\u0001');
+        builder.append(state.canonicalHash()).append('\u0001');
+        for (String step : state.path()) {
+            builder.append(step).append('\u0002');
+        }
+        builder.append('\u0001');
+        for (String rule : state.appliedRuleIds()) {
+            builder.append(rule).append('\u0003');
+        }
+        return "path-" + Long.toHexString(Integer.toUnsignedLong(builder.toString().hashCode()));
     }
 
     private DiscoveredTransformation toDiscovered(String pathId, String root, SearchState state, ExpressionScore before) {
@@ -209,6 +215,8 @@ public class RuleDiscoveryService {
     private List<TransformationStep> buildSteps(SearchState state) {
         List<String> expressionPath = state.path();
         List<String> ruleIds = state.appliedRuleIds();
+        List<RewriteKind> ruleKinds = state.appliedRuleKinds();
+        List<Boolean> equivalenceFlags = state.equivalencePreservingFlags();
         if (expressionPath.size() < 2 || ruleIds.isEmpty()) {
             return List.of();
         }
@@ -219,15 +227,19 @@ public class RuleDiscoveryService {
             String after = expressionPath.get(i + 1);
             int scoreBefore = expressionScorer.score(before).weightedTotal();
             int scoreAfter = expressionScorer.score(after).weightedTotal();
+            RewriteKind kind = i < ruleKinds.size() && ruleKinds.get(i) != null
+                ? ruleKinds.get(i)
+                : RewriteKind.NORMALIZE;
+            boolean equivalencePreserving = i >= equivalenceFlags.size() || equivalenceFlags.get(i);
             steps.add(new TransformationStep(
                 i,
                 before,
                 after,
                 ruleIds.get(i),
-                RewriteKind.NORMALIZE,
+                kind,
                 scoreBefore,
                 scoreAfter,
-                true,
+                equivalencePreserving,
                 ruleIds.get(i)
             ));
         }

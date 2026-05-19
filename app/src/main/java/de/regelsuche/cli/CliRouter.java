@@ -122,39 +122,42 @@ public class CliRouter {
             DiscoverySettings.collectingEquivalentPaths()
         );
 
-        List<RuleCandidate> candidates = discovery.discover(min, max);
-        out.println("Found " + candidates.size() + " rule candidate(s).");
-        List<DiscoveredTransformation> transformations = graphStore.discoveredTransformations();
-        transformations.stream()
-            .max((a, b) -> Integer.compare(a.totalImprovement(), b.totalImprovement()))
-            .ifPresent(best -> out.println("Best improvement: "
-                + best.originalExpression() + " -> " + best.improvedExpression()
-                + " (Δ=" + best.totalImprovement() + ")"));
-        if (candidates.isEmpty() && transformations.isEmpty()) {
-            out.println("Hinweis: Keine Regel und keine Verbesserung gefunden. "
-                + "Bereich (--min/--max) oder Suchtiefe erhöhen.");
-        }
-
-        if (!formats.isEmpty()) {
-            try {
-                List<Path> written = exportFileService.writeAll(
-                    Paths.get(directory),
-                    formats,
-                    transformations,
-                    candidates,
-                    inventoryRepository.findAll()
-                );
-                for (Path path : written) {
-                    out.println("Exported " + transformations.size()
-                        + " transformations to " + path.toAbsolutePath());
-                }
-            } catch (Exception ex) {
-                out.println("Export failed: " + ex.getMessage());
-                return 2;
+        try {
+            List<RuleCandidate> candidates = discovery.discover(min, max);
+            out.println("Found " + candidates.size() + " rule candidate(s).");
+            List<DiscoveredTransformation> transformations = graphStore.discoveredTransformations();
+            transformations.stream()
+                .max((a, b) -> Integer.compare(a.totalImprovement(), b.totalImprovement()))
+                .ifPresent(best -> out.println("Best improvement: "
+                    + best.originalExpression() + " -> " + best.improvedExpression()
+                    + " (Δ=" + best.totalImprovement() + ")"));
+            if (candidates.isEmpty() && transformations.isEmpty()) {
+                out.println("Hinweis: Keine Regel und keine Verbesserung gefunden. "
+                    + "Bereich (--min/--max) oder Suchtiefe erhöhen.");
             }
+
+            if (!formats.isEmpty()) {
+                try {
+                    List<Path> written = exportFileService.writeAll(
+                        Paths.get(directory),
+                        formats,
+                        transformations,
+                        candidates,
+                        inventoryRepository.findAll()
+                    );
+                    for (Path path : written) {
+                        out.println("Exported " + transformations.size()
+                            + " transformations to " + path.toAbsolutePath());
+                    }
+                } catch (Exception ex) {
+                    out.println("Export failed: " + ex.getMessage());
+                    return 2;
+                }
+            }
+            return 0;
+        } finally {
+            discovery.shutdown();
         }
-        discovery.shutdown();
-        return 0;
     }
 
     private int runTransform(String[] args) {

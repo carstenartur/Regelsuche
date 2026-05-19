@@ -49,7 +49,7 @@ Die CLI unterstützt mehrere Unterkommandos für Entdeckung, Transformation, Reg
 ./gradlew :app:run --args='path show <pfadId> --format markdown'
 ```
 
-Beispielausgabe nach einer Entdeckungslauf:
+Beispielausgabe nach einem Entdeckungslauf:
 
 ```
 Found 2 rule candidate(s).

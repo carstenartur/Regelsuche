@@ -67,7 +67,7 @@ public class DefaultTransformationExportService implements TransformationExportS
     public String exportMermaid(List<DiscoveredTransformation> transformations) {
         StringBuilder builder = new StringBuilder("graph TD\n");
         for (DiscoveredTransformation transformation : transformations) {
-            String nodePrefix = "P" + Math.abs(transformation.id().hashCode()) + "_";
+            String nodePrefix = "P" + Integer.toUnsignedString(transformation.id().hashCode()) + "_";
             int stepIndex = 0;
             for (TransformationStep step : transformation.steps()) {
                 String from = nodePrefix + stepIndex;

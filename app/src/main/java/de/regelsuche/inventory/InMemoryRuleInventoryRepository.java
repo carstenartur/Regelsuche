@@ -2,7 +2,6 @@ package de.regelsuche.inventory;
 
 import java.time.Instant;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,8 +30,8 @@ public class InMemoryRuleInventoryRepository implements RuleInventoryRepository 
 
     @Override
     public List<ReusableRule> findAll() {
-        // Preserve insertion order for deterministic exports.
-        return new LinkedHashMap<>(rules).values().stream()
+        // Sort by id so exports are deterministic regardless of the underlying map's iteration order.
+        return rules.values().stream()
             .sorted(Comparator.comparing(ReusableRule::id))
             .toList();
     }

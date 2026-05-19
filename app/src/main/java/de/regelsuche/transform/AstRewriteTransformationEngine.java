@@ -325,40 +325,41 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
         @Override
         public boolean matches(Expr subtree) {
-            return duplicateTermIndex(subtree) >= 0;
+            return findDuplicateTermIndices(subtree) != null;
         }
 
         @Override
         public Expr apply(Expr subtree) {
             List<Expr> terms = flattenAddition(subtree);
-            int duplicateIndex = duplicateTermIndex(terms);
-            if (duplicateIndex < 0) {
+            int[] indices = findDuplicateTermIndices(terms);
+            if (indices == null) {
                 throw new IllegalArgumentException("Rule does not match subtree");
             }
-            Expr duplicate = terms.get(duplicateIndex);
+            Expr duplicate = terms.get(indices[0]);
             List<Expr> rewritten = new ArrayList<>(terms);
-            rewritten.remove(duplicateIndex + 1);
-            rewritten.remove(duplicateIndex);
+            // Remove the later index first so the earlier index stays valid.
+            rewritten.remove(indices[1]);
+            rewritten.remove(indices[0]);
             rewritten.add(new BinaryExpr(new NumberExpr(2), BinaryOperator.MUL, duplicate));
             return buildAddition(rewritten);
         }
 
-        private int duplicateTermIndex(Expr subtree) {
+        private int[] findDuplicateTermIndices(Expr subtree) {
             if (!(subtree instanceof BinaryExpr addition) || addition.operator() != BinaryOperator.ADD) {
-                return -1;
+                return null;
             }
-            return duplicateTermIndex(flattenAddition(subtree));
+            return findDuplicateTermIndices(flattenAddition(subtree));
         }
 
-        private int duplicateTermIndex(List<Expr> terms) {
+        private int[] findDuplicateTermIndices(List<Expr> terms) {
             for (int i = 0; i < terms.size(); i++) {
                 for (int j = i + 1; j < terms.size(); j++) {
                     if (terms.get(i).equals(terms.get(j))) {
-                        return i;
+                        return new int[] { i, j };
                     }
                 }
             }
-            return -1;
+            return null;
         }
 
         private List<Expr> flattenAddition(Expr expression) {
