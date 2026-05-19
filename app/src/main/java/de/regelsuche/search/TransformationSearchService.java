@@ -7,6 +7,7 @@ import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.GraphSnapshot;
 import de.regelsuche.input.InputRequest;
+import de.regelsuche.mining.CandidateProofStatus;
 import de.regelsuche.notify.SimplificationNotifier;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
@@ -123,7 +124,16 @@ public class TransformationSearchService {
                     state.expression(),
                     state.appliedRuleId(),
                     state.depth(),
-                    state.improvement()
+                    state.improvement(),
+                    root + "#" + state.depth(),
+                    state.canonicalHash(),
+                    scorer.score(state.parentExpression()).weightedTotal(),
+                    state.score().weightedTotal(),
+                    state.appliedRuleKind(),
+                    state.mayIncreaseComplexity(),
+                    state.estimatedCostDelta(),
+                    state.equivalencePreservingByConstruction(),
+                    CandidateProofStatus.OBSERVED
                 ));
             }
             if (state.improvement() > 0) {

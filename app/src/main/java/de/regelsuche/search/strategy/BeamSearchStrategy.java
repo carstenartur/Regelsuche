@@ -24,6 +24,10 @@ public class BeamSearchStrategy implements SearchStrategy {
             problem.canonicalizer().stableHash(root),
             null,
             null,
+            RewriteKind.NORMALIZE,
+            false,
+            0,
+            true,
             0
         );
         List<SearchState> explored = new ArrayList<>();
@@ -79,6 +83,10 @@ public class BeamSearchStrategy implements SearchStrategy {
                         hash,
                         current.expression(),
                         transformation.rule(),
+                        transformation.kind(),
+                        transformation.mayIncreaseComplexity(),
+                        transformation.estimatedCostDelta(),
+                        transformation.equivalencePreservingByConstruction(),
                         improvement
                     );
                     if (visited.contains(stateKey(nextState))) {

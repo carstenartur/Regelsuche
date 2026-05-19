@@ -13,6 +13,7 @@ public record RuleCandidate(
     boolean containsFreeParameters,
     List<String> parameterRelations,
     RuleStatus status,
+    CandidateProofStatus proofStatus,
     String canonicalHash
 ) {
     public RuleCandidate {

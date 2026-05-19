@@ -31,15 +31,30 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
         try (Session session = driver.session()) {
             session.run(
                 "MERGE (from:Expression {value: $from}) "
-                    + "MERGE (to:Expression {value: $to}) "
-                    + "MERGE (from)-[r:TRANSFORMATION {rule: $rule}]->(to) "
-                    + "SET r.depth = $depth, r.improvement = $improvement",
-                java.util.Map.of(
-                    "from", edge.fromExpression(),
-                    "to", edge.toExpression(),
-                    "rule", edge.transformationRule(),
-                    "depth", edge.depth(),
-                    "improvement", edge.improvement()
+                     + "MERGE (to:Expression {value: $to}) "
+                     + "MERGE (from)-[r:TRANSFORMATION {rule: $rule}]->(to) "
+                    + "SET r.depth = $depth, r.improvement = $improvement, "
+                    + "r.pathId = $pathId, r.canonicalHash = $canonicalHash, "
+                    + "r.scoreBefore = $scoreBefore, r.scoreAfter = $scoreAfter, "
+                    + "r.rewriteKind = $rewriteKind, r.mayIncreaseComplexity = $mayIncreaseComplexity, "
+                    + "r.estimatedCostDelta = $estimatedCostDelta, "
+                    + "r.equivalencePreservingByConstruction = $equivalencePreservingByConstruction, "
+                    + "r.validationStatus = $validationStatus",
+                java.util.Map.ofEntries(
+                    java.util.Map.entry("from", edge.fromExpression()),
+                    java.util.Map.entry("to", edge.toExpression()),
+                    java.util.Map.entry("rule", edge.transformationRule()),
+                    java.util.Map.entry("depth", edge.depth()),
+                    java.util.Map.entry("improvement", edge.improvement()),
+                    java.util.Map.entry("pathId", edge.pathId()),
+                    java.util.Map.entry("canonicalHash", edge.canonicalHash()),
+                    java.util.Map.entry("scoreBefore", edge.scoreBefore()),
+                    java.util.Map.entry("scoreAfter", edge.scoreAfter()),
+                    java.util.Map.entry("rewriteKind", edge.rewriteKind().name()),
+                    java.util.Map.entry("mayIncreaseComplexity", edge.mayIncreaseComplexity()),
+                    java.util.Map.entry("estimatedCostDelta", edge.estimatedCostDelta()),
+                    java.util.Map.entry("equivalencePreservingByConstruction", edge.equivalencePreservingByConstruction()),
+                    java.util.Map.entry("validationStatus", edge.validationStatus().name())
                 )
             );
         }

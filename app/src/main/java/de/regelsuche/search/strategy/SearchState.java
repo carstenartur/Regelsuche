@@ -1,6 +1,7 @@
 package de.regelsuche.search.strategy;
 
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.transform.RewriteKind;
 import java.util.List;
 import java.util.Set;
 
@@ -15,6 +16,10 @@ public record SearchState(
     String canonicalHash,
     String parentExpression,
     String appliedRuleId,
+    RewriteKind appliedRuleKind,
+    boolean mayIncreaseComplexity,
+    int estimatedCostDelta,
+    boolean equivalencePreservingByConstruction,
     int improvement
 ) {
     public SearchState {

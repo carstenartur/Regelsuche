@@ -97,7 +97,16 @@ public class RuleDiscoveryService {
                         state.expression(),
                         state.appliedRuleId(),
                         state.depth(),
-                        state.improvement()
+                        state.improvement(),
+                        root + "#" + state.depth(),
+                        state.canonicalHash(),
+                        expressionScorer.score(state.parentExpression()).weightedTotal(),
+                        state.score().weightedTotal(),
+                        state.appliedRuleKind(),
+                        state.mayIncreaseComplexity(),
+                        state.estimatedCostDelta(),
+                        state.equivalencePreservingByConstruction(),
+                        CandidateProofStatus.OBSERVED
                     ));
                 }
                 if (state.depth() == 0) {

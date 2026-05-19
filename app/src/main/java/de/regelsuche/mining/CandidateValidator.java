@@ -15,6 +15,22 @@ public class CandidateValidator {
     }
 
     public boolean validate(GeneralizedPattern pattern) {
+        return proofStatus(pattern) != CandidateProofStatus.OBSERVED;
+    }
+
+    public CandidateProofStatus proofStatus(GeneralizedPattern pattern) {
+        boolean validatedByFreshExamples = validateFreshExamples(pattern);
+        if (!validatedByFreshExamples) {
+            return CandidateProofStatus.OBSERVED;
+        }
+        if (equivalenceService.areEquivalent(pattern.leftPattern(), pattern.rightPattern())
+            && equivalenceService.evidence(pattern.leftPattern(), pattern.rightPattern()).contains("SymPy")) {
+            return CandidateProofStatus.SYMBOLICALLY_VERIFIED;
+        }
+        return CandidateProofStatus.VALIDATED_BY_EXAMPLES;
+    }
+
+    private boolean validateFreshExamples(GeneralizedPattern pattern) {
         for (int value : freshValues(pattern)) {
             String left = instantiate(pattern.leftPattern(), value);
             String right = instantiate(pattern.rightPattern(), value);

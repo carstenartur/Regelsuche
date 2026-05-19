@@ -40,7 +40,13 @@ public class RuleCandidateMiner {
                     String hash = RulePatternCanonicalizer.hash(pattern.leftPattern(), pattern.rightPattern());
                     buckets.computeIfAbsent(
                         hash,
-                        key -> new CandidateBucket(pattern.leftPattern(), pattern.rightPattern(), pattern.parameterRelations(), hash)
+                        key -> new CandidateBucket(
+                            pattern.leftPattern(),
+                            pattern.rightPattern(),
+                            pattern.parameterRelations(),
+                            validator.proofStatus(pattern),
+                            hash
+                        )
                     ).addAll(cluster);
                 });
         }
@@ -52,13 +58,21 @@ public class RuleCandidateMiner {
         private final String leftPattern;
         private final String rightPattern;
         private final List<String> parameterRelations;
+        private final CandidateProofStatus proofStatus;
         private final String hash;
         private final List<SuccessfulTransformationPath> paths = new ArrayList<>();
 
-        private CandidateBucket(String leftPattern, String rightPattern, List<String> parameterRelations, String hash) {
+        private CandidateBucket(
+            String leftPattern,
+            String rightPattern,
+            List<String> parameterRelations,
+            CandidateProofStatus proofStatus,
+            String hash
+        ) {
             this.leftPattern = leftPattern;
             this.rightPattern = rightPattern;
             this.parameterRelations = List.copyOf(parameterRelations);
+            this.proofStatus = proofStatus;
             this.hash = hash;
         }
 
@@ -81,6 +95,7 @@ public class RuleCandidateMiner {
                 leftPattern.contains("A") || rightPattern.contains("A"),
                 parameterRelations,
                 knownRules.statusFor(leftPattern, rightPattern),
+                proofStatus,
                 hash
             );
         }

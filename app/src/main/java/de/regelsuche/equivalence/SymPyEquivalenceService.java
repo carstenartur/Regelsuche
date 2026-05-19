@@ -2,9 +2,18 @@ package de.regelsuche.equivalence;
 
 import de.regelsuche.algebra.QuadraticAnalyzer;
 import de.regelsuche.algebra.QuadraticCoefficients;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
@@ -17,6 +26,10 @@ public class SymPyEquivalenceService implements EquivalenceService {
         if (symPyResult != null) {
             return symPyResult;
         }
+        Boolean sampledResult = trySampledNumericEquivalence(leftExpression, rightExpression);
+        if (sampledResult != null) {
+            return sampledResult;
+        }
         Optional<QuadraticCoefficients> left = QuadraticAnalyzer.analyze(leftExpression);
         Optional<QuadraticCoefficients> right = QuadraticAnalyzer.analyze(rightExpression);
         return left.isPresent() && right.isPresent() && left.orElseThrow().equals(right.orElseThrow());
@@ -24,9 +37,20 @@ public class SymPyEquivalenceService implements EquivalenceService {
 
     @Override
     public String evidence(String leftExpression, String rightExpression) {
-        return areEquivalent(leftExpression, rightExpression)
-            ? "simplify(lhs - rhs) == 0 or matching normalized quadratic coefficients"
-            : "no equivalence proof found";
+        Boolean symPyResult = trySymPy(leftExpression, rightExpression);
+        if (Boolean.TRUE.equals(symPyResult)) {
+            return "SymPy simplify(lhs - rhs) == 0";
+        }
+        Boolean sampledResult = trySampledNumericEquivalence(leftExpression, rightExpression);
+        if (Boolean.TRUE.equals(sampledResult)) {
+            return "validated by deterministic numeric samples";
+        }
+        Optional<QuadraticCoefficients> left = QuadraticAnalyzer.analyze(leftExpression);
+        Optional<QuadraticCoefficients> right = QuadraticAnalyzer.analyze(rightExpression);
+        if (left.isPresent() && right.isPresent() && left.orElseThrow().equals(right.orElseThrow())) {
+            return "matching normalized quadratic coefficients";
+        }
+        return "no equivalence proof found";
     }
 
     private Boolean trySymPy(String leftExpression, String rightExpression) {
@@ -57,5 +81,62 @@ public class SymPyEquivalenceService implements EquivalenceService {
 
     private String toSymPyPowerSyntax(String expression) {
         return expression.replace("^", "**");
+    }
+
+    private Boolean trySampledNumericEquivalence(String leftExpression, String rightExpression) {
+        Expr left;
+        Expr right;
+        try {
+            left = parser.parseTerm(leftExpression);
+            right = parser.parseTerm(rightExpression);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+        Set<String> variables = new HashSet<>();
+        collectVariables(left, variables);
+        collectVariables(right, variables);
+        for (int seed = 1; seed <= 7; seed++) {
+            Map<String, Double> assignment = new HashMap<>();
+            int offset = 0;
+            for (String variable : variables) {
+                assignment.put(variable, (double) (seed + offset + 1));
+                offset++;
+            }
+            double leftValue = evaluate(left, assignment);
+            double rightValue = evaluate(right, assignment);
+            if (!Double.isFinite(leftValue) || !Double.isFinite(rightValue) || Math.abs(leftValue - rightValue) > 1e-7) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void collectVariables(Expr expression, Set<String> variables) {
+        if (expression instanceof VariableExpr variableExpr) {
+            variables.add(variableExpr.name());
+        } else if (expression instanceof BinaryExpr binaryExpr) {
+            collectVariables(binaryExpr.left(), variables);
+            collectVariables(binaryExpr.right(), variables);
+        }
+    }
+
+    private double evaluate(Expr expression, Map<String, Double> variables) {
+        if (expression instanceof NumberExpr numberExpr) {
+            return numberExpr.value();
+        }
+        if (expression instanceof VariableExpr variableExpr) {
+            return variables.getOrDefault(variableExpr.name(), 0.0);
+        }
+        BinaryExpr binaryExpr = (BinaryExpr) expression;
+        double left = evaluate(binaryExpr.left(), variables);
+        double right = evaluate(binaryExpr.right(), variables);
+        BinaryOperator operator = binaryExpr.operator();
+        return switch (operator) {
+            case ADD -> left + right;
+            case SUB -> left - right;
+            case MUL -> left * right;
+            case DIV -> Math.abs(right) < 1e-12 ? Double.NaN : left / right;
+            case POW -> Math.pow(left, right);
+        };
     }
 }

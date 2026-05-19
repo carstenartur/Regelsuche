@@ -4,21 +4,25 @@ import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.PriorityQueue;
+import java.util.Random;
 import java.util.Set;
 
-public class BestFirstSearchStrategy implements SearchStrategy {
+public class RandomMonteCarloSearchStrategy implements SearchStrategy {
+    private final Random random;
+
+    public RandomMonteCarloSearchStrategy(long seed) {
+        this.random = new Random(seed);
+    }
+
     @Override
     public List<SearchState> search(SearchProblem problem) {
         String root = problem.rootExpression().trim().replaceAll("\\s+", " ");
-        ExpressionScore rootScore = problem.scorer().score(root);
         SearchState rootState = new SearchState(
             root,
             0,
-            rootScore,
+            problem.scorer().score(root),
             List.of(root),
             List.of(),
             Set.of(),
@@ -32,14 +36,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             true,
             0
         );
-
-        PriorityQueue<SearchState> frontier = new PriorityQueue<>(Comparator.comparingInt(this::priority));
         List<SearchState> explored = new ArrayList<>();
         Set<String> visited = new HashSet<>();
+        List<SearchState> frontier = new ArrayList<>();
         frontier.add(rootState);
-
         while (!frontier.isEmpty() && explored.size() < problem.heuristic().maxVisitedExpressions()) {
-            SearchState current = frontier.remove();
+            SearchState current = frontier.remove(random.nextInt(frontier.size()));
             if (!visited.add(stateKey(current))) {
                 continue;
             }
@@ -47,9 +49,10 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             if (current.depth() >= problem.heuristic().maxDepth()) {
                 continue;
             }
-
+            List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));
+            java.util.Collections.shuffle(transformations, random);
             int generated = 0;
-            for (Transformation transformation : problem.engine().transform(current.expression())) {
+            for (Transformation transformation : transformations) {
                 if (generated >= problem.heuristic().maxCandidatesPerState()) {
                     break;
                 }
@@ -61,27 +64,26 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                     continue;
                 }
                 String nextExpression = transformation.transformedExpression();
-                String hash = problem.canonicalizer().stableHash(nextExpression);
                 if (nextExpression.equals(current.expression())) {
                     continue;
                 }
                 ExpressionScore nextScore = problem.scorer().score(nextExpression);
                 int improvement = current.score().weightedTotal() - nextScore.weightedTotal();
-                Set<String> applied = new HashSet<>(current.appliedRuleApplications());
-                applied.add(transformation.applicationKey());
+                Set<String> applications = new HashSet<>(current.appliedRuleApplications());
+                applications.add(transformation.applicationKey());
                 List<String> path = new ArrayList<>(current.path());
                 path.add(nextExpression);
-                List<String> appliedRuleIds = new ArrayList<>(current.appliedRuleIds());
-                appliedRuleIds.add(transformation.rule());
+                List<String> ruleIds = new ArrayList<>(current.appliedRuleIds());
+                ruleIds.add(transformation.rule());
                 SearchState nextState = new SearchState(
                     nextExpression,
                     current.depth() + 1,
                     nextScore,
                     path,
-                    appliedRuleIds,
-                    applied,
+                    ruleIds,
+                    applications,
                     expandedSteps,
-                    hash,
+                    problem.canonicalizer().stableHash(nextExpression),
                     current.expression(),
                     transformation.rule(),
                     transformation.kind(),
@@ -90,21 +92,13 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                     transformation.equivalencePreservingByConstruction(),
                     improvement
                 );
-                if (visited.contains(stateKey(nextState))) {
-                    continue;
+                if (!visited.contains(stateKey(nextState))) {
+                    frontier.add(nextState);
+                    generated++;
                 }
-                frontier.add(nextState);
-                generated++;
             }
         }
         return explored;
-    }
-
-    protected int priority(SearchState state) {
-        int depthPenalty = state.depth() * 2;
-        int expansionPenalty = state.expandedStepCount() * 5;
-        int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
-        return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;
     }
 
     private String stateKey(SearchState state) {
