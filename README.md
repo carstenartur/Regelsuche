@@ -28,6 +28,70 @@ Gradle-basiertes Java-Projekt für regelbasierte Ausdrucksumformungen mit:
 ./gradlew :app:run --args='term "x + 0"'
 ```
 
+## CLI Quickstart
+
+Die CLI unterstützt mehrere Unterkommandos für Entdeckung, Transformation, Regelvorrat und Pfadanzeige:
+
+```bash
+# Regelentdeckung mit Export nach Markdown, JSON und Mermaid in das Verzeichnis ./exports
+./gradlew :app:run --args='discover --min 1 --max 5 --export markdown,json,mermaid'
+
+# Direkte Umformung eines Terms
+./gradlew :app:run --args='transform "x + 0"'
+
+# Regelvorrat anzeigen
+./gradlew :app:run --args='inventory list'
+
+# Regelvorrat als JSON exportieren
+./gradlew :app:run --args='inventory export --format json'
+
+# Konkreten Pfad als Markdown rendern
+./gradlew :app:run --args='path show <pfadId> --format markdown'
+```
+
+Beispielausgabe nach einer Entdeckungslauf:
+
+```
+Found 2 rule candidate(s).
+Best improvement: (x + 3)^2 -> x^2 + 6*x + 9 (Δ=24)
+Exported 18 transformations to /…/exports/discovered-transformations.json
+Exported 18 transformations to /…/exports/discovered-transformations.md
+Exported 18 transformations to /…/exports/transformation-graph.mmd
+```
+
+## Exportformate
+
+Discovery-Ergebnisse können in mehreren Formaten ausgegeben werden:
+
+- **JSON** (`discovered-transformations.json`) – versioniertes Schema (`schemaVersion`, `generatedAt`, `transformations`, `ruleCandidates`, `reusableRules`) mit vollständigem Rechenweg pro Transformation, lesbar/zurücklesbar via `TransformationImportService`.
+- **Markdown** (`discovered-transformations.md`) – nummerierte Abschnitte mit Rechenweg und Bewertungstabelle (Vorher/Nachher).
+- **LaTeX** (`discovered-transformations.tex`) – mathematische Darstellung in `\begin{align*}`-Umgebungen.
+- **Mermaid** (`transformation-graph.mmd`) – Graph-Ansicht der Rechenwege; aufeinanderfolgende Schritte teilen sich Knoten-IDs.
+- **Regelvorrat** (`rule-inventory.json`) – aktuelle wiederverwendbare Regeln.
+
+## Regelvorrat
+
+`RuleInventoryRepository` speichert wiederverwendbare Regeln (`ReusableRule`) inklusive `canonicalHash`, `createdAt`, `lastUsedAt`, `usageCount`. Doppelte Einträge (gleicher `canonicalHash`) werden zurückgewiesen und stattdessen wird der Verwendungszähler der bestehenden Regel erhöht. Repository-Methoden: `findById`, `findByStatus`, `findReusable`, `saveAll`, `importBundle`, `exportBundle`.
+
+## Wiederverwendung gefundener Regeln
+
+`InventoryBackedRewriteRuleProvider` aktiviert nicht alle bekannten Regeln blind. Die `RuleInventoryConfiguration` erlaubt Allow-/Deny-Listen, das Deaktivieren einzelner Regeln, einen `minProofStatus` und eine maximale Komplexitätszunahme. Für jede betrachtete Regel wird eine `RuleActivationDecision` geliefert, sodass nachvollziehbar ist, warum eine Regel nicht aktiviert wurde.
+
+## Grenzen der Regelentdeckung
+
+Die Entdeckung verlässt sich auf atomare Rewrite-Regeln und symbolische Äquivalenz. Spezialregeln (z.B. `quadratic_*`, `binomial_*`, `perfect_square_*`, `difference_of_squares_*`) werden bewusst **nicht** zur Erzeugung von Rewrite-Schritten verwendet; der `QuadraticAnalyzer` dient nur als Baseline-/Äquivalenz-Fallback bzw. in Tests. Welche Pfade entdeckt werden, hängt von der Suchstrategie, der `SearchHeuristic` und der `DiscoverySettings` ab (`includeNonImprovingEquivalentPaths`, `maxPathLengthForCandidateMining`, `minExamplesPerCandidate`, `minReusableStatus`). Bei besonders breiten Suchen sollte die Beam-Breite und der `maxExpandingSteps`-Wert hinreichend hoch gewählt werden.
+
+## Glossar
+
+| Begriff | Bedeutung |
+|---|---|
+| `RewriteRule` | Atomare strukturelle Umformungsregel (z.B. `ast_distribute_left_add`). Bausteine, aus denen Pfade entstehen. |
+| `TransformationStep` | Ein einzelner Anwendungsschritt einer `RewriteRule` mit Vorher/Nachher-Ausdruck und Bewertung. |
+| `DiscoveredTransformation` | Vollständiger Rechenweg (Liste von `TransformationStep`s) mit stabiler ID, Scores und Validierungsstatus. |
+| `RuleCandidate` | Aus mehreren Pfaden destillierter Regelvorschlag mit Parameter-Relationen, Beispielen und unterstützenden Transformations-IDs. |
+| `ReusableRule` | Persistierte, wiederverwendbare Variante eines validierten Kandidaten samt `canonicalHash` und Nutzungs-Metadaten. |
+| `ExportBundle` | Selbstbeschreibendes Paket aus Transformationen, Kandidaten und wiederverwendbaren Regeln für Export/Import. |
+
 ## Tests
 
 ```bash
