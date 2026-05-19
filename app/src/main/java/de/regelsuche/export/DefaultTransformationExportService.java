@@ -24,7 +24,7 @@ public class DefaultTransformationExportService implements TransformationExportS
     public String exportJson(List<DiscoveredTransformation> transformations, List<ReusableRule> rules) {
         return "{\n  \"transformations\": ["
             + transformations.stream().map(this::transformationJson).collect(Collectors.joining(","))
-            + "\n  ],\n  \"rules\": ["
+            + "\n  ],\n  \"reusableRules\": ["
             + rules.stream().map(this::ruleJson).collect(Collectors.joining(","))
             + "\n  ]\n}";
     }
@@ -49,19 +49,61 @@ public class DefaultTransformationExportService implements TransformationExportS
         return "\n    {\"id\":\"" + escapeJson(transformation.id()) + "\","
             + "\"originalExpression\":\"" + escapeJson(transformation.originalExpression()) + "\","
             + "\"improvedExpression\":\"" + escapeJson(transformation.improvedExpression()) + "\","
+            + "\"scores\":{\"original\":" + scoreJson(transformation.originalScore())
+            + ",\"improved\":" + scoreJson(transformation.improvedScore()) + "},"
             + "\"totalImprovement\":" + transformation.totalImprovement() + ","
-            + "\"validationStatus\":\"" + transformation.validationStatus() + "\"}";
+            + "\"validationStatus\":\"" + transformation.validationStatus() + "\","
+            + "\"discoveredAt\":\"" + transformation.discoveredAt() + "\","
+            + "\"canonicalHash\":\"" + escapeJson(transformation.canonicalHash()) + "\","
+            + "\"steps\":["
+            + transformation.steps().stream().map(this::stepJson).collect(Collectors.joining(","))
+            + "]}";
     }
 
     private String ruleJson(ReusableRule rule) {
         return "\n    {\"id\":\"" + escapeJson(rule.id()) + "\","
             + "\"leftPattern\":\"" + escapeJson(rule.leftPattern()) + "\","
             + "\"rightPattern\":\"" + escapeJson(rule.rightPattern()) + "\","
-            + "\"proofStatus\":\"" + rule.proofStatus() + "\"}";
+            + "\"parameterRelations\":["
+            + rule.parameterRelations().stream()
+                .map(relation -> "\"" + escapeJson(relation) + "\"")
+                .collect(Collectors.joining(","))
+            + "],"
+            + "\"proofStatus\":\"" + rule.proofStatus() + "\","
+            + "\"knownRuleStatus\":\"" + rule.knownRuleStatus() + "\","
+            + "\"supportingExamples\":" + rule.supportingExamples() + ","
+            + "\"averageImprovement\":" + rule.averageImprovement() + ","
+            + "\"createdAt\":\"" + rule.createdAt() + "\"}";
+    }
+
+    private String stepJson(TransformationStep step) {
+        return "{\"index\":" + step.index() + ","
+            + "\"beforeExpression\":\"" + escapeJson(step.beforeExpression()) + "\","
+            + "\"afterExpression\":\"" + escapeJson(step.afterExpression()) + "\","
+            + "\"ruleId\":\"" + escapeJson(step.ruleId()) + "\","
+            + "\"ruleKind\":\"" + step.ruleKind() + "\","
+            + "\"scoreBefore\":" + step.scoreBefore() + ","
+            + "\"scoreAfter\":" + step.scoreAfter() + ","
+            + "\"equivalencePreserving\":" + step.equivalencePreserving() + ","
+            + "\"explanation\":\"" + escapeJson(step.explanation()) + "\"}";
+    }
+
+    private String scoreJson(de.regelsuche.scoring.ExpressionScore score) {
+        return "{\"stringLength\":" + score.stringLength() + ","
+            + "\"astNodeCount\":" + score.astNodeCount() + ","
+            + "\"operatorCount\":" + score.operatorCount() + ","
+            + "\"nestingDepth\":" + score.nestingDepth() + ","
+            + "\"recognizedPatternBonus\":" + score.recognizedPatternBonus() + ","
+            + "\"weightedTotal\":" + score.weightedTotal() + "}";
     }
 
     private String escapeJson(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t");
     }
 
     private String escapeMermaid(String value) {

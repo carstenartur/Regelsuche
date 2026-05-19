@@ -7,10 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.example.AlgebraicExampleGenerator;
+import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
+import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.SymPyTransformationEngine;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -53,29 +54,112 @@ class RuleCandidateMinerTest {
     }
 
     @Test
+    void e2eDiscoveryDoesNotUseQuadraticFallback() {
+        AtomicDiscoveryResult result = discoverKnownBinomialFromAtomicSteps();
+
+        assertTrue(result.store().snapshot().edges().stream()
+            .map(GraphEdge::pathId)
+            .map(pathId -> pathId.substring(0, pathId.lastIndexOf('#')))
+            .distinct()
+            .count() >= 3);
+        assertTrue(result.store().snapshot().edges().stream()
+            .map(GraphEdge::transformationRule)
+            .noneMatch(this::isForbiddenSpecialRule));
+    }
+
+    @Test
+    void knownBinomialRuleEmergesFromAtomicStepsOnly() {
+        AtomicDiscoveryResult result = discoverKnownBinomialFromAtomicSteps();
+
+        RuleCandidate candidate = requireCandidate(
+            result.candidates(),
+            "(x + A)^2",
+            "x^2 + 2*A*x + A^2"
+        );
+        assertEquals(RuleStatus.MATCHES_KNOWN_RULE, candidate.status());
+        assertTrue(candidate.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal());
+        assertTrue(candidate.examplesCount() >= 3);
+        assertTrue(result.store().snapshot().edges().stream()
+            .map(GraphEdge::transformationRule)
+            .anyMatch("ast_power_two_to_product"::equals));
+        assertTrue(result.store().snapshot().edges().stream()
+            .map(GraphEdge::transformationRule)
+            .anyMatch(rule -> rule.startsWith("ast_distribute")));
+        assertTrue(result.store().snapshot().edges().stream()
+            .map(GraphEdge::transformationRule)
+            .anyMatch("ast_canonical_normalize"::equals));
+        assertTrue(result.store().snapshot().edges().stream()
+            .map(GraphEdge::transformationRule)
+            .anyMatch("ast_product_to_power_two"::equals));
+        assertTrue(result.store().snapshot().edges().stream()
+            .map(GraphEdge::transformationRule)
+            .anyMatch("ast_double_term"::equals));
+        assertTrue(result.store().snapshot().edges().stream()
+            .map(GraphEdge::transformationRule)
+            .anyMatch(rule -> rule.startsWith("ast_factor_common")));
+        assertTrue(result.store().snapshot().edges().stream()
+            .map(GraphEdge::transformationRule)
+            .noneMatch(this::isForbiddenSpecialRule));
+    }
+
+    @Test
     void discoversKnownBinomialRuleFromSearchPaths() {
+        AtomicDiscoveryResult result = discoverKnownBinomialFromAtomicSteps();
+
+        assertTrue(result.candidates().stream().anyMatch(candidate ->
+            candidate.leftPattern().equals("(x + A)^2")
+                && candidate.rightPattern().equals("x^2 + 2*A*x + A^2")
+                && candidate.status() == RuleStatus.MATCHES_KNOWN_RULE
+                && candidate.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()
+        ), () -> "Expected first binomial rule candidate in " + result.candidates());
+    }
+
+    private AtomicDiscoveryResult discoverKnownBinomialFromAtomicSteps() {
+        InMemoryExpressionGraphStore store = new InMemoryExpressionGraphStore();
         RuleDiscoveryService service = new RuleDiscoveryService(
-            new AlgebraicExampleGenerator(),
-            new SymPyTransformationEngine(),
+            new AlgebraicExampleGenerator() {
+                @Override
+                public List<String> generateSmallIntegerExamples(int min, int max) {
+                    return List.of("(x + 1)^2", "(x + 2)^2", "(x + 3)^2");
+                }
+            },
+            new AstRewriteTransformationEngine(),
             new SymPyEquivalenceService(),
-            new ExpressionScorer(),
-            new InMemoryExpressionGraphStore(),
+            new ExpansionRewardingScorer(),
+            store,
             new RuleCandidateMiner(new KnownRuleRepository()),
             event -> {}
         );
 
         try {
             List<RuleCandidate> candidates = service.discover(1, 5);
-
-            assertTrue(candidates.stream().anyMatch(candidate ->
-                candidate.leftPattern().equals("x^2 + 2*A*x + A^2")
-                    && candidate.rightPattern().equals("(x + A)^2")
-                    && candidate.status() == RuleStatus.MATCHES_KNOWN_RULE
-                    && candidate.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()
-            ), () -> "Expected first binomial rule candidate in " + candidates);
+            return new AtomicDiscoveryResult(candidates, store);
         } finally {
             service.shutdown();
         }
+    }
+
+    private boolean isForbiddenSpecialRule(String ruleId) {
+        String normalized = ruleId.toLowerCase();
+        return normalized.contains("quadratic")
+            || normalized.contains("binomial")
+            || normalized.contains("perfect_square")
+            || normalized.contains("difference_of_squares");
+    }
+
+    private static final class ExpansionRewardingScorer extends ExpressionScorer {
+        @Override
+        public ExpressionScore score(String expression) {
+            ExpressionScore score = super.score(expression);
+            int weightedTotal = score.weightedTotal();
+            if (expression.contains(") ^ 2")) {
+                weightedTotal += 30;
+            }
+            return new ExpressionScore(weightedTotal, 0, 0, 0, 0);
+        }
+    }
+
+    private record AtomicDiscoveryResult(List<RuleCandidate> candidates, InMemoryExpressionGraphStore store) {
     }
 
     @Test

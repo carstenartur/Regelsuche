@@ -124,7 +124,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             simplify("ast_multiply_zero_left", op(BinaryOperator.MUL, num(0), a), num(0)),
             simplify("ast_subtract_zero", op(BinaryOperator.SUB, a, num(0)), a),
             simplify("ast_divide_one", op(BinaryOperator.DIV, a, num(1)), a),
-            normalize("ast_double_term", op(BinaryOperator.ADD, a, a), op(BinaryOperator.MUL, num(2), a)),
+            new DoubleTermRule(),
             normalize("ast_product_to_power_two", op(BinaryOperator.MUL, a, a), op(BinaryOperator.POW, a, num(2))),
             expand("ast_power_two_to_product", op(BinaryOperator.POW, a, num(2)), op(BinaryOperator.MUL, a, a), 3),
             new CombinePowersRule(),
@@ -310,6 +310,76 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 return new CommonTerms(leftProduct.left(), leftProduct.right(), rightProduct.right());
             }
             return null;
+        }
+    }
+
+    private static final class DoubleTermRule extends MetadataRule {
+        private DoubleTermRule() {
+            super(RewriteKind.NORMALIZE, false, 0);
+        }
+
+        @Override
+        public String id() {
+            return "ast_double_term";
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+            return duplicateTermIndex(subtree) >= 0;
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+            List<Expr> terms = flattenAddition(subtree);
+            int duplicateIndex = duplicateTermIndex(terms);
+            if (duplicateIndex < 0) {
+                throw new IllegalArgumentException("Rule does not match subtree");
+            }
+            Expr duplicate = terms.get(duplicateIndex);
+            List<Expr> rewritten = new ArrayList<>(terms);
+            rewritten.remove(duplicateIndex + 1);
+            rewritten.remove(duplicateIndex);
+            rewritten.add(new BinaryExpr(new NumberExpr(2), BinaryOperator.MUL, duplicate));
+            return buildAddition(rewritten);
+        }
+
+        private int duplicateTermIndex(Expr subtree) {
+            if (!(subtree instanceof BinaryExpr addition) || addition.operator() != BinaryOperator.ADD) {
+                return -1;
+            }
+            return duplicateTermIndex(flattenAddition(subtree));
+        }
+
+        private int duplicateTermIndex(List<Expr> terms) {
+            for (int i = 0; i < terms.size(); i++) {
+                for (int j = i + 1; j < terms.size(); j++) {
+                    if (terms.get(i).equals(terms.get(j))) {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        private List<Expr> flattenAddition(Expr expression) {
+            if (expression instanceof BinaryExpr binaryExpr && binaryExpr.operator() == BinaryOperator.ADD) {
+                List<Expr> terms = new ArrayList<>();
+                terms.addAll(flattenAddition(binaryExpr.left()));
+                terms.addAll(flattenAddition(binaryExpr.right()));
+                return terms;
+            }
+            return List.of(expression);
+        }
+
+        private Expr buildAddition(List<Expr> terms) {
+            if (terms.isEmpty()) {
+                return new NumberExpr(0);
+            }
+            Expr expression = terms.getFirst();
+            for (int i = 1; i < terms.size(); i++) {
+                expression = new BinaryExpr(expression, BinaryOperator.ADD, terms.get(i));
+            }
+            return expression;
         }
     }
 
