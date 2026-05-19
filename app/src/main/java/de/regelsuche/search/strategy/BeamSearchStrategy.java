@@ -1,0 +1,107 @@
+package de.regelsuche.search.strategy;
+
+import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class BeamSearchStrategy implements SearchStrategy {
+    @Override
+    public List<SearchState> search(SearchProblem problem) {
+        String root = problem.rootExpression().trim().replaceAll("\\s+", " ");
+        SearchState rootState = new SearchState(
+            root,
+            0,
+            problem.scorer().score(root),
+            List.of(root),
+            List.of(),
+            Set.of(),
+            0,
+            problem.canonicalizer().stableHash(root),
+            null,
+            null,
+            0
+        );
+        List<SearchState> explored = new ArrayList<>();
+        List<SearchState> beam = List.of(rootState);
+        Set<String> visited = new HashSet<>();
+
+        for (int depth = 0; depth <= problem.heuristic().maxDepth() && !beam.isEmpty(); depth++) {
+            List<SearchState> next = new ArrayList<>();
+            for (SearchState current : beam) {
+                if (explored.size() >= problem.heuristic().maxVisitedExpressions()) {
+                    return explored;
+                }
+                if (!visited.add(stateKey(current))) {
+                    continue;
+                }
+                explored.add(current);
+                if (current.depth() >= problem.heuristic().maxDepth()) {
+                    continue;
+                }
+                int generated = 0;
+                for (Transformation transformation : problem.engine().transform(current.expression())) {
+                    if (generated >= problem.heuristic().maxCandidatesPerState()) {
+                        break;
+                    }
+                    if (current.appliedRuleApplications().contains(transformation.applicationKey())) {
+                        continue;
+                    }
+                    int expandedSteps = current.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);
+                    if (expandedSteps > problem.heuristic().maxExpandingSteps()) {
+                        continue;
+                    }
+                    String nextExpression = transformation.transformedExpression();
+                    String hash = problem.canonicalizer().stableHash(nextExpression);
+                    if (nextExpression.equals(current.expression())) {
+                        continue;
+                    }
+                    ExpressionScore nextScore = problem.scorer().score(nextExpression);
+                    int improvement = current.score().weightedTotal() - nextScore.weightedTotal();
+                    Set<String> applied = new HashSet<>(current.appliedRuleApplications());
+                    applied.add(transformation.applicationKey());
+                    List<String> path = new ArrayList<>(current.path());
+                    path.add(nextExpression);
+                    List<String> appliedRuleIds = new ArrayList<>(current.appliedRuleIds());
+                    appliedRuleIds.add(transformation.rule());
+                    SearchState nextState = new SearchState(
+                        nextExpression,
+                        current.depth() + 1,
+                        nextScore,
+                        path,
+                        appliedRuleIds,
+                        applied,
+                        expandedSteps,
+                        hash,
+                        current.expression(),
+                        transformation.rule(),
+                        improvement
+                    );
+                    if (visited.contains(stateKey(nextState))) {
+                        continue;
+                    }
+                    next.add(nextState);
+                    generated++;
+                }
+            }
+            next.sort(Comparator.comparingInt(this::priority));
+            beam = next.stream().limit(problem.heuristic().beamWidth()).toList();
+        }
+        return explored;
+    }
+
+    private int priority(SearchState state) {
+        int depthPenalty = state.depth() * 2;
+        int expansionPenalty = state.expandedStepCount() * 5;
+        int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
+        return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;
+    }
+
+    private String stateKey(SearchState state) {
+        return state.canonicalHash() + ":" + state.appliedRuleApplications();
+    }
+}

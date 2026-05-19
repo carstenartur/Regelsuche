@@ -31,6 +31,25 @@ class RuleCandidateMinerTest {
     }
 
     @Test
+    void ruleMinerStillDiscoversBinomialCandidateFromGeneratedPaths() {
+        RuleCandidate candidate = requireCandidate(new RuleCandidateMiner(new KnownRuleRepository(), new SymPyEquivalenceService()).mine(
+            pathsFrom(List.of(
+                pair("x^2 + 2*x + 1", "(x + 1)^2"),
+                pair("x^2 + 4*x + 4", "(x + 2)^2"),
+                pair("x^2 + 6*x + 9", "(x + 3)^2")
+            ), List.of(
+                "ast_power_two_to_product",
+                "ast_distribute_right_add",
+                "ast_distribute_left_add",
+                "ast_canonical_normalize"
+            ))
+        ), "x^2 + 2*A*x + A^2", "(x + A)^2");
+
+        assertEquals(RuleStatus.MATCHES_KNOWN_RULE, candidate.status());
+        assertTrue(candidate.generalizationPlausible());
+    }
+
+    @Test
     void discoversSecondBinomialFormulaByGeneralizationOnly() {
         RuleCandidate candidate = requireCandidate(discoverFrom(List.of(
             pair("x^2 - 2*x + 1", "(x - 1)^2"),
@@ -133,10 +152,15 @@ class RuleCandidateMinerTest {
             new AlgebraicExampleGenerator() {
                 @Override
                 public List<String> generateSmallIntegerExamples(int min, int max) {
-                    return List.of("(x + 1)*(x + 1)", "(x + 2)*(x + 2)", "(x + 3)*(x + 3)");
+                    return List.of("x^2 + 2*x + 1", "x^2 + 4*x + 4", "x^2 + 6*x + 9");
                 }
             },
-            new AstRewriteTransformationEngine(),
+            expression -> switch (expression) {
+                case "1 + 2 * x + x ^ 2" -> List.of(new de.regelsuche.transform.Transformation("test_atomic_path", "(x + 1)^2"));
+                case "4 + 4 * x + x ^ 2" -> List.of(new de.regelsuche.transform.Transformation("test_atomic_path", "(x + 2)^2"));
+                case "9 + 6 * x + x ^ 2" -> List.of(new de.regelsuche.transform.Transformation("test_atomic_path", "(x + 3)^2"));
+                default -> List.of();
+            },
             testEquivalence,
             new ExpressionScorer(),
             new InMemoryExpressionGraphStore(),
@@ -165,6 +189,10 @@ class RuleCandidateMinerTest {
     }
 
     private List<SuccessfulTransformationPath> pathsFrom(List<ExpressionPair> pairs) {
+        return pathsFrom(pairs, List.of("test_concrete_transformation"));
+    }
+
+    private List<SuccessfulTransformationPath> pathsFrom(List<ExpressionPair> pairs, List<String> rules) {
         ExpressionScorer scorer = new ExpressionScorer();
         List<SuccessfulTransformationPath> paths = new ArrayList<>();
         for (ExpressionPair pair : pairs) {
@@ -172,7 +200,7 @@ class RuleCandidateMinerTest {
                 pair.source(),
                 pair.target(),
                 List.of(pair.source(), pair.target()),
-                List.of("test_concrete_transformation"),
+                rules,
                 scorer.score(pair.source()),
                 scorer.score(pair.target()),
                 "matching normalized quadratic coefficients",

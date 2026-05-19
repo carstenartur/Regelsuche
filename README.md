@@ -66,18 +66,37 @@ Das Pattern-System bindet strukturelle Platzhalter an beliebige AST-Teilbäume:
 - `PatternExpr.op(ADD, A, B)` beschreibt Operator-Muster.
 - `PatternRewriteRule` instanziiert Zielmuster aus den gefundenen Bindings.
 
-Aktuell enthaltene Basisregeln decken neutrale Elemente, Null-Regeln,
-Dopplungen, Potenzkombination, Distribution, Ausklammern und strukturelle
-Binom-Expansion ab. Beispiele:
+Aktuell enthaltene Basisregeln sind absichtlich atomar. Es gibt keine direkte
+Schulbuchregel für binomische Formeln, Differenz von Quadraten oder quadratische
+Ergänzung. Erlaubte Spielzüge sind z. B.:
 
-- `w + x*(y + z) -> w + x*y + x*z` durch rekursive Distribution in einem Teilbaum
-- `(a + b)*c + (a + b)*d -> (a + b)*(c + d)` durch strukturelles Ausklammern
-- `(x^2)^3 -> x^6` mit korrekt geklammerter Potenzformatierung
-- `(y + z)*(y + z) -> y^2 + 2*y*z + z^2` ohne Beschränkung auf die Variable `x`
+- `A^2 -> A*A`
+- `A*(B + C) -> A*B + A*C`
+- `(B + C)*A -> B*A + C*A`
+- `A*B + A*C -> A*(B + C)`
+- `A + A -> 2*A`
+- `A*A -> A^2`
+- `(A^m)*(A^n) -> A^(m+n)`
+- `(A^m)^n -> A^(m*n)`
+- neutrale und absorbierende Elemente wie `A + 0`, `A * 1`, `A * 0`
 
-Quadratische Analyzer dürfen weiterhin für Scoring, Äquivalenz-Fallbacks, Tests
-und bekannte Baselines existieren. Sie werden aber nicht als direkte
-Transformationslogik in `SymPyTransformationEngine` verwendet.
+Diese Regeln gelten für beliebige AST-Teilbäume, nicht nur für einzelne Variablen
+oder Integer. Bekannte Formeln dürfen nicht als Spielzüge eingebaut sein; sie
+müssen als Muster aus vielen kleinen allgemeinen Spielzügen entstehen. Beispiel:
+
+```text
+(x+a)^2
+-> (x+a)*(x+a)
+-> x*(x+a) + a*(x+a)
+-> x*x + x*a + a*x + a*a
+-> x^2 + 2*a*x + a^2
+```
+
+`RewriteRule` trägt Metadaten (`RewriteKind`, Komplexitätsrisiko,
+geschätztes Kosten-Delta und Äquivalenzstatus), damit die Suche expandierende
+oder potenziell teure Regeln gezielt begrenzen kann. Quadratische Analyzer dürfen
+weiterhin für Scoring, Äquivalenz-Fallbacks, Tests und bekannte Baselines
+existieren. Sie werden aber nicht als direkte Transformationslogik verwendet.
 
 ## Suche und Graph
 
@@ -85,12 +104,40 @@ Die Transformationssuche erzeugt aus jedem Ausdruck Folgezustände primär durch
 lokale AST-Rewrite-Regeln. Regeln werden nicht nur am Wurzelausdruck, sondern
 rekursiv an jedem Teilbaum ausprobiert. Jeder Ausdruckszustand wird als Knoten
 gespeichert, jede angewendete Umformung als gerichtete Kante mit Regelname,
-Tiefe und Score-Verbesserung.
+Tiefe und Score-Verbesserung. Der Graph speichert konkrete Suchpfade und nicht
+nur Endergebnisse.
+
+Die Suche läuft über eine `SearchStrategy`-Schnittstelle. Implementiert sind
+`BestFirstSearchStrategy` und `BeamSearchStrategy`; einfache BFS ist nicht mehr
+die zentrale Suchlogik. Ein Zustand enthält Ausdruck, Tiefe, Score, Pfad,
+angewendete Regel-IDs, Anzahl expandierender Schritte und kanonischen Hash.
+Bewertet werden u. a. Ausdruckskomplexität, AST-Größe, Operatoranzahl,
+Verschachtelung, bisherige Tiefe, expandierende Schritte und Expansion ohne
+Verbesserung.
+
+Der Suchraum wird durch Heuristiken begrenzt: maximale Suchtiefe, maximale Anzahl
+besuchter Strukturen, maximale AST-Größenzunahme pro Schritt, keine Wiederholung
+derselben Regel auf demselben kanonischen Teilbaum im selben Pfad, maximale
+Anzahl expandierender Schritte und maximale Kandidaten pro Zustand. Das ist
+notwendig, weil algebraisch äquivalente Umformungen sehr schnell zyklische oder
+exponentiell wachsende Suchräume bilden.
 Der Speicher kann lokal im Arbeitsspeicher oder über Neo4j erfolgen.
 
-Der Suchraum wird durch Heuristiken begrenzt, insbesondere maximale Suchtiefe
-und bereits besuchte Ausdrücke. Das ist notwendig, weil algebraisch äquivalente
-Umformungen sehr schnell zyklische oder exponentiell wachsende Suchräume bilden.
+
+## Normalform und Kanonisierung
+
+`ExpressionCanonicalizer` vereinheitlicht Ausdrücke für `visited`-Mengen,
+Anti-Zyklen und Graph-Vergleiche:
+
+- kommutative Operatoren werden stabil sortiert (`b+a == a+b`)
+- verschachtelte Additionen und Multiplikationen werden geflattet
+- neutrale Elemente werden entfernt (`x*1 == x`)
+- Zahlen werden normalisiert
+- wiederholte Faktoren werden zusammengeführt (`x*x == x^2`)
+- stabile Hashes markieren bereits gesehene Strukturen
+
+Die Kanonisierung ersetzt keine Regelentdeckung. Sie kontrolliert Suche und
+Duplikate; die konkreten Graph-Kanten bleiben die kleinen Rewrite-Schritte.
 
 ## Bewertung und Äquivalenz
 
@@ -152,12 +199,17 @@ Anti-Duplikation erfolgt durch kanonisierte Variablennamen und einen Hash des
 abstrahierten Musters. Wenn ein neuer Kandidat entdeckt wird, erzeugt die
 asynchrone Suche ein `RuleCandidateDiscoveredEvent`.
 
-Wichtig ist die Unterscheidung:
+Wichtig ist die klare Trennung:
 
-- **Mustererkennung** findet wiederkehrende strukturelle Ähnlichkeit.
+- **Rewrite-Regeln** sind kleine erlaubte Spielzüge.
+- **Suchstrategie** erzeugt konkrete Pfade aus diesen Spielzügen.
+- **RuleCandidateMiner** abstrahiert erfolgreiche Pfade per Normalisierung,
+  Anti-Unification, Parameter-Relationen und frischer Validierung.
+- **KnownRuleRepository** ordnet Kandidaten nur ein; es entdeckt und löst nichts.
 - **Regelkandidat** ist ein validiertes, plausibles abstrahiertes Muster.
 - **Bewiesene mathematische Regel** erfordert weiterhin einen separaten Beweis;
-  die Suche garantiert keine mathematische Neuheit oder Vollständigkeit.
+  die Suche ist heuristisch, nicht vollständig, und garantiert keine
+  mathematische Neuheit oder Vollständigkeit.
 
 ## Bekannte Regeln als Referenz
 

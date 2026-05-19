@@ -2,6 +2,7 @@ package de.regelsuche.search;
 
 import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.GraphSnapshot;
@@ -10,14 +11,15 @@ import de.regelsuche.notify.SimplificationNotifier;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.parse.ParsedInput;
-import de.regelsuche.transform.Transformation;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.strategy.SearchStrategy;
 import de.regelsuche.transform.TransformationEngine;
 import java.time.Instant;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -32,6 +34,9 @@ public class TransformationSearchService {
     private final ExpressionGraphStore graphStore;
     private final SearchHeuristic heuristic;
     private final SimplificationNotifier notifier;
+    private final SearchStrategy searchStrategy;
+    private final ExpressionScorer scorer;
+    private final ExpressionCanonicalizer canonicalizer;
     private final ExecutorService executorService;
     private final Set<String> globallyVisited = ConcurrentHashMap.newKeySet();
     private final List<SimplificationSuccess> successes = Collections.synchronizedList(new ArrayList<>());
@@ -42,11 +47,24 @@ public class TransformationSearchService {
         SearchHeuristic heuristic,
         SimplificationNotifier notifier
     ) {
+        this(engine, graphStore, heuristic, notifier, new BestFirstSearchStrategy());
+    }
+
+    public TransformationSearchService(
+        TransformationEngine engine,
+        ExpressionGraphStore graphStore,
+        SearchHeuristic heuristic,
+        SimplificationNotifier notifier,
+        SearchStrategy searchStrategy
+    ) {
         this.parser = new ExpressionParser();
         this.engine = engine;
         this.graphStore = graphStore;
         this.heuristic = heuristic;
         this.notifier = notifier;
+        this.searchStrategy = searchStrategy;
+        this.scorer = new ExpressionScorer();
+        this.canonicalizer = new ExpressionCanonicalizer();
         this.executorService = Executors.newSingleThreadExecutor();
     }
 
@@ -92,70 +110,42 @@ public class TransformationSearchService {
     }
 
     private void explore(String root) {
-        Deque<NodeState> queue = new ArrayDeque<>();
-        queue.add(new NodeState(root, 0));
-        while (!queue.isEmpty()) {
-            NodeState current = queue.removeFirst();
-            if (!heuristic.withinLimits(current.depth(), globallyVisited.size())) {
+        SearchProblem problem = new SearchProblem(root, engine, scorer, canonicalizer, heuristic);
+        for (SearchState state : searchStrategy.search(problem)) {
+            boolean alreadyVisited = !globallyVisited.add(state.canonicalHash() + ":" + state.appliedRuleApplications());
+            if (alreadyVisited && state.improvement() <= 0) {
                 continue;
             }
-            if (!globallyVisited.add(current.expression())) {
-                continue;
+            graphStore.saveNode(state.expression(), state.score().weightedTotal());
+            if (state.parentExpression() != null && state.appliedRuleId() != null) {
+                graphStore.saveEdge(new GraphEdge(
+                    state.parentExpression(),
+                    state.expression(),
+                    state.appliedRuleId(),
+                    state.depth(),
+                    state.improvement()
+                ));
             }
-
-            int currentComplexity = complexity(current.expression());
-            graphStore.saveNode(current.expression(), currentComplexity);
-            if (current.depth() >= heuristic.maxDepth()) {
-                continue;
-            }
-
-            for (Transformation transformation : engine.transform(current.expression())) {
-                String transformed = transformation.transformedExpression();
-                if (transformed.equals(current.expression()) || transformed.isBlank()) {
-                    continue;
-                }
-
-                int transformedComplexity = complexity(transformed);
-                int improvement = currentComplexity - transformedComplexity;
-
-                graphStore.saveNode(transformed, transformedComplexity);
-                graphStore.saveEdge(
-                    new GraphEdge(current.expression(), transformed, transformation.rule(), current.depth() + 1, improvement)
+            if (state.improvement() > 0) {
+                SimplificationSuccess success = new SimplificationSuccess(
+                    root,
+                    state.expression(),
+                    state.appliedRuleId(),
+                    state.depth(),
+                    state.improvement(),
+                    Instant.now()
                 );
-
-                if (improvement > 0) {
-                    SimplificationSuccess success = new SimplificationSuccess(
-                        root,
-                        transformed,
-                        transformation.rule(),
-                        current.depth() + 1,
-                        improvement,
-                        Instant.now()
-                    );
-                    successes.add(success);
-                    if (heuristic.shouldNotify(currentComplexity, transformedComplexity)) {
-                        notifier.onSignificantSimplification(current.expression(), transformed);
-                    }
-                }
-
-                if (heuristic.withinLimits(current.depth() + 1, globallyVisited.size())) {
-                    queue.addLast(new NodeState(transformed, current.depth() + 1));
+                successes.add(success);
+                int oldComplexity = scorer.score(state.parentExpression()).weightedTotal();
+                int newComplexity = state.score().weightedTotal();
+                if (heuristic.shouldNotify(oldComplexity, newComplexity)) {
+                    notifier.onSignificantSimplification(state.parentExpression(), state.expression());
                 }
             }
         }
     }
 
     static int complexity(String expression) {
-        String compact = expression.replaceAll("\\s+", "");
-        int operators = 0;
-        for (char c : compact.toCharArray()) {
-            if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '=') {
-                operators++;
-            }
-        }
-        return compact.length() + operators;
-    }
-
-    private record NodeState(String expression, int depth) {
+        return new ExpressionScorer().score(expression).weightedTotal();
     }
 }
