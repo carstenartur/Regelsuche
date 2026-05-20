@@ -4,6 +4,7 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 
@@ -34,6 +35,18 @@ public final class ExpressionFormatter {
         }
         if (expr instanceof VariableExpr variableExpr) {
             return variableExpr.name();
+        }
+        if (expr instanceof FunctionExpr functionExpr) {
+            StringBuilder builder = new StringBuilder(functionExpr.name());
+            builder.append('(');
+            for (int i = 0; i < functionExpr.arguments().size(); i++) {
+                if (i > 0) {
+                    builder.append(", ");
+                }
+                builder.append(format(functionExpr.arguments().get(i), 0));
+            }
+            builder.append(')');
+            return builder.toString();
         }
         BinaryExpr binaryExpr = (BinaryExpr) expr;
         BinaryOperator operator = binaryExpr.operator();

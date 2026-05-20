@@ -43,7 +43,7 @@ import java.util.Set;
  * {@link de.regelsuche.App} entry point.
  */
 public class CliRouter {
-    private static final Set<String> SUBCOMMANDS = Set.of("discover", "transform", "inventory", "path");
+    private static final Set<String> SUBCOMMANDS = Set.of("discover", "transform", "inventory", "path", "benchmark", "serve", "explain");
 
     private final PrintStream out;
     private final ExportFileService exportFileService;
@@ -90,6 +90,9 @@ public class CliRouter {
                 case "transform" -> runTransform(rest);
                 case "inventory" -> runInventory(rest);
                 case "path" -> runPath(rest);
+                case "benchmark" -> runBenchmark(rest);
+                case "serve" -> runServe(rest);
+                case "explain" -> runExplain(rest);
                 default -> {
                     out.println("Unknown command: " + command);
                     yield 1;
@@ -184,7 +187,7 @@ public class CliRouter {
 
     private int runInventory(String[] args) {
         if (args.length == 0) {
-            out.println("Usage: inventory list|export");
+            out.println("Usage: inventory list|export|enable|disable|import|tag");
             return 1;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
@@ -195,11 +198,64 @@ public class CliRouter {
                 if (rules.isEmpty()) {
                     out.println("Inventory is empty.");
                 } else {
-                    rules.forEach(rule -> out.println(rule.id() + ": "
-                        + rule.leftPattern() + " -> " + rule.rightPattern()
-                        + " (" + rule.proofStatus() + ", usage=" + rule.usageCount() + ")"));
+                    rules.forEach(rule -> {
+                        String enabled = inventoryRepository.isEnabled(rule.id()) ? "enabled" : "disabled";
+                        String tags = inventoryRepository.tagsOf(rule.id()).isEmpty()
+                            ? ""
+                            : " tags=" + inventoryRepository.tagsOf(rule.id());
+                        out.println(rule.id() + ": "
+                            + rule.leftPattern() + " -> " + rule.rightPattern()
+                            + " (" + rule.proofStatus() + ", usage=" + rule.usageCount()
+                            + ", " + enabled + ")" + tags);
+                    });
                 }
                 return 0;
+            }
+            case "enable" -> {
+                if (rest.length == 0) {
+                    out.println("Usage: inventory enable <ruleId>");
+                    return 1;
+                }
+                inventoryRepository.setEnabled(rest[0], true);
+                out.println("Enabled " + rest[0]);
+                return 0;
+            }
+            case "disable" -> {
+                if (rest.length == 0) {
+                    out.println("Usage: inventory disable <ruleId>");
+                    return 1;
+                }
+                inventoryRepository.setEnabled(rest[0], false);
+                out.println("Disabled " + rest[0]);
+                return 0;
+            }
+            case "tag" -> {
+                if (rest.length < 2) {
+                    out.println("Usage: inventory tag <ruleId> <tag>");
+                    return 1;
+                }
+                inventoryRepository.addTag(rest[0], rest[1]);
+                out.println("Tagged " + rest[0] + " with " + rest[1]);
+                return 0;
+            }
+            case "import" -> {
+                if (rest.length == 0) {
+                    out.println("Usage: inventory import <file.json>");
+                    return 1;
+                }
+                Path source = Paths.get(rest[0]);
+                try {
+                    String json = java.nio.file.Files.readString(source);
+                    de.regelsuche.export.ExportBundle bundle =
+                        new de.regelsuche.export.DefaultTransformationImportService().importJson(json);
+                    inventoryRepository.importBundle(bundle);
+                    out.println("Imported " + bundle.reusableRules().size()
+                        + " reusable rule(s) from " + source.toAbsolutePath());
+                    return 0;
+                } catch (Exception ex) {
+                    out.println("Inventory import failed: " + ex.getMessage());
+                    return 2;
+                }
             }
             case "export" -> {
                 Map<String, String> options = parseOptions(rest);
@@ -229,6 +285,98 @@ public class CliRouter {
                 return 1;
             }
         }
+    }
+
+    private int runBenchmark(String[] args) {
+        Map<String, String> options = parseOptions(args);
+        de.regelsuche.benchmark.BenchmarkSuite suite = new de.regelsuche.benchmark.BenchmarkSuite();
+        java.util.List<de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult> results = suite.runAll();
+        for (de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult result : results) {
+            out.println("# " + result.name());
+            result.results().forEach(row -> out.println("  " + row));
+            if (!options.containsKey("quiet")) {
+                out.println();
+            }
+        }
+        return 0;
+    }
+
+    private int runServe(String[] args) {
+        Map<String, String> options = parseOptions(args);
+        int port = Integer.parseInt(options.getOrDefault("port", "8080"));
+        String host = options.getOrDefault("host", "127.0.0.1");
+        de.regelsuche.web.WebSecurityConfig.Builder configBuilder = de.regelsuche.web.WebSecurityConfig.builder();
+        boolean securityEnabled = false;
+        if (options.containsKey("user") && options.containsKey("password")) {
+            configBuilder.basicAuth(options.get("user"), options.get("password"));
+            if (options.containsKey("realm")) {
+                configBuilder.realm(options.get("realm"));
+            }
+            securityEnabled = true;
+        }
+        if (options.containsKey("keystore")) {
+            String storePass = options.getOrDefault("keystore-password", "");
+            String type = options.getOrDefault("keystore-type", "PKCS12");
+            configBuilder.tls(Paths.get(options.get("keystore")), storePass.toCharArray(), type);
+            securityEnabled = true;
+        }
+        if (options.containsKey("max-request-bytes")) {
+            try {
+                configBuilder.maxRequestBytes(Integer.parseInt(options.get("max-request-bytes")));
+            } catch (NumberFormatException ex) {
+                out.println("Invalid --max-request-bytes: " + options.get("max-request-bytes"));
+                return 2;
+            }
+        }
+        de.regelsuche.web.WebSecurityConfig securityConfig = configBuilder.build();
+        try {
+            de.regelsuche.web.WebWorkbenchServer server = new de.regelsuche.web.WebWorkbenchServer(
+                host, port, graphStore, inventoryRepository, exportService, securityConfig
+            );
+            server.start();
+            String scheme = securityConfig.isTlsEnabled() ? "https" : "http";
+            out.println("Web workbench listening on " + scheme + "://" + host + ":" + port
+                + (securityEnabled ? " (secured)" : ""));
+            out.println("Press Ctrl+C to stop.");
+            // Block forever (until interrupted).
+            try {
+                Thread.currentThread().join();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            } finally {
+                server.stop();
+            }
+            return 0;
+        } catch (Exception ex) {
+            out.println("serve failed: " + ex.getMessage());
+            return 2;
+        }
+    }
+
+    private int runExplain(String[] args) {
+        if (args.length < 1) {
+            out.println("Usage: explain <pathId> [--form short|school|expert|latex|json]");
+            return 1;
+        }
+        String pathId = args[0];
+        Map<String, String> options = parseOptions(Arrays.copyOfRange(args, 1, args.length));
+        String formName = options.getOrDefault("form", "school").toUpperCase(Locale.ROOT);
+        de.regelsuche.explain.ExplanationService.Form form;
+        try {
+            form = de.regelsuche.explain.ExplanationService.Form.valueOf(formName);
+        } catch (IllegalArgumentException ex) {
+            out.println("Unsupported form: " + options.get("form"));
+            return 1;
+        }
+        Optional<DiscoveredTransformation> match = graphStore.discoveredTransformations().stream()
+            .filter(transformation -> transformation.id().equals(pathId))
+            .findFirst();
+        if (match.isEmpty()) {
+            out.println("Path " + pathId + " not found");
+            return 1;
+        }
+        out.println(new de.regelsuche.explain.ExplanationService().renderPath(match.get(), form));
+        return 0;
     }
 
     private int runPath(String[] args) {

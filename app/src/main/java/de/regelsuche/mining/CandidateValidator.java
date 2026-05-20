@@ -88,6 +88,10 @@ public class CandidateValidator {
         } else if (node instanceof PatternBinary binary) {
             collectPlaceholders(binary.left(), placeholders);
             collectPlaceholders(binary.right(), placeholders);
+        } else if (node instanceof PatternFunction function) {
+            for (RulePatternNode argument : function.arguments()) {
+                collectPlaceholders(argument, placeholders);
+            }
         }
     }
 

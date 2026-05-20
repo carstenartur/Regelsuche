@@ -82,6 +82,7 @@ public class PatternGeneralizer {
             case ADD -> Optional.of(NormalizedNode.add(generalizedChildren));
             case MUL -> Optional.of(NormalizedNode.multiply(generalizedChildren));
             case POW -> Optional.of(NormalizedNode.pow(generalizedChildren.get(0), generalizedChildren.get(1)));
+            case FUNCTION -> Optional.of(NormalizedNode.function(first.name(), generalizedChildren));
             case PLACEHOLDER -> Optional.of(first);
             case NUMBER, VARIABLE -> Optional.empty();
         };

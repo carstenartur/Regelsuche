@@ -2,6 +2,7 @@ package de.regelsuche.inventory;
 
 import de.regelsuche.mining.CandidateProofStatus;
 import de.regelsuche.mining.PatternBinary;
+import de.regelsuche.mining.PatternFunction;
 import de.regelsuche.mining.PatternNumber;
 import de.regelsuche.mining.PatternVariable;
 import de.regelsuche.mining.RulePatternNode;
@@ -60,7 +61,7 @@ public class InventoryBackedRewriteRuleProvider {
                         + configuration.minProofStatus()));
                 continue;
             }
-            if (!configuration.allows(reusableRule.id())) {
+            if (!configuration.allows(reusableRule.id()) || !repository.isEnabled(reusableRule.id())) {
                 lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
                     "Rule id " + reusableRule.id() + " not allowed by allow/deny/disabled list"));
                 continue;
@@ -126,6 +127,13 @@ public class InventoryBackedRewriteRuleProvider {
         }
         if (node instanceof PatternVariable variable) {
             return PatternExpr.var(variable.name());
+        }
+        if (node instanceof PatternFunction function) {
+            PatternExpr[] converted = new PatternExpr[function.arguments().size()];
+            for (int i = 0; i < converted.length; i++) {
+                converted[i] = toPatternExpr(function.arguments().get(i));
+            }
+            return PatternExpr.fn(function.name(), converted);
         }
         PatternBinary binary = (PatternBinary) node;
         return PatternExpr.op(binary.op(), toPatternExpr(binary.left()), toPatternExpr(binary.right()));

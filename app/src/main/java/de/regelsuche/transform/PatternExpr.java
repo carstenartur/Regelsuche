@@ -3,12 +3,17 @@ package de.regelsuche.transform;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
-public sealed interface PatternExpr permits PatternExpr.Placeholder, PatternExpr.LiteralNumber, PatternExpr.Operation {
+public sealed interface PatternExpr
+    permits PatternExpr.Placeholder, PatternExpr.LiteralNumber, PatternExpr.Operation, PatternExpr.Function {
     static PatternExpr var(String name) {
         return new Placeholder(name);
     }
@@ -19,6 +24,10 @@ public sealed interface PatternExpr permits PatternExpr.Placeholder, PatternExpr
 
     static PatternExpr op(BinaryOperator operator, PatternExpr left, PatternExpr right) {
         return new Operation(operator, left, right);
+    }
+
+    static PatternExpr fn(String name, PatternExpr... arguments) {
+        return new Function(name, List.of(arguments));
     }
 
     boolean match(Expr expression, Map<String, Expr> bindings);
@@ -79,6 +88,47 @@ public sealed interface PatternExpr permits PatternExpr.Placeholder, PatternExpr
         @Override
         public Expr instantiate(Map<String, Expr> bindings) {
             return new BinaryExpr(left.instantiate(bindings), operator, right.instantiate(bindings));
+        }
+    }
+
+    /**
+     * Pattern for function applications like {@code sin(A)} or {@code log(A*B)}.
+     * Matches a {@link FunctionExpr} by exact name (case-sensitive) and arity,
+     * recursively matching each argument.
+     */
+    record Function(String name, List<PatternExpr> arguments) implements PatternExpr {
+        public Function {
+            Objects.requireNonNull(name, "name");
+            if (name.isBlank()) {
+                throw new IllegalArgumentException("function name must not be blank");
+            }
+            Objects.requireNonNull(arguments, "arguments");
+            arguments = List.copyOf(arguments);
+        }
+
+        @Override
+        public boolean match(Expr expression, Map<String, Expr> bindings) {
+            if (!(expression instanceof FunctionExpr functionExpr)) {
+                return false;
+            }
+            if (!functionExpr.name().equals(name) || functionExpr.arguments().size() != arguments.size()) {
+                return false;
+            }
+            for (int i = 0; i < arguments.size(); i++) {
+                if (!arguments.get(i).match(functionExpr.arguments().get(i), bindings)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public Expr instantiate(Map<String, Expr> bindings) {
+            List<Expr> args = new ArrayList<>(arguments.size());
+            for (PatternExpr argument : arguments) {
+                args.add(argument.instantiate(bindings));
+            }
+            return new FunctionExpr(name, args);
         }
     }
 }

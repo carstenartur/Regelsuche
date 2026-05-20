@@ -37,6 +37,18 @@ public class MarkdownMathRenderer implements MathRenderer {
 
     static String renderDocument(List<DiscoveredTransformation> transformations, MathRenderer renderer) {
         StringBuilder builder = new StringBuilder("# Gefundene Umformungen\n\n");
+        if (!transformations.isEmpty()) {
+            builder.append("## Inhaltsverzeichnis\n\n");
+            for (int i = 0; i < transformations.size(); i++) {
+                DiscoveredTransformation transformation = transformations.get(i);
+                builder.append(i + 1).append(". ")
+                    .append(transformation.originalExpression()).append(" → ")
+                    .append(transformation.improvedExpression())
+                    .append(" _(Δ=").append(transformation.totalImprovement()).append(", ")
+                    .append(transformation.validationStatus()).append(")_\n");
+            }
+            builder.append('\n');
+        }
         for (int i = 0; i < transformations.size(); i++) {
             DiscoveredTransformation transformation = transformations.get(i);
             builder.append("## ").append(i + 1).append(". ")

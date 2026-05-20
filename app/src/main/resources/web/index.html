@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Regelsuche Workbench</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+    <div class="brand">
+        <h1>Regelsuche</h1>
+        <p class="tagline">Mathematik-Workbench – Ausdrücke erkunden, Regeln entdecken, Beweise vorbereiten.</p>
+    </div>
+    <nav class="tabs">
+        <button class="tab active" data-tab="workbench">Workbench</button>
+        <button class="tab" data-tab="paths">Pfade</button>
+        <button class="tab" data-tab="graph">Graph</button>
+        <button class="tab" data-tab="candidates">Regelkandidaten</button>
+        <button class="tab" data-tab="inventory">Inventar</button>
+        <button class="tab" data-tab="exports">Exporte</button>
+        <button class="tab" data-tab="help">Hilfe</button>
+    </nav>
+</header>
+
+<main>
+    <!-- ─────────── Workbench tab ─────────── -->
+    <section id="tab-workbench" class="tab-panel active">
+        <h2>Ausdruck eingeben</h2>
+        <form id="searchForm" class="card">
+            <label class="field">
+                <span>Ausdruck</span>
+                <input type="text" name="expression" value="(x + 1)*(x + 1)" required
+                       placeholder="z.B. (x+1)^2, sin(x)^2 + cos(x)^2, log(a*b)">
+            </label>
+            <div class="grid">
+                <label class="field">
+                    <span>Typ</span>
+                    <select name="type">
+                        <option value="TERM" selected>Term</option>
+                        <option value="EQUATION">Gleichung</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Profil</span>
+                    <select name="profile">
+                        <option value="FAST_SIMPLIFY">Schnelle Vereinfachung</option>
+                        <option value="DISCOVERY" selected>Erkundung / Discovery</option>
+                        <option value="TEACHING">Didaktik</option>
+                        <option value="PROOF_ORIENTED">Beweisorientiert</option>
+                        <option value="EXHAUSTIVE_SMALL">Erschöpfend (klein)</option>
+                    </select>
+                </label>
+            </div>
+            <fieldset class="field">
+                <legend>Regel-Domänen</legend>
+                <div class="domain-grid">
+                    <label><input type="checkbox" name="domain" value="core" checked> core (atomare Grundregeln)</label>
+                    <label><input type="checkbox" name="domain" value="polynomial" checked> polynomial</label>
+                    <label><input type="checkbox" name="domain" value="rational"> rational</label>
+                    <label><input type="checkbox" name="domain" value="trigonometric"> trigonometric (sin²+cos²=1, …)</label>
+                    <label><input type="checkbox" name="domain" value="logarithmic"> logarithmic (log(a·b)=log a+log b, …)</label>
+                    <label><input type="checkbox" name="domain" value="radical"> radical (√(a²)=|a|, …)</label>
+                    <label><input type="checkbox" name="domain" value="calculus_basic"> calculus_basic (exp/log)</label>
+                </div>
+                <p class="hint">Hinweis: Die Domänen-Auswahl wird zusammen mit dem Profil an die Server-API übergeben.
+                    Domänen, die das aktuelle Profil nicht unterstützt, werden serverseitig ignoriert.</p>
+            </fieldset>
+            <div class="actions">
+                <button type="submit" class="primary">Suche starten</button>
+                <button type="button" id="loadExample-trig">Beispiel: sin²+cos²</button>
+                <button type="button" id="loadExample-log">Beispiel: log(a·b)</button>
+                <button type="button" id="loadExample-eq">Beispiel: 2x+3 = 7</button>
+            </div>
+        </form>
+        <div id="searchStatus" class="status"></div>
+        <pre id="searchOutput" class="output"></pre>
+    </section>
+
+    <!-- ─────────── Paths tab ─────────── -->
+    <section id="tab-paths" class="tab-panel">
+        <div class="card">
+            <h2>Gefundene Rechenwege</h2>
+            <div class="actions">
+                <button id="reloadPaths" class="primary">Aktualisieren</button>
+                <label class="field inline">
+                    <span>Darstellung:</span>
+                    <select id="pathFormat">
+                        <option value="SCHOOL">Schulbuch</option>
+                        <option value="LATEX">LaTeX</option>
+                        <option value="STEPS">Schritte</option>
+                    </select>
+                </label>
+            </div>
+            <div id="pathsList" class="list"></div>
+            <h3>Detail-Erklärung</h3>
+            <p class="hint">Klick auf einen Pfad oben, um den Rechenweg darzustellen.
+                LaTeX-Quelltext kann z.B. in Obsidian/Notion eingefügt werden.</p>
+            <pre id="pathDetail" class="output"></pre>
+        </div>
+    </section>
+
+    <!-- ─────────── Graph tab ─────────── -->
+    <section id="tab-graph" class="tab-panel">
+        <div class="card">
+            <h2>Graphansicht (Mermaid)</h2>
+            <div class="actions">
+                <button id="reloadGraph" class="primary">Graph laden</button>
+            </div>
+            <p class="hint">Quelltext im Mermaid-Format – kann z.B. in <code>mermaid.live</code> oder in Markdown-Editoren
+                gerendert werden.</p>
+            <pre id="graphOutput" class="output mono"></pre>
+        </div>
+    </section>
+
+    <!-- ─────────── Candidates tab ─────────── -->
+    <section id="tab-candidates" class="tab-panel">
+        <div class="card">
+            <h2>Regelkandidaten</h2>
+            <div class="actions">
+                <button id="reloadCandidates" class="primary">Aktualisieren</button>
+            </div>
+            <p class="hint">Beobachtete Regelkandidaten. <strong>Assumptions</strong> werden je nach Regel-Domäne
+                eingeblendet (z.B. <code>b ≠ 0</code> bei Quotienten, <code>a &gt; 0</code> bei Logarithmen).</p>
+            <div id="candidatesList" class="list"></div>
+        </div>
+    </section>
+
+    <!-- ─────────── Inventory tab ─────────── -->
+    <section id="tab-inventory" class="tab-panel">
+        <div class="card">
+            <h2>Regelinventar</h2>
+            <div class="actions">
+                <button id="reloadInventory" class="primary">Aktualisieren</button>
+            </div>
+            <p class="hint">Aktivieren/deaktivieren oder taggen. Geänderte Tags werden lokal in der UI dargestellt;
+                die Persistenz erfolgt serverseitig (sofern eine schreibende Inventory-API aktiviert ist).</p>
+            <div id="inventoryList" class="list"></div>
+        </div>
+    </section>
+
+    <!-- ─────────── Exports tab ─────────── -->
+    <section id="tab-exports" class="tab-panel">
+        <div class="card">
+            <h2>Exporte</h2>
+            <p>Exportiert alle entdeckten Transformationen plus das aktuelle Inventar.</p>
+            <div class="export-grid">
+                <a class="export-button" href="/api/exports/markdown" target="_blank">Markdown (.md)</a>
+                <a class="export-button" href="/api/exports/latex" target="_blank">LaTeX (.tex)</a>
+                <a class="export-button" href="/api/exports/mermaid" target="_blank">Mermaid (Graph)</a>
+                <a class="export-button" href="/api/exports/json" target="_blank">JSON-Bundle</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ─────────── Help tab ─────────── -->
+    <section id="tab-help" class="tab-panel">
+        <div class="card help">
+            <h2>Hilfe</h2>
+            <h3>Unterstützte Syntax</h3>
+            <ul>
+                <li>Arithmetik: <code>+ − * / ^</code></li>
+                <li>Klammern: <code>(…)</code></li>
+                <li>Variablen: einbuchstabig (<code>x</code>, <code>y</code>, …) oder mehrbuchstabig (<code>abc</code>)</li>
+                <li>Funktionen: <code>sin(x), cos(x), tan(x), log(x), ln(x), sqrt(x), exp(x), abs(x)</code></li>
+                <li>Gleichungen: <code>2*x + 3 = 7</code> mit Typ "Gleichung"</li>
+            </ul>
+            <h3>Workflow</h3>
+            <ol>
+                <li>Im Tab <strong>Workbench</strong> Ausdruck, Profil und gewünschte Domänen wählen, dann „Suche starten".</li>
+                <li>Im Tab <strong>Pfade</strong> die gefundenen Rechenwege ansehen.</li>
+                <li>Im Tab <strong>Graph</strong> die entdeckten Transformationen als Mermaid-Graph.</li>
+                <li>Im Tab <strong>Regelkandidaten</strong> beobachtete Verallgemeinerungen prüfen
+                    (inkl. <em>Assumptions</em>).</li>
+                <li>Im Tab <strong>Inventar</strong> wiederverwendbare Regeln aktivieren/deaktivieren/taggen.</li>
+                <li>Im Tab <strong>Exporte</strong> Bundles für Doku oder Proof-Bridge herunterladen.</li>
+            </ol>
+        </div>
+    </section>
+</main>
+
+<footer>
+    <small>Regelsuche · lokales Web-Frontend · für Trial &amp; Discovery, nicht für Produktion.</small>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
