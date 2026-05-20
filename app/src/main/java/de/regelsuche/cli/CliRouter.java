@@ -305,12 +305,38 @@ public class CliRouter {
         Map<String, String> options = parseOptions(args);
         int port = Integer.parseInt(options.getOrDefault("port", "8080"));
         String host = options.getOrDefault("host", "127.0.0.1");
+        de.regelsuche.web.WebSecurityConfig.Builder configBuilder = de.regelsuche.web.WebSecurityConfig.builder();
+        boolean securityEnabled = false;
+        if (options.containsKey("user") && options.containsKey("password")) {
+            configBuilder.basicAuth(options.get("user"), options.get("password"));
+            if (options.containsKey("realm")) {
+                configBuilder.realm(options.get("realm"));
+            }
+            securityEnabled = true;
+        }
+        if (options.containsKey("keystore")) {
+            String storePass = options.getOrDefault("keystore-password", "");
+            String type = options.getOrDefault("keystore-type", "PKCS12");
+            configBuilder.tls(Paths.get(options.get("keystore")), storePass.toCharArray(), type);
+            securityEnabled = true;
+        }
+        if (options.containsKey("max-request-bytes")) {
+            try {
+                configBuilder.maxRequestBytes(Integer.parseInt(options.get("max-request-bytes")));
+            } catch (NumberFormatException ex) {
+                out.println("Invalid --max-request-bytes: " + options.get("max-request-bytes"));
+                return 2;
+            }
+        }
+        de.regelsuche.web.WebSecurityConfig securityConfig = configBuilder.build();
         try {
             de.regelsuche.web.WebWorkbenchServer server = new de.regelsuche.web.WebWorkbenchServer(
-                host, port, graphStore, inventoryRepository, exportService
+                host, port, graphStore, inventoryRepository, exportService, securityConfig
             );
             server.start();
-            out.println("Web workbench listening on http://" + host + ":" + port);
+            String scheme = securityConfig.isTlsEnabled() ? "https" : "http";
+            out.println("Web workbench listening on " + scheme + "://" + host + ":" + port
+                + (securityEnabled ? " (secured)" : ""));
             out.println("Press Ctrl+C to stop.");
             // Block forever (until interrupted).
             try {

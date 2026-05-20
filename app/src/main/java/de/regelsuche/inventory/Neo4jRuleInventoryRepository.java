@@ -4,8 +4,10 @@ import de.regelsuche.mining.CandidateProofStatus;
 import de.regelsuche.mining.RuleStatus;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.GraphDatabase;
@@ -28,7 +30,9 @@ public class Neo4jRuleInventoryRepository implements RuleInventoryRepository {
                     + "SET rule.leftPattern = $leftPattern, rule.rightPattern = $rightPattern, "
                     + "rule.parameterRelations = $parameterRelations, rule.proofStatus = $proofStatus, "
                     + "rule.knownRuleStatus = $knownRuleStatus, rule.supportingExamples = $supportingExamples, "
-                    + "rule.averageImprovement = $averageImprovement, rule.createdAt = $createdAt",
+                    + "rule.averageImprovement = $averageImprovement, rule.createdAt = $createdAt, "
+                    + "rule.enabled = coalesce(rule.enabled, true), "
+                    + "rule.tags = coalesce(rule.tags, [])",
                 Map.of(
                     "id", rule.id(),
                     "leftPattern", rule.leftPattern(),
@@ -73,6 +77,68 @@ public class Neo4jRuleInventoryRepository implements RuleInventoryRepository {
                 ));
             }
             return rules;
+        }
+    }
+
+    @Override
+    public void setEnabled(String ruleId, boolean enabled) {
+        try (Session session = driver.session()) {
+            session.run(
+                "MATCH (rule:ReusableRule {id: $id}) SET rule.enabled = $enabled",
+                Map.of("id", ruleId, "enabled", enabled)
+            );
+        }
+    }
+
+    @Override
+    public boolean isEnabled(String ruleId) {
+        try (Session session = driver.session()) {
+            var result = session.run(
+                "MATCH (rule:ReusableRule {id: $id}) RETURN coalesce(rule.enabled, true) AS enabled",
+                Map.of("id", ruleId)
+            );
+            if (result.hasNext()) {
+                return result.next().get("enabled").asBoolean(true);
+            }
+            return true;
+        }
+    }
+
+    @Override
+    public void addTag(String ruleId, String tag) {
+        try (Session session = driver.session()) {
+            session.run(
+                "MATCH (rule:ReusableRule {id: $id}) "
+                    + "SET rule.tags = coalesce(rule.tags, []) + "
+                    + "CASE WHEN $tag IN coalesce(rule.tags, []) THEN [] ELSE [$tag] END",
+                Map.of("id", ruleId, "tag", tag)
+            );
+        }
+    }
+
+    @Override
+    public void removeTag(String ruleId, String tag) {
+        try (Session session = driver.session()) {
+            session.run(
+                "MATCH (rule:ReusableRule {id: $id}) "
+                    + "SET rule.tags = [t IN coalesce(rule.tags, []) WHERE t <> $tag]",
+                Map.of("id", ruleId, "tag", tag)
+            );
+        }
+    }
+
+    @Override
+    public Set<String> tagsOf(String ruleId) {
+        try (Session session = driver.session()) {
+            var result = session.run(
+                "MATCH (rule:ReusableRule {id: $id}) RETURN coalesce(rule.tags, []) AS tags",
+                Map.of("id", ruleId)
+            );
+            if (result.hasNext()) {
+                List<String> tags = result.next().get("tags").asList(Value::asString);
+                return new LinkedHashSet<>(tags);
+            }
+            return Set.of();
         }
     }
 

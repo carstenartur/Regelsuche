@@ -76,6 +76,17 @@ public final class RationalRules {
         }
 
         @Override
+        public java.util.List<de.regelsuche.assumption.Assumption> assumptions(Expr subtree) {
+            Cancellable terms = extract(subtree);
+            if (terms == null) {
+                return java.util.List.of();
+            }
+            return java.util.List.of(
+                de.regelsuche.assumption.Assumption.nonZero(
+                    de.regelsuche.parse.ExpressionFormatter.format(terms.remainingDenominator())));
+        }
+
+        @Override
         public boolean matches(Expr subtree) {
             return extract(subtree) != null;
         }
@@ -160,6 +171,19 @@ public final class RationalRules {
         }
 
         @Override
+        public java.util.List<de.regelsuche.assumption.Assumption> assumptions(Expr subtree) {
+            Pair pair = parts(subtree);
+            if (pair == null) {
+                return java.util.List.of();
+            }
+            return java.util.List.of(
+                de.regelsuche.assumption.Assumption.nonZero(
+                    de.regelsuche.parse.ExpressionFormatter.format(pair.leftDenominator)),
+                de.regelsuche.assumption.Assumption.nonZero(
+                    de.regelsuche.parse.ExpressionFormatter.format(pair.rightDenominator)));
+        }
+
+        @Override
         public Expr apply(Expr subtree) {
             Pair pair = parts(subtree);
             if (pair == null) {
@@ -227,6 +251,19 @@ public final class RationalRules {
         @Override
         public boolean matches(Expr subtree) {
             return extract(subtree) != null;
+        }
+
+        @Override
+        public java.util.List<de.regelsuche.assumption.Assumption> assumptions(Expr subtree) {
+            Parts parts = extract(subtree);
+            if (parts == null) {
+                return java.util.List.of();
+            }
+            return java.util.List.of(
+                de.regelsuche.assumption.Assumption.nonZero(
+                    de.regelsuche.parse.ExpressionFormatter.format(parts.b)),
+                de.regelsuche.assumption.Assumption.nonZero(
+                    de.regelsuche.parse.ExpressionFormatter.format(parts.c)));
         }
 
         @Override

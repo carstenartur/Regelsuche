@@ -1,7 +1,11 @@
 package de.regelsuche.web;
 
+import com.sun.net.httpserver.BasicAuthenticator;
+import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsServer;
 import de.regelsuche.api.ExportQueryService;
 import de.regelsuche.api.RuleInventoryQueryService;
 import de.regelsuche.api.TransformationQueryService;
@@ -37,10 +41,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.security.KeyStore;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
 
 /**
  * Minimal embedded web workbench backed by the JDK's built-in
@@ -57,6 +65,7 @@ public class WebWorkbenchServer {
     private final ExpressionGraphStore graphStore;
     private final RuleInventoryRepository inventoryRepository;
     private final TransformationExportService exportService;
+    private final WebSecurityConfig securityConfig;
 
     private final TransformationQueryService transformationQuery;
     private final RuleInventoryQueryService inventoryQuery;
@@ -72,29 +81,98 @@ public class WebWorkbenchServer {
         RuleInventoryRepository inventoryRepository,
         TransformationExportService exportService
     ) {
+        this(host, port, graphStore, inventoryRepository, exportService, WebSecurityConfig.none());
+    }
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig
+    ) {
         this.host = host;
         this.port = port;
         this.graphStore = graphStore;
         this.inventoryRepository = inventoryRepository;
         this.exportService = exportService;
+        this.securityConfig = securityConfig == null ? WebSecurityConfig.none() : securityConfig;
         this.transformationQuery = new TransformationQueryService(graphStore);
         this.inventoryQuery = new RuleInventoryQueryService(graphStore, inventoryRepository);
         this.exportQuery = new ExportQueryService(graphStore, inventoryRepository);
     }
 
     public void start() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(host, port), 0);
-        server.createContext("/api/search", this::handleSearch);
-        server.createContext("/api/discover", this::handleDiscover);
-        server.createContext("/api/paths", this::handlePaths);
-        server.createContext("/api/graph", this::handleGraph);
-        server.createContext("/api/candidates", this::handleCandidates);
-        server.createContext("/api/inventory", this::handleInventory);
-        server.createContext("/api/exports", this::handleExports);
-        server.createContext("/api/explain", this::handleExplain);
-        server.createContext("/", this::handleStatic);
+        if (securityConfig.isTlsEnabled()) {
+            HttpsServer httpsServer = HttpsServer.create(new InetSocketAddress(host, port), 0);
+            httpsServer.setHttpsConfigurator(buildHttpsConfigurator(securityConfig));
+            server = httpsServer;
+        } else {
+            server = HttpServer.create(new InetSocketAddress(host, port), 0);
+        }
+        secure(server.createContext("/api/search", this::handleSearch));
+        secure(server.createContext("/api/discover", this::handleDiscover));
+        secure(server.createContext("/api/paths", this::handlePaths));
+        secure(server.createContext("/api/graph", this::handleGraph));
+        secure(server.createContext("/api/candidates", this::handleCandidates));
+        secure(server.createContext("/api/inventory", this::handleInventory));
+        secure(server.createContext("/api/exports", this::handleExports));
+        secure(server.createContext("/api/explain", this::handleExplain));
+        secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
         server.start();
+    }
+
+    private void secure(HttpContext context) {
+        if (!securityConfig.isAuthEnabled()) {
+            return;
+        }
+        context.setAuthenticator(new BasicAuthenticator(securityConfig.realm()) {
+            @Override
+            public boolean checkCredentials(String suppliedUsername, String suppliedPassword) {
+                return constantTimeEquals(suppliedUsername, securityConfig.username())
+                    && constantTimeEquals(suppliedPassword, securityConfig.password());
+            }
+        });
+    }
+
+    private static boolean constantTimeEquals(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        byte[] a = left.getBytes(StandardCharsets.UTF_8);
+        byte[] b = right.getBytes(StandardCharsets.UTF_8);
+        if (a.length != b.length) {
+            // Still iterate to avoid trivially leaking length differences via timing.
+            int diff = a.length ^ b.length;
+            for (int i = 0; i < Math.min(a.length, b.length); i++) {
+                diff |= a[i] ^ b[i];
+            }
+            return diff == 0;
+        }
+        int diff = 0;
+        for (int i = 0; i < a.length; i++) {
+            diff |= a[i] ^ b[i];
+        }
+        return diff == 0;
+    }
+
+    private static HttpsConfigurator buildHttpsConfigurator(WebSecurityConfig config) {
+        try {
+            KeyStore keystore = KeyStore.getInstance(config.keystoreType());
+            try (InputStream input = Files.newInputStream(config.keystorePath())) {
+                keystore.load(input, config.keystorePassword());
+            }
+            KeyManagerFactory keyManagerFactory =
+                KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(keystore, config.keystorePassword());
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
+            return new HttpsConfigurator(sslContext);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to initialize TLS context", ex);
+        }
     }
 
     public void stop() {
@@ -428,7 +506,12 @@ public class WebWorkbenchServer {
 
     private Map<String, Object> readJsonObject(HttpExchange exchange) throws IOException {
         try (InputStream stream = exchange.getRequestBody()) {
-            String text = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            int limit = securityConfig.maxRequestBytes();
+            byte[] buffer = stream.readNBytes(limit + 1);
+            if (buffer.length > limit) {
+                throw new IOException("request body exceeds limit of " + limit + " bytes");
+            }
+            String text = new String(buffer, StandardCharsets.UTF_8);
             if (text.isBlank()) {
                 return Map.of();
             }
