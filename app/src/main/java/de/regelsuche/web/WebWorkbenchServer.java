@@ -121,6 +121,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/inventory", this::handleInventory));
         secure(server.createContext("/api/exports", this::handleExports));
         secure(server.createContext("/api/explain", this::handleExplain));
+        secure(server.createContext("/api/analyze", this::handleAnalyze));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
         server.start();
@@ -729,6 +730,98 @@ public class WebWorkbenchServer {
         } else {
             sendText(exchange, 200, explanationService.renderPath(match.get(), formEnum));
         }
+    }
+
+    private void handleAnalyze(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String suffix = path.substring("/api/analyze".length()).replaceFirst("^/", "");
+        if (!"move".equals(suffix)) {
+            sendStatus(exchange, 404, "expected /api/analyze/move?expression=...");
+            return;
+        }
+        String expression = queryParam(exchange, "expression", "");
+        if (expression.isBlank()) {
+            sendStatus(exchange, 400, "expression query parameter is required");
+            return;
+        }
+        de.regelsuche.api.searchgraph.SearchGraphDto graph = buildSearchGraph();
+        de.regelsuche.analyze.MoveAnalysisDto analysis =
+            new de.regelsuche.analyze.MoveAnalysisService().analyze(graph, expression);
+        sendJson(exchange, 200, moveAnalysisToJson(analysis));
+    }
+
+    private String moveAnalysisToJson(de.regelsuche.analyze.MoveAnalysisDto a) {
+        JsonWriter w = new JsonWriter();
+        w.beginObject();
+        w.property("expression", a.expression());
+        w.property("reason", a.reason());
+        w.property("mostUsefulRule", a.mostUsefulRule());
+        if (a.bestMove() != null) {
+            w.object("bestMove", inner -> writeMove(inner, a.bestMove()));
+        }
+        w.array("alternatives", arr -> {
+            for (var m : a.alternatives()) {
+                arr.objectValue(o -> writeMove(o, m));
+            }
+        });
+        w.array("deadEnds", arr -> {
+            for (var m : a.deadEnds()) {
+                arr.objectValue(o -> writeMove(o, m));
+            }
+        });
+        w.endObject();
+        return w.toString();
+    }
+
+    private static void writeMove(JsonWriter w, de.regelsuche.analyze.MoveAnalysisDto.Move m) {
+        w.property("ruleId", m.ruleId());
+        w.property("ruleKind", m.ruleKind());
+        w.property("toExpression", m.toExpression());
+        w.property("toLatex", m.toLatex());
+        w.property("scoreDelta", m.scoreDelta());
+        w.property("deadEnd", m.deadEnd());
+        w.property("isBest", m.isBest());
+        w.property("equivalencePreserving", m.equivalencePreserving());
+        w.stringArray("assumptions", m.assumptions());
+        w.stringArray("pathIds", m.pathIds());
+    }
+
+    private de.regelsuche.export.SearchAnalysisReportService.SearchAnalysisReportContext analysisReportContext() {
+        var transformations = graphStore.discoveredTransformations();
+        var best = transformations.stream()
+            .max(java.util.Comparator.comparingInt(DiscoveredTransformation::totalImprovement))
+            .orElse(null);
+        java.util.List<DiscoveredTransformation> alternatives;
+        if (best != null) {
+            alternatives = transformations.stream().filter(t -> !t.id().equals(best.id())).toList();
+        } else {
+            alternatives = java.util.List.of();
+        }
+        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);
+        var known = new de.regelsuche.mining.KnownRuleRepository();
+        var identities = macros.stream()
+            .map(m -> de.regelsuche.api.IdentityReportDto.from(m, known.statusFor(m.leftPattern(), m.rightPattern())))
+            .toList();
+        java.util.Set<String> assumptions = new java.util.LinkedHashSet<>();
+        for (var t : transformations) {
+            for (var step : t.steps()) {
+                if (!step.equivalencePreserving()) {
+                    assumptions.add("Pfad " + t.id() + ", Schritt " + step.stepIndex() + ": " + step.ruleId());
+                }
+            }
+        }
+        return new de.regelsuche.export.SearchAnalysisReportService.SearchAnalysisReportContext(
+            best == null ? "" : best.originalExpression(),
+            "DISCOVERY",
+            java.util.List.of("core"),
+            buildSearchGraph(),
+            best,
+            alternatives,
+            macros,
+            identities,
+            new java.util.ArrayList<>(assumptions),
+            inventoryRepository.findAll()
+        );
     }
 
     private void handleStatic(HttpExchange exchange) throws IOException {
