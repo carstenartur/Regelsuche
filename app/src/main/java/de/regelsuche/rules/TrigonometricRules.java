@@ -152,6 +152,9 @@ public final class TrigonometricRules {
                 return List.of();
             }
             Expr argument = tan.arguments().get(0);
+            // Symbol payload contains the function-call form `cos(arg)`. The SMT
+            // bridge parses function calls via `toSmtExpr`, the Lean bridge
+            // emits the expression text — both targets render this correctly.
             return List.of(Assumption.nonZero("cos(" + ExpressionFormatter.format(argument) + ")"));
         }
     }

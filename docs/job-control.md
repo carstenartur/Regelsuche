@@ -30,7 +30,7 @@ restored.restore(Path.of("jobs.json"));        // restauriert als PAUSED
 
 * **submit** legt den Job an, startet ihn auf dem ServiceFactory-Service und gibt einen Schnappschuss zurück.
 * **pause** signalisiert kooperativ; die laufende Strategie läuft bis zu ihrem nächsten Beobachterpunkt, dann fällt der Status auf `PAUSED`. Falls die Strategie keine kooperativen Punkte hat, wird der Service heruntergefahren und der Job auf `PAUSED` gesetzt.
-* **resume** startet den Job mit einem **frischen** Service erneut (von Anfang an). Das spiegelt die aktuelle Architektur wider – persistente, mittendrin fortsetzbare Checkpoints brauchen einen serializable Such-State und sind aktuell nicht implementiert.
+* **resume** startet den Job auf einem frischen Service neu. Wenn ein `SearchCheckpointRepository` konfiguriert ist, übernimmt der Manager den besten bisher gefundenen Ausdruck (`checkpoint.resumeSeed()`) als neuen Input statt von der Original-Eingabe zu beginnen. Der vollständige strategiespezifische Suchstack (z.B. komplette Beam-Frontier oder MCTS-Baum) wird **nicht** wiederhergestellt; das ist eine bewusste Vereinfachung. Siehe [`docs/checkpointing.md`](checkpointing.md).
 * **cancel** beendet endgültig (`CANCELLED`).
 * **checkpoint/restore** schreibt/liest die Jobtabelle als JSON. Restaurierte Jobs landen auf `PAUSED`, nicht automatisch im Lauf; `resume()` muss explizit gerufen werden.
 

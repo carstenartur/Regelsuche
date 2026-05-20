@@ -90,21 +90,25 @@
         const out = $('pathsList');
         let parsed = null;
         try { parsed = JSON.parse(raw); } catch (ex) { /* fallthrough */ }
-        if (!parsed || !parsed.paths || !parsed.paths.length) {
+        const list = parsed && (parsed.transformations || parsed.paths);
+        if (!list || !list.length) {
             out.innerHTML = '<div class="hint">Keine Pfade verfügbar. Starte zuerst eine Suche.</div>';
             return;
         }
         out.innerHTML = '';
-        parsed.paths.forEach((path) => {
+        list.forEach((path) => {
             const div = document.createElement('div');
             div.className = 'list-item clickable';
             const title = document.createElement('h4');
-            title.textContent = (path.originalExpression || '?') + ' → ' + (path.simplifiedExpression || '?');
+            const target = path.improvedExpression || path.simplifiedExpression || '?';
+            title.textContent = (path.originalExpression || '?') + ' → ' + target;
             div.appendChild(title);
             const meta = document.createElement('div');
             meta.className = 'meta';
-            meta.textContent = 'Tiefe ' + (path.depth || 0)
-                + ' · Verbesserung ' + (path.improvement || 0)
+            const depth = (path.steps && path.steps.length) || path.depth || 0;
+            const improvement = path.totalImprovement != null ? path.totalImprovement : (path.improvement || 0);
+            meta.textContent = 'Tiefe ' + depth
+                + ' · Verbesserung ' + improvement
                 + (path.id ? ' · id=' + path.id : '');
             div.appendChild(meta);
             if (path.id) {

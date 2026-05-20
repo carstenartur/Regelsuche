@@ -47,7 +47,6 @@ public class Neo4jRuleInventoryRepository implements RuleInventoryRepository {
                     + "rule.canonicalHash = $canonicalHash, "
                     + "rule.usageCount = $usageCount, "
                     + "rule.lastUsedAt = $lastUsedAt, "
-                    + "rule.version = coalesce(rule.version, 1) + CASE WHEN rule.canonicalHash IS NULL OR rule.canonicalHash = '' OR rule.canonicalHash = $canonicalHash THEN 0 ELSE 1 END, "
                     + "rule.enabled = coalesce(rule.enabled, true), "
                     + "rule.tags = coalesce(rule.tags, [])",
                 params

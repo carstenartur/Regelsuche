@@ -122,6 +122,7 @@ public class ParameterRelationMiner {
                 case ADD -> NormalizedNode.add(children);
                 case MUL -> NormalizedNode.multiply(children);
                 case POW -> NormalizedNode.pow(children.get(0), children.get(1));
+                case FUNCTION -> NormalizedNode.function(node.name(), children);
             };
         }
     }

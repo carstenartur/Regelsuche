@@ -160,7 +160,8 @@ public class SymPyEquivalenceService implements EquivalenceService {
             case "sin" -> Math.sin(argument);
             case "cos" -> Math.cos(argument);
             case "tan" -> Math.tan(argument);
-            case "log", "ln" -> argument <= 0 ? Double.NaN : Math.log(argument);
+            case "log" -> argument <= 0 ? Double.NaN : Math.log10(argument);
+            case "ln" -> argument <= 0 ? Double.NaN : Math.log(argument);
             case "sqrt" -> argument < 0 ? Double.NaN : Math.sqrt(argument);
             case "exp" -> Math.exp(argument);
             case "abs" -> Math.abs(argument);

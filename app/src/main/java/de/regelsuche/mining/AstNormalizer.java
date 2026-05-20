@@ -33,8 +33,10 @@ public class AstNormalizer {
             return NormalizedNode.variable(canonicalName);
         }
         if (expression instanceof FunctionExpr functionExpr) {
-            throw new IllegalArgumentException(
-                "Mining does not yet support function expressions like '" + functionExpr.name() + "(...)'");
+            List<NormalizedNode> args = functionExpr.arguments().stream()
+                .map(arg -> normalize(arg, variables))
+                .toList();
+            return NormalizedNode.function(functionExpr.name(), args);
         }
         BinaryExpr binaryExpr = (BinaryExpr) expression;
         NormalizedNode left = normalize(binaryExpr.left(), variables);

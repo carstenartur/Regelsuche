@@ -39,5 +39,5 @@ So liefern `rational_cancel_common_factor`, `rational_multiply_fractions` und `r
 
 ## Aktueller Stand
 
-* `RationalRules` ist die erste Regelfamilie, die Assumptions tatsächlich emittiert.
+* `RationalRules` war die erste Regelfamilie, die Assumptions emittiert hat. Inzwischen erzeugen auch `LogarithmicRules` (`POSITIVE` für Argumente von `log`/`ln`), `RadicalRules` (`NON_NEGATIVE` für Argumente von `sqrt`), `TrigonometricRules` (`NON_ZERO` für `cos(arg)` bei `tan → sin/cos`) und `CalculusBasicRules` (`POSITIVE` für `exp(log(x)) → x`) konkrete Assumptions.
 * Die Such- und Mining-Pipelines tragen Assumptions noch nicht automatisch entlang von Pfaden – dafür ist `AssumptionContext` als Sammelpunkt vorbereitet, aber die `TransformationSearchService`-Integration ist eine spätere Erweiterung (siehe `limits.md`).

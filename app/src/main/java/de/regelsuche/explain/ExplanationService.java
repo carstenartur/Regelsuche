@@ -22,6 +22,8 @@ public class ExplanationService {
     public enum Form {
         /** One short line per step (e.g. {@code a*(b+c) = a*b + a*c}). */
         SHORT,
+        /** Numbered step-by-step rendering. Alias of {@link #SHORT} kept for UI clarity. */
+        STEPS,
         /** Verbose, classroom-style German explanation. */
         SCHOOL,
         /** Technical: lists rule id, kind and cost delta. */
@@ -34,7 +36,7 @@ public class ExplanationService {
 
     public String renderStep(TransformationStep step, Form form) {
         return switch (form) {
-            case SHORT -> step.beforeExpression() + " = " + step.afterExpression();
+            case SHORT, STEPS -> step.beforeExpression() + " = " + step.afterExpression();
             case SCHOOL -> renderSchool(step);
             case EXPERT -> renderExpert(step);
             case LATEX -> toLatex(step.beforeExpression()) + " \\;\\rightarrow\\; " + toLatex(step.afterExpression());

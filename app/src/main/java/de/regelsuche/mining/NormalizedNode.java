@@ -14,6 +14,7 @@ final class NormalizedNode {
         ADD,
         MUL,
         POW,
+        FUNCTION,
         PLACEHOLDER
     }
 
@@ -43,6 +44,10 @@ final class NormalizedNode {
 
     static NormalizedNode pow(NormalizedNode base, NormalizedNode exponent) {
         return new NormalizedNode(Kind.POW, null, null, List.of(base, exponent));
+    }
+
+    static NormalizedNode function(String name, List<NormalizedNode> arguments) {
+        return new NormalizedNode(Kind.FUNCTION, null, name, arguments);
     }
 
     static NormalizedNode add(List<NormalizedNode> terms) {
@@ -128,6 +133,9 @@ final class NormalizedNode {
             case ADD -> formatAdd();
             case MUL -> formatMul();
             case POW -> parenthesize(children.get(0), Kind.POW) + "^" + parenthesize(children.get(1), Kind.POW);
+            case FUNCTION -> name + "(" + children.stream()
+                .map(NormalizedNode::canonicalString)
+                .collect(Collectors.joining(",")) + ")";
         };
     }
 
@@ -143,6 +151,9 @@ final class NormalizedNode {
             case ADD -> children.stream().map(child -> child.skeletonString(false)).collect(Collectors.joining("+", "add(", ")"));
             case MUL -> children.stream().map(child -> child.skeletonString(false)).collect(Collectors.joining("*", "mul(", ")"));
             case POW -> "pow(" + children.get(0).skeletonString(false) + "," + children.get(1).skeletonString(true) + ")";
+            case FUNCTION -> name + "(" + children.stream()
+                .map(child -> child.skeletonString(false))
+                .collect(Collectors.joining(",")) + ")";
         };
     }
 
@@ -152,6 +163,17 @@ final class NormalizedNode {
         }
         if (kind == Kind.VARIABLE) {
             return name.equals(other.name);
+        }
+        if (kind == Kind.FUNCTION) {
+            if (!name.equals(other.name)) {
+                return false;
+            }
+            for (int i = 0; i < children.size(); i++) {
+                if (!children.get(i).sameShape(other.children.get(i))) {
+                    return false;
+                }
+            }
+            return true;
         }
         if (kind == Kind.NUMBER || kind == Kind.PLACEHOLDER) {
             return true;
@@ -211,6 +233,7 @@ final class NormalizedNode {
             case VARIABLE, PLACEHOLDER -> "2:" + canonical;
             case NUMBER -> "9:" + Math.abs(number);
             case ADD -> "5:" + canonical;
+            case FUNCTION -> "6:" + canonical;
         };
     }
 
