@@ -5,6 +5,7 @@ import de.regelsuche.algebra.QuadraticCoefficients;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -117,6 +118,10 @@ public class SymPyEquivalenceService implements EquivalenceService {
         } else if (expression instanceof BinaryExpr binaryExpr) {
             collectVariables(binaryExpr.left(), variables);
             collectVariables(binaryExpr.right(), variables);
+        } else if (expression instanceof FunctionExpr functionExpr) {
+            for (Expr argument : functionExpr.arguments()) {
+                collectVariables(argument, variables);
+            }
         }
     }
 
@@ -126,6 +131,9 @@ public class SymPyEquivalenceService implements EquivalenceService {
         }
         if (expression instanceof VariableExpr variableExpr) {
             return variables.getOrDefault(variableExpr.name(), 0.0);
+        }
+        if (expression instanceof FunctionExpr functionExpr) {
+            return evaluateFunction(functionExpr, variables);
         }
         BinaryExpr binaryExpr = (BinaryExpr) expression;
         double left = evaluate(binaryExpr.left(), variables);
@@ -137,6 +145,26 @@ public class SymPyEquivalenceService implements EquivalenceService {
             case MUL -> left * right;
             case DIV -> Math.abs(right) < 1e-12 ? Double.NaN : left / right;
             case POW -> Math.pow(left, right);
+        };
+    }
+
+    private double evaluateFunction(FunctionExpr functionExpr, Map<String, Double> variables) {
+        if (functionExpr.arguments().size() != 1) {
+            return Double.NaN;
+        }
+        double argument = evaluate(functionExpr.arguments().get(0), variables);
+        if (!Double.isFinite(argument)) {
+            return Double.NaN;
+        }
+        return switch (functionExpr.name()) {
+            case "sin" -> Math.sin(argument);
+            case "cos" -> Math.cos(argument);
+            case "tan" -> Math.tan(argument);
+            case "log", "ln" -> argument <= 0 ? Double.NaN : Math.log(argument);
+            case "sqrt" -> argument < 0 ? Double.NaN : Math.sqrt(argument);
+            case "exp" -> Math.exp(argument);
+            case "abs" -> Math.abs(argument);
+            default -> Double.NaN;
         };
     }
 }

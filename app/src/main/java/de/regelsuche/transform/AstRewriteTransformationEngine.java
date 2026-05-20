@@ -3,6 +3,7 @@ package de.regelsuche.transform;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.input.InputRequest;
@@ -106,6 +107,20 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                     new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rightRewrite.expression()),
                     rightRewrite.sourceSubtreeHash()
                 ));
+            }
+        } else if (subtree instanceof FunctionExpr functionExpr) {
+            List<Expr> arguments = functionExpr.arguments();
+            for (int index = 0; index < arguments.size(); index++) {
+                final int position = index;
+                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index))) {
+                    List<Expr> replaced = new ArrayList<>(arguments);
+                    replaced.set(position, argRewrite.expression());
+                    results.add(new RewriteResult(
+                        argRewrite.rule(),
+                        new FunctionExpr(functionExpr.name(), replaced),
+                        argRewrite.sourceSubtreeHash()
+                    ));
+                }
             }
         }
         return results;

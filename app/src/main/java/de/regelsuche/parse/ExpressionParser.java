@@ -4,6 +4,7 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.input.InputRequest;
@@ -136,7 +137,26 @@ public class ExpressionParser {
         while (cursor.peekLetterOrDigitOrUnderscore()) {
             cursor.advance();
         }
-        return new VariableExpr(cursor.slice(start, cursor.position()));
+        String name = cursor.slice(start, cursor.position());
+        cursor.skipWhitespace();
+        if (cursor.peek('(')) {
+            cursor.advance();
+            List<Expr> arguments = new ArrayList<>();
+            cursor.skipWhitespace();
+            if (!cursor.peek(')')) {
+                arguments.add(parseExpression(cursor));
+                cursor.skipWhitespace();
+                while (cursor.consume(',')) {
+                    arguments.add(parseExpression(cursor));
+                    cursor.skipWhitespace();
+                }
+            }
+            if (!cursor.consume(')')) {
+                throw new IllegalArgumentException("Missing closing ')' after function arguments at position " + cursor.position());
+            }
+            return new FunctionExpr(name, arguments);
+        }
+        return new VariableExpr(name);
     }
 
     private static final class Cursor {

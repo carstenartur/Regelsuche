@@ -3,6 +3,7 @@ package de.regelsuche.canonical;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
@@ -49,6 +50,13 @@ public class ExpressionCanonicalizer {
                 case DIV -> new BinaryExpr(canonicalize(binaryExpr.left()), BinaryOperator.DIV, canonicalize(binaryExpr.right()));
                 case POW -> canonicalizePower(binaryExpr);
             };
+        }
+        if (expression instanceof FunctionExpr functionExpr) {
+            List<Expr> normalised = new ArrayList<>(functionExpr.arguments().size());
+            for (Expr argument : functionExpr.arguments()) {
+                normalised.add(canonicalize(argument));
+            }
+            return new FunctionExpr(functionExpr.name(), normalised);
         }
         return expression;
     }
@@ -205,6 +213,13 @@ public class ExpressionCanonicalizer {
     private int count(Expr expression) {
         if (expression instanceof BinaryExpr binaryExpr) {
             return 1 + count(binaryExpr.left()) + count(binaryExpr.right());
+        }
+        if (expression instanceof FunctionExpr functionExpr) {
+            int total = 1;
+            for (Expr argument : functionExpr.arguments()) {
+                total += count(argument);
+            }
+            return total;
         }
         return 1;
     }

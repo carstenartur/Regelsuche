@@ -55,6 +55,11 @@ public record Assumption(Kind kind, String expression, List<String> symbols) {
         return new Assumption(Kind.POSITIVE, argument + " > 0", List.of(argument));
     }
 
+    /** {@code argument >= 0}, useful for square-root identities. */
+    public static Assumption nonNegative(String argument) {
+        return new Assumption(Kind.NON_NEGATIVE, argument + " >= 0", List.of(argument));
+    }
+
     @Override
     public String toString() {
         return kind + "(" + expression + ")";

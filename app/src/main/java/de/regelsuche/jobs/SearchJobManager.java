@@ -1,5 +1,8 @@
 package de.regelsuche.jobs;
 
+import de.regelsuche.checkpoint.InMemorySearchCheckpointRepository;
+import de.regelsuche.checkpoint.SearchCheckpoint;
+import de.regelsuche.checkpoint.SearchCheckpointRepository;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.search.SimplificationSuccess;
@@ -8,13 +11,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,9 +57,22 @@ import java.util.function.Function;
 public class SearchJobManager {
     private final Map<String, JobHandle> jobs = new ConcurrentHashMap<>();
     private final Function<SearchJob, TransformationSearchService> serviceFactory;
+    private final SearchCheckpointRepository checkpointRepository;
 
     public SearchJobManager(Function<SearchJob, TransformationSearchService> serviceFactory) {
+        this(serviceFactory, new InMemorySearchCheckpointRepository());
+    }
+
+    public SearchJobManager(
+        Function<SearchJob, TransformationSearchService> serviceFactory,
+        SearchCheckpointRepository checkpointRepository
+    ) {
         this.serviceFactory = serviceFactory;
+        this.checkpointRepository = checkpointRepository;
+    }
+
+    public SearchCheckpointRepository checkpointRepository() {
+        return checkpointRepository;
     }
 
     public SearchJob submit(String expression, InputType inputType, String profile, List<String> notes) {
@@ -103,7 +122,7 @@ public class SearchJobManager {
         if (handle == null) {
             return Optional.empty();
         }
-        handle.resume();
+        handle.resumeFromCheckpoint();
         return Optional.of(handle.snapshot());
     }
 
@@ -361,6 +380,43 @@ public class SearchJobManager {
             launch(running);
         }
 
+        /**
+         * Resume from the latest stored {@link SearchCheckpoint} if any. The
+         * job's effective input is rebuilt from the checkpoint's
+         * {@link SearchCheckpoint#resumeSeed() resume seed} so that the
+         * resumed search continues from progress instead of starting over.
+         */
+        void resumeFromCheckpoint() {
+            SearchJob current = state.get();
+            if (current.state() == SearchJob.State.RUNNING) {
+                return;
+            }
+            pauseRequested = false;
+            Optional<SearchCheckpoint> checkpoint = checkpointRepository.findByJobId(current.id());
+            if (checkpoint.isPresent()) {
+                SearchCheckpoint cp = checkpoint.get();
+                SearchJob resumed = new SearchJob(
+                    current.id(),
+                    cp.resumeSeed(),
+                    current.inputType(),
+                    current.profile(),
+                    SearchJob.State.RUNNING,
+                    current.createdAt(),
+                    Instant.now(),
+                    current.discoveredSuccesses(),
+                    current.exploredStates(),
+                    current.bestExpression(),
+                    current.bestImprovement(),
+                    current.notes()
+                );
+                state.set(resumed);
+                launch(resumed);
+            } else {
+                SearchJob running = state.updateAndGet(snapshot -> snapshot.withState(SearchJob.State.RUNNING));
+                launch(running);
+            }
+        }
+
         void requestPause() {
             pauseRequested = true;
             TransformationSearchService service = activeService;
@@ -398,6 +454,10 @@ public class SearchJobManager {
                 int improvement = best.map(SimplificationSuccess::improvement).orElse(0);
                 state.updateAndGet(current ->
                     current.withProgress(explored, successes.size(), bestExpr, improvement));
+
+                // Always persist a checkpoint so a later resume can pick up.
+                writeCheckpoint(service, successes);
+
                 if (error != null) {
                     state.updateAndGet(current -> current.withState(SearchJob.State.FAILED));
                 } else if (pauseRequested && state.get().state() != SearchJob.State.CANCELLED) {
@@ -410,6 +470,39 @@ public class SearchJobManager {
             } finally {
                 service.shutdown();
             }
+        }
+
+        private void writeCheckpoint(TransformationSearchService service, List<SimplificationSuccess> successes) {
+            SearchJob current = state.get();
+            // Use the visited node set from the graph snapshot as a proxy for
+            // already-explored states. The frontier is the best successes (sorted
+            // by improvement descending) so resume can re-seed from the most
+            // promising state.
+            Set<String> visited = new LinkedHashSet<>(service.getGraphSnapshot().nodes());
+            List<SearchCheckpoint.BestPath> bestPaths = successes.stream()
+                .sorted(Comparator.comparingInt(SimplificationSuccess::improvement).reversed())
+                .limit(16)
+                .map(success -> new SearchCheckpoint.BestPath(
+                    success.simplifiedExpression(),
+                    success.improvement(),
+                    success.transformationRule() == null ? "" : success.transformationRule()))
+                .toList();
+            List<String> frontier = bestPaths.stream()
+                .map(SearchCheckpoint.BestPath::expression)
+                .toList();
+            SearchCheckpoint checkpoint = new SearchCheckpoint(
+                current.id(),
+                current.expression(),
+                current.profile(),
+                "default",
+                frontier,
+                List.copyOf(visited),
+                bestPaths,
+                current.id().hashCode(),
+                current.createdAt(),
+                Instant.now()
+            );
+            checkpointRepository.save(checkpoint);
         }
     }
 

@@ -66,6 +66,10 @@ public class ParameterRelationEvaluator {
             Integer value = bindings.get(variable.name());
             return value == null ? OptionalInt.empty() : OptionalInt.of(value);
         }
+        if (node instanceof PatternFunction) {
+            // Function patterns cannot be reduced to integer parameter relations.
+            return OptionalInt.empty();
+        }
         PatternBinary binary = (PatternBinary) node;
         OptionalInt left = evaluate(binary.left(), bindings);
         OptionalInt right = evaluate(binary.right(), bindings);

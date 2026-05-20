@@ -3,6 +3,7 @@ package de.regelsuche.mining;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.input.InputRequest;
@@ -30,6 +31,10 @@ public class AstNormalizer {
         if (expression instanceof VariableExpr variableExpr) {
             String canonicalName = variables.computeIfAbsent(variableExpr.name(), key -> variables.isEmpty() ? "x" : "v" + variables.size());
             return NormalizedNode.variable(canonicalName);
+        }
+        if (expression instanceof FunctionExpr functionExpr) {
+            throw new IllegalArgumentException(
+                "Mining does not yet support function expressions like '" + functionExpr.name() + "(...)'");
         }
         BinaryExpr binaryExpr = (BinaryExpr) expression;
         NormalizedNode left = normalize(binaryExpr.left(), variables);

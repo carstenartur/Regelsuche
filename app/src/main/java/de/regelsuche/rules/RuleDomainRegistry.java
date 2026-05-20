@@ -21,6 +21,10 @@ public final class RuleDomainRegistry {
     public static final String CORE = "core";
     public static final String POLYNOMIAL = "polynomial";
     public static final String RATIONAL = "rational";
+    public static final String TRIGONOMETRIC = "trigonometric";
+    public static final String LOGARITHMIC = "logarithmic";
+    public static final String RADICAL = "radical";
+    public static final String CALCULUS_BASIC = "calculus_basic";
 
     private final Map<String, RuleDomain> domains = new LinkedHashMap<>();
 
@@ -31,6 +35,14 @@ public final class RuleDomainRegistry {
             PolynomialRules.rules()));
         register(new SimpleRuleDomain(RATIONAL, "Bruchregeln (Kürzen, gemeinsamer Nenner, Multiplikation, Division)",
             RationalRules.rules()));
+        register(new SimpleRuleDomain(TRIGONOMETRIC, "Trigonometrische Identitäten (Pythagoras, Doppelwinkel)",
+            TrigonometricRules.rules()));
+        register(new SimpleRuleDomain(LOGARITHMIC, "Logarithmische Identitäten mit Positivitäts-Assumptions",
+            LogarithmicRules.rules()));
+        register(new SimpleRuleDomain(RADICAL, "Wurzelregeln (sqrt(a^2)=abs(a), Produkt-/Quotientenregel)",
+            RadicalRules.rules()));
+        register(new SimpleRuleDomain(CALCULUS_BASIC, "Basis Analysis (exp/log-Inversion)",
+            CalculusBasicRules.rules()));
     }
 
     public RuleDomainRegistry register(RuleDomain domain) {
