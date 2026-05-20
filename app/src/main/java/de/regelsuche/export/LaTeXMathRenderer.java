@@ -24,16 +24,22 @@ public class LaTeXMathRenderer implements MathRenderer {
             body.append(toLatex(path.originalExpression()))
                 .append(" &\\rightarrow ")
                 .append(toLatex(path.improvedExpression()))
-                .append("\\\\\n");
+                .append(" \\tag{0}\\\\\n");
         } else {
             body.append(toLatex(steps.get(0).beforeExpression()))
                 .append(" &\\rightarrow ")
                 .append(toLatex(steps.get(0).afterExpression()))
-                .append("\\\\\n");
+                .append(" && \\text{(")
+                .append(escapeText(steps.get(0).ruleId()))
+                .append(")} \\tag{1}\\\\\n");
             for (int i = 1; i < steps.size(); i++) {
                 body.append("        &\\rightarrow ")
                     .append(toLatex(steps.get(i).afterExpression()))
-                    .append("\\\\\n");
+                    .append(" && \\text{(")
+                    .append(escapeText(steps.get(i).ruleId()))
+                    .append(")} \\tag{")
+                    .append(i + 1)
+                    .append("}\\\\\n");
             }
         }
         body.append("\\end{align*}\n");
@@ -48,5 +54,9 @@ public class LaTeXMathRenderer implements MathRenderer {
 
     private String toLatex(String expression) {
         return expression.replace("*", " \\cdot ");
+    }
+
+    private String escapeText(String value) {
+        return value.replace("_", "\\_");
     }
 }

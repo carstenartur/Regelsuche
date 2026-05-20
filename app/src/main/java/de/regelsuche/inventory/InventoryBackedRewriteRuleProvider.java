@@ -60,7 +60,7 @@ public class InventoryBackedRewriteRuleProvider {
                         + configuration.minProofStatus()));
                 continue;
             }
-            if (!configuration.allows(reusableRule.id())) {
+            if (!configuration.allows(reusableRule.id()) || !repository.isEnabled(reusableRule.id())) {
                 lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
                     "Rule id " + reusableRule.id() + " not allowed by allow/deny/disabled list"));
                 continue;

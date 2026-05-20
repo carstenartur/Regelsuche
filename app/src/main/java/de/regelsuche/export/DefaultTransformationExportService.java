@@ -66,8 +66,10 @@ public class DefaultTransformationExportService implements TransformationExportS
     @Override
     public String exportMermaid(List<DiscoveredTransformation> transformations) {
         StringBuilder builder = new StringBuilder("graph TD\n");
+        StringBuilder classAssignments = new StringBuilder();
         for (DiscoveredTransformation transformation : transformations) {
             String nodePrefix = "P" + Integer.toUnsignedString(transformation.id().hashCode()) + "_";
+            String cssClass = mermaidStatusClass(transformation.validationStatus());
             int stepIndex = 0;
             for (TransformationStep step : transformation.steps()) {
                 String from = nodePrefix + stepIndex;
@@ -75,10 +77,32 @@ public class DefaultTransformationExportService implements TransformationExportS
                 builder.append("  ").append(from).append("[\"").append(escapeMermaid(step.beforeExpression())).append("\"]")
                     .append(" -->|").append(escapeMermaid(step.ruleId())).append("| ")
                     .append(to).append("[\"").append(escapeMermaid(step.afterExpression())).append("\"]\n");
+                if (stepIndex == 0) {
+                    classAssignments.append("  class ").append(from).append(' ').append(cssClass).append(";\n");
+                }
+                classAssignments.append("  class ").append(to).append(' ').append(cssClass).append(";\n");
                 stepIndex++;
             }
         }
+        builder.append(classAssignments);
+        if (!transformations.isEmpty()) {
+            builder.append("  classDef observed fill:#eeeeee,stroke:#888;\n");
+            builder.append("  classDef validated fill:#e6f4ea,stroke:#34a853;\n");
+            builder.append("  classDef symbolic fill:#fff7cc,stroke:#f4b400;\n");
+            builder.append("  classDef formal fill:#cfe2ff,stroke:#1a73e8;\n");
+            builder.append("  classDef rejected fill:#fce8e6,stroke:#ea4335;\n");
+        }
         return builder.toString();
+    }
+
+    private String mermaidStatusClass(de.regelsuche.mining.CandidateProofStatus status) {
+        return switch (status) {
+            case FORMALLY_PROVED, FORMALLY_PROVABLE -> "formal";
+            case SYMBOLICALLY_VERIFIED -> "symbolic";
+            case VALIDATED_BY_EXAMPLES -> "validated";
+            case REJECTED -> "rejected";
+            case OBSERVED -> "observed";
+        };
     }
 
     private void writeTransformation(JsonWriter writer, DiscoveredTransformation transformation) {

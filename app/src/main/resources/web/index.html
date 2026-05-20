@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Regelsuche Workbench</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+    <h1>Regelsuche – Mathematik-Workbench</h1>
+    <p>Eingebetteter REST/HTML-Client für lokale Exploration entdeckter Umformungen.</p>
+</header>
+
+<main>
+    <section>
+        <h2>Suche starten</h2>
+        <form id="searchForm">
+            <label>
+                Ausdruck:
+                <input type="text" name="expression" value="(x + 1)*(x + 1)" required>
+            </label>
+            <label>
+                Typ:
+                <select name="type">
+                    <option value="TERM" selected>TERM</option>
+                    <option value="EQUATION">EQUATION</option>
+                </select>
+            </label>
+            <label>
+                Profil:
+                <select name="profile">
+                    <option value="FAST_SIMPLIFY">Schnelle Vereinfachung</option>
+                    <option value="DISCOVERY" selected>Erkundung / Discovery</option>
+                    <option value="TEACHING">Didaktik</option>
+                    <option value="PROOF_ORIENTED">Beweisorientiert</option>
+                    <option value="EXHAUSTIVE_SMALL">Erschöpfend (klein)</option>
+                </select>
+            </label>
+            <button type="submit">Suche starten</button>
+        </form>
+        <pre id="searchOutput" class="output"></pre>
+    </section>
+
+    <section>
+        <h2>Gefundene Pfade</h2>
+        <button id="reloadPaths">Pfadliste aktualisieren</button>
+        <pre id="pathsOutput" class="output"></pre>
+    </section>
+
+    <section>
+        <h2>Regelinventar</h2>
+        <button id="reloadInventory">Inventar aktualisieren</button>
+        <pre id="inventoryOutput" class="output"></pre>
+    </section>
+
+    <section>
+        <h2>Exporte</h2>
+        <p>
+            <a href="/api/exports/markdown" target="_blank">Markdown</a> ·
+            <a href="/api/exports/latex" target="_blank">LaTeX</a> ·
+            <a href="/api/exports/mermaid" target="_blank">Mermaid (Graph)</a> ·
+            <a href="/api/exports/json" target="_blank">JSON-Bundle</a>
+        </p>
+    </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
