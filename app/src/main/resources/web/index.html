@@ -20,6 +20,7 @@
         <button class="tab" data-tab="identities">Identitäten</button>
         <button class="tab" data-tab="dashboard">Dashboard</button>
         <button class="tab" data-tab="replay">Replay</button>
+        <button class="tab" data-tab="compare">Vergleich</button>
         <button class="tab" data-tab="inventory">Inventar</button>
         <button class="tab" data-tab="exports">Exporte</button>
         <button class="tab" data-tab="help">Hilfe</button>
@@ -116,10 +117,21 @@
                         <option value="transformations">Pfade (klassische Mermaid-Ansicht)</option>
                     </select>
                 </label>
+                <label class="field inline">
+                    <span>Filter:</span>
+                    <input type="text" id="graphFilter" placeholder="bestPath=true,hideDeadEnds=true,ruleKind=NORMALIZE">
+                </label>
+                <label class="field inline">
+                    <input type="checkbox" id="graphInteractive" checked>
+                    <span>Interaktiv (Cytoscape)</span>
+                </label>
             </div>
-            <p class="hint">Mermaid-Quelltext. Klassen <code>best</code> markieren den besten Pfad,
-                <code>deadend</code> markiert Sackgassen. Kann in <code>mermaid.live</code> oder im
-                Markdown-Editor gerendert werden.</p>
+            <p class="hint">Im interaktiven Modus rendert <code>cytoscape.js</code> den Suchgraph als
+                zoom-/pan-/klickbare Visualisierung mit Inspector-Panel.
+                Fällt automatisch auf die Mermaid-Quelltext-Ansicht zurück, wenn das CDN nicht erreichbar ist.
+                LaTeX im Inspector wird über <code>MathJax</code> gerendert.</p>
+            <div id="graphCanvas" class="graph-canvas" style="height:520px;border:1px solid #ddd;border-radius:8px;background:#fafafa;display:none;"></div>
+            <div id="graphInspector" class="graph-inspector" style="display:none;"></div>
             <pre id="graphOutput" class="output mono"></pre>
         </div>
     </section>
@@ -180,6 +192,27 @@
             <div id="replayCanvas" class="replay-canvas"></div>
             <p class="hint">Zeigt jeden Schritt mit LaTeX-Darstellung und Regelbegründung.
                 Play durchläuft die Schritte mit 1.2 s Pause.</p>
+        </div>
+    </section>
+
+    <!-- ─────────── Compare tab ─────────── -->
+    <section id="tab-compare" class="tab-panel">
+        <div class="card">
+            <h2>Pfade vergleichen</h2>
+            <div class="actions">
+                <label class="field inline">
+                    <span>Links:</span>
+                    <select id="compareLeftSelect"></select>
+                </label>
+                <label class="field inline">
+                    <span>Rechts:</span>
+                    <select id="compareRightSelect"></select>
+                </label>
+                <button id="compareLoad" class="primary">Vergleichen</button>
+            </div>
+            <p class="hint">Side-by-Side-Vergleich: gemeinsame Knoten/Regeln, Step-Diffs, Teaching-Scores,
+                Annahmen-Anzahl, und Empfehlung welcher Pfad kürzer / didaktischer / mit weniger Annahmen ist.</p>
+            <div id="compareOutput" class="output mono"></div>
         </div>
     </section>
 

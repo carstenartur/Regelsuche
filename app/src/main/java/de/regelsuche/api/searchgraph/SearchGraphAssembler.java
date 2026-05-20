@@ -28,13 +28,25 @@ import java.util.Set;
 public final class SearchGraphAssembler {
 
     private final MathRenderer latex;
+    private final MacroSequenceClusterer macroClusterer;
+    private final StructuralExpressionClusterer structuralClusterer;
 
     public SearchGraphAssembler() {
         this(new LaTeXMathRenderer());
     }
 
     public SearchGraphAssembler(MathRenderer latex) {
+        this(latex, new MacroSequenceClusterer(), new StructuralExpressionClusterer());
+    }
+
+    public SearchGraphAssembler(
+        MathRenderer latex,
+        MacroSequenceClusterer macroClusterer,
+        StructuralExpressionClusterer structuralClusterer
+    ) {
         this.latex = Objects.requireNonNull(latex);
+        this.macroClusterer = Objects.requireNonNull(macroClusterer);
+        this.structuralClusterer = Objects.requireNonNull(structuralClusterer);
     }
 
     public SearchGraphDto assemble(GraphSnapshot snapshot, List<SimplificationSuccess> successes) {
@@ -46,6 +58,16 @@ public final class SearchGraphAssembler {
         List<SimplificationSuccess> successes,
         List<RuleCandidate> candidates,
         int macroRuleCount
+    ) {
+        return assemble(snapshot, successes, candidates, macroRuleCount, List.of());
+    }
+
+    public SearchGraphDto assemble(
+        GraphSnapshot snapshot,
+        List<SimplificationSuccess> successes,
+        List<RuleCandidate> candidates,
+        int macroRuleCount,
+        List<de.regelsuche.discovery.DiscoveredTransformation> transformations
     ) {
         Objects.requireNonNull(snapshot, "snapshot");
         successes = successes == null ? List.of() : successes;
@@ -155,6 +177,11 @@ public final class SearchGraphAssembler {
         for (Map.Entry<String, List<String>> entry : nodesByCluster.entrySet()) {
             clusterDtos.add(new SearchGraphClusterDto(entry.getKey(), entry.getKey(), entry.getValue()));
         }
+        // Augment with macro-sequence and structural clusters when transformations are supplied.
+        if (transformations != null && !transformations.isEmpty()) {
+            clusterDtos.addAll(macroClusterer.cluster(transformations));
+        }
+        clusterDtos.addAll(structuralClusterer.cluster(orderedNodes));
 
         SearchGraphStatsDto stats = SearchGraphStatsService.compute(
             snapshot,

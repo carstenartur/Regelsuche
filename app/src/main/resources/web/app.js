@@ -13,6 +13,26 @@
  * UI is still usable when an endpoint is missing.
  */
 (() => {
+    // Optional CDN libraries for the interactive Cytoscape graph view and
+    // MathJax-based inline LaTeX. Loaded dynamically so the static HTML
+    // contains no third-party <script src=...> tags (avoids SRI churn and
+    // means the workbench works offline with the Mermaid fallback).
+    function loadCdnScript(src) {
+        return new Promise((resolve) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.crossOrigin = 'anonymous';
+            s.referrerPolicy = 'no-referrer';
+            s.onload = () => resolve(true);
+            s.onerror = () => { window.__cytoscapeFailed = true; resolve(false); };
+            document.head.appendChild(s);
+        });
+    }
+    // Fire-and-forget; functions guard on `typeof cytoscape === 'function'`.
+    loadCdnScript('https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js');
+    loadCdnScript('https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js');
+
     const $ = (id) => document.getElementById(id);
     const setStatus = (msg, level = '') => {
         const el = $('searchStatus');
@@ -135,16 +155,132 @@
     /* ─── Graph tab ─── */
     $('reloadGraph').addEventListener('click', async () => {
         const out = $('graphOutput');
+        const canvas = $('graphCanvas');
+        const inspector = $('graphInspector');
+        const filter = $('graphFilter') && $('graphFilter').value || '';
+        const interactive = $('graphInteractive') && $('graphInteractive').checked;
+        const filterQuery = filter ? ('?filter=' + encodeURIComponent(filter)) : '';
+        const source = $('graphSource') && $('graphSource').value || 'search-graph';
         out.textContent = 'Lade …';
+        if (canvas) canvas.style.display = 'none';
+        if (inspector) { inspector.style.display = 'none'; inspector.innerHTML = ''; }
         try {
-            const source = $('graphSource') && $('graphSource').value || 'search-graph';
-            const url = source === 'search-graph' ? '/api/exports/search-graph.mmd' : '/api/graph';
+            if (interactive && source === 'search-graph' && typeof cytoscape === 'function' && !window.__cytoscapeFailed) {
+                const response = await fetch('/api/search-graph' + filterQuery);
+                const data = await response.json();
+                renderCytoscape(data);
+                out.textContent = '(Interaktive Cytoscape-Ansicht aktiv – Mermaid-Quelltext unten ist Fallback.)';
+                const mermaidResp = await fetch('/api/exports/search-graph.mmd' + filterQuery);
+                out.textContent = (await mermaidResp.text());
+                return;
+            }
+            const url = source === 'search-graph' ? ('/api/exports/search-graph.mmd' + filterQuery) : '/api/graph';
             const response = await fetch(url);
             out.textContent = await response.text();
         } catch (ex) {
             out.textContent = 'Fehler: ' + ex;
         }
     });
+
+    function renderCytoscape(graph) {
+        const canvas = $('graphCanvas');
+        const inspector = $('graphInspector');
+        if (!canvas || typeof cytoscape !== 'function') {
+            return;
+        }
+        canvas.style.display = 'block';
+        canvas.innerHTML = '';
+        const elements = [];
+        (graph.nodes || []).forEach(n => elements.push({ data: { id: n.id, label: n.expression, payload: n } }));
+        (graph.edges || []).forEach(e => elements.push({
+            data: { id: e.from + '->' + e.to + ':' + e.ruleId, source: e.from, target: e.to, label: e.ruleId, payload: e }
+        }));
+        const cy = cytoscape({
+            container: canvas,
+            elements: elements,
+            style: [
+                { selector: 'node', style: { 'label': 'data(label)', 'font-size': 10, 'background-color': '#3b82f6', 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center' } },
+                { selector: 'node[?payload.isBest]', style: { 'background-color': '#10b981' } },
+                { selector: 'node[?payload.isDeadEnd]', style: { 'background-color': '#9ca3af' } },
+                { selector: 'edge', style: { 'label': 'data(label)', 'font-size': 8, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle' } }
+            ],
+            layout: { name: 'breadthfirst', spacingFactor: 1.2 }
+        });
+        cy.on('tap', 'node', evt => showInspector(evt.target.data('payload')));
+        cy.on('tap', 'edge', evt => showInspector(evt.target.data('payload')));
+        if (inspector) {
+            inspector.style.display = 'block';
+            inspector.innerHTML = '<em>Klicke auf einen Knoten oder eine Kante, um Details anzuzeigen.</em>';
+        }
+    }
+
+    function showInspector(payload) {
+        const inspector = $('graphInspector');
+        if (!inspector) return;
+        const rows = Object.entries(payload || {}).map(([k, v]) =>
+            `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}</div>`);
+        inspector.innerHTML = rows.join('');
+        if (payload && payload.latex && window.MathJax && window.MathJax.typesetPromise) {
+            inspector.innerHTML += '<div class="latex">$' + payload.latex + '$</div>';
+            window.MathJax.typesetPromise([inspector]).catch(() => {});
+        }
+    }
+
+    /* ─── Compare tab ─── */
+    if ($('compareLoad')) {
+        $('compareLoad').addEventListener('click', compareLoad);
+        populateCompareSelects();
+    }
+    async function populateCompareSelects() {
+        try {
+            const response = await fetch('/api/paths');
+            const data = await response.json();
+            const left = $('compareLeftSelect');
+            const right = $('compareRightSelect');
+            if (!left || !right) return;
+            left.innerHTML = '';
+            right.innerHTML = '';
+            (data.transformations || []).forEach(p => {
+                const optL = document.createElement('option');
+                optL.value = p.id; optL.textContent = p.id + ' (' + p.originalExpression + ')';
+                left.appendChild(optL);
+                right.appendChild(optL.cloneNode(true));
+            });
+        } catch (ex) {
+            // ignore
+        }
+    }
+    async function compareLoad() {
+        const left = $('compareLeftSelect').value;
+        const right = $('compareRightSelect').value;
+        const out = $('compareOutput');
+        if (!left || !right) { out.textContent = 'Bitte zwei Pfade wählen.'; return; }
+        try {
+            const response = await fetch('/api/paths/compare?left=' + encodeURIComponent(left) + '&right=' + encodeURIComponent(right));
+            const data = await response.json();
+            out.innerHTML = renderComparison(data);
+        } catch (ex) {
+            out.textContent = 'Fehler: ' + ex;
+        }
+    }
+    function renderComparison(c) {
+        return '<table class="compare"><thead><tr><th></th><th>' + escapeHtml(c.leftPathId) + '</th><th>' + escapeHtml(c.rightPathId) + '</th></tr></thead>'
+            + '<tbody>'
+            + row('Teaching-Score', c.leftTeachingScore.toFixed(3), c.rightTeachingScore.toFixed(3))
+            + row('Annahmen-Schritte', c.leftAssumptionSteps, c.rightAssumptionSteps)
+            + row('Proof-Status', c.leftProofStatus, c.rightProofStatus)
+            + row('Score-Reihe', c.leftScoreSeries.join(' → '), c.rightScoreSeries.join(' → '))
+            + '</tbody></table>'
+            + '<p><strong>Kürzer:</strong> ' + escapeHtml(c.shorterPath || '—') + ' · '
+            + '<strong>Didaktisch:</strong> ' + escapeHtml(c.teachingPreferredPath || '—') + ' · '
+            + '<strong>Weniger Annahmen:</strong> ' + escapeHtml(c.fewerAssumptionsPath || '—') + '</p>'
+            + '<h4>Gemeinsame Regeln</h4><ul>' + (c.sharedRules || []).map(r => '<li>' + escapeHtml(r) + '</li>').join('') + '</ul>'
+            + '<h4>Nur links</h4><ul>' + (c.leftOnlySteps || []).map(s => '<li>' + escapeHtml(s) + '</li>').join('') + '</ul>'
+            + '<h4>Nur rechts</h4><ul>' + (c.rightOnlySteps || []).map(s => '<li>' + escapeHtml(s) + '</li>').join('') + '</ul>';
+    }
+    function row(label, l, r) {
+        return '<tr><th>' + escapeHtml(label) + '</th><td>' + escapeHtml(String(l)) + '</td><td>' + escapeHtml(String(r)) + '</td></tr>';
+    }
 
     /* ─── Identities tab ─── */
     if ($('reloadIdentities')) {

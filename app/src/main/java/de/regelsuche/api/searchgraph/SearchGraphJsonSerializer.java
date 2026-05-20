@@ -44,7 +44,10 @@ public final class SearchGraphJsonSerializer {
             w.objectValue(inner -> {
                 inner.property("id", cluster.id());
                 inner.property("label", cluster.label());
+                inner.property("type", cluster.type().name());
                 inner.stringArray("nodeIds", cluster.nodeIds());
+                inner.stringArray("supportingPathIds", cluster.supportingPathIds());
+                inner.property("cohesionScore", cluster.cohesionScore());
             })));
         writer.object("stats", stats -> {
             SearchGraphStatsDto statsDto = dto.stats();

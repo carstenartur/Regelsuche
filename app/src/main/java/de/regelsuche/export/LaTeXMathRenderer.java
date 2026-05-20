@@ -2,61 +2,34 @@ package de.regelsuche.export;
 
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
-import java.util.List;
 
+/**
+ * LaTeX renderer for math content.
+ *
+ * <p>Delegates to {@link AstLatexRenderer} so the output is AST-based
+ * (fractions as {@code \frac}, powers as {@code ^}, functions like
+ * {@code \sin}, {@code \log}, {@code \sqrt}, proper parenthesisation by
+ * operator precedence, equations, equation systems). The previous naive
+ * {@code *}-replacement implementation is retained only as a final fallback
+ * inside {@link AstLatexRenderer} for inputs that cannot be parsed.</p>
+ */
 public class LaTeXMathRenderer implements MathRenderer {
+
+    private final AstLatexRenderer delegate = new AstLatexRenderer();
+
     @Override
     public String renderExpression(String expression) {
-        return toLatex(expression);
+        return delegate.renderExpression(expression);
     }
 
     @Override
     public String renderStep(TransformationStep step) {
-        return toLatex(step.beforeExpression()) + " &\\rightarrow " + toLatex(step.afterExpression());
+        return delegate.renderStep(step);
     }
 
     @Override
     public String renderPath(DiscoveredTransformation path) {
-        StringBuilder body = new StringBuilder();
-        body.append("\\begin{align*}\n");
-        List<TransformationStep> steps = path.steps();
-        if (steps.isEmpty()) {
-            body.append(toLatex(path.originalExpression()))
-                .append(" &\\rightarrow ")
-                .append(toLatex(path.improvedExpression()))
-                .append(" \\tag{0}\\\\\n");
-        } else {
-            body.append(toLatex(steps.get(0).beforeExpression()))
-                .append(" &\\rightarrow ")
-                .append(toLatex(steps.get(0).afterExpression()))
-                .append(" && \\text{(")
-                .append(escapeText(steps.get(0).ruleId()))
-                .append(")} \\tag{1}\\\\\n");
-            for (int i = 1; i < steps.size(); i++) {
-                body.append("        &\\rightarrow ")
-                    .append(toLatex(steps.get(i).afterExpression()))
-                    .append(" && \\text{(")
-                    .append(escapeText(steps.get(i).ruleId()))
-                    .append(")} \\tag{")
-                    .append(i + 1)
-                    .append("}\\\\\n");
-            }
-        }
-        body.append("\\end{align*}\n");
-        body.append("\\textbf{Score:} ")
-            .append(path.originalScore().weightedTotal())
-            .append(" \\to ")
-            .append(path.improvedScore().weightedTotal())
-            .append("\\\\\n");
-        body.append("\\textbf{Status:} ").append(path.validationStatus());
-        return body.toString();
-    }
-
-    private String toLatex(String expression) {
-        return expression.replace("*", " \\cdot ");
-    }
-
-    private String escapeText(String value) {
-        return value.replace("_", "\\_");
+        return delegate.renderPath(path);
     }
 }
+

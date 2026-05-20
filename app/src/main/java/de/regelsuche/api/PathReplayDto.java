@@ -55,7 +55,9 @@ public record PathReplayDto(
         return new PathReplayDto(path.id(), replaySteps);
     }
 
+    private static final de.regelsuche.export.AstLatexRenderer LATEX = new de.regelsuche.export.AstLatexRenderer();
+
     private static String toLatex(String expression) {
-        return expression == null ? "" : expression.replace("*", " \\cdot ");
+        return expression == null ? "" : LATEX.renderExpression(expression);
     }
 }

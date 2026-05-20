@@ -276,6 +276,10 @@ public class WebWorkbenchServer {
         if (suffix.startsWith("/")) {
             suffix = suffix.substring(1);
         }
+        if (suffix.startsWith("compare")) {
+            handlePathComparison(exchange);
+            return;
+        }
         if (suffix.isEmpty()) {
             String sortParam = queryParam(exchange, "sort", "score");
             int limit = parseIntParam(queryParam(exchange, "limit", "0"), 0);
@@ -323,17 +327,55 @@ public class WebWorkbenchServer {
     }
 
     private void handleSearchGraph(HttpExchange exchange) throws IOException {
-        de.regelsuche.api.searchgraph.SearchGraphAssembler assembler =
-            new de.regelsuche.api.searchgraph.SearchGraphAssembler();
-        de.regelsuche.mining.MacroRuleMiner macroMiner = new de.regelsuche.mining.MacroRuleMiner();
-        var macros = macroMiner.mine(graphStore.discoveredTransformations());
-        de.regelsuche.api.searchgraph.SearchGraphDto graph = assembler.assemble(
-            graphStore.snapshot(),
-            successesFromGraph(),
-            graphStore.ruleCandidates(),
-            macros.size()
-        );
+        de.regelsuche.api.searchgraph.SearchGraphDto graph = buildSearchGraph();
+        String filterExpr = queryParam(exchange, "filter", "");
+        if (!filterExpr.isBlank()) {
+            graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);
+        }
         sendJson(exchange, 200, de.regelsuche.api.searchgraph.SearchGraphJsonSerializer.toJson(graph));
+    }
+
+    private void handlePathComparison(HttpExchange exchange) throws IOException {
+        String leftId = queryParam(exchange, "left", "");
+        String rightId = queryParam(exchange, "right", "");
+        if (leftId.isBlank() || rightId.isBlank()) {
+            sendStatus(exchange, 400, "left and right query parameters are required");
+            return;
+        }
+        var transformations = graphStore.discoveredTransformations();
+        var leftMatch = transformations.stream().filter(t -> t.id().equals(leftId)).findFirst();
+        var rightMatch = transformations.stream().filter(t -> t.id().equals(rightId)).findFirst();
+        if (leftMatch.isEmpty() || rightMatch.isEmpty()) {
+            sendStatus(exchange, 404, "left or right path not found");
+            return;
+        }
+        de.regelsuche.paths.PathComparisonDto dto =
+            new de.regelsuche.paths.PathComparisonService().compare(leftMatch.get(), rightMatch.get());
+        sendJson(exchange, 200, pathComparisonToJson(dto));
+    }
+
+    private String pathComparisonToJson(de.regelsuche.paths.PathComparisonDto dto) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("leftPathId", dto.leftPathId());
+        writer.property("rightPathId", dto.rightPathId());
+        writer.stringArray("sharedNodes", dto.sharedNodes());
+        writer.stringArray("sharedRules", dto.sharedRules());
+        writer.stringArray("leftOnlySteps", dto.leftOnlySteps());
+        writer.stringArray("rightOnlySteps", dto.rightOnlySteps());
+        writer.array("leftScoreSeries", w -> dto.leftScoreSeries().forEach(w::value));
+        writer.array("rightScoreSeries", w -> dto.rightScoreSeries().forEach(w::value));
+        writer.property("leftTeachingScore", dto.leftTeachingScore());
+        writer.property("rightTeachingScore", dto.rightTeachingScore());
+        writer.property("leftProofStatus", dto.leftProofStatus().name());
+        writer.property("rightProofStatus", dto.rightProofStatus().name());
+        writer.property("leftAssumptionSteps", dto.leftAssumptionSteps());
+        writer.property("rightAssumptionSteps", dto.rightAssumptionSteps());
+        writer.property("shorterPath", dto.shorterPath());
+        writer.property("teachingPreferredPath", dto.teachingPreferredPath());
+        writer.property("fewerAssumptionsPath", dto.fewerAssumptionsPath());
+        writer.endObject();
+        return writer.toString();
     }
 
     private void handleIdentities(HttpExchange exchange) throws IOException {
@@ -530,6 +572,32 @@ public class WebWorkbenchServer {
             sendJson(exchange, 200, exportService.exportBundle(exportQuery.bundle()));
             return;
         }
+        // Sub-resource exports: /api/exports/cluster/{id}.md, /path/{id}.tex, /identity/{id}.md
+        if (format.startsWith("cluster/") && format.endsWith(".md")) {
+            String clusterId = format.substring("cluster/".length(), format.length() - ".md".length());
+            sendText(exchange, 200, renderClusterMarkdown(clusterId));
+            return;
+        }
+        if (format.startsWith("path/") && format.endsWith(".tex")) {
+            String pathId = format.substring("path/".length(), format.length() - ".tex".length());
+            String tex = renderPathLatex(pathId);
+            if (tex == null) {
+                sendStatus(exchange, 404, "path not found: " + pathId);
+                return;
+            }
+            sendText(exchange, 200, tex);
+            return;
+        }
+        if (format.startsWith("identity/") && format.endsWith(".md")) {
+            String identityId = format.substring("identity/".length(), format.length() - ".md".length());
+            String md = renderIdentityMarkdown(identityId);
+            if (md == null) {
+                sendStatus(exchange, 404, "identity not found: " + identityId);
+                return;
+            }
+            sendText(exchange, 200, md);
+            return;
+        }
         List<DiscoveredTransformation> transformations = graphStore.discoveredTransformations();
         switch (format.toLowerCase(Locale.ROOT)) {
             case "markdown", "md" -> sendText(exchange, 200, exportService.exportMarkdown(transformations));
@@ -538,9 +606,20 @@ public class WebWorkbenchServer {
             case "json" -> sendJson(exchange, 200, exportService.exportBundle(exportQuery.bundle()));
             case "search-graph", "search-graph.json" -> {
                 var graph = buildSearchGraph();
+                String filterExpr = queryParam(exchange, "filter", "");
+                if (!filterExpr.isBlank()) {
+                    graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);
+                }
                 sendJson(exchange, 200, exportService.exportSearchGraphJson(graph));
             }
-            case "search-graph.mmd" -> sendText(exchange, 200, exportService.exportSearchGraphMermaid(buildSearchGraph()));
+            case "search-graph.mmd" -> {
+                var graph = buildSearchGraph();
+                String filterExpr = queryParam(exchange, "filter", "");
+                if (!filterExpr.isBlank()) {
+                    graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);
+                }
+                sendText(exchange, 200, exportService.exportSearchGraphMermaid(graph));
+            }
             case "search-graph.graphml" -> sendText(exchange, 200, exportService.exportSearchGraphGraphMl(buildSearchGraph()));
             case "best-path.md", "best-path" -> sendText(exchange, 200, exportService.exportBestPathMarkdown(transformations));
             case "identity-report.tex", "identity-report" -> {
@@ -557,13 +636,69 @@ public class WebWorkbenchServer {
         }
     }
 
-    private de.regelsuche.api.searchgraph.SearchGraphDto buildSearchGraph() {
+    private String renderClusterMarkdown(String clusterId) {
+        de.regelsuche.api.searchgraph.SearchGraphDto graph = buildSearchGraph();
+        de.regelsuche.api.searchgraph.SearchGraphClusterDto cluster = graph.clusters().stream()
+            .filter(c -> c.id().equals(clusterId))
+            .findFirst()
+            .orElse(null);
+        if (cluster == null) {
+            return "# Cluster nicht gefunden: " + clusterId + "\n";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("# Cluster: ").append(cluster.label()).append("\n\n");
+        sb.append("- **Id:** `").append(cluster.id()).append("`\n");
+        sb.append("- **Typ:** ").append(cluster.type().name()).append("\n");
+        sb.append("- **Cohesion:** ").append(String.format(Locale.ROOT, "%.3f", cluster.cohesionScore())).append("\n");
+        sb.append("- **Knoten:** ").append(cluster.nodeIds().size()).append("\n");
+        if (!cluster.supportingPathIds().isEmpty()) {
+            sb.append("- **Supporting paths:** ").append(String.join(", ", cluster.supportingPathIds())).append("\n");
+        }
+        sb.append("\n## Knoten\n\n");
+        for (String n : cluster.nodeIds()) {
+            sb.append("- `").append(n).append("`\n");
+        }
+        return sb.toString();
+    }
+
+    private String renderPathLatex(String pathId) {
+        var match = graphStore.discoveredTransformations().stream()
+            .filter(t -> t.id().equals(pathId))
+            .findFirst();
+        if (match.isEmpty()) {
+            return null;
+        }
+        return new de.regelsuche.export.AstLatexRenderer().renderPath(match.get());
+    }
+
+    private String renderIdentityMarkdown(String identityId) {
         var macros = new de.regelsuche.mining.MacroRuleMiner().mine(graphStore.discoveredTransformations());
+        var match = macros.stream().filter(m -> m.id().equals(identityId)).findFirst();
+        if (match.isEmpty()) {
+            return null;
+        }
+        var macro = match.get();
+        StringBuilder sb = new StringBuilder();
+        sb.append("# Identität ").append(macro.id()).append("\n\n");
+        sb.append("- **Pattern:** `").append(macro.leftPattern()).append("` → `")
+            .append(macro.rightPattern()).append("`\n");
+        sb.append("- **Sequenz:** ").append(String.join(" → ", macro.ruleIdSequence())).append("\n");
+        sb.append("- **Vorkommen:** ").append(macro.occurrences()).append("\n");
+        sb.append("- **Proof:** ").append(macro.proofStatus().name()).append("\n");
+        sb.append("- **Supporting Pfade:** ")
+            .append(String.join(", ", macro.supportingTransformationIds())).append("\n");
+        return sb.toString();
+    }
+
+    private de.regelsuche.api.searchgraph.SearchGraphDto buildSearchGraph() {
+        var transformations = graphStore.discoveredTransformations();
+        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);
         return new de.regelsuche.api.searchgraph.SearchGraphAssembler().assemble(
             graphStore.snapshot(),
             successesFromGraph(),
             graphStore.ruleCandidates(),
-            macros.size()
+            macros.size(),
+            transformations
         );
     }
 
