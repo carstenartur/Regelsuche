@@ -115,6 +115,8 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/discover", this::handleDiscover));
         secure(server.createContext("/api/paths", this::handlePaths));
         secure(server.createContext("/api/graph", this::handleGraph));
+        secure(server.createContext("/api/search-graph", this::handleSearchGraph));
+        secure(server.createContext("/api/identities", this::handleIdentities));
         secure(server.createContext("/api/candidates", this::handleCandidates));
         secure(server.createContext("/api/inventory", this::handleInventory));
         secure(server.createContext("/api/exports", this::handleExports));
@@ -275,10 +277,35 @@ public class WebWorkbenchServer {
             suffix = suffix.substring(1);
         }
         if (suffix.isEmpty()) {
-            sendJson(exchange, 200, dtoListToJson("transformations", transformationQuery.bestImprovements()));
+            String sortParam = queryParam(exchange, "sort", "score");
+            int limit = parseIntParam(queryParam(exchange, "limit", "0"), 0);
+            de.regelsuche.paths.PathSorters.Mode mode = de.regelsuche.paths.PathSorters.Mode.parse(sortParam);
+            List<de.regelsuche.discovery.DiscoveredTransformation> sorted =
+                new de.regelsuche.paths.PathSorters().sort(graphStore.discoveredTransformations(), mode);
+            if (limit > 0 && sorted.size() > limit) {
+                sorted = sorted.subList(0, limit);
+            }
+            List<de.regelsuche.api.TransformationPathDto> dtos = sorted.stream()
+                .map(de.regelsuche.api.TransformationPathDto::from)
+                .toList();
+            sendJson(exchange, 200, dtoListToJson("transformations", dtos));
             return;
         }
-        transformationQuery.pathById(suffix).ifPresentOrElse(
+        // /api/paths/{id} or /api/paths/{id}/replay
+        if (suffix.endsWith("/replay")) {
+            String pathId = suffix.substring(0, suffix.length() - "/replay".length());
+            var match = graphStore.discoveredTransformations().stream()
+                .filter(t -> t.id().equals(pathId))
+                .findFirst();
+            if (match.isEmpty()) {
+                sendStatus(exchange, 404, "path not found");
+                return;
+            }
+            sendJson(exchange, 200, replayJson(de.regelsuche.api.PathReplayDto.from(match.get(), explanationService)));
+            return;
+        }
+        final String singleId = suffix;
+        transformationQuery.pathById(singleId).ifPresentOrElse(
             dto -> {
                 try {
                     sendJson(exchange, 200, singleDtoJson(dto));
@@ -293,6 +320,128 @@ public class WebWorkbenchServer {
                 }
             }
         );
+    }
+
+    private void handleSearchGraph(HttpExchange exchange) throws IOException {
+        de.regelsuche.api.searchgraph.SearchGraphAssembler assembler =
+            new de.regelsuche.api.searchgraph.SearchGraphAssembler();
+        de.regelsuche.mining.MacroRuleMiner macroMiner = new de.regelsuche.mining.MacroRuleMiner();
+        var macros = macroMiner.mine(graphStore.discoveredTransformations());
+        de.regelsuche.api.searchgraph.SearchGraphDto graph = assembler.assemble(
+            graphStore.snapshot(),
+            successesFromGraph(),
+            graphStore.ruleCandidates(),
+            macros.size()
+        );
+        sendJson(exchange, 200, de.regelsuche.api.searchgraph.SearchGraphJsonSerializer.toJson(graph));
+    }
+
+    private void handleIdentities(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String suffix = path.substring("/api/identities".length()).replaceFirst("^/", "");
+        de.regelsuche.mining.MacroRuleMiner macroMiner = new de.regelsuche.mining.MacroRuleMiner();
+        de.regelsuche.mining.KnownRuleRepository known = new de.regelsuche.mining.KnownRuleRepository();
+        var macros = macroMiner.mine(graphStore.discoveredTransformations());
+
+        if (suffix.endsWith("/promote") && "POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            String identityId = suffix.substring(0, suffix.length() - "/promote".length());
+            var match = macros.stream().filter(m -> m.id().equals(identityId)).findFirst();
+            if (match.isEmpty()) {
+                sendStatus(exchange, 404, "identity not found");
+                return;
+            }
+            var candidate = match.get();
+            String ruleId = "macro-" + Integer.toUnsignedString(candidate.id().hashCode());
+            de.regelsuche.inventory.ReusableRule rule = new de.regelsuche.inventory.ReusableRule(
+                ruleId,
+                candidate.leftPattern(),
+                candidate.rightPattern(),
+                List.of(),
+                candidate.proofStatus(),
+                known.statusFor(candidate.leftPattern(), candidate.rightPattern()),
+                candidate.occurrences(),
+                candidate.compressionRatio(),
+                java.time.Instant.now()
+            );
+            inventoryRepository.save(rule);
+            sendJson(exchange, 200, "{\"promotedRuleId\":\"" + escapeJson(ruleId) + "\"}");
+            return;
+        }
+        if (!suffix.isEmpty() && !"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+
+        // GET /api/identities -> list
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.array("identities", w -> macros.forEach(macro -> {
+            var dto = de.regelsuche.api.IdentityReportDto.from(
+                macro, known.statusFor(macro.leftPattern(), macro.rightPattern()));
+            w.objectValue(inner -> {
+                inner.property("id", dto.id());
+                inner.property("leftPattern", dto.leftPattern());
+                inner.property("rightPattern", dto.rightPattern());
+                inner.stringArray("ruleIdSequence", dto.ruleIdSequence());
+                inner.property("occurrences", dto.occurrences());
+                inner.property("compressionRatio", dto.compressionRatio());
+                inner.property("proofStatus", dto.proofStatus().name());
+                inner.property("knownRuleStatus", dto.knownRuleStatus().name());
+                inner.stringArray("supportingTransformationIds", dto.supportingTransformationIds());
+            });
+        }));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private List<de.regelsuche.search.SimplificationSuccess> successesFromGraph() {
+        // Build SimplificationSuccess records from the discovered transformations
+        // we already have in the graph store. This avoids needing a running search
+        // service to render /api/search-graph after the fact.
+        java.util.List<de.regelsuche.search.SimplificationSuccess> result = new java.util.ArrayList<>();
+        for (de.regelsuche.discovery.DiscoveredTransformation transformation : graphStore.discoveredTransformations()) {
+            result.add(new de.regelsuche.search.SimplificationSuccess(
+                transformation.originalExpression(),
+                transformation.improvedExpression(),
+                transformation.steps().isEmpty() ? "" : transformation.steps().getLast().ruleId(),
+                transformation.steps().size(),
+                transformation.totalImprovement(),
+                transformation.discoveredAt()
+            ));
+        }
+        return result;
+    }
+
+    private static int parseIntParam(String value, int fallback) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private static String escapeJson(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private String replayJson(de.regelsuche.api.PathReplayDto dto) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("pathId", dto.pathId());
+        writer.array("steps", w -> dto.steps().forEach(step ->
+            w.objectValue(inner -> {
+                inner.property("stepIndex", step.stepIndex());
+                inner.property("fromExpression", step.fromExpression());
+                inner.property("fromLatex", step.fromLatex());
+                inner.property("toExpression", step.toExpression());
+                inner.property("toLatex", step.toLatex());
+                inner.property("ruleId", step.ruleId());
+                inner.property("ruleExplanation", step.ruleExplanation());
+                inner.property("scoreDelta", step.scoreDelta());
+                inner.property("equivalencePreserving", step.equivalencePreserving());
+            })));
+        writer.endObject();
+        return writer.toString();
     }
 
     private void handleGraph(HttpExchange exchange) throws IOException {
@@ -387,8 +536,35 @@ public class WebWorkbenchServer {
             case "latex", "tex" -> sendText(exchange, 200, exportService.exportLatex(transformations));
             case "mermaid", "mmd" -> sendText(exchange, 200, exportService.exportMermaid(transformations));
             case "json" -> sendJson(exchange, 200, exportService.exportBundle(exportQuery.bundle()));
+            case "search-graph", "search-graph.json" -> {
+                var graph = buildSearchGraph();
+                sendJson(exchange, 200, exportService.exportSearchGraphJson(graph));
+            }
+            case "search-graph.mmd" -> sendText(exchange, 200, exportService.exportSearchGraphMermaid(buildSearchGraph()));
+            case "search-graph.graphml" -> sendText(exchange, 200, exportService.exportSearchGraphGraphMl(buildSearchGraph()));
+            case "best-path.md", "best-path" -> sendText(exchange, 200, exportService.exportBestPathMarkdown(transformations));
+            case "identity-report.tex", "identity-report" -> {
+                var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);
+                var known = new de.regelsuche.mining.KnownRuleRepository();
+                var identities = macros.stream()
+                    .map(m -> de.regelsuche.api.IdentityReportDto.from(
+                        m, known.statusFor(m.leftPattern(), m.rightPattern())))
+                    .toList();
+                sendText(exchange, 200, exportService.exportIdentityReportLatex(
+                    buildSearchGraph(), transformations, graphStore.ruleCandidates(), identities));
+            }
             default -> sendStatus(exchange, 404, "unknown format: " + format);
         }
+    }
+
+    private de.regelsuche.api.searchgraph.SearchGraphDto buildSearchGraph() {
+        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(graphStore.discoveredTransformations());
+        return new de.regelsuche.api.searchgraph.SearchGraphAssembler().assemble(
+            graphStore.snapshot(),
+            successesFromGraph(),
+            graphStore.ruleCandidates(),
+            macros.size()
+        );
     }
 
     private void handleExplain(HttpExchange exchange) throws IOException {

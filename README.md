@@ -23,7 +23,9 @@ Gradle-basiertes Java-Projekt für regelbasierte Ausdrucksumformungen mit:
 - Referenzbestand bekannter Regeln zum Einordnen gefundener Kandidaten
 
 > Regelsuche macht mathematische Umformungsräume sichtbar – Knoten sind Ausdrücke,
-> Kanten sind Umformungen, Pfade sind Rechenwege. Siehe [docs/visual-search-graph.md](docs/visual-search-graph.md).
+> Kanten sind Umformungen, Pfade sind Rechenwege. Siehe [docs/visual-search-graph.md](docs/visual-search-graph.md),
+> [docs/replay-mode.md](docs/replay-mode.md), [docs/macro-rules.md](docs/macro-rules.md)
+> und [docs/didactic-ranking.md](docs/didactic-ranking.md).
 
 ## Starten
 

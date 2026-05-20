@@ -17,6 +17,9 @@
         <button class="tab" data-tab="paths">Pfade</button>
         <button class="tab" data-tab="graph">Graph</button>
         <button class="tab" data-tab="candidates">Regelkandidaten</button>
+        <button class="tab" data-tab="identities">Identitäten</button>
+        <button class="tab" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="replay">Replay</button>
         <button class="tab" data-tab="inventory">Inventar</button>
         <button class="tab" data-tab="exports">Exporte</button>
         <button class="tab" data-tab="help">Hilfe</button>
@@ -103,12 +106,20 @@
     <!-- ─────────── Graph tab ─────────── -->
     <section id="tab-graph" class="tab-panel">
         <div class="card">
-            <h2>Graphansicht (Mermaid)</h2>
+            <h2>Suchgraph (Mathematik als sichtbarer Suchraum)</h2>
             <div class="actions">
                 <button id="reloadGraph" class="primary">Graph laden</button>
+                <label class="field inline">
+                    <span>Quelle:</span>
+                    <select id="graphSource">
+                        <option value="search-graph">Suchgraph (Knoten + Kanten + bestPath + Sackgassen)</option>
+                        <option value="transformations">Pfade (klassische Mermaid-Ansicht)</option>
+                    </select>
+                </label>
             </div>
-            <p class="hint">Quelltext im Mermaid-Format – kann z.B. in <code>mermaid.live</code> oder in Markdown-Editoren
-                gerendert werden.</p>
+            <p class="hint">Mermaid-Quelltext. Klassen <code>best</code> markieren den besten Pfad,
+                <code>deadend</code> markiert Sackgassen. Kann in <code>mermaid.live</code> oder im
+                Markdown-Editor gerendert werden.</p>
             <pre id="graphOutput" class="output mono"></pre>
         </div>
     </section>
@@ -123,6 +134,52 @@
             <p class="hint">Beobachtete Regelkandidaten. <strong>Assumptions</strong> werden je nach Regel-Domäne
                 eingeblendet (z.B. <code>b ≠ 0</code> bei Quotienten, <code>a &gt; 0</code> bei Logarithmen).</p>
             <div id="candidatesList" class="list"></div>
+        </div>
+    </section>
+
+    <!-- ─────────── Identities tab ─────────── -->
+    <section id="tab-identities" class="tab-panel">
+        <div class="card">
+            <h2>Emergente Identitäten</h2>
+            <div class="actions">
+                <button id="reloadIdentities" class="primary">Aktualisieren</button>
+            </div>
+            <p class="hint">Wiederkehrende Schritt-Sequenzen aus erfolgreichen Pfaden – Kandidaten für Makroregeln.
+                <em>„Als Regel übernehmen"</em> speichert eine Identität in das Regelinventar.</p>
+            <div id="identitiesList" class="list"></div>
+        </div>
+    </section>
+
+    <!-- ─────────── Dashboard tab ─────────── -->
+    <section id="tab-dashboard" class="tab-panel">
+        <div class="card">
+            <h2>Such-Dashboard</h2>
+            <div class="actions">
+                <button id="reloadDashboard" class="primary">Aktualisieren</button>
+            </div>
+            <div id="dashboardTiles" class="dashboard-grid"></div>
+            <h3>Häufigste Regeln</h3>
+            <pre id="dashboardRules" class="output mono"></pre>
+        </div>
+    </section>
+
+    <!-- ─────────── Replay tab ─────────── -->
+    <section id="tab-replay" class="tab-panel">
+        <div class="card">
+            <h2>Schritt-für-Schritt-Replay</h2>
+            <div class="actions">
+                <label class="field inline">
+                    <span>Pfad:</span>
+                    <select id="replayPathSelect"></select>
+                </label>
+                <button id="replayLoad" class="primary">Laden</button>
+                <button id="replayPrev">⟵</button>
+                <button id="replayPlay">▶</button>
+                <button id="replayNext">⟶</button>
+            </div>
+            <div id="replayCanvas" class="replay-canvas"></div>
+            <p class="hint">Zeigt jeden Schritt mit LaTeX-Darstellung und Regelbegründung.
+                Play durchläuft die Schritte mit 1.2 s Pause.</p>
         </div>
     </section>
 
@@ -149,6 +206,11 @@
                 <a class="export-button" href="/api/exports/latex" target="_blank">LaTeX (.tex)</a>
                 <a class="export-button" href="/api/exports/mermaid" target="_blank">Mermaid (Graph)</a>
                 <a class="export-button" href="/api/exports/json" target="_blank">JSON-Bundle</a>
+                <a class="export-button" href="/api/exports/search-graph.json" target="_blank">Suchgraph (JSON)</a>
+                <a class="export-button" href="/api/exports/search-graph.mmd" target="_blank">Suchgraph (Mermaid)</a>
+                <a class="export-button" href="/api/exports/search-graph.graphml" target="_blank">Suchgraph (GraphML)</a>
+                <a class="export-button" href="/api/exports/best-path.md" target="_blank">Bester Pfad (.md)</a>
+                <a class="export-button" href="/api/exports/identity-report.tex" target="_blank">Identitätsbericht (.tex)</a>
             </div>
         </div>
     </section>

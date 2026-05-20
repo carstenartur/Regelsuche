@@ -137,12 +137,199 @@
         const out = $('graphOutput');
         out.textContent = 'Lade …';
         try {
-            const response = await fetch('/api/graph');
+            const source = $('graphSource') && $('graphSource').value || 'search-graph';
+            const url = source === 'search-graph' ? '/api/exports/search-graph.mmd' : '/api/graph';
+            const response = await fetch(url);
             out.textContent = await response.text();
         } catch (ex) {
             out.textContent = 'Fehler: ' + ex;
         }
     });
+
+    /* ─── Identities tab ─── */
+    if ($('reloadIdentities')) {
+        $('reloadIdentities').addEventListener('click', loadIdentities);
+    }
+    async function loadIdentities() {
+        const out = $('identitiesList');
+        out.innerHTML = '<div class="hint">Lade …</div>';
+        try {
+            const response = await fetch('/api/identities');
+            const data = await response.json();
+            renderIdentities(data.identities || []);
+        } catch (ex) {
+            out.innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
+        }
+    }
+    function renderIdentities(items) {
+        const out = $('identitiesList');
+        if (!items.length) {
+            out.innerHTML = '<div class="hint">Noch keine wiederkehrenden Sequenzen entdeckt.</div>';
+            return;
+        }
+        out.innerHTML = '';
+        items.forEach((identity) => {
+            const card = document.createElement('div');
+            card.className = 'identity-card';
+            const seq = (identity.ruleIdSequence || []).join(' → ');
+            card.innerHTML = '<h4>' + escapeHtml(identity.leftPattern || '?') + ' → '
+                + escapeHtml(identity.rightPattern || '?') + '</h4>'
+                + '<div class="hint">Sequenz: <code>' + escapeHtml(seq) + '</code></div>'
+                + '<div class="hint">Vorkommen: ' + identity.occurrences
+                + ' · Kompression: ' + (identity.compressionRatio || 0).toFixed(2)
+                + ' · Status: ' + escapeHtml(identity.proofStatus || '')
+                + ' · bekannt: ' + escapeHtml(identity.knownRuleStatus || '') + '</div>';
+            const promote = document.createElement('button');
+            promote.className = 'primary';
+            promote.textContent = 'Als Regel übernehmen';
+            promote.addEventListener('click', async () => {
+                promote.disabled = true;
+                try {
+                    const res = await fetch('/api/identities/' + encodeURIComponent(identity.id) + '/promote',
+                        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                    if (res.ok) {
+                        promote.textContent = '✓ Übernommen';
+                    } else {
+                        promote.textContent = 'Fehler ' + res.status;
+                        promote.disabled = false;
+                    }
+                } catch (ex) {
+                    promote.textContent = 'Fehler';
+                    promote.disabled = false;
+                }
+            });
+            card.appendChild(promote);
+            out.appendChild(card);
+        });
+    }
+
+    /* ─── Dashboard tab ─── */
+    if ($('reloadDashboard')) {
+        $('reloadDashboard').addEventListener('click', loadDashboard);
+    }
+    async function loadDashboard() {
+        const tiles = $('dashboardTiles');
+        const rules = $('dashboardRules');
+        tiles.innerHTML = '<div class="hint">Lade …</div>';
+        try {
+            const response = await fetch('/api/search-graph');
+            const data = await response.json();
+            const stats = data.stats || {};
+            const tileData = [
+                ['Knoten', stats.nodesVisited],
+                ['Kanten', stats.edgesGenerated],
+                ['Sackgassen', stats.deadEnds],
+                ['Bester Score', stats.bestScore],
+                ['Verzweigungsfaktor (ø)', (stats.averageBranchingFactor || 0).toFixed(2)],
+                ['Max. Tiefe', stats.maxDepthReached],
+                ['Kandidaten', stats.candidateCount],
+                ['Makroregeln', stats.macroRuleCount]
+            ];
+            tiles.innerHTML = '';
+            tileData.forEach(([label, value]) => {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.innerHTML = '<div class="tile-value">' + (value == null ? '–' : value)
+                    + '</div><div class="tile-label">' + label + '</div>';
+                tiles.appendChild(tile);
+            });
+            const usage = stats.ruleUsageFrequency || {};
+            rules.textContent = Object.entries(usage)
+                .map(([rule, count]) => count + '\t' + rule)
+                .join('\n') || '–';
+        } catch (ex) {
+            tiles.innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
+        }
+    }
+
+    /* ─── Replay tab ─── */
+    let replayState = { steps: [], index: 0, timer: null };
+    if ($('replayLoad')) {
+        $('replayLoad').addEventListener('click', loadReplay);
+        $('replayPrev').addEventListener('click', () => { stopReplay(); stepReplay(-1); });
+        $('replayNext').addEventListener('click', () => { stopReplay(); stepReplay(1); });
+        $('replayPlay').addEventListener('click', () => {
+            if (replayState.timer) { stopReplay(); return; }
+            replayState.timer = setInterval(() => {
+                if (replayState.index >= replayState.steps.length - 1) { stopReplay(); return; }
+                stepReplay(1);
+            }, 1200);
+            $('replayPlay').textContent = '⏸';
+        });
+    }
+    function stopReplay() {
+        if (replayState.timer) { clearInterval(replayState.timer); replayState.timer = null; }
+        if ($('replayPlay')) $('replayPlay').textContent = '▶';
+    }
+    function stepReplay(delta) {
+        const next = replayState.index + delta;
+        if (next < 0 || next >= replayState.steps.length) return;
+        replayState.index = next;
+        renderReplayStep();
+    }
+    async function populateReplayPaths() {
+        const select = $('replayPathSelect');
+        if (!select) return;
+        try {
+            const response = await fetch('/api/paths?sort=score');
+            const data = await response.json();
+            select.innerHTML = '';
+            (data.transformations || []).forEach((path) => {
+                const opt = document.createElement('option');
+                opt.value = path.id;
+                opt.textContent = path.id + ' — Δ' + path.totalImprovement;
+                select.appendChild(opt);
+            });
+        } catch (ex) {
+            select.innerHTML = '<option>Fehler: ' + ex + '</option>';
+        }
+    }
+    async function loadReplay() {
+        const select = $('replayPathSelect');
+        const pathId = select && select.value;
+        if (!pathId) { return; }
+        stopReplay();
+        try {
+            const response = await fetch('/api/paths/' + encodeURIComponent(pathId) + '/replay');
+            const data = await response.json();
+            replayState.steps = data.steps || [];
+            replayState.index = 0;
+            renderReplayStep();
+        } catch (ex) {
+            $('replayCanvas').innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
+        }
+    }
+    function renderReplayStep() {
+        const canvas = $('replayCanvas');
+        if (!canvas) return;
+        if (!replayState.steps.length) {
+            canvas.innerHTML = '<div class="hint">Wähle oben einen Pfad und klicke „Laden".</div>';
+            return;
+        }
+        const step = replayState.steps[replayState.index];
+        canvas.innerHTML = '<div class="replay-step">'
+            + '<div class="replay-step-index">Schritt ' + (step.stepIndex + 1)
+            + ' / ' + replayState.steps.length + '</div>'
+            + '<div class="replay-from"><strong>Vorher:</strong> '
+            + '<code>' + escapeHtml(step.fromExpression) + '</code><br>'
+            + '<span class="latex">$' + escapeHtml(step.fromLatex) + '$</span></div>'
+            + '<div class="replay-to"><strong>Nachher:</strong> '
+            + '<code>' + escapeHtml(step.toExpression) + '</code><br>'
+            + '<span class="latex">$' + escapeHtml(step.toLatex) + '$</span></div>'
+            + '<div class="replay-rule"><strong>Regel:</strong> <code>'
+            + escapeHtml(step.ruleId) + '</code></div>'
+            + '<div class="replay-explanation"><pre>'
+            + escapeHtml(step.ruleExplanation || '') + '</pre></div>'
+            + '<div class="hint">Δ Komplexität: ' + step.scoreDelta
+            + ' · Äquivalenzerhaltend: ' + step.equivalencePreserving + '</div>'
+            + '</div>';
+    }
+    function escapeHtml(value) {
+        if (value == null) return '';
+        return String(value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
 
     /* ─── Candidates tab ─── */
     $('reloadCandidates').addEventListener('click', loadCandidates);
@@ -299,6 +486,12 @@
                     loadCandidates().finally(() => $('candidatesList').dataset.loaded = '1');
                 } else if (which === 'inventory' && !$('inventoryList').dataset.loaded) {
                     loadInventory().finally(() => $('inventoryList').dataset.loaded = '1');
+                } else if (which === 'identities' && $('identitiesList') && !$('identitiesList').dataset.loaded) {
+                    loadIdentities().finally(() => $('identitiesList').dataset.loaded = '1');
+                } else if (which === 'dashboard' && $('dashboardTiles') && !$('dashboardTiles').dataset.loaded) {
+                    loadDashboard().finally(() => $('dashboardTiles').dataset.loaded = '1');
+                } else if (which === 'replay' && $('replayPathSelect') && !$('replayPathSelect').dataset.loaded) {
+                    populateReplayPaths().finally(() => $('replayPathSelect').dataset.loaded = '1');
                 }
             });
         });

@@ -52,11 +52,45 @@ tile view. Currently:
 - `macroRuleCount` – injected by the caller (filled in by the macro-rule miner
   in a follow-up step).
 
-## Roadmap (planned follow-up PRs)
+## HTTP API
 
-1. **HTTP API** – `GET /api/search-graph`, `GET /api/paths`, `GET /api/paths/{id}/replay`.
-2. **Macro-rule mining** & emergent-identity report (`POST /api/identities/{id}/promote`).
-3. **Didactic ranking** – `TeachingPathScorer` plus `sort=teaching`.
-4. **Exports** – `search-graph.{json,graphml,mmd}`, `best-path.md`, `identity-report.tex`.
-5. **UI** – Cytoscape.js graph tab, replay tab, alternative-paths comparison,
-   identities, dashboard. Mermaid as fallback.
+Alle Endpoints werden vom eingebetteten `WebWorkbenchServer` ausgeliefert (kein
+externes Framework):
+
+| Endpoint                                    | Zweck                                                        |
+|---------------------------------------------|--------------------------------------------------------------|
+| `GET /api/search-graph`                     | `SearchGraphDto` als JSON.                                   |
+| `GET /api/paths?sort=score|length|teaching|proof&limit=N` | Sortierte / begrenzte Pfadliste.                |
+| `GET /api/paths/{id}/replay`                | `PathReplayDto` – Schritt-für-Schritt-Replay.                |
+| `GET /api/identities`                       | Emergent-identity-Report (Makroregel-Kandidaten).            |
+| `POST /api/identities/{id}/promote`         | Speichert eine Makroregel als `ReusableRule` ins Inventar.   |
+| `GET /api/exports/search-graph.json`        | Suchgraph als JSON (gleiche Form wie API).                   |
+| `GET /api/exports/search-graph.mmd`         | Suchgraph als Mermaid (Cytoscape-Fallback).                  |
+| `GET /api/exports/search-graph.graphml`     | Suchgraph als GraphML (yEd, Gephi).                          |
+| `GET /api/exports/best-path.md`             | Bester Pfad als Markdown.                                    |
+| `GET /api/exports/identity-report.tex`      | Konsolidierter LaTeX-Bericht.                                |
+
+Siehe `docs/replay-mode.md`, `docs/macro-rules.md` und `docs/didactic-ranking.md`
+für die jeweiligen Teil-Features.
+
+## UI-Tabs
+
+Erweiterung von `resources/web/index.html` und `app.js`:
+
+- **Graph** – Mermaid-Rendering des Suchgraphen (Klassen `best` und `deadend`).
+  Cytoscape-Vendoring ist optional und wegen der Größe (~1 MB) bewusst nicht
+  enthalten.
+- **Replay** – Pfad-Dropdown, Play/Pause/Step, LaTeX-Anzeige.
+- **Identitäten** – Karten je Makroregel mit "Als Regel übernehmen"-Button
+  (`POST /api/identities/{id}/promote`).
+- **Dashboard** – Tile-Ansicht der `SearchGraphStatsDto`-Werte plus Top-Regeln.
+
+## Roadmap (vollständig umgesetzt in diesem PR)
+
+1. ✅ **HTTP API** – `GET /api/search-graph`, `GET /api/paths?sort=…`, `GET /api/paths/{id}/replay`.
+2. ✅ **Macro-rule mining** & emergent-identity report (`POST /api/identities/{id}/promote`).
+3. ✅ **Didactic ranking** – `TeachingPathScorer` plus `sort=teaching`.
+4. ✅ **Exports** – `search-graph.{json,graphml,mmd}`, `best-path.md`, `identity-report.tex`.
+5. ✅ **UI** – Graph (Mermaid), Replay, Identitäten, Dashboard. Cytoscape-Vendoring
+   ist als spätere Option dokumentiert, aber nicht enthalten, um die Repo-Größe
+   nicht aufzublähen.
