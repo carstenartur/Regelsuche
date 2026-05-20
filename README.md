@@ -22,6 +22,9 @@ Gradle-basiertes Java-Projekt für regelbasierte Ausdrucksumformungen mit:
 - Mining von Regel-Kandidaten per AST-Normalisierung, Anti-Unification und Parameter-Relationen
 - Referenzbestand bekannter Regeln zum Einordnen gefundener Kandidaten
 
+> Regelsuche macht mathematische Umformungsräume sichtbar – Knoten sind Ausdrücke,
+> Kanten sind Umformungen, Pfade sind Rechenwege. Siehe [docs/visual-search-graph.md](docs/visual-search-graph.md).
+
 ## Starten
 
 ```bash
