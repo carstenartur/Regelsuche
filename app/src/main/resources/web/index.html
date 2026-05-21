@@ -19,6 +19,7 @@
         <button class="tab" data-tab="candidates">Regelkandidaten</button>
         <button class="tab" data-tab="identities">Identitäten</button>
         <button class="tab" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="benchmark">Benchmark</button>
         <button class="tab" data-tab="replay">Replay</button>
         <button class="tab" data-tab="compare">Vergleich</button>
         <button class="tab" data-tab="inventory">Inventar</button>
@@ -53,9 +54,9 @@
                     <span class="demo-title">Trigonometrie</span>
                     <span class="demo-expr">sin²(x)+cos²(x)</span>
                 </button>
-                <button class="demo-button" data-demo="equation">
+                <button class="demo-button" data-demo="polynomial-expansion">
                     <span class="demo-icon">=</span>
-                    <span class="demo-title">Polynom-Gleichung</span>
+                    <span class="demo-title">Polynom-Expansion</span>
                     <span class="demo-expr">(x+1)(x+2)</span>
                 </button>
             </div>
@@ -213,6 +214,22 @@
             <div id="dashboardTiles" class="dashboard-grid"></div>
             <h3>Häufigste Regeln</h3>
             <pre id="dashboardRules" class="output mono"></pre>
+        </div>
+    </section>
+
+    <!-- ─────────── Benchmark tab ─────────── -->
+    <section id="tab-benchmark" class="tab-panel">
+        <div class="card">
+            <h2>Benchmark</h2>
+            <div class="actions">
+                <button id="reloadBenchmark" class="primary">Benchmark laden</button>
+                <a class="export-button" href="/api/benchmark" target="_blank">JSON ansehen</a>
+            </div>
+            <p class="hint">Jede Zeile zeigt einen Benchmark-Lauf: Szenario, Strategie,
+                Erfolg (gefunden), Laufzeit, besuchte Zustände, Schritte, eingesetzte Regeln und
+                den höchsten erreichten Proof-Status. Hover über einen Status-Badge,
+                um die Bedeutung zu sehen.</p>
+            <div id="benchmarkSuites" class="benchmark-suites"></div>
         </div>
     </section>
 

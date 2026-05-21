@@ -1025,7 +1025,9 @@ public class WebWorkbenchServer {
                         r.property("shortestImprovingDepth", row.shortestImprovingDepth());
                         r.property("expandedSteps", row.expandedSteps());
                         r.property("distinctRules", row.distinctRules());
-                        r.property("found", row.bestImprovement() > 0);
+                        r.property("elapsedMillis", row.elapsedMillis());
+                        r.property("proofStatus", row.proofStatus().name());
+                        r.property("found", row.found());
                     })));
             })));
         writer.endObject();

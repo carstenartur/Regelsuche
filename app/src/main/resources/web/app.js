@@ -98,26 +98,66 @@
     function renderDemoSummary(data) {
         const m = data.metrics || {};
         const best = data.bestPath || {};
-        const identities = (data.identities || []).slice(0, 3);
+        const selected = data.selectedPath || best;
+        const identities = (data.identities || []).slice(0, 5);
+        const targetReached = !!data.targetReached;
+        const assumptions = data.assumptions || [];
+
+        // Honest banner: identity recognised OR "no identity found, best path was…".
+        const banner = targetReached
+            ? '<div class="status ok demo-banner">'
+                + '<strong>Identität erkannt:</strong> '
+                + escapeHtml(selected.originalExpression || data.expression || '')
+                + ' = '
+                + escapeHtml(selected.improvedExpression || '')
+                + '</div>'
+            : '<div class="status warn demo-banner">'
+                + '<strong>Keine Identität gefunden.</strong> Bester gefundener Umformungsweg: '
+                + (selected.improvedExpression
+                    ? escapeHtml(selected.originalExpression || data.expression || '')
+                      + ' → '
+                      + escapeHtml(selected.improvedExpression)
+                    : '<em>kein Verbesserungsweg im Suchbudget gefunden</em>')
+                + '</div>';
+
+        const proofTag = selected.validationStatus
+            ? renderProofStatusBadge(selected.validationStatus)
+            : '';
+        const assumptionsBlock = assumptions.length
+            ? '<h4>Annahmen</h4><ul>' + assumptions.map((a) =>
+                '<li><code>' + escapeHtml(a) + '</code></li>').join('') + '</ul>'
+            : '';
+        const bestMove = (selected.steps && selected.steps.length)
+            ? selected.steps[0]
+            : null;
+        const bestMoveBlock = bestMove
+            ? '<h4>Best Move</h4><p><code>' + escapeHtml(bestMove.beforeExpression || '')
+                + ' → ' + escapeHtml(bestMove.afterExpression || '')
+                + '</code> · Regel <code>' + escapeHtml(bestMove.ruleId || '') + '</code></p>'
+            : '';
+
         const rows = [
             ['Eingabe', data.expression || ''],
             ['Profil', data.profile || ''],
+            ['Treffer (selectedPath)',
+                selected.improvedExpression
+                    ? selected.originalExpression + ' → ' + selected.improvedExpression
+                      + ' (' + (selected.steps ? selected.steps.length : 0) + ' Schritte, Verbesserung '
+                      + (selected.totalImprovement || 0) + ')'
+                    : '–'],
+            ['Proof-Status', selected.validationStatus || '–'],
+            ['Erwartete Identität', data.expectedHighlight || ''],
             ['Knoten / Kanten', (m.nodes || 0) + ' / ' + (m.edges || 0)],
             ['Pfade entdeckt', m.pathsDiscovered || 0],
-            ['Bester Pfad',
-                best.improvedExpression
-                    ? best.originalExpression + ' → ' + best.improvedExpression
-                      + ' (' + (best.steps || 0) + ' Schritte, Verbesserung ' + (best.totalImprovement || 0) + ')'
-                    : '–'],
-            ['Identitäten', m.identitiesFound || 0],
-            ['Erwartete Identität', data.expectedHighlight || '']
+            ['Identitäten gefunden', m.identitiesFound || 0],
+            ['Laufzeit', (m.elapsedMillis || 0) + ' ms']
         ];
         const tableRows = rows.map((r) =>
             '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(String(r[1])) + '</td></tr>').join('');
         const idList = identities.length
             ? '<h4>Erkannte Identitäten</h4><ul>' + identities.map((i) =>
                 '<li><code>' + escapeHtml(i.leftPattern) + ' → ' + escapeHtml(i.rightPattern)
-                  + '</code> · ' + escapeHtml(i.proofStatus) + '</li>').join('') + '</ul>'
+                  + '</code> · ' + renderProofStatusBadge(i.proofStatus) + '</li>').join('') + '</ul>'
             : '';
         const links = data.links || {};
         const linkList = [
@@ -131,9 +171,41 @@
             .map((l) => '<a class="export-button" href="' + l[1] + '" target="_blank">' + escapeHtml(l[0]) + '</a>')
             .join(' ');
         $('demoSummary').innerHTML =
-            '<table>' + tableRows + '</table>'
+            banner
+            + (proofTag ? '<p>Proof-Status des selektierten Pfades: ' + proofTag + '</p>' : '')
+            + bestMoveBlock
+            + assumptionsBlock
+            + '<table>' + tableRows + '</table>'
             + idList
             + '<div class="demo-actions">' + linkList + '</div>';
+    }
+
+    /* ─── Proof-status legend (loaded lazily, cached) ─── */
+    const proofStatusLegend = {};
+    let proofStatusLoaded = null;
+    function ensureProofStatusLegend() {
+        if (proofStatusLoaded) { return proofStatusLoaded; }
+        proofStatusLoaded = fetch('/api/proof-status')
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data && Array.isArray(data.statuses)) {
+                    data.statuses.forEach((s) => {
+                        proofStatusLegend[s.status || s.name] =
+                            s.descriptionDe || s.shortDescription || s.descriptionEn
+                                || s.description || s.label || (s.status || s.name);
+                    });
+                }
+            })
+            .catch(() => {});
+        return proofStatusLoaded;
+    }
+    ensureProofStatusLegend();
+
+    function renderProofStatusBadge(status) {
+        if (!status) { return ''; }
+        const tooltip = proofStatusLegend[status] || status;
+        return '<span class="proof-badge proof-' + status.toLowerCase()
+            + '" title="' + escapeHtml(tooltip) + '">' + escapeHtml(status) + '</span>';
     }
 
     function escapeHtml(s) {
@@ -462,6 +534,61 @@
         } catch (ex) {
             tiles.innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
         }
+    }
+
+    /* ─── Benchmark tab ─── */
+    if ($('reloadBenchmark')) {
+        $('reloadBenchmark').addEventListener('click', loadBenchmark);
+    }
+    async function loadBenchmark() {
+        const host = $('benchmarkSuites');
+        if (!host) return;
+        host.innerHTML = '<div class="hint">Lade Benchmark (das kann ein paar Sekunden dauern) …</div>';
+        await ensureProofStatusLegend();
+        try {
+            const response = await fetch('/api/benchmark');
+            if (!response.ok) {
+                host.innerHTML = '<div class="status error">HTTP ' + response.status + '</div>';
+                return;
+            }
+            const data = await response.json();
+            const scenarios = data.scenarios || [];
+            if (!scenarios.length) {
+                host.innerHTML = '<div class="hint">Keine Benchmark-Szenarien gefunden.</div>';
+                return;
+            }
+            host.innerHTML = scenarios.map(renderBenchmarkScenario).join('')
+                + '<p class="hint">Gesamtlaufzeit: ' + (data.elapsedMillis || 0) + ' ms</p>';
+        } catch (ex) {
+            host.innerHTML = '<div class="status error">Netzwerkfehler: ' + ex + '</div>';
+        }
+    }
+    function renderBenchmarkScenario(scenario) {
+        const rows = (scenario.results || []).map((r) => {
+            const foundLabel = r.found
+                ? '<span class="benchmark-ok">ja</span>'
+                : '<span class="benchmark-miss">nein</span>';
+            return '<tr>'
+                + '<td><code>' + escapeHtml(r.strategy || '') + '</code></td>'
+                + '<td><code>' + escapeHtml(r.expression || '') + '</code></td>'
+                + '<td>' + foundLabel + '</td>'
+                + '<td>' + (r.elapsedMillis != null ? r.elapsedMillis + ' ms' : '–') + '</td>'
+                + '<td>' + (r.exploredStates || 0) + '</td>'
+                + '<td>' + (r.expandedSteps || 0) + '</td>'
+                + '<td>' + (r.distinctRules || 0) + '</td>'
+                + '<td>' + renderProofStatusBadge(r.proofStatus) + '</td>'
+                + '</tr>';
+        }).join('');
+        return '<div class="card benchmark-scenario">'
+            + '<h3>Szenario: <code>' + escapeHtml(scenario.name || '') + '</code></h3>'
+            + '<table class="benchmark-table">'
+            + '<thead><tr>'
+            + '<th>Strategie</th><th>Ausdruck</th><th>Gefunden</th><th>Laufzeit</th>'
+            + '<th>Besuchte Zustände</th><th>Schritte</th><th>Regeln</th><th>Proof-Status</th>'
+            + '</tr></thead>'
+            + '<tbody>' + rows + '</tbody>'
+            + '</table>'
+            + '</div>';
     }
 
     /* ─── Replay tab ─── */

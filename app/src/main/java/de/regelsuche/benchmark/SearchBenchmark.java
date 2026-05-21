@@ -28,6 +28,7 @@ public class SearchBenchmark {
         List<SearchBenchmarkResult> results = new ArrayList<>();
         for (String expression : expressions) {
             for (NamedSearchStrategy strategy : strategies) {
+                long startedNanos = System.nanoTime();
                 List<SearchState> states = strategy.strategy().search(new SearchProblem(
                     expression,
                     engine,
@@ -35,6 +36,7 @@ public class SearchBenchmark {
                     canonicalizer,
                     heuristic
                 ));
+                long elapsedMillis = (System.nanoTime() - startedNanos) / 1_000_000L;
                 int bestImprovement = states.stream().mapToInt(SearchState::improvement).max().orElse(0);
                 int shortestImprovingDepth = states.stream()
                     .filter(state -> state.improvement() > 0)
@@ -46,6 +48,12 @@ public class SearchBenchmark {
                     .flatMap(state -> state.appliedRuleIds().stream())
                     .distinct()
                     .count();
+                // The bare benchmark only runs the search; it does not validate
+                // identities formally. An improving path corresponds to a
+                // concrete equivalent expression -> VALIDATED_BY_EXAMPLES.
+                de.regelsuche.mining.CandidateProofStatus proofStatus = bestImprovement > 0
+                    ? de.regelsuche.mining.CandidateProofStatus.VALIDATED_BY_EXAMPLES
+                    : de.regelsuche.mining.CandidateProofStatus.OBSERVED;
                 results.add(new SearchBenchmarkResult(
                     strategy.name(),
                     expression,
@@ -53,7 +61,9 @@ public class SearchBenchmark {
                     bestImprovement,
                     shortestImprovingDepth,
                     expandedSteps,
-                    distinctRules
+                    distinctRules,
+                    elapsedMillis,
+                    proofStatus
                 ));
             }
         }
