@@ -509,6 +509,80 @@ Der Prototyp ist zu einer belastbareren Forschungsplattform erweitert worden:
 - Graph-Persistenz vollständiger Suchpfad-Metadaten
 - reproduzierbare Suchbenchmarks für Qualität und Explosion
 
+## Suchintelligenz (Transposition Table & Lern-Loop)
+
+Die Suchplattform wurde um eine mathematische **Transposition Table** und einen
+**lernenden Regelvorrat** ergänzt. Ziel ist es, dass Folgesuchen messbar
+intelligenter werden – analog zu einem Schachcomputer, der gleiche Stellungen
+wiedererkennt.
+
+### Transposition Table (`de.regelsuche.search.memory`)
+
+Die Tabelle indiziert besuchte Zustände über `ExpressionCanonicalizer.canonicalHash(...)`
+und hält pro Eintrag `bestScore`, `minDepthSeen`, `bestKnownPathId`,
+`reachedByRuleIds` und `visitCount`. Drei Implementierungen folgen dem in
+`PersistenceContext` etablierten Modus:
+
+| Persistenz   | Implementierung                  | Default-Pfad                      |
+| ------------ | -------------------------------- | --------------------------------- |
+| `IN_MEMORY`  | `InMemoryTranspositionTable`     | nur Prozessspeicher               |
+| `JSON_FILE`  | `JsonFileTranspositionTable`     | `./data/regelsuche/transposition.json` |
+| `REMOTE_NEO4J` | `Neo4jTranspositionTable`      | wiederverwendet `Driver`/`Session` |
+
+### Explainable Pruning
+
+Vor `expand()` prüft jede Strategie über `TranspositionGate` die Tabelle. Re-Visits
+sind erlaubt, wenn (a) geringere Tiefe, (b) besserer Score oder (c) ein neuer
+Eintrag in `reachedByRuleIds` vorliegt; andernfalls wird der Zustand mit einem
+`PruningDecision` protokolliert:
+
+| Reason                | Bedeutung                                                |
+| --------------------- | -------------------------------------------------------- |
+| `ALREADY_KNOWN_BETTER`| Bekannter Zustand mit besserem Score                     |
+| `ALREADY_KNOWN_EQUAL` | Bekannter Zustand, kein Mehrwert (klassischer Zyklus)    |
+| `REPLACED_WORSE_PATH` | Neuer Pfad ersetzt schlechteren                          |
+| `KEPT_NEW_RULE_COMBO` | Re-Visit beibehalten, weil neue Regelkombination         |
+| `KEPT_LOWER_DEPTH`    | Re-Visit beibehalten, weil kürzerer Pfad                 |
+| `BUDGET_EXCEEDED`     | Suchbudget aufgebraucht                                  |
+
+Die Entscheidungen werden via `JsonWriter` an `/api/search`-Antworten,
+`search-analysis-report.json` und einen neuen Bundle-Eintrag
+`pruning-decisions.json` angehängt.
+
+### Suchprofil `DISCOVERY_PLUS`
+
+Neues Profil mit aktiver Transposition Table, positiv gewichteten Mining-Signalen
+und höherer Pfaddiversität. Die bestehenden Profile (`FAST_SIMPLIFY`, `DISCOVERY`,
+`TEACHING`, `PROOF_ORIENTED`, `EXHAUSTIVE_SMALL`) bleiben unverändert; die Tabelle
+ist dort optional und per Default aus, damit alle bisherigen `transform`-Tests
+stabil weiterlaufen.
+
+### Lern-Loop (`MacroRuleLearningService`)
+
+Nach jedem Suchlauf werden über den bestehenden `RuleCandidateMiner`
+Makro-Kandidaten anti-unifiziert. `ReusableRule` führt jetzt `occurrenceCount`,
+`averageImprovement`, `supportingPathIds` und `confidenceScore`; alte
+`rule-inventory.json`-Dateien werden ohne diese Felder migriert (Default `0`).
+Ab `confidenceScore ≥ 0.8` und `occurrenceCount ≥ 3` aktiviert der Service die
+Regel automatisch im `RuleInventoryRepository`, sodass die nächste Suche sie über
+`InventoryBackedRewriteRuleProvider` als Schritt einsetzen kann.
+
+### Demo „System lernt eine Makroregel"
+
+`POST /api/demo/macro-learning` führt vier Suchläufe nacheinander aus –
+`(x+1)^2`, `(x+2)^2`, `(x+3)^2`, `(x+7)^2`. Die Antwort liefert pro Schritt
+Schrittanzahl, Laufzeit, `confidenceScore`-Verlauf und das Flag
+`usedLearnedRule`, das anzeigt, ob der vierte Lauf die gelernte
+binomische Regel als Schritt nutzt. Im UI ist die Demo als fünfter Button
+zugänglich; ein eigener Summary-Renderer zeigt die „vorher / nachher"-Tempo.
+
+### UI-Tab „Suchgedächtnis"
+
+Neuer Reiter mit drei Sektionen: bekannte Zustände (Ausdruck, Hash, `visitCount`,
+`bestScore`, `bestKnownPathId`), Pruning-Entscheidungen mit Filter nach
+`PruningReason` und gelernte Makroregeln. Daten kommen aus
+`/api/memory/states`, `/api/memory/pruning` und `/api/memory/macros`.
+
 Die Grenzen bleiben explizit:
 
 - Suche ist heuristisch und nicht vollständig.

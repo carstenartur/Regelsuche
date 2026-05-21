@@ -130,6 +130,7 @@ class DemoEndToEndTest {
         assertTrue(entries.contains("search-graph.graphml"), entries.toString());
         assertTrue(entries.contains("best-path.md"), entries.toString());
         assertTrue(entries.contains("rule-inventory.json"), entries.toString());
+        assertTrue(entries.contains("pruning-decisions.json"), entries.toString());
     }
 
     @Test

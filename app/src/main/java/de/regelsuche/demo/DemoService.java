@@ -38,14 +38,24 @@ public final class DemoService {
     private final TransformationEngine engine;
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+    private final de.regelsuche.search.memory.SearchMemory searchMemory;
 
     public DemoService(ExpressionGraphStore graphStore) {
-        this(graphStore, new AstRewriteTransformationEngine(DemoRuleSet.rules()));
+        this(graphStore, new AstRewriteTransformationEngine(DemoRuleSet.rules()), null);
     }
 
     public DemoService(ExpressionGraphStore graphStore, TransformationEngine engine) {
+        this(graphStore, engine, null);
+    }
+
+    public DemoService(
+        ExpressionGraphStore graphStore,
+        TransformationEngine engine,
+        de.regelsuche.search.memory.SearchMemory searchMemory
+    ) {
         this.graphStore = graphStore;
         this.engine = engine;
+        this.searchMemory = searchMemory;
     }
 
     /**
@@ -67,7 +77,8 @@ public final class DemoService {
         graphStore.saveNode(root, before.weightedTotal());
 
         SearchProblem problem = new SearchProblem(
-            root, engine, scorer, canonicalizer, demo.profile().heuristic());
+            root, engine, scorer, canonicalizer, demo.profile().heuristic(),
+            demo.profile().usesTranspositionTable() ? searchMemory : null);
         List<SearchState> states = demo.profile().newStrategy().search(problem);
 
         // Target expression in canonical form so we can compare on equal terms

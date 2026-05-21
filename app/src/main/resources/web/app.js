@@ -95,7 +95,30 @@
         }
     }
 
+    function renderMacroLearningSummary(data) {
+        const sp = data.speedup || {};
+        const stepsHtml = (data.steps || []).map((s) =>
+            '<tr><td>' + s.expression + '</td><td>' + s.stepCount + '</td>'
+            + '<td>' + s.elapsedMillis + ' ms</td>'
+            + '<td>' + (s.confidenceScore || 0).toFixed(2) + '</td>'
+            + '<td>' + s.learnedRulesActive + '</td></tr>').join('');
+        $('demoSummary').innerHTML =
+            '<div class="status ok demo-banner"><strong>System lernt eine Makroregel.</strong>'
+            + ' Gelernte Regel wurde im letzten Lauf'
+            + (data.usedLearnedRule ? ' angewendet.' : ' nicht angewendet.') + '</div>'
+            + '<table class="demo-table"><thead><tr>'
+            + '<th>Ausdruck</th><th>Schritte</th><th>Laufzeit</th><th>Konfidenz</th>'
+            + '<th>aktive Makros</th></tr></thead><tbody>' + stepsHtml + '</tbody></table>'
+            + '<p class="hint">Vorher (' + (sp.firstRunSteps || 0) + ' Schritte / '
+            + (sp.firstRunMillis || 0) + ' ms) → nachher ('
+            + (sp.lastRunSteps || 0) + ' Schritte / ' + (sp.lastRunMillis || 0) + ' ms).</p>';
+    }
+
     function renderDemoSummary(data) {
+        if (data && data.id === 'macro-learning') {
+            renderMacroLearningSummary(data);
+            return;
+        }
         const m = data.metrics || {};
         const best = data.bestPath || {};
         const selected = data.selectedPath || best;
@@ -823,6 +846,91 @@
         });
     }
 
+    /* ─── Memory tab ─── */
+    if ($('reloadMemory')) {
+        $('reloadMemory').addEventListener('click', loadMemory);
+        if ($('memoryPruningFilter')) {
+            $('memoryPruningFilter').addEventListener('change', loadMemory);
+        }
+    }
+    async function loadMemory() {
+        try {
+            const [statesResp, pruningResp, macrosResp] = await Promise.all([
+                fetch('/api/memory/states'),
+                fetch('/api/memory/pruning'),
+                fetch('/api/memory/macros'),
+            ]);
+            const states = await statesResp.json();
+            const pruning = await pruningResp.json();
+            const macros = await macrosResp.json();
+            renderMemoryStates(states);
+            renderMemoryPruning(pruning);
+            renderMemoryMacros(macros);
+        } catch (e) {
+            console.error('loadMemory failed', e);
+        }
+    }
+    function renderMemoryStates(data) {
+        const out = $('memoryStates');
+        if (!out) return;
+        out.innerHTML = '';
+        const entries = (data && data.entries) || [];
+        if (entries.length === 0) {
+            out.textContent = 'Noch keine Zustände beobachtet. Starte einen DISCOVERY_PLUS-Suchlauf.';
+            return;
+        }
+        entries.slice(0, 50).forEach((e) => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.innerHTML =
+                '<div><strong>' + (e.canonicalExpression || '') + '</strong></div>'
+                + '<div class="hint">hash: ' + e.canonicalHash + ' · visits: ' + e.visitCount
+                + ' · bestScore: ' + e.bestScore + ' · depth: ' + e.minDepthSeen + '</div>';
+            out.appendChild(div);
+        });
+    }
+    function renderMemoryPruning(data) {
+        const out = $('memoryPruning');
+        if (!out) return;
+        out.innerHTML = '';
+        const filter = $('memoryPruningFilter') ? $('memoryPruningFilter').value : '';
+        const decisions = ((data && data.decisions) || [])
+            .filter((d) => !filter || d.reason === filter);
+        if (decisions.length === 0) {
+            out.textContent = 'Keine Pruning-Entscheidungen für den Filter.';
+            return;
+        }
+        decisions.slice(0, 50).forEach((d) => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.innerHTML =
+                '<div><span class="badge">' + d.reason + '</span> '
+                + '<strong>' + (d.expression || '') + '</strong></div>'
+                + '<div class="hint">' + (d.explanation || '') + '</div>';
+            out.appendChild(div);
+        });
+    }
+    function renderMemoryMacros(data) {
+        const out = $('memoryMacros');
+        if (!out) return;
+        out.innerHTML = '';
+        const macros = (data && data.macros) || [];
+        if (macros.length === 0) {
+            out.textContent = 'Noch keine Makroregeln gelernt.';
+            return;
+        }
+        macros.forEach((m) => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.innerHTML =
+                '<div><strong>' + m.leftPattern + ' → ' + m.rightPattern + '</strong></div>'
+                + '<div class="hint">occurrences: ' + m.occurrenceCount
+                + ' · confidence: ' + (m.confidenceScore || 0).toFixed(2)
+                + ' · enabled: ' + m.enabled + '</div>';
+            out.appendChild(div);
+        });
+    }
+
     /* ─── Auto-load on page open ─── */
     document.addEventListener('DOMContentLoaded', () => {
         // Lazy-load when a tab is activated for the first time.
@@ -841,6 +949,8 @@
                     loadDashboard().finally(() => $('dashboardTiles').dataset.loaded = '1');
                 } else if (which === 'replay' && $('replayPathSelect') && !$('replayPathSelect').dataset.loaded) {
                     populateReplayPaths().finally(() => $('replayPathSelect').dataset.loaded = '1');
+                } else if (which === 'memory' && $('memoryStates') && !$('memoryStates').dataset.loaded) {
+                    loadMemory().finally(() => $('memoryStates').dataset.loaded = '1');
                 }
             });
         });

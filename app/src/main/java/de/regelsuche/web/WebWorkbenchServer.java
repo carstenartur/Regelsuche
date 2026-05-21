@@ -125,6 +125,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/explain", this::handleExplain));
         secure(server.createContext("/api/analyze", this::handleAnalyze));
         secure(server.createContext("/api/demo", this::handleDemo));
+        secure(server.createContext("/api/memory", this::handleMemory));
         secure(server.createContext("/api/proof-status", this::handleProofStatus));
         secure(server.createContext("/api/benchmark", this::handleBenchmark));
         secure(server.createContext("/", this::handleStatic));
@@ -860,6 +861,169 @@ public class WebWorkbenchServer {
         );
     }
 
+    private String runMacroLearningDemo() {
+        String[] expressions = {"(x+1)^2", "(x+2)^2", "(x+3)^2", "(x+7)^2"};
+        de.regelsuche.learning.MacroRuleLearningService learner =
+            new de.regelsuche.learning.MacroRuleLearningService(inventoryRepository);
+        de.regelsuche.canonical.ExpressionCanonicalizer canonicalizer =
+            new de.regelsuche.canonical.ExpressionCanonicalizer();
+        de.regelsuche.scoring.ExpressionScorer scorer = new de.regelsuche.scoring.ExpressionScorer();
+        de.regelsuche.transform.TransformationEngine engine =
+            new de.regelsuche.transform.AstRewriteTransformationEngine(
+                de.regelsuche.demo.DemoRuleSet.rules());
+        de.regelsuche.equivalence.SymPyEquivalenceService equivalence =
+            new de.regelsuche.equivalence.SymPyEquivalenceService();
+        List<java.util.Map<String, Object>> stepReports = new java.util.ArrayList<>();
+        List<de.regelsuche.mining.SuccessfulTransformationPath> aggregated = new java.util.ArrayList<>();
+        long firstRunSteps = -1, firstRunMillis = -1, lastRunSteps = -1, lastRunMillis = -1;
+        boolean usedLearnedRule = false;
+        double lastConfidence = 0.0;
+        List<Double> confidenceTrace = new java.util.ArrayList<>();
+        for (int i = 0; i < expressions.length; i++) {
+            String expr = expressions[i];
+            long t0 = System.nanoTime();
+            String root = canonicalizer.canonicalize(expr);
+            de.regelsuche.scoring.ExpressionScore before = scorer.score(root);
+            de.regelsuche.search.SearchProfile profile = de.regelsuche.search.SearchProfile.DISCOVERY_PLUS;
+            de.regelsuche.search.strategy.SearchProblem problem =
+                new de.regelsuche.search.strategy.SearchProblem(
+                    root, engine, scorer, canonicalizer, profile.heuristic(), searchMemory);
+            List<de.regelsuche.search.strategy.SearchState> states =
+                profile.newStrategy().search(problem);
+            long elapsed = (System.nanoTime() - t0) / 1_000_000L;
+            int stepsOnBest = 0;
+            de.regelsuche.search.strategy.SearchState best = null;
+            boolean usedLearnedHere = false;
+            for (de.regelsuche.search.strategy.SearchState s : states) {
+                if (s.depth() == 0 || !equivalence.areEquivalent(root, s.expression())) {
+                    continue;
+                }
+                if (best == null || s.depth() < best.depth()) {
+                    best = s;
+                }
+                aggregated.add(new de.regelsuche.mining.SuccessfulTransformationPath(
+                    "macro-" + i + "-d" + s.depth() + "-" + Integer.toHexString(s.canonicalHash().hashCode()),
+                    root, s.expression(), s.path(), s.appliedRuleIds(),
+                    before, s.score(), true, "macro-demo",
+                    java.util.Map.of("variable", "x")));
+                for (String rid : s.appliedRuleIds()) {
+                    if (rid != null && rid.startsWith("macro_")) {
+                        usedLearnedHere = true;
+                    }
+                }
+            }
+            if (best != null) {
+                stepsOnBest = best.appliedRuleIds().size();
+            }
+            de.regelsuche.learning.MacroLearningResult learning = learner.learn(aggregated);
+            double confidence = learning.touchedRules().isEmpty()
+                ? 0.0 : learning.touchedRules().get(0).confidenceScore();
+            confidenceTrace.add(confidence);
+            lastConfidence = confidence;
+            if (i == 0) {
+                firstRunSteps = stepsOnBest;
+                firstRunMillis = elapsed;
+            }
+            if (i == expressions.length - 1) {
+                lastRunSteps = stepsOnBest;
+                lastRunMillis = elapsed;
+                usedLearnedRule = usedLearnedHere;
+            }
+            stepReports.add(java.util.Map.of(
+                "index", i,
+                "expression", expr,
+                "stepCount", stepsOnBest,
+                "elapsedMillis", elapsed,
+                "confidenceScore", confidence,
+                "learnedRulesActive", inventoryRepository.findEnabled().stream()
+                    .filter(r -> r.id().startsWith("macro_")).count()
+            ));
+        }
+        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();
+        w.beginObject();
+        w.property("id", "macro-learning");
+        w.property("title", "System lernt eine Makroregel");
+        w.property("usedLearnedRule", usedLearnedRule);
+        w.property("finalConfidenceScore", lastConfidence);
+        w.array("confidenceTrace", arr -> confidenceTrace.forEach(v -> arr.value(v.toString())));
+        final long fSteps = firstRunSteps, fMs = firstRunMillis;
+        final long lSteps = lastRunSteps, lMs = lastRunMillis;
+        w.object("speedup", s -> {
+            s.property("firstRunSteps", fSteps);
+            s.property("firstRunMillis", fMs);
+            s.property("lastRunSteps", lSteps);
+            s.property("lastRunMillis", lMs);
+        });
+        w.array("steps", arr -> stepReports.forEach(rep -> arr.objectValue(inner -> {
+            inner.property("index", (int) rep.get("index"));
+            inner.property("expression", (String) rep.get("expression"));
+            inner.property("stepCount", (int) rep.get("stepCount"));
+            inner.property("elapsedMillis", (long) rep.get("elapsedMillis"));
+            inner.property("confidenceScore", (double) rep.get("confidenceScore"));
+            inner.property("learnedRulesActive", (long) rep.get("learnedRulesActive"));
+        })));
+        w.endObject();
+        return w.toString();
+    }
+
+    private void handleMemory(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String suffix = path.substring("/api/memory".length()).replaceFirst("^/", "");
+        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();
+        switch (suffix) {
+            case "states" -> {
+                w.beginObject();
+                w.property("size", searchMemory.table().size());
+                w.array("entries", arr -> searchMemory.table().entries().forEach(e ->
+                    arr.objectValue(inner -> {
+                        inner.property("canonicalHash", e.canonicalHash());
+                        inner.property("canonicalExpression", e.canonicalExpression());
+                        inner.property("bestScore", e.bestScore());
+                        inner.property("minDepthSeen", e.minDepthSeen());
+                        inner.property("bestKnownPathId", e.bestKnownPathId());
+                        inner.stringArray("reachedByRuleIds",
+                            new java.util.ArrayList<>(e.reachedByRuleIds()));
+                        inner.property("visitCount", e.visitCount());
+                        inner.property("firstSeen", e.firstSeen().toString());
+                        inner.property("lastSeen", e.lastSeen().toString());
+                    })));
+                w.endObject();
+                sendJson(exchange, 200, w.toString());
+            }
+            case "pruning" -> sendJson(exchange, 200, renderPruningDecisionsJson());
+            case "macros" -> {
+                w.beginObject();
+                w.array("macros", arr -> inventoryRepository.findAll().stream()
+                    .filter(r -> r.occurrenceCount() > 0 || r.confidenceScore() > 0)
+                    .forEach(r -> arr.objectValue(inner -> {
+                        inner.property("id", r.id());
+                        inner.property("leftPattern", r.leftPattern());
+                        inner.property("rightPattern", r.rightPattern());
+                        inner.property("occurrenceCount", r.occurrenceCount());
+                        inner.property("confidenceScore", r.confidenceScore());
+                        inner.property("averageImprovement", r.averageImprovement());
+                        inner.stringArray("supportingPathIds", r.supportingPathIds());
+                        inner.property("enabled", inventoryRepository.isEnabled(r.id()));
+                    })));
+                w.endObject();
+                sendJson(exchange, 200, w.toString());
+            }
+            case "" -> {
+                w.beginObject();
+                w.property("size", searchMemory.table().size());
+                w.property("pruningDecisions", searchMemory.decisions().size());
+                w.object("links", l -> {
+                    l.property("states", "/api/memory/states");
+                    l.property("pruning", "/api/memory/pruning");
+                    l.property("macros", "/api/memory/macros");
+                });
+                w.endObject();
+                sendJson(exchange, 200, w.toString());
+            }
+            default -> sendStatus(exchange, 404, "unknown memory endpoint: " + suffix);
+        }
+    }
+
     private void handleDemo(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
         String suffix = path.substring("/api/demo".length()).replaceFirst("^/", "");
@@ -892,7 +1056,15 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 405, "method not allowed");
             return;
         }
-        de.regelsuche.demo.DemoService demoService = new de.regelsuche.demo.DemoService(graphStore);
+        if ("macro-learning".equals(demo.id()) && "POST".equalsIgnoreCase(method)) {
+            sendJson(exchange, 200, runMacroLearningDemo());
+            return;
+        }
+        de.regelsuche.demo.DemoService demoService =
+            new de.regelsuche.demo.DemoService(graphStore,
+                new de.regelsuche.transform.AstRewriteTransformationEngine(
+                    de.regelsuche.demo.DemoRuleSet.rules()),
+                searchMemory);
         de.regelsuche.demo.DemoService.DemoRunResult result = demoService.run(demo);
         sendJson(exchange, 200, renderDemoBundle(result));
     }

@@ -75,6 +75,19 @@ public final class DemoCatalog {
             "(x+1)*(x+2) = x^2 + 3*x + 2",
             "2 + 3 * x + x ^ 2"
         ));
+        map.put("macro-learning", new Demo(
+            "macro-learning",
+            "System lernt eine Makroregel",
+            "Vier aufeinanderfolgende Suchläufe über (x+1)^2, (x+2)^2, (x+3)^2 und (x+7)^2: "
+                + "nach drei Beispielen aktiviert MacroRuleLearningService die binomische "
+                + "Formel als Makroregel im Inventar, der vierte Lauf nutzt sie und ist messbar "
+                + "kürzer.",
+            "(x+7)^2",
+            InputType.TERM,
+            SearchProfile.DISCOVERY_PLUS,
+            "(a+b)^2 wird als gelernte Regel angewandt",
+            "49 + 14 * x + x ^ 2"
+        ));
         return java.util.Collections.unmodifiableMap(map);
     }
 

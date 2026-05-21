@@ -23,6 +23,7 @@
         <button class="tab" data-tab="replay">Replay</button>
         <button class="tab" data-tab="compare">Vergleich</button>
         <button class="tab" data-tab="inventory">Inventar</button>
+        <button class="tab" data-tab="memory">Suchgedächtnis</button>
         <button class="tab" data-tab="exports">Exporte</button>
         <button class="tab" data-tab="help">Hilfe</button>
     </nav>
@@ -58,6 +59,11 @@
                     <span class="demo-icon">=</span>
                     <span class="demo-title">Polynom-Expansion</span>
                     <span class="demo-expr">(x+1)(x+2)</span>
+                </button>
+                <button class="demo-button" data-demo="macro-learning">
+                    <span class="demo-icon">⚡</span>
+                    <span class="demo-title">System lernt eine Makroregel</span>
+                    <span class="demo-expr">(x+1)² → (x+7)²</span>
                 </button>
             </div>
             <div id="demoStatus" class="status"></div>
@@ -284,6 +290,33 @@
             <p class="hint">Aktivieren/deaktivieren oder taggen. Geänderte Tags werden lokal in der UI dargestellt;
                 die Persistenz erfolgt serverseitig (sofern eine schreibende Inventory-API aktiviert ist).</p>
             <div id="inventoryList" class="list"></div>
+        </div>
+    </section>
+
+    <!-- ─────────── Memory tab ─────────── -->
+    <section id="tab-memory" class="tab-panel">
+        <div class="card">
+            <h2>Suchgedächtnis</h2>
+            <div class="actions">
+                <button id="reloadMemory" class="primary">Aktualisieren</button>
+                <select id="memoryPruningFilter">
+                    <option value="">Alle Pruning-Gründe</option>
+                    <option value="ALREADY_KNOWN_BETTER">ALREADY_KNOWN_BETTER</option>
+                    <option value="ALREADY_KNOWN_EQUAL">ALREADY_KNOWN_EQUAL</option>
+                    <option value="REPLACED_WORSE_PATH">REPLACED_WORSE_PATH</option>
+                    <option value="KEPT_NEW_RULE_COMBO">KEPT_NEW_RULE_COMBO</option>
+                    <option value="KEPT_LOWER_DEPTH">KEPT_LOWER_DEPTH</option>
+                    <option value="BUDGET_EXCEEDED">BUDGET_EXCEEDED</option>
+                </select>
+            </div>
+            <p class="hint">Mathematische Transposition Table: bekannte Zustände (paginiert), Pruning-Entscheidungen
+                und gelernte Makroregeln aus dem aktuellen Suchgedächtnis.</p>
+            <h3>Bekannte Zustände</h3>
+            <div id="memoryStates" class="list"></div>
+            <h3>Pruning-Entscheidungen</h3>
+            <div id="memoryPruning" class="list"></div>
+            <h3>Gelernte Makroregeln</h3>
+            <div id="memoryMacros" class="list"></div>
         </div>
     </section>
 
