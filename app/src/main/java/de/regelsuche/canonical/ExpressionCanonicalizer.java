@@ -1,10 +1,13 @@
 package de.regelsuche.canonical;
 
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionContext;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -17,13 +20,41 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Strong-canonicalization service.
+ *
+ * <p>Performs algebraic-normal-form rewriting on expressions so that
+ * structurally distinct but mathematically equal syntactic variants collapse
+ * to the same {@link #canonicalize(String) canonical string} and therefore
+ * the same {@link #stableHash(String) stable hash}. This is the single
+ * source-of-truth used by the {@link de.regelsuche.search.memory.TranspositionTable
+ * transposition table}, the rule miner and graph deduplication.</p>
+ *
+ * <p>The basic API ({@link #canonicalize(Expr)}, {@link #stableHash(String)})
+ * only applies <em>assumption-free</em> reductions — every rewrite is sound
+ * without further side conditions. Reductions that are only correct under
+ * an assumption (such as {@code x/x → 1} which needs {@code x ≠ 0}) are
+ * available through the {@code …With(...)} overloads, which collect those
+ * conditions into an {@link AssumptionContext} so callers can decide what to
+ * do with them (record on the rule candidate, prove them, or skip the
+ * reduction altogether).</p>
+ */
 public class ExpressionCanonicalizer {
     private final ExpressionParser parser = new ExpressionParser();
 
     public String canonicalize(String expression) {
+        return canonicalizeWith(expression, null);
+    }
+
+    /**
+     * Like {@link #canonicalize(String)} but additionally applies
+     * assumption-bearing reductions (e.g. {@code x/x → 1}) and records any
+     * resulting side conditions into {@code context}.
+     */
+    public String canonicalizeWith(String expression, AssumptionContext context) {
         try {
             Expr parsed = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();
-            return ExpressionFormatter.format(canonicalize(parsed));
+            return ExpressionFormatter.format(canonicalize(parsed, context));
         } catch (IllegalArgumentException ex) {
             return expression.trim().replaceAll("\\s+", " ");
         }
@@ -31,6 +62,31 @@ public class ExpressionCanonicalizer {
 
     public String stableHash(String expression) {
         return sha256(canonicalize(expression));
+    }
+
+    /**
+     * Assumption-aware variant of {@link #stableHash(String)}. The hash
+     * embeds a fingerprint of the assumptions that {@code context} carries
+     * <em>after</em> canonicalization so that an entry that was simplified
+     * under {@code x ≠ 0} does not collide with one that was not.
+     */
+    public String stableHashWith(String expression, AssumptionContext context) {
+        String canonical = canonicalizeWith(expression, context);
+        String fingerprint = assumptionFingerprint(context);
+        return sha256(fingerprint.isEmpty() ? canonical : (canonical + "\u0001" + fingerprint));
+    }
+
+    /** Stable fingerprint of the assumptions in {@code context}, suitable for hash composition. */
+    public static String assumptionFingerprint(AssumptionContext context) {
+        if (context == null || context.isEmpty()) {
+            return "";
+        }
+        List<String> expressions = new ArrayList<>();
+        for (Assumption assumption : context.snapshot()) {
+            expressions.add(assumption.kind() + "|" + assumption.expression());
+        }
+        java.util.Collections.sort(expressions);
+        return String.join(";", expressions);
     }
 
     public int astNodeCount(String expression) {
@@ -43,30 +99,39 @@ public class ExpressionCanonicalizer {
     }
 
     public Expr canonicalize(Expr expression) {
+        return canonicalize(expression, null);
+    }
+
+    /**
+     * Recursive canonicalization with optional assumption tracking. Passing
+     * {@code null} for {@code context} keeps the behavior assumption-free
+     * (the default for general-purpose hashing).
+     */
+    public Expr canonicalize(Expr expression, AssumptionContext context) {
         if (expression instanceof BinaryExpr binaryExpr) {
             return switch (binaryExpr.operator()) {
-                case ADD, SUB -> canonicalizeAddition(binaryExpr);
-                case MUL -> canonicalizeMultiplication(binaryExpr);
-                case DIV -> new BinaryExpr(canonicalize(binaryExpr.left()), BinaryOperator.DIV, canonicalize(binaryExpr.right()));
-                case POW -> canonicalizePower(binaryExpr);
+                case ADD, SUB -> canonicalizeAddition(binaryExpr, context);
+                case MUL -> canonicalizeMultiplication(binaryExpr, context);
+                case DIV -> canonicalizeDivision(binaryExpr, context);
+                case POW -> canonicalizePower(binaryExpr, context);
             };
         }
         if (expression instanceof FunctionExpr functionExpr) {
             List<Expr> normalised = new ArrayList<>(functionExpr.arguments().size());
             for (Expr argument : functionExpr.arguments()) {
-                normalised.add(canonicalize(argument));
+                normalised.add(canonicalize(argument, context));
             }
             return new FunctionExpr(functionExpr.name(), normalised);
         }
         return expression;
     }
 
-    private Expr canonicalizeAddition(BinaryExpr expression) {
+    private Expr canonicalizeAddition(BinaryExpr expression, AssumptionContext context) {
         List<SignedTerm> terms = new ArrayList<>();
         collectTerms(expression, 1, terms);
         Map<String, TermBucket> buckets = new LinkedHashMap<>();
         for (SignedTerm signedTerm : terms) {
-            Expr normalized = canonicalize(signedTerm.term());
+            Expr normalized = canonicalize(signedTerm.term(), context);
             Coefficient coefficient = coefficientOf(normalized);
             int value = signedTerm.sign() * coefficient.value();
             if (value == 0) {
@@ -78,7 +143,7 @@ public class ExpressionCanonicalizer {
 
         List<TermBucket> ordered = buckets.values().stream()
             .filter(bucket -> bucket.coefficient() != 0)
-            .sorted((left, right) -> ExpressionFormatter.format(left.term()).compareTo(ExpressionFormatter.format(right.term())))
+            .sorted(ExpressionCanonicalizer::compareMonomials)
             .toList();
         if (ordered.isEmpty()) {
             return new NumberExpr(0);
@@ -98,13 +163,13 @@ public class ExpressionCanonicalizer {
         return result;
     }
 
-    private Expr canonicalizeMultiplication(BinaryExpr expression) {
+    private Expr canonicalizeMultiplication(BinaryExpr expression, AssumptionContext context) {
         List<Expr> factors = new ArrayList<>();
         collectFactors(expression, factors);
         int numeric = 1;
         Map<String, FactorBucket> buckets = new LinkedHashMap<>();
         for (Expr factor : factors) {
-            Expr normalized = canonicalize(factor);
+            Expr normalized = canonicalize(factor, context);
             if (isNumber(normalized, 0)) {
                 return new NumberExpr(0);
             }
@@ -136,9 +201,9 @@ public class ExpressionCanonicalizer {
         return leftAssociate(ordered, BinaryOperator.MUL);
     }
 
-    private Expr canonicalizePower(BinaryExpr expression) {
-        Expr base = canonicalize(expression.left());
-        Expr exponent = canonicalize(expression.right());
+    private Expr canonicalizePower(BinaryExpr expression, AssumptionContext context) {
+        Expr base = canonicalize(expression.left(), context);
+        Expr exponent = canonicalize(expression.right(), context);
         if (isNumber(exponent, 0)) {
             return new NumberExpr(1);
         }
@@ -146,6 +211,114 @@ public class ExpressionCanonicalizer {
             return base;
         }
         return new BinaryExpr(base, BinaryOperator.POW, exponent);
+    }
+
+    /**
+     * Division canonicalization. Without an {@link AssumptionContext} the
+     * operator is opaque (just recurse), preserving the assumption-free
+     * default. With a context, three assumption-bearing reductions fire and
+     * record their side conditions:
+     * <ul>
+     *   <li>{@code 0 / d  →  0}            under {@code d ≠ 0}</li>
+     *   <li>{@code d / d  →  1}            under {@code d ≠ 0}</li>
+     *   <li>{@code (a*d) / d  →  a}        under {@code d ≠ 0}</li>
+     * </ul>
+     */
+    private Expr canonicalizeDivision(BinaryExpr expression, AssumptionContext context) {
+        Expr numerator = canonicalize(expression.left(), context);
+        Expr denominator = canonicalize(expression.right(), context);
+        if (context != null && !isNumber(denominator, 0) && !isNumber(denominator, 1)) {
+            String denomText = ExpressionFormatter.format(denominator);
+            // 0 / d -> 0 (d ≠ 0)
+            if (isNumber(numerator, 0)) {
+                context.add(Assumption.nonZero(denomText));
+                return new NumberExpr(0);
+            }
+            // d / d -> 1 (d ≠ 0)
+            if (numerator.equals(denominator)) {
+                context.add(Assumption.nonZero(denomText));
+                return new NumberExpr(1);
+            }
+            // (a*d) / d -> a  and  (d*a) / d -> a  (d ≠ 0)
+            Expr cancelled = cancelDivisor(numerator, denominator);
+            if (cancelled != null) {
+                context.add(Assumption.nonZero(denomText));
+                return cancelled;
+            }
+        }
+        return new BinaryExpr(numerator, BinaryOperator.DIV, denominator);
+    }
+
+    /**
+     * If {@code denominator} appears as one of the factors of a canonical
+     * product {@code numerator}, return the product of the remaining factors
+     * (or {@link NumberExpr}{@code (1)} if no other factor remains). Returns
+     * {@code null} when no cancellation is possible.
+     */
+    private Expr cancelDivisor(Expr numerator, Expr denominator) {
+        if (!(numerator instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.MUL) {
+            return null;
+        }
+        List<Expr> factors = new ArrayList<>();
+        collectFactors(binary, factors);
+        boolean removed = false;
+        List<Expr> remaining = new ArrayList<>();
+        for (Expr factor : factors) {
+            if (!removed && factor.equals(denominator)) {
+                removed = true;
+                continue;
+            }
+            remaining.add(factor);
+        }
+        if (!removed) {
+            return null;
+        }
+        if (remaining.isEmpty()) {
+            return new NumberExpr(1);
+        }
+        return leftAssociate(remaining, BinaryOperator.MUL);
+    }
+
+    /**
+     * Compare two monomial buckets by (descending degree, ascending lex of
+     * formatted base). Falls back to lex-only for non-monomial keys so the
+     * order remains stable.
+     */
+    private static int compareMonomials(TermBucket left, TermBucket right) {
+        int leftDegree = monomialDegree(left.term());
+        int rightDegree = monomialDegree(right.term());
+        if (leftDegree != rightDegree) {
+            return Integer.compare(rightDegree, leftDegree); // higher degree first
+        }
+        return ExpressionFormatter.format(left.term()).compareTo(ExpressionFormatter.format(right.term()));
+    }
+
+    /**
+     * Sum of integer exponents of variable factors in a canonical monomial.
+     * Returns {@code 0} for the {@code NumberExpr(1)} constant term, {@code 1}
+     * for a bare variable, the explicit exponent for {@code x^k}, and the
+     * accumulated exponent for products of such factors. Anything that isn't
+     * recognised is treated as degree {@code 0} so the comparator stays
+     * total.
+     */
+    static int monomialDegree(Expr expression) {
+        if (expression instanceof NumberExpr) {
+            return 0;
+        }
+        if (expression instanceof VariableExpr) {
+            return 1;
+        }
+        if (expression instanceof BinaryExpr binary) {
+            if (binary.operator() == BinaryOperator.POW
+                && binary.left() instanceof VariableExpr
+                && binary.right() instanceof NumberExpr exponent) {
+                return Math.max(0, (int) exponent.value());
+            }
+            if (binary.operator() == BinaryOperator.MUL) {
+                return monomialDegree(binary.left()) + monomialDegree(binary.right());
+            }
+        }
+        return 0;
     }
 
     private void collectTerms(Expr expression, int sign, List<SignedTerm> terms) {
