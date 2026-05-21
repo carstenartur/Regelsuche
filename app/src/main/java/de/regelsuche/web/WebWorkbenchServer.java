@@ -1049,6 +1049,8 @@ public class WebWorkbenchServer {
             putZipEntry(zip, "search-graph.graphml", exportService.exportSearchGraphGraphMl(graph));
             putZipEntry(zip, "search-graph.json", exportService.exportSearchGraphJson(graph));
             putZipEntry(zip, "best-path.md", exportService.exportBestPathMarkdown(transformations));
+            putZipEntry(zip, "rule-inventory.json",
+                exportService.exportJson(List.of(), List.of(), inventoryRepository.findAll()));
         }
         return out.toByteArray();
     }

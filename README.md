@@ -27,8 +27,9 @@ Gradle-basiertes Java-Projekt für regelbasierte Ausdrucksumformungen mit:
 > [docs/replay-mode.md](docs/replay-mode.md), [docs/macro-rules.md](docs/macro-rules.md)
 > und [docs/didactic-ranking.md](docs/didactic-ranking.md).
 
-## Quickstart mit Docker (Killer-App-Demo)
+## Quickstart: Single Docker Image (Killer-Demo Standard)
 
+**Der Standardmodus der Killer-Demo benötigt keine externe Infrastruktur.**
 Ein einziger Docker-Build, ein Image, in unter fünf Minuten ein klickbarer
 Demo-Flow im Browser:
 
@@ -38,22 +39,68 @@ docker run --rm -p 8080:8080 regelsuche
 ```
 
 Anschließend `http://localhost:8080/` öffnen. Im Demo-Hero stehen vier große
-Buttons bereit – Binomische Formel, Bruchkürzung, Trigonometrie, Polynom-
-Gleichung. Ein Klick startet die Suche, zeigt Suchgraph, Replay und
-Identität an und liefert den Bericht als Bundle.
+Buttons bereit – **Binomische Formel**, **Bruchkürzung**, **Trigonometrie**,
+**Polynom-Expansion**. Ein Klick startet die Suche, zeigt Suchgraph, Replay,
+Best Move und erkannte Identität an und liefert den Bericht als Bundle.
+
+Das Image enthält:
+
+* die Regelsuche-App und Web-Workbench,
+* lokale Persistenz **ohne externe Dienste** (JSON-Datei unter
+  `/opt/regelsuche/data`, siehe Abschnitt *Persistenz*),
+* alle vorkonfigurierten Demos.
 
 Wichtige Endpunkte:
 
 * `GET /api/demo` – Liste der Demos
-* `POST /api/demo/{binomial|rational|trigonometry|equation}` – Demo ausführen
+* `POST /api/demo/{binomial|rational|trigonometry|polynomial-expansion}` – Demo ausführen
+  (`equation` bleibt als Alias bestehen)
 * `GET /api/proof-status` – Erklärungen zu Proof-Status-Stufen
 * `GET /api/benchmark` – Benchmark-Lauf als JSON
 * `GET /api/exports/bundle.zip` – kompletter Bericht (Markdown, LaTeX, JSON,
-  Mermaid, GraphML) in einer Zip-Datei
+  Mermaid, GraphML, Rule-Inventory) in einer Zip-Datei
 
-Optional: Wird Neo4j verfügbar gemacht und die Variablen `NEO4J_URI`,
-`NEO4J_USER`, `NEO4J_PASSWORD` gesetzt, persistiert Regelsuche Graph und
-Inventar direkt im Graphdatenbank-Backend (`docker run -e NEO4J_URI=…`).
+## Optional: Full Mode mit Neo4j
+
+Für persistente, größere Analysen mit externem Neo4j-Server liefert das
+Repository eine optionale `docker-compose.yml`:
+
+```bash
+docker compose up --build
+```
+
+Das startet App + Neo4j 5 Community + persistentes Neo4j-Volume und setzt
+die Variablen `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` automatisch. Die
+App nutzt dann den `REMOTE_NEO4J`-Modus statt der JSON-Datei.
+
+**Wichtig:** Compose ist nur optionaler Persistenz-/Full-Mode – der
+Wow-Demo-Flow funktioniert vollständig schon mit dem Single-Image-Quickstart
+oben.
+
+## Persistenz: GraphPersistenceMode
+
+Konfiguration über zwei Umgebungsvariablen (alternativ über die
+JVM-Properties `regelsuche.persistence.mode` / `regelsuche.persistence.path`):
+
+| Modus            | Beschreibung                                                |
+|------------------|-------------------------------------------------------------|
+| `IN_MEMORY`      | Alles im RAM. Standard für CLI/Tests.                       |
+| `JSON_FILE`      | Lokale JSON-Datei, keine externen Dienste. Docker-Standard. |
+| `EMBEDDED_NEO4J` | *(reserviert)* Im aktuellen Distribut auf `JSON_FILE` gemappt – das Image bleibt schlank, keine GPL-lizenzierte Embedded-DB nötig. |
+| `REMOTE_NEO4J`   | Externer Neo4j-Server. Wird automatisch gewählt, wenn `NEO4J_URI/USER/PASSWORD` gesetzt sind. |
+
+Beispiele:
+
+```bash
+# Standard (Docker-Image setzt das bereits):
+REGELSUCHE_PERSISTENCE_MODE=JSON_FILE \
+REGELSUCHE_PERSISTENCE_PATH=./data/regelsuche \
+./gradlew :app:run --args='serve --host 0.0.0.0 --port 8080'
+
+# Full Mode (manuell, ohne docker-compose):
+NEO4J_URI=bolt://localhost:7687 NEO4J_USER=neo4j NEO4J_PASSWORD=secret \
+./gradlew :app:run --args='serve --port 8080'
+```
 
 ## Starten
 
@@ -61,45 +108,52 @@ Inventar direkt im Graphdatenbank-Backend (`docker run -e NEO4J_URI=…`).
 ./gradlew :app:run --args='term "x + 0"'
 ```
 
-## Demo: Binomische Formel emergiert aus atomaren Regeln
+## Demo: Binomische Formel
 
-Mit dieser Demo lässt sich die Workbench end-to-end erleben — eingegeben
-wird `(x+3)^2`, herausgefunden wird die binomische Formel als emergente
-Identität aus rein atomaren Rewrite-Regeln.
-
-```bash
-./gradlew :app:run --args='serve --port 8080'
-```
-
-Anschließend im Browser `http://localhost:8080/` öffnen.
+Eingegeben wird `(x+3)^2`, herausgefunden wird die binomische Formel als
+emergente Identität aus rein atomaren Rewrite-Regeln (`power_two_to_product`
+→ `distribute` → `combine_like_terms`).
 
 * **Eingabe:** `(x+3)^2`
-* **Screenshot-Hinweis:** Beim Klick auf "Suchen" entsteht im Cytoscape-Graph
-  ein Strang aus vier Knoten. Der beste Pfad (gelb hervorgehoben) verläuft
-  über `(x+3)*(x+3) → x*x + x*3 + 3*x + 3*3 → x^2 + 6x + 9`.
-* **Erwarteter Graph:**
-  ```
-  (x+3)^2 ──power_two_to_product──▶ (x+3)*(x+3) ──distribute──▶
-  x*x + x*3 + 3*x + 3*3 ──combine_like_terms──▶ x^2 + 6x + 9
-  ```
-* **Erwarteter Rechenweg im Replay-Tab:**
-  1. `(x+3)^2 = (x+3)*(x+3)` (Potenz als Produkt)
-  2. `(x+3)*(x+3) = x*x + x*3 + 3*x + 3*3` (Distributivität)
-  3. `x*x + x*3 + 3*x + 3*3 = x^2 + 6x + 9` (gleichartige Terme)
-* **Erwartete Makroregel** im "Makro-Regeln"-Tab:
-  `(a+b)^2 → a^2 + 2*a*b + b^2`, mit Beispielen, unterstützenden Pfaden,
-  Kompressionsrate und den Buttons "Als Regel übernehmen", "Formal prüfen",
-  "Auf neue Beispiele testen".
-* **Exportdateien** unter `/api/exports/`:
-    * `search-analysis-report.md` – kompletter Analysebericht (Eingabe,
-      Suchprofil, Domänen, Graphmetriken, bester Pfad, alternative Pfade,
-      Makroregeln, Identitäten, Annahmen, Proof-Status,
-      Regelvorrat-Änderungen).
-    * `search-analysis-report.tex` – LaTeX-Version desselben Berichts.
-    * `search-analysis-report.json` – maschinenlesbarer Bericht.
-* **"Chess-style"-Analyse:** `GET /api/analyze/move?expression=(x+3)^2`
-  liefert „bester Zug", „alternative Züge", Begründung und die in der
-  gesamten Suche nützlichste Regel.
+* **Erwarteter Treffer:** `(x+3)^2 = 9 + 6*x + x^2`
+* **Replay-Tab** zeigt den Weg über `(x+3)*(x+3) → x*x + x*3 + 3*x + 3*3 →
+  9 + 6*x + x^2`.
+* **Makroregel:** `(a+b)^2 → a^2 + 2*a*b + b^2`.
+
+## Demo: Bruchkürzung
+
+* **Eingabe:** `(x*y)/(x*z)`
+* **Erwarteter Treffer:** `(x*y)/(x*z) = y/z`
+* **Annahme** (im UI sichtbar): `x ≠ 0`.
+* Regel: `rational_cancel_common_factor`.
+
+## Demo: Trigonometrie
+
+* **Eingabe:** `sin(x)^2 + cos(x)^2`
+* **Erwarteter Treffer:** `sin(x)^2 + cos(x)^2 = 1`
+* Regel: `trig_pythagorean_sin_cos` (bzw. die symmetrische Variante).
+
+## Demo: Polynom-Expansion
+
+(Die frühere Demo „Polynom-Gleichung" wurde ehrlich umbenannt: der aktuelle
+atomare Regelvorrat löst keine linearen Gleichungen, expandiert aber
+Polynome.)
+
+* **Eingabe:** `(x+1)*(x+2)`
+* **Erwarteter Treffer:** `(x+1)*(x+2) = x^2 + 3*x + 2`
+* `equation` bleibt als URL-Alias erhalten.
+
+## Grenzen
+
+* Keine Gleichungslösung über Symbol-Isolation – die Demos beschränken sich
+  auf Term-Umformungen.
+* Embedded-Neo4j ist im Standard-Image **nicht** enthalten (sonst zöge das
+  eine GPL-lizenzierte Server-Abhängigkeit ins Image); statt dessen kommt
+  `JSON_FILE` zum Einsatz, das für den Single-User-Demo-Charakter mehr als
+  genug ist.
+* Suchtiefe und Knotenbudget sind pro Demo bewusst begrenzt – grössere
+  Analysen sind die Domäne des Full Mode.
+
 
 ## CLI Quickstart
 

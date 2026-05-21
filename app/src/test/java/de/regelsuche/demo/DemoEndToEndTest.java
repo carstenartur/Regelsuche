@@ -51,19 +51,16 @@ class DemoEndToEndTest {
     }
 
     @Test
-    void demoBinomialWorksEndToEnd() throws IOException {
+    void demoBinomialFindsExpectedExpansion() throws IOException {
         String body = runDemo("binomial");
         assertTrue(body.contains("\"id\":\"binomial\""), body);
         assertTrue(body.contains("\"expression\":\"(x+3)^2\""), body);
-        assertTrue(body.contains("\"bestPath\""), body);
-        // Demo must have produced at least one node + edge.
-        assertTrue(body.contains("\"nodes\""), body);
-        assertTrue(body.contains("\"edges\""), body);
-        // After the demo runs, the existing paths endpoint must return data.
-        String paths = getText("/api/paths");
-        assertTrue(paths.startsWith("{\"transformations\":["), paths);
-        assertTrue(paths.length() > "{\"transformations\":[]}".length(), paths);
-        // Replay of best path must be reachable.
+        // The selected path must reach the canonical binomial expansion
+        // 9 + 6*x + x^2 (real mathematical hit, not just HTTP 200).
+        assertTrue(body.contains("\"targetReached\":true"),
+            "binomial demo must reach the canonical target: " + body);
+        assertTrue(body.contains("9 + 6 * x + x ^ 2"),
+            "selected path must end at 9 + 6 * x + x ^ 2: " + body);
         assertTrue(graphStore.discoveredTransformations().size() > 0,
             "expected demo to record discovered transformations");
         String firstPathId = graphStore.discoveredTransformations().get(0).id();
@@ -72,64 +69,86 @@ class DemoEndToEndTest {
     }
 
     @Test
-    void demoRationalWorksEndToEnd() throws IOException {
+    void demoRationalCancelsCommonFactorWithAssumption() throws IOException {
         String body = runDemo("rational");
         assertTrue(body.contains("\"id\":\"rational\""), body);
         assertTrue(body.contains("(x*y)/(x*z)"), body);
-        assertTrue(body.contains("\"identities\""), body);
-        assertTrue(body.contains("\"links\""), body);
+        // Must reach y / z (real cancellation, not just a populated graph).
+        assertTrue(body.contains("\"targetReached\":true"),
+            "rational demo must reach the canonical target y / z: " + body);
+        assertTrue(body.contains("\"y / z\""),
+            "selected path must end at y / z: " + body);
+        // Assumption x != 0 must be surfaced.
+        assertTrue(body.contains("\"x != 0\""),
+            "rational demo must surface assumption x != 0: " + body);
     }
 
     @Test
-    void demoTrigonometryWorksEndToEnd() throws IOException {
+    void demoTrigonometryFindsPythagoreanIdentity() throws IOException {
         String body = runDemo("trigonometry");
         assertTrue(body.contains("\"id\":\"trigonometry\""), body);
-        assertTrue(body.contains("sin(x)") || body.contains("cos(x)"), body);
-        // Even when the atomic rule set finds no improvement, the search graph
-        // and metrics block must be present.
-        assertTrue(body.contains("\"metrics\""), body);
-        assertTrue(body.contains("\"links\""), body);
+        // sin(x)^2 + cos(x)^2 must reduce to the literal 1.
+        assertTrue(body.contains("\"targetReached\":true"),
+            "trigonometry demo must reach the Pythagorean identity 1: " + body);
+        assertTrue(body.contains("\"improvedExpression\":\"1\""),
+            "selected path must end at 1: " + body);
     }
 
     @Test
-    void demoEquationWorksEndToEnd() throws IOException {
-        String body = runDemo("equation");
-        assertTrue(body.contains("\"id\":\"equation\""), body);
+    void demoEquationSolvesOrClearlyTransformsEquation() throws IOException {
+        // The demo formerly known as "equation" has been honestly renamed to
+        // "polynomial-expansion" because the current atomic rule set does
+        // not solve linear equations. The old id stays as an alias.
+        String body = runDemo("polynomial-expansion");
+        assertTrue(body.contains("\"id\":\"polynomial-expansion\""), body);
         assertTrue(body.contains("(x+1)*(x+2)"), body);
-        // Equation demo should produce at least one discovered path
-        // (distribute + combine like terms).
-        assertTrue(graphStore.discoveredTransformations().size() > 0,
-            "expected equation demo to record discovered transformations");
+        assertTrue(body.contains("\"targetReached\":true"),
+            "polynomial-expansion demo must reach 2 + 3*x + x^2: " + body);
+        assertTrue(body.contains("2 + 3 * x + x ^ 2"),
+            "selected path must end at 2 + 3 * x + x ^ 2: " + body);
+
+        // Backwards-compatible alias: /api/demo/equation must still resolve.
+        String aliasBody = runDemo("equation");
+        assertTrue(aliasBody.contains("\"id\":\"polynomial-expansion\""),
+            "/api/demo/equation must alias to polynomial-expansion: " + aliasBody);
     }
 
     @Test
-    void exportedReportContainsGraphReplayAndRuleInventory() throws IOException {
+    void demoBundleContainsAllExpectedFiles() throws IOException {
         // Run binomial first so the export bundle has content.
         runDemo("binomial");
 
-        // The Markdown analysis report must include input, graph metrics,
-        // best path and identities sections. The expression is canonicalised
-        // by the analyzer, so just check for a stable header marker.
+        byte[] zipBytes = getBytes("/api/exports/bundle.zip");
+        assertTrue(zipBytes.length > 100, "bundle zip should not be empty");
+        Set<String> entries = listZipEntries(zipBytes);
+        // All eight required entries must be present.
+        assertTrue(entries.contains("search-analysis-report.md"), entries.toString());
+        assertTrue(entries.contains("search-analysis-report.tex"), entries.toString());
+        assertTrue(entries.contains("search-analysis-report.json"), entries.toString());
+        assertTrue(entries.contains("search-graph.json"), entries.toString());
+        assertTrue(entries.contains("search-graph.mmd"), entries.toString());
+        assertTrue(entries.contains("search-graph.graphml"), entries.toString());
+        assertTrue(entries.contains("best-path.md"), entries.toString());
+        assertTrue(entries.contains("rule-inventory.json"), entries.toString());
+    }
+
+    @Test
+    void demoReportContainsGraphReplayAndRuleInventory() throws IOException {
+        runDemo("binomial");
+
+        // Markdown analysis report must include the canonical sections.
         String md = getText("/api/exports/search-analysis-report.md");
         assertTrue(md.contains("Suchanalyse"), md);
         assertTrue(md.contains("Graphmetriken"), md);
         assertTrue(md.contains("Bester Pfad") || md.contains("bester Pfad"), md);
 
-        // The JSON analysis report must mention graph metrics + identities.
-        String json = getText("/api/exports/search-analysis-report.json");
-        assertNotNull(json);
-
-        // The bundle.zip endpoint must return a valid zip with the expected
-        // entries (Markdown, LaTeX, JSON, Mermaid, GraphML).
+        // Bundle must include a parseable rule-inventory.json with the
+        // expected top-level shape.
         byte[] zipBytes = getBytes("/api/exports/bundle.zip");
-        assertTrue(zipBytes.length > 100, "bundle zip should not be empty");
-        Set<String> entries = listZipEntries(zipBytes);
-        assertTrue(entries.contains("search-analysis-report.md"), entries.toString());
-        assertTrue(entries.contains("search-analysis-report.tex"), entries.toString());
-        assertTrue(entries.contains("search-analysis-report.json"), entries.toString());
-        assertTrue(entries.contains("search-graph.mmd"), entries.toString());
-        assertTrue(entries.contains("search-graph.graphml"), entries.toString());
-        assertTrue(entries.contains("best-path.md"), entries.toString());
+        String ruleInventory = readZipEntry(zipBytes, "rule-inventory.json");
+        assertNotNull(ruleInventory);
+        assertTrue(ruleInventory.contains("\"reusableRules\""),
+            "rule-inventory.json must contain reusableRules array: " + ruleInventory);
 
         // Search graph endpoint must return non-empty JSON after a demo ran.
         String searchGraph = getText("/api/search-graph");
@@ -184,5 +203,22 @@ class DemoEndToEndTest {
             }
         }
         return entries;
+    }
+
+    private String readZipEntry(byte[] bytes, String name) throws IOException {
+        try (InputStream in = new java.io.ByteArrayInputStream(bytes);
+             ZipInputStream zip = new ZipInputStream(in)) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (entry.getName().equals(name)) {
+                    ByteArrayOutputStream sink = new ByteArrayOutputStream();
+                    zip.transferTo(sink);
+                    zip.closeEntry();
+                    return sink.toString(StandardCharsets.UTF_8);
+                }
+                zip.closeEntry();
+            }
+        }
+        return null;
     }
 }
