@@ -4,6 +4,7 @@ import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.strategy.AStarSearchStrategy;
 import de.regelsuche.search.strategy.BeamSearchStrategy;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.EqualitySaturationStrategy;
 import de.regelsuche.search.strategy.HybridSearchStrategy;
 import de.regelsuche.search.strategy.MonteCarloTreeSearchStrategy;
 import de.regelsuche.search.strategy.SearchStrategy;
@@ -67,6 +68,22 @@ public enum SearchProfile {
         @Override
         public boolean usesTranspositionTable() {
             return true;
+        }
+    },
+    /**
+     * Equality-saturation profile: builds an {@link
+     * de.regelsuche.egraph.EGraph} of the input, applies every rewrite
+     * rule egg-style until fix-point or budget, then extracts the
+     * cheapest representative. Unlike the path-based strategies, every
+     * order of rewrites collapses into a single shared graph — no
+     * combinatorial explosion of permutations. Surfaces detailed
+     * {@link de.regelsuche.egraph.SaturationStats} via
+     * {@link EqualitySaturationStrategy#lastStats()}.
+     */
+    EQUALITY_SATURATION(new SearchHeuristic(4, 100, 1, 6, 200, 32), TransformationGoal.SIMPLIFY) {
+        @Override
+        public SearchStrategy newStrategy() {
+            return new EqualitySaturationStrategy();
         }
     };
 

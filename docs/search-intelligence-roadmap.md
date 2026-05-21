@@ -5,8 +5,8 @@ Suche von „lernende Rewrite-Schleife" hin zu „mathematische
 Suchintelligenz" weiterentwickeln. Die Reihenfolge ist nach Hebelwirkung
 und technischer Abhängigkeit sortiert.
 
-Stand: **PR 1, PR 3, PR 6 und PR 2a (E-Graph-Foundation) sind umgesetzt**;
-PR 2b (Saturation-Strategie) sowie PRs 4 und 5 sind als Folge-PRs offen.
+Stand: **PR 1, PR 3, PR 6, PR 2a und PR 2b sind umgesetzt**;
+PRs 4 und 5 sind als Folge-PRs offen.
 
 ## PR 1 — Strong Canonicalization &nbsp;✅ geliefert
 
@@ -122,25 +122,39 @@ Geliefert im neuen Paket `de.regelsuche.egraph`:
   Stabilität der `EClassId` über Merges, Roundtrip
   Extract → Formatter → Parser.
 
-### PR 2b — Saturation-Strategie &nbsp;offen
+### PR 2b — Saturation-Strategie &nbsp;✅ geliefert
 
-Vorgeschlagene Struktur:
+Geliefert in `de.regelsuche.egraph` und
+`de.regelsuche.search.strategy.EqualitySaturationStrategy`:
 
-* Adapter, der die bestehenden `RewriteRule`s im `transform`-Paket
-  als egg-artige `Searcher`/`Applier` über den E-Graph fährt
-  (Pattern-Match auf E-Klassen statt auf AST-Bäumen).
+* `EGraphPatternMatcher` / `EGraphPatternApplier` — die bestehenden
+  `PatternRewriteRule`s aus dem `transform`-Paket werden direkt als
+  egg-artige Searcher/Applier auf E-Klassen ausgeführt (kein AST-
+  Round-trip). Nicht-Pattern-Regeln (`MetadataRule`-Subklassen)
+  laufen über einen Brückenpfad: günstigste Repräsentanten extrahieren,
+  `matches`/`apply` aufrufen, Ergebnis zurück in den Graphen
+  hashconsen und `union`en.
+* `EqualitySaturation` — iteriert „alle Regeln, alle Matches sammeln,
+  dann anwenden", bis Fixpunkt, Iteration-Budget oder Knoten-Budget
+  erreicht ist. Liefert ein `SaturationStats`-Record mit `eclasses`,
+  `enodes`, `merges`, `iterations`, `appliedRules`, `extractedBest`,
+  `saturated` und einem `Reason`-Stop-Grund.
 * `EqualitySaturationStrategy implements SearchStrategy` — koexistiert
-  mit BestFirst/Beam/AStar/MCTS; Opt-in über neues
-  `SearchProfile.EQUALITY_SATURATION` oder ein Flag.
-* Extraktion nutzt direkt einen `de.regelsuche.scoring.cost.CostModel`
-  (PR 3) als `costOfNode`.
-
-Akzeptanzkriterien für PR 2b:
-
-* Saturierung verschmilzt `(a+b)*c` und `a*c + b*c` automatisch in
-  dieselbe E-Class (heute nur nach explizitem `union(...)`).
-* Auf den bestehenden Demo-Beispielen skaliert die Knotenzahl messbar
-  besser als `BeamSearchStrategy` (Benchmark via `SearchBenchmark`).
+  mit BestFirst / Beam / AStar / MCTS und gibt Root + extrahierten
+  Bestform-Zustand zurück; markiert die extrahierte `SearchState` mit
+  `appliedRuleId == "equality-saturation"`, damit Report-/UI-Renderer
+  Saturationsläufe erkennen.
+* `SearchProfile.EQUALITY_SATURATION` — neues Profil, eigenes
+  Heuristik-Preset, baut die neue Strategie.
+* Extraktion nutzt einen Cost-Hook (Default: 1 pro Operator/Funktion,
+  0 pro Blatt — kompatibel zum historischen `OperatorCountCost`); die
+  goal-spezifischen `CostModel`s aus PR 3 wirken weiterhin auf die
+  pfadbasierten Strategien.
+* Tests: `equalitySaturationFindsBinomialExpansion`,
+  `equalitySaturationAvoidsRewriteOrderExplosion`,
+  `equalitySaturationExtractsCheapestExpression`,
+  `equalitySaturationRespectsIterationBudget`,
+  `equalitySaturationReportsStats` plus Profile-Wiring-Test.
 
 ## PR 4 — Größere mathematische Domänen (in Sub-PRs splitten)
 

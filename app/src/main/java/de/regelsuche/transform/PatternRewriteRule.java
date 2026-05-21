@@ -43,6 +43,25 @@ public class PatternRewriteRule implements RewriteRule {
         return id;
     }
 
+    /**
+     * Source (left-hand side) pattern of this rule. Exposed so e-graph
+     * adapters in {@code de.regelsuche.egraph} can match the pattern
+     * directly against e-nodes/e-classes instead of materialising every
+     * concrete representative first.
+     */
+    public PatternExpr source() {
+        return source;
+    }
+
+    /**
+     * Target (right-hand side) pattern of this rule. Exposed so e-graph
+     * adapters can instantiate the rewrite directly inside the e-graph
+     * (a-la egg's {@code Applier}) rather than via an AST round-trip.
+     */
+    public PatternExpr target() {
+        return target;
+    }
+
     @Override
     public RewriteKind kind() {
         return kind;
