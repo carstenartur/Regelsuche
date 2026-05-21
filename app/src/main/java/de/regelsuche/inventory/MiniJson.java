@@ -16,12 +16,12 @@ import java.util.Map;
  * numbers, booleans, {@code null} or arrays of strings. Anything else will
  * be ignored or produce best-effort string values.</p>
  */
-final class MiniJson {
+public final class MiniJson {
     private MiniJson() {
     }
 
     /** Parse the named top-level array of objects into a list of key/value maps. */
-    static List<Map<String, String>> parseObjectArray(String json, String key) {
+    public static List<Map<String, String>> parseObjectArray(String json, String key) {
         Cursor cursor = new Cursor(json);
         cursor.expect('{');
         List<Map<String, String>> result = new ArrayList<>();
@@ -61,7 +61,7 @@ final class MiniJson {
     }
 
     /** Parse a JSON array of strings into a Java list (e.g. {@code ["a","b"]}). */
-    static List<String> parseStringArray(String json) {
+    public static List<String> parseStringArray(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
         }

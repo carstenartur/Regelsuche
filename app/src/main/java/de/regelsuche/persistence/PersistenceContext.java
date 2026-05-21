@@ -6,6 +6,10 @@ import de.regelsuche.graph.Neo4jExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.Neo4jRuleInventoryRepository;
 import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.search.memory.InMemoryTranspositionTable;
+import de.regelsuche.search.memory.JsonFileTranspositionTable;
+import de.regelsuche.search.memory.Neo4jTranspositionTable;
+import de.regelsuche.search.memory.TranspositionTable;
 import java.io.PrintStream;
 
 /**
@@ -21,15 +25,18 @@ public final class PersistenceContext implements AutoCloseable {
     private final GraphPersistenceMode effectiveMode;
     private final ExpressionGraphStore graphStore;
     private final RuleInventoryRepository inventoryRepository;
+    private final TranspositionTable transpositionTable;
 
     private PersistenceContext(
         GraphPersistenceMode effectiveMode,
         ExpressionGraphStore graphStore,
-        RuleInventoryRepository inventoryRepository
+        RuleInventoryRepository inventoryRepository,
+        TranspositionTable transpositionTable
     ) {
         this.effectiveMode = effectiveMode;
         this.graphStore = graphStore;
         this.inventoryRepository = inventoryRepository;
+        this.transpositionTable = transpositionTable;
     }
 
     public GraphPersistenceMode effectiveMode() {
@@ -42,6 +49,10 @@ public final class PersistenceContext implements AutoCloseable {
 
     public RuleInventoryRepository inventoryRepository() {
         return inventoryRepository;
+    }
+
+    public TranspositionTable transpositionTable() {
+        return transpositionTable;
     }
 
     /**
@@ -58,16 +69,18 @@ public final class PersistenceContext implements AutoCloseable {
                 return new PersistenceContext(
                     GraphPersistenceMode.IN_MEMORY,
                     new InMemoryExpressionGraphStore(),
-                    new InMemoryRuleInventoryRepository()
+                    new InMemoryRuleInventoryRepository(),
+                    new InMemoryTranspositionTable()
                 );
             }
             case JSON_FILE -> {
                 JsonFileExpressionGraphStore graph = new JsonFileExpressionGraphStore(config.storagePath());
                 JsonFileRuleInventoryRepository inventory = new JsonFileRuleInventoryRepository(config.storagePath());
+                JsonFileTranspositionTable table = new JsonFileTranspositionTable(config.storagePath());
                 if (log != null) {
                     log.println("Persistence: JSON_FILE at " + graph.filePath().toAbsolutePath());
                 }
-                return new PersistenceContext(GraphPersistenceMode.JSON_FILE, graph, inventory);
+                return new PersistenceContext(GraphPersistenceMode.JSON_FILE, graph, inventory, table);
             }
             case EMBEDDED_NEO4J -> {
                 // Embedded Neo4j is intentionally not bundled today (would
@@ -76,11 +89,12 @@ public final class PersistenceContext implements AutoCloseable {
                 // killer-demo's standard mode keeps working.
                 JsonFileExpressionGraphStore graph = new JsonFileExpressionGraphStore(config.storagePath());
                 JsonFileRuleInventoryRepository inventory = new JsonFileRuleInventoryRepository(config.storagePath());
+                JsonFileTranspositionTable table = new JsonFileTranspositionTable(config.storagePath());
                 if (log != null) {
                     log.println("Persistence: EMBEDDED_NEO4J requested but not bundled; "
                         + "using JSON_FILE at " + graph.filePath().toAbsolutePath());
                 }
-                return new PersistenceContext(GraphPersistenceMode.JSON_FILE, graph, inventory);
+                return new PersistenceContext(GraphPersistenceMode.JSON_FILE, graph, inventory, table);
             }
             case REMOTE_NEO4J -> {
                 if (!config.hasNeo4jCredentials()) {
@@ -102,10 +116,12 @@ public final class PersistenceContext implements AutoCloseable {
                     config.neo4jUri(), config.neo4jUser(), config.neo4jPassword());
                 Neo4jRuleInventoryRepository inventory = new Neo4jRuleInventoryRepository(
                     config.neo4jUri(), config.neo4jUser(), config.neo4jPassword());
+                Neo4jTranspositionTable table = new Neo4jTranspositionTable(
+                    config.neo4jUri(), config.neo4jUser(), config.neo4jPassword());
                 if (log != null) {
                     log.println("Persistence: REMOTE_NEO4J at " + config.neo4jUri());
                 }
-                return new PersistenceContext(GraphPersistenceMode.REMOTE_NEO4J, graph, inventory);
+                return new PersistenceContext(GraphPersistenceMode.REMOTE_NEO4J, graph, inventory, table);
             }
             default -> throw new IllegalStateException("Unhandled mode: " + config.mode());
         }
@@ -115,6 +131,9 @@ public final class PersistenceContext implements AutoCloseable {
     public void close() {
         closeQuietly(graphStore);
         closeQuietly(inventoryRepository);
+        if (transpositionTable instanceof AutoCloseable closable) {
+            closeQuietly(closable);
+        }
     }
 
     private static void closeQuietly(AutoCloseable resource) {

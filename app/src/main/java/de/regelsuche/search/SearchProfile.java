@@ -50,6 +50,23 @@ public enum SearchProfile {
         public SearchStrategy newStrategy() {
             return new MonteCarloTreeSearchStrategy(42L);
         }
+    },
+    /**
+     * Search-intelligence profile: activates the mathematical transposition
+     * table, keeps non-improving paths that bring new rule combinations and
+     * applies stricter cycle detection. Used to demonstrate learning
+     * macro-rules across multiple runs.
+     */
+    DISCOVERY_PLUS(new SearchHeuristic(6, 2000, 1, 6, 80, 16)) {
+        @Override
+        public SearchStrategy newStrategy() {
+            return new BestFirstSearchStrategy();
+        }
+
+        @Override
+        public boolean usesTranspositionTable() {
+            return true;
+        }
     };
 
     private final SearchHeuristic heuristic;
@@ -63,4 +80,13 @@ public enum SearchProfile {
     }
 
     public abstract SearchStrategy newStrategy();
+
+    /**
+     * Whether this profile activates the mathematical transposition table by
+     * default. Only {@link #DISCOVERY_PLUS} returns {@code true}; the other
+     * profiles preserve their pre-PR behaviour so existing tests stay green.
+     */
+    public boolean usesTranspositionTable() {
+        return false;
+    }
 }

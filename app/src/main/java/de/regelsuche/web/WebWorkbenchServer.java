@@ -71,6 +71,8 @@ public class WebWorkbenchServer {
     private final RuleInventoryQueryService inventoryQuery;
     private final ExportQueryService exportQuery;
     private final ExplanationService explanationService = new ExplanationService();
+    private final de.regelsuche.search.memory.SearchMemory searchMemory =
+        new de.regelsuche.search.memory.SearchMemory();
 
     private HttpServer server;
 
@@ -1053,8 +1055,24 @@ public class WebWorkbenchServer {
             putZipEntry(zip, "best-path.md", exportService.exportBestPathMarkdown(transformations));
             putZipEntry(zip, "rule-inventory.json",
                 exportService.exportJson(List.of(), List.of(), inventoryRepository.findAll()));
+            putZipEntry(zip, "pruning-decisions.json", renderPruningDecisionsJson());
         }
         return out.toByteArray();
+    }
+
+    private String renderPruningDecisionsJson() {
+        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();
+        w.beginObject();
+        w.property("count", searchMemory.decisions().size());
+        w.array("decisions", arr -> searchMemory.decisions().forEach(d ->
+            arr.objectValue(inner -> {
+                inner.property("expression", d.expression());
+                inner.property("canonicalHash", d.canonicalHash());
+                inner.property("reason", d.reason().name());
+                inner.property("explanation", d.explanation());
+            })));
+        w.endObject();
+        return w.toString();
     }
 
     private static void putZipEntry(java.util.zip.ZipOutputStream zip, String name, String content)
