@@ -33,6 +33,10 @@ class WebWorkbenchAssetsTest {
         assertTrue(html.contains("data-tab=\"workbench\""));
         assertTrue(html.contains("data-tab=\"candidates\""));
         assertTrue(html.contains("data-tab=\"inventory\""));
+        // Visual-search-graph tabs (Step 6).
+        assertTrue(html.contains("data-tab=\"identities\""));
+        assertTrue(html.contains("data-tab=\"dashboard\""));
+        assertTrue(html.contains("data-tab=\"replay\""));
         // New domain pickers introduced in the workbench overhaul.
         assertTrue(html.contains("trigonometric"));
         assertTrue(html.contains("logarithmic"));
@@ -41,6 +45,9 @@ class WebWorkbenchAssetsTest {
         String css = resourceAsString("/web/style.css");
         assertTrue(css.contains(".tab"));
         assertTrue(css.contains(".assumption"));
+        assertTrue(css.contains(".dashboard-grid"));
+        assertTrue(css.contains(".identity-card"));
+        assertTrue(css.contains(".replay-canvas"));
 
         String app = resourceAsString("/web/app.js");
         assertTrue(app.contains("/api/search"));
@@ -48,5 +55,9 @@ class WebWorkbenchAssetsTest {
         assertTrue(app.contains("/api/candidates"));
         assertTrue(app.contains("/api/paths"));
         assertTrue(app.contains("loadInventory"));
+        // Visual-search-graph endpoints wired into the UI.
+        assertTrue(app.contains("/api/identities"));
+        assertTrue(app.contains("/api/search-graph"));
+        assertTrue(app.contains("replay"));
     }
 }

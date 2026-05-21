@@ -115,10 +115,13 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/discover", this::handleDiscover));
         secure(server.createContext("/api/paths", this::handlePaths));
         secure(server.createContext("/api/graph", this::handleGraph));
+        secure(server.createContext("/api/search-graph", this::handleSearchGraph));
+        secure(server.createContext("/api/identities", this::handleIdentities));
         secure(server.createContext("/api/candidates", this::handleCandidates));
         secure(server.createContext("/api/inventory", this::handleInventory));
         secure(server.createContext("/api/exports", this::handleExports));
         secure(server.createContext("/api/explain", this::handleExplain));
+        secure(server.createContext("/api/analyze", this::handleAnalyze));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
         server.start();
@@ -274,11 +277,40 @@ public class WebWorkbenchServer {
         if (suffix.startsWith("/")) {
             suffix = suffix.substring(1);
         }
-        if (suffix.isEmpty()) {
-            sendJson(exchange, 200, dtoListToJson("transformations", transformationQuery.bestImprovements()));
+        if (suffix.startsWith("compare")) {
+            handlePathComparison(exchange);
             return;
         }
-        transformationQuery.pathById(suffix).ifPresentOrElse(
+        if (suffix.isEmpty()) {
+            String sortParam = queryParam(exchange, "sort", "score");
+            int limit = parseIntParam(queryParam(exchange, "limit", "0"), 0);
+            de.regelsuche.paths.PathSorters.Mode mode = de.regelsuche.paths.PathSorters.Mode.parse(sortParam);
+            List<de.regelsuche.discovery.DiscoveredTransformation> sorted =
+                new de.regelsuche.paths.PathSorters().sort(graphStore.discoveredTransformations(), mode);
+            if (limit > 0 && sorted.size() > limit) {
+                sorted = sorted.subList(0, limit);
+            }
+            List<de.regelsuche.api.TransformationPathDto> dtos = sorted.stream()
+                .map(de.regelsuche.api.TransformationPathDto::from)
+                .toList();
+            sendJson(exchange, 200, dtoListToJson("transformations", dtos));
+            return;
+        }
+        // /api/paths/{id} or /api/paths/{id}/replay
+        if (suffix.endsWith("/replay")) {
+            String pathId = suffix.substring(0, suffix.length() - "/replay".length());
+            var match = graphStore.discoveredTransformations().stream()
+                .filter(t -> t.id().equals(pathId))
+                .findFirst();
+            if (match.isEmpty()) {
+                sendStatus(exchange, 404, "path not found");
+                return;
+            }
+            sendJson(exchange, 200, replayJson(de.regelsuche.api.PathReplayDto.from(match.get(), explanationService)));
+            return;
+        }
+        final String singleId = suffix;
+        transformationQuery.pathById(singleId).ifPresentOrElse(
             dto -> {
                 try {
                     sendJson(exchange, 200, singleDtoJson(dto));
@@ -293,6 +325,168 @@ public class WebWorkbenchServer {
                 }
             }
         );
+    }
+
+    private void handleSearchGraph(HttpExchange exchange) throws IOException {
+        de.regelsuche.api.searchgraph.SearchGraphDto graph = buildSearchGraph();
+        String filterExpr = queryParam(exchange, "filter", "");
+        if (!filterExpr.isBlank()) {
+            graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);
+        }
+        sendJson(exchange, 200, de.regelsuche.api.searchgraph.SearchGraphJsonSerializer.toJson(graph));
+    }
+
+    private void handlePathComparison(HttpExchange exchange) throws IOException {
+        String leftId = queryParam(exchange, "left", "");
+        String rightId = queryParam(exchange, "right", "");
+        if (leftId.isBlank() || rightId.isBlank()) {
+            sendStatus(exchange, 400, "left and right query parameters are required");
+            return;
+        }
+        var transformations = graphStore.discoveredTransformations();
+        var leftMatch = transformations.stream().filter(t -> t.id().equals(leftId)).findFirst();
+        var rightMatch = transformations.stream().filter(t -> t.id().equals(rightId)).findFirst();
+        if (leftMatch.isEmpty() || rightMatch.isEmpty()) {
+            sendStatus(exchange, 404, "left or right path not found");
+            return;
+        }
+        de.regelsuche.paths.PathComparisonDto dto =
+            new de.regelsuche.paths.PathComparisonService().compare(leftMatch.get(), rightMatch.get());
+        sendJson(exchange, 200, pathComparisonToJson(dto));
+    }
+
+    private String pathComparisonToJson(de.regelsuche.paths.PathComparisonDto dto) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("leftPathId", dto.leftPathId());
+        writer.property("rightPathId", dto.rightPathId());
+        writer.stringArray("sharedNodes", dto.sharedNodes());
+        writer.stringArray("sharedRules", dto.sharedRules());
+        writer.stringArray("leftOnlySteps", dto.leftOnlySteps());
+        writer.stringArray("rightOnlySteps", dto.rightOnlySteps());
+        writer.array("leftScoreSeries", w -> dto.leftScoreSeries().forEach(w::value));
+        writer.array("rightScoreSeries", w -> dto.rightScoreSeries().forEach(w::value));
+        writer.property("leftTeachingScore", dto.leftTeachingScore());
+        writer.property("rightTeachingScore", dto.rightTeachingScore());
+        writer.property("leftProofStatus", dto.leftProofStatus().name());
+        writer.property("rightProofStatus", dto.rightProofStatus().name());
+        writer.property("leftAssumptionSteps", dto.leftAssumptionSteps());
+        writer.property("rightAssumptionSteps", dto.rightAssumptionSteps());
+        writer.property("shorterPath", dto.shorterPath());
+        writer.property("teachingPreferredPath", dto.teachingPreferredPath());
+        writer.property("fewerAssumptionsPath", dto.fewerAssumptionsPath());
+        writer.endObject();
+        return writer.toString();
+    }
+
+    private void handleIdentities(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String suffix = path.substring("/api/identities".length()).replaceFirst("^/", "");
+        de.regelsuche.mining.MacroRuleMiner macroMiner = new de.regelsuche.mining.MacroRuleMiner();
+        de.regelsuche.mining.KnownRuleRepository known = new de.regelsuche.mining.KnownRuleRepository();
+        var macros = macroMiner.mine(graphStore.discoveredTransformations());
+
+        if (suffix.endsWith("/promote") && "POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            String identityId = suffix.substring(0, suffix.length() - "/promote".length());
+            var match = macros.stream().filter(m -> m.id().equals(identityId)).findFirst();
+            if (match.isEmpty()) {
+                sendStatus(exchange, 404, "identity not found");
+                return;
+            }
+            var candidate = match.get();
+            // Use the macro miner's own stable id rather than the truncated
+            // 32-bit hashCode (which can collide and overwrite existing rules).
+            String ruleId = "macro-" + candidate.id();
+            de.regelsuche.inventory.ReusableRule rule = new de.regelsuche.inventory.ReusableRule(
+                ruleId,
+                candidate.leftPattern(),
+                candidate.rightPattern(),
+                List.of(),
+                candidate.proofStatus(),
+                known.statusFor(candidate.leftPattern(), candidate.rightPattern()),
+                candidate.occurrences(),
+                candidate.compressionRatio(),
+                java.time.Instant.now()
+            );
+            inventoryRepository.save(rule);
+            sendJson(exchange, 200, "{\"promotedRuleId\":\"" + escapeJson(ruleId) + "\"}");
+            return;
+        }
+        if (!suffix.isEmpty() && !"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+
+        // GET /api/identities -> list
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.array("identities", w -> macros.forEach(macro -> {
+            var dto = de.regelsuche.api.IdentityReportDto.from(
+                macro, known.statusFor(macro.leftPattern(), macro.rightPattern()));
+            w.objectValue(inner -> {
+                inner.property("id", dto.id());
+                inner.property("leftPattern", dto.leftPattern());
+                inner.property("rightPattern", dto.rightPattern());
+                inner.stringArray("ruleIdSequence", dto.ruleIdSequence());
+                inner.property("occurrences", dto.occurrences());
+                inner.property("compressionRatio", dto.compressionRatio());
+                inner.property("proofStatus", dto.proofStatus().name());
+                inner.property("knownRuleStatus", dto.knownRuleStatus().name());
+                inner.stringArray("supportingTransformationIds", dto.supportingTransformationIds());
+            });
+        }));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private List<de.regelsuche.search.SimplificationSuccess> successesFromGraph() {
+        // Build SimplificationSuccess records from the discovered transformations
+        // we already have in the graph store. This avoids needing a running search
+        // service to render /api/search-graph after the fact.
+        java.util.List<de.regelsuche.search.SimplificationSuccess> result = new java.util.ArrayList<>();
+        for (de.regelsuche.discovery.DiscoveredTransformation transformation : graphStore.discoveredTransformations()) {
+            result.add(new de.regelsuche.search.SimplificationSuccess(
+                transformation.originalExpression(),
+                transformation.improvedExpression(),
+                transformation.steps().isEmpty() ? "" : transformation.steps().getLast().ruleId(),
+                transformation.steps().size(),
+                transformation.totalImprovement(),
+                transformation.discoveredAt()
+            ));
+        }
+        return result;
+    }
+
+    private static int parseIntParam(String value, int fallback) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private static String escapeJson(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private String replayJson(de.regelsuche.api.PathReplayDto dto) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("pathId", dto.pathId());
+        writer.array("steps", w -> dto.steps().forEach(step ->
+            w.objectValue(inner -> {
+                inner.property("stepIndex", step.stepIndex());
+                inner.property("fromExpression", step.fromExpression());
+                inner.property("fromLatex", step.fromLatex());
+                inner.property("toExpression", step.toExpression());
+                inner.property("toLatex", step.toLatex());
+                inner.property("ruleId", step.ruleId());
+                inner.property("ruleExplanation", step.ruleExplanation());
+                inner.property("scoreDelta", step.scoreDelta());
+                inner.property("equivalencePreserving", step.equivalencePreserving());
+            })));
+        writer.endObject();
+        return writer.toString();
     }
 
     private void handleGraph(HttpExchange exchange) throws IOException {
@@ -381,14 +575,152 @@ public class WebWorkbenchServer {
             sendJson(exchange, 200, exportService.exportBundle(exportQuery.bundle()));
             return;
         }
+        // Sub-resource exports: /api/exports/cluster/{id}.md, /path/{id}.tex, /identity/{id}.md
+        if (format.startsWith("cluster/") && format.endsWith(".md")) {
+            String clusterId = format.substring("cluster/".length(), format.length() - ".md".length());
+            sendText(exchange, 200, renderClusterMarkdown(clusterId));
+            return;
+        }
+        if (format.startsWith("path/") && format.endsWith(".tex")) {
+            String pathId = format.substring("path/".length(), format.length() - ".tex".length());
+            String tex = renderPathLatex(pathId);
+            if (tex == null) {
+                sendStatus(exchange, 404, "path not found: " + pathId);
+                return;
+            }
+            sendText(exchange, 200, tex);
+            return;
+        }
+        if (format.startsWith("identity/") && format.endsWith(".md")) {
+            String identityId = format.substring("identity/".length(), format.length() - ".md".length());
+            String md = renderIdentityMarkdown(identityId);
+            if (md == null) {
+                sendStatus(exchange, 404, "identity not found: " + identityId);
+                return;
+            }
+            sendText(exchange, 200, md);
+            return;
+        }
+        if (format.startsWith("search-analysis-report")) {
+            var report = new de.regelsuche.export.SearchAnalysisReportService();
+            var ctx = analysisReportContext();
+            switch (format) {
+                case "search-analysis-report.md" -> sendText(exchange, 200, report.renderMarkdown(ctx));
+                case "search-analysis-report.tex" -> sendText(exchange, 200, report.renderLatex(ctx));
+                case "search-analysis-report.json" -> sendJson(exchange, 200, report.renderJson(ctx));
+                default -> sendStatus(exchange, 404, "unknown analysis report format: " + format);
+            }
+            return;
+        }
         List<DiscoveredTransformation> transformations = graphStore.discoveredTransformations();
         switch (format.toLowerCase(Locale.ROOT)) {
             case "markdown", "md" -> sendText(exchange, 200, exportService.exportMarkdown(transformations));
             case "latex", "tex" -> sendText(exchange, 200, exportService.exportLatex(transformations));
             case "mermaid", "mmd" -> sendText(exchange, 200, exportService.exportMermaid(transformations));
             case "json" -> sendJson(exchange, 200, exportService.exportBundle(exportQuery.bundle()));
+            case "search-graph", "search-graph.json" -> {
+                var graph = buildSearchGraph();
+                String filterExpr = queryParam(exchange, "filter", "");
+                if (!filterExpr.isBlank()) {
+                    graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);
+                }
+                sendJson(exchange, 200, exportService.exportSearchGraphJson(graph));
+            }
+            case "search-graph.mmd" -> {
+                var graph = buildSearchGraph();
+                String filterExpr = queryParam(exchange, "filter", "");
+                if (!filterExpr.isBlank()) {
+                    graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);
+                }
+                sendText(exchange, 200, exportService.exportSearchGraphMermaid(graph));
+            }
+            case "search-graph.graphml" -> {
+                var graph = buildSearchGraph();
+                String filterExpr = queryParam(exchange, "filter", "");
+                if (!filterExpr.isBlank()) {
+                    graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);
+                }
+                sendText(exchange, 200, exportService.exportSearchGraphGraphMl(graph));
+            }
+            case "best-path.md", "best-path" -> sendText(exchange, 200, exportService.exportBestPathMarkdown(transformations));
+            case "identity-report.tex", "identity-report" -> {
+                var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);
+                var known = new de.regelsuche.mining.KnownRuleRepository();
+                var identities = macros.stream()
+                    .map(m -> de.regelsuche.api.IdentityReportDto.from(
+                        m, known.statusFor(m.leftPattern(), m.rightPattern())))
+                    .toList();
+                sendText(exchange, 200, exportService.exportIdentityReportLatex(
+                    buildSearchGraph(), transformations, graphStore.ruleCandidates(), identities));
+            }
             default -> sendStatus(exchange, 404, "unknown format: " + format);
         }
+    }
+
+    private String renderClusterMarkdown(String clusterId) {
+        de.regelsuche.api.searchgraph.SearchGraphDto graph = buildSearchGraph();
+        de.regelsuche.api.searchgraph.SearchGraphClusterDto cluster = graph.clusters().stream()
+            .filter(c -> c.id().equals(clusterId))
+            .findFirst()
+            .orElse(null);
+        if (cluster == null) {
+            return "# Cluster nicht gefunden: " + clusterId + "\n";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("# Cluster: ").append(cluster.label()).append("\n\n");
+        sb.append("- **Id:** `").append(cluster.id()).append("`\n");
+        sb.append("- **Typ:** ").append(cluster.type().name()).append("\n");
+        sb.append("- **Cohesion:** ").append(String.format(Locale.ROOT, "%.3f", cluster.cohesionScore())).append("\n");
+        sb.append("- **Knoten:** ").append(cluster.nodeIds().size()).append("\n");
+        if (!cluster.supportingPathIds().isEmpty()) {
+            sb.append("- **Supporting paths:** ").append(String.join(", ", cluster.supportingPathIds())).append("\n");
+        }
+        sb.append("\n## Knoten\n\n");
+        for (String n : cluster.nodeIds()) {
+            sb.append("- `").append(n).append("`\n");
+        }
+        return sb.toString();
+    }
+
+    private String renderPathLatex(String pathId) {
+        var match = graphStore.discoveredTransformations().stream()
+            .filter(t -> t.id().equals(pathId))
+            .findFirst();
+        if (match.isEmpty()) {
+            return null;
+        }
+        return new de.regelsuche.export.AstLatexRenderer().renderPath(match.get());
+    }
+
+    private String renderIdentityMarkdown(String identityId) {
+        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(graphStore.discoveredTransformations());
+        var match = macros.stream().filter(m -> m.id().equals(identityId)).findFirst();
+        if (match.isEmpty()) {
+            return null;
+        }
+        var macro = match.get();
+        StringBuilder sb = new StringBuilder();
+        sb.append("# Identität ").append(macro.id()).append("\n\n");
+        sb.append("- **Pattern:** `").append(macro.leftPattern()).append("` → `")
+            .append(macro.rightPattern()).append("`\n");
+        sb.append("- **Sequenz:** ").append(String.join(" → ", macro.ruleIdSequence())).append("\n");
+        sb.append("- **Vorkommen:** ").append(macro.occurrences()).append("\n");
+        sb.append("- **Proof:** ").append(macro.proofStatus().name()).append("\n");
+        sb.append("- **Supporting Pfade:** ")
+            .append(String.join(", ", macro.supportingTransformationIds())).append("\n");
+        return sb.toString();
+    }
+
+    private de.regelsuche.api.searchgraph.SearchGraphDto buildSearchGraph() {
+        var transformations = graphStore.discoveredTransformations();
+        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);
+        return new de.regelsuche.api.searchgraph.SearchGraphAssembler().assemble(
+            graphStore.snapshot(),
+            successesFromGraph(),
+            graphStore.ruleCandidates(),
+            macros.size(),
+            transformations
+        );
     }
 
     private void handleExplain(HttpExchange exchange) throws IOException {
@@ -418,6 +750,98 @@ public class WebWorkbenchServer {
         } else {
             sendText(exchange, 200, explanationService.renderPath(match.get(), formEnum));
         }
+    }
+
+    private void handleAnalyze(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String suffix = path.substring("/api/analyze".length()).replaceFirst("^/", "");
+        if (!"move".equals(suffix)) {
+            sendStatus(exchange, 404, "expected /api/analyze/move?expression=...");
+            return;
+        }
+        String expression = queryParam(exchange, "expression", "");
+        if (expression.isBlank()) {
+            sendStatus(exchange, 400, "expression query parameter is required");
+            return;
+        }
+        de.regelsuche.api.searchgraph.SearchGraphDto graph = buildSearchGraph();
+        de.regelsuche.analyze.MoveAnalysisDto analysis =
+            new de.regelsuche.analyze.MoveAnalysisService().analyze(graph, expression);
+        sendJson(exchange, 200, moveAnalysisToJson(analysis));
+    }
+
+    private String moveAnalysisToJson(de.regelsuche.analyze.MoveAnalysisDto a) {
+        JsonWriter w = new JsonWriter();
+        w.beginObject();
+        w.property("expression", a.expression());
+        w.property("reason", a.reason());
+        w.property("mostUsefulRule", a.mostUsefulRule());
+        if (a.bestMove() != null) {
+            w.object("bestMove", inner -> writeMove(inner, a.bestMove()));
+        }
+        w.array("alternatives", arr -> {
+            for (var m : a.alternatives()) {
+                arr.objectValue(o -> writeMove(o, m));
+            }
+        });
+        w.array("deadEnds", arr -> {
+            for (var m : a.deadEnds()) {
+                arr.objectValue(o -> writeMove(o, m));
+            }
+        });
+        w.endObject();
+        return w.toString();
+    }
+
+    private static void writeMove(JsonWriter w, de.regelsuche.analyze.MoveAnalysisDto.Move m) {
+        w.property("ruleId", m.ruleId());
+        w.property("ruleKind", m.ruleKind());
+        w.property("toExpression", m.toExpression());
+        w.property("toLatex", m.toLatex());
+        w.property("scoreDelta", m.scoreDelta());
+        w.property("deadEnd", m.deadEnd());
+        w.property("isBest", m.isBest());
+        w.property("equivalencePreserving", m.equivalencePreserving());
+        w.stringArray("assumptions", m.assumptions());
+        w.stringArray("pathIds", m.pathIds());
+    }
+
+    private de.regelsuche.export.SearchAnalysisReportService.SearchAnalysisReportContext analysisReportContext() {
+        var transformations = graphStore.discoveredTransformations();
+        var best = transformations.stream()
+            .max(java.util.Comparator.comparingInt(DiscoveredTransformation::totalImprovement))
+            .orElse(null);
+        java.util.List<DiscoveredTransformation> alternatives;
+        if (best != null) {
+            alternatives = transformations.stream().filter(t -> !t.id().equals(best.id())).toList();
+        } else {
+            alternatives = java.util.List.of();
+        }
+        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);
+        var known = new de.regelsuche.mining.KnownRuleRepository();
+        var identities = macros.stream()
+            .map(m -> de.regelsuche.api.IdentityReportDto.from(m, known.statusFor(m.leftPattern(), m.rightPattern())))
+            .toList();
+        java.util.Set<String> assumptions = new java.util.LinkedHashSet<>();
+        for (var t : transformations) {
+            for (var step : t.steps()) {
+                if (!step.equivalencePreserving()) {
+                    assumptions.add("Pfad " + t.id() + ", Schritt " + step.index() + ": " + step.ruleId());
+                }
+            }
+        }
+        return new de.regelsuche.export.SearchAnalysisReportService.SearchAnalysisReportContext(
+            best == null ? "" : best.originalExpression(),
+            "DISCOVERY",
+            java.util.List.of("core"),
+            buildSearchGraph(),
+            best,
+            alternatives,
+            macros,
+            identities,
+            new java.util.ArrayList<>(assumptions),
+            inventoryRepository.findAll()
+        );
     }
 
     private void handleStatic(HttpExchange exchange) throws IOException {

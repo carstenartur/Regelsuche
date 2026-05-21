@@ -13,6 +13,26 @@
  * UI is still usable when an endpoint is missing.
  */
 (() => {
+    // Optional CDN libraries for the interactive Cytoscape graph view and
+    // MathJax-based inline LaTeX. Loaded dynamically so the static HTML
+    // contains no third-party <script src=...> tags (avoids SRI churn and
+    // means the workbench works offline with the Mermaid fallback).
+    function loadCdnScript(src) {
+        return new Promise((resolve) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.crossOrigin = 'anonymous';
+            s.referrerPolicy = 'no-referrer';
+            s.onload = () => resolve(true);
+            s.onerror = () => { window.__cytoscapeFailed = true; resolve(false); };
+            document.head.appendChild(s);
+        });
+    }
+    // Fire-and-forget; functions guard on `typeof cytoscape === 'function'`.
+    loadCdnScript('https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js');
+    loadCdnScript('https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js');
+
     const $ = (id) => document.getElementById(id);
     const setStatus = (msg, level = '') => {
         const el = $('searchStatus');
@@ -135,14 +155,317 @@
     /* ─── Graph tab ─── */
     $('reloadGraph').addEventListener('click', async () => {
         const out = $('graphOutput');
+        const canvas = $('graphCanvas');
+        const inspector = $('graphInspector');
+        const filter = $('graphFilter') && $('graphFilter').value || '';
+        const interactive = $('graphInteractive') && $('graphInteractive').checked;
+        const filterQuery = filter ? ('?filter=' + encodeURIComponent(filter)) : '';
+        const source = $('graphSource') && $('graphSource').value || 'search-graph';
         out.textContent = 'Lade …';
+        if (canvas) canvas.style.display = 'none';
+        if (inspector) { inspector.style.display = 'none'; inspector.innerHTML = ''; }
         try {
-            const response = await fetch('/api/graph');
+            if (interactive && source === 'search-graph' && typeof cytoscape === 'function' && !window.__cytoscapeFailed) {
+                const response = await fetch('/api/search-graph' + filterQuery);
+                const data = await response.json();
+                renderCytoscape(data);
+                out.textContent = '(Interaktive Cytoscape-Ansicht aktiv – Mermaid-Quelltext unten ist Fallback.)';
+                const mermaidResp = await fetch('/api/exports/search-graph.mmd' + filterQuery);
+                out.textContent = (await mermaidResp.text());
+                return;
+            }
+            const url = source === 'search-graph' ? ('/api/exports/search-graph.mmd' + filterQuery) : '/api/graph';
+            const response = await fetch(url);
             out.textContent = await response.text();
         } catch (ex) {
             out.textContent = 'Fehler: ' + ex;
         }
     });
+
+    function renderCytoscape(graph) {
+        const canvas = $('graphCanvas');
+        const inspector = $('graphInspector');
+        if (!canvas || typeof cytoscape !== 'function') {
+            return;
+        }
+        canvas.style.display = 'block';
+        canvas.innerHTML = '';
+        const elements = [];
+        (graph.nodes || []).forEach(n => elements.push({ data: { id: n.id, label: n.expression, payload: n } }));
+        (graph.edges || []).forEach(e => elements.push({
+            data: { id: e.from + '->' + e.to + ':' + e.ruleId, source: e.from, target: e.to, label: e.ruleId, payload: e }
+        }));
+        const cy = cytoscape({
+            container: canvas,
+            elements: elements,
+            style: [
+                { selector: 'node', style: { 'label': 'data(label)', 'font-size': 10, 'background-color': '#3b82f6', 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center' } },
+                { selector: 'node[?payload.isBest]', style: { 'background-color': '#10b981' } },
+                { selector: 'node[?payload.isDeadEnd]', style: { 'background-color': '#9ca3af' } },
+                { selector: 'edge', style: { 'label': 'data(label)', 'font-size': 8, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle' } }
+            ],
+            layout: { name: 'breadthfirst', spacingFactor: 1.2 }
+        });
+        cy.on('tap', 'node', evt => showInspector(evt.target.data('payload')));
+        cy.on('tap', 'edge', evt => showInspector(evt.target.data('payload')));
+        if (inspector) {
+            inspector.style.display = 'block';
+            inspector.innerHTML = '<em>Klicke auf einen Knoten oder eine Kante, um Details anzuzeigen.</em>';
+        }
+    }
+
+    function showInspector(payload) {
+        const inspector = $('graphInspector');
+        if (!inspector) return;
+        const rows = Object.entries(payload || {}).map(([k, v]) =>
+            `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}</div>`);
+        inspector.innerHTML = rows.join('');
+        if (payload && payload.latex && window.MathJax && window.MathJax.typesetPromise) {
+            inspector.innerHTML += '<div class="latex">$' + payload.latex + '$</div>';
+            window.MathJax.typesetPromise([inspector]).catch(() => {});
+        }
+    }
+
+    /* ─── Compare tab ─── */
+    if ($('compareLoad')) {
+        $('compareLoad').addEventListener('click', compareLoad);
+        populateCompareSelects();
+    }
+    async function populateCompareSelects() {
+        try {
+            const response = await fetch('/api/paths');
+            const data = await response.json();
+            const left = $('compareLeftSelect');
+            const right = $('compareRightSelect');
+            if (!left || !right) return;
+            left.innerHTML = '';
+            right.innerHTML = '';
+            (data.transformations || []).forEach(p => {
+                const optL = document.createElement('option');
+                optL.value = p.id; optL.textContent = p.id + ' (' + p.originalExpression + ')';
+                left.appendChild(optL);
+                right.appendChild(optL.cloneNode(true));
+            });
+        } catch (ex) {
+            // ignore
+        }
+    }
+    async function compareLoad() {
+        const left = $('compareLeftSelect').value;
+        const right = $('compareRightSelect').value;
+        const out = $('compareOutput');
+        if (!left || !right) { out.textContent = 'Bitte zwei Pfade wählen.'; return; }
+        try {
+            const response = await fetch('/api/paths/compare?left=' + encodeURIComponent(left) + '&right=' + encodeURIComponent(right));
+            const data = await response.json();
+            out.innerHTML = renderComparison(data);
+        } catch (ex) {
+            out.textContent = 'Fehler: ' + ex;
+        }
+    }
+    function renderComparison(c) {
+        return '<table class="compare"><thead><tr><th></th><th>' + escapeHtml(c.leftPathId) + '</th><th>' + escapeHtml(c.rightPathId) + '</th></tr></thead>'
+            + '<tbody>'
+            + row('Teaching-Score', c.leftTeachingScore.toFixed(3), c.rightTeachingScore.toFixed(3))
+            + row('Annahmen-Schritte', c.leftAssumptionSteps, c.rightAssumptionSteps)
+            + row('Proof-Status', c.leftProofStatus, c.rightProofStatus)
+            + row('Score-Reihe', c.leftScoreSeries.join(' → '), c.rightScoreSeries.join(' → '))
+            + '</tbody></table>'
+            + '<p><strong>Kürzer:</strong> ' + escapeHtml(c.shorterPath || '—') + ' · '
+            + '<strong>Didaktisch:</strong> ' + escapeHtml(c.teachingPreferredPath || '—') + ' · '
+            + '<strong>Weniger Annahmen:</strong> ' + escapeHtml(c.fewerAssumptionsPath || '—') + '</p>'
+            + '<h4>Gemeinsame Regeln</h4><ul>' + (c.sharedRules || []).map(r => '<li>' + escapeHtml(r) + '</li>').join('') + '</ul>'
+            + '<h4>Nur links</h4><ul>' + (c.leftOnlySteps || []).map(s => '<li>' + escapeHtml(s) + '</li>').join('') + '</ul>'
+            + '<h4>Nur rechts</h4><ul>' + (c.rightOnlySteps || []).map(s => '<li>' + escapeHtml(s) + '</li>').join('') + '</ul>';
+    }
+    function row(label, l, r) {
+        return '<tr><th>' + escapeHtml(label) + '</th><td>' + escapeHtml(String(l)) + '</td><td>' + escapeHtml(String(r)) + '</td></tr>';
+    }
+
+    /* ─── Identities tab ─── */
+    if ($('reloadIdentities')) {
+        $('reloadIdentities').addEventListener('click', loadIdentities);
+    }
+    async function loadIdentities() {
+        const out = $('identitiesList');
+        out.innerHTML = '<div class="hint">Lade …</div>';
+        try {
+            const response = await fetch('/api/identities');
+            const data = await response.json();
+            renderIdentities(data.identities || []);
+        } catch (ex) {
+            out.innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
+        }
+    }
+    function renderIdentities(items) {
+        const out = $('identitiesList');
+        if (!items.length) {
+            out.innerHTML = '<div class="hint">Noch keine wiederkehrenden Sequenzen entdeckt.</div>';
+            return;
+        }
+        out.innerHTML = '';
+        items.forEach((identity) => {
+            const card = document.createElement('div');
+            card.className = 'identity-card';
+            const seq = (identity.ruleIdSequence || []).join(' → ');
+            card.innerHTML = '<h4>' + escapeHtml(identity.leftPattern || '?') + ' → '
+                + escapeHtml(identity.rightPattern || '?') + '</h4>'
+                + '<div class="hint">Sequenz: <code>' + escapeHtml(seq) + '</code></div>'
+                + '<div class="hint">Vorkommen: ' + identity.occurrences
+                + ' · Kompression: ' + (identity.compressionRatio || 0).toFixed(2)
+                + ' · Status: ' + escapeHtml(identity.proofStatus || '')
+                + ' · bekannt: ' + escapeHtml(identity.knownRuleStatus || '') + '</div>';
+            const promote = document.createElement('button');
+            promote.className = 'primary';
+            promote.textContent = 'Als Regel übernehmen';
+            promote.addEventListener('click', async () => {
+                promote.disabled = true;
+                try {
+                    const res = await fetch('/api/identities/' + encodeURIComponent(identity.id) + '/promote',
+                        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                    if (res.ok) {
+                        promote.textContent = '✓ Übernommen';
+                    } else {
+                        promote.textContent = 'Fehler ' + res.status;
+                        promote.disabled = false;
+                    }
+                } catch (ex) {
+                    promote.textContent = 'Fehler';
+                    promote.disabled = false;
+                }
+            });
+            card.appendChild(promote);
+            out.appendChild(card);
+        });
+    }
+
+    /* ─── Dashboard tab ─── */
+    if ($('reloadDashboard')) {
+        $('reloadDashboard').addEventListener('click', loadDashboard);
+    }
+    async function loadDashboard() {
+        const tiles = $('dashboardTiles');
+        const rules = $('dashboardRules');
+        tiles.innerHTML = '<div class="hint">Lade …</div>';
+        try {
+            const response = await fetch('/api/search-graph');
+            const data = await response.json();
+            const stats = data.stats || {};
+            const tileData = [
+                ['Knoten', stats.nodesVisited],
+                ['Kanten', stats.edgesGenerated],
+                ['Sackgassen', stats.deadEnds],
+                ['Bester Score', stats.bestScore],
+                ['Verzweigungsfaktor (ø)', (stats.averageBranchingFactor || 0).toFixed(2)],
+                ['Max. Tiefe', stats.maxDepthReached],
+                ['Kandidaten', stats.candidateCount],
+                ['Makroregeln', stats.macroRuleCount]
+            ];
+            tiles.innerHTML = '';
+            tileData.forEach(([label, value]) => {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.innerHTML = '<div class="tile-value">' + (value == null ? '–' : value)
+                    + '</div><div class="tile-label">' + label + '</div>';
+                tiles.appendChild(tile);
+            });
+            const usage = stats.ruleUsageFrequency || {};
+            rules.textContent = Object.entries(usage)
+                .map(([rule, count]) => count + '\t' + rule)
+                .join('\n') || '–';
+        } catch (ex) {
+            tiles.innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
+        }
+    }
+
+    /* ─── Replay tab ─── */
+    let replayState = { steps: [], index: 0, timer: null };
+    if ($('replayLoad')) {
+        $('replayLoad').addEventListener('click', loadReplay);
+        $('replayPrev').addEventListener('click', () => { stopReplay(); stepReplay(-1); });
+        $('replayNext').addEventListener('click', () => { stopReplay(); stepReplay(1); });
+        $('replayPlay').addEventListener('click', () => {
+            if (replayState.timer) { stopReplay(); return; }
+            replayState.timer = setInterval(() => {
+                if (replayState.index >= replayState.steps.length - 1) { stopReplay(); return; }
+                stepReplay(1);
+            }, 1200);
+            $('replayPlay').textContent = '⏸';
+        });
+    }
+    function stopReplay() {
+        if (replayState.timer) { clearInterval(replayState.timer); replayState.timer = null; }
+        if ($('replayPlay')) $('replayPlay').textContent = '▶';
+    }
+    function stepReplay(delta) {
+        const next = replayState.index + delta;
+        if (next < 0 || next >= replayState.steps.length) return;
+        replayState.index = next;
+        renderReplayStep();
+    }
+    async function populateReplayPaths() {
+        const select = $('replayPathSelect');
+        if (!select) return;
+        try {
+            const response = await fetch('/api/paths?sort=score');
+            const data = await response.json();
+            select.innerHTML = '';
+            (data.transformations || []).forEach((path) => {
+                const opt = document.createElement('option');
+                opt.value = path.id;
+                opt.textContent = path.id + ' — Δ' + path.totalImprovement;
+                select.appendChild(opt);
+            });
+        } catch (ex) {
+            select.innerHTML = '<option>Fehler: ' + ex + '</option>';
+        }
+    }
+    async function loadReplay() {
+        const select = $('replayPathSelect');
+        const pathId = select && select.value;
+        if (!pathId) { return; }
+        stopReplay();
+        try {
+            const response = await fetch('/api/paths/' + encodeURIComponent(pathId) + '/replay');
+            const data = await response.json();
+            replayState.steps = data.steps || [];
+            replayState.index = 0;
+            renderReplayStep();
+        } catch (ex) {
+            $('replayCanvas').innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
+        }
+    }
+    function renderReplayStep() {
+        const canvas = $('replayCanvas');
+        if (!canvas) return;
+        if (!replayState.steps.length) {
+            canvas.innerHTML = '<div class="hint">Wähle oben einen Pfad und klicke „Laden".</div>';
+            return;
+        }
+        const step = replayState.steps[replayState.index];
+        canvas.innerHTML = '<div class="replay-step">'
+            + '<div class="replay-step-index">Schritt ' + (step.stepIndex + 1)
+            + ' / ' + replayState.steps.length + '</div>'
+            + '<div class="replay-from"><strong>Vorher:</strong> '
+            + '<code>' + escapeHtml(step.fromExpression) + '</code><br>'
+            + '<span class="latex">$' + escapeHtml(step.fromLatex) + '$</span></div>'
+            + '<div class="replay-to"><strong>Nachher:</strong> '
+            + '<code>' + escapeHtml(step.toExpression) + '</code><br>'
+            + '<span class="latex">$' + escapeHtml(step.toLatex) + '$</span></div>'
+            + '<div class="replay-rule"><strong>Regel:</strong> <code>'
+            + escapeHtml(step.ruleId) + '</code></div>'
+            + '<div class="replay-explanation"><pre>'
+            + escapeHtml(step.ruleExplanation || '') + '</pre></div>'
+            + '<div class="hint">Δ Komplexität: ' + step.scoreDelta
+            + ' · Äquivalenzerhaltend: ' + step.equivalencePreserving + '</div>'
+            + '</div>';
+    }
+    function escapeHtml(value) {
+        if (value == null) return '';
+        return String(value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
 
     /* ─── Candidates tab ─── */
     $('reloadCandidates').addEventListener('click', loadCandidates);
@@ -299,6 +622,12 @@
                     loadCandidates().finally(() => $('candidatesList').dataset.loaded = '1');
                 } else if (which === 'inventory' && !$('inventoryList').dataset.loaded) {
                     loadInventory().finally(() => $('inventoryList').dataset.loaded = '1');
+                } else if (which === 'identities' && $('identitiesList') && !$('identitiesList').dataset.loaded) {
+                    loadIdentities().finally(() => $('identitiesList').dataset.loaded = '1');
+                } else if (which === 'dashboard' && $('dashboardTiles') && !$('dashboardTiles').dataset.loaded) {
+                    loadDashboard().finally(() => $('dashboardTiles').dataset.loaded = '1');
+                } else if (which === 'replay' && $('replayPathSelect') && !$('replayPathSelect').dataset.loaded) {
+                    populateReplayPaths().finally(() => $('replayPathSelect').dataset.loaded = '1');
                 }
             });
         });

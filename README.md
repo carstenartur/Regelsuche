@@ -22,11 +22,56 @@ Gradle-basiertes Java-Projekt für regelbasierte Ausdrucksumformungen mit:
 - Mining von Regel-Kandidaten per AST-Normalisierung, Anti-Unification und Parameter-Relationen
 - Referenzbestand bekannter Regeln zum Einordnen gefundener Kandidaten
 
+> Regelsuche macht mathematische Umformungsräume sichtbar – Knoten sind Ausdrücke,
+> Kanten sind Umformungen, Pfade sind Rechenwege. Siehe [docs/visual-search-graph.md](docs/visual-search-graph.md),
+> [docs/replay-mode.md](docs/replay-mode.md), [docs/macro-rules.md](docs/macro-rules.md)
+> und [docs/didactic-ranking.md](docs/didactic-ranking.md).
+
 ## Starten
 
 ```bash
 ./gradlew :app:run --args='term "x + 0"'
 ```
+
+## Demo: Binomische Formel emergiert aus atomaren Regeln
+
+Mit dieser Demo lässt sich die Workbench end-to-end erleben — eingegeben
+wird `(x+3)^2`, herausgefunden wird die binomische Formel als emergente
+Identität aus rein atomaren Rewrite-Regeln.
+
+```bash
+./gradlew :app:run --args='serve --port 8080'
+```
+
+Anschließend im Browser `http://localhost:8080/` öffnen.
+
+* **Eingabe:** `(x+3)^2`
+* **Screenshot-Hinweis:** Beim Klick auf "Suchen" entsteht im Cytoscape-Graph
+  ein Strang aus vier Knoten. Der beste Pfad (gelb hervorgehoben) verläuft
+  über `(x+3)*(x+3) → x*x + x*3 + 3*x + 3*3 → x^2 + 6x + 9`.
+* **Erwarteter Graph:**
+  ```
+  (x+3)^2 ──power_two_to_product──▶ (x+3)*(x+3) ──distribute──▶
+  x*x + x*3 + 3*x + 3*3 ──combine_like_terms──▶ x^2 + 6x + 9
+  ```
+* **Erwarteter Rechenweg im Replay-Tab:**
+  1. `(x+3)^2 = (x+3)*(x+3)` (Potenz als Produkt)
+  2. `(x+3)*(x+3) = x*x + x*3 + 3*x + 3*3` (Distributivität)
+  3. `x*x + x*3 + 3*x + 3*3 = x^2 + 6x + 9` (gleichartige Terme)
+* **Erwartete Makroregel** im "Makro-Regeln"-Tab:
+  `(a+b)^2 → a^2 + 2*a*b + b^2`, mit Beispielen, unterstützenden Pfaden,
+  Kompressionsrate und den Buttons "Als Regel übernehmen", "Formal prüfen",
+  "Auf neue Beispiele testen".
+* **Exportdateien** unter `/api/exports/`:
+    * `search-analysis-report.md` – kompletter Analysebericht (Eingabe,
+      Suchprofil, Domänen, Graphmetriken, bester Pfad, alternative Pfade,
+      Makroregeln, Identitäten, Annahmen, Proof-Status,
+      Regelvorrat-Änderungen).
+    * `search-analysis-report.tex` – LaTeX-Version desselben Berichts.
+    * `search-analysis-report.json` – maschinenlesbarer Bericht.
+* **"Chess-style"-Analyse:** `GET /api/analyze/move?expression=(x+3)^2`
+  liefert „bester Zug", „alternative Züge", Begründung und die in der
+  gesamten Suche nützlichste Regel.
 
 ## CLI Quickstart
 
