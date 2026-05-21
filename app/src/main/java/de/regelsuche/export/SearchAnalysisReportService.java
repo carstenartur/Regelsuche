@@ -30,9 +30,9 @@ public final class SearchAnalysisReportService {
         appendHeader(sb, ctx, " * ");
         SearchGraphStatsDto stats = ctx.graph().stats();
         sb.append("## Graphmetriken\n\n");
-        sb.append(" * Knoten: ").append(stats.nodeCount()).append("\n");
-        sb.append(" * Kanten: ").append(stats.edgeCount()).append("\n");
-        sb.append(" * Sackgassen: ").append(stats.deadEndCount()).append("\n");
+        sb.append(" * Knoten: ").append(stats.nodesVisited()).append("\n");
+        sb.append(" * Kanten: ").append(stats.edgesGenerated()).append("\n");
+        sb.append(" * Sackgassen: ").append(stats.deadEnds()).append("\n");
         sb.append(" * Bester Score: ").append(stats.bestScore()).append("\n");
         sb.append(" * Durchschn. Branching: ")
             .append(String.format(Locale.ROOT, "%.2f", stats.averageBranchingFactor())).append("\n");
@@ -139,9 +139,9 @@ public final class SearchAnalysisReportService {
         w.stringArray("domains", ctx.domains());
         SearchGraphStatsDto s = ctx.graph().stats();
         w.object("graphMetrics", inner -> {
-            inner.property("nodeCount", s.nodeCount());
-            inner.property("edgeCount", s.edgeCount());
-            inner.property("deadEndCount", s.deadEndCount());
+            inner.property("nodeCount", s.nodesVisited());
+            inner.property("edgeCount", s.edgesGenerated());
+            inner.property("deadEndCount", s.deadEnds());
             inner.property("bestScore", s.bestScore());
             inner.property("averageBranchingFactor", s.averageBranchingFactor());
             inner.property("maxDepthReached", s.maxDepthReached());

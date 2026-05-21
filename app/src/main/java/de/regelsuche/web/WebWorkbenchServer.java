@@ -599,6 +599,17 @@ public class WebWorkbenchServer {
             sendText(exchange, 200, md);
             return;
         }
+        if (format.startsWith("search-analysis-report")) {
+            var report = new de.regelsuche.export.SearchAnalysisReportService();
+            var ctx = analysisReportContext();
+            switch (format) {
+                case "search-analysis-report.md" -> sendText(exchange, 200, report.renderMarkdown(ctx));
+                case "search-analysis-report.tex" -> sendText(exchange, 200, report.renderLatex(ctx));
+                case "search-analysis-report.json" -> sendJson(exchange, 200, report.renderJson(ctx));
+                default -> sendStatus(exchange, 404, "unknown analysis report format: " + format);
+            }
+            return;
+        }
         List<DiscoveredTransformation> transformations = graphStore.discoveredTransformations();
         switch (format.toLowerCase(Locale.ROOT)) {
             case "markdown", "md" -> sendText(exchange, 200, exportService.exportMarkdown(transformations));
@@ -806,7 +817,7 @@ public class WebWorkbenchServer {
         for (var t : transformations) {
             for (var step : t.steps()) {
                 if (!step.equivalencePreserving()) {
-                    assumptions.add("Pfad " + t.id() + ", Schritt " + step.stepIndex() + ": " + step.ruleId());
+                    assumptions.add("Pfad " + t.id() + ", Schritt " + step.index() + ": " + step.ruleId());
                 }
             }
         }
