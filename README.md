@@ -27,6 +27,34 @@ Gradle-basiertes Java-Projekt für regelbasierte Ausdrucksumformungen mit:
 > [docs/replay-mode.md](docs/replay-mode.md), [docs/macro-rules.md](docs/macro-rules.md)
 > und [docs/didactic-ranking.md](docs/didactic-ranking.md).
 
+## Quickstart mit Docker (Killer-App-Demo)
+
+Ein einziger Docker-Build, ein Image, in unter fünf Minuten ein klickbarer
+Demo-Flow im Browser:
+
+```bash
+docker build -t regelsuche .
+docker run --rm -p 8080:8080 regelsuche
+```
+
+Anschließend `http://localhost:8080/` öffnen. Im Demo-Hero stehen vier große
+Buttons bereit – Binomische Formel, Bruchkürzung, Trigonometrie, Polynom-
+Gleichung. Ein Klick startet die Suche, zeigt Suchgraph, Replay und
+Identität an und liefert den Bericht als Bundle.
+
+Wichtige Endpunkte:
+
+* `GET /api/demo` – Liste der Demos
+* `POST /api/demo/{binomial|rational|trigonometry|equation}` – Demo ausführen
+* `GET /api/proof-status` – Erklärungen zu Proof-Status-Stufen
+* `GET /api/benchmark` – Benchmark-Lauf als JSON
+* `GET /api/exports/bundle.zip` – kompletter Bericht (Markdown, LaTeX, JSON,
+  Mermaid, GraphML) in einer Zip-Datei
+
+Optional: Wird Neo4j verfügbar gemacht und die Variablen `NEO4J_URI`,
+`NEO4J_USER`, `NEO4J_PASSWORD` gesetzt, persistiert Regelsuche Graph und
+Inventar direkt im Graphdatenbank-Backend (`docker run -e NEO4J_URI=…`).
+
 ## Starten
 
 ```bash

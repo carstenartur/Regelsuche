@@ -60,6 +60,92 @@
     $('loadExample-log').addEventListener('click', () => loadExample('log(a*b)', 'TERM'));
     $('loadExample-eq').addEventListener('click', () => loadExample('2*x + 3 = 7', 'EQUATION'));
 
+    /* ─── Demo buttons (Killer-App landing flow) ─── */
+    async function runDemo(demoId, btn) {
+        const status = $('demoStatus');
+        const summary = $('demoSummary');
+        const buttons = document.querySelectorAll('.demo-button');
+        buttons.forEach((b) => (b.disabled = true));
+        status.className = 'status';
+        status.textContent = 'Starte Demo ' + demoId + ' …';
+        summary.innerHTML = '';
+        try {
+            const response = await fetch('/api/demo/' + encodeURIComponent(demoId), { method: 'POST' });
+            const raw = await response.text();
+            if (!response.ok) {
+                status.className = 'status error';
+                status.textContent = 'Demo fehlgeschlagen (HTTP ' + response.status + '): ' + raw;
+                return;
+            }
+            const data = JSON.parse(raw);
+            status.className = 'status ok';
+            status.textContent = 'Demo "' + data.title + '" abgeschlossen in '
+                + (data.metrics && data.metrics.elapsedMillis) + ' ms.';
+            renderDemoSummary(data);
+            // Refresh the existing panels so users see graph/replay immediately.
+            if (typeof loadPaths === 'function') { loadPaths().catch(() => {}); }
+            if (typeof loadIdentities === 'function') { loadIdentities().catch(() => {}); }
+            const graphBtn = $('reloadGraph');
+            if (graphBtn) { graphBtn.click(); }
+        } catch (ex) {
+            status.className = 'status error';
+            status.textContent = 'Netzwerkfehler: ' + ex;
+        } finally {
+            buttons.forEach((b) => (b.disabled = false));
+        }
+    }
+
+    function renderDemoSummary(data) {
+        const m = data.metrics || {};
+        const best = data.bestPath || {};
+        const identities = (data.identities || []).slice(0, 3);
+        const rows = [
+            ['Eingabe', data.expression || ''],
+            ['Profil', data.profile || ''],
+            ['Knoten / Kanten', (m.nodes || 0) + ' / ' + (m.edges || 0)],
+            ['Pfade entdeckt', m.pathsDiscovered || 0],
+            ['Bester Pfad',
+                best.improvedExpression
+                    ? best.originalExpression + ' → ' + best.improvedExpression
+                      + ' (' + (best.steps || 0) + ' Schritte, Verbesserung ' + (best.totalImprovement || 0) + ')'
+                    : '–'],
+            ['Identitäten', m.identitiesFound || 0],
+            ['Erwartete Identität', data.expectedHighlight || '']
+        ];
+        const tableRows = rows.map((r) =>
+            '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(String(r[1])) + '</td></tr>').join('');
+        const idList = identities.length
+            ? '<h4>Erkannte Identitäten</h4><ul>' + identities.map((i) =>
+                '<li><code>' + escapeHtml(i.leftPattern) + ' → ' + escapeHtml(i.rightPattern)
+                  + '</code> · ' + escapeHtml(i.proofStatus) + '</li>').join('') + '</ul>'
+            : '';
+        const links = data.links || {};
+        const linkList = [
+            ['Bericht (Markdown)', links.reportMarkdown],
+            ['Bericht (LaTeX)', links.reportLatex],
+            ['Bericht (JSON)', links.reportJson],
+            ['Suchgraph (Mermaid)', links.searchGraphMermaid],
+            ['Suchgraph (GraphML)', links.searchGraphGraphMl],
+            ['Bundle (.zip)', links.reportBundleZip]
+        ].filter((l) => l[1])
+            .map((l) => '<a class="export-button" href="' + l[1] + '" target="_blank">' + escapeHtml(l[0]) + '</a>')
+            .join(' ');
+        $('demoSummary').innerHTML =
+            '<table>' + tableRows + '</table>'
+            + idList
+            + '<div class="demo-actions">' + linkList + '</div>';
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    document.querySelectorAll('.demo-button').forEach((btn) => {
+        btn.addEventListener('click', () => runDemo(btn.dataset.demo, btn));
+    });
+
     /* ─── Search form ─── */
     $('searchForm').addEventListener('submit', async (event) => {
         event.preventDefault();

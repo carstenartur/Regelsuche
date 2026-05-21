@@ -208,3 +208,53 @@ footer { text-align: center; padding: 1rem; color: #9ca3af; font-size: 0.8rem; }
 table.compare { border-collapse: collapse; width: 100%; margin-bottom: 0.75rem; }
 table.compare th, table.compare td { border: 1px solid #e5e7eb; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }
 table.compare thead th { background: #eff6ff; }
+
+/* ─── Demo hero (killer-app landing flow) ─── */
+.demo-hero { margin-bottom: 1.25rem; }
+.demo-card {
+    background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%);
+    border-color: #c7d2fe;
+}
+.demo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin: 0.75rem 0 0.5rem;
+}
+.demo-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    background: #fff;
+    border: 2px solid #c7d2fe;
+    border-radius: 10px;
+    padding: 1rem 0.75rem;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    color: #1f2937;
+    font: inherit;
+}
+.demo-button:hover {
+    border-color: #6366f1;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(99,102,241,0.15);
+}
+.demo-button:disabled { opacity: 0.6; cursor: progress; }
+.demo-icon { font-size: 1.6rem; color: #4338ca; }
+.demo-title { font-weight: 600; font-size: 1rem; }
+.demo-expr { color: #4b5563; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9rem; }
+.demo-summary {
+    margin-top: 0.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    color: #1f2937;
+}
+.demo-summary table { width: 100%; border-collapse: collapse; }
+.demo-summary th, .demo-summary td {
+    text-align: left;
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+.demo-actions { margin-top: 0.6rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }

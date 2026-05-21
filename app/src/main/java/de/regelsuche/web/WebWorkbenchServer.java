@@ -122,6 +122,9 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/exports", this::handleExports));
         secure(server.createContext("/api/explain", this::handleExplain));
         secure(server.createContext("/api/analyze", this::handleAnalyze));
+        secure(server.createContext("/api/demo", this::handleDemo));
+        secure(server.createContext("/api/proof-status", this::handleProofStatus));
+        secure(server.createContext("/api/benchmark", this::handleBenchmark));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
         server.start();
@@ -601,6 +604,17 @@ public class WebWorkbenchServer {
             sendText(exchange, 200, md);
             return;
         }
+        if (format.equals("bundle.zip")) {
+            byte[] zipBytes = buildReportBundleZip();
+            exchange.getResponseHeaders().add("Content-Type", "application/zip");
+            exchange.getResponseHeaders().add(
+                "Content-Disposition", "attachment; filename=\"regelsuche-report-bundle.zip\"");
+            exchange.sendResponseHeaders(200, zipBytes.length);
+            try (OutputStream body = exchange.getResponseBody()) {
+                body.write(zipBytes);
+            }
+            return;
+        }
         if (format.startsWith("search-analysis-report")) {
             var report = new de.regelsuche.export.SearchAnalysisReportService();
             var ctx = analysisReportContext();
@@ -842,6 +856,187 @@ public class WebWorkbenchServer {
             new java.util.ArrayList<>(assumptions),
             inventoryRepository.findAll()
         );
+    }
+
+    private void handleDemo(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String suffix = path.substring("/api/demo".length()).replaceFirst("^/", "");
+        if (suffix.isEmpty()) {
+            // List all available demos.
+            JsonWriter writer = new JsonWriter();
+            writer.beginObject();
+            writer.array("demos", arr -> de.regelsuche.demo.DemoCatalog.all().values().forEach(demo ->
+                arr.objectValue(inner -> {
+                    inner.property("id", demo.id());
+                    inner.property("title", demo.title());
+                    inner.property("description", demo.description());
+                    inner.property("expression", demo.expression());
+                    inner.property("inputType", demo.inputType().name());
+                    inner.property("profile", demo.profile().name());
+                    inner.property("expectedHighlight", demo.expectedHighlight());
+                })));
+            writer.endObject();
+            sendJson(exchange, 200, writer.toString());
+            return;
+        }
+        de.regelsuche.demo.DemoCatalog.Demo demo = de.regelsuche.demo.DemoCatalog.byId(suffix);
+        if (demo == null) {
+            sendStatus(exchange, 404, "unknown demo: " + suffix);
+            return;
+        }
+        String method = exchange.getRequestMethod();
+        if (!"GET".equalsIgnoreCase(method) && !"POST".equalsIgnoreCase(method)) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        de.regelsuche.demo.DemoService demoService = new de.regelsuche.demo.DemoService(graphStore);
+        de.regelsuche.demo.DemoService.DemoRunResult result = demoService.run(demo);
+        sendJson(exchange, 200, renderDemoBundle(result));
+    }
+
+    private String renderDemoBundle(de.regelsuche.demo.DemoService.DemoRunResult result) {
+        de.regelsuche.demo.DemoCatalog.Demo demo = result.demo();
+        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(graphStore.discoveredTransformations());
+        var known = new de.regelsuche.mining.KnownRuleRepository();
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("id", demo.id());
+        writer.property("title", demo.title());
+        writer.property("description", demo.description());
+        writer.property("expression", demo.expression());
+        writer.property("inputType", demo.inputType().name());
+        writer.property("profile", demo.profile().name());
+        writer.property("expectedHighlight", demo.expectedHighlight());
+        writer.property("rootExpression", result.rootExpression());
+        writer.object("metrics", m -> {
+            m.property("nodes", result.nodesSaved());
+            m.property("edges", result.edgesSaved());
+            m.property("pathsDiscovered", result.pathsDiscovered());
+            m.property("elapsedMillis", result.elapsedMillis());
+            m.property("identitiesFound", macros.size());
+        });
+        if (result.bestPath() != null) {
+            var best = result.bestPath();
+            writer.object("bestPath", b -> {
+                b.property("id", best.id());
+                b.property("originalExpression", best.originalExpression());
+                b.property("improvedExpression", best.improvedExpression());
+                b.property("totalImprovement", best.totalImprovement());
+                b.property("steps", best.steps().size());
+                b.property("proofStatus", best.validationStatus().name());
+            });
+        } else {
+            writer.nullProperty("bestPath");
+        }
+        writer.array("identities", arr -> macros.forEach(macro ->
+            arr.objectValue(inner -> {
+                inner.property("id", macro.id());
+                inner.property("leftPattern", macro.leftPattern());
+                inner.property("rightPattern", macro.rightPattern());
+                inner.property("occurrences", macro.occurrences());
+                inner.property("compressionRatio", macro.compressionRatio());
+                inner.property("proofStatus", macro.proofStatus().name());
+                inner.property("knownRuleStatus",
+                    known.statusFor(macro.leftPattern(), macro.rightPattern()).name());
+            })));
+        writer.object("links", l -> {
+            l.property("searchGraph", "/api/search-graph");
+            l.property("paths", "/api/paths");
+            l.property("identities", "/api/identities");
+            l.property("candidates", "/api/candidates");
+            l.property("inventory", "/api/inventory");
+            l.property("reportMarkdown", "/api/exports/search-analysis-report.md");
+            l.property("reportLatex", "/api/exports/search-analysis-report.tex");
+            l.property("reportJson", "/api/exports/search-analysis-report.json");
+            l.property("searchGraphMermaid", "/api/exports/search-graph.mmd");
+            l.property("searchGraphGraphMl", "/api/exports/search-graph.graphml");
+            l.property("reportBundleZip", "/api/exports/bundle.zip");
+            l.property("analyzeMove", "/api/analyze/move?expression=" + demo.expression());
+        });
+        writer.endObject();
+        return writer.toString();
+    }
+
+    private void handleProofStatus(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.array("statuses", arr ->
+            de.regelsuche.proof.ProofStatusDescription.all().values().forEach(d ->
+                arr.objectValue(inner -> {
+                    inner.property("status", d.status().name());
+                    inner.property("ordinal", d.status().ordinal());
+                    inner.property("label", d.label());
+                    inner.property("descriptionDe", d.summaryDe());
+                    inner.property("descriptionEn", d.summaryEn());
+                })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleBenchmark(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        long started = System.nanoTime();
+        var suite = new de.regelsuche.benchmark.BenchmarkSuite();
+        List<de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult> results = suite.runAll();
+        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("elapsedMillis", elapsedMillis);
+        writer.array("scenarios", scenarios -> results.forEach(scenario ->
+            scenarios.objectValue(s -> {
+                s.property("name", scenario.name());
+                s.array("results", rows -> scenario.results().forEach(row ->
+                    rows.objectValue(r -> {
+                        r.property("strategy", row.strategyName());
+                        r.property("expression", row.expression());
+                        r.property("exploredStates", row.exploredStates());
+                        r.property("bestImprovement", row.bestImprovement());
+                        r.property("shortestImprovingDepth", row.shortestImprovingDepth());
+                        r.property("expandedSteps", row.expandedSteps());
+                        r.property("distinctRules", row.distinctRules());
+                        r.property("found", row.bestImprovement() > 0);
+                    })));
+            })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private byte[] buildReportBundleZip() throws IOException {
+        var report = new de.regelsuche.export.SearchAnalysisReportService();
+        var ctx = analysisReportContext();
+        var transformations = graphStore.discoveredTransformations();
+        var graph = buildSearchGraph();
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {
+            putZipEntry(zip, "search-analysis-report.md", report.renderMarkdown(ctx));
+            putZipEntry(zip, "search-analysis-report.tex", report.renderLatex(ctx));
+            putZipEntry(zip, "search-analysis-report.json", report.renderJson(ctx));
+            putZipEntry(zip, "transformations.md", exportService.exportMarkdown(transformations));
+            putZipEntry(zip, "transformations.tex", exportService.exportLatex(transformations));
+            putZipEntry(zip, "transformations.json", exportService.exportBundle(exportQuery.bundle()));
+            putZipEntry(zip, "search-graph.mmd", exportService.exportSearchGraphMermaid(graph));
+            putZipEntry(zip, "search-graph.graphml", exportService.exportSearchGraphGraphMl(graph));
+            putZipEntry(zip, "search-graph.json", exportService.exportSearchGraphJson(graph));
+            putZipEntry(zip, "best-path.md", exportService.exportBestPathMarkdown(transformations));
+        }
+        return out.toByteArray();
+    }
+
+    private static void putZipEntry(java.util.zip.ZipOutputStream zip, String name, String content)
+        throws IOException {
+        java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(name);
+        zip.putNextEntry(entry);
+        if (content != null) {
+            zip.write(content.getBytes(StandardCharsets.UTF_8));
+        }
+        zip.closeEntry();
     }
 
     private void handleStatic(HttpExchange exchange) throws IOException {
