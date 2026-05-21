@@ -874,6 +874,7 @@ public class WebWorkbenchServer {
                     inner.property("inputType", demo.inputType().name());
                     inner.property("profile", demo.profile().name());
                     inner.property("expectedHighlight", demo.expectedHighlight());
+                    inner.property("expectedResultExpression", demo.expectedResultExpression());
                 })));
             writer.endObject();
             sendJson(exchange, 200, writer.toString());
@@ -907,27 +908,23 @@ public class WebWorkbenchServer {
         writer.property("inputType", demo.inputType().name());
         writer.property("profile", demo.profile().name());
         writer.property("expectedHighlight", demo.expectedHighlight());
+        writer.property("expectedResultExpression", demo.expectedResultExpression());
+        writer.property("canonicalTargetExpression",
+            result.canonicalTargetExpression() == null ? "" : result.canonicalTargetExpression());
         writer.property("rootExpression", result.rootExpression());
+        writer.property("targetReached", result.targetReached());
+        writer.stringArray("assumptions", result.assumptions());
         writer.object("metrics", m -> {
             m.property("nodes", result.nodesSaved());
             m.property("edges", result.edgesSaved());
             m.property("pathsDiscovered", result.pathsDiscovered());
             m.property("elapsedMillis", result.elapsedMillis());
             m.property("identitiesFound", macros.size());
+            m.property("appliedRuleCount", result.appliedRuleIds().size());
         });
-        if (result.bestPath() != null) {
-            var best = result.bestPath();
-            writer.object("bestPath", b -> {
-                b.property("id", best.id());
-                b.property("originalExpression", best.originalExpression());
-                b.property("improvedExpression", best.improvedExpression());
-                b.property("totalImprovement", best.totalImprovement());
-                b.property("steps", best.steps().size());
-                b.property("proofStatus", best.validationStatus().name());
-            });
-        } else {
-            writer.nullProperty("bestPath");
-        }
+        writePath(writer, "selectedPath", result.selectedPath());
+        writePath(writer, "bestPath", result.bestPath());
+        writePath(writer, "targetPath", result.targetPath());
         writer.array("identities", arr -> macros.forEach(macro ->
             arr.objectValue(inner -> {
                 inner.property("id", macro.id());
@@ -955,6 +952,33 @@ public class WebWorkbenchServer {
         });
         writer.endObject();
         return writer.toString();
+    }
+
+    private static void writePath(JsonWriter writer, String key,
+                                  de.regelsuche.discovery.DiscoveredTransformation path) {
+        if (path == null) {
+            writer.nullProperty(key);
+            return;
+        }
+        writer.object(key, b -> {
+            b.property("id", path.id());
+            b.property("originalExpression", path.originalExpression());
+            b.property("improvedExpression", path.improvedExpression());
+            b.property("totalImprovement", path.totalImprovement());
+            b.property("steps", path.steps().size());
+            b.property("proofStatus", path.validationStatus().name());
+            b.array("stepDetails", arr -> path.steps().forEach(step ->
+                arr.objectValue(s -> {
+                    s.property("index", step.index());
+                    s.property("beforeExpression", step.beforeExpression());
+                    s.property("afterExpression", step.afterExpression());
+                    s.property("ruleId", step.ruleId());
+                    s.property("ruleKind", step.ruleKind().name());
+                    s.property("scoreBefore", step.scoreBefore());
+                    s.property("scoreAfter", step.scoreAfter());
+                    s.property("equivalencePreserving", step.equivalencePreserving());
+                })));
+        });
     }
 
     private void handleProofStatus(HttpExchange exchange) throws IOException {

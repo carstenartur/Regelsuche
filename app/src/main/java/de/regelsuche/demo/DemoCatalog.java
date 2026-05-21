@@ -23,7 +23,8 @@ public final class DemoCatalog {
         String expression,
         InputType inputType,
         SearchProfile profile,
-        String expectedHighlight
+        String expectedHighlight,
+        String expectedResultExpression
     ) {
     }
 
@@ -39,38 +40,40 @@ public final class DemoCatalog {
             "(x+3)^2",
             InputType.TERM,
             SearchProfile.DISCOVERY,
-            "(a+b)^2 = a^2 + 2*a*b + b^2"
+            "(a+b)^2 = a^2 + 2*a*b + b^2",
+            "9 + 6 * x + x ^ 2"
         ));
         map.put("rational", new Demo(
             "rational",
             "Bruchkürzung",
-            "Bei (x*y)/(x*z) wird der gemeinsame Faktor x aus Zähler und Nenner als "
-                + "kürzbare Struktur erkannt.",
+            "Bei (x*y)/(x*z) wird der gemeinsame Faktor x aus Zähler und Nenner erkannt; "
+                + "Voraussetzung: x ≠ 0.",
             "(x*y)/(x*z)",
             InputType.TERM,
-            SearchProfile.TEACHING,
-            "(x*y)/(x*z) = y/z, sofern x ≠ 0"
+            SearchProfile.DISCOVERY,
+            "(x*y)/(x*z) = y/z, sofern x ≠ 0",
+            "y / z"
         ));
         map.put("trigonometry", new Demo(
             "trigonometry",
             "Trigonometrische Identität",
-            "sin(x)^2 + cos(x)^2 zeigt das Zusammenspiel von Pythagoräischer Identität "
-                + "und Suchraum: die atomaren Regeln allein liefern (noch) keinen Beweis, "
-                + "aber Suchgraph und Replay machen den Lösungsraum sichtbar.",
+            "sin(x)^2 + cos(x)^2 wird über die Pythagoräische Identität auf 1 reduziert.",
             "sin(x)^2 + cos(x)^2",
             InputType.TERM,
             SearchProfile.DISCOVERY,
-            "sin(x)^2 + cos(x)^2 = 1"
+            "sin(x)^2 + cos(x)^2 = 1",
+            "1"
         ));
-        map.put("equation", new Demo(
-            "equation",
-            "Polynom-Gleichung",
-            "Bei (x+1)*(x+2) zeigt der Suchgraph, wie aus Distributivität und gleichen "
-                + "Termen eine ausmultiplizierte Form x^2 + 3x + 2 entsteht.",
+        map.put("polynomial-expansion", new Demo(
+            "polynomial-expansion",
+            "Polynom-Expansion",
+            "(x+1)*(x+2) wird durch Distributivität und Zusammenfassen gleicher Terme zu "
+                + "x^2 + 3*x + 2 expandiert.",
             "(x+1)*(x+2)",
             InputType.TERM,
             SearchProfile.DISCOVERY,
-            "(x+1)*(x+2) = x^2 + 3*x + 2"
+            "(x+1)*(x+2) = x^2 + 3*x + 2",
+            "2 + 3 * x + x ^ 2"
         ));
         return java.util.Collections.unmodifiableMap(map);
     }
@@ -86,6 +89,17 @@ public final class DemoCatalog {
         if (id == null) {
             return null;
         }
-        return DEMOS.get(id.toLowerCase(java.util.Locale.ROOT));
+        String key = id.toLowerCase(java.util.Locale.ROOT);
+        Demo found = DEMOS.get(key);
+        if (found != null) {
+            return found;
+        }
+        // Backwards-compatible alias: the demo formerly known as "equation"
+        // has been honestly renamed to "polynomial-expansion" because the
+        // current atomic rule set does not solve linear equations.
+        if ("equation".equals(key)) {
+            return DEMOS.get("polynomial-expansion");
+        }
+        return null;
     }
 }

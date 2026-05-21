@@ -52,8 +52,20 @@ public final class ExpressionFormatter {
         BinaryOperator operator = binaryExpr.operator();
         int precedence = operator.precedence();
 
-        String left = format(binaryExpr.left(), precedence + (operator == BinaryOperator.POW ? 1 : 0));
-        String right = format(binaryExpr.right(), precedence + (operator == BinaryOperator.POW ? -1 : 0));
+        int leftAdjust = (operator == BinaryOperator.POW) ? 1 : 0;
+        // Right side needs an extra precedence level for left-associative,
+        // non-commutative operators (DIV, SUB) so that `(a/b)/c` and `a/(b/c)`
+        // round-trip safely through parse → format → parse. POW is
+        // right-associative, so the right side can share the same precedence
+        // without parens. ADD/MUL are commutative-associative, so omitting
+        // parens on the right does not change the value.
+        int rightAdjust = switch (operator) {
+            case POW -> -1;
+            case DIV, SUB -> 1;
+            default -> 0;
+        };
+        String left = format(binaryExpr.left(), precedence + leftAdjust);
+        String right = format(binaryExpr.right(), precedence + rightAdjust);
         String value = left + " " + operator.symbol() + " " + right;
         if (precedence < parentPrecedence) {
             return "(" + value + ")";
