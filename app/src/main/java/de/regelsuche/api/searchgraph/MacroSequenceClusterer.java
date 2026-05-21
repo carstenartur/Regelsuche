@@ -59,7 +59,16 @@ public final class MacroSequenceClusterer {
         List<SearchGraphClusterDto> clusters = new ArrayList<>();
         int counter = 0;
         Set<List<String>> claimedBy = new LinkedHashSet<>();
-        for (Map.Entry<List<String>, List<int[]>> entry : windows.entrySet()) {
+        List<Map.Entry<List<String>, List<int[]>>> orderedEntries = new ArrayList<>(windows.entrySet());
+        // longest-first: ensures sub-windows can be detected and suppressed
+        orderedEntries.sort((a, b) -> {
+            int cmp = Integer.compare(b.getKey().size(), a.getKey().size());
+            if (cmp != 0) {
+                return cmp;
+            }
+            return Integer.compare(b.getValue().size(), a.getValue().size());
+        });
+        for (Map.Entry<List<String>, List<int[]>> entry : orderedEntries) {
             // distinct transformations supporting the window
             Set<Integer> distinct = new LinkedHashSet<>();
             for (int[] occ : entry.getValue()) {

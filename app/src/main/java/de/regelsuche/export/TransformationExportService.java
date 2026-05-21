@@ -56,8 +56,13 @@ public interface TransformationExportService {
                 .append("[\"").append(node.expression().replace("\"", "'")).append("\"]\n");
         }
         for (SearchGraphEdgeDto edge : searchGraph.edges()) {
-            String from = nodeIds.getOrDefault(edge.from(), "N0");
-            String to = nodeIds.getOrDefault(edge.to(), "N0");
+            String from = nodeIds.get(edge.from());
+            String to = nodeIds.get(edge.to());
+            if (from == null || to == null) {
+                // Skip edges that reference nodes not present in the graph
+                // rather than silently redirecting them to a placeholder.
+                continue;
+            }
             builder.append("  ").append(from).append(" -->|")
                 .append(edge.ruleId().replace("\"", "'"))
                 .append("| ").append(to).append('\n');

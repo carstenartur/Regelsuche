@@ -394,7 +394,9 @@ public class WebWorkbenchServer {
                 return;
             }
             var candidate = match.get();
-            String ruleId = "macro-" + Integer.toUnsignedString(candidate.id().hashCode());
+            // Use the macro miner's own stable id rather than the truncated
+            // 32-bit hashCode (which can collide and overwrite existing rules).
+            String ruleId = "macro-" + candidate.id();
             de.regelsuche.inventory.ReusableRule rule = new de.regelsuche.inventory.ReusableRule(
                 ruleId,
                 candidate.leftPattern(),
@@ -632,7 +634,14 @@ public class WebWorkbenchServer {
                 }
                 sendText(exchange, 200, exportService.exportSearchGraphMermaid(graph));
             }
-            case "search-graph.graphml" -> sendText(exchange, 200, exportService.exportSearchGraphGraphMl(buildSearchGraph()));
+            case "search-graph.graphml" -> {
+                var graph = buildSearchGraph();
+                String filterExpr = queryParam(exchange, "filter", "");
+                if (!filterExpr.isBlank()) {
+                    graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);
+                }
+                sendText(exchange, 200, exportService.exportSearchGraphGraphMl(graph));
+            }
             case "best-path.md", "best-path" -> sendText(exchange, 200, exportService.exportBestPathMarkdown(transformations));
             case "identity-report.tex", "identity-report" -> {
                 var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);

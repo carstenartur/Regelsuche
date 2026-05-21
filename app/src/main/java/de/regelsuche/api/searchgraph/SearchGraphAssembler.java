@@ -265,7 +265,11 @@ public final class SearchGraphAssembler {
         Map<String, List<String>> result = new LinkedHashMap<>();
         for (GraphEdge edge : edges) {
             String key = edge.fromExpression() + "|" + edge.toExpression() + "|" + edge.transformationRule();
-            result.computeIfAbsent(key, k -> new ArrayList<>()).add(edge.pathId() == null ? "" : edge.pathId());
+            String pathId = edge.pathId();
+            if (pathId == null || pathId.isBlank()) {
+                continue;
+            }
+            result.computeIfAbsent(key, k -> new ArrayList<>()).add(pathId);
         }
         // Annotate successes by linking their (root -> simplified) pair to a synthetic best-path id.
         for (SimplificationSuccess success : successes) {

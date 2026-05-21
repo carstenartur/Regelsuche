@@ -74,9 +74,8 @@ public final class TeachingPathScorer {
 
     private double computeKnownRatio(List<TransformationStep> steps) {
         long hits = steps.stream()
-            .filter(step -> knownRules.all().stream()
-                .anyMatch(known -> known.leftPattern().contains(step.beforeExpression())
-                    || step.ruleId().contains("known")))
+            .filter(step -> knownRules.statusFor(step.beforeExpression(), step.afterExpression())
+                == RuleStatus.MATCHES_KNOWN_RULE)
             .count();
         return (double) hits / (double) steps.size();
     }

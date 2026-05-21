@@ -20,7 +20,9 @@ import java.util.Set;
  *   <li>{@code bestPath=true} – keep only nodes/edges on the best path</li>
  *   <li>{@code hideDeadEnds=true} – drop dead-end nodes</li>
  *   <li>{@code ruleKind=NORMALIZE|SIMPLIFY|...} – keep edges of given kind</li>
- *   <li>{@code rule=ruleId,ruleId,…} – keep edges using one of these ids</li>
+ *   <li>{@code rule=ruleId+ruleId+…} – keep edges using one of these ids
+ *       (joined by {@code +} to avoid colliding with the top-level
+ *       comma separator)</li>
  *   <li>{@code proofStatus=OBSERVED|SYMBOLICALLY_VERIFIED|…}</li>
  *   <li>{@code minScoreDelta=&lt;int&gt;}, {@code maxScoreDelta=&lt;int&gt;}</li>
  *   <li>{@code cluster=clusterId} – keep only nodes inside that cluster</li>
@@ -192,7 +194,7 @@ public final class SearchGraphFilter {
         SearchGraphStatsDto filteredStats = new SearchGraphStatsDto(
             keptNodes.size(),
             finalEdges.size(),
-            countDeadEnds(keptNodes),
+            countDeadEnds(keptNodes, finalEdges),
             stats.bestScore(),
             stats.averageBranchingFactor(),
             stats.maxDepthReached(),
@@ -204,10 +206,20 @@ public final class SearchGraphFilter {
         return new SearchGraphDto(keptNodes, finalEdges, keptClusters, filteredStats);
     }
 
-    private static int countDeadEnds(List<SearchGraphNodeDto> nodes) {
+    private static int countDeadEnds(List<SearchGraphNodeDto> nodes, List<SearchGraphEdgeDto> edges) {
+        // A node counts as dead end in the filtered subgraph when it has no
+        // outgoing edge after filtering (or was already flagged a dead end),
+        // and isn't itself a "best" terminal node.
+        Set<String> hasOutgoing = new HashSet<>();
+        for (SearchGraphEdgeDto edge : edges) {
+            hasOutgoing.add(edge.from());
+        }
         int deadEnds = 0;
         for (SearchGraphNodeDto node : nodes) {
-            if (node.isDeadEnd()) {
+            if (node.isBest()) {
+                continue;
+            }
+            if (node.isDeadEnd() || !hasOutgoing.contains(node.id())) {
                 deadEnds++;
             }
         }
