@@ -85,9 +85,16 @@ public final class JsonFileTranspositionTable extends InMemoryTranspositionTable
         persist();
     }
 
+    @Override
+    public synchronized void remove(String canonicalHash) {
+        super.remove(canonicalHash);
+        persist();
+    }
+
     private void persist() {
         StringBuilder builder = new StringBuilder();
-        builder.append("{\n  \"entries\": [\n");
+        builder.append("{\n  \"schemaVersion\": ").append(GlobalMemoryService.SCHEMA_VERSION).append(",\n");
+        builder.append("  \"entries\": [\n");
         List<TranspositionEntry> all = new ArrayList<>(entries());
         for (int i = 0; i < all.size(); i++) {
             TranspositionEntry entry = all.get(i);

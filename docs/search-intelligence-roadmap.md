@@ -5,7 +5,7 @@ Suche von „lernende Rewrite-Schleife" hin zu „mathematische
 Suchintelligenz" weiterentwickeln. Die Reihenfolge ist nach Hebelwirkung
 und technischer Abhängigkeit sortiert.
 
-Stand: **PR 1 und PR 3 sind umgesetzt**, PRs 2, 4, 5, 6 sind als Folge-PRs offen.
+Stand: **PR 1, PR 3 und PR 6 sind umgesetzt**, PRs 2, 4 und 5 sind als Folge-PRs offen.
 
 ## PR 1 — Strong Canonicalization &nbsp;✅ geliefert
 
@@ -132,24 +132,43 @@ Jeder Schritt eigener PR samt eigener Demo + Tests.
 * Infrastruktur (Lean-Installation, Cache, Worker-Container) explizit
   dokumentieren — wahrscheinlich blockiert durch externes Setup.
 
-## PR 6 — Global Mathematical Memory
+## PR 6 — Global Mathematical Memory &nbsp;✅ geliefert
 
-Sinnvoll **nach** PR 1, sonst zählt der Speicher syntaktische Varianten
-doppelt (mit PR 1 sind die Varianten bereits zusammengefasst).
+Geliefert (additive, keine API-Brüche):
 
-* Long-Running-Persistenz für `TranspositionTable` und
-  `RuleInventoryRepository` über Suchläufe und Sessions hinweg.
-* Schema-Versionierung für `transposition.json` (Migrationspfad).
-* Garbage Collection seltener Knoten (z. B. Visit-Count-Threshold).
-* Universalitäts-Score: Wie oft (in wie vielen unterschiedlichen
-  Aufgaben) wurde dieser Knoten besucht?
-* Statistik-API: „in wie vielen Läufen erschien diese Struktur",
-  „welche Regelkombinationen sind cross-task nützlich".
-* UI-Sektion „universelle Muster" im Suchgedächtnis-Tab.
+* `GlobalMemoryService` in `de.regelsuche.search.memory` als zentraler
+  Einstieg für sessionübergreifende Statistik auf der
+  `TranspositionTable`.
+* `SCHEMA_VERSION`-Konstante; `JsonFileTranspositionTable.persist()`
+  schreibt jetzt `"schemaVersion": 1` in den JSON-Header.
+  Bestehende `transposition.json`-Dateien ohne Version werden weiterhin
+  gelesen (das `hydrate()`-Parsing ignoriert unbekannte Felder).
+* `garbageCollect(minVisits, retainOlderThan, now)` — entfernt nur
+  Einträge, die **beide** Kriterien erfüllen (selten *und* alt). Persistenz
+  wird beim JSON-Backend automatisch durchgereicht.
+* `universalityScore(entry, now)` — Diversität der erreichenden
+  Regelpfade dominiert (Faktor 10), Visit-Count ist auf 20 gedeckelt,
+  damit eine einzige populäre syntaktische Variante keinen wirklich
+  universellen Knoten verdrängt; Recency liefert leichten Bonus.
+* `topUniversalPatterns(limit, now)` — deterministisches Ranking,
+  Tiebreaker per `canonicalHash`.
+* `ruleCoverage()` — Map `ruleId → distinct states reached`, in
+  absteigender Frequenz, geeignet für die geplante UI-Sektion
+  „universelle Muster".
+* `InMemoryTranspositionTable.remove(hash)` — neue, additive Methode,
+  vom JSON-Backend mit Persistenz überschrieben.
+
+Tests: `GlobalMemoryServiceTest` deckt Score-Gewichtung, Top-Ranking,
+Rule-Coverage, GC-Selektivität und JSON-Roundtrip (inkl. Schema-Version
+und persistenter GC) ab.
+
+Offen für eine kleine Folge-Iteration: UI-Sektion „universelle Muster"
+im Suchgedächtnis-Tab des `WebWorkbenchServer` — Service-Seite ist
+vollständig vorhanden.
 
 ## Empfohlene Reihenfolge
 
-`1` (erledigt) → `3` (erledigt) → `2` → `6` → `4a/4b/…` → `5`.
+`1` (erledigt) → `3` (erledigt) → `2` → `6` (erledigt) → `4a/4b/…` → `5`.
 
 Begründung:
 

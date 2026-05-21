@@ -63,4 +63,16 @@ public class InMemoryTranspositionTable implements TranspositionTable {
     public void clear() {
         entries.clear();
     }
+
+    /**
+     * Drop the entry for {@code canonicalHash}. Used by
+     * {@link GlobalMemoryService#garbageCollect} to evict rare, old
+     * entries. No-op if no entry exists for the hash.
+     */
+    public void remove(String canonicalHash) {
+        if (canonicalHash == null) {
+            return;
+        }
+        entries.remove(canonicalHash);
+    }
 }
