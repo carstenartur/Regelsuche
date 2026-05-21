@@ -5,7 +5,8 @@ Suche von „lernende Rewrite-Schleife" hin zu „mathematische
 Suchintelligenz" weiterentwickeln. Die Reihenfolge ist nach Hebelwirkung
 und technischer Abhängigkeit sortiert.
 
-Stand: **PR 1, PR 3 und PR 6 sind umgesetzt**, PRs 2, 4 und 5 sind als Folge-PRs offen.
+Stand: **PR 1, PR 3, PR 6 und PR 2a (E-Graph-Foundation) sind umgesetzt**;
+PR 2b (Saturation-Strategie) sowie PRs 4 und 5 sind als Folge-PRs offen.
 
 ## PR 1 — Strong Canonicalization &nbsp;✅ geliefert
 
@@ -90,24 +91,54 @@ Offen für eine kleine Folge-Iteration: das UI-Dropdown im
 `<select>`-Element neben dem bestehenden Profil-Dropdown). Die
 Server-/Search-Seite ist bereits vollständig vorbereitet.
 
-## PR 2 — E-Graphs / Equality Saturation
+## PR 2 — E-Graphs / Equality Saturation &nbsp;🟡 teilweise geliefert (PR 2a)
 
 Größter Architekturschritt, profitiert massiv von PR 1.
 
+### PR 2a — E-Graph-Foundation &nbsp;✅ geliefert
+
+Geliefert im neuen Paket `de.regelsuche.egraph`:
+
+* `ENode` (Symbol + Liste der Kind-`EClassId`s), `EClassId`, `EClass`
+  (Knotenmenge + Parent-Set für Congruence-Propagierung).
+* `UnionFind` mit Pfadkompression und Union-by-Rank, deterministisches
+  Tiebreak nach kleinerem Index.
+* `EGraph` mit
+  * `add(ENode)` mit Hash-Consing,
+  * `addExpression(Expr)` für die Integration mit dem bestehenden
+    `de.regelsuche.ast`,
+  * `union(a, b)` (queued in einem Worklist),
+  * `rebuild()` als egg-artige Congruence-Closure-Schleife
+    (Re-Canonicalize Parents → neue Congruenzen finden → Knotenmenge
+    deduplizieren), idempotent,
+  * `extract(id, costOfNode)` als klassische DP-Extraktion: per Klasse
+    der billigste Knoten + Summe der Kind-Klassenkosten, bis das
+    Cost-Table stabil ist. Erzeugt einen `Expr` zurück, der über den
+    bestehenden `ExpressionFormatter` formatiert und erneut geparst
+    werden kann.
+* Tests in `EGraphTest`: Union-Find-Transitivität, Hash-Consing,
+  Congruence-Closure (`a≡b ⇒ a+1≡b+1`), Extraction wählt billigste
+  Form (`(a+b)*c` vor `a*c+b*c`), Idempotenz von `rebuild()`,
+  Stabilität der `EClassId` über Merges, Roundtrip
+  Extract → Formatter → Parser.
+
+### PR 2b — Saturation-Strategie &nbsp;offen
+
 Vorgeschlagene Struktur:
 
-* Neues Paket `de.regelsuche.egraph` mit `EGraph`, `EClass`, `ENode`,
-  Union-Find, Congruence Closure, Rebuild-Logik.
-* Saturierung mit den vorhandenen `RewriteRule`s als egg-artige
-  `Searcher`/`Applier`-Adapter (Pattern-Match + bedingte Anwendung).
-* Extraktion über pluggable Cost-Funktion (Schnittstelle siehe PR 3).
-* Integration als neue `SearchStrategy` `EqualitySaturationStrategy`,
-  koexistiert mit BestFirst/Beam/AStar/MCTS; standardmäßig aus,
-  Opt-in über `SearchProfile.EQUALITY_SATURATION` oder ein neues Flag.
+* Adapter, der die bestehenden `RewriteRule`s im `transform`-Paket
+  als egg-artige `Searcher`/`Applier` über den E-Graph fährt
+  (Pattern-Match auf E-Klassen statt auf AST-Bäumen).
+* `EqualitySaturationStrategy implements SearchStrategy` — koexistiert
+  mit BestFirst/Beam/AStar/MCTS; Opt-in über neues
+  `SearchProfile.EQUALITY_SATURATION` oder ein Flag.
+* Extraktion nutzt direkt einen `de.regelsuche.scoring.cost.CostModel`
+  (PR 3) als `costOfNode`.
 
-Akzeptanzkriterien:
+Akzeptanzkriterien für PR 2b:
 
-* Saturierung verschmilzt `(a+b)*c` und `a*c + b*c` in dieselbe E-Class.
+* Saturierung verschmilzt `(a+b)*c` und `a*c + b*c` automatisch in
+  dieselbe E-Class (heute nur nach explizitem `union(...)`).
 * Auf den bestehenden Demo-Beispielen skaliert die Knotenzahl messbar
   besser als `BeamSearchStrategy` (Benchmark via `SearchBenchmark`).
 
@@ -168,7 +199,7 @@ vollständig vorhanden.
 
 ## Empfohlene Reihenfolge
 
-`1` (erledigt) → `3` (erledigt) → `2` → `6` (erledigt) → `4a/4b/…` → `5`.
+`1` (erledigt) → `3` (erledigt) → `2a` (erledigt) → `6` (erledigt) → `2b` → `4a/4b/…` → `5`.
 
 Begründung:
 
