@@ -338,16 +338,20 @@ public class CliRouter {
             de.regelsuche.persistence.PersistenceConfig.fromEnvironment();
         ExpressionGraphStore activeGraphStore = graphStore;
         RuleInventoryRepository activeInventory = inventoryRepository;
+        de.regelsuche.search.memory.SearchMemory activeSearchMemory =
+            new de.regelsuche.search.memory.SearchMemory();
         de.regelsuche.persistence.PersistenceContext persistenceContext = null;
         if (persistenceConfig.mode() != de.regelsuche.persistence.GraphPersistenceMode.IN_MEMORY) {
             persistenceContext = de.regelsuche.persistence.PersistenceContext.from(persistenceConfig, out);
             activeGraphStore = persistenceContext.graphStore();
             activeInventory = persistenceContext.inventoryRepository();
+            activeSearchMemory = new de.regelsuche.search.memory.SearchMemory(
+                persistenceContext.transpositionTable());
         }
 
         try {
             de.regelsuche.web.WebWorkbenchServer server = new de.regelsuche.web.WebWorkbenchServer(
-                host, port, activeGraphStore, activeInventory, exportService, securityConfig
+                host, port, activeGraphStore, activeInventory, exportService, securityConfig, activeSearchMemory
             );
             server.start();
             String scheme = securityConfig.isTlsEnabled() ? "https" : "http";

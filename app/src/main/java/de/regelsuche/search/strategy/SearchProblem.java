@@ -34,8 +34,9 @@ public record SearchProblem(
 
     /**
      * Backwards-compatible constructor that preserves the pre-PR-3 API
-     * (no explicit cost model): selecting {@link TransformationGoal#SIMPLIFY}
-     * — i.e. the historical operator-count behaviour — is the default.
+     * (no explicit cost model): strategies use their legacy
+     * {@link de.regelsuche.scoring.ExpressionScore#weightedTotal()}-based
+     * ordering.
      */
     public SearchProblem(
         String rootExpression,
@@ -55,7 +56,8 @@ public record SearchProblem(
 
     /**
      * Returns this problem with {@code costModel} attached. Passing {@code
-     * null} restores the default operator-count behaviour.
+     * null} restores legacy strategy-local ordering based on
+     * {@link de.regelsuche.scoring.ExpressionScore#weightedTotal()}.
      */
     public SearchProblem withCostModel(CostModel costModel) {
         return new SearchProblem(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel);
@@ -66,4 +68,3 @@ public record SearchProblem(
         return withCostModel(goal == null ? null : goal.defaultCostModel());
     }
 }
-

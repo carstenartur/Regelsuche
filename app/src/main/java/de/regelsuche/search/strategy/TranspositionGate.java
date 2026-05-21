@@ -14,10 +14,11 @@ import java.util.Set;
  * {@link SearchMemory transposition table} attached to a {@link SearchProblem}.
  *
  * <p>Returns a {@link Verdict#KEEP keep verdict} if the state should be
- * expanded, or a {@link Verdict#PRUNE prune verdict} if not. In either case
- * the helper records a {@link PruningDecision} for explainability when
- * {@code memory} is non-null. Strategies that pass {@code null} memory
- * behave exactly as before – no lookup, no recording.</p>
+ * expanded, or a {@link Verdict#PRUNE prune verdict} if not. When
+ * {@code memory} is non-null, the helper records a {@link PruningDecision}
+ * for revisits (and other non-first-sighting cases) to keep pruning decisions
+ * explainable. Strategies that pass {@code null} memory behave exactly as
+ * before – no lookup, no recording.</p>
  */
 public final class TranspositionGate {
 

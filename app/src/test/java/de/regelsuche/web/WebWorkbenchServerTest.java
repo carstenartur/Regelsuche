@@ -7,11 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.search.memory.InMemoryTranspositionTable;
+import de.regelsuche.search.memory.SearchMemory;
+import de.regelsuche.search.memory.TranspositionEntry;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,6 +84,38 @@ class WebWorkbenchServerTest {
             stream.write("{\"expression\":\"\"}".getBytes(StandardCharsets.UTF_8));
         }
         assertEquals(400, connection.getResponseCode());
+    }
+
+    @Test
+    void memoryEndpointUsesInjectedSearchMemory() throws IOException {
+        server.stop();
+        SearchMemory memory = new SearchMemory(new InMemoryTranspositionTable());
+        Instant now = Instant.now();
+        memory.table().record(new TranspositionEntry(
+            "hash-1",
+            "x + 0",
+            3,
+            1,
+            "path-1",
+            Set.of("rule-1"),
+            1,
+            now,
+            now
+        ));
+        server = new WebWorkbenchServer(
+            "127.0.0.1",
+            0,
+            new InMemoryExpressionGraphStore(),
+            new InMemoryRuleInventoryRepository(),
+            new DefaultTransformationExportService(),
+            WebSecurityConfig.none(),
+            memory
+        );
+        server.start();
+        HttpURLConnection connection = open("/api/memory");
+        assertEquals(200, connection.getResponseCode());
+        String body = new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(body.contains("\"size\":1"), body);
     }
 
     private HttpURLConnection open(String path) throws IOException {

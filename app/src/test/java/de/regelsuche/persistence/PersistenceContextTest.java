@@ -11,6 +11,7 @@ import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.CandidateProofStatus;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.search.memory.TranspositionEntry;
 import de.regelsuche.transform.RewriteKind;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,6 +19,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -131,6 +133,29 @@ class PersistenceContextTest {
             assertEquals(GraphPersistenceMode.JSON_FILE, ctx.effectiveMode());
             assertNotNull(ctx.graphStore());
             assertNotNull(ctx.inventoryRepository());
+        }
+    }
+
+    @Test
+    void jsonFileTranspositionTableSurvivesRestart(@TempDir Path tmp) {
+        PersistenceConfig config = new PersistenceConfig(
+            GraphPersistenceMode.JSON_FILE, tmp, null, null, null);
+        Instant now = Instant.parse("2024-01-01T00:00:00Z");
+        try (PersistenceContext ctx = PersistenceContext.from(config, null)) {
+            ctx.transpositionTable().record(new TranspositionEntry(
+                "hash-1",
+                "x + 0",
+                3,
+                1,
+                "path-1",
+                Set.of("rule-1"),
+                1,
+                now,
+                now
+            ));
+        }
+        try (PersistenceContext reopened = PersistenceContext.from(config, null)) {
+            assertTrue(reopened.transpositionTable().lookup("hash-1").isPresent());
         }
     }
 

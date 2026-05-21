@@ -71,8 +71,7 @@ public class WebWorkbenchServer {
     private final RuleInventoryQueryService inventoryQuery;
     private final ExportQueryService exportQuery;
     private final ExplanationService explanationService = new ExplanationService();
-    private final de.regelsuche.search.memory.SearchMemory searchMemory =
-        new de.regelsuche.search.memory.SearchMemory();
+    private final de.regelsuche.search.memory.SearchMemory searchMemory;
 
     private HttpServer server;
 
@@ -94,12 +93,25 @@ public class WebWorkbenchServer {
         TransformationExportService exportService,
         WebSecurityConfig securityConfig
     ) {
+        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, null);
+    }
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        de.regelsuche.search.memory.SearchMemory searchMemory
+    ) {
         this.host = host;
         this.port = port;
         this.graphStore = graphStore;
         this.inventoryRepository = inventoryRepository;
         this.exportService = exportService;
         this.securityConfig = securityConfig == null ? WebSecurityConfig.none() : securityConfig;
+        this.searchMemory = searchMemory == null ? new de.regelsuche.search.memory.SearchMemory() : searchMemory;
         this.transformationQuery = new TransformationQueryService(graphStore);
         this.inventoryQuery = new RuleInventoryQueryService(graphStore, inventoryRepository);
         this.exportQuery = new ExportQueryService(graphStore, inventoryRepository);
