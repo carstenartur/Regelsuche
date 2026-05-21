@@ -302,9 +302,9 @@ class RuleCandidateMinerTest {
                 }
             },
             expression -> switch (expression) {
-                case "1 + 2 * x + x ^ 2" -> List.of(new de.regelsuche.transform.Transformation("test_atomic_path", "(x + 1)^2"));
-                case "4 + 4 * x + x ^ 2" -> List.of(new de.regelsuche.transform.Transformation("test_atomic_path", "(x + 2)^2"));
-                case "9 + 6 * x + x ^ 2" -> List.of(new de.regelsuche.transform.Transformation("test_atomic_path", "(x + 3)^2"));
+                case "x ^ 2 + 2 * x + 1" -> List.of(new de.regelsuche.transform.Transformation("test_atomic_path", "(x + 1)^2"));
+                case "x ^ 2 + 4 * x + 4" -> List.of(new de.regelsuche.transform.Transformation("test_atomic_path", "(x + 2)^2"));
+                case "x ^ 2 + 6 * x + 9" -> List.of(new de.regelsuche.transform.Transformation("test_atomic_path", "(x + 3)^2"));
                 default -> List.of();
             },
             testEquivalence,

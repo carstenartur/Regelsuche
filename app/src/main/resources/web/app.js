@@ -60,6 +60,187 @@
     $('loadExample-log').addEventListener('click', () => loadExample('log(a*b)', 'TERM'));
     $('loadExample-eq').addEventListener('click', () => loadExample('2*x + 3 = 7', 'EQUATION'));
 
+    /* ─── Demo buttons (Killer-App landing flow) ─── */
+    async function runDemo(demoId, btn) {
+        const status = $('demoStatus');
+        const summary = $('demoSummary');
+        const buttons = document.querySelectorAll('.demo-button');
+        buttons.forEach((b) => (b.disabled = true));
+        status.className = 'status';
+        status.textContent = 'Starte Demo ' + demoId + ' …';
+        summary.innerHTML = '';
+        try {
+            const response = await fetch('/api/demo/' + encodeURIComponent(demoId), { method: 'POST' });
+            const raw = await response.text();
+            if (!response.ok) {
+                status.className = 'status error';
+                status.textContent = 'Demo fehlgeschlagen (HTTP ' + response.status + '): ' + raw;
+                return;
+            }
+            const data = JSON.parse(raw);
+            status.className = 'status ok';
+            status.textContent = 'Demo "' + data.title + '" abgeschlossen in '
+                + (data.metrics && data.metrics.elapsedMillis) + ' ms.';
+            renderDemoSummary(data);
+            // Refresh the existing panels so users see graph/replay immediately.
+            if (typeof loadPaths === 'function') { loadPaths().catch(() => {}); }
+            if (typeof loadIdentities === 'function') { loadIdentities().catch(() => {}); }
+            const graphBtn = $('reloadGraph');
+            if (graphBtn) { graphBtn.click(); }
+        } catch (ex) {
+            status.className = 'status error';
+            status.textContent = 'Netzwerkfehler: ' + ex;
+        } finally {
+            buttons.forEach((b) => (b.disabled = false));
+        }
+    }
+
+    function renderMacroLearningSummary(data) {
+        const sp = data.speedup || {};
+        const stepsHtml = (data.steps || []).map((s) =>
+            '<tr><td>' + s.expression + '</td><td>' + s.stepCount + '</td>'
+            + '<td>' + s.elapsedMillis + ' ms</td>'
+            + '<td>' + (s.confidenceScore || 0).toFixed(2) + '</td>'
+            + '<td>' + s.learnedRulesActive + '</td></tr>').join('');
+        $('demoSummary').innerHTML =
+            '<div class="status ok demo-banner"><strong>System lernt eine Makroregel.</strong>'
+            + ' Gelernte Regel wurde im letzten Lauf'
+            + (data.usedLearnedRule ? ' angewendet.' : ' nicht angewendet.') + '</div>'
+            + '<table class="demo-table"><thead><tr>'
+            + '<th>Ausdruck</th><th>Schritte</th><th>Laufzeit</th><th>Konfidenz</th>'
+            + '<th>aktive Makros</th></tr></thead><tbody>' + stepsHtml + '</tbody></table>'
+            + '<p class="hint">Vorher (' + (sp.firstRunSteps || 0) + ' Schritte / '
+            + (sp.firstRunMillis || 0) + ' ms) → nachher ('
+            + (sp.lastRunSteps || 0) + ' Schritte / ' + (sp.lastRunMillis || 0) + ' ms).</p>';
+    }
+
+    function renderDemoSummary(data) {
+        if (data && data.id === 'macro-learning') {
+            renderMacroLearningSummary(data);
+            return;
+        }
+        const m = data.metrics || {};
+        const best = data.bestPath || {};
+        const selected = data.selectedPath || best;
+        const identities = (data.identities || []).slice(0, 5);
+        const targetReached = !!data.targetReached;
+        const assumptions = data.assumptions || [];
+
+        // Honest banner: identity recognised OR "no identity found, best path was…".
+        const banner = targetReached
+            ? '<div class="status ok demo-banner">'
+                + '<strong>Identität erkannt:</strong> '
+                + escapeHtml(selected.originalExpression || data.expression || '')
+                + ' = '
+                + escapeHtml(selected.improvedExpression || '')
+                + '</div>'
+            : '<div class="status warn demo-banner">'
+                + '<strong>Keine Identität gefunden.</strong> Bester gefundener Umformungsweg: '
+                + (selected.improvedExpression
+                    ? escapeHtml(selected.originalExpression || data.expression || '')
+                      + ' → '
+                      + escapeHtml(selected.improvedExpression)
+                    : '<em>kein Verbesserungsweg im Suchbudget gefunden</em>')
+                + '</div>';
+
+        const proofTag = selected.validationStatus
+            ? renderProofStatusBadge(selected.validationStatus)
+            : '';
+        const assumptionsBlock = assumptions.length
+            ? '<h4>Annahmen</h4><ul>' + assumptions.map((a) =>
+                '<li><code>' + escapeHtml(a) + '</code></li>').join('') + '</ul>'
+            : '';
+        const bestMove = (selected.steps && selected.steps.length)
+            ? selected.steps[0]
+            : null;
+        const bestMoveBlock = bestMove
+            ? '<h4>Best Move</h4><p><code>' + escapeHtml(bestMove.beforeExpression || '')
+                + ' → ' + escapeHtml(bestMove.afterExpression || '')
+                + '</code> · Regel <code>' + escapeHtml(bestMove.ruleId || '') + '</code></p>'
+            : '';
+
+        const rows = [
+            ['Eingabe', data.expression || ''],
+            ['Profil', data.profile || ''],
+            ['Treffer (selectedPath)',
+                selected.improvedExpression
+                    ? selected.originalExpression + ' → ' + selected.improvedExpression
+                      + ' (' + (selected.steps ? selected.steps.length : 0) + ' Schritte, Verbesserung '
+                      + (selected.totalImprovement || 0) + ')'
+                    : '–'],
+            ['Proof-Status', selected.validationStatus || '–'],
+            ['Erwartete Identität', data.expectedHighlight || ''],
+            ['Knoten / Kanten', (m.nodes || 0) + ' / ' + (m.edges || 0)],
+            ['Pfade entdeckt', m.pathsDiscovered || 0],
+            ['Identitäten gefunden', m.identitiesFound || 0],
+            ['Laufzeit', (m.elapsedMillis || 0) + ' ms']
+        ];
+        const tableRows = rows.map((r) =>
+            '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(String(r[1])) + '</td></tr>').join('');
+        const idList = identities.length
+            ? '<h4>Erkannte Identitäten</h4><ul>' + identities.map((i) =>
+                '<li><code>' + escapeHtml(i.leftPattern) + ' → ' + escapeHtml(i.rightPattern)
+                  + '</code> · ' + renderProofStatusBadge(i.proofStatus) + '</li>').join('') + '</ul>'
+            : '';
+        const links = data.links || {};
+        const linkList = [
+            ['Bericht (Markdown)', links.reportMarkdown],
+            ['Bericht (LaTeX)', links.reportLatex],
+            ['Bericht (JSON)', links.reportJson],
+            ['Suchgraph (Mermaid)', links.searchGraphMermaid],
+            ['Suchgraph (GraphML)', links.searchGraphGraphMl],
+            ['Bundle (.zip)', links.reportBundleZip]
+        ].filter((l) => l[1])
+            .map((l) => '<a class="export-button" href="' + l[1] + '" target="_blank">' + escapeHtml(l[0]) + '</a>')
+            .join(' ');
+        $('demoSummary').innerHTML =
+            banner
+            + (proofTag ? '<p>Proof-Status des selektierten Pfades: ' + proofTag + '</p>' : '')
+            + bestMoveBlock
+            + assumptionsBlock
+            + '<table>' + tableRows + '</table>'
+            + idList
+            + '<div class="demo-actions">' + linkList + '</div>';
+    }
+
+    /* ─── Proof-status legend (loaded lazily, cached) ─── */
+    const proofStatusLegend = {};
+    let proofStatusLoaded = null;
+    function ensureProofStatusLegend() {
+        if (proofStatusLoaded) { return proofStatusLoaded; }
+        proofStatusLoaded = fetch('/api/proof-status')
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data && Array.isArray(data.statuses)) {
+                    data.statuses.forEach((s) => {
+                        proofStatusLegend[s.status || s.name] =
+                            s.descriptionDe || s.shortDescription || s.descriptionEn
+                                || s.description || s.label || (s.status || s.name);
+                    });
+                }
+            })
+            .catch(() => {});
+        return proofStatusLoaded;
+    }
+    ensureProofStatusLegend();
+
+    function renderProofStatusBadge(status) {
+        if (!status) { return ''; }
+        const tooltip = proofStatusLegend[status] || status;
+        return '<span class="proof-badge proof-' + status.toLowerCase()
+            + '" title="' + escapeHtml(tooltip) + '">' + escapeHtml(status) + '</span>';
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    document.querySelectorAll('.demo-button').forEach((btn) => {
+        btn.addEventListener('click', () => runDemo(btn.dataset.demo, btn));
+    });
+
     /* ─── Search form ─── */
     $('searchForm').addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -378,6 +559,61 @@
         }
     }
 
+    /* ─── Benchmark tab ─── */
+    if ($('reloadBenchmark')) {
+        $('reloadBenchmark').addEventListener('click', loadBenchmark);
+    }
+    async function loadBenchmark() {
+        const host = $('benchmarkSuites');
+        if (!host) return;
+        host.innerHTML = '<div class="hint">Lade Benchmark (das kann ein paar Sekunden dauern) …</div>';
+        await ensureProofStatusLegend();
+        try {
+            const response = await fetch('/api/benchmark');
+            if (!response.ok) {
+                host.innerHTML = '<div class="status error">HTTP ' + response.status + '</div>';
+                return;
+            }
+            const data = await response.json();
+            const scenarios = data.scenarios || [];
+            if (!scenarios.length) {
+                host.innerHTML = '<div class="hint">Keine Benchmark-Szenarien gefunden.</div>';
+                return;
+            }
+            host.innerHTML = scenarios.map(renderBenchmarkScenario).join('')
+                + '<p class="hint">Gesamtlaufzeit: ' + (data.elapsedMillis || 0) + ' ms</p>';
+        } catch (ex) {
+            host.innerHTML = '<div class="status error">Netzwerkfehler: ' + ex + '</div>';
+        }
+    }
+    function renderBenchmarkScenario(scenario) {
+        const rows = (scenario.results || []).map((r) => {
+            const foundLabel = r.found
+                ? '<span class="benchmark-ok">ja</span>'
+                : '<span class="benchmark-miss">nein</span>';
+            return '<tr>'
+                + '<td><code>' + escapeHtml(r.strategy || '') + '</code></td>'
+                + '<td><code>' + escapeHtml(r.expression || '') + '</code></td>'
+                + '<td>' + foundLabel + '</td>'
+                + '<td>' + (r.elapsedMillis != null ? r.elapsedMillis + ' ms' : '–') + '</td>'
+                + '<td>' + (r.exploredStates || 0) + '</td>'
+                + '<td>' + (r.expandedSteps || 0) + '</td>'
+                + '<td>' + (r.distinctRules || 0) + '</td>'
+                + '<td>' + renderProofStatusBadge(r.proofStatus) + '</td>'
+                + '</tr>';
+        }).join('');
+        return '<div class="card benchmark-scenario">'
+            + '<h3>Szenario: <code>' + escapeHtml(scenario.name || '') + '</code></h3>'
+            + '<table class="benchmark-table">'
+            + '<thead><tr>'
+            + '<th>Strategie</th><th>Ausdruck</th><th>Gefunden</th><th>Laufzeit</th>'
+            + '<th>Besuchte Zustände</th><th>Schritte</th><th>Regeln</th><th>Proof-Status</th>'
+            + '</tr></thead>'
+            + '<tbody>' + rows + '</tbody>'
+            + '</table>'
+            + '</div>';
+    }
+
     /* ─── Replay tab ─── */
     let replayState = { steps: [], index: 0, timer: null };
     if ($('replayLoad')) {
@@ -610,6 +846,91 @@
         });
     }
 
+    /* ─── Memory tab ─── */
+    if ($('reloadMemory')) {
+        $('reloadMemory').addEventListener('click', loadMemory);
+        if ($('memoryPruningFilter')) {
+            $('memoryPruningFilter').addEventListener('change', loadMemory);
+        }
+    }
+    async function loadMemory() {
+        try {
+            const [statesResp, pruningResp, macrosResp] = await Promise.all([
+                fetch('/api/memory/states'),
+                fetch('/api/memory/pruning'),
+                fetch('/api/memory/macros'),
+            ]);
+            const states = await statesResp.json();
+            const pruning = await pruningResp.json();
+            const macros = await macrosResp.json();
+            renderMemoryStates(states);
+            renderMemoryPruning(pruning);
+            renderMemoryMacros(macros);
+        } catch (e) {
+            console.error('loadMemory failed', e);
+        }
+    }
+    function renderMemoryStates(data) {
+        const out = $('memoryStates');
+        if (!out) return;
+        out.innerHTML = '';
+        const entries = (data && data.entries) || [];
+        if (entries.length === 0) {
+            out.textContent = 'Noch keine Zustände beobachtet. Starte einen DISCOVERY_PLUS-Suchlauf.';
+            return;
+        }
+        entries.slice(0, 50).forEach((e) => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.innerHTML =
+                '<div><strong>' + (e.canonicalExpression || '') + '</strong></div>'
+                + '<div class="hint">hash: ' + e.canonicalHash + ' · visits: ' + e.visitCount
+                + ' · bestScore: ' + e.bestScore + ' · depth: ' + e.minDepthSeen + '</div>';
+            out.appendChild(div);
+        });
+    }
+    function renderMemoryPruning(data) {
+        const out = $('memoryPruning');
+        if (!out) return;
+        out.innerHTML = '';
+        const filter = $('memoryPruningFilter') ? $('memoryPruningFilter').value : '';
+        const decisions = ((data && data.decisions) || [])
+            .filter((d) => !filter || d.reason === filter);
+        if (decisions.length === 0) {
+            out.textContent = 'Keine Pruning-Entscheidungen für den Filter.';
+            return;
+        }
+        decisions.slice(0, 50).forEach((d) => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.innerHTML =
+                '<div><span class="badge">' + d.reason + '</span> '
+                + '<strong>' + (d.expression || '') + '</strong></div>'
+                + '<div class="hint">' + (d.explanation || '') + '</div>';
+            out.appendChild(div);
+        });
+    }
+    function renderMemoryMacros(data) {
+        const out = $('memoryMacros');
+        if (!out) return;
+        out.innerHTML = '';
+        const macros = (data && data.macros) || [];
+        if (macros.length === 0) {
+            out.textContent = 'Noch keine Makroregeln gelernt.';
+            return;
+        }
+        macros.forEach((m) => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            div.innerHTML =
+                '<div><strong>' + m.leftPattern + ' → ' + m.rightPattern + '</strong></div>'
+                + '<div class="hint">occurrences: ' + m.occurrenceCount
+                + ' · confidence: ' + (m.confidenceScore || 0).toFixed(2)
+                + ' · enabled: ' + m.enabled + '</div>';
+            out.appendChild(div);
+        });
+    }
+
     /* ─── Auto-load on page open ─── */
     document.addEventListener('DOMContentLoaded', () => {
         // Lazy-load when a tab is activated for the first time.
@@ -628,6 +949,8 @@
                     loadDashboard().finally(() => $('dashboardTiles').dataset.loaded = '1');
                 } else if (which === 'replay' && $('replayPathSelect') && !$('replayPathSelect').dataset.loaded) {
                     populateReplayPaths().finally(() => $('replayPathSelect').dataset.loaded = '1');
+                } else if (which === 'memory' && $('memoryStates') && !$('memoryStates').dataset.loaded) {
+                    loadMemory().finally(() => $('memoryStates').dataset.loaded = '1');
                 }
             });
         });

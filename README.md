@@ -27,51 +27,133 @@ Gradle-basiertes Java-Projekt für regelbasierte Ausdrucksumformungen mit:
 > [docs/replay-mode.md](docs/replay-mode.md), [docs/macro-rules.md](docs/macro-rules.md)
 > und [docs/didactic-ranking.md](docs/didactic-ranking.md).
 
+## Quickstart: Single Docker Image (Killer-Demo Standard)
+
+**Der Standardmodus der Killer-Demo benötigt keine externe Infrastruktur.**
+Ein einziger Docker-Build, ein Image, in unter fünf Minuten ein klickbarer
+Demo-Flow im Browser:
+
+```bash
+docker build -t regelsuche .
+docker run --rm -p 8080:8080 regelsuche
+```
+
+Anschließend `http://localhost:8080/` öffnen. Im Demo-Hero stehen vier große
+Buttons bereit – **Binomische Formel**, **Bruchkürzung**, **Trigonometrie**,
+**Polynom-Expansion**. Ein Klick startet die Suche, zeigt Suchgraph, Replay,
+Best Move und erkannte Identität an und liefert den Bericht als Bundle.
+
+Das Image enthält:
+
+* die Regelsuche-App und Web-Workbench,
+* lokale Persistenz **ohne externe Dienste** (JSON-Datei unter
+  `/opt/regelsuche/data`, siehe Abschnitt *Persistenz*),
+* alle vorkonfigurierten Demos.
+
+Wichtige Endpunkte:
+
+* `GET /api/demo` – Liste der Demos
+* `POST /api/demo/{binomial|rational|trigonometry|polynomial-expansion}` – Demo ausführen
+  (`equation` bleibt als Alias bestehen)
+* `GET /api/proof-status` – Erklärungen zu Proof-Status-Stufen
+* `GET /api/benchmark` – Benchmark-Lauf als JSON
+* `GET /api/exports/bundle.zip` – kompletter Bericht (Markdown, LaTeX, JSON,
+  Mermaid, GraphML, Rule-Inventory) in einer Zip-Datei
+
+## Optional: Full Mode mit Neo4j
+
+Für persistente, größere Analysen mit externem Neo4j-Server liefert das
+Repository eine optionale `docker-compose.yml`:
+
+```bash
+docker compose up --build
+```
+
+Das startet App + Neo4j 5 Community + persistentes Neo4j-Volume und setzt
+die Variablen `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` automatisch. Die
+App nutzt dann den `REMOTE_NEO4J`-Modus statt der JSON-Datei.
+
+**Wichtig:** Compose ist nur optionaler Persistenz-/Full-Mode – der
+Wow-Demo-Flow funktioniert vollständig schon mit dem Single-Image-Quickstart
+oben.
+
+## Persistenz: GraphPersistenceMode
+
+Konfiguration über zwei Umgebungsvariablen (alternativ über die
+JVM-Properties `regelsuche.persistence.mode` / `regelsuche.persistence.path`):
+
+| Modus            | Beschreibung                                                |
+|------------------|-------------------------------------------------------------|
+| `IN_MEMORY`      | Alles im RAM. Standard für CLI/Tests.                       |
+| `JSON_FILE`      | Lokale JSON-Datei, keine externen Dienste. Docker-Standard. |
+| `EMBEDDED_NEO4J` | *(reserviert)* Im aktuellen Distribut auf `JSON_FILE` gemappt – das Image bleibt schlank, keine GPL-lizenzierte Embedded-DB nötig. |
+| `REMOTE_NEO4J`   | Externer Neo4j-Server. Wird automatisch gewählt, wenn `NEO4J_URI/USER/PASSWORD` gesetzt sind. |
+
+Beispiele:
+
+```bash
+# Standard (Docker-Image setzt das bereits):
+REGELSUCHE_PERSISTENCE_MODE=JSON_FILE \
+REGELSUCHE_PERSISTENCE_PATH=./data/regelsuche \
+./gradlew :app:run --args='serve --host 0.0.0.0 --port 8080'
+
+# Full Mode (manuell, ohne docker-compose):
+NEO4J_URI=bolt://localhost:7687 NEO4J_USER=neo4j NEO4J_PASSWORD=secret \
+./gradlew :app:run --args='serve --port 8080'
+```
+
 ## Starten
 
 ```bash
 ./gradlew :app:run --args='term "x + 0"'
 ```
 
-## Demo: Binomische Formel emergiert aus atomaren Regeln
+## Demo: Binomische Formel
 
-Mit dieser Demo lässt sich die Workbench end-to-end erleben — eingegeben
-wird `(x+3)^2`, herausgefunden wird die binomische Formel als emergente
-Identität aus rein atomaren Rewrite-Regeln.
-
-```bash
-./gradlew :app:run --args='serve --port 8080'
-```
-
-Anschließend im Browser `http://localhost:8080/` öffnen.
+Eingegeben wird `(x+3)^2`, herausgefunden wird die binomische Formel als
+emergente Identität aus rein atomaren Rewrite-Regeln (`power_two_to_product`
+→ `distribute` → `combine_like_terms`).
 
 * **Eingabe:** `(x+3)^2`
-* **Screenshot-Hinweis:** Beim Klick auf "Suchen" entsteht im Cytoscape-Graph
-  ein Strang aus vier Knoten. Der beste Pfad (gelb hervorgehoben) verläuft
-  über `(x+3)*(x+3) → x*x + x*3 + 3*x + 3*3 → x^2 + 6x + 9`.
-* **Erwarteter Graph:**
-  ```
-  (x+3)^2 ──power_two_to_product──▶ (x+3)*(x+3) ──distribute──▶
-  x*x + x*3 + 3*x + 3*3 ──combine_like_terms──▶ x^2 + 6x + 9
-  ```
-* **Erwarteter Rechenweg im Replay-Tab:**
-  1. `(x+3)^2 = (x+3)*(x+3)` (Potenz als Produkt)
-  2. `(x+3)*(x+3) = x*x + x*3 + 3*x + 3*3` (Distributivität)
-  3. `x*x + x*3 + 3*x + 3*3 = x^2 + 6x + 9` (gleichartige Terme)
-* **Erwartete Makroregel** im "Makro-Regeln"-Tab:
-  `(a+b)^2 → a^2 + 2*a*b + b^2`, mit Beispielen, unterstützenden Pfaden,
-  Kompressionsrate und den Buttons "Als Regel übernehmen", "Formal prüfen",
-  "Auf neue Beispiele testen".
-* **Exportdateien** unter `/api/exports/`:
-    * `search-analysis-report.md` – kompletter Analysebericht (Eingabe,
-      Suchprofil, Domänen, Graphmetriken, bester Pfad, alternative Pfade,
-      Makroregeln, Identitäten, Annahmen, Proof-Status,
-      Regelvorrat-Änderungen).
-    * `search-analysis-report.tex` – LaTeX-Version desselben Berichts.
-    * `search-analysis-report.json` – maschinenlesbarer Bericht.
-* **"Chess-style"-Analyse:** `GET /api/analyze/move?expression=(x+3)^2`
-  liefert „bester Zug", „alternative Züge", Begründung und die in der
-  gesamten Suche nützlichste Regel.
+* **Erwarteter Treffer:** `(x+3)^2 = 9 + 6*x + x^2`
+* **Replay-Tab** zeigt den Weg über `(x+3)*(x+3) → x*x + x*3 + 3*x + 3*3 →
+  9 + 6*x + x^2`.
+* **Makroregel:** `(a+b)^2 → a^2 + 2*a*b + b^2`.
+
+## Demo: Bruchkürzung
+
+* **Eingabe:** `(x*y)/(x*z)`
+* **Erwarteter Treffer:** `(x*y)/(x*z) = y/z`
+* **Annahme** (im UI sichtbar): `x ≠ 0`.
+* Regel: `rational_cancel_common_factor`.
+
+## Demo: Trigonometrie
+
+* **Eingabe:** `sin(x)^2 + cos(x)^2`
+* **Erwarteter Treffer:** `sin(x)^2 + cos(x)^2 = 1`
+* Regel: `trig_pythagorean_sin_cos` (bzw. die symmetrische Variante).
+
+## Demo: Polynom-Expansion
+
+(Die frühere Demo „Polynom-Gleichung" wurde ehrlich umbenannt: der aktuelle
+atomare Regelvorrat löst keine linearen Gleichungen, expandiert aber
+Polynome.)
+
+* **Eingabe:** `(x+1)*(x+2)`
+* **Erwarteter Treffer:** `(x+1)*(x+2) = x^2 + 3*x + 2`
+* `equation` bleibt als URL-Alias erhalten.
+
+## Grenzen
+
+* Keine Gleichungslösung über Symbol-Isolation – die Demos beschränken sich
+  auf Term-Umformungen.
+* Embedded-Neo4j ist im Standard-Image **nicht** enthalten (sonst zöge das
+  eine GPL-lizenzierte Server-Abhängigkeit ins Image); statt dessen kommt
+  `JSON_FILE` zum Einsatz, das für den Single-User-Demo-Charakter mehr als
+  genug ist.
+* Suchtiefe und Knotenbudget sind pro Demo bewusst begrenzt – grössere
+  Analysen sind die Domäne des Full Mode.
+
 
 ## CLI Quickstart
 
@@ -297,12 +379,25 @@ Anti-Zyklen und Graph-Vergleiche:
 - kommutative Operatoren werden stabil sortiert (`b+a == a+b`)
 - verschachtelte Additionen und Multiplikationen werden geflattet
 - neutrale Elemente werden entfernt (`x*1 == x`)
-- Zahlen werden normalisiert
+- Zahlen werden normalisiert und konstant gefaltet (`2+3 == 5`, `3*4 == 12`)
 - wiederholte Faktoren werden zusammengeführt (`x*x == x^2`)
+- Polynom-Normalform: Monome nach absteigendem Grad sortiert
+  (`1 + 2*x + x^2 → x^2 + 2*x + 1`)
 - stabile Hashes markieren bereits gesehene Strukturen
+
+Assumption-bewusste Reduktionen wie `x/x → 1` (nur unter `x ≠ 0`) sind
+**Opt-in** über `canonicalizeWith(expr, AssumptionContext)` bzw.
+`stableHashWith(expr, AssumptionContext)`. Die gesammelten Assumptions
+fließen als Fingerprint in den Hash ein, damit Transposition-Treffer mit
+aktiven Assumptions nicht mit assumption-freien Einträgen verschmelzen.
 
 Die Kanonisierung ersetzt keine Regelentdeckung. Sie kontrolliert Suche und
 Duplikate; die konkreten Graph-Kanten bleiben die kleinen Rewrite-Schritte.
+
+Die nächsten Schritte Richtung mathematische Suchintelligenz (Equality
+Saturation, Cost Models, Global Memory, weitere Domänen, Proof-Integration)
+sind in [`docs/search-intelligence-roadmap.md`](docs/search-intelligence-roadmap.md)
+beschrieben.
 
 ## Bewertung und Äquivalenz
 
@@ -426,6 +521,88 @@ Der Prototyp ist zu einer belastbareren Forschungsplattform erweitert worden:
 - Proof-Status-Lifecycle für Regelkandidaten
 - Graph-Persistenz vollständiger Suchpfad-Metadaten
 - reproduzierbare Suchbenchmarks für Qualität und Explosion
+
+## Suchintelligenz (Transposition Table & Lern-Loop)
+
+Die Suchplattform wurde um eine mathematische **Transposition Table** und einen
+**lernenden Regelvorrat** ergänzt. Ziel ist es, dass Folgesuchen messbar
+intelligenter werden – analog zu einem Schachcomputer, der gleiche Stellungen
+wiedererkennt.
+
+### Transposition Table (`de.regelsuche.search.memory`)
+
+Die Tabelle indiziert besuchte Zustände über `ExpressionCanonicalizer.canonicalHash(...)`
+und hält pro Eintrag `bestScore`, `minDepthSeen`, `bestKnownPathId`,
+`reachedByRuleIds` und `visitCount`. Drei Implementierungen folgen dem in
+`PersistenceContext` etablierten Modus:
+
+| Persistenz   | Implementierung                  | Default-Pfad                      |
+| ------------ | -------------------------------- | --------------------------------- |
+| `IN_MEMORY`  | `InMemoryTranspositionTable`     | nur Prozessspeicher               |
+| `JSON_FILE`  | `JsonFileTranspositionTable`     | `./data/regelsuche/transposition.json` |
+| `REMOTE_NEO4J` | `Neo4jTranspositionTable`      | wiederverwendet `Driver`/`Session` |
+
+### Explainable Pruning
+
+Vor `expand()` prüft jede Strategie über `TranspositionGate` die Tabelle. Re-Visits
+sind erlaubt, wenn (a) geringere Tiefe, (b) besserer Score oder (c) ein neuer
+Eintrag in `reachedByRuleIds` vorliegt; andernfalls wird der Zustand mit einem
+`PruningDecision` protokolliert:
+
+| Reason                | Bedeutung                                                |
+| --------------------- | -------------------------------------------------------- |
+| `ALREADY_KNOWN_BETTER`| Bekannter Zustand mit besserem Score                     |
+| `ALREADY_KNOWN_EQUAL` | Bekannter Zustand, kein Mehrwert (klassischer Zyklus)    |
+| `REPLACED_WORSE_PATH` | Neuer Pfad ersetzt schlechteren                          |
+| `KEPT_NEW_RULE_COMBO` | Re-Visit beibehalten, weil neue Regelkombination         |
+| `KEPT_LOWER_DEPTH`    | Re-Visit beibehalten, weil kürzerer Pfad                 |
+| `BUDGET_EXCEEDED`     | Suchbudget aufgebraucht                                  |
+
+Die Entscheidungen werden via `JsonWriter` an `/api/search`-Antworten,
+`search-analysis-report.json` und einen neuen Bundle-Eintrag
+`pruning-decisions.json` angehängt.
+
+### Suchprofil `DISCOVERY_PLUS`
+
+Neues Profil mit aktiver Transposition Table, positiv gewichteten Mining-Signalen
+und höherer Pfaddiversität. Die bestehenden Profile (`FAST_SIMPLIFY`, `DISCOVERY`,
+`TEACHING`, `PROOF_ORIENTED`, `EXHAUSTIVE_SMALL`) bleiben unverändert; die Tabelle
+ist dort optional und per Default aus, damit alle bisherigen `transform`-Tests
+stabil weiterlaufen.
+
+### Lern-Loop (`MacroRuleLearningService`)
+
+Nach jedem Suchlauf werden über den bestehenden `RuleCandidateMiner`
+Makro-Kandidaten anti-unifiziert. `ReusableRule` führt jetzt `occurrenceCount`,
+`averageImprovement`, `supportingPathIds` und `confidenceScore`; alte
+`rule-inventory.json`-Dateien werden ohne diese Felder migriert (Default `0`).
+Ab `confidenceScore ≥ 0.8` und `occurrenceCount ≥ 3` aktiviert der Service die
+Regel automatisch im `RuleInventoryRepository`, sodass die nächste Suche sie über
+`InventoryBackedRewriteRuleProvider` als Schritt einsetzen kann.
+
+### Demo „System lernt eine Makroregel"
+
+`POST /api/demo/macro-learning` führt vier Suchläufe nacheinander aus –
+`(x+1)^2`, `(x+2)^2`, `(x+3)^2`, `(x+7)^2`. Die Antwort liefert pro Schritt
+Schrittanzahl, Laufzeit, `confidenceScore`-Verlauf und das Flag
+`usedLearnedRule`, das anzeigt, ob der vierte Lauf die gelernte
+binomische Regel als Schritt nutzt. Im UI ist die Demo als fünfter Button
+zugänglich; ein eigener Summary-Renderer zeigt die „vorher / nachher"-Tempo.
+
+### UI-Tab „Suchgedächtnis"
+
+Neuer Reiter mit drei Sektionen: bekannte Zustände (Ausdruck, Hash, `visitCount`,
+`bestScore`, `bestKnownPathId`), Pruning-Entscheidungen mit Filter nach
+`PruningReason` und gelernte Makroregeln. Daten kommen aus
+`/api/memory/states`, `/api/memory/pruning` und `/api/memory/macros`.
+
+### Nächste Schritte: mathematische Suchintelligenz
+
+Die Roadmap für die nächsten sechs Schritte (Strong Canonicalization
+geliefert; E-Graphs, Cost Models, weitere Domänen, Proof-Integration,
+Global Memory ausstehend) ist in
+[`docs/search-intelligence-roadmap.md`](docs/search-intelligence-roadmap.md)
+dokumentiert.
 
 Die Grenzen bleiben explizit:
 

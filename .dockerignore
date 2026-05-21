@@ -1,0 +1,24 @@
+# Exclude VCS and IDE noise from the Docker build context.
+.git
+.gitignore
+.gitattributes
+.github
+.idea
+.vscode
+*.iml
+
+# Local build artefacts (rebuilt inside the image).
+**/build
+**/.gradle
+**/out
+**/bin
+
+# Logs, OS junk, editor backups.
+*.log
+.DS_Store
+Thumbs.db
+
+# Docs that don't need to land in the image.
+docs
+LICENSE
+README.md

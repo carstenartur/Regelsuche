@@ -19,15 +19,63 @@
         <button class="tab" data-tab="candidates">Regelkandidaten</button>
         <button class="tab" data-tab="identities">Identitäten</button>
         <button class="tab" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="benchmark">Benchmark</button>
         <button class="tab" data-tab="replay">Replay</button>
         <button class="tab" data-tab="compare">Vergleich</button>
         <button class="tab" data-tab="inventory">Inventar</button>
+        <button class="tab" data-tab="memory">Suchgedächtnis</button>
         <button class="tab" data-tab="exports">Exporte</button>
         <button class="tab" data-tab="help">Hilfe</button>
     </nav>
 </header>
 
 <main>
+    <!-- ─────────── Demo hero (Mathematik als Spiel) ─────────── -->
+    <section id="demoHero" class="demo-hero">
+        <div class="card demo-card">
+            <h2>Mathematik als Spiel – probier eine Demo</h2>
+            <p class="hint">
+                Klicke einen Button: Regelsuche entdeckt den Lösungsweg, zeigt den Suchgraph,
+                spielt die Schritte als Replay ab, hebt die emergente Identität hervor und
+                exportiert den Bericht. Kein Setup nötig.
+            </p>
+            <div class="demo-grid">
+                <button class="demo-button" data-demo="binomial">
+                    <span class="demo-icon">∑</span>
+                    <span class="demo-title">Binomische Formel</span>
+                    <span class="demo-expr">(x+3)²</span>
+                </button>
+                <button class="demo-button" data-demo="rational">
+                    <span class="demo-icon">÷</span>
+                    <span class="demo-title">Bruch kürzen</span>
+                    <span class="demo-expr">(x·y)/(x·z)</span>
+                </button>
+                <button class="demo-button" data-demo="trigonometry">
+                    <span class="demo-icon">∿</span>
+                    <span class="demo-title">Trigonometrie</span>
+                    <span class="demo-expr">sin²(x)+cos²(x)</span>
+                </button>
+                <button class="demo-button" data-demo="polynomial-expansion">
+                    <span class="demo-icon">=</span>
+                    <span class="demo-title">Polynom-Expansion</span>
+                    <span class="demo-expr">(x+1)(x+2)</span>
+                </button>
+                <button class="demo-button" data-demo="macro-learning">
+                    <span class="demo-icon">⚡</span>
+                    <span class="demo-title">System lernt eine Makroregel</span>
+                    <span class="demo-expr">(x+1)² → (x+7)²</span>
+                </button>
+            </div>
+            <div id="demoStatus" class="status"></div>
+            <div id="demoSummary" class="demo-summary"></div>
+            <div class="demo-actions">
+                <a class="export-button" href="/api/benchmark" target="_blank">Benchmark JSON</a>
+                <a class="export-button" href="/api/proof-status" target="_blank">Proof-Status-Legende</a>
+                <a class="export-button" href="/api/exports/bundle.zip" target="_blank">Bericht-Bundle (.zip)</a>
+            </div>
+        </div>
+    </section>
+
     <!-- ─────────── Workbench tab ─────────── -->
     <section id="tab-workbench" class="tab-panel active">
         <h2>Ausdruck eingeben</h2>
@@ -175,6 +223,22 @@
         </div>
     </section>
 
+    <!-- ─────────── Benchmark tab ─────────── -->
+    <section id="tab-benchmark" class="tab-panel">
+        <div class="card">
+            <h2>Benchmark</h2>
+            <div class="actions">
+                <button id="reloadBenchmark" class="primary">Benchmark laden</button>
+                <a class="export-button" href="/api/benchmark" target="_blank">JSON ansehen</a>
+            </div>
+            <p class="hint">Jede Zeile zeigt einen Benchmark-Lauf: Szenario, Strategie,
+                Erfolg (gefunden), Laufzeit, besuchte Zustände, Schritte, eingesetzte Regeln und
+                den höchsten erreichten Proof-Status. Hover über einen Status-Badge,
+                um die Bedeutung zu sehen.</p>
+            <div id="benchmarkSuites" class="benchmark-suites"></div>
+        </div>
+    </section>
+
     <!-- ─────────── Replay tab ─────────── -->
     <section id="tab-replay" class="tab-panel">
         <div class="card">
@@ -226,6 +290,33 @@
             <p class="hint">Aktivieren/deaktivieren oder taggen. Geänderte Tags werden lokal in der UI dargestellt;
                 die Persistenz erfolgt serverseitig (sofern eine schreibende Inventory-API aktiviert ist).</p>
             <div id="inventoryList" class="list"></div>
+        </div>
+    </section>
+
+    <!-- ─────────── Memory tab ─────────── -->
+    <section id="tab-memory" class="tab-panel">
+        <div class="card">
+            <h2>Suchgedächtnis</h2>
+            <div class="actions">
+                <button id="reloadMemory" class="primary">Aktualisieren</button>
+                <select id="memoryPruningFilter">
+                    <option value="">Alle Pruning-Gründe</option>
+                    <option value="ALREADY_KNOWN_BETTER">ALREADY_KNOWN_BETTER</option>
+                    <option value="ALREADY_KNOWN_EQUAL">ALREADY_KNOWN_EQUAL</option>
+                    <option value="REPLACED_WORSE_PATH">REPLACED_WORSE_PATH</option>
+                    <option value="KEPT_NEW_RULE_COMBO">KEPT_NEW_RULE_COMBO</option>
+                    <option value="KEPT_LOWER_DEPTH">KEPT_LOWER_DEPTH</option>
+                    <option value="BUDGET_EXCEEDED">BUDGET_EXCEEDED</option>
+                </select>
+            </div>
+            <p class="hint">Mathematische Transposition Table: bekannte Zustände (paginiert), Pruning-Entscheidungen
+                und gelernte Makroregeln aus dem aktuellen Suchgedächtnis.</p>
+            <h3>Bekannte Zustände</h3>
+            <div id="memoryStates" class="list"></div>
+            <h3>Pruning-Entscheidungen</h3>
+            <div id="memoryPruning" class="list"></div>
+            <h3>Gelernte Makroregeln</h3>
+            <div id="memoryMacros" class="list"></div>
         </div>
     </section>
 

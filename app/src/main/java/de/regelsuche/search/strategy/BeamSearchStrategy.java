@@ -43,6 +43,12 @@ public class BeamSearchStrategy implements SearchStrategy {
                 if (!visited.add(stateKey(current))) {
                     continue;
                 }
+                if (current.depth() > 0
+                    && TranspositionGate.evaluate(problem.memory(), current,
+                        current.canonicalHash() + "#" + current.depth())
+                    == TranspositionGate.Verdict.PRUNE) {
+                    continue;
+                }
                 explored.add(current);
                 if (current.depth() >= problem.heuristic().maxDepth()) {
                     continue;

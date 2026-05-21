@@ -208,3 +208,85 @@ footer { text-align: center; padding: 1rem; color: #9ca3af; font-size: 0.8rem; }
 table.compare { border-collapse: collapse; width: 100%; margin-bottom: 0.75rem; }
 table.compare th, table.compare td { border: 1px solid #e5e7eb; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }
 table.compare thead th { background: #eff6ff; }
+
+/* ─── Demo hero (killer-app landing flow) ─── */
+.demo-hero { margin-bottom: 1.25rem; }
+.demo-card {
+    background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%);
+    border-color: #c7d2fe;
+}
+.demo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin: 0.75rem 0 0.5rem;
+}
+.demo-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    background: #fff;
+    border: 2px solid #c7d2fe;
+    border-radius: 10px;
+    padding: 1rem 0.75rem;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    color: #1f2937;
+    font: inherit;
+}
+.demo-button:hover {
+    border-color: #6366f1;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(99,102,241,0.15);
+}
+.demo-button:disabled { opacity: 0.6; cursor: progress; }
+.demo-icon { font-size: 1.6rem; color: #4338ca; }
+.demo-title { font-weight: 600; font-size: 1rem; }
+.demo-expr { color: #4b5563; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9rem; }
+.demo-summary {
+    margin-top: 0.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    color: #1f2937;
+}
+.demo-summary table { width: 100%; border-collapse: collapse; }
+.demo-summary th, .demo-summary td {
+    text-align: left;
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+.demo-actions { margin-top: 0.6rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+/* ──────────── Killer-demo refinements ──────────── */
+.demo-banner { margin-top: 0.6rem; padding: 0.6rem 0.8rem; border-radius: 6px; }
+.status.warn { background: #fff7ed; border-left: 4px solid #f59e0b; color: #92400e; }
+
+.proof-badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    background: #e0e7ff;
+    color: #3730a3;
+    cursor: help;
+    border: 1px solid #c7d2fe;
+}
+.proof-observed             { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+.proof-validated_by_examples { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+.proof-symbolically_verified { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+.proof-formally_provable    { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.proof-formally_proved      { background: #d1fae5; color: #064e3b; border-color: #6ee7b7; }
+.proof-rejected             { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+
+.benchmark-suites { display: flex; flex-direction: column; gap: 0.8rem; margin-top: 0.6rem; }
+.benchmark-scenario h3 { margin-top: 0; }
+.benchmark-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.benchmark-table th, .benchmark-table td {
+    text-align: left; padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid #e5e7eb; vertical-align: top;
+}
+.benchmark-table thead th { background: #f9fafb; }
+.benchmark-ok    { color: #065f46; font-weight: 600; }
+.benchmark-miss  { color: #991b1b; font-weight: 600; }

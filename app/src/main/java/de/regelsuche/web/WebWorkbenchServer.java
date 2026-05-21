@@ -71,6 +71,7 @@ public class WebWorkbenchServer {
     private final RuleInventoryQueryService inventoryQuery;
     private final ExportQueryService exportQuery;
     private final ExplanationService explanationService = new ExplanationService();
+    private final de.regelsuche.search.memory.SearchMemory searchMemory;
 
     private HttpServer server;
 
@@ -92,12 +93,25 @@ public class WebWorkbenchServer {
         TransformationExportService exportService,
         WebSecurityConfig securityConfig
     ) {
+        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, null);
+    }
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        de.regelsuche.search.memory.SearchMemory searchMemory
+    ) {
         this.host = host;
         this.port = port;
         this.graphStore = graphStore;
         this.inventoryRepository = inventoryRepository;
         this.exportService = exportService;
         this.securityConfig = securityConfig == null ? WebSecurityConfig.none() : securityConfig;
+        this.searchMemory = searchMemory == null ? new de.regelsuche.search.memory.SearchMemory() : searchMemory;
         this.transformationQuery = new TransformationQueryService(graphStore);
         this.inventoryQuery = new RuleInventoryQueryService(graphStore, inventoryRepository);
         this.exportQuery = new ExportQueryService(graphStore, inventoryRepository);
@@ -122,6 +136,10 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/exports", this::handleExports));
         secure(server.createContext("/api/explain", this::handleExplain));
         secure(server.createContext("/api/analyze", this::handleAnalyze));
+        secure(server.createContext("/api/demo", this::handleDemo));
+        secure(server.createContext("/api/memory", this::handleMemory));
+        secure(server.createContext("/api/proof-status", this::handleProofStatus));
+        secure(server.createContext("/api/benchmark", this::handleBenchmark));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
         server.start();
@@ -601,6 +619,17 @@ public class WebWorkbenchServer {
             sendText(exchange, 200, md);
             return;
         }
+        if (format.equals("bundle.zip")) {
+            byte[] zipBytes = buildReportBundleZip();
+            exchange.getResponseHeaders().add("Content-Type", "application/zip");
+            exchange.getResponseHeaders().add(
+                "Content-Disposition", "attachment; filename=\"regelsuche-report-bundle.zip\"");
+            exchange.sendResponseHeaders(200, zipBytes.length);
+            try (OutputStream body = exchange.getResponseBody()) {
+                body.write(zipBytes);
+            }
+            return;
+        }
         if (format.startsWith("search-analysis-report")) {
             var report = new de.regelsuche.export.SearchAnalysisReportService();
             var ctx = analysisReportContext();
@@ -842,6 +871,402 @@ public class WebWorkbenchServer {
             new java.util.ArrayList<>(assumptions),
             inventoryRepository.findAll()
         );
+    }
+
+    private String runMacroLearningDemo() {
+        String[] expressions = {"(x+1)^2", "(x+2)^2", "(x+3)^2", "(x+7)^2"};
+        de.regelsuche.learning.MacroRuleLearningService learner =
+            new de.regelsuche.learning.MacroRuleLearningService(inventoryRepository);
+        de.regelsuche.canonical.ExpressionCanonicalizer canonicalizer =
+            new de.regelsuche.canonical.ExpressionCanonicalizer();
+        de.regelsuche.scoring.ExpressionScorer scorer = new de.regelsuche.scoring.ExpressionScorer();
+        de.regelsuche.transform.TransformationEngine engine =
+            new de.regelsuche.transform.AstRewriteTransformationEngine(
+                de.regelsuche.demo.DemoRuleSet.rules());
+        de.regelsuche.equivalence.SymPyEquivalenceService equivalence =
+            new de.regelsuche.equivalence.SymPyEquivalenceService();
+        List<java.util.Map<String, Object>> stepReports = new java.util.ArrayList<>();
+        List<de.regelsuche.mining.SuccessfulTransformationPath> aggregated = new java.util.ArrayList<>();
+        long firstRunSteps = -1, firstRunMillis = -1, lastRunSteps = -1, lastRunMillis = -1;
+        boolean usedLearnedRule = false;
+        double lastConfidence = 0.0;
+        List<Double> confidenceTrace = new java.util.ArrayList<>();
+        for (int i = 0; i < expressions.length; i++) {
+            String expr = expressions[i];
+            long t0 = System.nanoTime();
+            String root = canonicalizer.canonicalize(expr);
+            de.regelsuche.scoring.ExpressionScore before = scorer.score(root);
+            de.regelsuche.search.SearchProfile profile = de.regelsuche.search.SearchProfile.DISCOVERY_PLUS;
+            de.regelsuche.search.strategy.SearchProblem problem =
+                new de.regelsuche.search.strategy.SearchProblem(
+                    root, engine, scorer, canonicalizer, profile.heuristic(), searchMemory);
+            List<de.regelsuche.search.strategy.SearchState> states =
+                profile.newStrategy().search(problem);
+            long elapsed = (System.nanoTime() - t0) / 1_000_000L;
+            int stepsOnBest = 0;
+            de.regelsuche.search.strategy.SearchState best = null;
+            boolean usedLearnedHere = false;
+            for (de.regelsuche.search.strategy.SearchState s : states) {
+                if (s.depth() == 0 || !equivalence.areEquivalent(root, s.expression())) {
+                    continue;
+                }
+                if (best == null || s.depth() < best.depth()) {
+                    best = s;
+                }
+                aggregated.add(new de.regelsuche.mining.SuccessfulTransformationPath(
+                    "macro-" + i + "-d" + s.depth() + "-" + Integer.toHexString(s.canonicalHash().hashCode()),
+                    root, s.expression(), s.path(), s.appliedRuleIds(),
+                    before, s.score(), true, "macro-demo",
+                    java.util.Map.of("variable", "x")));
+                for (String rid : s.appliedRuleIds()) {
+                    if (rid != null && rid.startsWith("macro_")) {
+                        usedLearnedHere = true;
+                    }
+                }
+            }
+            if (best != null) {
+                stepsOnBest = best.appliedRuleIds().size();
+            }
+            de.regelsuche.learning.MacroLearningResult learning = learner.learn(aggregated);
+            double confidence = learning.touchedRules().isEmpty()
+                ? 0.0 : learning.touchedRules().get(0).confidenceScore();
+            confidenceTrace.add(confidence);
+            lastConfidence = confidence;
+            if (i == 0) {
+                firstRunSteps = stepsOnBest;
+                firstRunMillis = elapsed;
+            }
+            if (i == expressions.length - 1) {
+                lastRunSteps = stepsOnBest;
+                lastRunMillis = elapsed;
+                usedLearnedRule = usedLearnedHere;
+            }
+            stepReports.add(java.util.Map.of(
+                "index", i,
+                "expression", expr,
+                "stepCount", stepsOnBest,
+                "elapsedMillis", elapsed,
+                "confidenceScore", confidence,
+                "learnedRulesActive", inventoryRepository.findEnabled().stream()
+                    .filter(r -> r.id().startsWith("macro_")).count()
+            ));
+        }
+        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();
+        w.beginObject();
+        w.property("id", "macro-learning");
+        w.property("title", "System lernt eine Makroregel");
+        w.property("usedLearnedRule", usedLearnedRule);
+        w.property("finalConfidenceScore", lastConfidence);
+        w.array("confidenceTrace", arr -> confidenceTrace.forEach(v -> arr.value(v.toString())));
+        final long fSteps = firstRunSteps, fMs = firstRunMillis;
+        final long lSteps = lastRunSteps, lMs = lastRunMillis;
+        w.object("speedup", s -> {
+            s.property("firstRunSteps", fSteps);
+            s.property("firstRunMillis", fMs);
+            s.property("lastRunSteps", lSteps);
+            s.property("lastRunMillis", lMs);
+        });
+        w.array("steps", arr -> stepReports.forEach(rep -> arr.objectValue(inner -> {
+            inner.property("index", (int) rep.get("index"));
+            inner.property("expression", (String) rep.get("expression"));
+            inner.property("stepCount", (int) rep.get("stepCount"));
+            inner.property("elapsedMillis", (long) rep.get("elapsedMillis"));
+            inner.property("confidenceScore", (double) rep.get("confidenceScore"));
+            inner.property("learnedRulesActive", (long) rep.get("learnedRulesActive"));
+        })));
+        w.endObject();
+        return w.toString();
+    }
+
+    private void handleMemory(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String suffix = path.substring("/api/memory".length()).replaceFirst("^/", "");
+        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();
+        switch (suffix) {
+            case "states" -> {
+                w.beginObject();
+                w.property("size", searchMemory.table().size());
+                w.array("entries", arr -> searchMemory.table().entries().forEach(e ->
+                    arr.objectValue(inner -> {
+                        inner.property("canonicalHash", e.canonicalHash());
+                        inner.property("canonicalExpression", e.canonicalExpression());
+                        inner.property("bestScore", e.bestScore());
+                        inner.property("minDepthSeen", e.minDepthSeen());
+                        inner.property("bestKnownPathId", e.bestKnownPathId());
+                        inner.stringArray("reachedByRuleIds",
+                            new java.util.ArrayList<>(e.reachedByRuleIds()));
+                        inner.property("visitCount", e.visitCount());
+                        inner.property("firstSeen", e.firstSeen().toString());
+                        inner.property("lastSeen", e.lastSeen().toString());
+                    })));
+                w.endObject();
+                sendJson(exchange, 200, w.toString());
+            }
+            case "pruning" -> sendJson(exchange, 200, renderPruningDecisionsJson());
+            case "macros" -> {
+                w.beginObject();
+                w.array("macros", arr -> inventoryRepository.findAll().stream()
+                    .filter(r -> r.occurrenceCount() > 0 || r.confidenceScore() > 0)
+                    .forEach(r -> arr.objectValue(inner -> {
+                        inner.property("id", r.id());
+                        inner.property("leftPattern", r.leftPattern());
+                        inner.property("rightPattern", r.rightPattern());
+                        inner.property("occurrenceCount", r.occurrenceCount());
+                        inner.property("confidenceScore", r.confidenceScore());
+                        inner.property("averageImprovement", r.averageImprovement());
+                        inner.stringArray("supportingPathIds", r.supportingPathIds());
+                        inner.property("enabled", inventoryRepository.isEnabled(r.id()));
+                    })));
+                w.endObject();
+                sendJson(exchange, 200, w.toString());
+            }
+            case "" -> {
+                w.beginObject();
+                w.property("size", searchMemory.table().size());
+                w.property("pruningDecisions", searchMemory.decisions().size());
+                w.object("links", l -> {
+                    l.property("states", "/api/memory/states");
+                    l.property("pruning", "/api/memory/pruning");
+                    l.property("macros", "/api/memory/macros");
+                });
+                w.endObject();
+                sendJson(exchange, 200, w.toString());
+            }
+            default -> sendStatus(exchange, 404, "unknown memory endpoint: " + suffix);
+        }
+    }
+
+    private void handleDemo(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String suffix = path.substring("/api/demo".length()).replaceFirst("^/", "");
+        if (suffix.isEmpty()) {
+            // List all available demos.
+            JsonWriter writer = new JsonWriter();
+            writer.beginObject();
+            writer.array("demos", arr -> de.regelsuche.demo.DemoCatalog.all().values().forEach(demo ->
+                arr.objectValue(inner -> {
+                    inner.property("id", demo.id());
+                    inner.property("title", demo.title());
+                    inner.property("description", demo.description());
+                    inner.property("expression", demo.expression());
+                    inner.property("inputType", demo.inputType().name());
+                    inner.property("profile", demo.profile().name());
+                    inner.property("expectedHighlight", demo.expectedHighlight());
+                    inner.property("expectedResultExpression", demo.expectedResultExpression());
+                })));
+            writer.endObject();
+            sendJson(exchange, 200, writer.toString());
+            return;
+        }
+        de.regelsuche.demo.DemoCatalog.Demo demo = de.regelsuche.demo.DemoCatalog.byId(suffix);
+        if (demo == null) {
+            sendStatus(exchange, 404, "unknown demo: " + suffix);
+            return;
+        }
+        String method = exchange.getRequestMethod();
+        if (!"GET".equalsIgnoreCase(method) && !"POST".equalsIgnoreCase(method)) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        if ("macro-learning".equals(demo.id()) && "POST".equalsIgnoreCase(method)) {
+            sendJson(exchange, 200, runMacroLearningDemo());
+            return;
+        }
+        de.regelsuche.demo.DemoService demoService =
+            new de.regelsuche.demo.DemoService(graphStore,
+                new de.regelsuche.transform.AstRewriteTransformationEngine(
+                    de.regelsuche.demo.DemoRuleSet.rules()),
+                searchMemory);
+        de.regelsuche.demo.DemoService.DemoRunResult result = demoService.run(demo);
+        sendJson(exchange, 200, renderDemoBundle(result));
+    }
+
+    private String renderDemoBundle(de.regelsuche.demo.DemoService.DemoRunResult result) {
+        de.regelsuche.demo.DemoCatalog.Demo demo = result.demo();
+        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(graphStore.discoveredTransformations());
+        var known = new de.regelsuche.mining.KnownRuleRepository();
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("id", demo.id());
+        writer.property("title", demo.title());
+        writer.property("description", demo.description());
+        writer.property("expression", demo.expression());
+        writer.property("inputType", demo.inputType().name());
+        writer.property("profile", demo.profile().name());
+        writer.property("expectedHighlight", demo.expectedHighlight());
+        writer.property("expectedResultExpression", demo.expectedResultExpression());
+        writer.property("canonicalTargetExpression",
+            result.canonicalTargetExpression() == null ? "" : result.canonicalTargetExpression());
+        writer.property("rootExpression", result.rootExpression());
+        writer.property("targetReached", result.targetReached());
+        writer.stringArray("assumptions", result.assumptions());
+        writer.object("metrics", m -> {
+            m.property("nodes", result.nodesSaved());
+            m.property("edges", result.edgesSaved());
+            m.property("pathsDiscovered", result.pathsDiscovered());
+            m.property("elapsedMillis", result.elapsedMillis());
+            m.property("identitiesFound", macros.size());
+            m.property("appliedRuleCount", result.appliedRuleIds().size());
+        });
+        writePath(writer, "selectedPath", result.selectedPath());
+        writePath(writer, "bestPath", result.bestPath());
+        writePath(writer, "targetPath", result.targetPath());
+        writer.array("identities", arr -> macros.forEach(macro ->
+            arr.objectValue(inner -> {
+                inner.property("id", macro.id());
+                inner.property("leftPattern", macro.leftPattern());
+                inner.property("rightPattern", macro.rightPattern());
+                inner.property("occurrences", macro.occurrences());
+                inner.property("compressionRatio", macro.compressionRatio());
+                inner.property("proofStatus", macro.proofStatus().name());
+                inner.property("knownRuleStatus",
+                    known.statusFor(macro.leftPattern(), macro.rightPattern()).name());
+            })));
+        writer.object("links", l -> {
+            l.property("searchGraph", "/api/search-graph");
+            l.property("paths", "/api/paths");
+            l.property("identities", "/api/identities");
+            l.property("candidates", "/api/candidates");
+            l.property("inventory", "/api/inventory");
+            l.property("reportMarkdown", "/api/exports/search-analysis-report.md");
+            l.property("reportLatex", "/api/exports/search-analysis-report.tex");
+            l.property("reportJson", "/api/exports/search-analysis-report.json");
+            l.property("searchGraphMermaid", "/api/exports/search-graph.mmd");
+            l.property("searchGraphGraphMl", "/api/exports/search-graph.graphml");
+            l.property("reportBundleZip", "/api/exports/bundle.zip");
+            l.property("analyzeMove", "/api/analyze/move?expression=" + demo.expression());
+        });
+        writer.endObject();
+        return writer.toString();
+    }
+
+    private static void writePath(JsonWriter writer, String key,
+                                  de.regelsuche.discovery.DiscoveredTransformation path) {
+        if (path == null) {
+            writer.nullProperty(key);
+            return;
+        }
+        writer.object(key, b -> {
+            b.property("id", path.id());
+            b.property("originalExpression", path.originalExpression());
+            b.property("improvedExpression", path.improvedExpression());
+            b.property("totalImprovement", path.totalImprovement());
+            b.property("steps", path.steps().size());
+            b.property("proofStatus", path.validationStatus().name());
+            b.array("stepDetails", arr -> path.steps().forEach(step ->
+                arr.objectValue(s -> {
+                    s.property("index", step.index());
+                    s.property("beforeExpression", step.beforeExpression());
+                    s.property("afterExpression", step.afterExpression());
+                    s.property("ruleId", step.ruleId());
+                    s.property("ruleKind", step.ruleKind().name());
+                    s.property("scoreBefore", step.scoreBefore());
+                    s.property("scoreAfter", step.scoreAfter());
+                    s.property("equivalencePreserving", step.equivalencePreserving());
+                })));
+        });
+    }
+
+    private void handleProofStatus(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.array("statuses", arr ->
+            de.regelsuche.proof.ProofStatusDescription.all().values().forEach(d ->
+                arr.objectValue(inner -> {
+                    inner.property("status", d.status().name());
+                    inner.property("ordinal", d.status().ordinal());
+                    inner.property("label", d.label());
+                    inner.property("descriptionDe", d.summaryDe());
+                    inner.property("descriptionEn", d.summaryEn());
+                })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleBenchmark(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        long started = System.nanoTime();
+        var suite = new de.regelsuche.benchmark.BenchmarkSuite();
+        List<de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult> results = suite.runAll();
+        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("elapsedMillis", elapsedMillis);
+        writer.array("scenarios", scenarios -> results.forEach(scenario ->
+            scenarios.objectValue(s -> {
+                s.property("name", scenario.name());
+                s.array("results", rows -> scenario.results().forEach(row ->
+                    rows.objectValue(r -> {
+                        r.property("strategy", row.strategyName());
+                        r.property("expression", row.expression());
+                        r.property("exploredStates", row.exploredStates());
+                        r.property("bestImprovement", row.bestImprovement());
+                        r.property("shortestImprovingDepth", row.shortestImprovingDepth());
+                        r.property("expandedSteps", row.expandedSteps());
+                        r.property("distinctRules", row.distinctRules());
+                        r.property("elapsedMillis", row.elapsedMillis());
+                        r.property("proofStatus", row.proofStatus().name());
+                        r.property("found", row.found());
+                    })));
+            })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private byte[] buildReportBundleZip() throws IOException {
+        var report = new de.regelsuche.export.SearchAnalysisReportService();
+        var ctx = analysisReportContext();
+        var transformations = graphStore.discoveredTransformations();
+        var graph = buildSearchGraph();
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {
+            putZipEntry(zip, "search-analysis-report.md", report.renderMarkdown(ctx));
+            putZipEntry(zip, "search-analysis-report.tex", report.renderLatex(ctx));
+            putZipEntry(zip, "search-analysis-report.json", report.renderJson(ctx));
+            putZipEntry(zip, "transformations.md", exportService.exportMarkdown(transformations));
+            putZipEntry(zip, "transformations.tex", exportService.exportLatex(transformations));
+            putZipEntry(zip, "transformations.json", exportService.exportBundle(exportQuery.bundle()));
+            putZipEntry(zip, "search-graph.mmd", exportService.exportSearchGraphMermaid(graph));
+            putZipEntry(zip, "search-graph.graphml", exportService.exportSearchGraphGraphMl(graph));
+            putZipEntry(zip, "search-graph.json", exportService.exportSearchGraphJson(graph));
+            putZipEntry(zip, "best-path.md", exportService.exportBestPathMarkdown(transformations));
+            putZipEntry(zip, "rule-inventory.json",
+                exportService.exportJson(List.of(), List.of(), inventoryRepository.findAll()));
+            putZipEntry(zip, "pruning-decisions.json", renderPruningDecisionsJson());
+        }
+        return out.toByteArray();
+    }
+
+    private String renderPruningDecisionsJson() {
+        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();
+        w.beginObject();
+        w.property("count", searchMemory.decisions().size());
+        w.array("decisions", arr -> searchMemory.decisions().forEach(d ->
+            arr.objectValue(inner -> {
+                inner.property("expression", d.expression());
+                inner.property("canonicalHash", d.canonicalHash());
+                inner.property("reason", d.reason().name());
+                inner.property("explanation", d.explanation());
+            })));
+        w.endObject();
+        return w.toString();
+    }
+
+    private static void putZipEntry(java.util.zip.ZipOutputStream zip, String name, String content)
+        throws IOException {
+        java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(name);
+        zip.putNextEntry(entry);
+        if (content != null) {
+            zip.write(content.getBytes(StandardCharsets.UTF_8));
+        }
+        zip.closeEntry();
     }
 
     private void handleStatic(HttpExchange exchange) throws IOException {

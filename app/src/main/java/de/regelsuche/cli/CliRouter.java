@@ -329,9 +329,29 @@ public class CliRouter {
             }
         }
         de.regelsuche.web.WebSecurityConfig securityConfig = configBuilder.build();
+
+        // Resolve persistence: if the environment / JVM properties select a
+        // non-default mode, route the web workbench through it so the
+        // killer-demo's single Docker image can offer file-backed (or remote
+        // Neo4j) persistence without any extra wiring.
+        de.regelsuche.persistence.PersistenceConfig persistenceConfig =
+            de.regelsuche.persistence.PersistenceConfig.fromEnvironment();
+        ExpressionGraphStore activeGraphStore = graphStore;
+        RuleInventoryRepository activeInventory = inventoryRepository;
+        de.regelsuche.search.memory.SearchMemory activeSearchMemory =
+            new de.regelsuche.search.memory.SearchMemory();
+        de.regelsuche.persistence.PersistenceContext persistenceContext = null;
+        if (persistenceConfig.mode() != de.regelsuche.persistence.GraphPersistenceMode.IN_MEMORY) {
+            persistenceContext = de.regelsuche.persistence.PersistenceContext.from(persistenceConfig, out);
+            activeGraphStore = persistenceContext.graphStore();
+            activeInventory = persistenceContext.inventoryRepository();
+            activeSearchMemory = new de.regelsuche.search.memory.SearchMemory(
+                persistenceContext.transpositionTable());
+        }
+
         try {
             de.regelsuche.web.WebWorkbenchServer server = new de.regelsuche.web.WebWorkbenchServer(
-                host, port, graphStore, inventoryRepository, exportService, securityConfig
+                host, port, activeGraphStore, activeInventory, exportService, securityConfig, activeSearchMemory
             );
             server.start();
             String scheme = securityConfig.isTlsEnabled() ? "https" : "http";
@@ -350,6 +370,10 @@ public class CliRouter {
         } catch (Exception ex) {
             out.println("serve failed: " + ex.getMessage());
             return 2;
+        } finally {
+            if (persistenceContext != null) {
+                persistenceContext.close();
+            }
         }
     }
 

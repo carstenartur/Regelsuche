@@ -107,6 +107,9 @@ public class InMemoryRuleInventoryRepository implements RuleInventoryRepository 
             builder.append(",\"canonicalHash\":").append(quote(rule.canonicalHash()));
             builder.append(",\"lastUsedAt\":").append(rule.lastUsedAt() == null ? "null" : quote(rule.lastUsedAt().toString()));
             builder.append(",\"usageCount\":").append(rule.usageCount());
+            builder.append(",\"occurrenceCount\":").append(rule.occurrenceCount());
+            builder.append(",\"confidenceScore\":").append(rule.confidenceScore());
+            builder.append(",\"supportingPathIds\":").append(quoteArray(rule.supportingPathIds()));
             builder.append(",\"enabled\":").append(isEnabled(rule.id()));
             builder.append(",\"tags\":").append(quoteArray(new ArrayList<>(tagsOf(rule.id()))));
             builder.append("}");
@@ -142,7 +145,10 @@ public class InMemoryRuleInventoryRepository implements RuleInventoryRepository 
                 Instant.parse(raw.getOrDefault("createdAt", Instant.EPOCH.toString())),
                 raw.getOrDefault("canonicalHash", ""),
                 lastUsedAt,
-                Integer.parseInt(raw.getOrDefault("usageCount", "0"))
+                Integer.parseInt(raw.getOrDefault("usageCount", "0")),
+                Integer.parseInt(raw.getOrDefault("occurrenceCount", "0")),
+                MiniJson.parseStringArray(raw.getOrDefault("supportingPathIds", "[]")),
+                Double.parseDouble(raw.getOrDefault("confidenceScore", "0"))
             );
             repo.save(rule);
             if ("false".equals(raw.get("enabled"))) {
