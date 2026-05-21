@@ -5,7 +5,7 @@ Suche von „lernende Rewrite-Schleife" hin zu „mathematische
 Suchintelligenz" weiterentwickeln. Die Reihenfolge ist nach Hebelwirkung
 und technischer Abhängigkeit sortiert.
 
-Stand: **PR 1 ist umgesetzt**, PRs 2–6 sind als Folge-PRs offen.
+Stand: **PR 1 und PR 3 sind umgesetzt**, PRs 2, 4, 5, 6 sind als Folge-PRs offen.
 
 ## PR 1 — Strong Canonicalization &nbsp;✅ geliefert
 
@@ -46,6 +46,50 @@ Tests in `ExpressionCanonicalizerTest`:
 * Property-Test über `RandomExpressionGenerator`: kanonische Form ist
   Fixpunkt unter erneuter Kanonisierung.
 
+## PR 3 — Cost Models & TransformationGoal &nbsp;✅ geliefert
+
+Geliefert in `de.regelsuche.scoring.cost`:
+
+* Interface `CostModel` mit stabiler `id()` für UI/JSON-Export und einer
+  Convenience-`cost(expression, canonicalizer, score)`-Overload, die das
+  Parsing kapselt.
+* Sechs Implementierungen:
+  * `OperatorCountCost` — historischer Default, zählt AST-Operatoren;
+  * `DepthCost` — bevorzugt flache Strukturen;
+  * `FactoredFormCost` — belohnt Multiplikationen nicht-trivialer
+    Teilausdrücke und bestraft Top-Level-Summanden;
+  * `NumericStabilityCost` — bestraft Subtraktion ähnlicher Operanden
+    (Auslöschung), Division durch potenziell kleine Werte, hohe Potenzen;
+  * `TeachingFriendlinessCost` — bevorzugt kleine Koeffizienten, geringe
+    Tiefe, vermeidet Division und exotische Funktionen;
+  * `SymmetryCost` — Kommutativ-Bonus (gleich lange Operanden in
+    AC-Gruppen), Palindrom-Bonus (z. B. `a + b + a`).
+* Enum `TransformationGoal { SIMPLIFY, FACTORIZE, NUMERICALLY_STABLE,
+  PROOF_FRIENDLY, TEACHING_FRIENDLY }` mit `defaultCostModel()`.
+* `SearchProblem` trägt jetzt ein optionales `CostModel`-Feld
+  (API-rückwärtskompatibel über zwei zusätzliche Konstruktoren) plus
+  `withCostModel(...)` und `withGoal(...)`-Convenience-Methoden.
+* `BestFirstSearchStrategy.priority(state, problem)` und
+  `AStarSearchStrategy.priority(state, problem)` konsultieren das
+  Cost-Model statt der rohen `weightedTotal()`-Summe, wenn eines gesetzt
+  ist; ohne Cost-Model bleibt das alte Verhalten exakt erhalten.
+* `SearchProfile` trägt jetzt ein `defaultGoal()`, sodass die UI für jedes
+  Profil eine sinnvolle Goal-Voreinstellung anzeigen kann
+  (`TEACHING → TEACHING_FRIENDLY`, `PROOF_ORIENTED → PROOF_FRIENDLY`, ...).
+
+Tests:
+
+* `TransformationGoalTest` — pro Goal ein „A ist strikt besser als B"-Beispiel
+  plus stabile `id()`-Kontrakte.
+* `GoalAwareSearchTest` — verifiziert, dass das Cost-Model die
+  BestFirst-Reihenfolge tatsächlich beeinflusst, jeder Goal die Suche
+  steuern kann und die Legacy-Konstruktoren weiter funktionieren.
+
+Offen für eine kleine Folge-Iteration: das UI-Dropdown im
+`WebWorkbenchServer` (REST-Feld `goal` auf `/api/search`,
+`<select>`-Element neben dem bestehenden Profil-Dropdown). Die
+Server-/Search-Seite ist bereits vollständig vorbereitet.
+
 ## PR 2 — E-Graphs / Equality Saturation
 
 Größter Architekturschritt, profitiert massiv von PR 1.
@@ -66,27 +110,6 @@ Akzeptanzkriterien:
 * Saturierung verschmilzt `(a+b)*c` und `a*c + b*c` in dieselbe E-Class.
 * Auf den bestehenden Demo-Beispielen skaliert die Knotenzahl messbar
   besser als `BeamSearchStrategy` (Benchmark via `SearchBenchmark`).
-
-## PR 3 — Cost Models & TransformationGoal
-
-Kleines API, aber sofort sichtbare „intelligentere" Entscheidungen.
-
-* Interface `CostModel` mit Implementierungen:
-  * `OperatorCountCost` (heute implizit),
-  * `DepthCost`,
-  * `FactoredFormCost` — bevorzugt faktorisierte Formen,
-  * `NumericStabilityCost` — vermeidet Subtraktion ähnlich großer
-    Floats / Division durch kleine Werte,
-  * `TeachingFriendlinessCost` — bevorzugt Schulnotation,
-  * `SymmetryCost` — bevorzugt symmetrische Strukturen.
-* Enum `TransformationGoal { SIMPLIFY, FACTORIZE, NUMERICALLY_STABLE,
-  PROOF_FRIENDLY, TEACHING_FRIENDLY }` — wählt Default-Cost und
-  Heuristik in `AStar`/`BestFirst`.
-* UI: Goal-Dropdown neben Profil; in `search-analysis-report.json`
-  als Feld `goal` mitgeführt.
-
-Akzeptanzkriterien: Pro Goal mindestens ein Beispiel mit klarer
-„Ergebnis A besser als Ergebnis B"-Aussage.
 
 ## PR 4 — Größere mathematische Domänen (in Sub-PRs splitten)
 
@@ -126,7 +149,7 @@ doppelt (mit PR 1 sind die Varianten bereits zusammengefasst).
 
 ## Empfohlene Reihenfolge
 
-`1` (erledigt) → `3` → `2` → `6` → `4a/4b/…` → `5`.
+`1` (erledigt) → `3` (erledigt) → `2` → `6` → `4a/4b/…` → `5`.
 
 Begründung:
 

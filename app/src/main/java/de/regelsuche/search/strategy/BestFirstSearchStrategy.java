@@ -33,7 +33,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             0
         );
 
-        PriorityQueue<SearchState> frontier = new PriorityQueue<>(Comparator.comparingInt(this::priority));
+        Comparator<SearchState> byPriority = Comparator.comparingInt(state -> priority(state, problem));
+        PriorityQueue<SearchState> frontier = new PriorityQueue<>(byPriority);
         List<SearchState> explored = new ArrayList<>();
         Set<String> visited = new HashSet<>();
         frontier.add(rootState);
@@ -117,6 +118,28 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         int expansionPenalty = state.expandedStepCount() * 5;
         int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
         return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;
+    }
+
+    /**
+     * Goal-aware priority. When the {@link SearchProblem} carries a
+     * {@link de.regelsuche.scoring.cost.CostModel} the model replaces the
+     * raw {@code weightedTotal()} term — every other component (depth and
+     * expansion penalties, no-improvement penalty) stays the same so
+     * existing tuning is preserved.
+     */
+    protected int priority(SearchState state, SearchProblem problem) {
+        if (problem.costModel() == null) {
+            return priority(state);
+        }
+        int depthPenalty = state.depth() * 2;
+        int expansionPenalty = state.expandedStepCount() * 5;
+        int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
+        int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());
+        if (modelCost == Integer.MAX_VALUE) {
+            // Unparseable candidate: treat as worst possible without overflow.
+            return Integer.MAX_VALUE / 2;
+        }
+        return modelCost + depthPenalty + expansionPenalty + noImprovementPenalty;
     }
 
     private String stateKey(SearchState state) {
