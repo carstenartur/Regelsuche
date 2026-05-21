@@ -379,12 +379,25 @@ Anti-Zyklen und Graph-Vergleiche:
 - kommutative Operatoren werden stabil sortiert (`b+a == a+b`)
 - verschachtelte Additionen und Multiplikationen werden geflattet
 - neutrale Elemente werden entfernt (`x*1 == x`)
-- Zahlen werden normalisiert
+- Zahlen werden normalisiert und konstant gefaltet (`2+3 == 5`, `3*4 == 12`)
 - wiederholte Faktoren werden zusammengeführt (`x*x == x^2`)
+- Polynom-Normalform: Monome nach absteigendem Grad sortiert
+  (`1 + 2*x + x^2 → x^2 + 2*x + 1`)
 - stabile Hashes markieren bereits gesehene Strukturen
+
+Assumption-bewusste Reduktionen wie `x/x → 1` (nur unter `x ≠ 0`) sind
+**Opt-in** über `canonicalizeWith(expr, AssumptionContext)` bzw.
+`stableHashWith(expr, AssumptionContext)`. Die gesammelten Assumptions
+fließen als Fingerprint in den Hash ein, damit Transposition-Treffer mit
+aktiven Assumptions nicht mit assumption-freien Einträgen verschmelzen.
 
 Die Kanonisierung ersetzt keine Regelentdeckung. Sie kontrolliert Suche und
 Duplikate; die konkreten Graph-Kanten bleiben die kleinen Rewrite-Schritte.
+
+Die nächsten Schritte Richtung mathematische Suchintelligenz (Equality
+Saturation, Cost Models, Global Memory, weitere Domänen, Proof-Integration)
+sind in [`docs/search-intelligence-roadmap.md`](docs/search-intelligence-roadmap.md)
+beschrieben.
 
 ## Bewertung und Äquivalenz
 
@@ -582,6 +595,14 @@ Neuer Reiter mit drei Sektionen: bekannte Zustände (Ausdruck, Hash, `visitCount
 `bestScore`, `bestKnownPathId`), Pruning-Entscheidungen mit Filter nach
 `PruningReason` und gelernte Makroregeln. Daten kommen aus
 `/api/memory/states`, `/api/memory/pruning` und `/api/memory/macros`.
+
+### Nächste Schritte: mathematische Suchintelligenz
+
+Die Roadmap für die nächsten sechs Schritte (Strong Canonicalization
+geliefert; E-Graphs, Cost Models, weitere Domänen, Proof-Integration,
+Global Memory ausstehend) ist in
+[`docs/search-intelligence-roadmap.md`](docs/search-intelligence-roadmap.md)
+dokumentiert.
 
 Die Grenzen bleiben explizit:
 
