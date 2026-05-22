@@ -74,6 +74,7 @@ public class WebWorkbenchServer {
     private final de.regelsuche.search.memory.SearchMemory searchMemory;
     private final de.regelsuche.proof.ProofBridgeService leanProofBridgeService;
     private final de.regelsuche.proof.ProofBridgeService smtProofBridgeService;
+    private final de.regelsuche.proof.ProofWorkbenchService proofWorkbenchService;
 
     private HttpServer server;
 
@@ -123,6 +124,22 @@ public class WebWorkbenchServer {
         de.regelsuche.proof.ProofBridgeService leanProofBridgeService,
         de.regelsuche.proof.ProofBridgeService smtProofBridgeService
     ) {
+        this(host, port, graphStore, inventoryRepository, exportService,
+            securityConfig, searchMemory, leanProofBridgeService, smtProofBridgeService, null);
+    }
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        de.regelsuche.search.memory.SearchMemory searchMemory,
+        de.regelsuche.proof.ProofBridgeService leanProofBridgeService,
+        de.regelsuche.proof.ProofBridgeService smtProofBridgeService,
+        de.regelsuche.proof.ProofWorkbenchService proofWorkbenchService
+    ) {
         this.host = host;
         this.port = port;
         this.graphStore = graphStore;
@@ -136,6 +153,7 @@ public class WebWorkbenchServer {
         this.smtProofBridgeService = smtProofBridgeService == null
             ? defaultProofBridgeService(new de.regelsuche.proof.SmtProofBridge())
             : smtProofBridgeService;
+        this.proofWorkbenchService = proofWorkbenchService;
         this.transformationQuery = new TransformationQueryService(graphStore);
         this.inventoryQuery = new RuleInventoryQueryService(graphStore, inventoryRepository);
         this.exportQuery = new ExportQueryService(graphStore, inventoryRepository);
@@ -170,6 +188,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/memory", this::handleMemory));
         secure(server.createContext("/api/proof-status", this::handleProofStatus));
         secure(server.createContext("/api/proof-bridge", this::handleProofBridge));
+        secure(server.createContext("/api/proof/jobs", this::handleProofJobs));
         secure(server.createContext("/api/benchmark", this::handleBenchmark));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
@@ -246,15 +265,20 @@ public class WebWorkbenchServer {
         String expression = stringValue(body, "expression", "");
         String typeName = stringValue(body, "type", InputType.TERM.name()).toUpperCase(Locale.ROOT);
         String profileName = stringValue(body, "profile", SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);
+        String goalName = stringValue(body, "goal", "").toUpperCase(Locale.ROOT);
         if (expression.isBlank()) {
             sendStatus(exchange, 400, "expression must not be blank");
             return;
         }
         InputType type;
         SearchProfile profile;
+        de.regelsuche.scoring.cost.TransformationGoal goal;
         try {
             type = InputType.valueOf(typeName);
             profile = SearchProfile.valueOf(profileName);
+            goal = goalName.isBlank()
+                ? profile.defaultGoal()
+                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);
         } catch (IllegalArgumentException ex) {
             sendStatus(exchange, 400, ex.getMessage());
             return;
@@ -267,10 +291,11 @@ public class WebWorkbenchServer {
             profile.newStrategy()
         );
         try {
-            search.submit(new InputRequest(type, expression)).join();
+            search.submit(new InputRequest(type, expression), goal).join();
             JsonWriter writer = new JsonWriter();
             writer.beginObject();
             writer.property("profile", profile.name());
+            writer.property("goal", goal.name());
             writer.property("inputType", type.name());
             writer.property("expression", expression);
             writer.property("successes", search.getSuccesses().size());
@@ -1062,6 +1087,39 @@ public class WebWorkbenchServer {
                 w.endObject();
                 sendJson(exchange, 200, w.toString());
             }
+            case "universal" -> {
+                // Surfaces the top universal patterns + cross-task rule
+                // coverage so the workbench UI can show "the moves that work
+                // everywhere" — see GlobalMemoryService for the scoring rule.
+                de.regelsuche.search.memory.GlobalMemoryService global =
+                    new de.regelsuche.search.memory.GlobalMemoryService(searchMemory.table());
+                java.time.Instant now = java.time.Instant.now();
+                var topPatterns = global.topUniversalPatterns(20, now);
+                java.util.Map<String, Integer> coverage = global.ruleCoverage();
+                w.beginObject();
+                w.property("size", searchMemory.table().size());
+                w.array("patterns", arr -> topPatterns.forEach(entry ->
+                    arr.objectValue(inner -> {
+                        inner.property("canonicalHash", entry.canonicalHash());
+                        inner.property("canonicalExpression", entry.canonicalExpression());
+                        inner.property("universalityScore", global.universalityScore(entry, now));
+                        inner.property("visitCount", entry.visitCount());
+                        inner.property("bestScore", entry.bestScore());
+                        inner.property("minDepthSeen", entry.minDepthSeen());
+                        inner.property("bestKnownPathId", entry.bestKnownPathId());
+                        inner.stringArray("reachedByRuleIds",
+                            new java.util.ArrayList<>(entry.reachedByRuleIds()));
+                        inner.property("firstSeen", entry.firstSeen().toString());
+                        inner.property("lastSeen", entry.lastSeen().toString());
+                    })));
+                w.array("ruleCoverage", arr -> coverage.forEach((ruleId, count) ->
+                    arr.objectValue(inner -> {
+                        inner.property("ruleId", ruleId);
+                        inner.property("coverage", count);
+                    })));
+                w.endObject();
+                sendJson(exchange, 200, w.toString());
+            }
             case "" -> {
                 w.beginObject();
                 w.property("size", searchMemory.table().size());
@@ -1070,6 +1128,7 @@ public class WebWorkbenchServer {
                     l.property("states", "/api/memory/states");
                     l.property("pruning", "/api/memory/pruning");
                     l.property("macros", "/api/memory/macros");
+                    l.property("universal", "/api/memory/universal");
                 });
                 w.endObject();
                 sendJson(exchange, 200, w.toString());
@@ -1337,6 +1396,222 @@ public class WebWorkbenchServer {
         sendJson(exchange, 200, writer.toString());
     }
 
+    // ── Proof Job REST API ─────────────────────────────────────────────────
+    //
+    // Routes (all under {@code /api/proof/jobs}, registered as a single
+    // prefix context):
+    //   GET    /api/proof/jobs                              → list all jobs
+    //   POST   /api/proof/jobs                              → submit a new job
+    //   GET    /api/proof/jobs/{id}                         → job details
+    //   POST   /api/proof/jobs/{id}/cancel                  → cancel
+    //   GET    /api/proof/jobs/{id}/artifacts               → bundle file list
+    //   GET    /api/proof/jobs/{id}/artifacts/{name}        → fetch file body
+
+    private void handleProofJobs(HttpExchange exchange) throws IOException {
+        if (proofWorkbenchService == null) {
+            sendStatus(exchange, 503, "proof workbench disabled "
+                + "(set REGELSUCHE_PROOF_ENABLED=true)");
+            return;
+        }
+        String path = exchange.getRequestURI().getPath();
+        // Strip "/api/proof/jobs" prefix and split.
+        String suffix = path.substring("/api/proof/jobs".length());
+        String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);
+
+        if (suffix.isEmpty() || "/".equals(suffix)) {
+            if ("GET".equals(method)) {
+                handleProofJobList(exchange);
+            } else if ("POST".equals(method)) {
+                handleProofJobCreate(exchange);
+            } else {
+                sendStatus(exchange, 405, "method not allowed");
+            }
+            return;
+        }
+
+        String[] parts = suffix.substring(1).split("/", -1);
+        String jobId = parts[0];
+        if (parts.length == 1) {
+            if ("GET".equals(method)) {
+                handleProofJobGet(exchange, jobId);
+            } else {
+                sendStatus(exchange, 405, "method not allowed");
+            }
+            return;
+        }
+        if (parts.length == 2 && "cancel".equals(parts[1])) {
+            if ("POST".equals(method)) {
+                handleProofJobCancel(exchange, jobId);
+            } else {
+                sendStatus(exchange, 405, "method not allowed");
+            }
+            return;
+        }
+        if (parts.length == 2 && "artifacts".equals(parts[1])) {
+            if ("GET".equals(method)) {
+                handleProofJobArtifactList(exchange, jobId);
+            } else {
+                sendStatus(exchange, 405, "method not allowed");
+            }
+            return;
+        }
+        if (parts.length == 3 && "artifacts".equals(parts[1])) {
+            if ("GET".equals(method)) {
+                handleProofJobArtifactRead(exchange, jobId, parts[2]);
+            } else {
+                sendStatus(exchange, 405, "method not allowed");
+            }
+            return;
+        }
+        sendStatus(exchange, 404, "unknown proof endpoint: " + path);
+    }
+
+    private void handleProofJobList(HttpExchange exchange) throws IOException {
+        var jobs = proofWorkbenchService.listJobs();
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.array("jobs", arr -> jobs.forEach(job ->
+            arr.objectValue(o -> writeProofJobJson(o, job))));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleProofJobCreate(HttpExchange exchange) throws IOException {
+        Map<String, Object> body = readJsonObject(exchange);
+        String left = stringValue(body, "leftPattern", "").trim();
+        String right = stringValue(body, "rightPattern", "").trim();
+        if (left.isBlank() || right.isBlank()) {
+            sendStatus(exchange, 400, "leftPattern and rightPattern are required");
+            return;
+        }
+        int priority = intValue(body, "priority", 0);
+        if (priority < 0) {
+            sendStatus(exchange, 400, "priority must be >= 0");
+            return;
+        }
+        String worker = stringValue(body, "worker", "").trim();
+        if (!worker.isEmpty()) {
+            sendStatus(exchange, 400, "worker selection is not supported");
+            return;
+        }
+        List<de.regelsuche.assumption.Assumption> assumptions = new java.util.ArrayList<>();
+        Object raw = body.get("assumptions");
+        if (raw instanceof List<?> list) {
+            for (Object item : list) {
+                if (item == null) {
+                    continue;
+                }
+                if (item instanceof Map<?, ?> map) {
+                    Object exprRaw = map.get("expression");
+                    String expr = exprRaw == null ? "" : String.valueOf(exprRaw);
+                    Object kindObj = map.get("kind");
+                    String kindRaw = kindObj == null ? "CUSTOM" : String.valueOf(kindObj);
+                    de.regelsuche.assumption.Assumption.Kind kind;
+                    try {
+                        kind = de.regelsuche.assumption.Assumption.Kind.valueOf(
+                            kindRaw.toUpperCase(Locale.ROOT));
+                    } catch (IllegalArgumentException ex) {
+                        kind = de.regelsuche.assumption.Assumption.Kind.CUSTOM;
+                    }
+                    assumptions.add(new de.regelsuche.assumption.Assumption(kind, expr));
+                } else {
+                    assumptions.add(new de.regelsuche.assumption.Assumption(
+                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));
+                }
+            }
+        }
+        String jobId = proofWorkbenchService.submit(left, right, assumptions, priority);
+        var job = proofWorkbenchService.getJob(jobId).orElse(null);
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("jobId", jobId);
+        if (job != null) {
+            writer.property("status", job.status().name());
+            writer.property("workerId", job.workerType());
+        }
+        writer.endObject();
+        sendJson(exchange, 201, writer.toString());
+    }
+
+    private void handleProofJobGet(HttpExchange exchange, String jobId) throws IOException {
+        var job = proofWorkbenchService.getJob(jobId);
+        if (job.isEmpty()) {
+            sendStatus(exchange, 404, "job not found: " + jobId);
+            return;
+        }
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writeProofJobJson(writer, job.get());
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleProofJobCancel(HttpExchange exchange, String jobId) throws IOException {
+        var cancelled = proofWorkbenchService.cancel(jobId);
+        if (cancelled.isEmpty()) {
+            sendStatus(exchange, 404, "job not found: " + jobId);
+            return;
+        }
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writeProofJobJson(writer, cancelled.get());
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleProofJobArtifactList(HttpExchange exchange, String jobId) throws IOException {
+        if (proofWorkbenchService.getJob(jobId).isEmpty()) {
+            sendStatus(exchange, 404, "job not found: " + jobId);
+            return;
+        }
+        var names = proofWorkbenchService.listArtifacts(jobId);
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("jobId", jobId);
+        writer.array("artifacts", arr -> names.forEach(arr::value));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleProofJobArtifactRead(HttpExchange exchange, String jobId, String name) throws IOException {
+        // Defence-in-depth: refuse traversal even though the artifact repo
+        // already validates ids.
+        if (name.contains("..") || name.contains("/") || name.contains("\\")) {
+            sendStatus(exchange, 400, "invalid artifact name");
+            return;
+        }
+        var body = proofWorkbenchService.readArtifact(jobId, name);
+        if (body.isEmpty()) {
+            sendStatus(exchange, 404, "artifact not found: " + jobId + "/" + name);
+            return;
+        }
+        String contentType = "text/plain; charset=utf-8";
+        if (name.endsWith(".json")) {
+            contentType = "application/json; charset=utf-8";
+        }
+        send(exchange, 200, contentType, body.get());
+    }
+
+    private void writeProofJobJson(JsonWriter writer, de.regelsuche.proof.ProofJob job) {
+        writer.property("id", job.id());
+        writer.property("leftPattern", job.leftPattern());
+        writer.property("rightPattern", job.rightPattern());
+        writer.property("status", job.status().name());
+        writer.property("priority", job.priority());
+        writer.property("retryCount", job.retryCount());
+        writer.property("maxRetries", job.maxRetries());
+        writer.property("workerId", job.workerType());
+        writer.property("createdAt", job.createdAt().toString());
+        writer.property("updatedAt", job.updatedAt().toString());
+        writer.property("proofStatus", job.resultStatus() == null ? "" : job.resultStatus().name());
+        writer.property("errorMessage", job.errorMessage());
+        writer.array("assumptions", arr -> job.assumptions().forEach(a ->
+            arr.objectValue(o -> {
+                o.property("kind", a.kind().name());
+                o.property("expression", a.expression());
+            })));
+    }
+
     private void handleBenchmark(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
             sendStatus(exchange, 405, "method not allowed");
@@ -1357,6 +1632,7 @@ public class WebWorkbenchServer {
                         r.property("strategy", row.strategyName());
                         r.property("expression", row.expression());
                         r.property("exploredStates", row.exploredStates());
+                        r.property("visitedStates", row.visitedStates());
                         r.property("bestImprovement", row.bestImprovement());
                         r.property("shortestImprovingDepth", row.shortestImprovingDepth());
                         r.property("expandedSteps", row.expandedSteps());
@@ -1364,6 +1640,19 @@ public class WebWorkbenchServer {
                         r.property("elapsedMillis", row.elapsedMillis());
                         r.property("proofStatus", row.proofStatus().name());
                         r.property("found", row.found());
+                        // Quality metrics ("Ampelstatus" surface).
+                        if (row.expectedResultMatched() != null) {
+                            r.property("expectedResultMatched", row.expectedResultMatched());
+                        } else {
+                            r.nullProperty("expectedResultMatched");
+                        }
+                        r.property("prunedStates", row.prunedStates());
+                        r.property("eGraphClasses", row.eGraphClasses());
+                        r.property("eGraphNodes", row.eGraphNodes());
+                        r.property("saturationSavings", row.saturationSavings());
+                        r.property("learnedRuleUsed", row.learnedRuleUsed());
+                        r.property("exportBundleValid", row.exportBundleValid());
+                        r.property("quality", row.qualityLabel());
                     })));
             })));
         writer.endObject();

@@ -21,7 +21,7 @@ class SearchBenchmarkTest {
         );
 
         List<SearchBenchmarkResult> results = benchmark.run(
-            List.of("(x + 0) * 1"),
+            List.of("x + 0"),
             List.of(
                 new SearchBenchmark.NamedSearchStrategy("best-first", new BestFirstSearchStrategy()),
                 new SearchBenchmark.NamedSearchStrategy("beam", new BeamSearchStrategy()),
@@ -33,5 +33,7 @@ class SearchBenchmarkTest {
         assertEquals(4, results.size());
         assertTrue(results.stream().allMatch(result -> result.exploredStates() > 0));
         assertTrue(results.stream().anyMatch(result -> result.bestImprovement() > 0));
+        assertTrue(results.stream().allMatch(result -> result.expectedResultMatched() != null));
+        assertTrue(results.stream().allMatch(result -> result.prunedStates() >= 0));
     }
 }

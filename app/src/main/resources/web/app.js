@@ -61,7 +61,21 @@
     $('loadExample-eq').addEventListener('click', () => loadExample('2*x + 3 = 7', 'EQUATION'));
 
     /* ─── Demo buttons (Killer-App landing flow) ─── */
+    /**
+     * Reveal the full tab strip the first time the user actually starts a
+     * search or clicks a demo. Until then only the workbench entry tab is
+     * visible (see body.pre-search rules in style.css) so newcomers see a
+     * single obvious flow instead of a feature wall.
+     */
+    function markSearchStarted() {
+        if (document.body.classList.contains('pre-search')) {
+            document.body.classList.remove('pre-search');
+            document.body.dataset.preSearch = 'false';
+        }
+    }
+
     async function runDemo(demoId, btn) {
+        markSearchStarted();
         const status = $('demoStatus');
         const summary = $('demoSummary');
         const buttons = document.querySelectorAll('.demo-button');
@@ -395,6 +409,7 @@
     /* ─── Search form ─── */
     $('searchForm').addEventListener('submit', async (event) => {
         event.preventDefault();
+        markSearchStarted();
         const form = event.target;
         const domains = Array.from(form.querySelectorAll('input[name="domain"]:checked')).map((c) => c.value);
         const payload = {
@@ -403,6 +418,9 @@
             profile: form.profile.value,
             domains: domains
         };
+        if (form.goal && form.goal.value) {
+            payload.goal = form.goal.value;
+        }
         setStatus('Suche läuft …');
         $('searchOutput').textContent = '';
         try {
@@ -772,14 +790,35 @@
             const foundLabel = r.found
                 ? '<span class="benchmark-ok">ja</span>'
                 : '<span class="benchmark-miss">nein</span>';
+            const expectedLabel = (r.expectedResultMatched === true)
+                ? '<span class="benchmark-ok">✓</span>'
+                : (r.expectedResultMatched === false)
+                    ? '<span class="benchmark-miss">✗</span>'
+                    : '<span class="hint">—</span>';
+            const qualityLabel = r.quality === 'OK'
+                ? '<span class="benchmark-ok">✅</span>'
+                : r.quality === 'WARN'
+                    ? '<span class="benchmark-warn">⚠️</span>'
+                    : r.quality === 'FAIL'
+                        ? '<span class="benchmark-miss">❌</span>'
+                        : '';
+            const eGraph = (r.eGraphClasses || 0) + ' / ' + (r.eGraphNodes || 0);
+            const learned = r.learnedRuleUsed
+                ? '<span class="benchmark-ok">✓</span>'
+                : '<span class="hint">–</span>';
             return '<tr>'
+                + '<td>' + qualityLabel + '</td>'
                 + '<td><code>' + escapeHtml(r.strategy || '') + '</code></td>'
                 + '<td><code>' + escapeHtml(r.expression || '') + '</code></td>'
                 + '<td>' + foundLabel + '</td>'
+                + '<td>' + expectedLabel + '</td>'
                 + '<td>' + (r.elapsedMillis != null ? r.elapsedMillis + ' ms' : '–') + '</td>'
-                + '<td>' + (r.exploredStates || 0) + '</td>'
-                + '<td>' + (r.expandedSteps || 0) + '</td>'
-                + '<td>' + (r.distinctRules || 0) + '</td>'
+                + '<td>' + (r.visitedStates || r.exploredStates || 0) + '</td>'
+                + '<td>' + (r.prunedStates || 0) + '</td>'
+                + '<td>' + eGraph + '</td>'
+                + '<td>' + (r.saturationSavings != null
+                    ? (r.saturationSavings * 100).toFixed(1) + '%' : '–') + '</td>'
+                + '<td>' + learned + '</td>'
                 + '<td>' + renderProofStatusBadge(r.proofStatus) + '</td>'
                 + '</tr>';
         }).join('');
@@ -787,8 +826,10 @@
             + '<h3>Szenario: <code>' + escapeHtml(scenario.name || '') + '</code></h3>'
             + '<table class="benchmark-table">'
             + '<thead><tr>'
-            + '<th>Strategie</th><th>Ausdruck</th><th>Gefunden</th><th>Laufzeit</th>'
-            + '<th>Besuchte Zustände</th><th>Schritte</th><th>Regeln</th><th>Proof-Status</th>'
+            + '<th>Status</th><th>Strategie</th><th>Ausdruck</th><th>Gefunden</th>'
+            + '<th>Erw. getroffen</th><th>Laufzeit</th>'
+            + '<th>Besucht</th><th>Geprunt</th><th>e-Klassen / -Knoten</th>'
+            + '<th>Sat-Sparung</th><th>Lernregel</th><th>Proof-Status</th>'
             + '</tr></thead>'
             + '<tbody>' + rows + '</tbody>'
             + '</table>'
@@ -1113,17 +1154,20 @@
     }
     async function loadMemory() {
         try {
-            const [statesResp, pruningResp, macrosResp] = await Promise.all([
+            const [statesResp, pruningResp, macrosResp, universalResp] = await Promise.all([
                 fetch('/api/memory/states'),
                 fetch('/api/memory/pruning'),
                 fetch('/api/memory/macros'),
+                fetch('/api/memory/universal'),
             ]);
             const states = await statesResp.json();
             const pruning = await pruningResp.json();
             const macros = await macrosResp.json();
+            const universal = await universalResp.json();
             renderMemoryStates(states);
             renderMemoryPruning(pruning);
             renderMemoryMacros(macros);
+            renderMemoryUniversal(universal);
         } catch (e) {
             console.error('loadMemory failed', e);
         }
@@ -1188,6 +1232,63 @@
             out.appendChild(div);
         });
     }
+    function renderMemoryUniversal(data) {
+        const out = $('memoryUniversal');
+        if (out) {
+            out.innerHTML = '';
+            const patterns = (data && data.patterns) || [];
+            if (patterns.length === 0) {
+                out.textContent = 'Noch keine universellen Muster — starte einen DISCOVERY_PLUS-Suchlauf.';
+            } else {
+                patterns.forEach((p) => {
+                    const div = document.createElement('div');
+                    div.className = 'list-item';
+                    const rules = escapeHtml((p.reachedByRuleIds || []).join(', ') || '—');
+                    const pathId = p.bestKnownPathId ? String(p.bestKnownPathId) : '';
+                    const escapedPathId = escapeHtml(pathId);
+                    const pathLink = p.bestKnownPathId
+                        ? ' · best path: <a href="#" data-path="' + escapedPathId
+                            + '" class="universal-path">' + escapedPathId + '</a>'
+                        : '';
+                    div.innerHTML =
+                        '<div><strong>' + escapeHtml(p.canonicalExpression || '') + '</strong></div>'
+                        + '<div class="hint">universality: <b>' + escapeHtml(String(p.universalityScore ?? '')) + '</b>'
+                        + ' · visits: ' + escapeHtml(String(p.visitCount ?? ''))
+                        + ' · bestScore: ' + escapeHtml(String(p.bestScore ?? ''))
+                        + ' · depth: ' + escapeHtml(String(p.minDepthSeen ?? '')) + '</div>'
+                        + '<div class="hint">rules: ' + rules + pathLink + '</div>';
+                    out.appendChild(div);
+                });
+                out.querySelectorAll('a.universal-path').forEach((a) => {
+                    a.addEventListener('click', (evt) => {
+                        evt.preventDefault();
+                        // Hand off to the Paths tab so the user can replay the
+                        // supporting transformation directly.
+                        const pathId = a.dataset.path;
+                        if (typeof window !== 'undefined') {
+                            window.location.hash = '#path=' + encodeURIComponent(pathId);
+                        }
+                    });
+                });
+            }
+        }
+        const cov = $('memoryRuleCoverage');
+        if (cov) {
+            cov.innerHTML = '';
+            const coverage = (data && data.ruleCoverage) || [];
+            if (coverage.length === 0) {
+                cov.textContent = 'Keine Coverage-Daten.';
+            } else {
+                coverage.slice(0, 30).forEach((c) => {
+                    const div = document.createElement('div');
+                    div.className = 'list-item';
+                    div.innerHTML = '<span class="badge">' + c.coverage + '</span> '
+                        + '<code>' + c.ruleId + '</code>';
+                    cov.appendChild(div);
+                });
+            }
+        }
+    }
 
     /* ─── Auto-load on page open ─── */
     document.addEventListener('DOMContentLoaded', () => {
@@ -1209,8 +1310,151 @@
                     populateReplayPaths().finally(() => $('replayPathSelect').dataset.loaded = '1');
                 } else if (which === 'memory' && $('memoryStates') && !$('memoryStates').dataset.loaded) {
                     loadMemory().finally(() => $('memoryStates').dataset.loaded = '1');
+                } else if (which === 'proofJobs' && $('proofJobList') && !$('proofJobList').dataset.loaded) {
+                    loadProofJobs().finally(() => $('proofJobList').dataset.loaded = '1');
                 }
             });
         });
+
+        /* Proof-Jobs UI bindings */
+        const submitBtn = $('proofJobSubmit');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', submitProofJob);
+        }
+        const reloadBtn = $('proofJobReload');
+        if (reloadBtn) {
+            reloadBtn.addEventListener('click', loadProofJobs);
+        }
     });
+
+    /* ─── Proof Jobs ─── */
+
+    function submitProofJob() {
+        const message = $('proofJobMessage');
+        const left = ($('proofJobLeft').value || '').trim();
+        const right = ($('proofJobRight').value || '').trim();
+        if (!left || !right) {
+            if (message) { message.textContent = 'Left- und Right-Pattern sind erforderlich.'; }
+            return;
+        }
+        const priority = parseInt($('proofJobPriority').value || '0', 10);
+        const rawAssumptions = ($('proofJobAssumptions').value || '').split(/\r?\n/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+            .map((expression) => ({ kind: 'CUSTOM', expression }));
+        const body = JSON.stringify({
+            leftPattern: left,
+            rightPattern: right,
+            assumptions: rawAssumptions,
+            priority,
+        });
+        fetch('/api/proof/jobs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+        }).then((response) => {
+            if (response.status === 503) {
+                if (message) { message.textContent = 'Proof-Workbench ist deaktiviert (REGELSUCHE_PROOF_ENABLED=false).'; }
+                return null;
+            }
+            return response.json();
+        }).then((json) => {
+            if (json && json.jobId) {
+                if (message) { message.textContent = 'Job eingereicht: ' + json.jobId; }
+                loadProofJobs();
+            }
+        }).catch((err) => {
+            if (message) { message.textContent = 'Fehler: ' + err; }
+        });
+    }
+
+    function loadProofJobs() {
+        const container = $('proofJobList');
+        if (!container) { return Promise.resolve(); }
+        return fetch('/api/proof/jobs').then((response) => {
+            if (response.status === 503) {
+                container.innerHTML = '<div class="item">Proof-Workbench ist deaktiviert.</div>';
+                return null;
+            }
+            return response.json();
+        }).then((json) => {
+            if (!json) { return; }
+            renderProofJobs(json.jobs || []);
+        }).catch((err) => {
+            container.innerHTML = '<div class="item">Fehler beim Laden: ' + err + '</div>';
+        });
+    }
+
+    function renderProofJobs(jobs) {
+        const container = $('proofJobList');
+        container.innerHTML = '';
+        if (jobs.length === 0) {
+            container.innerHTML = '<div class="item">Noch keine Jobs eingereicht.</div>';
+            return;
+        }
+        jobs.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+            .forEach((job) => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                const isTerminal = job.status === 'DONE' || job.status === 'FAILED' || job.status === 'CANCELLED';
+                const cancelBtn = isTerminal ? ''
+                    : ' <button class="proof-cancel" data-id="' + escapeHtml(job.id) + '">Cancel</button>';
+                const artifactBtn = ' <button class="proof-artifacts" data-id="' + escapeHtml(job.id) + '">Artefakte</button>';
+                div.innerHTML = '<div><b>' + escapeHtml(job.leftPattern) + ' → '
+                    + escapeHtml(job.rightPattern) + '</b></div>'
+                    + '<div>Status: <code>' + escapeHtml(job.status) + '</code>'
+                    + ' · Worker: ' + escapeHtml(job.workerId)
+                    + ' · Priorität: ' + job.priority
+                    + ' · Retries: ' + job.retryCount + '/' + job.maxRetries
+                    + (job.proofStatus ? ' · Proof: <code>' + escapeHtml(job.proofStatus) + '</code>' : '')
+                    + '</div>'
+                    + '<div class="hint">ID: <code>' + escapeHtml(job.id) + '</code>'
+                    + ' · created ' + escapeHtml(job.createdAt) + '</div>'
+                    + (job.errorMessage ? '<div class="hint">Fehler: ' + escapeHtml(job.errorMessage) + '</div>' : '')
+                    + '<div class="actions">' + artifactBtn + cancelBtn + '</div>';
+                container.appendChild(div);
+            });
+        container.querySelectorAll('.proof-cancel').forEach((btn) => {
+            btn.addEventListener('click', () => cancelProofJob(btn.dataset.id));
+        });
+        container.querySelectorAll('.proof-artifacts').forEach((btn) => {
+            btn.addEventListener('click', () => loadProofArtifacts(btn.dataset.id));
+        });
+    }
+
+    function cancelProofJob(jobId) {
+        fetch('/api/proof/jobs/' + encodeURIComponent(jobId) + '/cancel', { method: 'POST' })
+            .then(() => loadProofJobs());
+    }
+
+    function loadProofArtifacts(jobId) {
+        const container = $('proofJobArtifacts');
+        if (!container) { return; }
+        container.innerHTML = '<div class="item">Lade Artefakte für ' + escapeHtml(jobId) + ' …</div>';
+        fetch('/api/proof/jobs/' + encodeURIComponent(jobId) + '/artifacts')
+            .then((response) => response.json())
+            .then((json) => {
+                container.innerHTML = '';
+                const header = document.createElement('div');
+                header.className = 'item';
+                header.innerHTML = '<b>Bundle für Job</b> <code>' + escapeHtml(jobId) + '</code>';
+                container.appendChild(header);
+                (json.artifacts || []).forEach((name) => {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    const url = '/api/proof/jobs/' + encodeURIComponent(jobId)
+                        + '/artifacts/' + encodeURIComponent(name);
+                    div.innerHTML = '<a href="' + url + '" target="_blank">' + escapeHtml(name) + '</a>';
+                    container.appendChild(div);
+                });
+                if (!json.artifacts || json.artifacts.length === 0) {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    div.textContent = 'Noch keine Artefakte (Job läuft eventuell noch).';
+                    container.appendChild(div);
+                }
+            }).catch((err) => {
+                container.innerHTML = '<div class="item">Fehler: ' + escapeHtml(String(err)) + '</div>';
+            });
+    }
 })();

@@ -47,6 +47,33 @@ Das startet App + Neo4j 5 Community + persistentes Volume und setzt
 [`docs/getting-started.md`](docs/getting-started.md) und
 [`docs/architecture.md`](docs/architecture.md).
 
+## 5-Minuten-Tour
+
+Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
+
+1. **Demo starten.** Auf `http://localhost:8080/` einen Demo-Button (z.B.
+   _Binomische Formel_) klicken. Erst nach diesem Klick werden die Folge-Tabs
+   (Graph, Replay, Proof-Jobs, Export, …) sichtbar — das Landing-Form ist
+   absichtlich auf einen einzigen Hauptfluss „Ausdruck → Ziel → Suche starten"
+   reduziert.
+2. **Suchgraph + Replay ansehen.** `Graph`-Tab zeigt den entdeckten
+   Transformationsraum; `Replay` spielt den besten Pfad Schritt für Schritt
+   ab.
+3. **Proof-Job anlegen.** Im `Proof-Jobs`-Tab `Left=a + 0`, `Right=a`
+   eintippen und _Job einreichen_ klicken — der Status der asynchronen
+   Pipeline wird live aktualisiert, Artefakte (`proof.smt2`, `proof.lean`,
+   `metadata.json`, `stdout.txt`, `stderr.txt`) liegen unter
+   `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`.
+   ![Proof-Job-Panel](docs/assets/screenshots/proof-job-panel.png)
+4. **Qualitätsdashboard prüfen.** `Benchmark`-Tab → jede Zeile zeigt
+   Ampelstatus, `expectedResultMatched`, e-Graph-Größe, Saturation-Sparung
+   und ob eine gelernte Makroregel beteiligt war. Der vollständige Report
+   liegt unter [`docs/benchmark-report.md`](docs/benchmark-report.md) (CI lädt
+   ihn als Artefakt `benchmark-report` hoch).
+5. **Bericht exportieren.** Im `Exporte`-Tab den `bundle.zip` Download
+   starten — enthält Markdown/LaTeX/JSON/Mermaid/GraphML und das aktuelle
+   Rule-Inventory.
+
 ## Was kann Regelsuche?
 
 * **Atomare Rewrite-Regeln** statt vorgefertigter Formeln — Schulbuchidentitäten
@@ -61,6 +88,16 @@ Das startet App + Neo4j 5 Community + persistentes Volume und setzt
   `linear-algebra` getaggt.
 * **Proof-Bridge** generiert ein Lean/SMT-Skript pro Pfad. `FORMALLY_PROVED`
   wird nur gesetzt, wenn der Prover den Beweis bestätigt.
+* **Proof-Workbench** — persistente Job-Queue mit REST-API
+  (`POST /api/proof/jobs`, `GET /api/proof/jobs/{id}`,
+  `POST /api/proof/jobs/{id}/cancel`,
+  `GET /api/proof/jobs/{id}/artifacts`) plus eigener UI-Tab. Jobs, Cache und
+  Artefakt-Bundle (`proof.lean`, `proof.smt2`, `stdout.txt`, `stderr.txt`,
+  `metadata.json` pro Job) werden via `REGELSUCHE_PROOF_ENABLED`,
+  `REGELSUCHE_PROOF_ARTIFACT_PATH`, `REGELSUCHE_PROOF_JOB_STORE` und
+  `REGELSUCHE_PROOF_CACHE` konfiguriert. Für echte Prover gibt es
+  `Dockerfile.proof` (Z3 + cvc5 vorinstalliert, Lean optional via
+  `--build-arg INSTALL_LEAN=true`).
 * **Persistenz** als einzelner JSON-File (Killer-Demo-Modus) oder echtes
   Neo4j 5 (Full Mode via `docker compose up`).
 * **Export-Bundle** mit Markdown, LaTeX, JSON, Mermaid, GraphML und dem
@@ -71,13 +108,19 @@ Das startet App + Neo4j 5 Community + persistentes Volume und setzt
 * [Getting Started](docs/getting-started.md) — Docker, lokaler Gradle-Lauf,
   wichtige Endpunkte, optionaler Neo4j-Mode.
 * [Architektur](docs/architecture.md) — Module, Datenflüsse, Persistenz.
-* [Such-Intelligenz](docs/search-intelligence-roadmap.md) und
+* [Nutzer-Workflows](docs/user-workflows.md) — Lehrer/Schüler,
+  Forscher, CAS-Vergleich, Proof-Workflow.
+* [Such-Intelligenz](docs/search-intelligence.md) und
   [Equality-Saturation](docs/equality-saturation.md).
 * [Math-Domains](docs/math-domains.md) — semantische Domänen, Replay-Karten,
   Discovery-Tags.
 * [Proof-Bridge](docs/proof-bridge.md) — vom Pfad zum formalen Beweis.
+* [Proof-Workbench](docs/proof-workbench.md) — persistente Jobs, REST,
+  Artefakt-Bundle, Dockerfile.proof.
 * [Macro-Rules](docs/macro-rules.md) — wie das System eigene Regeln lernt.
 * [Testing](docs/testing.md) — Unit-, Browser-E2E- und Doc-Asset-Pipelines.
+* [Developer Guide](docs/developer-guide.md) — Repo-Layout, Build-Kommandos,
+  Konventionen, neue Endpunkte hinzufügen.
 
 Eine Komplett-Übersicht der Dokumentation findet sich unter
 [`docs/`](docs/). Die historische Langfassung dieses README ist

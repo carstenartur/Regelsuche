@@ -34,6 +34,25 @@ header {
     color: #1f2937;
     font-weight: 600;
 }
+/* Landing-page focus mode (PR #16 follow-up §3): before the user starts
+ * their first search, only the entry-point ("Workbench") tab is shown so
+ * newcomers see one obvious primary flow instead of a feature wall. After
+ * the first demo click or `searchForm` submit, the app removes
+ * `body.pre-search` and the full tab strip is revealed. */
+body.pre-search .tab[data-tab="paths"],
+body.pre-search .tab[data-tab="graph"],
+body.pre-search .tab[data-tab="candidates"],
+body.pre-search .tab[data-tab="identities"],
+body.pre-search .tab[data-tab="dashboard"],
+body.pre-search .tab[data-tab="benchmark"],
+body.pre-search .tab[data-tab="replay"],
+body.pre-search .tab[data-tab="compare"],
+body.pre-search .tab[data-tab="inventory"],
+body.pre-search .tab[data-tab="memory"],
+body.pre-search .tab[data-tab="proofJobs"],
+body.pre-search .tab[data-tab="exports"] {
+    display: none;
+}
 main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
@@ -290,6 +309,7 @@ table.compare thead th { background: #eff6ff; }
 .benchmark-table thead th { background: #f9fafb; }
 .benchmark-ok    { color: #065f46; font-weight: 600; }
 .benchmark-miss  { color: #991b1b; font-weight: 600; }
+.benchmark-warn  { color: #92400e; font-weight: 600; }
 
 /* ── Math-domain UI polish (PR #13 follow-up) ───────────────────────── */
 .math-domain-panel {

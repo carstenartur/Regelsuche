@@ -7,6 +7,7 @@ Regelsuche fährt drei Test-Schichten, alle als Gradle-Tasks:
 | Unit & Integration | `./gradlew test` | JUnit-5-Tests aller Module (`app/src/test/java`) | im JVM, kein Browser |
 | Browser-E2E | `./gradlew e2eTest` | Playwright steuert Chromium gegen die echte `WebWorkbenchServer`-Instanz | `app/src/e2eTest/java` |
 | Doku-Assets | `./gradlew e2eTest -Pregelsuche.recordDocs=true` | gleiche Tests + Screenshots/Videos für die [Demo-Gallery](demo-gallery.md) | Output unter `docs/assets/` |
+| Benchmark-Report | `./gradlew benchmarkReport` | rendert `docs/benchmark-report.md` + `docs/assets/benchmark-summary.json` aus der `BenchmarkSuite` | JVM, kein Browser |
 
 ## `./gradlew test`
 
@@ -51,12 +52,21 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
 
 ## CI-Integration
 
-`.github/workflows/ci-cd.yml` fährt drei voneinander unabhängige Jobs:
+`.github/workflows/ci-cd.yml` fährt vier voneinander unabhängige Jobs:
 
 * `unit-test` — `./gradlew test`
 * `browser-e2e` — installiert Chromium und ruft `./gradlew e2eTest` auf
+  (deckt u. a. die landing-page-spezifischen Flows `landingPageShowsSimplePrimaryFlow`,
+  `tabsHiddenBeforeFirstSearch`, `tabsVisibleAfterSearch`,
+  `goalSelectionIsSubmittedWithSearch` aus
+  [`LandingPageBrowserFlowTest`](../app/src/e2eTest/java/de/regelsuche/e2e/LandingPageBrowserFlowTest.java)
+  und den Proof-Job-Flow `proofJobPanelBrowserFlow` aus
+  [`ProofJobPanelBrowserFlowTest`](../app/src/e2eTest/java/de/regelsuche/e2e/ProofJobPanelBrowserFlowTest.java) ab)
 * `docs-assets` — nur auf `main`: `./gradlew e2eTest -Pregelsuche.recordDocs=true`
   und lädt die frischen Screenshots/Videos als CI-Artifact hoch.
+* `benchmark-report` — `./gradlew benchmarkReport` rendert die aktuelle
+  Qualitäts-Übersicht und lädt `docs/benchmark-report.md` +
+  `docs/assets/benchmark-summary.json` als Artefakte hoch.
 
 Bei roten E2E-Tests lädt der Workflow zusätzlich die Playwright-Trace-Dateien
 und den `e2eTest`-HTML-Report hoch, damit Fehler ohne lokalen Re-Run
