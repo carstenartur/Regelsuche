@@ -72,6 +72,8 @@ public class WebWorkbenchServer {
     private final ExportQueryService exportQuery;
     private final ExplanationService explanationService = new ExplanationService();
     private final de.regelsuche.search.memory.SearchMemory searchMemory;
+    private final de.regelsuche.proof.ProofBridgeService leanProofBridgeService;
+    private final de.regelsuche.proof.ProofBridgeService smtProofBridgeService;
 
     private HttpServer server;
 
@@ -105,6 +107,22 @@ public class WebWorkbenchServer {
         WebSecurityConfig securityConfig,
         de.regelsuche.search.memory.SearchMemory searchMemory
     ) {
+        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, searchMemory,
+            defaultProofBridgeService(new de.regelsuche.proof.LeanProofBridge()),
+            defaultProofBridgeService(new de.regelsuche.proof.SmtProofBridge()));
+    }
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        de.regelsuche.search.memory.SearchMemory searchMemory,
+        de.regelsuche.proof.ProofBridgeService leanProofBridgeService,
+        de.regelsuche.proof.ProofBridgeService smtProofBridgeService
+    ) {
         this.host = host;
         this.port = port;
         this.graphStore = graphStore;
@@ -112,9 +130,21 @@ public class WebWorkbenchServer {
         this.exportService = exportService;
         this.securityConfig = securityConfig == null ? WebSecurityConfig.none() : securityConfig;
         this.searchMemory = searchMemory == null ? new de.regelsuche.search.memory.SearchMemory() : searchMemory;
+        this.leanProofBridgeService = leanProofBridgeService == null
+            ? defaultProofBridgeService(new de.regelsuche.proof.LeanProofBridge())
+            : leanProofBridgeService;
+        this.smtProofBridgeService = smtProofBridgeService == null
+            ? defaultProofBridgeService(new de.regelsuche.proof.SmtProofBridge())
+            : smtProofBridgeService;
         this.transformationQuery = new TransformationQueryService(graphStore);
         this.inventoryQuery = new RuleInventoryQueryService(graphStore, inventoryRepository);
         this.exportQuery = new ExportQueryService(graphStore, inventoryRepository);
+    }
+
+    private static de.regelsuche.proof.ProofBridgeService defaultProofBridgeService(
+        de.regelsuche.proof.ProofBridge bridge
+    ) {
+        return new de.regelsuche.proof.ProofBridgeService(bridge);
     }
 
     public void start() throws IOException {
@@ -1090,6 +1120,7 @@ public class WebWorkbenchServer {
                 new de.regelsuche.transform.AstRewriteTransformationEngine(
                     de.regelsuche.demo.DemoRuleSet.rules()),
                 searchMemory);
+        demoService.useProofBridge(leanProofBridgeService);
         de.regelsuche.demo.DemoService.DemoRunResult result = demoService.run(demo);
         sendJson(exchange, 200, renderDemoBundle(result));
     }
@@ -1252,11 +1283,8 @@ public class WebWorkbenchServer {
             return;
         }
         String tool = stringValue(body, "tool", "lean4").toLowerCase(java.util.Locale.ROOT);
-        de.regelsuche.proof.ProofBridge bridge = "smt".equals(tool)
-            ? new de.regelsuche.proof.SmtProofBridge()
-            : new de.regelsuche.proof.LeanProofBridge();
         de.regelsuche.proof.ProofBridgeService service =
-            new de.regelsuche.proof.ProofBridgeService(bridge);
+            "smt".equals(tool) ? smtProofBridgeService : leanProofBridgeService;
         List<de.regelsuche.assumption.Assumption> assumptions = new java.util.ArrayList<>();
         Object raw = body.get("assumptions");
         if (raw instanceof List<?> list) {

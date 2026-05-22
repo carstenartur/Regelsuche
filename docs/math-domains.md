@@ -18,7 +18,7 @@ Alle vier Demos werden im
 ausgeführt; der `DemoService` delegiert lediglich. Demo-JSON enthält
 deshalb für jede Math-Domain-Demo:
 
-* `expressionType` — `EQUATION`, `INEQUALITY`, `DERIVATIVE`, `MATRIX`,
+* `expressionType` — `EQUATION`, `INEQUALITY`, `TERM` (für Ableitungen), `MATRIX`,
 * `LaTeX` für vorher/nachher,
 * `proofOutcome` (`OBSERVED`, `VALIDATED_BY_EXAMPLES`,
   `SYMBOLICALLY_VERIFIED`, `FORMALLY_PROVED`),

@@ -58,6 +58,15 @@ class LinearInequalitySolverTest {
     }
 
     @Test
+    void nonLiteralFactorIsRejectedForSoundness() {
+        Inequality input = new Inequality(parse("x"), Comparator.LT, parse("3"));
+        assertThrows(IllegalArgumentException.class,
+            () -> engine.multiplyBothSides(input, parse("k")));
+        assertThrows(IllegalArgumentException.class,
+            () -> engine.divideBothSides(input, parse("k")));
+    }
+
+    @Test
     void divideBothSidesSurfacesNonZeroAssumption() {
         Inequality input = new Inequality(parse("2*x"), Comparator.GT, parse("4"));
         InequalityStep step = engine.divideBothSides(input, new NumberExpr(2));

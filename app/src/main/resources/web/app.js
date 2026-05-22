@@ -125,6 +125,13 @@
         const identities = (data.identities || []).slice(0, 5);
         const targetReached = !!data.targetReached;
         const assumptions = data.assumptions || [];
+        const stepDetails = Array.isArray(selected.stepDetails)
+            ? selected.stepDetails
+            : (Array.isArray(selected.steps) ? selected.steps : []);
+        const stepCount = typeof selected.steps === 'number'
+            ? selected.steps
+            : stepDetails.length;
+        const proofStatus = selected.proofStatus || selected.validationStatus || '';
 
         // Honest banner: identity recognised OR "no identity found, best path was…".
         const banner = targetReached
@@ -143,15 +150,15 @@
                     : '<em>kein Verbesserungsweg im Suchbudget gefunden</em>')
                 + '</div>';
 
-        const proofTag = selected.validationStatus
-            ? renderProofStatusBadge(selected.validationStatus)
+        const proofTag = proofStatus
+            ? renderProofStatusBadge(proofStatus)
             : '';
         const assumptionsBlock = assumptions.length
             ? '<h4>Annahmen</h4><ul>' + assumptions.map((a) =>
                 '<li><code>' + escapeHtml(a) + '</code></li>').join('') + '</ul>'
             : '';
-        const bestMove = (selected.steps && selected.steps.length)
-            ? selected.steps[0]
+        const bestMove = stepDetails.length
+            ? stepDetails[0]
             : null;
         const bestMoveBlock = bestMove
             ? '<h4>Best Move</h4><p><code>' + escapeHtml(bestMove.beforeExpression || '')
@@ -165,10 +172,10 @@
             ['Treffer (selectedPath)',
                 selected.improvedExpression
                     ? selected.originalExpression + ' → ' + selected.improvedExpression
-                      + ' (' + (selected.steps ? selected.steps.length : 0) + ' Schritte, Verbesserung '
+                      + ' (' + stepCount + ' Schritte, Verbesserung '
                       + (selected.totalImprovement || 0) + ')'
                     : '–'],
-            ['Proof-Status', selected.validationStatus || '–'],
+            ['Proof-Status', proofStatus || '–'],
             ['Erwartete Identität', data.expectedHighlight || ''],
             ['Knoten / Kanten', (m.nodes || 0) + ' / ' + (m.edges || 0)],
             ['Pfade entdeckt', m.pathsDiscovered || 0],

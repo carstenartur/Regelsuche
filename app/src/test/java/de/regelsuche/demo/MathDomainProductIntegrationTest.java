@@ -111,6 +111,8 @@ class MathDomainProductIntegrationTest {
         assertTrue(bundle.contains("\"id\":\"math-equation\""));
         assertTrue(bundle.contains("\"targetReached\":true"),
             "equation demo must reach its target: " + bundle);
+        assertTrue(bundle.contains("\"proofOutcome\""),
+            "math-domain demos must include proofOutcome metadata: " + bundle);
         // The bundle exposes a non-empty selectedPath – i.e. the demo went
         // through the regular discovered-transformation pipeline, not a side
         // channel.

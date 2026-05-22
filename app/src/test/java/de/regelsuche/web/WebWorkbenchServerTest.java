@@ -7,6 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.proof.ProofBridge;
+import de.regelsuche.proof.ProofBridgeService;
+import de.regelsuche.proof.ProverExecutor;
 import de.regelsuche.search.memory.InMemoryTranspositionTable;
 import de.regelsuche.search.memory.SearchMemory;
 import de.regelsuche.search.memory.TranspositionEntry;
@@ -16,6 +20,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,6 +121,48 @@ class WebWorkbenchServerTest {
         assertEquals(200, connection.getResponseCode());
         String body = new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertTrue(body.contains("\"size\":1"), body);
+    }
+
+    @Test
+    void injectedProofBridgeServiceIsUsedByDemoAndProofBridgeEndpoints() throws IOException {
+        server.stop();
+        ProofBridge provingBridge = (left, right, assumptions) ->
+            new ProofBridge.ProofAttempt(CandidateProofStatus.FORMALLY_PROVABLE, "theorem demo", "lean4");
+        ProverExecutor successExecutor = new ProverExecutor(List.of("cat"), "lean4", ".lean");
+        ProofBridgeService provingService = new ProofBridgeService(provingBridge, null, successExecutor);
+        server = new WebWorkbenchServer(
+            "127.0.0.1",
+            0,
+            new InMemoryExpressionGraphStore(),
+            new InMemoryRuleInventoryRepository(),
+            new DefaultTransformationExportService(),
+            WebSecurityConfig.none(),
+            new SearchMemory(),
+            provingService,
+            provingService
+        );
+        server.start();
+
+        HttpURLConnection demo = open("/api/demo/math-equation");
+        demo.setRequestMethod("POST");
+        demo.setDoOutput(true);
+        String demoBody = new String(demo.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(demoBody.contains("\"proofOutcome\""), demoBody);
+        assertTrue(demoBody.contains("\"proverStatus\":\"PROVER_CONFIRMED\""), demoBody);
+        assertTrue(demoBody.contains("\"proofStatus\":\"FORMALLY_PROVED\""), demoBody);
+
+        HttpURLConnection proof = open("/api/proof-bridge");
+        proof.setRequestMethod("POST");
+        proof.setDoOutput(true);
+        proof.setRequestProperty("Content-Type", "application/json");
+        try (OutputStream stream = proof.getOutputStream()) {
+            stream.write("{\"leftPattern\":\"x + 3 = 7\",\"rightPattern\":\"x = 4\",\"tool\":\"lean4\"}"
+                .getBytes(StandardCharsets.UTF_8));
+        }
+        assertEquals(200, proof.getResponseCode());
+        String proofBody = new String(proof.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(proofBody.contains("\"proverStatus\":\"PROVER_CONFIRMED\""), proofBody);
+        assertTrue(proofBody.contains("\"proofStatus\":\"FORMALLY_PROVED\""), proofBody);
     }
 
     private HttpURLConnection open(String path) throws IOException {

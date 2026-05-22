@@ -20,9 +20,8 @@ import java.util.Objects;
  *       constant: the comparator stays the same for a strictly positive
  *       factor, <em>flips</em> for a strictly negative factor, and the
  *       (degenerate) zero case is rejected because it collapses the
- *       inequality to {@code 0 ⋈ 0}. For non-literal multipliers the
- *       transformation surfaces an assumption capturing the sign that the
- *       caller must justify.</li>
+ *       inequality to {@code 0 ⋈ 0}. To keep the rewrite sound, only
+ *       numeric literal factors are accepted.</li>
  * </ul>
  */
 public final class InequalityRewriteEngine {
@@ -69,6 +68,10 @@ public final class InequalityRewriteEngine {
     public InequalityStep multiplyBothSides(Inequality inequality, Expr factor) {
         Objects.requireNonNull(inequality, "inequality");
         Objects.requireNonNull(factor, "factor");
+        if (!(factor instanceof NumberExpr)) {
+            throw new IllegalArgumentException(
+                "multiplyBothSides requires a numeric literal factor");
+        }
         if (factor instanceof NumberExpr number && number.value() == 0.0) {
             throw new IllegalArgumentException("Cannot multiply an inequality by zero");
         }
@@ -100,6 +103,10 @@ public final class InequalityRewriteEngine {
     public InequalityStep divideBothSides(Inequality inequality, Expr divisor) {
         Objects.requireNonNull(inequality, "inequality");
         Objects.requireNonNull(divisor, "divisor");
+        if (!(divisor instanceof NumberExpr)) {
+            throw new IllegalArgumentException(
+                "divideBothSides requires a numeric literal divisor");
+        }
         if (divisor instanceof NumberExpr number && number.value() == 0.0) {
             throw new IllegalArgumentException("Cannot divide an inequality by zero");
         }
@@ -120,7 +127,6 @@ public final class InequalityRewriteEngine {
         java.util.List<Assumption> assumptions = new java.util.ArrayList<>();
         assumptions.add(Assumption.nonZero(formatted));
         assumptions.addAll(assumptionsForMultiplier(divisor, sign));
-        // Deduplicate: a strict positive/negative assumption already implies non-zero.
         return new InequalityStep(
             "inequality_divide_both_sides",
             next,
