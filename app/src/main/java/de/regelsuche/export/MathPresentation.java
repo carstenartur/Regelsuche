@@ -1,5 +1,6 @@
 package de.regelsuche.export;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -94,5 +95,54 @@ public final class MathPresentation {
             .replace("ast_", "")
             .replace('_', ' ');
         return "\\text{" + humanised + "}";
+    }
+
+    /**
+     * Step in an aligned derivation block: the (already LaTeX-rendered)
+     * left- and right-hand sides plus the rule id that produced the
+     * transition. The {@code fromLatex} of step <em>n+1</em> is expected
+     * to match the {@code toLatex} of step <em>n</em>; the renderer
+     * only emits the very first {@code fromLatex} and then chains the
+     * {@code toLatex} of each subsequent step underneath.
+     */
+    public record DerivationStep(String fromLatex, String toLatex, String ruleId) {
+        public DerivationStep {
+            fromLatex = fromLatex == null ? "" : fromLatex;
+            toLatex = toLatex == null ? "" : toLatex;
+            ruleId = ruleId == null ? "" : ruleId;
+        }
+    }
+
+    /**
+     * Renders a list of {@link DerivationStep}s as a single
+     * {@code \begin{aligned} … \end{aligned}} block with
+     * {@code \xrightarrow{\text{rule}}} arrows between rows, matching the
+     * derivation style used in {@code docs/demo-gallery.md}.
+     *
+     * <p>The first row carries the source expression; each subsequent
+     * row starts with an alignment ampersand and the labelled arrow,
+     * followed by the new right-hand side. Returns the empty string if
+     * the input is {@code null} or empty so callers can safely embed the
+     * result in a DTO without additional guards.</p>
+     */
+    public String alignedDerivationLatex(List<DerivationStep> steps) {
+        if (steps == null || steps.isEmpty()) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder(64 + steps.size() * 32);
+        out.append("\\begin{aligned}\n");
+        out.append(steps.get(0).fromLatex());
+        for (DerivationStep step : steps) {
+            out.append(" \\\\\n");
+            String arrow = ruleLatex(step.ruleId());
+            if (arrow.isEmpty()) {
+                out.append("&\\rightarrow ");
+            } else {
+                out.append("&\\xrightarrow{").append(arrow).append("} ");
+            }
+            out.append(step.toLatex());
+        }
+        out.append("\n\\end{aligned}");
+        return out.toString();
     }
 }

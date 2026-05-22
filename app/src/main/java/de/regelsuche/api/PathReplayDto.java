@@ -14,13 +14,36 @@ import java.util.List;
  */
 public record PathReplayDto(
     String pathId,
-    List<ReplayStep> steps
+    List<ReplayStep> steps,
+    String alignedDerivationLatex
 ) {
     public PathReplayDto {
         if (pathId == null || pathId.isBlank()) {
             throw new IllegalArgumentException("pathId is required");
         }
         steps = List.copyOf(steps);
+        alignedDerivationLatex = alignedDerivationLatex == null ? "" : alignedDerivationLatex;
+    }
+
+    /**
+     * Backward-compatible constructor that derives the aligned
+     * derivation block from {@code steps} via {@link MATH}.
+     */
+    public PathReplayDto(String pathId, List<ReplayStep> steps) {
+        this(pathId, steps, derive(steps));
+    }
+
+    private static String derive(List<ReplayStep> steps) {
+        if (steps == null || steps.isEmpty()) {
+            return "";
+        }
+        java.util.List<de.regelsuche.export.MathPresentation.DerivationStep> derivation =
+            new java.util.ArrayList<>(steps.size());
+        for (ReplayStep step : steps) {
+            derivation.add(new de.regelsuche.export.MathPresentation.DerivationStep(
+                step.fromLatex(), step.toLatex(), step.ruleId()));
+        }
+        return MATH.alignedDerivationLatex(derivation);
     }
 
     public record ReplayStep(

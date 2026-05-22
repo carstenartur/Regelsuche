@@ -83,4 +83,19 @@ class AllMathDtosCarryLatexTest {
         );
         assertEquals("\\xrightarrow{\\text{custom}}", edge.ruleLatex());
     }
+
+    @Test
+    void pathReplayDtoCarriesAlignedDerivationLatex() {
+        DiscoveredTransformation path = samplePath();
+        PathReplayDto replay = PathReplayDto.from(path, new ExplanationService());
+        assertNotNull(replay.alignedDerivationLatex());
+        assertFalse(replay.alignedDerivationLatex().isBlank(),
+            "Stage 2: every replay DTO must carry an aligned derivation block");
+        org.junit.jupiter.api.Assertions.assertTrue(
+            replay.alignedDerivationLatex().contains("\\begin{aligned}"),
+            "expected \\begin{aligned} in: " + replay.alignedDerivationLatex());
+        org.junit.jupiter.api.Assertions.assertTrue(
+            replay.alignedDerivationLatex().contains("\\end{aligned}"),
+            "expected \\end{aligned} in: " + replay.alignedDerivationLatex());
+    }
 }

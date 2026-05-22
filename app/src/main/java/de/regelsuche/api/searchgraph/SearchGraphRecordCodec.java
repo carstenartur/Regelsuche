@@ -94,6 +94,7 @@ public final class SearchGraphRecordCodec {
 
     private static void writeReplay(JsonWriter writer, PathReplayDto replay) {
         writer.property("pathId", replay.pathId());
+        writer.property("alignedDerivationLatex", replay.alignedDerivationLatex());
         writer.array("steps", w -> replay.steps().forEach(step -> w.objectValue(inner -> {
             inner.property("stepIndex", step.stepIndex());
             inner.property("fromExpression", step.fromExpression());
@@ -249,7 +250,12 @@ public final class SearchGraphRecordCodec {
                 booleanValue(m.get("equivalencePreserving"), true)
             ))
             .toList();
-        return new PathReplayDto(stringValue(values.get("pathId"), "?"), steps);
+        String pathId = stringValue(values.get("pathId"), "?");
+        Object persisted = values.get("alignedDerivationLatex");
+        if (persisted instanceof String s && !s.isBlank()) {
+            return new PathReplayDto(pathId, steps, s);
+        }
+        return new PathReplayDto(pathId, steps);
     }
 
     private static MacroRuleCandidate readMacro(Map<String, Object> values) {

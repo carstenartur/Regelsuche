@@ -69,4 +69,46 @@ class WebUiMathPipelineTest {
         assertTrue(content.contains("data-math"),
             "Math-bearing nodes must carry their raw LaTeX in data-math for the CDN-failure fallback");
     }
+
+    /**
+     * Stage 2 pin: the replay panel must render the whole derivation
+     * as a single {@code \begin{aligned}} block (provided by the
+     * backend in {@code PathReplayDto.alignedDerivationLatex}).
+     */
+    @Test
+    void appJsRendersAlignedDerivationBlockForReplay() throws IOException {
+        Path appJs = locateAppJs();
+        if (appJs == null) {
+            return;
+        }
+        String content = Files.readString(appJs);
+        assertTrue(content.contains("alignedDerivationLatex"),
+            "app.js must read PathReplayDto.alignedDerivationLatex");
+        assertTrue(content.contains("renderAlignedDerivationBlock"),
+            "app.js must expose a renderAlignedDerivationBlock() helper for the replay tab");
+        assertTrue(content.contains("replay-derivation-block"),
+            "app.js must emit a .replay-derivation-block wrapper so the block is styleable");
+    }
+
+    /**
+     * Defensive guard against the Stage 1 stray-`}` regression: the
+     * single-file IIFE (`(() => { … })();`) must contain an equal
+     * number of `{` and `}` characters and must end with the IIFE
+     * close marker. Treat string literals naively — the file is the
+     * sole owner of the math pipeline so the structural shape matters.
+     */
+    @Test
+    void appJsRemainsAValidIifeWithBalancedBraces() throws IOException {
+        Path appJs = locateAppJs();
+        if (appJs == null) {
+            return;
+        }
+        String content = Files.readString(appJs);
+        assertTrue(content.trim().endsWith("})();"),
+            "app.js must remain a single IIFE ending with })();");
+        long open = content.chars().filter(c -> c == '{').count();
+        long close = content.chars().filter(c -> c == '}').count();
+        assertTrue(open == close,
+            "app.js must have balanced braces (got { = " + open + " vs } = " + close + ")");
+    }
 }

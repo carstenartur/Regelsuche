@@ -44,4 +44,32 @@ class MathPresentationTest {
         String label = math.ruleLatex("some_unknown_rule_xyz");
         assertTrue(label.startsWith("\\text{"), "got: " + label);
     }
+
+    @Test
+    void alignedDerivationLatexEmitsBeginAlignedWithArrows() {
+        String latex = math.alignedDerivationLatex(java.util.List.of(
+            new MathPresentation.DerivationStep("(x+3)^2", "x(x+3)+3(x+3)", "polynomial_distribute"),
+            new MathPresentation.DerivationStep("x(x+3)+3(x+3)", "x^2+6x+9", "polynomial_collect_like_terms")
+        ));
+        assertTrue(latex.startsWith("\\begin{aligned}"), latex);
+        assertTrue(latex.endsWith("\\end{aligned}"), latex);
+        assertTrue(latex.contains("(x+3)^2"));
+        assertTrue(latex.contains("\\xrightarrow{a(b+c)\\to ab+ac}"), latex);
+        assertTrue(latex.contains("\\xrightarrow{ax+bx\\to(a+b)x}"), latex);
+        assertTrue(latex.contains(" \\\\\n&"), "rows must be separated by `\\\\\\n&`: " + latex);
+    }
+
+    @Test
+    void alignedDerivationLatexReturnsBlankForEmptyOrNull() {
+        assertEquals("", math.alignedDerivationLatex(null));
+        assertEquals("", math.alignedDerivationLatex(java.util.List.of()));
+    }
+
+    @Test
+    void alignedDerivationLatexFallsBackToPlainArrowWhenRuleIsBlank() {
+        String latex = math.alignedDerivationLatex(java.util.List.of(
+            new MathPresentation.DerivationStep("a", "b", "")
+        ));
+        assertTrue(latex.contains("&\\rightarrow b"), latex);
+    }
 }

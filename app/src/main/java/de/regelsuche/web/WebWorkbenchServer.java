@@ -602,6 +602,7 @@ public class WebWorkbenchServer {
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("pathId", dto.pathId());
+        writer.property("alignedDerivationLatex", dto.alignedDerivationLatex());
         writer.array("steps", w -> dto.steps().forEach(step ->
             w.objectValue(inner -> {
                 inner.property("stepIndex", step.stepIndex());

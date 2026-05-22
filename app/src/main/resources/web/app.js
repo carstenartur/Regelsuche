@@ -911,7 +911,7 @@
     }
 
     /* ─── Replay tab ─── */
-    let replayState = { steps: [], index: 0, timer: null };
+    let replayState = { steps: [], index: 0, timer: null, alignedDerivationLatex: '' };
     if ($('replayLoad')) {
         $('replayLoad').addEventListener('click', loadReplay);
         $('replayPrev').addEventListener('click', () => { stopReplay(); stepReplay(-1); });
@@ -961,6 +961,7 @@
             const response = await fetch('/api/paths/' + encodeURIComponent(pathId) + '/replay');
             const data = await response.json();
             replayState.steps = data.steps || [];
+            replayState.alignedDerivationLatex = data.alignedDerivationLatex || '';
             replayState.index = 0;
             renderReplayStep();
         } catch (ex) {
@@ -978,7 +979,10 @@
         const ruleId = step.ruleId || '';
         // Math-domain-specific extras for the four PR-#13 demos.
         const extras = renderReplayDomainExtras(step, ruleId);
-        canvas.innerHTML = '<div class="replay-step">'
+        const derivationBlock = renderAlignedDerivationBlock(
+            replayState.alignedDerivationLatex, replayState.index);
+        canvas.innerHTML = derivationBlock
+            + '<div class="replay-step">'
             + '<div class="replay-step-index">Schritt ' + (step.stepIndex + 1)
             + ' / ' + replayState.steps.length + '</div>'
             + '<div class="replay-from"><strong>Vorher:</strong> '
@@ -997,6 +1001,23 @@
             + '</div>';
         window.renderMath(canvas);
     }
+
+    /**
+     * Stage 2: render the whole derivation as one `\begin{aligned}` block
+     * with a highlighted row for the currently focused step. The block is
+     * provided by the backend (PathReplayDto.alignedDerivationLatex) so
+     * the same rule-arrow style is reused across server-rendered
+     * exports and the interactive UI.
+     */
+    function renderAlignedDerivationBlock(latex, focusIndex) {
+        if (!latex) return '';
+        const display = '$$' + latex + '$$';
+        return '<div class="replay-derivation-block" data-focus-step="' + focusIndex + '">'
+            + '<div class="replay-derivation-title">Rechenweg</div>'
+            + '<div class="math replay-derivation-math" data-math="' + escapeHtml(display) + '">'
+            + escapeHtml(display)
+            + '</div>'
+            + '</div>';
     }
 
     /**
