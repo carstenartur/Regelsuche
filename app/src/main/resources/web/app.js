@@ -31,7 +31,80 @@
     }
     // Fire-and-forget; functions guard on `typeof cytoscape === 'function'`.
     loadCdnScript('https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js');
+    // KaTeX is preferred for math typesetting (fast, App-feel). MathJax is
+    // loaded as a fallback for constructs that KaTeX does not support, and
+    // also as the renderer used by legacy call sites until they are migrated
+    // to the central renderMath(root) pipeline. The KaTeX stylesheet is
+    // injected so the page works without a static <link> in index.html.
+    function loadCdnStylesheet(href) {
+        return new Promise((resolve) => {
+            const l = document.createElement('link');
+            l.rel = 'stylesheet';
+            l.href = href;
+            l.crossOrigin = 'anonymous';
+            l.referrerPolicy = 'no-referrer';
+            l.onload = () => resolve(true);
+            l.onerror = () => resolve(false);
+            document.head.appendChild(l);
+        });
+    }
+    loadCdnStylesheet('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css');
+    loadCdnScript('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js').then((ok) => {
+        if (!ok) { return; }
+        loadCdnScript('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js').then(() => {
+            // Typeset whatever is already on screen once KaTeX is ready.
+            window.renderMath(document.body);
+        });
+    });
     loadCdnScript('https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js');
+
+    /**
+     * Central math typesetter. Walks `root` for nodes carrying inline LaTeX
+     * (`[data-math]`, `.math`, or the legacy `.latex` class) and renders
+     * them via KaTeX when available, falling back to MathJax, and finally
+     * leaving the raw LaTeX visible inside a `<code>` block tagged
+     * `math-fallback` so the formula remains legible without any CDN.
+     *
+     * All UI surfaces (replay, demo summary, search-graph inspector,
+     * matrix preview, hints, proof panel, export preview) must call this
+     * helper instead of invoking MathJax directly so the rendering path
+     * stays uniform.
+     */
+    window.renderMath = function renderMath(root) {
+        if (!root) { return; }
+        const nodes = root.querySelectorAll('[data-math], .math, .latex');
+        if (typeof window.renderMathInElement === 'function') {
+            try {
+                window.renderMathInElement(root, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\(', right: '\\)', display: false },
+                        { left: '\\[', right: '\\]', display: true }
+                    ],
+                    throwOnError: false
+                });
+                return;
+            } catch (_) {
+                // fall through to MathJax / plain fallback below
+            }
+        }
+        if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+            window.MathJax.typesetPromise([root]).catch(() => {});
+            return;
+        }
+        // No renderer available — surface the raw LaTeX in a <code> block so
+        // the formula is still legible.
+        nodes.forEach((node) => {
+            if (node.classList.contains('math-fallback')) { return; }
+            const raw = node.getAttribute('data-math') || node.textContent || '';
+            node.innerHTML = '';
+            const code = document.createElement('code');
+            code.textContent = raw;
+            node.appendChild(code);
+            node.classList.add('math-fallback');
+        });
+    };
 
     const $ = (id) => document.getElementById(id);
     const setStatus = (msg, level = '') => {
@@ -225,6 +298,7 @@
             + idList
             + '<div class="demo-actions">' + linkList + '</div>';
         wireProofBridgeButton(data);
+        window.renderMath($('demoSummary'));
     }
 
     /**
@@ -274,9 +348,9 @@
             if (inputLatex || resultLatex) {
                 html += '<div class="math-domain-panel math-matrix-panel">'
                     + '<h4>Matrix-Vorschau (bmatrix)</h4>'
-                    + '<div class="latex">$' + escapeHtml(inputLatex) + '$</div>'
+                    + '<div class="math" data-math="$' + escapeHtml(inputLatex) + '$">$' + escapeHtml(inputLatex) + '$</div>'
                     + '<div class="hint">→</div>'
-                    + '<div class="latex">$' + escapeHtml(resultLatex) + '$</div>'
+                    + '<div class="math" data-math="$' + escapeHtml(resultLatex) + '$">$' + escapeHtml(resultLatex) + '$</div>'
                     + '</div>';
             }
         }
@@ -570,10 +644,10 @@
         const rows = Object.entries(payload || {}).map(([k, v]) =>
             `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}</div>`);
         inspector.innerHTML = rows.join('');
-        if (payload && payload.latex && window.MathJax && window.MathJax.typesetPromise) {
-            inspector.innerHTML += '<div class="latex">$' + payload.latex + '$</div>';
-            window.MathJax.typesetPromise([inspector]).catch(() => {});
+        if (payload && payload.latex) {
+            inspector.innerHTML += '<div class="math" data-math="$' + payload.latex + '$">$' + payload.latex + '$</div>';
         }
+        window.renderMath(inspector);
     }
 
     /* ─── Compare tab ─── */
@@ -909,10 +983,10 @@
             + ' / ' + replayState.steps.length + '</div>'
             + '<div class="replay-from"><strong>Vorher:</strong> '
             + '<code>' + escapeHtml(step.fromExpression) + '</code><br>'
-            + '<span class="latex">$' + escapeHtml(step.fromLatex) + '$</span></div>'
+            + '<span class="math" data-math="$' + escapeHtml(step.fromLatex) + '$">$' + escapeHtml(step.fromLatex) + '$</span></div>'
             + '<div class="replay-to"><strong>Nachher:</strong> '
             + '<code>' + escapeHtml(step.toExpression) + '</code><br>'
-            + '<span class="latex">$' + escapeHtml(step.toLatex) + '$</span></div>'
+            + '<span class="math" data-math="$' + escapeHtml(step.toLatex) + '$">$' + escapeHtml(step.toLatex) + '$</span></div>'
             + '<div class="replay-rule"><strong>Regel:</strong> <code>'
             + escapeHtml(ruleId) + '</code></div>'
             + extras
@@ -921,6 +995,8 @@
             + '<div class="hint">Δ Komplexität: ' + step.scoreDelta
             + ' · Äquivalenzerhaltend: ' + step.equivalencePreserving + '</div>'
             + '</div>';
+        window.renderMath(canvas);
+    }
     }
 
     /**

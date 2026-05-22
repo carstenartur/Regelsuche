@@ -14,6 +14,7 @@ public record SearchGraphEdgeDto(
     String from,
     String to,
     String ruleId,
+    String ruleLatex,
     RewriteKind ruleKind,
     int scoreDelta,
     List<String> assumptions,
@@ -25,8 +26,30 @@ public record SearchGraphEdgeDto(
             throw new IllegalArgumentException("from and to are required");
         }
         ruleId = ruleId == null ? "" : ruleId;
+        ruleLatex = ruleLatex == null ? "" : ruleLatex;
         ruleKind = ruleKind == null ? RewriteKind.NORMALIZE : ruleKind;
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         pathIds = pathIds == null ? List.of() : List.copyOf(pathIds);
+    }
+
+    /**
+     * Backwards-compatible constructor for callers that pre-date the
+     * {@link #ruleLatex()} field. The LaTeX rule label is derived from
+     * {@code ruleId} via the central
+     * {@link de.regelsuche.export.MathPresentation#ruleLatex(String)} helper.
+     */
+    public SearchGraphEdgeDto(
+        String from,
+        String to,
+        String ruleId,
+        RewriteKind ruleKind,
+        int scoreDelta,
+        List<String> assumptions,
+        List<String> pathIds,
+        boolean equivalencePreserving
+    ) {
+        this(from, to, ruleId,
+            de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(ruleId),
+            ruleKind, scoreDelta, assumptions, pathIds, equivalencePreserving);
     }
 }

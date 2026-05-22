@@ -55,9 +55,10 @@ public record PathReplayDto(
         return new PathReplayDto(path.id(), replaySteps);
     }
 
-    private static final de.regelsuche.export.AstLatexRenderer LATEX = new de.regelsuche.export.AstLatexRenderer();
+    private static final de.regelsuche.export.MathPresentation MATH =
+        de.regelsuche.export.MathPresentation.DEFAULT;
 
     private static String toLatex(String expression) {
-        return expression == null ? "" : LATEX.renderExpression(expression);
+        return MATH.latex(expression);
     }
 }

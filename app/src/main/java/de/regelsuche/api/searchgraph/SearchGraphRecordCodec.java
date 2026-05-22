@@ -62,6 +62,7 @@ public final class SearchGraphRecordCodec {
             inner.property("from", edge.from());
             inner.property("to", edge.to());
             inner.property("ruleId", edge.ruleId());
+            inner.property("ruleLatex", edge.ruleLatex());
             inner.property("ruleKind", edge.ruleKind().name());
             inner.property("scoreDelta", edge.scoreDelta());
             inner.stringArray("assumptions", edge.assumptions());
@@ -185,16 +186,22 @@ public final class SearchGraphRecordCodec {
             .toList();
         List<SearchGraphEdgeDto> edges = readList(values.get("edges")).stream()
             .map(SearchGraphRecordCodec::asMap)
-            .map(m -> new SearchGraphEdgeDto(
-                stringValue(m.get("from"), ""),
-                stringValue(m.get("to"), ""),
-                stringValue(m.get("ruleId"), ""),
-                RewriteKind.valueOf(stringValue(m.get("ruleKind"), RewriteKind.NORMALIZE.name())),
-                intValue(m.get("scoreDelta"), 0),
-                stringList(m.get("assumptions")),
-                stringList(m.get("pathIds")),
-                booleanValue(m.get("equivalencePreserving"), true)
-            ))
+            .map(m -> {
+                String ruleId = stringValue(m.get("ruleId"), "");
+                String ruleLatex = stringValue(m.get("ruleLatex"),
+                    de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(ruleId));
+                return new SearchGraphEdgeDto(
+                    stringValue(m.get("from"), ""),
+                    stringValue(m.get("to"), ""),
+                    ruleId,
+                    ruleLatex,
+                    RewriteKind.valueOf(stringValue(m.get("ruleKind"), RewriteKind.NORMALIZE.name())),
+                    intValue(m.get("scoreDelta"), 0),
+                    stringList(m.get("assumptions")),
+                    stringList(m.get("pathIds")),
+                    booleanValue(m.get("equivalencePreserving"), true)
+                );
+            })
             .toList();
         List<SearchGraphClusterDto> clusters = readList(values.get("clusters")).stream()
             .map(SearchGraphRecordCodec::asMap)

@@ -121,8 +121,11 @@ public class ExplanationService {
         writer.property("explanation", step.explanation());
     }
 
+    private static final de.regelsuche.export.MathPresentation MATH =
+        de.regelsuche.export.MathPresentation.DEFAULT;
+
     private String toLatex(String expression) {
-        return expression.replace("*", " \\cdot ");
+        return MATH.latex(expression);
     }
 
     private String humanRuleName(String ruleId) {
