@@ -6,3 +6,11 @@ build
 
 # Ignore Kotlin plugin data
 .kotlin
+
+# Generated browser-flow videos are produced by `./gradlew e2eTest
+# -Pregelsuche.recordDocs=true` and uploaded as CI artifacts; they
+# are too large to commit. Screenshots under
+# docs/assets/screenshots/ are committed and serve as the canonical
+# visual documentation.
+docs/assets/videos/
+docs/assets/gifs/

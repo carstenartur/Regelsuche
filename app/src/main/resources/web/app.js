@@ -218,7 +218,7 @@
             return '';
         }
         const selected = data.selectedPath || data.bestPath || {};
-        const steps = selected.steps || [];
+        const steps = selected.stepDetails || [];
         let html = '';
         if (data.id === 'math-equation') {
             const rows = steps.map((s, i) =>
