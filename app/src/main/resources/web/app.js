@@ -61,7 +61,21 @@
     $('loadExample-eq').addEventListener('click', () => loadExample('2*x + 3 = 7', 'EQUATION'));
 
     /* ─── Demo buttons (Killer-App landing flow) ─── */
+    /**
+     * Reveal the full tab strip the first time the user actually starts a
+     * search or clicks a demo. Until then only the workbench entry tab is
+     * visible (see body.pre-search rules in style.css) so newcomers see a
+     * single obvious flow instead of a feature wall.
+     */
+    function markSearchStarted() {
+        if (document.body.classList.contains('pre-search')) {
+            document.body.classList.remove('pre-search');
+            document.body.dataset.preSearch = 'false';
+        }
+    }
+
     async function runDemo(demoId, btn) {
+        markSearchStarted();
         const status = $('demoStatus');
         const summary = $('demoSummary');
         const buttons = document.querySelectorAll('.demo-button');
@@ -395,6 +409,7 @@
     /* ─── Search form ─── */
     $('searchForm').addEventListener('submit', async (event) => {
         event.preventDefault();
+        markSearchStarted();
         const form = event.target;
         const domains = Array.from(form.querySelectorAll('input[name="domain"]:checked')).map((c) => c.value);
         const payload = {
