@@ -14,20 +14,57 @@ public record SearchGraphEdgeDto(
     String from,
     String to,
     String ruleId,
+    String ruleLatex,
     RewriteKind ruleKind,
     int scoreDelta,
     List&lt;String&gt; assumptions,
     List&lt;String&gt; pathIds,
     boolean equivalencePreserving
 ) {
-<span class="fc" id="L23">    public SearchGraphEdgeDto {</span>
-<span class="pc bpc" id="L24" title="2 of 4 branches missed.">        if (from == null || to == null) {</span>
-<span class="nc" id="L25">            throw new IllegalArgumentException(&quot;from and to are required&quot;);</span>
+<span class="fc" id="L24">    public SearchGraphEdgeDto {</span>
+<span class="pc bpc" id="L25" title="2 of 4 branches missed.">        if (from == null || to == null) {</span>
+<span class="nc" id="L26">            throw new IllegalArgumentException(&quot;from and to are required&quot;);</span>
         }
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
-<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        ruleKind = ruleKind == null ? RewriteKind.NORMALIZE : ruleKind;</span>
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
-<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        pathIds = pathIds == null ? List.of() : List.copyOf(pathIds);</span>
-<span class="fc" id="L31">    }</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        ruleLatex = ruleLatex == null ? &quot;&quot; : ruleLatex;</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        ruleKind = ruleKind == null ? RewriteKind.NORMALIZE : ruleKind;</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        pathIds = pathIds == null ? List.of() : List.copyOf(pathIds);</span>
+<span class="fc" id="L33">    }</span>
+
+    /**
+     * Backwards-compatible constructor for callers that pre-date the
+     * {@link #ruleLatex()} field. The LaTeX rule label is derived from
+     * {@code ruleId} via the central
+     * {@link de.regelsuche.export.MathPresentation#ruleLatex(String)} helper.
+     */
+    public SearchGraphEdgeDto(
+        String from,
+        String to,
+        String ruleId,
+        RewriteKind ruleKind,
+        int scoreDelta,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; pathIds,
+        boolean equivalencePreserving
+    ) {
+<span class="fc" id="L51">        this(from, to, ruleId,</span>
+<span class="fc" id="L52">            de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(ruleId),</span>
+            ruleKind, scoreDelta, assumptions, pathIds, equivalencePreserving);
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * Stage 5 — structured {@link de.regelsuche.export.layout.MathLayout MathLayout}
+     * for the edge's rule caption. Derived on demand from {@link #ruleLatex()}
+     * via {@link de.regelsuche.export.MathPresentation#layout(String)} so the
+     * record stays codec-compatible while still surfacing the layout pipeline
+     * to layout-aware front-ends and exports.
+     */
+    public de.regelsuche.export.layout.MathLayout layout() {
+<span class="fc" id="L64">        return de.regelsuche.export.layout.MathLayout.fromLatexFragment(</span>
+            ruleLatex,
+<span class="fc" id="L66">            de.regelsuche.export.layout.AstAriaRenderer.ariaLabel(ruleId)</span>
+        );
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

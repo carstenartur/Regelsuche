@@ -23,9 +23,9 @@ public final class JsonReader {
 <span class="fc" id="L23">        expect('{');</span>
 <span class="fc" id="L24">        Map&lt;String, Object&gt; values = new LinkedHashMap&lt;&gt;();</span>
 <span class="fc" id="L25">        skipWhitespace();</span>
-<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (peek('}')) {</span>
-<span class="nc" id="L27">            index++;</span>
-<span class="nc" id="L28">            return values;</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        if (peek('}')) {</span>
+<span class="fc" id="L27">            index++;</span>
+<span class="fc" id="L28">            return values;</span>
         }
         do {
 <span class="fc" id="L31">            String key = readString();</span>
@@ -89,13 +89,13 @@ public final class JsonReader {
 <span class="fc bfc" id="L89" title="All 2 branches covered.">            if (current == '&quot;') {</span>
 <span class="fc" id="L90">                return builder.toString();</span>
             }
-<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (current == '\\') {</span>
-<span class="nc" id="L93">                char escaped = source.charAt(index++);</span>
-<span class="nc bnc" id="L94" title="All 10 branches missed.">                builder.append(switch (escaped) {</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (current == '\\') {</span>
+<span class="fc" id="L93">                char escaped = source.charAt(index++);</span>
+<span class="pc bpc" id="L94" title="8 of 10 branches missed.">                builder.append(switch (escaped) {</span>
 <span class="nc" id="L95">                    case '&quot;' -&gt; '&quot;';</span>
-<span class="nc" id="L96">                    case '\\' -&gt; '\\';</span>
+<span class="fc" id="L96">                    case '\\' -&gt; '\\';</span>
 <span class="nc" id="L97">                    case '/' -&gt; '/';</span>
-<span class="nc" id="L98">                    case 'n' -&gt; '\n';</span>
+<span class="fc" id="L98">                    case 'n' -&gt; '\n';</span>
 <span class="nc" id="L99">                    case 'r' -&gt; '\r';</span>
 <span class="nc" id="L100">                    case 't' -&gt; '\t';</span>
 <span class="nc" id="L101">                    case 'b' -&gt; '\b';</span>
@@ -103,7 +103,7 @@ public final class JsonReader {
 <span class="nc" id="L103">                    case 'u' -&gt; readUnicodeEscape();</span>
 <span class="nc" id="L104">                    default -&gt; escaped;</span>
                 });
-<span class="nc" id="L106">            } else {</span>
+<span class="fc" id="L106">            } else {</span>
 <span class="fc" id="L107">                builder.append(current);</span>
             }
 <span class="fc" id="L109">        }</span>

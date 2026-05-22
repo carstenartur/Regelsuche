@@ -21,53 +21,54 @@ public final class SearchGraphJsonSerializer {
 <span class="fc" id="L21">                inner.property(&quot;id&quot;, node.id());</span>
 <span class="fc" id="L22">                inner.property(&quot;expression&quot;, node.expression());</span>
 <span class="fc" id="L23">                inner.property(&quot;latex&quot;, node.latex());</span>
-<span class="fc" id="L24">                inner.property(&quot;score&quot;, node.score());</span>
-<span class="fc" id="L25">                inner.property(&quot;depth&quot;, node.depth());</span>
-<span class="fc" id="L26">                inner.property(&quot;visitedCount&quot;, node.visitedCount());</span>
-<span class="fc" id="L27">                inner.property(&quot;isBest&quot;, node.isBest());</span>
-<span class="fc" id="L28">                inner.property(&quot;isDeadEnd&quot;, node.isDeadEnd());</span>
-<span class="fc" id="L29">                inner.property(&quot;candidateStatus&quot;, node.candidateStatus().name());</span>
-<span class="fc" id="L30">                inner.property(&quot;clusterId&quot;, node.clusterId());</span>
-<span class="fc" id="L31">            })));</span>
-<span class="fc" id="L32">        writer.array(&quot;edges&quot;, w -&gt; dto.edges().forEach(edge -&gt;</span>
-<span class="fc" id="L33">            w.objectValue(inner -&gt; {</span>
-<span class="fc" id="L34">                inner.property(&quot;from&quot;, edge.from());</span>
-<span class="fc" id="L35">                inner.property(&quot;to&quot;, edge.to());</span>
-<span class="fc" id="L36">                inner.property(&quot;ruleId&quot;, edge.ruleId());</span>
-<span class="fc" id="L37">                inner.property(&quot;ruleKind&quot;, edge.ruleKind().name());</span>
-<span class="fc" id="L38">                inner.property(&quot;scoreDelta&quot;, edge.scoreDelta());</span>
-<span class="fc" id="L39">                inner.stringArray(&quot;assumptions&quot;, edge.assumptions());</span>
-<span class="fc" id="L40">                inner.stringArray(&quot;pathIds&quot;, edge.pathIds());</span>
-<span class="fc" id="L41">                inner.property(&quot;equivalencePreserving&quot;, edge.equivalencePreserving());</span>
-<span class="fc" id="L42">            })));</span>
-<span class="fc" id="L43">        writer.array(&quot;clusters&quot;, w -&gt; dto.clusters().forEach(cluster -&gt;</span>
-<span class="fc" id="L44">            w.objectValue(inner -&gt; {</span>
-<span class="fc" id="L45">                inner.property(&quot;id&quot;, cluster.id());</span>
-<span class="fc" id="L46">                inner.property(&quot;label&quot;, cluster.label());</span>
-<span class="fc" id="L47">                inner.property(&quot;type&quot;, cluster.type().name());</span>
-<span class="fc" id="L48">                inner.stringArray(&quot;nodeIds&quot;, cluster.nodeIds());</span>
-<span class="fc" id="L49">                inner.stringArray(&quot;supportingPathIds&quot;, cluster.supportingPathIds());</span>
-<span class="fc" id="L50">                inner.property(&quot;cohesionScore&quot;, cluster.cohesionScore());</span>
-<span class="fc" id="L51">            })));</span>
-<span class="fc" id="L52">        writer.object(&quot;stats&quot;, stats -&gt; {</span>
-<span class="fc" id="L53">            SearchGraphStatsDto statsDto = dto.stats();</span>
-<span class="fc" id="L54">            stats.property(&quot;nodesVisited&quot;, statsDto.nodesVisited());</span>
-<span class="fc" id="L55">            stats.property(&quot;edgesGenerated&quot;, statsDto.edgesGenerated());</span>
-<span class="fc" id="L56">            stats.property(&quot;deadEnds&quot;, statsDto.deadEnds());</span>
-<span class="fc" id="L57">            stats.property(&quot;bestScore&quot;, statsDto.bestScore());</span>
-<span class="fc" id="L58">            stats.property(&quot;averageBranchingFactor&quot;, statsDto.averageBranchingFactor());</span>
-<span class="fc" id="L59">            stats.property(&quot;maxDepthReached&quot;, statsDto.maxDepthReached());</span>
-<span class="fc" id="L60">            stats.object(&quot;ruleUsageFrequency&quot;, rules -&gt; {</span>
-<span class="fc bfc" id="L61" title="All 2 branches covered.">                for (Map.Entry&lt;String, Integer&gt; entry : statsDto.ruleUsageFrequency().entrySet()) {</span>
-<span class="fc" id="L62">                    rules.property(entry.getKey(), entry.getValue());</span>
-<span class="fc" id="L63">                }</span>
-<span class="fc" id="L64">            });</span>
-<span class="fc" id="L65">            stats.stringArray(&quot;mostUsefulRules&quot;, statsDto.mostUsefulRules());</span>
-<span class="fc" id="L66">            stats.property(&quot;candidateCount&quot;, statsDto.candidateCount());</span>
-<span class="fc" id="L67">            stats.property(&quot;macroRuleCount&quot;, statsDto.macroRuleCount());</span>
-<span class="fc" id="L68">        });</span>
-<span class="fc" id="L69">        writer.endObject();</span>
-<span class="fc" id="L70">        return writer.toString();</span>
+<span class="fc" id="L24">                inner.property(&quot;expressionLatex&quot;, node.expressionLatex());</span>
+<span class="fc" id="L25">                inner.property(&quot;score&quot;, node.score());</span>
+<span class="fc" id="L26">                inner.property(&quot;depth&quot;, node.depth());</span>
+<span class="fc" id="L27">                inner.property(&quot;visitedCount&quot;, node.visitedCount());</span>
+<span class="fc" id="L28">                inner.property(&quot;isBest&quot;, node.isBest());</span>
+<span class="fc" id="L29">                inner.property(&quot;isDeadEnd&quot;, node.isDeadEnd());</span>
+<span class="fc" id="L30">                inner.property(&quot;candidateStatus&quot;, node.candidateStatus().name());</span>
+<span class="fc" id="L31">                inner.property(&quot;clusterId&quot;, node.clusterId());</span>
+<span class="fc" id="L32">            })));</span>
+<span class="fc" id="L33">        writer.array(&quot;edges&quot;, w -&gt; dto.edges().forEach(edge -&gt;</span>
+<span class="fc" id="L34">            w.objectValue(inner -&gt; {</span>
+<span class="fc" id="L35">                inner.property(&quot;from&quot;, edge.from());</span>
+<span class="fc" id="L36">                inner.property(&quot;to&quot;, edge.to());</span>
+<span class="fc" id="L37">                inner.property(&quot;ruleId&quot;, edge.ruleId());</span>
+<span class="fc" id="L38">                inner.property(&quot;ruleKind&quot;, edge.ruleKind().name());</span>
+<span class="fc" id="L39">                inner.property(&quot;scoreDelta&quot;, edge.scoreDelta());</span>
+<span class="fc" id="L40">                inner.stringArray(&quot;assumptions&quot;, edge.assumptions());</span>
+<span class="fc" id="L41">                inner.stringArray(&quot;pathIds&quot;, edge.pathIds());</span>
+<span class="fc" id="L42">                inner.property(&quot;equivalencePreserving&quot;, edge.equivalencePreserving());</span>
+<span class="fc" id="L43">            })));</span>
+<span class="fc" id="L44">        writer.array(&quot;clusters&quot;, w -&gt; dto.clusters().forEach(cluster -&gt;</span>
+<span class="fc" id="L45">            w.objectValue(inner -&gt; {</span>
+<span class="fc" id="L46">                inner.property(&quot;id&quot;, cluster.id());</span>
+<span class="fc" id="L47">                inner.property(&quot;label&quot;, cluster.label());</span>
+<span class="fc" id="L48">                inner.property(&quot;type&quot;, cluster.type().name());</span>
+<span class="fc" id="L49">                inner.stringArray(&quot;nodeIds&quot;, cluster.nodeIds());</span>
+<span class="fc" id="L50">                inner.stringArray(&quot;supportingPathIds&quot;, cluster.supportingPathIds());</span>
+<span class="fc" id="L51">                inner.property(&quot;cohesionScore&quot;, cluster.cohesionScore());</span>
+<span class="fc" id="L52">            })));</span>
+<span class="fc" id="L53">        writer.object(&quot;stats&quot;, stats -&gt; {</span>
+<span class="fc" id="L54">            SearchGraphStatsDto statsDto = dto.stats();</span>
+<span class="fc" id="L55">            stats.property(&quot;nodesVisited&quot;, statsDto.nodesVisited());</span>
+<span class="fc" id="L56">            stats.property(&quot;edgesGenerated&quot;, statsDto.edgesGenerated());</span>
+<span class="fc" id="L57">            stats.property(&quot;deadEnds&quot;, statsDto.deadEnds());</span>
+<span class="fc" id="L58">            stats.property(&quot;bestScore&quot;, statsDto.bestScore());</span>
+<span class="fc" id="L59">            stats.property(&quot;averageBranchingFactor&quot;, statsDto.averageBranchingFactor());</span>
+<span class="fc" id="L60">            stats.property(&quot;maxDepthReached&quot;, statsDto.maxDepthReached());</span>
+<span class="fc" id="L61">            stats.object(&quot;ruleUsageFrequency&quot;, rules -&gt; {</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                for (Map.Entry&lt;String, Integer&gt; entry : statsDto.ruleUsageFrequency().entrySet()) {</span>
+<span class="fc" id="L63">                    rules.property(entry.getKey(), entry.getValue());</span>
+<span class="fc" id="L64">                }</span>
+<span class="fc" id="L65">            });</span>
+<span class="fc" id="L66">            stats.stringArray(&quot;mostUsefulRules&quot;, statsDto.mostUsefulRules());</span>
+<span class="fc" id="L67">            stats.property(&quot;candidateCount&quot;, statsDto.candidateCount());</span>
+<span class="fc" id="L68">            stats.property(&quot;macroRuleCount&quot;, statsDto.macroRuleCount());</span>
+<span class="fc" id="L69">        });</span>
+<span class="fc" id="L70">        writer.endObject();</span>
+<span class="fc" id="L71">        return writer.toString();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

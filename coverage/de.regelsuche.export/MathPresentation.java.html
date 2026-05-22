@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MathPresentation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.export</a> &gt; <span class="el_source">MathPresentation.java</span></div><h1>MathPresentation.java</h1><pre class="source lang-java linenums">package de.regelsuche.export;
+
+import de.regelsuche.export.layout.AstAriaRenderer;
+import de.regelsuche.export.layout.MathLayout;
+import de.regelsuche.export.layout.MathLayoutNode;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Central math-presentation helper. The &lt;strong&gt;only&lt;/strong&gt; sanctioned
+ * source of LaTeX strings for the Web-Workbench: every DTO and service
+ * that surfaces a mathematical expression to the UI, the export bundle,
+ * the proof panel, the didactic views or the demo gallery is expected
+ * to route through this helper.
+ *
+ * &lt;p&gt;Internally delegates to {@link AstLatexRenderer}. Hand-rolled
+ * substitutions such as {@code expression.replace(&quot;*&quot;, &quot; \\cdot &quot;)}
+ * are explicitly out of scope and pinned down by
+ * {@code NoAdHocOperatorReplacementsTest}.&lt;/p&gt;
+ *
+ * &lt;p&gt;The helper additionally exposes light-weight presentation utilities
+ * for rule labels (used as search-graph edge captions and replay arrow
+ * labels) so that the same display style is reused across every panel.&lt;/p&gt;
+ */
+public final class MathPresentation {
+
+    /** Default, thread-safe instance suitable for sharing across callers. */
+<span class="fc" id="L30">    public static final MathPresentation DEFAULT = new MathPresentation();</span>
+
+<span class="fc" id="L32">    private static final Map&lt;String, String&gt; RULE_LATEX_LABELS = Map.ofEntries(</span>
+<span class="fc" id="L33">        Map.entry(&quot;inequality_multiply_both_sides&quot;, &quot;\\cdot c&quot;),</span>
+<span class="fc" id="L34">        Map.entry(&quot;inequality_divide_both_sides&quot;, &quot;\\div c&quot;),</span>
+<span class="fc" id="L35">        Map.entry(&quot;calculus_power_rule&quot;, &quot;\\tfrac{d}{dx}\\,x^{n}&quot;),</span>
+<span class="fc" id="L36">        Map.entry(&quot;calculus_sum_rule&quot;, &quot;\\tfrac{d}{dx}(f+g)&quot;),</span>
+<span class="fc" id="L37">        Map.entry(&quot;calculus_product_rule&quot;, &quot;\\tfrac{d}{dx}(fg)&quot;),</span>
+<span class="fc" id="L38">        Map.entry(&quot;calculus_chain_rule&quot;, &quot;\\tfrac{d}{dx}f(g(x))&quot;),</span>
+<span class="fc" id="L39">        Map.entry(&quot;trig_pythagoras&quot;, &quot;\\sin^2+\\cos^2=1&quot;),</span>
+<span class="fc" id="L40">        Map.entry(&quot;rational_cancel_common_factor&quot;, &quot;\\frac{ax}{bx}\\to\\frac{a}{b}&quot;),</span>
+<span class="fc" id="L41">        Map.entry(&quot;polynomial_distribute&quot;, &quot;a(b+c)\\to ab+ac&quot;),</span>
+<span class="fc" id="L42">        Map.entry(&quot;polynomial_collect_like_terms&quot;, &quot;ax+bx\\to(a+b)x&quot;)</span>
+    );
+
+    private final AstLatexRenderer renderer;
+
+    public MathPresentation() {
+<span class="fc" id="L48">        this(new AstLatexRenderer());</span>
+<span class="fc" id="L49">    }</span>
+
+<span class="fc" id="L51">    public MathPresentation(AstLatexRenderer renderer) {</span>
+<span class="fc" id="L52">        this.renderer = Objects.requireNonNull(renderer, &quot;renderer&quot;);</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Renders an expression as a LaTeX string suitable for either
+     * {@code $...$} (inline) or {@code $$...$$} (display) embedding.
+     * Returns the empty string for {@code null} / blank input so callers
+     * can safely propagate the value into DTOs without further null
+     * checks.
+     */
+    public String latex(String expression) {
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L64">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L66">        return renderer.renderExpression(expression);</span>
+    }
+
+    /**
+     * Convenience: wraps a LaTeX body in the inline-math delimiters that
+     * the front-end {@code renderMath(root)} helper looks for. Returns
+     * an empty string for blank input.
+     */
+    public String inlineMath(String latex) {
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        if (latex == null || latex.isBlank()) {</span>
+<span class="fc" id="L76">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L78">        return &quot;$&quot; + latex + &quot;$&quot;;</span>
+    }
+
+    /**
+     * Renders a rule id as a compact LaTeX label suitable for search-graph
+     * edge captions and {@code \xrightarrow{\text{...}}} step arrows in
+     * derivations. Falls back to a humanised text representation when the
+     * rule id is not in the curated label table.
+     */
+    public String ruleLatex(String ruleId) {
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">        if (ruleId == null || ruleId.isBlank()) {</span>
+<span class="fc" id="L89">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L91">        String mapped = RULE_LATEX_LABELS.get(ruleId);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (mapped != null) {</span>
+<span class="fc" id="L93">            return mapped;</span>
+        }
+        // Generic fallback: render the rule id as {\text{...}} so KaTeX
+        // typesets it in a math-aware way without trying to parse the
+        // identifier itself.
+<span class="fc" id="L98">        String humanised = ruleId</span>
+<span class="fc" id="L99">            .replace(&quot;ast_&quot;, &quot;&quot;)</span>
+<span class="fc" id="L100">            .replace('_', ' ');</span>
+<span class="fc" id="L101">        return &quot;\\text{&quot; + humanised + &quot;}&quot;;</span>
+    }
+
+    /**
+     * Step in an aligned derivation block: the (already LaTeX-rendered)
+     * left- and right-hand sides plus the rule id that produced the
+     * transition. The {@code fromLatex} of step &lt;em&gt;n+1&lt;/em&gt; is expected
+     * to match the {@code toLatex} of step &lt;em&gt;n&lt;/em&gt;; the renderer
+     * only emits the very first {@code fromLatex} and then chains the
+     * {@code toLatex} of each subsequent step underneath.
+     *
+     * &lt;p&gt;Stage 3 additions:
+     * &lt;ul&gt;
+     *   &lt;li&gt;{@link #comparatorFlipped()} — set to {@code true} when the
+     *       transition flipped an inequality comparator (e.g. {@code &lt;}
+     *       became {@code &gt;}) and the rule id is one of the
+     *       {@code inequality_multiply_both_sides} /
+     *       {@code inequality_divide_both_sides} pair.&lt;/li&gt;
+     *   &lt;li&gt;{@link #changedFromSpans()} / {@link #changedToSpans()} —
+     *       token-level diff spans (start offset + length, both in code
+     *       points) over {@code fromLatex} / {@code toLatex} respectively.
+     *       Used by {@link MathPresentation#alignedDerivationLatexWithDiff(List)}
+     *       to wrap changed tokens in {@code \htmlClass{diff-old|diff-new}{…}}.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * &lt;p&gt;Stage 5 addition:
+     * &lt;ul&gt;
+     *   &lt;li&gt;{@link #toExpression()} — the raw (non-LaTeX) target expression, used
+     *       by {@link MathPresentation#derivationLayout(List)} to build a
+     *       screen-reader-friendly {@code aria-label} via
+     *       {@link de.regelsuche.export.layout.AstAriaRenderer}. Empty string when
+     *       not available (e.g. callers using the legacy 3-arg constructor).&lt;/li&gt;
+     * &lt;/ul&gt;
+     */
+    public record DerivationStep(
+        String fromLatex,
+        String toLatex,
+        String ruleId,
+        boolean comparatorFlipped,
+        List&lt;int[]&gt; changedFromSpans,
+        List&lt;int[]&gt; changedToSpans,
+        String toExpression
+    ) {
+<span class="fc" id="L144">        public DerivationStep {</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            fromLatex = fromLatex == null ? &quot;&quot; : fromLatex;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            toLatex = toLatex == null ? &quot;&quot; : toLatex;</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            changedFromSpans = changedFromSpans == null</span>
+<span class="pc" id="L149">                ? List.of() : List.copyOf(changedFromSpans);</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            changedToSpans = changedToSpans == null</span>
+<span class="pc" id="L151">                ? List.of() : List.copyOf(changedToSpans);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            toExpression = toExpression == null ? &quot;&quot; : toExpression;</span>
+<span class="fc" id="L153">        }</span>
+
+        /**
+         * Backward-compatible 6-arg constructor used by callers that pre-date
+         * the Stage 5 expression-for-aria addition. Sets {@code toExpression}
+         * to empty string; aria labels will be omitted for such steps.
+         */
+        public DerivationStep(
+            String fromLatex,
+            String toLatex,
+            String ruleId,
+            boolean comparatorFlipped,
+            List&lt;int[]&gt; changedFromSpans,
+            List&lt;int[]&gt; changedToSpans
+        ) {
+<span class="nc" id="L168">            this(fromLatex, toLatex, ruleId, comparatorFlipped,</span>
+                changedFromSpans, changedToSpans, &quot;&quot;);
+<span class="nc" id="L170">        }</span>
+
+        /**
+         * Backward-compatible 3-arg constructor used by existing callers
+         * (and by the codec readers that pre-date the diff annotations).
+         * Computes the diff spans from the from/to LaTeX strings and the
+         * comparator-flip flag from the rule id and the from/to texts.
+         */
+        public DerivationStep(String fromLatex, String toLatex, String ruleId) {
+<span class="fc" id="L179">            this(</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                fromLatex == null ? &quot;&quot; : fromLatex,</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                toLatex == null ? &quot;&quot; : toLatex,</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                ruleId == null ? &quot;&quot; : ruleId,</span>
+<span class="fc" id="L183">                detectComparatorFlip(ruleId, fromLatex, toLatex),</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                MathDiff.diffSpans(fromLatex == null ? &quot;&quot; : fromLatex,</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                    toLatex == null ? &quot;&quot; : toLatex).fromSpans(),</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                MathDiff.diffSpans(fromLatex == null ? &quot;&quot; : fromLatex,</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                    toLatex == null ? &quot;&quot; : toLatex).toSpans(),</span>
+                &quot;&quot;
+            );
+<span class="fc" id="L190">        }</span>
+    }
+
+    /**
+     * Stage 3 — comparator-flip heuristic moved server-side from the
+     * legacy front-end check. Returns {@code true} when the rule id is
+     * one of the inequality multiply/divide pair AND the from/to texts
+     * each contain a comparator AND those comparators have opposite
+     * directions (e.g. {@code &lt;} became {@code &gt;} or {@code \le} became
+     * {@code \ge}).
+     */
+    public static boolean detectComparatorFlip(String ruleId, String fromText, String toText) {
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (ruleId == null) {</span>
+<span class="nc" id="L203">            return false;</span>
+        }
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        boolean rulePair = ruleId.equals(&quot;inequality_multiply_both_sides&quot;)</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            || ruleId.equals(&quot;inequality_divide_both_sides&quot;);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (!rulePair) {</span>
+<span class="fc" id="L208">            return false;</span>
+        }
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        if (fromText == null || toText == null) {</span>
+<span class="nc" id="L211">            return false;</span>
+        }
+<span class="fc" id="L213">        int fromDir = comparatorDirection(fromText);</span>
+<span class="fc" id="L214">        int toDir = comparatorDirection(toText);</span>
+<span class="pc bpc" id="L215" title="2 of 6 branches missed.">        return fromDir != 0 &amp;&amp; toDir != 0 &amp;&amp; fromDir != toDir;</span>
+    }
+
+    /** +1 for {@code &lt;}/{@code \le}, -1 for {@code &gt;}/{@code \ge}, 0 otherwise. */
+    private static int comparatorDirection(String text) {
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L221">            return 0;</span>
+        }
+        // Prefer LaTeX comparator macros when present; fall back to ASCII.
+<span class="pc bpc" id="L224" title="2 of 6 branches missed.">        if (text.contains(&quot;\\le&quot;) || text.contains(&quot;\\leq&quot;) || text.contains(&quot;\\lt&quot;)) {</span>
+<span class="fc" id="L225">            return +1;</span>
+        }
+<span class="pc bpc" id="L227" title="2 of 6 branches missed.">        if (text.contains(&quot;\\ge&quot;) || text.contains(&quot;\\geq&quot;) || text.contains(&quot;\\gt&quot;)) {</span>
+<span class="fc" id="L228">            return -1;</span>
+        }
+<span class="fc" id="L230">        int firstLt = text.indexOf('&lt;');</span>
+<span class="fc" id="L231">        int firstGt = text.indexOf('&gt;');</span>
+<span class="pc bpc" id="L232" title="3 of 6 branches missed.">        if (firstLt &gt;= 0 &amp;&amp; (firstGt &lt; 0 || firstLt &lt; firstGt)) {</span>
+<span class="fc" id="L233">            return +1;</span>
+        }
+<span class="pc bpc" id="L235" title="4 of 6 branches missed.">        if (firstGt &gt;= 0 &amp;&amp; (firstLt &lt; 0 || firstGt &lt; firstLt)) {</span>
+<span class="fc" id="L236">            return -1;</span>
+        }
+<span class="nc" id="L238">        return 0;</span>
+    }
+
+    /**
+     * Renders a list of {@link DerivationStep}s as a single
+     * {@code \begin{aligned} … \end{aligned}} block with
+     * {@code \xrightarrow{\text{rule}}} arrows between rows, matching the
+     * derivation style used in {@code docs/demo-gallery.md}.
+     *
+     * &lt;p&gt;The first row carries the source expression; each subsequent
+     * row starts with an alignment ampersand and the labelled arrow,
+     * followed by the new right-hand side. Returns the empty string if
+     * the input is {@code null} or empty so callers can safely embed the
+     * result in a DTO without additional guards.&lt;/p&gt;
+     */
+    public String alignedDerivationLatex(List&lt;DerivationStep&gt; steps) {
+<span class="fc bfc" id="L254" title="All 4 branches covered.">        if (steps == null || steps.isEmpty()) {</span>
+<span class="fc" id="L255">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L257">        StringBuilder out = new StringBuilder(64 + steps.size() * 32);</span>
+<span class="fc" id="L258">        out.append(&quot;\\begin{aligned}\n&quot;);</span>
+<span class="fc" id="L259">        out.append(steps.get(0).fromLatex());</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (DerivationStep step : steps) {</span>
+<span class="fc" id="L261">            out.append(&quot; \\\\\n&quot;);</span>
+<span class="fc" id="L262">            String arrow = ruleLatex(step.ruleId());</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            if (arrow.isEmpty()) {</span>
+<span class="fc" id="L264">                out.append(&quot;&amp;\\rightarrow &quot;);</span>
+            } else {
+<span class="fc" id="L266">                out.append(&quot;&amp;\\xrightarrow{&quot;).append(arrow).append(&quot;} &quot;);</span>
+            }
+<span class="fc" id="L268">            out.append(step.toLatex());</span>
+<span class="fc" id="L269">        }</span>
+<span class="fc" id="L270">        out.append(&quot;\n\\end{aligned}&quot;);</span>
+<span class="fc" id="L271">        return out.toString();</span>
+    }
+
+    /**
+     * Stage 3 — same aligned block as {@link #alignedDerivationLatex(List)},
+     * but with changed substrings of every step's {@code toLatex} (and
+     * the very first {@code fromLatex}) wrapped in
+     * {@code \htmlClass{diff-old}{…}} / {@code \htmlClass{diff-new}{…}}
+     * markers. KaTeX trust mode is already enabled in the front-end
+     * pipeline so these classes survive into the rendered DOM and pick
+     * up the CSS tokens emitted by {@code style.css}.
+     *
+     * &lt;p&gt;Returns the same plain block as
+     * {@link #alignedDerivationLatex(List)} when no diff spans are
+     * present so callers do not need to special-case the empty-diff
+     * case.&lt;/p&gt;
+     */
+    public String alignedDerivationLatexWithDiff(List&lt;DerivationStep&gt; steps) {
+<span class="fc bfc" id="L289" title="All 4 branches covered.">        if (steps == null || steps.isEmpty()) {</span>
+<span class="fc" id="L290">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L292">        StringBuilder out = new StringBuilder(96 + steps.size() * 48);</span>
+<span class="fc" id="L293">        out.append(&quot;\\begin{aligned}\n&quot;);</span>
+        // The first row carries the source expression. We only know what
+        // &quot;changed&quot; once a transition is applied, so the very first row
+        // shows the unmodified fromLatex of step 0.
+<span class="fc" id="L297">        out.append(steps.get(0).fromLatex());</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        for (DerivationStep step : steps) {</span>
+<span class="fc" id="L299">            out.append(&quot; \\\\\n&quot;);</span>
+<span class="fc" id="L300">            String arrow = ruleLatex(step.ruleId());</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            if (arrow.isEmpty()) {</span>
+<span class="nc" id="L302">                out.append(&quot;&amp;\\rightarrow &quot;);</span>
+            } else {
+<span class="fc" id="L304">                out.append(&quot;&amp;\\xrightarrow{&quot;).append(arrow).append(&quot;} &quot;);</span>
+            }
+<span class="fc" id="L306">            out.append(wrapDiff(step.toLatex(), step.changedToSpans(), &quot;diff-new&quot;));</span>
+<span class="fc" id="L307">        }</span>
+<span class="fc" id="L308">        out.append(&quot;\n\\end{aligned}&quot;);</span>
+<span class="fc" id="L309">        return out.toString();</span>
+    }
+
+    /**
+     * Wraps the byte ranges in {@code spans} of {@code latex} with
+     * {@code \htmlClass{&lt;cssClass&gt;}{…}}. Spans are interpreted as a
+     * sequence of half-open intervals over the {@code latex} string;
+     * out-of-range or overlapping spans are coalesced/clipped.
+     */
+    static String wrapDiff(String latex, List&lt;int[]&gt; spans, String cssClass) {
+<span class="pc bpc" id="L319" title="3 of 8 branches missed.">        if (latex == null || latex.isEmpty() || spans == null || spans.isEmpty()) {</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            return latex == null ? &quot;&quot; : latex;</span>
+        }
+<span class="fc" id="L322">        java.util.List&lt;int[]&gt; norm = new java.util.ArrayList&lt;&gt;(spans.size());</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        for (int[] span : spans) {</span>
+<span class="pc bpc" id="L324" title="2 of 4 branches missed.">            if (span == null || span.length &lt; 2) {</span>
+<span class="nc" id="L325">                continue;</span>
+            }
+<span class="fc" id="L327">            int start = Math.max(0, span[0]);</span>
+<span class="fc" id="L328">            int length = Math.max(0, span[1]);</span>
+<span class="fc" id="L329">            int end = Math.min(latex.length(), start + length);</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            if (end &lt;= start) {</span>
+<span class="nc" id="L331">                continue;</span>
+            }
+<span class="fc" id="L333">            norm.add(new int[] { start, end });</span>
+<span class="fc" id="L334">        }</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">        if (norm.isEmpty()) {</span>
+<span class="nc" id="L336">            return latex;</span>
+        }
+<span class="fc" id="L338">        norm.sort((a, b) -&gt; Integer.compare(a[0], b[0]));</span>
+        // Coalesce overlapping spans so the rendered LaTeX stays valid.
+<span class="fc" id="L340">        java.util.List&lt;int[]&gt; merged = new java.util.ArrayList&lt;&gt;(norm.size());</span>
+<span class="fc" id="L341">        int[] current = norm.get(0).clone();</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        for (int i = 1; i &lt; norm.size(); i++) {</span>
+<span class="fc" id="L343">            int[] next = norm.get(i);</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">            if (next[0] &lt;= current[1]) {</span>
+<span class="nc" id="L345">                current[1] = Math.max(current[1], next[1]);</span>
+            } else {
+<span class="fc" id="L347">                merged.add(current);</span>
+<span class="fc" id="L348">                current = next.clone();</span>
+            }
+        }
+<span class="fc" id="L351">        merged.add(current);</span>
+<span class="fc" id="L352">        StringBuilder out = new StringBuilder(latex.length() + merged.size() * (cssClass.length() + 16));</span>
+<span class="fc" id="L353">        int cursor = 0;</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        for (int[] span : merged) {</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">            if (span[0] &gt; cursor) {</span>
+<span class="fc" id="L356">                out.append(latex, cursor, span[0]);</span>
+            }
+<span class="fc" id="L358">            out.append(&quot;\\htmlClass{&quot;).append(cssClass).append(&quot;}{&quot;)</span>
+<span class="fc" id="L359">                .append(latex, span[0], span[1]).append(&quot;}&quot;);</span>
+<span class="fc" id="L360">            cursor = span[1];</span>
+<span class="fc" id="L361">        }</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (cursor &lt; latex.length()) {</span>
+<span class="fc" id="L363">            out.append(latex, cursor, latex.length());</span>
+        }
+<span class="fc" id="L365">        return out.toString();</span>
+    }
+
+    /**
+     * Stage 5 — produces a structured {@link MathLayout} for a single
+     * expression. By default returns a single-fragment inline layout
+     * whose {@link MathLayoutNode#toLatex()} round-trips to
+     * {@link #latex(String)}, plus an ARIA label derived from the raw
+     * expression via {@link AstAriaRenderer}.
+     */
+    public MathLayout layout(String expression) {
+<span class="fc" id="L376">        String latex = latex(expression);</span>
+<span class="fc" id="L377">        String aria = AstAriaRenderer.ariaLabel(expression);</span>
+<span class="fc" id="L378">        return MathLayout.fromLatexFragment(latex, aria);</span>
+    }
+
+    /**
+     * Stage 5 — structured aligned-derivation layout. Each step
+     * becomes one {@link MathLayoutNode.Kind#ALIGNED_ROW} composed of
+     * a from-fragment + arrow-label + to-fragment. Diff spans from the
+     * step's {@code changedFromSpans} / {@code changedToSpans} are
+     * surfaced as {@code &quot;diff-old&quot;} / {@code &quot;diff-new&quot;} CSS classes
+     * on the corresponding fragment nodes, so the front-end can render
+     * colour-diff highlights as DOM attributes (no KaTeX trust mode
+     * required for diffs in the layout-aware path).
+     */
+    public MathLayout derivationLayout(List&lt;DerivationStep&gt; steps) {
+<span class="pc bpc" id="L392" title="1 of 4 branches missed.">        if (steps == null || steps.isEmpty()) {</span>
+<span class="fc" id="L393">            return new MathLayout(MathLayout.Kind.ALIGNED, List.of(), &quot;&quot;);</span>
+        }
+<span class="fc" id="L395">        List&lt;MathLayoutNode&gt; rows = new ArrayList&lt;&gt;(steps.size() + 1);</span>
+        // First row: the source expression (no arrow label).
+<span class="fc" id="L397">        rows.add(MathLayoutNode.alignedRow(List.of(</span>
+<span class="fc" id="L398">            MathLayoutNode.fragment(steps.get(0).fromLatex())</span>
+        )));
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        for (DerivationStep step : steps) {</span>
+<span class="fc" id="L401">            List&lt;MathLayoutNode&gt; rowChildren = new ArrayList&lt;&gt;(2);</span>
+<span class="fc" id="L402">            rowChildren.add(MathLayoutNode.arrowLabel(ruleLatex(step.ruleId())));</span>
+            // Wrap the entire to-fragment as a single fragment node with
+            // a `diff-new` CSS class when at least one diff span is
+            // present (the per-character splitting lives on the
+            // string-based path that consumes \htmlClass wrappers).
+<span class="pc bpc" id="L407" title="1 of 4 branches missed.">            boolean hasDiff = step.changedToSpans() != null &amp;&amp; !step.changedToSpans().isEmpty();</span>
+<span class="fc" id="L408">            rowChildren.add(MathLayoutNode.fragment(</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">                step.toLatex(), hasDiff ? &quot;diff-new&quot; : null));</span>
+<span class="fc" id="L410">            rows.add(MathLayoutNode.alignedRow(rowChildren));</span>
+<span class="fc" id="L411">        }</span>
+        // Build aria label from raw expressions when available; skip steps where
+        // only LaTeX is present (AstAriaRenderer is designed for raw expressions
+        // and would produce backslash-heavy labels from LaTeX input).
+<span class="fc" id="L415">        StringBuilder aria = new StringBuilder();</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        for (DerivationStep step : steps) {</span>
+<span class="fc" id="L417">            String expr = step.toExpression();</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">            if (!expr.isEmpty()) {</span>
+<span class="fc" id="L419">                aria.append(AstAriaRenderer.ariaLabel(expr)).append(&quot;; &quot;);</span>
+            }
+<span class="fc" id="L421">        }</span>
+<span class="fc" id="L422">        return new MathLayout(MathLayout.Kind.ALIGNED, rows, aria.toString().trim());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

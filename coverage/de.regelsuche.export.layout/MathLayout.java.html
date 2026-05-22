@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MathLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.export.layout</a> &gt; <span class="el_source">MathLayout.java</span></div><h1>MathLayout.java</h1><pre class="source lang-java linenums">package de.regelsuche.export.layout;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Stage 5 — structured layout description for a mathematical
+ * expression or derivation. Replaces the string-only LaTeX surface so
+ * the front-end and exports can apply consistent spacing, line-
+ * breaking and accessibility metadata without re-parsing LaTeX.
+ *
+ * &lt;p&gt;A {@code MathLayout} consists of a {@link Kind kind} (inline /
+ * display / aligned), an ordered list of {@link MathLayoutNode nodes}
+ * and an optional {@code ariaLabel} derived from the AST that
+ * front-end renderers inject as {@code aria-label} on the host element
+ * for screen-reader accessibility.&lt;/p&gt;
+ *
+ * &lt;p&gt;{@link #toLatex()} re-emits a plain LaTeX string equivalent to
+ * the legacy {@link de.regelsuche.export.MathPresentation#latex(String)}
+ * output so existing string-only callers (codecs, exports, KaTeX
+ * fallback) keep working unchanged.&lt;/p&gt;
+ */
+public record MathLayout(
+    Kind kind,
+    List&lt;MathLayoutNode&gt; nodes,
+    String ariaLabel
+) {
+
+<span class="fc" id="L30">    public MathLayout {</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        kind = kind == null ? Kind.INLINE : kind;</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        ariaLabel = ariaLabel == null ? &quot;&quot; : ariaLabel;</span>
+<span class="fc" id="L34">    }</span>
+
+<span class="fc" id="L36">    public enum Kind {</span>
+<span class="fc" id="L37">        INLINE,</span>
+<span class="fc" id="L38">        DISPLAY,</span>
+<span class="fc" id="L39">        ALIGNED</span>
+    }
+
+    /**
+     * Re-emits a plain LaTeX string equivalent to the legacy
+     * {@link de.regelsuche.export.MathPresentation#latex(String)} or
+     * {@link de.regelsuche.export.MathPresentation#alignedDerivationLatex(java.util.List)}
+     * output, depending on {@link #kind()}. The string returned never
+     * carries the surrounding {@code $…$} / {@code $$…$$} delimiters
+     * (callers wrap as needed).
+     */
+    public String toLatex() {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (kind == Kind.ALIGNED) {</span>
+            // The aligned representation pre-stitches rows into a
+            // single `\begin{aligned}…\end{aligned}` block.
+<span class="fc" id="L54">            return alignedToLatex();</span>
+        }
+<span class="fc" id="L56">        StringBuilder out = new StringBuilder();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (MathLayoutNode node : nodes) {</span>
+<span class="fc" id="L58">            out.append(node.toLatex());</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        return out.toString();</span>
+    }
+
+    private String alignedToLatex() {
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (nodes.isEmpty()) {</span>
+<span class="fc" id="L65">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L67">        StringBuilder out = new StringBuilder(&quot;\\begin{aligned}\n&quot;);</span>
+<span class="fc" id="L68">        boolean first = true;</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (MathLayoutNode node : nodes) {</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (node.kind() != MathLayoutNode.Kind.ALIGNED_ROW) {</span>
+<span class="nc" id="L71">                continue;</span>
+            }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (!first) {</span>
+<span class="fc" id="L74">                out.append(&quot; \\\\\n&quot;);</span>
+            }
+<span class="fc" id="L76">            first = false;</span>
+<span class="fc" id="L77">            out.append(node.toLatex());</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc" id="L79">        out.append(&quot;\n\\end{aligned}&quot;);</span>
+<span class="fc" id="L80">        return out.toString();</span>
+    }
+
+    /**
+     * Helper to assemble a single-fragment inline layout from raw LaTeX.
+     * Used by {@link de.regelsuche.export.MathPresentation#layout(String)}
+     * as the default behaviour when the AST renderer is consulted.
+     */
+    public static MathLayout fromLatexFragment(String latex, String aria) {
+<span class="fc" id="L89">        Objects.requireNonNull(latex, &quot;latex&quot;);</span>
+<span class="fc" id="L90">        return new MathLayout(</span>
+            Kind.INLINE,
+<span class="fc" id="L92">            List.of(MathLayoutNode.fragment(latex)),</span>
+            aria
+        );
+    }
+
+    /**
+     * Compact JSON-ready map representation. Codecs use this to emit
+     * a small `{kind, nodes:[…], aria}` JSON object alongside the
+     * legacy `…Latex` string field.
+     */
+    public Map&lt;String, Object&gt; toMap() {
+<span class="fc" id="L103">        return Map.of(</span>
+<span class="fc" id="L104">            &quot;kind&quot;, kind.name(),</span>
+<span class="fc" id="L105">            &quot;nodes&quot;, nodes.stream().map(MathLayoutNode::toMap).toList(),</span>
+            &quot;aria&quot;, ariaLabel
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

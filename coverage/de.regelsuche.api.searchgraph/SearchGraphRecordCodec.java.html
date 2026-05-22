@@ -50,115 +50,136 @@ public final class SearchGraphRecordCodec {
 <span class="fc" id="L50">            inner.property(&quot;id&quot;, node.id());</span>
 <span class="fc" id="L51">            inner.property(&quot;expression&quot;, node.expression());</span>
 <span class="fc" id="L52">            inner.property(&quot;latex&quot;, node.latex());</span>
-<span class="fc" id="L53">            inner.property(&quot;score&quot;, node.score());</span>
-<span class="fc" id="L54">            inner.property(&quot;depth&quot;, node.depth());</span>
-<span class="fc" id="L55">            inner.property(&quot;visitedCount&quot;, node.visitedCount());</span>
-<span class="fc" id="L56">            inner.property(&quot;isBest&quot;, node.isBest());</span>
-<span class="fc" id="L57">            inner.property(&quot;isDeadEnd&quot;, node.isDeadEnd());</span>
-<span class="fc" id="L58">            inner.property(&quot;candidateStatus&quot;, node.candidateStatus().name());</span>
-<span class="fc" id="L59">            inner.property(&quot;clusterId&quot;, node.clusterId());</span>
-<span class="fc" id="L60">        })));</span>
-<span class="fc" id="L61">        writer.array(&quot;edges&quot;, w -&gt; dto.edges().forEach(edge -&gt; w.objectValue(inner -&gt; {</span>
-<span class="fc" id="L62">            inner.property(&quot;from&quot;, edge.from());</span>
-<span class="fc" id="L63">            inner.property(&quot;to&quot;, edge.to());</span>
-<span class="fc" id="L64">            inner.property(&quot;ruleId&quot;, edge.ruleId());</span>
-<span class="fc" id="L65">            inner.property(&quot;ruleKind&quot;, edge.ruleKind().name());</span>
-<span class="fc" id="L66">            inner.property(&quot;scoreDelta&quot;, edge.scoreDelta());</span>
-<span class="fc" id="L67">            inner.stringArray(&quot;assumptions&quot;, edge.assumptions());</span>
-<span class="fc" id="L68">            inner.stringArray(&quot;pathIds&quot;, edge.pathIds());</span>
-<span class="fc" id="L69">            inner.property(&quot;equivalencePreserving&quot;, edge.equivalencePreserving());</span>
-<span class="fc" id="L70">        })));</span>
-<span class="fc" id="L71">        writer.array(&quot;clusters&quot;, w -&gt; dto.clusters().forEach(cluster -&gt; w.objectValue(inner -&gt; {</span>
-<span class="fc" id="L72">            inner.property(&quot;id&quot;, cluster.id());</span>
-<span class="fc" id="L73">            inner.property(&quot;label&quot;, cluster.label());</span>
-<span class="fc" id="L74">            inner.property(&quot;type&quot;, cluster.type().name());</span>
-<span class="fc" id="L75">            inner.stringArray(&quot;nodeIds&quot;, cluster.nodeIds());</span>
-<span class="fc" id="L76">            inner.stringArray(&quot;supportingPathIds&quot;, cluster.supportingPathIds());</span>
-<span class="fc" id="L77">            inner.property(&quot;cohesionScore&quot;, cluster.cohesionScore());</span>
-<span class="fc" id="L78">        })));</span>
-<span class="fc" id="L79">        writer.object(&quot;stats&quot;, stats -&gt; {</span>
-<span class="fc" id="L80">            SearchGraphStatsDto s = dto.stats();</span>
-<span class="fc" id="L81">            stats.property(&quot;nodesVisited&quot;, s.nodesVisited());</span>
-<span class="fc" id="L82">            stats.property(&quot;edgesGenerated&quot;, s.edgesGenerated());</span>
-<span class="fc" id="L83">            stats.property(&quot;deadEnds&quot;, s.deadEnds());</span>
-<span class="fc" id="L84">            stats.property(&quot;bestScore&quot;, s.bestScore());</span>
-<span class="fc" id="L85">            stats.property(&quot;averageBranchingFactor&quot;, s.averageBranchingFactor());</span>
-<span class="fc" id="L86">            stats.property(&quot;maxDepthReached&quot;, s.maxDepthReached());</span>
-<span class="fc" id="L87">            stats.object(&quot;ruleUsageFrequency&quot;, rules -&gt; s.ruleUsageFrequency().forEach(rules::property));</span>
-<span class="fc" id="L88">            stats.stringArray(&quot;mostUsefulRules&quot;, s.mostUsefulRules());</span>
-<span class="fc" id="L89">            stats.property(&quot;candidateCount&quot;, s.candidateCount());</span>
-<span class="fc" id="L90">            stats.property(&quot;macroRuleCount&quot;, s.macroRuleCount());</span>
-<span class="fc" id="L91">        });</span>
-<span class="fc" id="L92">    }</span>
+<span class="fc" id="L53">            inner.property(&quot;expressionLatex&quot;, node.expressionLatex());</span>
+<span class="fc" id="L54">            inner.property(&quot;score&quot;, node.score());</span>
+<span class="fc" id="L55">            inner.property(&quot;depth&quot;, node.depth());</span>
+<span class="fc" id="L56">            inner.property(&quot;visitedCount&quot;, node.visitedCount());</span>
+<span class="fc" id="L57">            inner.property(&quot;isBest&quot;, node.isBest());</span>
+<span class="fc" id="L58">            inner.property(&quot;isDeadEnd&quot;, node.isDeadEnd());</span>
+<span class="fc" id="L59">            inner.property(&quot;candidateStatus&quot;, node.candidateStatus().name());</span>
+<span class="fc" id="L60">            inner.property(&quot;clusterId&quot;, node.clusterId());</span>
+<span class="fc" id="L61">        })));</span>
+<span class="fc" id="L62">        writer.array(&quot;edges&quot;, w -&gt; dto.edges().forEach(edge -&gt; w.objectValue(inner -&gt; {</span>
+<span class="fc" id="L63">            inner.property(&quot;from&quot;, edge.from());</span>
+<span class="fc" id="L64">            inner.property(&quot;to&quot;, edge.to());</span>
+<span class="fc" id="L65">            inner.property(&quot;ruleId&quot;, edge.ruleId());</span>
+<span class="fc" id="L66">            inner.property(&quot;ruleLatex&quot;, edge.ruleLatex());</span>
+<span class="fc" id="L67">            inner.property(&quot;ruleKind&quot;, edge.ruleKind().name());</span>
+<span class="fc" id="L68">            inner.property(&quot;scoreDelta&quot;, edge.scoreDelta());</span>
+<span class="fc" id="L69">            inner.stringArray(&quot;assumptions&quot;, edge.assumptions());</span>
+<span class="fc" id="L70">            inner.stringArray(&quot;pathIds&quot;, edge.pathIds());</span>
+<span class="fc" id="L71">            inner.property(&quot;equivalencePreserving&quot;, edge.equivalencePreserving());</span>
+<span class="fc" id="L72">        })));</span>
+<span class="fc" id="L73">        writer.array(&quot;clusters&quot;, w -&gt; dto.clusters().forEach(cluster -&gt; w.objectValue(inner -&gt; {</span>
+<span class="fc" id="L74">            inner.property(&quot;id&quot;, cluster.id());</span>
+<span class="fc" id="L75">            inner.property(&quot;label&quot;, cluster.label());</span>
+<span class="fc" id="L76">            inner.property(&quot;type&quot;, cluster.type().name());</span>
+<span class="fc" id="L77">            inner.stringArray(&quot;nodeIds&quot;, cluster.nodeIds());</span>
+<span class="fc" id="L78">            inner.stringArray(&quot;supportingPathIds&quot;, cluster.supportingPathIds());</span>
+<span class="fc" id="L79">            inner.property(&quot;cohesionScore&quot;, cluster.cohesionScore());</span>
+<span class="fc" id="L80">        })));</span>
+<span class="fc" id="L81">        writer.object(&quot;stats&quot;, stats -&gt; {</span>
+<span class="fc" id="L82">            SearchGraphStatsDto s = dto.stats();</span>
+<span class="fc" id="L83">            stats.property(&quot;nodesVisited&quot;, s.nodesVisited());</span>
+<span class="fc" id="L84">            stats.property(&quot;edgesGenerated&quot;, s.edgesGenerated());</span>
+<span class="fc" id="L85">            stats.property(&quot;deadEnds&quot;, s.deadEnds());</span>
+<span class="fc" id="L86">            stats.property(&quot;bestScore&quot;, s.bestScore());</span>
+<span class="fc" id="L87">            stats.property(&quot;averageBranchingFactor&quot;, s.averageBranchingFactor());</span>
+<span class="fc" id="L88">            stats.property(&quot;maxDepthReached&quot;, s.maxDepthReached());</span>
+<span class="fc" id="L89">            stats.object(&quot;ruleUsageFrequency&quot;, rules -&gt; s.ruleUsageFrequency().forEach(rules::property));</span>
+<span class="fc" id="L90">            stats.stringArray(&quot;mostUsefulRules&quot;, s.mostUsefulRules());</span>
+<span class="fc" id="L91">            stats.property(&quot;candidateCount&quot;, s.candidateCount());</span>
+<span class="fc" id="L92">            stats.property(&quot;macroRuleCount&quot;, s.macroRuleCount());</span>
+<span class="fc" id="L93">        });</span>
+<span class="fc" id="L94">    }</span>
 
     private static void writeReplay(JsonWriter writer, PathReplayDto replay) {
-<span class="fc" id="L95">        writer.property(&quot;pathId&quot;, replay.pathId());</span>
-<span class="fc" id="L96">        writer.array(&quot;steps&quot;, w -&gt; replay.steps().forEach(step -&gt; w.objectValue(inner -&gt; {</span>
-<span class="fc" id="L97">            inner.property(&quot;stepIndex&quot;, step.stepIndex());</span>
-<span class="fc" id="L98">            inner.property(&quot;fromExpression&quot;, step.fromExpression());</span>
-<span class="fc" id="L99">            inner.property(&quot;fromLatex&quot;, step.fromLatex());</span>
-<span class="fc" id="L100">            inner.property(&quot;toExpression&quot;, step.toExpression());</span>
-<span class="fc" id="L101">            inner.property(&quot;toLatex&quot;, step.toLatex());</span>
-<span class="fc" id="L102">            inner.property(&quot;ruleId&quot;, step.ruleId());</span>
-<span class="fc" id="L103">            inner.property(&quot;ruleExplanation&quot;, step.ruleExplanation());</span>
-<span class="fc" id="L104">            inner.property(&quot;scoreDelta&quot;, step.scoreDelta());</span>
-<span class="fc" id="L105">            inner.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
-<span class="fc" id="L106">        })));</span>
-<span class="fc" id="L107">    }</span>
+<span class="fc" id="L97">        writer.property(&quot;pathId&quot;, replay.pathId());</span>
+<span class="fc" id="L98">        writer.property(&quot;alignedDerivationLatex&quot;, replay.alignedDerivationLatex());</span>
+<span class="fc" id="L99">        writer.property(&quot;alignedDerivationLatexWithDiff&quot;, replay.alignedDerivationLatexWithDiff());</span>
+<span class="fc" id="L100">        writer.array(&quot;steps&quot;, w -&gt; replay.steps().forEach(step -&gt; w.objectValue(inner -&gt; {</span>
+<span class="fc" id="L101">            inner.property(&quot;stepIndex&quot;, step.stepIndex());</span>
+<span class="fc" id="L102">            inner.property(&quot;fromExpression&quot;, step.fromExpression());</span>
+<span class="fc" id="L103">            inner.property(&quot;fromLatex&quot;, step.fromLatex());</span>
+<span class="fc" id="L104">            inner.property(&quot;toExpression&quot;, step.toExpression());</span>
+<span class="fc" id="L105">            inner.property(&quot;toLatex&quot;, step.toLatex());</span>
+<span class="fc" id="L106">            inner.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L107">            inner.property(&quot;ruleExplanation&quot;, step.ruleExplanation());</span>
+<span class="fc" id="L108">            inner.property(&quot;scoreDelta&quot;, step.scoreDelta());</span>
+<span class="fc" id="L109">            inner.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="fc" id="L110">            inner.property(&quot;comparatorFlipped&quot;, step.comparatorFlipped());</span>
+<span class="fc" id="L111">            writeSpanArray(inner, &quot;changedFromSpans&quot;, step.changedFromSpans());</span>
+<span class="fc" id="L112">            writeSpanArray(inner, &quot;changedToSpans&quot;, step.changedToSpans());</span>
+<span class="fc" id="L113">        })));</span>
+<span class="fc" id="L114">    }</span>
+
+    /**
+     * Writes a list of {@code [start, length]} integer pairs as a JSON
+     * array of two-element arrays. Used by the Stage 3 diff payload.
+     */
+    private static void writeSpanArray(JsonWriter writer, String key, List&lt;int[]&gt; spans) {
+<span class="fc" id="L121">        writer.array(key, w -&gt; {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            for (int[] span : spans) {</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                int start = span.length &gt; 0 ? span[0] : 0;</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                int length = span.length &gt; 1 ? span[1] : 0;</span>
+<span class="fc" id="L125">                w.arrayValue(inner -&gt; inner.value(start).value(length));</span>
+<span class="fc" id="L126">            }</span>
+<span class="fc" id="L127">        });</span>
+<span class="fc" id="L128">    }</span>
 
     private static void writeMacro(JsonWriter writer, MacroRuleCandidate macro) {
-<span class="nc" id="L110">        writer.property(&quot;id&quot;, macro.id());</span>
-<span class="nc" id="L111">        writer.stringArray(&quot;ruleIdSequence&quot;, macro.ruleIdSequence());</span>
-<span class="nc" id="L112">        writer.property(&quot;occurrences&quot;, macro.occurrences());</span>
-<span class="nc" id="L113">        writer.property(&quot;leftPattern&quot;, macro.leftPattern());</span>
-<span class="nc" id="L114">        writer.property(&quot;rightPattern&quot;, macro.rightPattern());</span>
-<span class="nc" id="L115">        writer.property(&quot;compressionRatio&quot;, macro.compressionRatio());</span>
-<span class="nc" id="L116">        writer.property(&quot;proofStatus&quot;, macro.proofStatus().name());</span>
-<span class="nc" id="L117">        writer.stringArray(&quot;supportingTransformationIds&quot;, macro.supportingTransformationIds());</span>
-<span class="nc" id="L118">    }</span>
+<span class="nc" id="L131">        writer.property(&quot;id&quot;, macro.id());</span>
+<span class="nc" id="L132">        writer.stringArray(&quot;ruleIdSequence&quot;, macro.ruleIdSequence());</span>
+<span class="nc" id="L133">        writer.property(&quot;occurrences&quot;, macro.occurrences());</span>
+<span class="nc" id="L134">        writer.property(&quot;leftPattern&quot;, macro.leftPattern());</span>
+<span class="nc" id="L135">        writer.property(&quot;rightPattern&quot;, macro.rightPattern());</span>
+<span class="nc" id="L136">        writer.property(&quot;compressionRatio&quot;, macro.compressionRatio());</span>
+<span class="nc" id="L137">        writer.property(&quot;proofStatus&quot;, macro.proofStatus().name());</span>
+<span class="nc" id="L138">        writer.stringArray(&quot;supportingTransformationIds&quot;, macro.supportingTransformationIds());</span>
+<span class="nc" id="L139">    }</span>
 
     private static void writeIdentity(JsonWriter writer, IdentityReportDto identity) {
-<span class="fc" id="L121">        writer.property(&quot;id&quot;, identity.id());</span>
-<span class="fc" id="L122">        writer.property(&quot;leftPattern&quot;, identity.leftPattern());</span>
-<span class="fc" id="L123">        writer.property(&quot;rightPattern&quot;, identity.rightPattern());</span>
-<span class="fc" id="L124">        writer.stringArray(&quot;ruleIdSequence&quot;, identity.ruleIdSequence());</span>
-<span class="fc" id="L125">        writer.property(&quot;occurrences&quot;, identity.occurrences());</span>
-<span class="fc" id="L126">        writer.property(&quot;compressionRatio&quot;, identity.compressionRatio());</span>
-<span class="fc" id="L127">        writer.property(&quot;proofStatus&quot;, identity.proofStatus().name());</span>
-<span class="fc" id="L128">        writer.property(&quot;knownRuleStatus&quot;, identity.knownRuleStatus().name());</span>
-<span class="fc" id="L129">        writer.stringArray(&quot;supportingTransformationIds&quot;, identity.supportingTransformationIds());</span>
-<span class="fc" id="L130">    }</span>
+<span class="fc" id="L142">        writer.property(&quot;id&quot;, identity.id());</span>
+<span class="fc" id="L143">        writer.property(&quot;leftPattern&quot;, identity.leftPattern());</span>
+<span class="fc" id="L144">        writer.property(&quot;rightPattern&quot;, identity.rightPattern());</span>
+<span class="fc" id="L145">        writer.stringArray(&quot;ruleIdSequence&quot;, identity.ruleIdSequence());</span>
+<span class="fc" id="L146">        writer.property(&quot;occurrences&quot;, identity.occurrences());</span>
+<span class="fc" id="L147">        writer.property(&quot;compressionRatio&quot;, identity.compressionRatio());</span>
+<span class="fc" id="L148">        writer.property(&quot;proofStatus&quot;, identity.proofStatus().name());</span>
+<span class="fc" id="L149">        writer.property(&quot;knownRuleStatus&quot;, identity.knownRuleStatus().name());</span>
+<span class="fc" id="L150">        writer.stringArray(&quot;supportingTransformationIds&quot;, identity.supportingTransformationIds());</span>
+<span class="fc" id="L151">    }</span>
 
     // ============================================================ fromJson
     public static SearchGraphRecord fromJson(String json) {
-<span class="fc" id="L134">        Objects.requireNonNull(json, &quot;json&quot;);</span>
-<span class="fc" id="L135">        return fromMap(new JsonReader(json).readObject());</span>
+<span class="fc" id="L155">        Objects.requireNonNull(json, &quot;json&quot;);</span>
+<span class="fc" id="L156">        return fromMap(new JsonReader(json).readObject());</span>
     }
 
     @SuppressWarnings(&quot;unchecked&quot;)
     public static SearchGraphRecord fromMap(Map&lt;String, Object&gt; root) {
-<span class="fc" id="L140">        SearchGraphDto graph = readGraph(asMap(root.get(&quot;graph&quot;)));</span>
-<span class="fc" id="L141">        List&lt;PathReplayDto&gt; replays = readList(root.get(&quot;replays&quot;)).stream()</span>
-<span class="fc" id="L142">            .map(SearchGraphRecordCodec::asMap)</span>
-<span class="fc" id="L143">            .map(SearchGraphRecordCodec::readReplay)</span>
-<span class="fc" id="L144">            .toList();</span>
-<span class="fc" id="L145">        List&lt;MacroRuleCandidate&gt; macros = readList(root.get(&quot;macroRules&quot;)).stream()</span>
-<span class="fc" id="L146">            .map(SearchGraphRecordCodec::asMap)</span>
-<span class="fc" id="L147">            .map(SearchGraphRecordCodec::readMacro)</span>
-<span class="fc" id="L148">            .toList();</span>
-<span class="fc" id="L149">        List&lt;IdentityReportDto&gt; identities = readList(root.get(&quot;identities&quot;)).stream()</span>
-<span class="fc" id="L150">            .map(SearchGraphRecordCodec::asMap)</span>
-<span class="fc" id="L151">            .map(SearchGraphRecordCodec::readIdentity)</span>
-<span class="fc" id="L152">            .toList();</span>
-<span class="fc" id="L153">        Map&lt;String, String&gt; exports = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : asMap(root.get(&quot;exports&quot;)).entrySet()) {</span>
-<span class="fc" id="L155">            exports.put(entry.getKey(), String.valueOf(entry.getValue()));</span>
-<span class="fc" id="L156">        }</span>
-<span class="fc" id="L157">        return new SearchGraphRecord(</span>
-<span class="fc" id="L158">            stringValue(root.get(&quot;id&quot;), &quot;&quot;),</span>
-<span class="fc" id="L159">            parseInstant(root.get(&quot;createdAt&quot;), Instant.EPOCH),</span>
-<span class="fc" id="L160">            stringValue(root.get(&quot;searchProfile&quot;), &quot;&quot;),</span>
-<span class="fc" id="L161">            stringList(root.get(&quot;domains&quot;)),</span>
+<span class="fc" id="L161">        SearchGraphDto graph = readGraph(asMap(root.get(&quot;graph&quot;)));</span>
+<span class="fc" id="L162">        List&lt;PathReplayDto&gt; replays = readList(root.get(&quot;replays&quot;)).stream()</span>
+<span class="fc" id="L163">            .map(SearchGraphRecordCodec::asMap)</span>
+<span class="fc" id="L164">            .map(SearchGraphRecordCodec::readReplay)</span>
+<span class="fc" id="L165">            .toList();</span>
+<span class="fc" id="L166">        List&lt;MacroRuleCandidate&gt; macros = readList(root.get(&quot;macroRules&quot;)).stream()</span>
+<span class="fc" id="L167">            .map(SearchGraphRecordCodec::asMap)</span>
+<span class="fc" id="L168">            .map(SearchGraphRecordCodec::readMacro)</span>
+<span class="fc" id="L169">            .toList();</span>
+<span class="fc" id="L170">        List&lt;IdentityReportDto&gt; identities = readList(root.get(&quot;identities&quot;)).stream()</span>
+<span class="fc" id="L171">            .map(SearchGraphRecordCodec::asMap)</span>
+<span class="fc" id="L172">            .map(SearchGraphRecordCodec::readIdentity)</span>
+<span class="fc" id="L173">            .toList();</span>
+<span class="fc" id="L174">        Map&lt;String, String&gt; exports = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : asMap(root.get(&quot;exports&quot;)).entrySet()) {</span>
+<span class="fc" id="L176">            exports.put(entry.getKey(), String.valueOf(entry.getValue()));</span>
+<span class="fc" id="L177">        }</span>
+<span class="fc" id="L178">        return new SearchGraphRecord(</span>
+<span class="fc" id="L179">            stringValue(root.get(&quot;id&quot;), &quot;&quot;),</span>
+<span class="fc" id="L180">            parseInstant(root.get(&quot;createdAt&quot;), Instant.EPOCH),</span>
+<span class="fc" id="L181">            stringValue(root.get(&quot;searchProfile&quot;), &quot;&quot;),</span>
+<span class="fc" id="L182">            stringList(root.get(&quot;domains&quot;)),</span>
             graph,
             replays,
             macros,
@@ -168,107 +189,153 @@ public final class SearchGraphRecordCodec {
     }
 
     private static SearchGraphDto readGraph(Map&lt;String, Object&gt; values) {
-<span class="fc" id="L171">        List&lt;SearchGraphNodeDto&gt; nodes = readList(values.get(&quot;nodes&quot;)).stream()</span>
-<span class="fc" id="L172">            .map(SearchGraphRecordCodec::asMap)</span>
-<span class="fc" id="L173">            .map(m -&gt; new SearchGraphNodeDto(</span>
-<span class="fc" id="L174">                stringValue(m.get(&quot;id&quot;), &quot;&quot;),</span>
-<span class="fc" id="L175">                stringValue(m.get(&quot;expression&quot;), &quot;&quot;),</span>
-<span class="fc" id="L176">                stringValue(m.get(&quot;latex&quot;), &quot;&quot;),</span>
-<span class="fc" id="L177">                intValue(m.get(&quot;score&quot;), 0),</span>
-<span class="fc" id="L178">                intValue(m.get(&quot;depth&quot;), 0),</span>
-<span class="fc" id="L179">                intValue(m.get(&quot;visitedCount&quot;), 0),</span>
-<span class="fc" id="L180">                booleanValue(m.get(&quot;isBest&quot;), false),</span>
-<span class="fc" id="L181">                booleanValue(m.get(&quot;isDeadEnd&quot;), false),</span>
-<span class="fc" id="L182">                CandidateProofStatus.valueOf(stringValue(m.get(&quot;candidateStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
-<span class="fc" id="L183">                stringValue(m.get(&quot;clusterId&quot;), &quot;&quot;)</span>
+<span class="fc" id="L192">        List&lt;SearchGraphNodeDto&gt; nodes = readList(values.get(&quot;nodes&quot;)).stream()</span>
+<span class="fc" id="L193">            .map(SearchGraphRecordCodec::asMap)</span>
+<span class="fc" id="L194">            .map(m -&gt; new SearchGraphNodeDto(</span>
+<span class="fc" id="L195">                stringValue(m.get(&quot;id&quot;), &quot;&quot;),</span>
+<span class="fc" id="L196">                stringValue(m.get(&quot;expression&quot;), &quot;&quot;),</span>
+<span class="fc" id="L197">                stringValue(m.get(&quot;latex&quot;), &quot;&quot;),</span>
+<span class="fc" id="L198">                intValue(m.get(&quot;score&quot;), 0),</span>
+<span class="fc" id="L199">                intValue(m.get(&quot;depth&quot;), 0),</span>
+<span class="fc" id="L200">                intValue(m.get(&quot;visitedCount&quot;), 0),</span>
+<span class="fc" id="L201">                booleanValue(m.get(&quot;isBest&quot;), false),</span>
+<span class="fc" id="L202">                booleanValue(m.get(&quot;isDeadEnd&quot;), false),</span>
+<span class="fc" id="L203">                CandidateProofStatus.valueOf(stringValue(m.get(&quot;candidateStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
+<span class="fc" id="L204">                stringValue(m.get(&quot;clusterId&quot;), &quot;&quot;),</span>
+<span class="fc" id="L205">                SearchExpression.classify(stringValue(m.get(&quot;expression&quot;), &quot;&quot;)),</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                m.get(&quot;expressionLatex&quot;) == null ? null : String.valueOf(m.get(&quot;expressionLatex&quot;))</span>
             ))
-<span class="fc" id="L185">            .toList();</span>
-<span class="fc" id="L186">        List&lt;SearchGraphEdgeDto&gt; edges = readList(values.get(&quot;edges&quot;)).stream()</span>
-<span class="fc" id="L187">            .map(SearchGraphRecordCodec::asMap)</span>
-<span class="fc" id="L188">            .map(m -&gt; new SearchGraphEdgeDto(</span>
-<span class="fc" id="L189">                stringValue(m.get(&quot;from&quot;), &quot;&quot;),</span>
-<span class="fc" id="L190">                stringValue(m.get(&quot;to&quot;), &quot;&quot;),</span>
-<span class="fc" id="L191">                stringValue(m.get(&quot;ruleId&quot;), &quot;&quot;),</span>
-<span class="fc" id="L192">                RewriteKind.valueOf(stringValue(m.get(&quot;ruleKind&quot;), RewriteKind.NORMALIZE.name())),</span>
-<span class="fc" id="L193">                intValue(m.get(&quot;scoreDelta&quot;), 0),</span>
-<span class="fc" id="L194">                stringList(m.get(&quot;assumptions&quot;)),</span>
-<span class="fc" id="L195">                stringList(m.get(&quot;pathIds&quot;)),</span>
-<span class="fc" id="L196">                booleanValue(m.get(&quot;equivalencePreserving&quot;), true)</span>
+<span class="fc" id="L208">            .toList();</span>
+<span class="fc" id="L209">        List&lt;SearchGraphEdgeDto&gt; edges = readList(values.get(&quot;edges&quot;)).stream()</span>
+<span class="fc" id="L210">            .map(SearchGraphRecordCodec::asMap)</span>
+<span class="fc" id="L211">            .map(m -&gt; {</span>
+<span class="fc" id="L212">                String ruleId = stringValue(m.get(&quot;ruleId&quot;), &quot;&quot;);</span>
+<span class="fc" id="L213">                String ruleLatex = stringValue(m.get(&quot;ruleLatex&quot;),</span>
+<span class="fc" id="L214">                    de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(ruleId));</span>
+<span class="fc" id="L215">                return new SearchGraphEdgeDto(</span>
+<span class="fc" id="L216">                    stringValue(m.get(&quot;from&quot;), &quot;&quot;),</span>
+<span class="fc" id="L217">                    stringValue(m.get(&quot;to&quot;), &quot;&quot;),</span>
+                    ruleId,
+                    ruleLatex,
+<span class="fc" id="L220">                    RewriteKind.valueOf(stringValue(m.get(&quot;ruleKind&quot;), RewriteKind.NORMALIZE.name())),</span>
+<span class="fc" id="L221">                    intValue(m.get(&quot;scoreDelta&quot;), 0),</span>
+<span class="fc" id="L222">                    stringList(m.get(&quot;assumptions&quot;)),</span>
+<span class="fc" id="L223">                    stringList(m.get(&quot;pathIds&quot;)),</span>
+<span class="fc" id="L224">                    booleanValue(m.get(&quot;equivalencePreserving&quot;), true)</span>
+                );
+            })
+<span class="fc" id="L227">            .toList();</span>
+<span class="fc" id="L228">        List&lt;SearchGraphClusterDto&gt; clusters = readList(values.get(&quot;clusters&quot;)).stream()</span>
+<span class="fc" id="L229">            .map(SearchGraphRecordCodec::asMap)</span>
+<span class="fc" id="L230">            .map(m -&gt; new SearchGraphClusterDto(</span>
+<span class="fc" id="L231">                stringValue(m.get(&quot;id&quot;), &quot;&quot;),</span>
+<span class="fc" id="L232">                stringValue(m.get(&quot;label&quot;), &quot;&quot;),</span>
+<span class="fc" id="L233">                ClusterType.valueOf(stringValue(m.get(&quot;type&quot;), ClusterType.RULE_USAGE.name())),</span>
+<span class="fc" id="L234">                stringList(m.get(&quot;nodeIds&quot;)),</span>
+<span class="fc" id="L235">                stringList(m.get(&quot;supportingPathIds&quot;)),</span>
+<span class="fc" id="L236">                doubleValue(m.get(&quot;cohesionScore&quot;), 0.0)</span>
             ))
-<span class="fc" id="L198">            .toList();</span>
-<span class="fc" id="L199">        List&lt;SearchGraphClusterDto&gt; clusters = readList(values.get(&quot;clusters&quot;)).stream()</span>
-<span class="fc" id="L200">            .map(SearchGraphRecordCodec::asMap)</span>
-<span class="fc" id="L201">            .map(m -&gt; new SearchGraphClusterDto(</span>
-<span class="fc" id="L202">                stringValue(m.get(&quot;id&quot;), &quot;&quot;),</span>
-<span class="fc" id="L203">                stringValue(m.get(&quot;label&quot;), &quot;&quot;),</span>
-<span class="fc" id="L204">                ClusterType.valueOf(stringValue(m.get(&quot;type&quot;), ClusterType.RULE_USAGE.name())),</span>
-<span class="fc" id="L205">                stringList(m.get(&quot;nodeIds&quot;)),</span>
-<span class="fc" id="L206">                stringList(m.get(&quot;supportingPathIds&quot;)),</span>
-<span class="fc" id="L207">                doubleValue(m.get(&quot;cohesionScore&quot;), 0.0)</span>
-            ))
-<span class="fc" id="L209">            .toList();</span>
-<span class="fc" id="L210">        Map&lt;String, Object&gt; stats = asMap(values.get(&quot;stats&quot;));</span>
-<span class="fc" id="L211">        Map&lt;String, Integer&gt; ruleUsage = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : asMap(stats.get(&quot;ruleUsageFrequency&quot;)).entrySet()) {</span>
-<span class="fc" id="L213">            ruleUsage.put(entry.getKey(), intValue(entry.getValue(), 0));</span>
-<span class="fc" id="L214">        }</span>
-<span class="fc" id="L215">        SearchGraphStatsDto statsDto = new SearchGraphStatsDto(</span>
-<span class="fc" id="L216">            intValue(stats.get(&quot;nodesVisited&quot;), 0),</span>
-<span class="fc" id="L217">            intValue(stats.get(&quot;edgesGenerated&quot;), 0),</span>
-<span class="fc" id="L218">            intValue(stats.get(&quot;deadEnds&quot;), 0),</span>
-<span class="fc" id="L219">            intValue(stats.get(&quot;bestScore&quot;), 0),</span>
-<span class="fc" id="L220">            doubleValue(stats.get(&quot;averageBranchingFactor&quot;), 0.0),</span>
-<span class="fc" id="L221">            intValue(stats.get(&quot;maxDepthReached&quot;), 0),</span>
+<span class="fc" id="L238">            .toList();</span>
+<span class="fc" id="L239">        Map&lt;String, Object&gt; stats = asMap(values.get(&quot;stats&quot;));</span>
+<span class="fc" id="L240">        Map&lt;String, Integer&gt; ruleUsage = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : asMap(stats.get(&quot;ruleUsageFrequency&quot;)).entrySet()) {</span>
+<span class="fc" id="L242">            ruleUsage.put(entry.getKey(), intValue(entry.getValue(), 0));</span>
+<span class="fc" id="L243">        }</span>
+<span class="fc" id="L244">        SearchGraphStatsDto statsDto = new SearchGraphStatsDto(</span>
+<span class="fc" id="L245">            intValue(stats.get(&quot;nodesVisited&quot;), 0),</span>
+<span class="fc" id="L246">            intValue(stats.get(&quot;edgesGenerated&quot;), 0),</span>
+<span class="fc" id="L247">            intValue(stats.get(&quot;deadEnds&quot;), 0),</span>
+<span class="fc" id="L248">            intValue(stats.get(&quot;bestScore&quot;), 0),</span>
+<span class="fc" id="L249">            doubleValue(stats.get(&quot;averageBranchingFactor&quot;), 0.0),</span>
+<span class="fc" id="L250">            intValue(stats.get(&quot;maxDepthReached&quot;), 0),</span>
             ruleUsage,
-<span class="fc" id="L223">            stringList(stats.get(&quot;mostUsefulRules&quot;)),</span>
-<span class="fc" id="L224">            intValue(stats.get(&quot;candidateCount&quot;), 0),</span>
-<span class="fc" id="L225">            intValue(stats.get(&quot;macroRuleCount&quot;), 0)</span>
+<span class="fc" id="L252">            stringList(stats.get(&quot;mostUsefulRules&quot;)),</span>
+<span class="fc" id="L253">            intValue(stats.get(&quot;candidateCount&quot;), 0),</span>
+<span class="fc" id="L254">            intValue(stats.get(&quot;macroRuleCount&quot;), 0)</span>
         );
-<span class="fc" id="L227">        return new SearchGraphDto(nodes, edges, clusters, statsDto);</span>
+<span class="fc" id="L256">        return new SearchGraphDto(nodes, edges, clusters, statsDto);</span>
     }
 
     private static PathReplayDto readReplay(Map&lt;String, Object&gt; values) {
-<span class="fc" id="L231">        List&lt;PathReplayDto.ReplayStep&gt; steps = readList(values.get(&quot;steps&quot;)).stream()</span>
-<span class="fc" id="L232">            .map(SearchGraphRecordCodec::asMap)</span>
-<span class="fc" id="L233">            .map(m -&gt; new PathReplayDto.ReplayStep(</span>
-<span class="fc" id="L234">                intValue(m.get(&quot;stepIndex&quot;), 0),</span>
-<span class="fc" id="L235">                stringValue(m.get(&quot;fromExpression&quot;), &quot;&quot;),</span>
-<span class="fc" id="L236">                stringValue(m.get(&quot;fromLatex&quot;), &quot;&quot;),</span>
-<span class="fc" id="L237">                stringValue(m.get(&quot;toExpression&quot;), &quot;&quot;),</span>
-<span class="fc" id="L238">                stringValue(m.get(&quot;toLatex&quot;), &quot;&quot;),</span>
-<span class="fc" id="L239">                stringValue(m.get(&quot;ruleId&quot;), &quot;&quot;),</span>
-<span class="fc" id="L240">                stringValue(m.get(&quot;ruleExplanation&quot;), &quot;&quot;),</span>
-<span class="fc" id="L241">                intValue(m.get(&quot;scoreDelta&quot;), 0),</span>
-<span class="fc" id="L242">                booleanValue(m.get(&quot;equivalencePreserving&quot;), true)</span>
+<span class="fc" id="L260">        List&lt;PathReplayDto.ReplayStep&gt; steps = readList(values.get(&quot;steps&quot;)).stream()</span>
+<span class="fc" id="L261">            .map(SearchGraphRecordCodec::asMap)</span>
+<span class="fc" id="L262">            .map(m -&gt; new PathReplayDto.ReplayStep(</span>
+<span class="fc" id="L263">                intValue(m.get(&quot;stepIndex&quot;), 0),</span>
+<span class="fc" id="L264">                stringValue(m.get(&quot;fromExpression&quot;), &quot;&quot;),</span>
+<span class="fc" id="L265">                stringValue(m.get(&quot;fromLatex&quot;), &quot;&quot;),</span>
+<span class="fc" id="L266">                stringValue(m.get(&quot;toExpression&quot;), &quot;&quot;),</span>
+<span class="fc" id="L267">                stringValue(m.get(&quot;toLatex&quot;), &quot;&quot;),</span>
+<span class="fc" id="L268">                stringValue(m.get(&quot;ruleId&quot;), &quot;&quot;),</span>
+<span class="fc" id="L269">                stringValue(m.get(&quot;ruleExplanation&quot;), &quot;&quot;),</span>
+<span class="fc" id="L270">                intValue(m.get(&quot;scoreDelta&quot;), 0),</span>
+<span class="fc" id="L271">                booleanValue(m.get(&quot;equivalencePreserving&quot;), true),</span>
+<span class="fc" id="L272">                booleanValue(m.get(&quot;comparatorFlipped&quot;),</span>
+<span class="fc" id="L273">                    de.regelsuche.export.MathPresentation.detectComparatorFlip(</span>
+<span class="fc" id="L274">                        stringValue(m.get(&quot;ruleId&quot;), &quot;&quot;),</span>
+<span class="fc" id="L275">                        stringValue(m.get(&quot;fromExpression&quot;), &quot;&quot;),</span>
+<span class="fc" id="L276">                        stringValue(m.get(&quot;toExpression&quot;), &quot;&quot;))),</span>
+<span class="fc" id="L277">                readSpanList(m.get(&quot;changedFromSpans&quot;)),</span>
+<span class="fc" id="L278">                readSpanList(m.get(&quot;changedToSpans&quot;))</span>
             ))
-<span class="fc" id="L244">            .toList();</span>
-<span class="fc" id="L245">        return new PathReplayDto(stringValue(values.get(&quot;pathId&quot;), &quot;?&quot;), steps);</span>
+<span class="fc" id="L280">            .toList();</span>
+<span class="fc" id="L281">        String pathId = stringValue(values.get(&quot;pathId&quot;), &quot;?&quot;);</span>
+<span class="fc" id="L282">        Object persisted = values.get(&quot;alignedDerivationLatex&quot;);</span>
+<span class="fc" id="L283">        Object persistedDiff = values.get(&quot;alignedDerivationLatexWithDiff&quot;);</span>
+<span class="pc bpc" id="L284" title="2 of 4 branches missed.">        String alignedPlain = persisted instanceof String s &amp;&amp; !s.isBlank() ? s : null;</span>
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">        String alignedDiff = persistedDiff instanceof String d &amp;&amp; !d.isBlank() ? d : null;</span>
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">        if (alignedPlain != null &amp;&amp; alignedDiff != null) {</span>
+<span class="fc" id="L287">            return new PathReplayDto(pathId, steps, alignedPlain, alignedDiff);</span>
+        }
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (alignedPlain != null) {</span>
+<span class="nc" id="L290">            return new PathReplayDto(pathId, steps, alignedPlain);</span>
+        }
+<span class="nc" id="L292">        return new PathReplayDto(pathId, steps);</span>
+    }
+
+    /** Read a list of {@code [start, length]} pairs back into {@code int[]} spans. */
+    private static List&lt;int[]&gt; readSpanList(Object raw) {
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L298">            return List.of();</span>
+        }
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (!(raw instanceof List&lt;?&gt; list)) {</span>
+<span class="nc" id="L301">            return List.of();</span>
+        }
+<span class="fc" id="L303">        List&lt;int[]&gt; out = new ArrayList&lt;&gt;(list.size());</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (Object element : list) {</span>
+<span class="pc bpc" id="L305" title="2 of 4 branches missed.">            if (!(element instanceof List&lt;?&gt; pair) || pair.size() &lt; 2) {</span>
+<span class="nc" id="L306">                continue;</span>
+            }
+<span class="fc" id="L308">            int start = intValue(pair.get(0), 0);</span>
+<span class="fc" id="L309">            int length = intValue(pair.get(1), 0);</span>
+<span class="fc" id="L310">            out.add(new int[] { start, length });</span>
+<span class="fc" id="L311">        }</span>
+<span class="fc" id="L312">        return out;</span>
     }
 
     private static MacroRuleCandidate readMacro(Map&lt;String, Object&gt; values) {
-<span class="nc" id="L249">        return new MacroRuleCandidate(</span>
-<span class="nc" id="L250">            stringValue(values.get(&quot;id&quot;), &quot;?&quot;),</span>
-<span class="nc" id="L251">            stringList(values.get(&quot;ruleIdSequence&quot;)),</span>
-<span class="nc" id="L252">            intValue(values.get(&quot;occurrences&quot;), 0),</span>
-<span class="nc" id="L253">            stringValue(values.get(&quot;leftPattern&quot;), &quot;&quot;),</span>
-<span class="nc" id="L254">            stringValue(values.get(&quot;rightPattern&quot;), &quot;&quot;),</span>
-<span class="nc" id="L255">            doubleValue(values.get(&quot;compressionRatio&quot;), 0.0),</span>
-<span class="nc" id="L256">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;proofStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
-<span class="nc" id="L257">            stringList(values.get(&quot;supportingTransformationIds&quot;))</span>
+<span class="nc" id="L316">        return new MacroRuleCandidate(</span>
+<span class="nc" id="L317">            stringValue(values.get(&quot;id&quot;), &quot;?&quot;),</span>
+<span class="nc" id="L318">            stringList(values.get(&quot;ruleIdSequence&quot;)),</span>
+<span class="nc" id="L319">            intValue(values.get(&quot;occurrences&quot;), 0),</span>
+<span class="nc" id="L320">            stringValue(values.get(&quot;leftPattern&quot;), &quot;&quot;),</span>
+<span class="nc" id="L321">            stringValue(values.get(&quot;rightPattern&quot;), &quot;&quot;),</span>
+<span class="nc" id="L322">            doubleValue(values.get(&quot;compressionRatio&quot;), 0.0),</span>
+<span class="nc" id="L323">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;proofStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
+<span class="nc" id="L324">            stringList(values.get(&quot;supportingTransformationIds&quot;))</span>
         );
     }
 
     private static IdentityReportDto readIdentity(Map&lt;String, Object&gt; values) {
-<span class="fc" id="L262">        return new IdentityReportDto(</span>
-<span class="fc" id="L263">            stringValue(values.get(&quot;id&quot;), &quot;?&quot;),</span>
-<span class="fc" id="L264">            stringValue(values.get(&quot;leftPattern&quot;), &quot;&quot;),</span>
-<span class="fc" id="L265">            stringValue(values.get(&quot;rightPattern&quot;), &quot;&quot;),</span>
-<span class="fc" id="L266">            stringList(values.get(&quot;ruleIdSequence&quot;)),</span>
-<span class="fc" id="L267">            intValue(values.get(&quot;occurrences&quot;), 0),</span>
-<span class="fc" id="L268">            doubleValue(values.get(&quot;compressionRatio&quot;), 0.0),</span>
-<span class="fc" id="L269">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;proofStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
-<span class="fc" id="L270">            RuleStatus.valueOf(stringValue(values.get(&quot;knownRuleStatus&quot;), RuleStatus.NEW.name())),</span>
-<span class="fc" id="L271">            stringList(values.get(&quot;supportingTransformationIds&quot;))</span>
+<span class="fc" id="L329">        return new IdentityReportDto(</span>
+<span class="fc" id="L330">            stringValue(values.get(&quot;id&quot;), &quot;?&quot;),</span>
+<span class="fc" id="L331">            stringValue(values.get(&quot;leftPattern&quot;), &quot;&quot;),</span>
+<span class="fc" id="L332">            stringValue(values.get(&quot;rightPattern&quot;), &quot;&quot;),</span>
+<span class="fc" id="L333">            stringList(values.get(&quot;ruleIdSequence&quot;)),</span>
+<span class="fc" id="L334">            intValue(values.get(&quot;occurrences&quot;), 0),</span>
+<span class="fc" id="L335">            doubleValue(values.get(&quot;compressionRatio&quot;), 0.0),</span>
+<span class="fc" id="L336">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;proofStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
+<span class="fc" id="L337">            RuleStatus.valueOf(stringValue(values.get(&quot;knownRuleStatus&quot;), RuleStatus.NEW.name())),</span>
+<span class="fc" id="L338">            stringList(values.get(&quot;supportingTransformationIds&quot;))</span>
         );
     }
 
@@ -276,85 +343,85 @@ public final class SearchGraphRecordCodec {
 
     @SuppressWarnings(&quot;unchecked&quot;)
     private static Map&lt;String, Object&gt; asMap(Object raw) {
-<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L280">            return Map.of();</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L347">            return Map.of();</span>
         }
-<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (raw instanceof Map&lt;?, ?&gt; map) {</span>
-<span class="fc" id="L283">            return (Map&lt;String, Object&gt;) map;</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">        if (raw instanceof Map&lt;?, ?&gt; map) {</span>
+<span class="fc" id="L350">            return (Map&lt;String, Object&gt;) map;</span>
         }
-<span class="nc" id="L285">        throw new IllegalArgumentException(&quot;Expected object, got &quot; + raw);</span>
+<span class="nc" id="L352">        throw new IllegalArgumentException(&quot;Expected object, got &quot; + raw);</span>
     }
 
     private static List&lt;Object&gt; readList(Object raw) {
-<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L290">            return List.of();</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L357">            return List.of();</span>
         }
-<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
-<span class="fc" id="L293">            return new ArrayList&lt;&gt;(list);</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="fc" id="L360">            return new ArrayList&lt;&gt;(list);</span>
         }
-<span class="nc" id="L295">        throw new IllegalArgumentException(&quot;Expected array, got &quot; + raw);</span>
+<span class="nc" id="L362">        throw new IllegalArgumentException(&quot;Expected array, got &quot; + raw);</span>
     }
 
     private static List&lt;String&gt; stringList(Object raw) {
-<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L300">            return List.of();</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L367">            return List.of();</span>
         }
-<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
-<span class="fc" id="L303">            return list.stream().map(String::valueOf).toList();</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="fc" id="L370">            return list.stream().map(String::valueOf).toList();</span>
         }
-<span class="nc" id="L305">        throw new IllegalArgumentException(&quot;Expected array of strings, got &quot; + raw);</span>
+<span class="nc" id="L372">        throw new IllegalArgumentException(&quot;Expected array of strings, got &quot; + raw);</span>
     }
 
     private static String stringValue(Object raw, String fallback) {
-<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        return raw == null ? fallback : String.valueOf(raw);</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        return raw == null ? fallback : String.valueOf(raw);</span>
     }
 
     private static int intValue(Object raw, int fallback) {
-<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L314">            return fallback;</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L381">            return fallback;</span>
         }
-<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
-<span class="fc" id="L317">            return number.intValue();</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
+<span class="fc" id="L384">            return number.intValue();</span>
         }
         try {
-<span class="nc" id="L320">            return Integer.parseInt(String.valueOf(raw));</span>
-<span class="nc" id="L321">        } catch (NumberFormatException ex) {</span>
-<span class="nc" id="L322">            return fallback;</span>
+<span class="nc" id="L387">            return Integer.parseInt(String.valueOf(raw));</span>
+<span class="nc" id="L388">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L389">            return fallback;</span>
         }
     }
 
     private static double doubleValue(Object raw, double fallback) {
-<span class="pc bpc" id="L327" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L328">            return fallback;</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L395">            return fallback;</span>
         }
-<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
-<span class="fc" id="L331">            return number.doubleValue();</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
+<span class="fc" id="L398">            return number.doubleValue();</span>
         }
         try {
-<span class="nc" id="L334">            return Double.parseDouble(String.valueOf(raw));</span>
-<span class="nc" id="L335">        } catch (NumberFormatException ex) {</span>
-<span class="nc" id="L336">            return fallback;</span>
+<span class="nc" id="L401">            return Double.parseDouble(String.valueOf(raw));</span>
+<span class="nc" id="L402">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L403">            return fallback;</span>
         }
     }
 
     private static boolean booleanValue(Object raw, boolean fallback) {
-<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L342">            return fallback;</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L409">            return fallback;</span>
         }
-<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        if (raw instanceof Boolean bool) {</span>
-<span class="fc" id="L345">            return bool;</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">        if (raw instanceof Boolean bool) {</span>
+<span class="fc" id="L412">            return bool;</span>
         }
-<span class="nc" id="L347">        return Boolean.parseBoolean(String.valueOf(raw));</span>
+<span class="nc" id="L414">        return Boolean.parseBoolean(String.valueOf(raw));</span>
     }
 
     private static Instant parseInstant(Object raw, Instant fallback) {
-<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L352">            return fallback;</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L419">            return fallback;</span>
         }
         try {
-<span class="fc" id="L355">            return Instant.parse(String.valueOf(raw));</span>
-<span class="nc" id="L356">        } catch (RuntimeException ex) {</span>
-<span class="nc" id="L357">            return fallback;</span>
+<span class="fc" id="L422">            return Instant.parse(String.valueOf(raw));</span>
+<span class="nc" id="L423">        } catch (RuntimeException ex) {</span>
+<span class="nc" id="L424">            return fallback;</span>
         }
     }
 }
