@@ -47,6 +47,33 @@ Das startet App + Neo4j 5 Community + persistentes Volume und setzt
 [`docs/getting-started.md`](docs/getting-started.md) und
 [`docs/architecture.md`](docs/architecture.md).
 
+## 5-Minuten-Tour
+
+Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
+
+1. **Demo starten.** Auf `http://localhost:8080/` einen Demo-Button (z.B.
+   _Binomische Formel_) klicken. Erst nach diesem Klick werden die Folge-Tabs
+   (Graph, Replay, Proof-Jobs, Export, …) sichtbar — das Landing-Form ist
+   absichtlich auf einen einzigen Hauptfluss „Ausdruck → Ziel → Suche starten"
+   reduziert.
+2. **Suchgraph + Replay ansehen.** `Graph`-Tab zeigt den entdeckten
+   Transformationsraum; `Replay` spielt den besten Pfad Schritt für Schritt
+   ab.
+3. **Proof-Job anlegen.** Im `Proof-Jobs`-Tab `Left=a + 0`, `Right=a`
+   eintippen und _Job einreichen_ klicken — der Status der asynchronen
+   Pipeline wird live aktualisiert, Artefakte (`proof.smt2`, `proof.lean`,
+   `metadata.json`, `stdout.txt`, `stderr.txt`) liegen unter
+   `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`.
+   ![Proof-Job-Panel](docs/assets/screenshots/proof-job-panel.png)
+4. **Qualitätsdashboard prüfen.** `Benchmark`-Tab → jede Zeile zeigt
+   Ampelstatus, `expectedResultMatched`, e-Graph-Größe, Saturation-Sparung
+   und ob eine gelernte Makroregel beteiligt war. Der vollständige Report
+   liegt unter [`docs/benchmark-report.md`](docs/benchmark-report.md) (CI lädt
+   ihn als Artefakt `benchmark-report` hoch).
+5. **Bericht exportieren.** Im `Exporte`-Tab den `bundle.zip` Download
+   starten — enthält Markdown/LaTeX/JSON/Mermaid/GraphML und das aktuelle
+   Rule-Inventory.
+
 ## Was kann Regelsuche?
 
 * **Atomare Rewrite-Regeln** statt vorgefertigter Formeln — Schulbuchidentitäten

@@ -4,6 +4,20 @@ Regelsuche ships a fully asynchronous proof pipeline behind the
 `Proof-Jobs` tab. Lean and SMT (Z3 / cvc5) workers run jobs from a
 persistent queue and write a structured artefact bundle per job.
 
+![Proof-Job-Panel im Browser](assets/screenshots/proof-job-panel.png)
+
+> Screenshot wird automatisch von `ProofJobPanelBrowserFlowTest` mit
+> `./gradlew e2eTest -Pregelsuche.recordDocs=true` aktualisiert.
+
+## End-to-end browser flow
+
+`ProofJobPanelBrowserFlowTest#proofJobPanelBrowserFlow` startet die
+Workbench in-process mit einem deterministischen
+`StubAlwaysSucceedsWorker`, öffnet den `Proof-Jobs`-Tab, schickt einen
+Job für `a + 0 → a` ab, wartet auf die Jobliste, ruft die Artefakt-Liste
+auf und macht einen Screenshot. So funktioniert die Pipeline auch in
+CI-Runnern ohne Z3 / Lean.
+
 ## Architecture
 
 ```

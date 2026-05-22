@@ -86,6 +86,30 @@ jobs:
           name: docs-videos
           path: docs/assets/videos/**
 
+  benchmark-report:
+    name: Benchmark quality report
+    runs-on: ubuntu-latest
+    needs: unit-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Run benchmark + render report
+        run: ./gradlew benchmarkReport
+      - name: Upload benchmark report (Markdown)
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: docs/benchmark-report.md
+      - name: Upload benchmark summary (JSON)
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-summary
+          path: docs/assets/benchmark-summary.json
+
 
   proof-image:
     name: Build Dockerfile.proof & verify provers

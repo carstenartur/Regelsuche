@@ -122,3 +122,45 @@ Surfaces:
 - UI: the **Ziel** dropdown next to **Profil** on the Workbench tab.
 - API: `POST /api/search` accepts `"goal": "..."`. Omitting it falls
   back to the profile's default goal.
+
+---
+
+## Landing page entry flow
+
+Newcomers see a deliberately reduced landing page: only the workbench
+entry tab is visible, with one primary form
+(_Ausdruck eingeben → Ziel wählen → Suche starten_) and the demo tile
+grid below it. Downstream tabs (`Graph`, `Replay`, `Proof-Jobs`,
+`Export`, `Benchmark`, …) are hidden by CSS (`body.pre-search`) until
+the user starts their first search or clicks a demo tile — see
+[`LandingPageBrowserFlowTest`](../app/src/e2eTest/java/de/regelsuche/e2e/LandingPageBrowserFlowTest.java)
+for the acceptance tests.
+
+## Proof workbench workflow
+
+For a step-by-step proof workflow including the browser flow that
+captures the screenshot below, see
+[Proof Workbench](proof-workbench.md). A typical run from the UI:
+
+1. Open the **Proof-Jobs** tab (revealed automatically after the first
+   search).
+2. Enter `Left = a + 0`, `Right = a`, click **Job einreichen**.
+3. The job appears in the list with a polled status; opening _Artefakte_
+   shows the persisted `proof.smt2` / `proof.lean` / `metadata.json`.
+
+![Proof-Job-Panel](assets/screenshots/proof-job-panel.png)
+
+## Benchmark quality dashboard
+
+The **Benchmark** tab and
+[`docs/benchmark-report.md`](benchmark-report.md) surface, per scenario:
+
+- ✅ / ⚠️ / ❌ Ampelstatus
+- `found`, `expectedResultMatched`, `proofStatus`
+- `visitedStates`, `prunedStates`, `eGraphClasses`, `eGraphNodes`
+- `saturationSavings`, `learnedRuleUsed`, `exportBundleValid`
+
+`./gradlew benchmarkReport` regenerates the Markdown report and the
+machine-readable
+[`docs/assets/benchmark-summary.json`](assets/benchmark-summary.json);
+CI uploads both as `benchmark-report` / `benchmark-summary` artefacts.

@@ -124,6 +124,17 @@ Die Tests stehen in
 | Test | `proofBridgePanelShowsGeneratedScript()` |
 | Status | `FORMALLY_PROVED` wird **nur** gesetzt, wenn der Prover (Lean/SMT) den Beweis bestätigt. |
 
+## Proof-Job-Panel — `a + 0 → a`
+
+![Proof-Job-Panel](assets/screenshots/proof-job-panel.png)
+
+| Aspekt | Wert |
+| --- | --- |
+| Tab | **Proof-Jobs** |
+| Flow | Job einreichen → Statuspolling → Artefaktbundle (`proof.*`, `metadata.json`, `stdout.txt`, `stderr.txt`) |
+| Test | `ProofJobPanelBrowserFlowTest#proofJobPanelBrowserFlow` |
+| Hinweis | Läuft auch ohne Z3/Lean, weil das e2e-Environment einen deterministischen `StubAlwaysSucceedsWorker` zuschaltet. |
+
 ## Export-Bundle
 
 ![Export-Bundle](assets/screenshots/export-bundle.png)
