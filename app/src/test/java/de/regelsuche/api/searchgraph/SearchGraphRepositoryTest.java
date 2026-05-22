@@ -120,6 +120,22 @@ class SearchGraphRepositoryTest {
         assertEquals(1, round.changedToSpans().get(0)[0]);
     }
 
+    @Test
+    void codecRoundTripsExpressionLatexForNodes() {
+        SearchGraphRecord original = sampleRecord("session-stage4");
+        String json = SearchGraphRecordCodec.toJson(original);
+        SearchGraphRecord parsed = SearchGraphRecordCodec.fromJson(json);
+        for (int i = 0; i < original.graph().nodes().size(); i++) {
+            SearchGraphNodeDto in = original.graph().nodes().get(i);
+            SearchGraphNodeDto out = parsed.graph().nodes().get(i);
+            assertNotNull(out.expressionLatex());
+            assertFalse(out.expressionLatex().isBlank(),
+                "expressionLatex must round-trip non-blank for " + in.id());
+            assertEquals(in.expressionLatex(), out.expressionLatex(),
+                "expressionLatex must round-trip via the codec for " + in.id());
+        }
+    }
+
     private static SearchGraphRecord sampleRecord(String id) {
         SearchGraphNodeDto node = new SearchGraphNodeDto(
             "x", "x", "x", 3, 0, 1, false, false,

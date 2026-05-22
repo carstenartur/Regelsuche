@@ -629,7 +629,12 @@
             container: canvas,
             elements: elements,
             style: [
-                { selector: 'node', style: { 'label': 'data(label)', 'font-size': 10, 'background-color': '#3b82f6', 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center' } },
+                // Stage 4: node labels are rendered as KaTeX HTML overlays
+                // (see graphMathOverlay) so the in-canvas label is hidden
+                // by setting its color to transparent. We still keep the
+                // text-content available for screen readers via the
+                // overlay's aria-label.
+                { selector: 'node', style: { 'label': '', 'font-size': 10, 'background-color': '#3b82f6', 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center' } },
                 { selector: 'node[?payload.isBest]', style: { 'background-color': '#10b981' } },
                 { selector: 'node[?payload.isDeadEnd]', style: { 'background-color': '#9ca3af' } },
                 { selector: 'edge', style: { 'label': 'data(label)', 'font-size': 8, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle' } }
@@ -638,11 +643,144 @@
         });
         cy.on('tap', 'node', evt => showInspector(evt.target.data('payload')));
         cy.on('tap', 'edge', evt => showInspector(evt.target.data('payload')));
+        // Stage 4: expose for browser tests; harmless in production.
+        window.__cyForTests = cy;
+        // Stage 4: install the KaTeX HTML-overlay layer over the cy
+        // canvas. The overlay re-projects each node's bounding box back
+        // to container coordinates on layoutstop / pan / zoom / position
+        // so the math nodes track the underlying Cytoscape positions
+        // smoothly via CSS transitions.
+        graphMathOverlay.install(cy, canvas);
         if (inspector) {
             inspector.style.display = 'block';
             inspector.innerHTML = '<em>Klicke auf einen Knoten oder eine Kante, um Details anzuzeigen.</em>';
         }
     }
+
+    /**
+     * Stage 4 — KaTeX graph-node HTML overlays. Renders each Cytoscape
+     * node's expression (via `payload.expressionLatex`) as an absolutely
+     * positioned `.graph-node-math` div inside a `.graph-overlay-layer`
+     * wrapper that sits over the canvas. The overlay layer is repositioned
+     * after `layoutstop` / `pan` / `zoom` / `position` events using each
+     * node's rendered bounding box, and CSS transitions keep the motion
+     * smooth.
+     *
+     * Optionally also projects edge `ruleLatex` captions as midpoint
+     * labels when the canvas carries `data-graph-math-edges` (so we can
+     * ship nodes-only first if the layout layer needs tuning).
+     */
+    const graphMathOverlay = (() => {
+        function ensureLayer(canvas) {
+            let layer = canvas.querySelector('.graph-overlay-layer');
+            if (!layer) {
+                layer = document.createElement('div');
+                layer.className = 'graph-overlay-layer';
+                layer.style.position = 'absolute';
+                layer.style.left = '0';
+                layer.style.top = '0';
+                layer.style.right = '0';
+                layer.style.bottom = '0';
+                layer.style.pointerEvents = 'none';
+                // The canvas itself must be a positioning context.
+                const computed = window.getComputedStyle(canvas).position;
+                if (computed === 'static') {
+                    canvas.style.position = 'relative';
+                }
+                canvas.appendChild(layer);
+            }
+            return layer;
+        }
+        function projectNode(node) {
+            // Returns the rendered bounding box of `node` in the
+            // container's coordinate system. Cytoscape's
+            // `renderedBoundingBox()` is already in container px after
+            // pan/zoom, so no extra math is needed.
+            const bb = node.renderedBoundingBox({ includeLabels: false });
+            return { x: bb.x1, y: bb.y1, w: bb.w, h: bb.h };
+        }
+        function syncOverlays(cy, layer) {
+            const showEdges = layer.parentElement
+                && layer.parentElement.hasAttribute('data-graph-math-edges');
+            const nodeIds = new Set();
+            cy.nodes().forEach((node) => {
+                const id = node.id();
+                nodeIds.add(id);
+                let host = layer.querySelector('[data-node-id="' + cssEscape(id) + '"]');
+                const payload = node.data('payload') || {};
+                const latex = payload.expressionLatex
+                    || payload.latex
+                    || payload.expression
+                    || id;
+                if (!host) {
+                    host = document.createElement('div');
+                    host.className = 'graph-node-math';
+                    host.setAttribute('data-node-id', id);
+                    host.setAttribute('data-math', '$' + latex + '$');
+                    host.textContent = '$' + latex + '$';
+                    if (payload.expression) {
+                        host.setAttribute('aria-label', String(payload.expression));
+                    }
+                    layer.appendChild(host);
+                }
+                if (payload.isBest) { host.classList.add('is-best'); } else { host.classList.remove('is-best'); }
+                if (payload.isDeadEnd) { host.classList.add('is-dead-end'); } else { host.classList.remove('is-dead-end'); }
+                const box = projectNode(node);
+                // Use translate3d so the GPU compositor can animate the
+                // CSS transition smoothly; the matching `.graph-node-math`
+                // CSS rule defines `transition: transform 200ms ease`.
+                host.style.transform = 'translate3d(' + (box.x + box.w / 2) + 'px,'
+                    + (box.y + box.h / 2) + 'px, 0) translate(-50%, -50%)';
+            });
+            // Optional edge captions.
+            if (showEdges) {
+                cy.edges().forEach((edge) => {
+                    const id = 'edge:' + edge.id();
+                    nodeIds.add(id);
+                    let host = layer.querySelector('[data-node-id="' + cssEscape(id) + '"]');
+                    const payload = edge.data('payload') || {};
+                    const latex = payload.ruleLatex || payload.ruleId || '';
+                    if (!latex) { return; }
+                    if (!host) {
+                        host = document.createElement('div');
+                        host.className = 'graph-node-math graph-edge-math';
+                        host.setAttribute('data-node-id', id);
+                        host.setAttribute('data-math', '$' + latex + '$');
+                        host.textContent = '$' + latex + '$';
+                        layer.appendChild(host);
+                    }
+                    const bb = edge.renderedBoundingBox();
+                    const cx = (bb.x1 + bb.x2) / 2;
+                    const cy2 = (bb.y1 + bb.y2) / 2;
+                    host.style.transform = 'translate3d(' + cx + 'px,' + cy2 + 'px, 0) translate(-50%, -50%)';
+                });
+            }
+            // Garbage-collect overlays for removed elements.
+            layer.querySelectorAll('[data-node-id]').forEach((host) => {
+                if (!nodeIds.has(host.getAttribute('data-node-id'))) {
+                    host.remove();
+                }
+            });
+            // Route every freshly added/updated math host through the
+            // central renderMath() pipeline so KaTeX takes over.
+            window.renderMath(layer);
+        }
+        function cssEscape(value) {
+            if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+                return CSS.escape(value);
+            }
+            return String(value).replace(/[^a-zA-Z0-9_-]/g, (c) => '\\' + c);
+        }
+        function install(cy, canvas) {
+            const layer = ensureLayer(canvas);
+            // Initial sync; subsequent updates are wired to Cytoscape
+            // events so the overlay stays aligned with the canvas.
+            const sync = () => syncOverlays(cy, layer);
+            cy.on('layoutstop pan zoom position', sync);
+            cy.ready(sync);
+        }
+        return { install, syncOverlays, ensureLayer };
+    })();
 
     function showInspector(payload) {
         const inspector = $('graphInspector');

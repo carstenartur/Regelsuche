@@ -174,4 +174,52 @@ class WebUiMathPipelineTest {
         }
         return null;
     }
+
+    /**
+     * Stage 4 pin: the search-graph tab installs a `graphMathOverlay`
+     * module that renders each Cytoscape node's expression as a KaTeX
+     * HTML overlay inside a `.graph-overlay-layer` wrapper, and
+     * re-projects the overlays on `layoutstop` / `pan` / `zoom` /
+     * `position` events through the central `renderMath()` pipeline.
+     */
+    @Test
+    void appJsInstallsKatexGraphOverlay() throws IOException {
+        Path appJs = locateAppJs();
+        if (appJs == null) {
+            return;
+        }
+        String content = Files.readString(appJs);
+        assertTrue(content.contains("graphMathOverlay"),
+            "app.js must define a graphMathOverlay module");
+        assertTrue(content.contains("graph-overlay-layer"),
+            "app.js must emit a .graph-overlay-layer wrapper over the canvas");
+        assertTrue(content.contains("graph-node-math"),
+            "app.js must emit .graph-node-math hosts per Cytoscape node");
+        assertTrue(content.contains("projectNode"),
+            "app.js must define a projectNode helper for overlay positioning");
+        assertTrue(content.contains("layoutstop"),
+            "app.js must hook the Cytoscape layoutstop event for re-projection");
+        assertTrue(content.contains("data-graph-math-edges"),
+            "app.js must gate edge captions behind data-graph-math-edges");
+        assertTrue(content.contains("expressionLatex"),
+            "app.js must read SearchGraphNodeDto.expressionLatex for the overlay");
+    }
+
+    @Test
+    void styleCssDefinesGraphOverlayTransitions() throws IOException {
+        Path styleCss = locateStyleCss();
+        if (styleCss == null) {
+            return;
+        }
+        String content = Files.readString(styleCss);
+        assertTrue(content.contains(".graph-node-math"),
+            "missing .graph-node-math rule");
+        assertTrue(content.contains(".graph-overlay-layer"),
+            "missing .graph-overlay-layer rule");
+        assertTrue(content.contains("transition: transform"),
+            ".graph-node-math must declare a transform transition for smooth motion");
+        assertTrue(content.contains(".graph-node-math.is-best")
+                && content.contains(".graph-node-math.is-dead-end"),
+            "missing best/dead-end color tokens that mirror the cytoscape block");
+    }
 }

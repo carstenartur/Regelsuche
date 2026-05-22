@@ -21,6 +21,7 @@ public final class SearchGraphJsonSerializer {
                 inner.property("id", node.id());
                 inner.property("expression", node.expression());
                 inner.property("latex", node.latex());
+                inner.property("expressionLatex", node.expressionLatex());
                 inner.property("score", node.score());
                 inner.property("depth", node.depth());
                 inner.property("visitedCount", node.visitedCount());

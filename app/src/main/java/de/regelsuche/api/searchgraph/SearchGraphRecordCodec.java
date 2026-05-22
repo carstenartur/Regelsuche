@@ -50,6 +50,7 @@ public final class SearchGraphRecordCodec {
             inner.property("id", node.id());
             inner.property("expression", node.expression());
             inner.property("latex", node.latex());
+            inner.property("expressionLatex", node.expressionLatex());
             inner.property("score", node.score());
             inner.property("depth", node.depth());
             inner.property("visitedCount", node.visitedCount());
@@ -200,7 +201,9 @@ public final class SearchGraphRecordCodec {
                 booleanValue(m.get("isBest"), false),
                 booleanValue(m.get("isDeadEnd"), false),
                 CandidateProofStatus.valueOf(stringValue(m.get("candidateStatus"), CandidateProofStatus.OBSERVED.name())),
-                stringValue(m.get("clusterId"), "")
+                stringValue(m.get("clusterId"), ""),
+                SearchExpression.classify(stringValue(m.get("expression"), "")),
+                m.get("expressionLatex") == null ? null : String.valueOf(m.get("expressionLatex"))
             ))
             .toList();
         List<SearchGraphEdgeDto> edges = readList(values.get("edges")).stream()
