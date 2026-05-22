@@ -97,6 +97,12 @@ class DidacticApiTest {
     }
 
     @Test
+    void hintRejectsGetMethod() throws IOException {
+        HttpURLConnection connection = open("GET", "/api/didactic/hint/sample-derivation-id");
+        assertEquals(405, connection.getResponseCode());
+    }
+
+    @Test
     void misconceptionsListsCatalogue() throws IOException {
         HttpURLConnection connection = open("GET", "/api/didactic/misconceptions");
         assertEquals(200, connection.getResponseCode());

@@ -1,6 +1,10 @@
 package de.regelsuche.didactic;
 
 import de.regelsuche.equivalence.EquivalenceService;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -42,6 +46,7 @@ public final class StudentStepValidator {
     private final EquivalenceService equivalence;
     private final MisconceptionDetector misconceptions;
     private final DidacticCostModel costModel;
+    private final ExpressionScorer scorer = new ExpressionScorer();
 
     public StudentStepValidator(EquivalenceService equivalence) {
         this(equivalence,
@@ -108,12 +113,19 @@ public final class StudentStepValidator {
     }
 
     private boolean isWithinDifficulty(String expression, DifficultyLevel level) {
-        // Re-use the cost model with the requested level; if the cost
-        // exceeds a reasonable budget, the step is "too complex".
-        DidacticCostModel scoped = new DidacticCostModel(level, costModel.profile());
-        int cost = scoped.cost(expression,
-            new de.regelsuche.canonical.ExpressionCanonicalizer(),
-            new de.regelsuche.scoring.ExpressionScorer().score(expression));
+        DidacticCostModel scoped = level == costModel.level()
+            ? costModel
+            : new DidacticCostModel(level, costModel.profile());
+        int cost;
+        try {
+            var ast = new ExpressionParser()
+                .parse(new InputRequest(InputType.TERM, expression))
+                .terms()
+                .getFirst();
+            cost = scoped.cost(expression, ast, scorer.score(expression));
+        } catch (RuntimeException ex) {
+            cost = Integer.MAX_VALUE;
+        }
         return cost < complexityBudget(level);
     }
 

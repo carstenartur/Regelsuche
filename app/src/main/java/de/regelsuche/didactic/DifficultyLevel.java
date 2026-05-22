@@ -9,13 +9,13 @@ import java.util.Set;
  *   <li>filter the rule set offered to the search (no derivatives in
  *       primary school, no symbolic logarithms before {@link #OBERSTUFE},
  *       …) — see {@link #permits(String)};</li>
- *   <li>tune the verbosity of {@link ExplanationGenerator}-style
+ *   <li>tune the verbosity of {@link de.regelsuche.explain.ExplanationService}-style
  *       hints;</li>
  *   <li>cap expression complexity inside {@link DidacticCostModel}.</li>
  * </ul>
  *
  * <p>The allow-list is intentionally conservative: rules without an
- * explicit minimum level default to {@link #MITTELSTUFE}. This matches
+ * explicit listing are rejected for non-{@link #EXPERTE} levels. This matches
  * spec item 6 ("erlaubte Regeln, Ausdruckskomplexität, Erklärungstiefe,
  * Abkürzungen, Formalitätsgrad").</p>
  */

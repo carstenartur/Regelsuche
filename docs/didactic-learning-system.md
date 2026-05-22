@@ -143,8 +143,6 @@ Suchpipeline einhängt — ohne Änderungen an den Strategien.
 
 ## Was bewusst noch nicht enthalten ist
 
-## Was bewusst noch nicht enthalten ist
-
 - Optional LLM-gestützte Formulierung kann über die Schnittstelle
   `LlmHintPhraser` angebunden werden — diese Sitzung liefert nur den
   No-Op-Adapter; konkrete Modell-Aufrufe sind bewusst extern gehalten.

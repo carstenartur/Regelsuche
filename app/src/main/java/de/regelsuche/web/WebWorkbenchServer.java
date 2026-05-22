@@ -42,6 +42,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyStore;
 import java.util.HashMap;
 import java.util.List;
@@ -75,12 +76,11 @@ public class WebWorkbenchServer {
     private final de.regelsuche.proof.ProofBridgeService leanProofBridgeService;
     private final de.regelsuche.proof.ProofBridgeService smtProofBridgeService;
     private final de.regelsuche.proof.ProofWorkbenchService proofWorkbenchService;
+    private final de.regelsuche.didactic.analytics.DidacticEventStore didacticEventStore;
+    private final de.regelsuche.didactic.analytics.DidacticAnalyticsService didacticAnalytics;
+    private final de.regelsuche.didactic.StudentStepValidator didacticStepValidator;
 
     private HttpServer server;
-    private final de.regelsuche.didactic.analytics.DidacticEventStore didacticEventStore =
-        new de.regelsuche.didactic.analytics.InMemoryDidacticEventStore();
-    private final de.regelsuche.didactic.analytics.DidacticAnalyticsService didacticAnalytics =
-        new de.regelsuche.didactic.analytics.DidacticAnalyticsService(didacticEventStore);
     private final de.regelsuche.didactic.export.EducationalExporter didacticExporter =
         new de.regelsuche.didactic.export.EducationalExporter();
 
@@ -163,12 +163,49 @@ public class WebWorkbenchServer {
         this.transformationQuery = new TransformationQueryService(graphStore);
         this.inventoryQuery = new RuleInventoryQueryService(graphStore, inventoryRepository);
         this.exportQuery = new ExportQueryService(graphStore, inventoryRepository);
+        this.didacticEventStore = createDidacticEventStore();
+        this.didacticAnalytics = new de.regelsuche.didactic.analytics.DidacticAnalyticsService(didacticEventStore);
+        this.didacticStepValidator = new de.regelsuche.didactic.StudentStepValidator(new SymPyEquivalenceService());
     }
 
     private static de.regelsuche.proof.ProofBridgeService defaultProofBridgeService(
         de.regelsuche.proof.ProofBridge bridge
     ) {
         return new de.regelsuche.proof.ProofBridgeService(bridge);
+    }
+
+    private static de.regelsuche.didactic.analytics.DidacticEventStore createDidacticEventStore() {
+        Map<String, String> env = System.getenv();
+        String jsonPath = readConfig(env, "REGELSUCHE_DIDACTIC_EVENT_STORE");
+        if (!jsonPath.isBlank()) {
+            try {
+                return new de.regelsuche.didactic.analytics.JsonFileDidacticEventStore(Path.of(jsonPath));
+            } catch (IOException ex) {
+                throw new IllegalStateException("Unable to initialize didactic event store at " + jsonPath, ex);
+            }
+        }
+        int maxEvents = parsePositiveInt(readConfig(env, "REGELSUCHE_DIDACTIC_EVENT_MAX"), 5000);
+        return new de.regelsuche.didactic.analytics.InMemoryDidacticEventStore(maxEvents);
+    }
+
+    private static String readConfig(Map<String, String> env, String key) {
+        String value = env.get(key);
+        if (value == null || value.isBlank()) {
+            value = System.getProperty(key);
+        }
+        return value == null ? "" : value.trim();
+    }
+
+    private static int parsePositiveInt(String value, int fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            return parsed > 0 ? parsed : fallback;
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
     }
 
     public void start() throws IOException {
@@ -970,10 +1007,8 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 400, "invalid difficulty: " + difficulty);
             return;
         }
-        de.regelsuche.didactic.StudentStepValidator validator =
-            new de.regelsuche.didactic.StudentStepValidator(new SymPyEquivalenceService());
         de.regelsuche.didactic.StudentStepValidator.Result result =
-            validator.validate(currentExpression, studentStep, level);
+            didacticStepValidator.validate(currentExpression, studentStep, level);
 
         didacticEventStore.record(de.regelsuche.didactic.analytics.DidacticEvent.stepCheck(
             java.time.Instant.now(),
@@ -1001,6 +1036,10 @@ public class WebWorkbenchServer {
     }
 
     private void handleDidacticHint(HttpExchange exchange, String pathId) throws IOException {
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
         if (pathId.isBlank()) {
             sendStatus(exchange, 400, "expected /api/didactic/hint/{pathId}");
             return;
@@ -1012,14 +1051,9 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 404, "path not found");
             return;
         }
-        String method = exchange.getRequestMethod();
-        Map<String, Object> body = "POST".equalsIgnoreCase(method)
-            ? readJsonObject(exchange)
-            : Map.of();
-        String currentExpression = stringValue(body, "currentExpression",
-            queryParam(exchange, "currentExpression", ""));
-        String profile = stringValue(body, "pedagogyProfile",
-            queryParam(exchange, "pedagogyProfile", "SCHOOL"));
+        Map<String, Object> body = readJsonObject(exchange);
+        String currentExpression = stringValue(body, "currentExpression", "");
+        String profile = stringValue(body, "pedagogyProfile", "SCHOOL");
 
         de.regelsuche.didactic.PedagogyProfile profileEnum;
         try {

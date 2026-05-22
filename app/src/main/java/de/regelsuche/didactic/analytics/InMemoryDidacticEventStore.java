@@ -8,12 +8,24 @@ import java.util.Objects;
 /** Thread-safe in-memory {@link DidacticEventStore} (default for tests). */
 public final class InMemoryDidacticEventStore implements DidacticEventStore {
 
+    private final int maxEvents;
     private final List<DidacticEvent> events =
         Collections.synchronizedList(new ArrayList<>());
+
+    public InMemoryDidacticEventStore() {
+        this(Integer.MAX_VALUE);
+    }
+
+    public InMemoryDidacticEventStore(int maxEvents) {
+        this.maxEvents = Math.max(1, maxEvents);
+    }
 
     @Override
     public void record(DidacticEvent event) {
         events.add(Objects.requireNonNull(event, "event"));
+        while (events.size() > maxEvents) {
+            events.removeFirst();
+        }
     }
 
     @Override

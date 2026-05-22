@@ -23,6 +23,7 @@ class DifficultyLevelTest {
         assertTrue(middle.permits("ast_distribute_left_add"));
         assertTrue(middle.permits("rational_cancel_common_factor"));
         assertFalse(middle.permits("calc_chain_rule"));
+        assertFalse(middle.permits("totally_unknown_rule_id"));
 
         // OBERSTUFE adds calculus basics and trig.
         DifficultyLevel upper = DifficultyLevel.OBERSTUFE;
