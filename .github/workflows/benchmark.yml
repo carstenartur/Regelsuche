@@ -49,7 +49,18 @@ jobs:
           test -f "$path"
           echo "path=$path" >> "$GITHUB_OUTPUT"
 
+      - name: Check benchmark history branch
+        id: benchmark-history
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No gh-pages branch found; skipping benchmark history publishing for this run."
+          fi
+
       - name: Publish benchmark results
+        if: steps.benchmark-history.outputs.exists == 'true'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Regelsuche JMH Benchmarks
