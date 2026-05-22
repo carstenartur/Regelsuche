@@ -139,6 +139,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/demo", this::handleDemo));
         secure(server.createContext("/api/memory", this::handleMemory));
         secure(server.createContext("/api/proof-status", this::handleProofStatus));
+        secure(server.createContext("/api/proof-bridge", this::handleProofBridge));
         secure(server.createContext("/api/benchmark", this::handleBenchmark));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
@@ -1053,6 +1054,7 @@ public class WebWorkbenchServer {
                     inner.property("profile", demo.profile().name());
                     inner.property("expectedHighlight", demo.expectedHighlight());
                     inner.property("expectedResultExpression", demo.expectedResultExpression());
+                    inner.property("domain", demo.domain());
                 })));
             writer.endObject();
             sendJson(exchange, 200, writer.toString());
@@ -1095,6 +1097,32 @@ public class WebWorkbenchServer {
         writer.property("profile", demo.profile().name());
         writer.property("expectedHighlight", demo.expectedHighlight());
         writer.property("expectedResultExpression", demo.expectedResultExpression());
+        writer.property("domain", demo.domain());
+        writer.property("expressionType", result.expressionType().name());
+        writer.property("comparatorFlipped", result.comparatorFlipped());
+        if (!result.inputLatex().isEmpty()) {
+            writer.property("inputLatex", result.inputLatex());
+        }
+        if (!result.resultLatex().isEmpty()) {
+            writer.property("resultLatex", result.resultLatex());
+        }
+        if (result.proofOutcome() != null) {
+            writer.object("proofOutcome", po -> {
+                var outcome = result.proofOutcome();
+                po.property("proofStatus", outcome.candidate().proofStatus().name());
+                if (outcome.execution() != null) {
+                    po.property("proverStatus", outcome.execution().status().name());
+                    po.property("exitCode", outcome.execution().exitCode());
+                    po.property("stdout", outcome.execution().stdout());
+                    po.property("stderr", outcome.execution().stderr());
+                    po.property("elapsedMillis", outcome.execution().durationMillis());
+                }
+                if (outcome.attempt() != null) {
+                    po.property("artifact", outcome.attempt().artifact());
+                    po.property("tool", outcome.attempt().tool());
+                }
+            });
+        }
         writer.property("canonicalTargetExpression",
             result.canonicalTargetExpression() == null ? "" : result.canonicalTargetExpression());
         writer.property("rootExpression", result.rootExpression());
@@ -1183,6 +1211,87 @@ public class WebWorkbenchServer {
                     inner.property("descriptionDe", d.summaryDe());
                     inner.property("descriptionEn", d.summaryEn());
                 })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    /**
+     * POST /api/proof-bridge — body {@code {"leftPattern": "...", "rightPattern": "...",
+     * "assumptions": ["x != 0", ...], "tool": "lean4"|"smt"}}.
+     *
+     * <p>Runs the configured {@link de.regelsuche.proof.ProofBridgeService}
+     * (Lean / SMT) and returns prover status, exit code, stdout, stderr,
+     * elapsed time, and the generated proof script so the UI's "Proof prüfen"
+     * button can render the full execution result. Only a successful prover
+     * run actually promotes the candidate to {@code FORMALLY_PROVED}; without
+     * an executor configured we report {@code SCRIPT_GENERATED}.</p>
+     */
+    private void handleProofBridge(HttpExchange exchange) throws IOException {
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        Map<String, Object> body = readJsonObject(exchange);
+        String left = stringValue(body, "leftPattern", "");
+        String right = stringValue(body, "rightPattern", "");
+        if (left.isBlank() || right.isBlank()) {
+            sendStatus(exchange, 400, "leftPattern and rightPattern are required");
+            return;
+        }
+        String tool = stringValue(body, "tool", "lean4").toLowerCase(java.util.Locale.ROOT);
+        de.regelsuche.proof.ProofBridge bridge = "smt".equals(tool)
+            ? new de.regelsuche.proof.SmtProofBridge()
+            : new de.regelsuche.proof.LeanProofBridge();
+        de.regelsuche.proof.ProofBridgeService service =
+            new de.regelsuche.proof.ProofBridgeService(bridge);
+        List<de.regelsuche.assumption.Assumption> assumptions = new java.util.ArrayList<>();
+        Object raw = body.get("assumptions");
+        if (raw instanceof List<?> list) {
+            for (Object item : list) {
+                if (item != null) {
+                    assumptions.add(new de.regelsuche.assumption.Assumption(
+                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));
+                }
+            }
+        }
+        de.regelsuche.mining.RuleCandidate candidate = new de.regelsuche.mining.RuleCandidate(
+            left, right, 1, 1.0, 1, true, true, false,
+            List.of(),
+            de.regelsuche.mining.RuleStatus.NEW,
+            de.regelsuche.mining.CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+            Integer.toHexString((left + "->" + right).hashCode()),
+            List.of()
+        );
+        de.regelsuche.proof.ProofBridgeService.ProofAttemptOutcome outcome =
+            service.attemptWithDetails(candidate, assumptions);
+
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("leftPattern", left);
+        writer.property("rightPattern", right);
+        writer.property("tool", tool);
+        writer.property("proofStatus", outcome.candidate().proofStatus().name());
+        if (outcome.execution() != null) {
+            writer.property("proverStatus", outcome.execution().status().name());
+            writer.property("exitCode", outcome.execution().exitCode());
+            writer.property("stdout", outcome.execution().stdout());
+            writer.property("stderr", outcome.execution().stderr());
+            writer.property("elapsedMillis", outcome.execution().durationMillis());
+        } else {
+            // No executor configured — be explicit so the UI can show the
+            // "script generated only" state instead of leaving the field
+            // absent.
+            writer.property("proverStatus",
+                de.regelsuche.proof.ProverExecutionResult.Status.SCRIPT_GENERATED.name());
+            writer.property("exitCode", -1);
+            writer.property("stdout", "");
+            writer.property("stderr", "");
+            writer.property("elapsedMillis", 0L);
+        }
+        if (outcome.attempt() != null) {
+            writer.property("artifact", outcome.attempt().artifact());
+            writer.property("artifactTool", outcome.attempt().tool());
+        }
         writer.endObject();
         sendJson(exchange, 200, writer.toString());
     }
