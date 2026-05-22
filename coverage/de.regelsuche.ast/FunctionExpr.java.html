@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FunctionExpr.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ast</a> &gt; <span class="el_source">FunctionExpr.java</span></div><h1>FunctionExpr.java</h1><pre class="source lang-java linenums">package de.regelsuche.ast;
+
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Function-call expression node, e.g. {@code sin(x)}, {@code log(x*y)}, or
+ * {@code abs(a)}.
+ *
+ * &lt;p&gt;The {@link #name()} is the lowercase function identifier; arguments
+ * are arbitrary {@link Expr} trees. The set of &quot;well-known&quot; function names
+ * recognised by the parser/formatter is documented in
+ * {@link #BUILTIN_NAMES} — additional names are accepted as long as they
+ * survive parsing (any letter-prefix followed by a parenthesised argument
+ * list).&lt;/p&gt;
+ *
+ * &lt;p&gt;Functions intentionally support an arbitrary arity so the AST can also
+ * represent multi-argument forms such as a future {@code log(base, x)}
+ * without further changes; the current rule set uses single-argument
+ * functions exclusively.&lt;/p&gt;
+ */
+public record FunctionExpr(String name, List&lt;Expr&gt; arguments) implements Expr {
+    /** Names recognised as built-ins by the parser/formatter/canonicalizer. */
+<span class="fc" id="L24">    public static final List&lt;String&gt; BUILTIN_NAMES = List.of(</span>
+        &quot;sin&quot;, &quot;cos&quot;, &quot;tan&quot;,
+        &quot;log&quot;, &quot;ln&quot;,
+        &quot;sqrt&quot;, &quot;exp&quot;, &quot;abs&quot;
+    );
+
+<span class="fc" id="L30">    public FunctionExpr {</span>
+<span class="fc" id="L31">        Objects.requireNonNull(name, &quot;name&quot;);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (name.isBlank()) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(&quot;function name must not be blank&quot;);</span>
+        }
+<span class="fc" id="L35">        Objects.requireNonNull(arguments, &quot;arguments&quot;);</span>
+<span class="fc" id="L36">        arguments = List.copyOf(arguments);</span>
+<span class="fc" id="L37">    }</span>
+
+    public FunctionExpr(String name, Expr argument) {
+<span class="fc" id="L40">        this(name, List.of(argument));</span>
+<span class="fc" id="L41">    }</span>
+
+    /** Convenience: first argument (the common single-arg case). */
+    public Expr argument() {
+<span class="nc" id="L45">        return arguments.get(0);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

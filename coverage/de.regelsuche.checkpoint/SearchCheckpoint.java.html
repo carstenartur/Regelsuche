@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchCheckpoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.checkpoint</a> &gt; <span class="el_source">SearchCheckpoint.java</span></div><h1>SearchCheckpoint.java</h1><pre class="source lang-java linenums">package de.regelsuche.checkpoint;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Persistable snapshot of a search job's exploration state.
+ *
+ * &lt;p&gt;Unlike a plain job listing, a {@code SearchCheckpoint} captures the
+ * concrete information needed to &lt;em&gt;continue&lt;/em&gt; a search rather than
+ * restart it from the original expression:&lt;/p&gt;
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link #frontier()} — expressions waiting to be explored, ordered
+ *       by the strategy's heuristic (best first).&lt;/li&gt;
+ *   &lt;li&gt;{@link #visitedHashes()} — canonical hashes already seen, so the
+ *       resumed search avoids re-exploring them.&lt;/li&gt;
+ *   &lt;li&gt;{@link #bestPaths()} — the best successes found so far.&lt;/li&gt;
+ *   &lt;li&gt;{@link #randomSeed()} — seed of the random/MCTS strategy, so
+ *       stochastic resumes are reproducible.&lt;/li&gt;
+ *   &lt;li&gt;{@link #profile()}, {@link #heuristicName()} — the configuration the
+ *       job was running under.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;The record is intentionally immutable; callers create a new
+ * checkpoint per progress save and let the repository overwrite the
+ * previous one.&lt;/p&gt;
+ */
+public record SearchCheckpoint(
+    String jobId,
+    String originalExpression,
+    String profile,
+    String heuristicName,
+    List&lt;String&gt; frontier,
+    List&lt;String&gt; visitedHashes,
+    List&lt;BestPath&gt; bestPaths,
+    long randomSeed,
+    Instant createdAt,
+    Instant updatedAt
+) {
+<span class="fc" id="L42">    public SearchCheckpoint {</span>
+<span class="fc" id="L43">        Objects.requireNonNull(jobId, &quot;jobId&quot;);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(originalExpression, &quot;originalExpression&quot;);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        profile = profile == null ? &quot;FAST_SIMPLIFY&quot; : profile;</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        heuristicName = heuristicName == null ? &quot;default&quot; : heuristicName;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        frontier = frontier == null ? List.of() : List.copyOf(frontier);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        visitedHashes = visitedHashes == null ? List.of() : List.copyOf(visitedHashes);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        bestPaths = bestPaths == null ? List.of() : List.copyOf(bestPaths);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        updatedAt = updatedAt == null ? createdAt : updatedAt;</span>
+<span class="fc" id="L52">    }</span>
+
+    /**
+     * @return the most promising expression to seed the resumed search with,
+     *         falling back to the original expression when the frontier is
+     *         empty.
+     */
+    public String resumeSeed() {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (!frontier.isEmpty()) {</span>
+<span class="fc" id="L61">            return frontier.get(0);</span>
+        }
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (!bestPaths.isEmpty()) {</span>
+<span class="nc" id="L64">            return bestPaths.get(0).expression();</span>
+        }
+<span class="fc" id="L66">        return originalExpression;</span>
+    }
+
+    /** A single best-so-far path. */
+    public record BestPath(String expression, int improvement, String lastRuleId) {
+<span class="fc" id="L71">        public BestPath {</span>
+<span class="fc" id="L72">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            lastRuleId = lastRuleId == null ? &quot;&quot; : lastRuleId;</span>
+<span class="fc" id="L74">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

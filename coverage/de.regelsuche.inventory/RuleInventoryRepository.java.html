@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleInventoryRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">RuleInventoryRepository.java</span></div><h1>RuleInventoryRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import de.regelsuche.export.ExportBundle;
+import de.regelsuche.mining.CandidateProofStatus;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+public interface RuleInventoryRepository extends AutoCloseable {
+    void save(ReusableRule rule);
+
+    List&lt;ReusableRule&gt; findAll();
+
+    default Optional&lt;ReusableRule&gt; findById(String id) {
+<span class="fc" id="L15">        return findAll().stream().filter(rule -&gt; rule.id().equals(id)).findFirst();</span>
+    }
+
+    default List&lt;ReusableRule&gt; findByStatus(CandidateProofStatus proofStatus) {
+<span class="nc" id="L19">        return findAll().stream()</span>
+<span class="nc bnc" id="L20" title="All 2 branches missed.">            .filter(rule -&gt; rule.proofStatus() == proofStatus)</span>
+<span class="nc" id="L21">            .toList();</span>
+    }
+
+    default List&lt;ReusableRule&gt; findReusable(CandidateProofStatus minProofStatus) {
+<span class="nc" id="L25">        return findAll().stream()</span>
+<span class="nc bnc" id="L26" title="All 2 branches missed.">            .filter(rule -&gt; rule.proofStatus().ordinal() &gt;= minProofStatus.ordinal())</span>
+<span class="nc" id="L27">            .toList();</span>
+    }
+
+    default void saveAll(List&lt;ReusableRule&gt; rules) {
+<span class="nc" id="L31">        rules.forEach(this::save);</span>
+<span class="nc" id="L32">    }</span>
+
+    default void importBundle(ExportBundle bundle) {
+<span class="nc" id="L35">        saveAll(bundle.reusableRules());</span>
+<span class="nc" id="L36">    }</span>
+
+    default ExportBundle exportBundle() {
+<span class="nc" id="L39">        return ExportBundle.of(List.of(), List.of(), findAll());</span>
+    }
+
+    /**
+     * Enable or disable a rule by id. Disabled rules are still returned by
+     * {@link #findAll()} (and exported) but are skipped by activation/lookup
+     * helpers such as {@link #findEnabled()}. The default implementation is a
+     * no-op for repositories that do not track an enabled flag.
+     */
+    default void setEnabled(String ruleId, boolean enabled) {
+        // no-op for repositories that don't track an enabled flag
+<span class="nc" id="L50">    }</span>
+
+    /** @return whether the rule with {@code ruleId} is enabled (default: true). */
+    default boolean isEnabled(String ruleId) {
+<span class="nc" id="L54">        return true;</span>
+    }
+
+    /** @return all rules that are currently enabled. */
+    default List&lt;ReusableRule&gt; findEnabled() {
+<span class="fc" id="L59">        return findAll().stream().filter(rule -&gt; isEnabled(rule.id())).toList();</span>
+    }
+
+    /** Associate a free-form domain tag (e.g. {@code &quot;polynomial&quot;}) with a rule. */
+    default void addTag(String ruleId, String tag) {
+        // no-op for repositories that don't track tags
+<span class="nc" id="L65">    }</span>
+
+    default void removeTag(String ruleId, String tag) {
+        // no-op for repositories that don't track tags
+<span class="nc" id="L69">    }</span>
+
+    /** @return tags previously associated with {@code ruleId}. */
+    default Set&lt;String&gt; tagsOf(String ruleId) {
+<span class="nc" id="L73">        return Set.of();</span>
+    }
+
+    /** @return rule ids carrying the given tag. */
+    default List&lt;ReusableRule&gt; findByTag(String tag) {
+<span class="fc" id="L78">        return findAll().stream().filter(rule -&gt; tagsOf(rule.id()).contains(tag)).toList();</span>
+    }
+
+    @Override
+    default void close() {
+<span class="fc" id="L83">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

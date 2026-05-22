@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DidacticCostModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.didactic</a> &gt; <span class="el_source">DidacticCostModel.java</span></div><h1>DidacticCostModel.java</h1><pre class="source lang-java linenums">package de.regelsuche.didactic;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.scoring.cost.CostModel;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Richer didactic cost model (spec item 1).
+ *
+ * &lt;p&gt;&quot;A mathematically valid path is not automatically understandable,
+ * teachable, elegant, learnable.&quot; This cost model goes beyond the
+ * existing {@link de.regelsuche.scoring.cost.TeachingFriendlinessCost} by
+ * combining the criteria called out in the spec:&lt;/p&gt;
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;b&gt;Operator complexity&lt;/b&gt; — exotic / advanced operators cost more
+ *       than +, -, *.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Expression depth&lt;/b&gt; — deep nesting is mentally expensive.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Symbolic overload&lt;/b&gt; — many distinct variables in a single
+ *       subterm increases mental load.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Mental load / size&lt;/b&gt; — total operator count, weighted by
+ *       depth (deep operators count more than flat ones).&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Large coefficients&lt;/b&gt; — penalised mildly; school-book
+ *       expressions tend to keep numbers small.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Difficulty cap&lt;/b&gt; — expressions whose depth or operator
+ *       complexity exceed the configured {@link DifficultyLevel} are
+ *       penalised, not rejected.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Profile bias&lt;/b&gt; — {@link PedagogyProfile#CONCISE} weights
+ *       size more heavily, {@link PedagogyProfile#VERY_DETAILED} weights
+ *       it less.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;The &quot;new concepts per step&quot;, &quot;sprunghaftigkeit&quot; and &quot;repetition of
+ * similar steps&quot; criteria are path-level properties, not single-expression
+ * properties; they live on {@link de.regelsuche.search.TeachingPathScorer}
+ * and on path-level analytics, not here. This class is the
+ * &lt;em&gt;node&lt;/em&gt;-level cost that plugs into the existing search
+ * machinery.&lt;/p&gt;
+ */
+public final class DidacticCostModel implements CostModel {
+
+    private final DifficultyLevel level;
+    private final PedagogyProfile profile;
+
+    public DidacticCostModel() {
+<span class="fc" id="L54">        this(DifficultyLevel.MITTELSTUFE, PedagogyProfile.SCHOOL);</span>
+<span class="fc" id="L55">    }</span>
+
+<span class="fc" id="L57">    public DidacticCostModel(DifficultyLevel level, PedagogyProfile profile) {</span>
+<span class="fc" id="L58">        this.level = Objects.requireNonNull(level, &quot;level&quot;);</span>
+<span class="fc" id="L59">        this.profile = Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L60">    }</span>
+
+    public DifficultyLevel level() {
+<span class="fc" id="L63">        return level;</span>
+    }
+
+    public PedagogyProfile profile() {
+<span class="fc" id="L67">        return profile;</span>
+    }
+
+    @Override
+    public String id() {
+<span class="fc" id="L72">        return &quot;didactic&quot;;</span>
+    }
+
+    @Override
+    public int cost(String expression, Expr parsedAst, ExpressionScore score) {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (parsedAst == null) {</span>
+            // Fall back to the score-based summary so the cost stays comparable.
+<span class="nc" id="L79">            return Math.max(0, score.operatorCount() * 2 + score.nestingDepth() * 3);</span>
+        }
+<span class="fc" id="L81">        int operators        = operatorCount(parsedAst);</span>
+<span class="fc" id="L82">        int depth            = depth(parsedAst);</span>
+<span class="fc" id="L83">        int operatorWeight   = operatorComplexity(parsedAst);</span>
+<span class="fc" id="L84">        int symbolicOverload = symbolicOverload(parsedAst);</span>
+<span class="fc" id="L85">        int largeCoeffs      = largeCoefficientPenalty(parsedAst);</span>
+<span class="fc" id="L86">        int divisionCost     = divisionPenalty(parsedAst);</span>
+
+        // Mental load: weighted operator count, made non-linear in depth so
+        // a step that adds depth costs more than a step that adds width.
+<span class="fc" id="L90">        int mentalLoad = operators + operatorWeight + depth * depth;</span>
+
+<span class="fc" id="L92">        int total = mentalLoad + symbolicOverload + largeCoeffs + divisionCost;</span>
+
+        // Difficulty cap: depth above the level budget is penalised.
+<span class="fc" id="L95">        int depthBudget = depthBudgetFor(level);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (depth &gt; depthBudget) {</span>
+<span class="fc" id="L97">            total += (depth - depthBudget) * 4;</span>
+        }
+
+        // Profile bias: CONCISE punishes size harder, VERY_DETAILED relaxes it.
+<span class="pc bpc" id="L101" title="4 of 5 branches missed.">        return switch (profile) {</span>
+<span class="nc" id="L102">            case CONCISE       -&gt; total + operators;            // +size weight</span>
+<span class="nc" id="L103">            case VERY_DETAILED -&gt; Math.max(0, total - operators / 2);</span>
+<span class="nc" id="L104">            case ELEGANT       -&gt; total + asymmetryPenalty(parsedAst);</span>
+<span class="nc" id="L105">            case EXAM_FRIENDLY -&gt; total + divisionCost; // double-penalise divisions</span>
+<span class="fc" id="L106">            case SCHOOL        -&gt; total;</span>
+        };
+    }
+
+    // -------- pure helpers --------
+
+    private static int operatorCount(Expr expression) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L114">            return 1 + operatorCount(binary.left()) + operatorCount(binary.right());</span>
+        }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L117">            int total = 1;</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            for (Expr arg : function.arguments()) {</span>
+<span class="nc" id="L119">                total += operatorCount(arg);</span>
+<span class="nc" id="L120">            }</span>
+<span class="nc" id="L121">            return total;</span>
+        }
+<span class="fc" id="L123">        return 0;</span>
+    }
+
+    private static int depth(Expr expression) {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L128">            return 1 + Math.max(depth(binary.left()), depth(binary.right()));</span>
+        }
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L131">            int max = 0;</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            for (Expr arg : function.arguments()) {</span>
+<span class="nc" id="L133">                max = Math.max(max, depth(arg));</span>
+<span class="nc" id="L134">            }</span>
+<span class="nc" id="L135">            return 1 + max;</span>
+        }
+<span class="fc" id="L137">        return 0;</span>
+    }
+
+    private static int operatorComplexity(Expr expression) {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">            int self = switch (binary.operator()) {</span>
+<span class="fc" id="L143">                case ADD, SUB -&gt; 1;</span>
+<span class="fc" id="L144">                case MUL      -&gt; 1;</span>
+<span class="nc" id="L145">                case DIV      -&gt; 3;</span>
+<span class="fc" id="L146">                case POW      -&gt; 2;</span>
+            };
+<span class="fc" id="L148">            return self + operatorComplexity(binary.left()) + operatorComplexity(binary.right());</span>
+        }
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L151" title="All 5 branches missed.">            int self = switch (function.name()) {</span>
+<span class="nc" id="L152">                case &quot;log&quot;, &quot;ln&quot;, &quot;exp&quot;  -&gt; 4;</span>
+<span class="nc" id="L153">                case &quot;sin&quot;, &quot;cos&quot;, &quot;tan&quot; -&gt; 3;</span>
+<span class="nc" id="L154">                case &quot;sqrt&quot;              -&gt; 3;</span>
+<span class="nc" id="L155">                case &quot;abs&quot;               -&gt; 2;</span>
+<span class="nc" id="L156">                default                  -&gt; 2;</span>
+            };
+<span class="nc" id="L158">            int total = self;</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            for (Expr arg : function.arguments()) {</span>
+<span class="nc" id="L160">                total += operatorComplexity(arg);</span>
+<span class="nc" id="L161">            }</span>
+<span class="nc" id="L162">            return total;</span>
+        }
+<span class="fc" id="L164">        return 0;</span>
+    }
+
+    private static int symbolicOverload(Expr expression) {
+<span class="fc" id="L168">        Set&lt;String&gt; variables = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L169">        collectVariables(expression, variables);</span>
+        // 0, 1, 2 distinct vars are fine; beyond that we add 2 per extra var.
+<span class="fc" id="L171">        int extra = variables.size() - 2;</span>
+<span class="fc" id="L172">        return Math.max(0, extra) * 2;</span>
+    }
+
+    private static void collectVariables(Expr expression, Set&lt;String&gt; sink) {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L177">            sink.add(variable.name());</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L179">            collectVariables(binary.left(), sink);</span>
+<span class="fc" id="L180">            collectVariables(binary.right(), sink);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            for (Expr arg : function.arguments()) {</span>
+<span class="nc" id="L183">                collectVariables(arg, sink);</span>
+<span class="nc" id="L184">            }</span>
+        }
+<span class="fc" id="L186">    }</span>
+
+    private static int largeCoefficientPenalty(Expr expression) {
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L190">            double abs = Math.abs(number.value());</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (abs &gt; 1000) {</span>
+<span class="fc" id="L192">                return 4;</span>
+            }
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (abs &gt; 100) {</span>
+<span class="nc" id="L195">                return 2;</span>
+            }
+<span class="fc" id="L197">            return 0;</span>
+        }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L200">            return largeCoefficientPenalty(binary.left()) + largeCoefficientPenalty(binary.right());</span>
+        }
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L203">            int total = 0;</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            for (Expr arg : function.arguments()) {</span>
+<span class="nc" id="L205">                total += largeCoefficientPenalty(arg);</span>
+<span class="nc" id="L206">            }</span>
+<span class="nc" id="L207">            return total;</span>
+        }
+<span class="fc" id="L209">        return 0;</span>
+    }
+
+    private static int divisionPenalty(Expr expression) {
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            int self = binary.operator() == BinaryOperator.DIV ? 3 : 0;</span>
+<span class="fc" id="L215">            return self + divisionPenalty(binary.left()) + divisionPenalty(binary.right());</span>
+        }
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L218">            int total = 0;</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            for (Expr arg : function.arguments()) {</span>
+<span class="nc" id="L220">                total += divisionPenalty(arg);</span>
+<span class="nc" id="L221">            }</span>
+<span class="nc" id="L222">            return total;</span>
+        }
+<span class="fc" id="L224">        return 0;</span>
+    }
+
+    private static int asymmetryPenalty(Expr expression) {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (expression instanceof BinaryExpr binary</span>
+<span class="nc bnc" id="L229" title="All 4 branches missed.">            &amp;&amp; (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.MUL)) {</span>
+<span class="nc" id="L230">            int left = depth(binary.left());</span>
+<span class="nc" id="L231">            int right = depth(binary.right());</span>
+<span class="nc" id="L232">            return Math.abs(left - right)</span>
+<span class="nc" id="L233">                + asymmetryPenalty(binary.left())</span>
+<span class="nc" id="L234">                + asymmetryPenalty(binary.right());</span>
+        }
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="nc" id="L237">            return asymmetryPenalty(binary.left()) + asymmetryPenalty(binary.right());</span>
+        }
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L240">            int total = 0;</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            for (Expr arg : function.arguments()) {</span>
+<span class="nc" id="L242">                total += asymmetryPenalty(arg);</span>
+<span class="nc" id="L243">            }</span>
+<span class="nc" id="L244">            return total;</span>
+        }
+<span class="nc" id="L246">        return 0;</span>
+    }
+
+    private static int depthBudgetFor(DifficultyLevel level) {
+<span class="pc bpc" id="L250" title="2 of 5 branches missed.">        return switch (level) {</span>
+<span class="fc" id="L251">            case GRUNDSCHULE  -&gt; 2;</span>
+<span class="fc" id="L252">            case MITTELSTUFE  -&gt; 4;</span>
+<span class="nc" id="L253">            case OBERSTUFE    -&gt; 6;</span>
+<span class="nc" id="L254">            case UNIVERSITAET -&gt; 8;</span>
+<span class="fc" id="L255">            case EXPERTE      -&gt; Integer.MAX_VALUE;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

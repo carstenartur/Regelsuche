@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PathSorters.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.paths</a> &gt; <span class="el_source">PathSorters.java</span></div><h1>PathSorters.java</h1><pre class="source lang-java linenums">package de.regelsuche.paths;
+
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.search.TeachingPathScorer;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Strategies for ordering discovered transformation paths.
+ *
+ * &lt;p&gt;Used by {@code GET /api/paths?sort=score|length|teaching|proof}.&lt;/p&gt;
+ */
+public final class PathSorters {
+
+    /** Recognised sort tokens for the HTTP API. */
+<span class="fc" id="L18">    public enum Mode {</span>
+<span class="fc" id="L19">        SCORE, LENGTH, TEACHING, PROOF;</span>
+
+        public static Mode parse(String value) {
+<span class="pc bpc" id="L22" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L23">                return SCORE;</span>
+            }
+            try {
+<span class="fc" id="L26">                return Mode.valueOf(value.toUpperCase(Locale.ROOT));</span>
+<span class="nc" id="L27">            } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L28">                return SCORE;</span>
+            }
+        }
+    }
+
+    private final TeachingPathScorer teachingScorer;
+
+    public PathSorters() {
+<span class="fc" id="L36">        this(new TeachingPathScorer());</span>
+<span class="fc" id="L37">    }</span>
+
+<span class="fc" id="L39">    public PathSorters(TeachingPathScorer teachingScorer) {</span>
+<span class="fc" id="L40">        this.teachingScorer = teachingScorer;</span>
+<span class="fc" id="L41">    }</span>
+
+    public List&lt;DiscoveredTransformation&gt; sort(List&lt;DiscoveredTransformation&gt; input, Mode mode) {
+<span class="fc" id="L44">        return input.stream().sorted(comparatorFor(mode)).toList();</span>
+    }
+
+    public Comparator&lt;DiscoveredTransformation&gt; comparatorFor(Mode mode) {
+<span class="pc bpc" id="L48" title="2 of 6 branches missed.">        return switch (mode == null ? Mode.SCORE : mode) {</span>
+<span class="fc" id="L49">            case SCORE -&gt; Comparator.comparingInt(DiscoveredTransformation::totalImprovement).reversed();</span>
+<span class="fc" id="L50">            case LENGTH -&gt; Comparator.comparingInt((DiscoveredTransformation t) -&gt; t.steps().size());</span>
+<span class="nc" id="L51">            case TEACHING -&gt; Comparator</span>
+<span class="nc" id="L52">                .comparingDouble((DiscoveredTransformation t) -&gt; teachingScorer.score(t))</span>
+<span class="nc" id="L53">                .reversed();</span>
+<span class="fc" id="L54">            case PROOF -&gt; Comparator</span>
+<span class="fc" id="L55">                .comparingInt((DiscoveredTransformation t) -&gt; proofWeight(t.validationStatus()))</span>
+<span class="fc" id="L56">                .reversed()</span>
+<span class="pc" id="L57">                .thenComparingInt(t -&gt; -t.totalImprovement());</span>
+        };
+    }
+
+    private static int proofWeight(CandidateProofStatus status) {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        return status == null ? 0 : status.ordinal();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

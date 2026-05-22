@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MacroRuleCandidate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">MacroRuleCandidate.java</span></div><h1>MacroRuleCandidate.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.List;
+
+/**
+ * A macro-rule candidate – a recurring contiguous sequence of atomic rule ids
+ * observed across multiple successful transformations.
+ *
+ * &lt;p&gt;The {@link MacroRuleMiner} discovers these by sliding-window frequency
+ * analysis over the rule-id sequences of {@link
+ * de.regelsuche.discovery.DiscoveredTransformation}s. The patterns themselves
+ * are concrete first witnesses; future PRs may add anti-unification to
+ * abstract them.&lt;/p&gt;
+ *
+ * &lt;p&gt;{@code compressionRatio} is defined as {@code sequenceLength / 1.0} as
+ * specified in the plan – higher means the macro replaces more atomic steps.
+ * &lt;/p&gt;
+ */
+public record MacroRuleCandidate(
+    String id,
+    List&lt;String&gt; ruleIdSequence,
+    int occurrences,
+    String leftPattern,
+    String rightPattern,
+    double compressionRatio,
+    CandidateProofStatus proofStatus,
+    List&lt;String&gt; supportingTransformationIds
+) {
+<span class="fc" id="L29">    public MacroRuleCandidate {</span>
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L31">            throw new IllegalArgumentException(&quot;id is required&quot;);</span>
+        }
+<span class="fc" id="L33">        ruleIdSequence = List.copyOf(ruleIdSequence);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        leftPattern = leftPattern == null ? &quot;&quot; : leftPattern;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        rightPattern = rightPattern == null ? &quot;&quot; : rightPattern;</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED : proofStatus;</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        supportingTransformationIds = supportingTransformationIds == null</span>
+<span class="nc" id="L38">            ? List.of()</span>
+<span class="fc" id="L39">            : List.copyOf(supportingTransformationIds);</span>
+<span class="fc" id="L40">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

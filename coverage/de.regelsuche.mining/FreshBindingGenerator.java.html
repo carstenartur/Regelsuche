@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FreshBindingGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">FreshBindingGenerator.java</span></div><h1>FreshBindingGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+<span class="fc" id="L9">public class FreshBindingGenerator {</span>
+<span class="fc" id="L10">    private static final int[][] VALUE_SETS = {</span>
+        {2, 3, 4, 5, 6},
+        {-3, 5, -4, 6, 7},
+        {5, -3, 7, -5, 8},
+        {4, -3, 5, -6, 7},
+        {-2, 5, 6, -4, 8},
+        {6, 7, -3, 4, -5}
+    };
+
+    public List&lt;Map&lt;String, Integer&gt;&gt; generate(Set&lt;String&gt; placeholders) {
+<span class="fc" id="L20">        List&lt;String&gt; orderedPlaceholders = new ArrayList&lt;&gt;(placeholders);</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (orderedPlaceholders.isEmpty()) {</span>
+<span class="nc" id="L22">            return List.of(Map.of());</span>
+        }
+<span class="fc" id="L24">        List&lt;Map&lt;String, Integer&gt;&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        for (int[] values : VALUE_SETS) {</span>
+<span class="fc" id="L26">            Map&lt;String, Integer&gt; binding = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            for (int index = 0; index &lt; orderedPlaceholders.size(); index++) {</span>
+<span class="fc" id="L28">                binding.put(orderedPlaceholders.get(index), values[index % values.length]);</span>
+            }
+<span class="fc" id="L30">            result.add(binding);</span>
+        }
+<span class="fc" id="L32">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

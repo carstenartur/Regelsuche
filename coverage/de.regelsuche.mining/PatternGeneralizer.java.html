@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PatternGeneralizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">PatternGeneralizer.java</span></div><h1>PatternGeneralizer.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+public class PatternGeneralizer {
+    private final AstNormalizer normalizer;
+    private final ParameterRelationMiner relationMiner;
+
+    public PatternGeneralizer() {
+<span class="fc" id="L14">        this(new AstNormalizer(), new ParameterRelationMiner());</span>
+<span class="fc" id="L15">    }</span>
+
+<span class="fc" id="L17">    PatternGeneralizer(AstNormalizer normalizer, ParameterRelationMiner relationMiner) {</span>
+<span class="fc" id="L18">        this.normalizer = normalizer;</span>
+<span class="fc" id="L19">        this.relationMiner = relationMiner;</span>
+<span class="fc" id="L20">    }</span>
+
+    public String skeleton(SuccessfulTransformationPath path) {
+<span class="fc" id="L23">        NormalizedNode left = normalizer.normalize(path.originalExpression());</span>
+<span class="fc" id="L24">        NormalizedNode right = normalizer.normalize(path.targetExpression());</span>
+<span class="fc" id="L25">        return left.skeletonString() + &quot;-&gt;&quot; + right.skeletonString();</span>
+    }
+
+    public Optional&lt;GeneralizedPattern&gt; generalize(List&lt;SuccessfulTransformationPath&gt; paths) {
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (paths.isEmpty()) {</span>
+<span class="nc" id="L30">            return Optional.empty();</span>
+        }
+<span class="fc" id="L32">        List&lt;NormalizedNode&gt; leftNodes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L33">        List&lt;NormalizedNode&gt; rightNodes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (SuccessfulTransformationPath path : paths) {</span>
+<span class="fc" id="L35">            leftNodes.add(normalizer.normalize(path.originalExpression()));</span>
+<span class="fc" id="L36">            rightNodes.add(normalizer.normalize(path.targetExpression()));</span>
+<span class="fc" id="L37">        }</span>
+<span class="fc" id="L38">        PlaceholderState state = new PlaceholderState();</span>
+<span class="fc" id="L39">        Optional&lt;NormalizedNode&gt; leftPattern = generalizeNodes(leftNodes, state);</span>
+<span class="fc" id="L40">        Optional&lt;NormalizedNode&gt; rightPattern = generalizeNodes(rightNodes, state);</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">        if (leftPattern.isEmpty() || rightPattern.isEmpty()) {</span>
+<span class="nc" id="L42">            return Optional.empty();</span>
+        }
+<span class="fc" id="L44">        ParameterRelationMiner.RelationResult relations = relationMiner.mine(state.values);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (relations.isEmpty()) {</span>
+<span class="fc" id="L46">            return Optional.empty();</span>
+        }
+<span class="fc" id="L48">        String left = relations.apply(leftPattern.orElseThrow()).canonicalString();</span>
+<span class="fc" id="L49">        String right = relations.apply(rightPattern.orElseThrow()).canonicalString();</span>
+<span class="fc" id="L50">        return Optional.of(new GeneralizedPattern(left, right, state.values, relations.descriptions()));</span>
+    }
+
+    private Optional&lt;NormalizedNode&gt; generalizeNodes(List&lt;NormalizedNode&gt; nodes, PlaceholderState state) {
+<span class="fc" id="L54">        NormalizedNode first = nodes.getFirst();</span>
+<span class="fc" id="L55">        boolean allEqual = nodes.stream().allMatch(first::equals);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (allEqual) {</span>
+<span class="fc" id="L57">            return Optional.of(first);</span>
+        }
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        boolean allNumbers = nodes.stream().allMatch(node -&gt; node.kind() == NormalizedNode.Kind.NUMBER);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (allNumbers) {</span>
+<span class="fc" id="L61">            String placeholder = state.nextPlaceholder();</span>
+<span class="fc" id="L62">            state.values.put(placeholder, nodes.stream().map(NormalizedNode::number).toList());</span>
+<span class="fc" id="L63">            return Optional.of(NormalizedNode.placeholder(placeholder));</span>
+        }
+<span class="fc" id="L65">        boolean sameShape = nodes.stream().allMatch(first::sameShape);</span>
+<span class="pc bpc" id="L66" title="3 of 6 branches missed.">        if (!sameShape || first.kind() == NormalizedNode.Kind.NUMBER || first.kind() == NormalizedNode.Kind.VARIABLE) {</span>
+<span class="nc" id="L67">            return Optional.empty();</span>
+        }
+<span class="fc" id="L69">        List&lt;NormalizedNode&gt; generalizedChildren = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (int childIndex = 0; childIndex &lt; first.children().size(); childIndex++) {</span>
+<span class="fc" id="L71">            List&lt;NormalizedNode&gt; childNodes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (NormalizedNode node : nodes) {</span>
+<span class="fc" id="L73">                childNodes.add(node.children().get(childIndex));</span>
+<span class="fc" id="L74">            }</span>
+<span class="fc" id="L75">            Optional&lt;NormalizedNode&gt; child = generalizeNodes(childNodes, state);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (child.isEmpty()) {</span>
+<span class="nc" id="L77">                return Optional.empty();</span>
+            }
+<span class="fc" id="L79">            generalizedChildren.add(child.orElseThrow());</span>
+        }
+<span class="pc bpc" id="L81" title="3 of 6 branches missed.">        return switch (first.kind()) {</span>
+<span class="fc" id="L82">            case ADD -&gt; Optional.of(NormalizedNode.add(generalizedChildren));</span>
+<span class="fc" id="L83">            case MUL -&gt; Optional.of(NormalizedNode.multiply(generalizedChildren));</span>
+<span class="fc" id="L84">            case POW -&gt; Optional.of(NormalizedNode.pow(generalizedChildren.get(0), generalizedChildren.get(1)));</span>
+<span class="nc" id="L85">            case FUNCTION -&gt; Optional.of(NormalizedNode.function(first.name(), generalizedChildren));</span>
+<span class="nc" id="L86">            case PLACEHOLDER -&gt; Optional.of(first);</span>
+<span class="nc" id="L87">            case NUMBER, VARIABLE -&gt; Optional.empty();</span>
+        };
+    }
+
+<span class="fc" id="L91">    private static final class PlaceholderState {</span>
+        private int index;
+<span class="fc" id="L93">        private final Map&lt;String, List&lt;Integer&gt;&gt; values = new LinkedHashMap&lt;&gt;();</span>
+
+        private String nextPlaceholder() {
+<span class="fc" id="L96">            index++;</span>
+<span class="fc" id="L97">            return &quot;N&quot; + index;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

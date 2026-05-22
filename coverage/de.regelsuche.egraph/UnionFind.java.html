@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnionFind.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">UnionFind.java</span></div><h1>UnionFind.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Simple union-find / disjoint-set forest over {@link EClassId}s with
+ * path compression and union-by-rank.
+ *
+ * &lt;p&gt;The {@link EGraph} uses this structure to track which e-classes have
+ * been merged. {@link #find} returns the canonical representative; {@link
+ * #union} returns the surviving root after merging two classes.&lt;/p&gt;
+ */
+<span class="fc" id="L14">public final class UnionFind {</span>
+
+<span class="fc" id="L16">    private final List&lt;Integer&gt; parent = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L17">    private final List&lt;Integer&gt; rank = new ArrayList&lt;&gt;();</span>
+
+    /**
+     * Add a fresh singleton set and return its (initial) representative.
+     */
+    public EClassId makeSet() {
+<span class="fc" id="L23">        int id = parent.size();</span>
+<span class="fc" id="L24">        parent.add(id);</span>
+<span class="fc" id="L25">        rank.add(0);</span>
+<span class="fc" id="L26">        return new EClassId(id);</span>
+    }
+
+    /** Number of underlying singletons ever created. */
+    public int size() {
+<span class="nc" id="L31">        return parent.size();</span>
+    }
+
+    /** Canonical representative of {@code id}'s set. */
+    public EClassId find(EClassId id) {
+<span class="fc" id="L36">        int x = id.value();</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (x &gt;= parent.size()) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(&quot;Unknown EClassId: &quot; + id);</span>
+        }
+        // iterative path compression — avoid recursion for deep chains.
+<span class="fc" id="L41">        int root = x;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        while (parent.get(root) != root) {</span>
+<span class="fc" id="L43">            root = parent.get(root);</span>
+        }
+<span class="fc" id="L45">        int cursor = x;</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        while (parent.get(cursor) != root) {</span>
+<span class="fc" id="L47">            int next = parent.get(cursor);</span>
+<span class="fc" id="L48">            parent.set(cursor, root);</span>
+<span class="fc" id="L49">            cursor = next;</span>
+<span class="fc" id="L50">        }</span>
+<span class="fc" id="L51">        return new EClassId(root);</span>
+    }
+
+    /**
+     * Merge the sets containing {@code a} and {@code b}. Returns the root
+     * that survived the merge; the other root is now an alias for it.
+     */
+    public EClassId union(EClassId a, EClassId b) {
+<span class="fc" id="L59">        int rootA = find(a).value();</span>
+<span class="fc" id="L60">        int rootB = find(b).value();</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (rootA == rootB) {</span>
+<span class="nc" id="L62">            return new EClassId(rootA);</span>
+        }
+<span class="fc" id="L64">        int rA = rank.get(rootA);</span>
+<span class="fc" id="L65">        int rB = rank.get(rootB);</span>
+        int survivor;
+        int merged;
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (rA &lt; rB) {</span>
+<span class="nc" id="L69">            survivor = rootB;</span>
+<span class="nc" id="L70">            merged = rootA;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        } else if (rA &gt; rB) {</span>
+<span class="fc" id="L72">            survivor = rootA;</span>
+<span class="fc" id="L73">            merged = rootB;</span>
+        } else {
+            // Prefer the smaller id for determinism in tests.
+<span class="fc" id="L76">            survivor = Math.min(rootA, rootB);</span>
+<span class="fc" id="L77">            merged = Math.max(rootA, rootB);</span>
+<span class="fc" id="L78">            rank.set(survivor, rA + 1);</span>
+        }
+<span class="fc" id="L80">        parent.set(merged, survivor);</span>
+<span class="fc" id="L81">        return new EClassId(survivor);</span>
+    }
+
+    /** {@code true} iff {@code a} and {@code b} are in the same set. */
+    public boolean inSameSet(EClassId a, EClassId b) {
+<span class="fc" id="L86">        return find(a).equals(find(b));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

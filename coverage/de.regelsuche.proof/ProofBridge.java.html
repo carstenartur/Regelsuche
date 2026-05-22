@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofBridge.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofBridge.java</span></div><h1>ProofBridge.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.mining.CandidateProofStatus;
+import java.util.List;
+
+/**
+ * Bridge to an external proof assistant or SMT solver.
+ *
+ * &lt;p&gt;Implementations transform a rule candidate / discovered equivalence into
+ * the target proof language (Lean lemma, SMT-LIB script, ...) and report the
+ * resulting status. The contract is intentionally narrow so that no specific
+ * proof tool is hard-wired into the rest of the codebase.&lt;/p&gt;
+ */
+public interface ProofBridge {
+    /**
+     * Attempt to prove that {@code left} and {@code right} are equivalent under
+     * the given {@code assumptions}.
+     *
+     * @return the new {@link CandidateProofStatus}. Implementations should
+     *         return {@link CandidateProofStatus#FORMALLY_PROVED} only if the
+     *         external tool actually succeeded; otherwise return at most
+     *         {@link CandidateProofStatus#FORMALLY_PROVABLE} to indicate that
+     *         a proof skeleton was generated and is ready for review/execution
+     *         by the tool, but has not yet been checked.
+     */
+    ProofAttempt prove(String left, String right, List&lt;Assumption&gt; assumptions);
+
+    /** Bundles the resulting status and the generated artifact (script). */
+    record ProofAttempt(CandidateProofStatus status, String artifact, String tool) {
+<span class="fc" id="L31">        public ProofAttempt {</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            if (status == null) {</span>
+<span class="nc" id="L33">                throw new IllegalArgumentException(&quot;status must not be null&quot;);</span>
+            }
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            artifact = artifact == null ? &quot;&quot; : artifact;</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            tool = tool == null ? &quot;unknown&quot; : tool;</span>
+<span class="fc" id="L37">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

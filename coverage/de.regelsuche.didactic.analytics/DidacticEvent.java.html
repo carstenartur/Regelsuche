@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DidacticEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.didactic.analytics</a> &gt; <span class="el_source">DidacticEvent.java</span></div><h1>DidacticEvent.java</h1><pre class="source lang-java linenums">package de.regelsuche.didactic.analytics;
+
+import de.regelsuche.didactic.DifficultyLevel;
+import de.regelsuche.didactic.HintGenerator;
+import de.regelsuche.didactic.PedagogyProfile;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * One observation from the didactic layer (spec item: Didaktik-Analytics).
+ *
+ * &lt;p&gt;Events are intentionally flat and JSON-friendly. Two kinds are recorded:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link Kind#STEP_CHECK} — a {@code StudentStepValidator} call. The
+ *       {@code correct} / {@code didacticallyAppropriate} fields capture
+ *       the result; {@code misconceptionId} is set when a typical mistake
+ *       was matched; {@code difficulty} is the level the student worked
+ *       at.&lt;/li&gt;
+ *   &lt;li&gt;{@link Kind#HINT} — a {@code HintGenerator} request. {@code
+ *       hintStrength} records which hint level was delivered last (or
+ *       {@code null} when no step was available); {@code pedagogyProfile}
+ *       carries the requested profile; {@code pathId} is the derivation
+ *       the hint applies to.&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public record DidacticEvent(
+    Kind kind,
+    Instant timestamp,
+    Optional&lt;String&gt; pathId,
+    Optional&lt;DifficultyLevel&gt; difficulty,
+    Optional&lt;PedagogyProfile&gt; pedagogyProfile,
+    Optional&lt;Boolean&gt; correct,
+    Optional&lt;Boolean&gt; didacticallyAppropriate,
+    Optional&lt;String&gt; misconceptionId,
+    Optional&lt;HintGenerator.Strength&gt; hintStrength
+) {
+
+    /** Kind of a single observation. */
+<span class="fc" id="L40">    public enum Kind { STEP_CHECK, HINT }</span>
+
+<span class="fc" id="L42">    public DidacticEvent {</span>
+<span class="fc" id="L43">        Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(timestamp, &quot;timestamp&quot;);</span>
+<span class="fc" id="L45">        Objects.requireNonNull(pathId, &quot;pathId&quot;);</span>
+<span class="fc" id="L46">        Objects.requireNonNull(difficulty, &quot;difficulty&quot;);</span>
+<span class="fc" id="L47">        Objects.requireNonNull(pedagogyProfile, &quot;pedagogyProfile&quot;);</span>
+<span class="fc" id="L48">        Objects.requireNonNull(correct, &quot;correct&quot;);</span>
+<span class="fc" id="L49">        Objects.requireNonNull(didacticallyAppropriate, &quot;didacticallyAppropriate&quot;);</span>
+<span class="fc" id="L50">        Objects.requireNonNull(misconceptionId, &quot;misconceptionId&quot;);</span>
+<span class="fc" id="L51">        Objects.requireNonNull(hintStrength, &quot;hintStrength&quot;);</span>
+<span class="fc" id="L52">    }</span>
+
+    /** Construct a STEP_CHECK event. */
+    public static DidacticEvent stepCheck(
+        Instant at,
+        DifficultyLevel difficulty,
+        boolean correct,
+        boolean didacticallyAppropriate,
+        String misconceptionId
+    ) {
+<span class="fc" id="L62">        return new DidacticEvent(</span>
+            Kind.STEP_CHECK,
+            at,
+<span class="fc" id="L65">            Optional.empty(),</span>
+<span class="fc" id="L66">            Optional.ofNullable(difficulty),</span>
+<span class="fc" id="L67">            Optional.empty(),</span>
+<span class="fc" id="L68">            Optional.of(correct),</span>
+<span class="fc" id="L69">            Optional.of(didacticallyAppropriate),</span>
+<span class="fc" id="L70">            Optional.ofNullable(misconceptionId),</span>
+<span class="fc" id="L71">            Optional.empty()</span>
+        );
+    }
+
+    /** Construct a HINT event. */
+    public static DidacticEvent hint(
+        Instant at,
+        String pathId,
+        PedagogyProfile profile,
+        HintGenerator.Strength deliveredStrength
+    ) {
+<span class="fc" id="L82">        return new DidacticEvent(</span>
+            Kind.HINT,
+            at,
+<span class="fc" id="L85">            Optional.ofNullable(pathId),</span>
+<span class="fc" id="L86">            Optional.empty(),</span>
+<span class="fc" id="L87">            Optional.ofNullable(profile),</span>
+<span class="fc" id="L88">            Optional.empty(),</span>
+<span class="fc" id="L89">            Optional.empty(),</span>
+<span class="fc" id="L90">            Optional.empty(),</span>
+<span class="fc" id="L91">            Optional.ofNullable(deliveredStrength)</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

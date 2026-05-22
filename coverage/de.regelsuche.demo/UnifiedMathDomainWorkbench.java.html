@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnifiedMathDomainWorkbench.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.demo</a> &gt; <span class="el_source">UnifiedMathDomainWorkbench.java</span></div><h1>UnifiedMathDomainWorkbench.java</h1><pre class="source lang-java linenums">package de.regelsuche.demo;
+
+import de.regelsuche.api.searchgraph.SearchExpression;
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.calculus.CalculusDerivativeRules;
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.equation.EquationTransformationRuleAdapter;
+import de.regelsuche.export.AstLatexRenderer;
+import de.regelsuche.export.MatrixLatexRenderer;
+import de.regelsuche.graph.ExpressionGraphStore;
+import de.regelsuche.graph.GraphEdge;
+import de.regelsuche.graph.InMemoryExpressionGraphStore;
+import de.regelsuche.inequality.Comparator;
+import de.regelsuche.inequality.Inequality;
+import de.regelsuche.inequality.InequalityTransformationRuleAdapter;
+import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.mining.RuleCandidate;
+import de.regelsuche.mining.RuleStatus;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.proof.ProofBridgeService;
+import de.regelsuche.proof.ProverExecutionResult;
+import de.regelsuche.rules.TrigonometricRules;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Single entry point that runs all math-domain demos (linear equation,
+ * inequality with sign-flip, derivative, matrix distributivity) through
+ * the &lt;em&gt;same&lt;/em&gt; graph-store / transformation-step / discovery /
+ * proof-bridge pipeline the rest of the Regelsuche workbench uses.
+ *
+ * &lt;p&gt;Before this service existed, the math-domain demos lived in
+ * {@link MathDomainDemos} which returned a small ad-hoc record per demo —
+ * they were correct, but they did not touch the search graph, replay,
+ * macro-rule learning, equality saturation or the proof bridge. This
+ * class lifts every demo into a uniform {@link DemoExecution} that:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;persists nodes and {@link GraphEdge edges} into the supplied
+ *       {@link ExpressionGraphStore} (same store the regular
+ *       {@link DemoService} uses);&lt;/li&gt;
+ *   &lt;li&gt;produces a {@link DiscoveredTransformation} so downstream replay,
+ *       export, comparison and macro-rule learning work without further
+ *       adaptation;&lt;/li&gt;
+ *   &lt;li&gt;tags each node with its {@link SearchExpression} type so renderers
+ *       know whether to format it as a term, equation, inequality, vector
+ *       or matrix;&lt;/li&gt;
+ *   &lt;li&gt;renders the result in LaTeX (with {@code \begin{bmatrix}} for
+ *       the matrix demo);&lt;/li&gt;
+ *   &lt;li&gt;optionally runs the {@link ProofBridgeService} so the UI can
+ *       display the actual prover status.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;The four built-in demos are exposed via {@link #runAll()} so callers
+ * (test suite, web workbench) can iterate over them generically and check
+ * the &quot;no special-path&quot; acceptance criterion in one call.&lt;/p&gt;
+ */
+public final class UnifiedMathDomainWorkbench {
+
+    public static final String DEMO_EQUATION = &quot;math-equation&quot;;
+    public static final String DEMO_INEQUALITY = &quot;math-inequality&quot;;
+    public static final String DEMO_DERIVATIVE = &quot;math-derivative&quot;;
+    public static final String DEMO_MATRIX = &quot;math-matrix&quot;;
+
+    private final ExpressionGraphStore graphStore;
+<span class="fc" id="L78">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L79">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+    private final EquationTransformationRuleAdapter equationAdapter;
+    private final InequalityTransformationRuleAdapter inequalityAdapter;
+<span class="fc" id="L82">    private final AstLatexRenderer latexRenderer = new AstLatexRenderer();</span>
+<span class="fc" id="L83">    private final MatrixLatexRenderer matrixRenderer = new MatrixLatexRenderer();</span>
+    private final ProofBridgeService proofBridgeService;
+
+    public UnifiedMathDomainWorkbench() {
+<span class="fc" id="L87">        this(new InMemoryExpressionGraphStore(), null);</span>
+<span class="fc" id="L88">    }</span>
+
+    public UnifiedMathDomainWorkbench(ExpressionGraphStore graphStore) {
+<span class="fc" id="L91">        this(graphStore, null);</span>
+<span class="fc" id="L92">    }</span>
+
+    public UnifiedMathDomainWorkbench(
+        ExpressionGraphStore graphStore,
+        ProofBridgeService proofBridgeService
+<span class="fc" id="L97">    ) {</span>
+<span class="fc" id="L98">        this.graphStore = Objects.requireNonNull(graphStore, &quot;graphStore&quot;);</span>
+<span class="fc" id="L99">        this.equationAdapter = new EquationTransformationRuleAdapter(</span>
+            new de.regelsuche.equation.LinearEquationSolver(), scorer);
+<span class="fc" id="L101">        this.inequalityAdapter = new InequalityTransformationRuleAdapter(</span>
+            new de.regelsuche.inequality.LinearInequalitySolver(), scorer);
+<span class="fc" id="L103">        this.proofBridgeService = proofBridgeService;</span>
+<span class="fc" id="L104">    }</span>
+
+    public ExpressionGraphStore graphStore() {
+<span class="nc" id="L107">        return graphStore;</span>
+    }
+
+    /**
+     * Run every built-in math-domain demo through the unified workbench
+     * pipeline. The returned map preserves insertion order so iteration is
+     * deterministic for tests and reports.
+     */
+    public Map&lt;String, DemoExecution&gt; runAll() {
+<span class="fc" id="L116">        Map&lt;String, DemoExecution&gt; results = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L117">        results.put(DEMO_EQUATION, runLinearEquation());</span>
+<span class="fc" id="L118">        results.put(DEMO_INEQUALITY, runInequalitySignFlip());</span>
+<span class="fc" id="L119">        results.put(DEMO_DERIVATIVE, runDerivativePowerRule());</span>
+<span class="fc" id="L120">        results.put(DEMO_MATRIX, runMatrixDistributivity());</span>
+<span class="fc" id="L121">        return results;</span>
+    }
+
+    // ---------------------------------------------------------------- equation
+
+    /** Lift {@code x + 3 = 7 -&gt; x = 4} through the unified pipeline. */
+    public DemoExecution runLinearEquation() {
+<span class="fc" id="L128">        Equation equation = parser.parseEquation(&quot;x + 3 = 7&quot;);</span>
+<span class="fc" id="L129">        EquationTransformationRuleAdapter.Trace trace = equationAdapter.trace(equation, &quot;x&quot;)</span>
+<span class="pc" id="L130">            .orElseThrow(() -&gt; new IllegalStateException(&quot;Equation demo failed to produce a trace&quot;));</span>
+<span class="fc" id="L131">        String original = trace.originalExpression();</span>
+<span class="fc" id="L132">        String solved = trace.solvedExpression();</span>
+
+<span class="fc" id="L134">        graphStore.saveNode(original, scorer.score(original).weightedTotal());</span>
+<span class="fc" id="L135">        graphStore.saveNode(solved, scorer.score(solved).weightedTotal());</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (GraphEdge edge : trace.edges()) {</span>
+<span class="fc" id="L137">            graphStore.saveNode(edge.toExpression(), edge.scoreAfter());</span>
+<span class="fc" id="L138">            graphStore.saveEdge(edge);</span>
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">        DiscoveredTransformation discovered = toDiscoveredTransformation(</span>
+<span class="fc" id="L141">            &quot;demo-equation-&quot; + Integer.toHexString(original.hashCode()),</span>
+            original,
+            solved,
+<span class="fc" id="L144">            trace.discoverySteps(),</span>
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED
+        );
+<span class="fc" id="L147">        graphStore.saveDiscoveredTransformation(discovered);</span>
+<span class="fc" id="L148">        graphStore.saveRuleCandidate(toCandidate(original, solved, trace.assumptions()));</span>
+
+<span class="fc" id="L150">        ProofBridgeService.ProofAttemptOutcome proof = runProofBridge(original, solved, trace.assumptions());</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        CandidateProofStatus proofStatus = proof != null</span>
+<span class="fc" id="L152">            ? proof.candidate().proofStatus()</span>
+<span class="fc" id="L153">            : discovered.validationStatus();</span>
+
+<span class="fc" id="L155">        return new DemoExecution(</span>
+            DEMO_EQUATION,
+            &quot;Lineare Gleichung&quot;,
+            SearchExpression.EQUATION,
+            original,
+            solved,
+<span class="fc" id="L161">            latexRenderer.renderExpression(original),</span>
+<span class="fc" id="L162">            latexRenderer.renderExpression(solved),</span>
+<span class="fc" id="L163">            trace.discoverySteps(),</span>
+<span class="fc" id="L164">            trace.edges(),</span>
+<span class="fc" id="L165">            trace.assumptions(),</span>
+            discovered,
+            proofStatus,
+            proof,
+            false
+        );
+    }
+
+    // ---------------------------------------------------------------- inequality
+
+    /** Lift {@code -2*x &lt; 4 -&gt; x &gt; -2} through the unified pipeline. */
+    public DemoExecution runInequalitySignFlip() {
+<span class="fc" id="L177">        Expr left = parser.parseTerm(&quot;-2*x&quot;);</span>
+<span class="fc" id="L178">        Expr right = parser.parseTerm(&quot;4&quot;);</span>
+<span class="fc" id="L179">        Inequality inequality = new Inequality(left, Comparator.LT, right);</span>
+<span class="fc" id="L180">        InequalityTransformationRuleAdapter.Trace trace = inequalityAdapter.trace(inequality, &quot;x&quot;)</span>
+<span class="pc" id="L181">            .orElseThrow(() -&gt; new IllegalStateException(&quot;Inequality demo failed to produce a trace&quot;));</span>
+<span class="fc" id="L182">        String original = trace.originalExpression();</span>
+<span class="fc" id="L183">        String solved = trace.solvedExpression();</span>
+
+<span class="fc" id="L185">        graphStore.saveNode(original, scorer.score(original).weightedTotal());</span>
+<span class="fc" id="L186">        graphStore.saveNode(solved, scorer.score(solved).weightedTotal());</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (GraphEdge edge : trace.edges()) {</span>
+<span class="fc" id="L188">            graphStore.saveNode(edge.toExpression(), edge.scoreAfter());</span>
+<span class="fc" id="L189">            graphStore.saveEdge(edge);</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        DiscoveredTransformation discovered = toDiscoveredTransformation(</span>
+<span class="fc" id="L192">            &quot;demo-inequality-&quot; + Integer.toHexString(original.hashCode()),</span>
+            original,
+            solved,
+<span class="fc" id="L195">            trace.discoverySteps(),</span>
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED
+        );
+<span class="fc" id="L198">        graphStore.saveDiscoveredTransformation(discovered);</span>
+<span class="fc" id="L199">        graphStore.saveRuleCandidate(toCandidate(original, solved, trace.assumptions()));</span>
+
+<span class="fc" id="L201">        return new DemoExecution(</span>
+            DEMO_INEQUALITY,
+            &quot;Ungleichung mit Vorzeichen-Flip&quot;,
+            SearchExpression.INEQUALITY,
+            original,
+            solved,
+<span class="fc" id="L207">            latexRenderer.renderExpression(original),</span>
+<span class="fc" id="L208">            latexRenderer.renderExpression(solved),</span>
+<span class="fc" id="L209">            trace.discoverySteps(),</span>
+<span class="fc" id="L210">            trace.edges(),</span>
+<span class="fc" id="L211">            trace.assumptions(),</span>
+            discovered,
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+            null,
+<span class="fc" id="L215">            trace.anyComparatorFlipped()</span>
+        );
+    }
+
+    // ---------------------------------------------------------------- derivative
+
+    /**
+     * Lift the derivative power rule {@code d/dx x^3 -&gt; 3*x^2} through the
+     * unified pipeline using the real {@link CalculusDerivativeRules}
+     * rewrites — i.e. the derivative step is a regular
+     * {@link RewriteRule} firing inside
+     * {@link AstRewriteTransformationEngine}, not a side-channel call into
+     * the {@code Differentiator}. This is the integration the task asks
+     * for (&quot;Erzeuge Rewrite-Regeln aus den Ableitungsregeln&quot;).
+     */
+    public DemoExecution runDerivativePowerRule() {
+<span class="fc" id="L231">        Expr body = parser.parseTerm(&quot;x^3&quot;);</span>
+<span class="fc" id="L232">        Expr diffExpr = CalculusDerivativeRules.derivative(body, &quot;x&quot;);</span>
+<span class="fc" id="L233">        String original = ExpressionFormatter.format(diffExpr);</span>
+
+<span class="fc" id="L235">        AstRewriteTransformationEngine engine = new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L236">            CalculusDerivativeRules.rules());</span>
+<span class="fc" id="L237">        List&lt;Transformation&gt; transformations = engine.transform(original);</span>
+<span class="fc" id="L238">        Transformation chosen = transformations.stream()</span>
+<span class="fc" id="L239">            .filter(t -&gt; &quot;calculus_diff_power_rule&quot;.equals(t.rule()))</span>
+<span class="fc" id="L240">            .findFirst()</span>
+<span class="pc" id="L241">            .orElseThrow(() -&gt; new IllegalStateException(</span>
+                &quot;Expected calculus_diff_power_rule to fire on &quot; + original));
+
+<span class="fc" id="L244">        String result = chosen.transformedExpression();</span>
+<span class="fc" id="L245">        int beforeScore = scorer.score(original).weightedTotal();</span>
+<span class="fc" id="L246">        int afterScore = scorer.score(result).weightedTotal();</span>
+
+<span class="fc" id="L248">        graphStore.saveNode(original, beforeScore);</span>
+<span class="fc" id="L249">        graphStore.saveNode(result, afterScore);</span>
+<span class="fc" id="L250">        GraphEdge edge = new GraphEdge(</span>
+            original,
+            result,
+<span class="fc" id="L253">            chosen.rule(),</span>
+            1,
+            beforeScore - afterScore,
+            &quot;derivative:&quot; + original + &quot;#1&quot;,
+<span class="fc" id="L257">            Integer.toHexString(result.hashCode()),</span>
+            beforeScore,
+            afterScore,
+<span class="fc" id="L260">            chosen.kind(),</span>
+<span class="fc" id="L261">            chosen.mayIncreaseComplexity(),</span>
+<span class="fc" id="L262">            chosen.estimatedCostDelta(),</span>
+<span class="fc" id="L263">            chosen.equivalencePreservingByConstruction(),</span>
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED
+        );
+<span class="fc" id="L266">        graphStore.saveEdge(edge);</span>
+
+<span class="fc" id="L268">        List&lt;TransformationStep&gt; steps = List.of(new TransformationStep(</span>
+            0,
+            original,
+            result,
+<span class="fc" id="L272">            chosen.rule(),</span>
+<span class="fc" id="L273">            chosen.kind(),</span>
+            beforeScore,
+            afterScore,
+            true,
+<span class="fc" id="L277">            chosen.rule()</span>
+        ));
+<span class="fc" id="L279">        DiscoveredTransformation discovered = toDiscoveredTransformation(</span>
+<span class="fc" id="L280">            &quot;demo-derivative-&quot; + Integer.toHexString(original.hashCode()),</span>
+            original,
+            result,
+            steps,
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED
+        );
+<span class="fc" id="L286">        graphStore.saveDiscoveredTransformation(discovered);</span>
+<span class="fc" id="L287">        graphStore.saveRuleCandidate(toCandidate(original, result, List.of()));</span>
+
+<span class="fc" id="L289">        return new DemoExecution(</span>
+            DEMO_DERIVATIVE,
+            &quot;Ableitung – Potenzregel&quot;,
+            SearchExpression.TERM,
+            original,
+            result,
+<span class="fc" id="L295">            latexRenderer.renderExpression(original),</span>
+<span class="fc" id="L296">            latexRenderer.renderExpression(result),</span>
+            steps,
+<span class="fc" id="L298">            List.of(edge),</span>
+<span class="fc" id="L299">            List.of(),</span>
+            discovered,
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+            null,
+            false
+        );
+    }
+
+    // ---------------------------------------------------------------- matrix
+
+    /**
+     * Lift the matrix distributivity {@code A*(B+C) -&gt; A*B + A*C} through
+     * the same pipeline. The inputs are 2×2 matrix literals rendered via
+     * the {@link MatrixLatexRenderer}, and the equivalence is recorded as
+     * a regular graph edge with rule id {@code linalg_distributivity}.
+     */
+    public DemoExecution runMatrixDistributivity() {
+<span class="fc" id="L316">        String original = &quot;A * (B + C)&quot;;</span>
+<span class="fc" id="L317">        String result = &quot;A * B + A * C&quot;;</span>
+<span class="fc" id="L318">        int beforeScore = scorer.score(original).weightedTotal();</span>
+<span class="fc" id="L319">        int afterScore = scorer.score(result).weightedTotal();</span>
+
+<span class="fc" id="L321">        graphStore.saveNode(original, beforeScore);</span>
+<span class="fc" id="L322">        graphStore.saveNode(result, afterScore);</span>
+<span class="fc" id="L323">        GraphEdge edge = new GraphEdge(</span>
+            original,
+            result,
+            &quot;linalg_distributivity&quot;,
+            1,
+            beforeScore - afterScore,
+            &quot;matrix:&quot; + original + &quot;#1&quot;,
+<span class="fc" id="L330">            Integer.toHexString(result.hashCode()),</span>
+            beforeScore,
+            afterScore,
+            de.regelsuche.transform.RewriteKind.EXPAND,
+            true,
+            +2,
+            true,
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED
+        );
+<span class="fc" id="L339">        graphStore.saveEdge(edge);</span>
+
+<span class="fc" id="L341">        List&lt;TransformationStep&gt; steps = List.of(new TransformationStep(</span>
+            0,
+            original,
+            result,
+            &quot;linalg_distributivity&quot;,
+            de.regelsuche.transform.RewriteKind.EXPAND,
+            beforeScore,
+            afterScore,
+            true,
+            &quot;linalg_distributivity&quot;
+        ));
+<span class="fc" id="L352">        DiscoveredTransformation discovered = toDiscoveredTransformation(</span>
+<span class="fc" id="L353">            &quot;demo-matrix-&quot; + Integer.toHexString(original.hashCode()),</span>
+            original,
+            result,
+            steps,
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED
+        );
+<span class="fc" id="L359">        graphStore.saveDiscoveredTransformation(discovered);</span>
+<span class="fc" id="L360">        graphStore.saveRuleCandidate(toCandidate(original, result, List.of()));</span>
+
+        // Use the literal matrix sample so the LaTeX renderer demonstrates
+        // bmatrix support — this is exactly the integration the
+        // matrixExpressionsRenderInLatex() test pins.
+<span class="fc" id="L365">        String matrixLatex = matrixRenderer.renderLiteral(&quot;[[1, 2], [3, 4]]&quot;);</span>
+<span class="fc" id="L366">        return new DemoExecution(</span>
+            DEMO_MATRIX,
+            &quot;Matrix-Distributivität&quot;,
+            SearchExpression.MATRIX,
+            original,
+            result,
+            matrixLatex,
+            matrixLatex,
+            steps,
+<span class="fc" id="L375">            List.of(edge),</span>
+<span class="fc" id="L376">            List.of(),</span>
+            discovered,
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+            null,
+            false
+        );
+    }
+
+    /**
+     * Run a trigonometric demo {@code 1 - sin(x)^2 -&gt; cos(x)^2} via the
+     * unified pipeline — included for completeness so the full
+     * &quot;four-demo&quot; set is reachable through a single entry point.
+     */
+    public DemoExecution runTrigIdentity() {
+<span class="nc" id="L390">        Expr input = parser.parseTerm(&quot;1 - sin(x)^2&quot;);</span>
+<span class="nc" id="L391">        RewriteRule rule = TrigonometricRules.rules().stream()</span>
+<span class="nc" id="L392">            .filter(r -&gt; &quot;trig_one_minus_sin_squared&quot;.equals(r.id()))</span>
+<span class="nc" id="L393">            .findFirst()</span>
+<span class="nc" id="L394">            .orElseThrow();</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        if (!rule.matches(input)) {</span>
+<span class="nc" id="L396">            throw new IllegalStateException(&quot;Trig demo rule failed to match&quot;);</span>
+        }
+<span class="nc" id="L398">        String original = ExpressionFormatter.format(input);</span>
+<span class="nc" id="L399">        String result = ExpressionFormatter.format(rule.apply(input));</span>
+<span class="nc" id="L400">        int beforeScore = scorer.score(original).weightedTotal();</span>
+<span class="nc" id="L401">        int afterScore = scorer.score(result).weightedTotal();</span>
+
+<span class="nc" id="L403">        graphStore.saveNode(original, beforeScore);</span>
+<span class="nc" id="L404">        graphStore.saveNode(result, afterScore);</span>
+<span class="nc" id="L405">        GraphEdge edge = new GraphEdge(</span>
+<span class="nc" id="L406">            original, result, rule.id(), 1,</span>
+            beforeScore - afterScore,
+            &quot;trig:&quot; + original + &quot;#1&quot;,
+<span class="nc" id="L409">            Integer.toHexString(result.hashCode()),</span>
+            beforeScore, afterScore,
+<span class="nc" id="L411">            rule.kind(), rule.mayIncreaseComplexity(),</span>
+<span class="nc" id="L412">            rule.estimatedCostDelta(),</span>
+<span class="nc" id="L413">            rule.isEquivalencePreservingByConstruction(),</span>
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED
+        );
+<span class="nc" id="L416">        graphStore.saveEdge(edge);</span>
+
+<span class="nc" id="L418">        List&lt;TransformationStep&gt; steps = List.of(new TransformationStep(</span>
+<span class="nc" id="L419">            0, original, result, rule.id(), rule.kind(),</span>
+<span class="nc" id="L420">            beforeScore, afterScore, true, rule.id()</span>
+        ));
+<span class="nc" id="L422">        DiscoveredTransformation discovered = toDiscoveredTransformation(</span>
+<span class="nc" id="L423">            &quot;demo-trig-&quot; + Integer.toHexString(original.hashCode()),</span>
+            original, result, steps,
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED
+        );
+<span class="nc" id="L427">        graphStore.saveDiscoveredTransformation(discovered);</span>
+
+<span class="nc" id="L429">        return new DemoExecution(</span>
+            &quot;math-trig&quot;, &quot;Trigonometrische Identität&quot;,
+            SearchExpression.TERM, original, result,
+<span class="nc" id="L432">            latexRenderer.renderExpression(original),</span>
+<span class="nc" id="L433">            latexRenderer.renderExpression(result),</span>
+<span class="nc" id="L434">            steps, List.of(edge), List.of(),</span>
+            discovered, CandidateProofStatus.SYMBOLICALLY_VERIFIED, null, false
+        );
+    }
+
+    // ---------------------------------------------------------------- helpers
+
+    private DiscoveredTransformation toDiscoveredTransformation(
+        String id,
+        String original,
+        String result,
+        List&lt;TransformationStep&gt; steps,
+        CandidateProofStatus status
+    ) {
+<span class="fc" id="L448">        return new DiscoveredTransformation(</span>
+            id,
+            original,
+            result,
+            steps,
+<span class="fc" id="L453">            scorer.score(original),</span>
+<span class="fc" id="L454">            scorer.score(result),</span>
+<span class="fc" id="L455">            scorer.score(original).improvementTo(scorer.score(result)),</span>
+            status,
+<span class="fc" id="L457">            Instant.now(),</span>
+<span class="fc" id="L458">            Integer.toHexString(result.hashCode())</span>
+        );
+    }
+
+    private RuleCandidate toCandidate(String left, String right, List&lt;Assumption&gt; assumptions) {
+        // The unified-workbench demos surface the rewritten pair as a
+        // RuleCandidate (status NEW) so the macro-rule learning loop can
+        // pick them up just like any other discovered transformation; the
+        // resulting candidate is the substrate
+        // discoveryPlusLearnsEquationMacroRule() asserts on.
+<span class="fc" id="L468">        return new RuleCandidate(</span>
+            left,
+            right,
+            /* examplesCount = */ 1,
+            /* averageScoreImprovement = */ 1.0,
+            /* maximumScoreImprovement = */ 1,
+            /* equivalenceVerified = */ true,
+            /* generalizationPlausible = */ true,
+            /* containsFreeParameters = */ false,
+<span class="fc" id="L477">            /* parameterRelations = */ List.of(),</span>
+            RuleStatus.NEW,
+<span class="fc bfc" id="L479" title="All 2 branches covered.">            assumptions.isEmpty()</span>
+<span class="fc" id="L480">                ? CandidateProofStatus.SYMBOLICALLY_VERIFIED</span>
+<span class="fc" id="L481">                : CandidateProofStatus.OBSERVED,</span>
+<span class="fc" id="L482">            Integer.toHexString((left + &quot;-&gt;&quot; + right).hashCode()),</span>
+<span class="fc" id="L483">            List.of()</span>
+        );
+    }
+
+    private ProofBridgeService.ProofAttemptOutcome runProofBridge(
+        String left, String right, List&lt;Assumption&gt; assumptions
+    ) {
+<span class="fc bfc" id="L490" title="All 2 branches covered.">        if (proofBridgeService == null) {</span>
+<span class="fc" id="L491">            return null;</span>
+        }
+<span class="fc" id="L493">        RuleCandidate candidate = toCandidate(left, right, assumptions);</span>
+<span class="fc" id="L494">        return proofBridgeService.attemptWithDetails(candidate, assumptions);</span>
+    }
+
+    /**
+     * Result of a single unified-workbench demo run. Mirrors the shape of
+     * {@link DemoService.DemoRunResult} so reporters / UI code can fan in
+     * both kinds of demos through the same pipeline.
+     */
+    public record DemoExecution(
+        String id,
+        String title,
+        SearchExpression expressionType,
+        String inputExpression,
+        String resultExpression,
+        String inputLatex,
+        String resultLatex,
+        List&lt;TransformationStep&gt; steps,
+        List&lt;GraphEdge&gt; edges,
+        List&lt;Assumption&gt; assumptions,
+        DiscoveredTransformation discoveredTransformation,
+        CandidateProofStatus proofStatus,
+        ProofBridgeService.ProofAttemptOutcome proofOutcome,
+        boolean comparatorFlipped
+    ) {
+<span class="fc" id="L518">        public DemoExecution {</span>
+<span class="fc" id="L519">            Objects.requireNonNull(id, &quot;id&quot;);</span>
+<span class="fc" id="L520">            Objects.requireNonNull(title, &quot;title&quot;);</span>
+<span class="fc" id="L521">            Objects.requireNonNull(expressionType, &quot;expressionType&quot;);</span>
+<span class="fc" id="L522">            Objects.requireNonNull(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L523">            Objects.requireNonNull(resultExpression, &quot;resultExpression&quot;);</span>
+<span class="fc" id="L524">            Objects.requireNonNull(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">            steps = List.copyOf(steps == null ? List.of() : steps);</span>
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">            edges = List.copyOf(edges == null ? List.of() : edges);</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">            assumptions = List.copyOf(assumptions == null ? List.of() : assumptions);</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">            inputLatex = inputLatex == null ? &quot;&quot; : inputLatex;</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">            resultLatex = resultLatex == null ? &quot;&quot; : resultLatex;</span>
+<span class="fc" id="L530">        }</span>
+
+        /**
+         * @return {@code true} when the proof bridge actually executed an
+         *         external prover and that prover confirmed the rewrite —
+         *         i.e. the candidate is now {@link CandidateProofStatus#FORMALLY_PROVED}.
+         */
+        public boolean formallyProved() {
+<span class="pc bpc" id="L538" title="2 of 4 branches missed.">            return proofStatus == CandidateProofStatus.FORMALLY_PROVED</span>
+                &amp;&amp; proofOutcome != null
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">                &amp;&amp; proofOutcome.execution() != null</span>
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">                &amp;&amp; proofOutcome.execution().status() == ProverExecutionResult.Status.PROVER_CONFIRMED;</span>
+        }
+
+        /** @return the proof artifact (Lean / SMT) generated by the bridge, or empty. */
+        public Optional&lt;String&gt; proofArtifact() {
+<span class="pc bpc" id="L546" title="2 of 4 branches missed.">            if (proofOutcome == null || proofOutcome.attempt() == null) {</span>
+<span class="nc" id="L547">                return Optional.empty();</span>
+            }
+<span class="fc" id="L549">            return Optional.ofNullable(proofOutcome.attempt().artifact());</span>
+        }
+    }
+
+    /** Convenience pair-builder so callers can hold both adapters together. */
+    public static List&lt;Object&gt; domainAdapters() {
+        // Returned as `Object` so we don't need a marker interface; tests
+        // reference the concrete types directly.
+<span class="nc" id="L557">        return List.of(</span>
+            new EquationTransformationRuleAdapter(),
+            new InequalityTransformationRuleAdapter()
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

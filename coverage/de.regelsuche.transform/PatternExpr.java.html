@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PatternExpr.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">PatternExpr.java</span></div><h1>PatternExpr.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+public sealed interface PatternExpr
+    permits PatternExpr.Placeholder, PatternExpr.LiteralNumber, PatternExpr.Operation, PatternExpr.Function {
+    static PatternExpr var(String name) {
+<span class="fc" id="L18">        return new Placeholder(name);</span>
+    }
+
+    static PatternExpr num(double value) {
+<span class="fc" id="L22">        return new LiteralNumber(value);</span>
+    }
+
+    static PatternExpr op(BinaryOperator operator, PatternExpr left, PatternExpr right) {
+<span class="fc" id="L26">        return new Operation(operator, left, right);</span>
+    }
+
+    static PatternExpr fn(String name, PatternExpr... arguments) {
+<span class="fc" id="L30">        return new Function(name, List.of(arguments));</span>
+    }
+
+    boolean match(Expr expression, Map&lt;String, Expr&gt; bindings);
+
+    Expr instantiate(Map&lt;String, Expr&gt; bindings);
+
+    record Placeholder(String name) implements PatternExpr {
+<span class="fc" id="L38">        public Placeholder {</span>
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">            if (name == null || name.isBlank()) {</span>
+<span class="nc" id="L40">                throw new IllegalArgumentException(&quot;placeholder name must not be blank&quot;);</span>
+            }
+<span class="fc" id="L42">        }</span>
+
+        @Override
+        public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
+<span class="fc" id="L46">            Expr bound = bindings.get(name);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (bound == null) {</span>
+<span class="fc" id="L48">                bindings.put(name, expression);</span>
+<span class="fc" id="L49">                return true;</span>
+            }
+<span class="fc" id="L51">            return bound.equals(expression);</span>
+        }
+
+        @Override
+        public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
+<span class="fc" id="L56">            return Optional.ofNullable(bindings.get(name))</span>
+<span class="pc" id="L57">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;Missing binding for &quot; + name));</span>
+        }
+    }
+
+<span class="fc" id="L61">    record LiteralNumber(double value) implements PatternExpr {</span>
+        @Override
+        public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
+<span class="fc bfc" id="L64" title="All 4 branches covered.">            return expression instanceof NumberExpr numberExpr &amp;&amp; numberExpr.value() == value;</span>
+        }
+
+        @Override
+        public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
+<span class="fc" id="L69">            return new NumberExpr(value);</span>
+        }
+    }
+
+    record Operation(BinaryOperator operator, PatternExpr left, PatternExpr right) implements PatternExpr {
+<span class="fc" id="L74">        public Operation {</span>
+<span class="pc bpc" id="L75" title="3 of 6 branches missed.">            if (operator == null || left == null || right == null) {</span>
+<span class="nc" id="L76">                throw new IllegalArgumentException(&quot;operator, left and right must not be null&quot;);</span>
+            }
+<span class="fc" id="L78">        }</span>
+
+        @Override
+        public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
+<span class="fc bfc" id="L82" title="All 4 branches covered.">            if (!(expression instanceof BinaryExpr binaryExpr) || binaryExpr.operator() != operator) {</span>
+<span class="fc" id="L83">                return false;</span>
+            }
+<span class="fc bfc" id="L85" title="All 4 branches covered.">            return left.match(binaryExpr.left(), bindings) &amp;&amp; right.match(binaryExpr.right(), bindings);</span>
+        }
+
+        @Override
+        public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
+<span class="fc" id="L90">            return new BinaryExpr(left.instantiate(bindings), operator, right.instantiate(bindings));</span>
+        }
+    }
+
+    /**
+     * Pattern for function applications like {@code sin(A)} or {@code log(A*B)}.
+     * Matches a {@link FunctionExpr} by exact name (case-sensitive) and arity,
+     * recursively matching each argument.
+     */
+    record Function(String name, List&lt;PatternExpr&gt; arguments) implements PatternExpr {
+<span class="fc" id="L100">        public Function {</span>
+<span class="fc" id="L101">            Objects.requireNonNull(name, &quot;name&quot;);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (name.isBlank()) {</span>
+<span class="nc" id="L103">                throw new IllegalArgumentException(&quot;function name must not be blank&quot;);</span>
+            }
+<span class="fc" id="L105">            Objects.requireNonNull(arguments, &quot;arguments&quot;);</span>
+<span class="fc" id="L106">            arguments = List.copyOf(arguments);</span>
+<span class="fc" id="L107">        }</span>
+
+        @Override
+        public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (!(expression instanceof FunctionExpr functionExpr)) {</span>
+<span class="fc" id="L112">                return false;</span>
+            }
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">            if (!functionExpr.name().equals(name) || functionExpr.arguments().size() != arguments.size()) {</span>
+<span class="fc" id="L115">                return false;</span>
+            }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (int i = 0; i &lt; arguments.size(); i++) {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                if (!arguments.get(i).match(functionExpr.arguments().get(i), bindings)) {</span>
+<span class="fc" id="L119">                    return false;</span>
+                }
+            }
+<span class="fc" id="L122">            return true;</span>
+        }
+
+        @Override
+        public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
+<span class="fc" id="L127">            List&lt;Expr&gt; args = new ArrayList&lt;&gt;(arguments.size());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            for (PatternExpr argument : arguments) {</span>
+<span class="fc" id="L129">                args.add(argument.instantiate(bindings));</span>
+<span class="fc" id="L130">            }</span>
+<span class="fc" id="L131">            return new FunctionExpr(name, args);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

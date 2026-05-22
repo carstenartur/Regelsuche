@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EClass.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">EClass.java</span></div><h1>EClass.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
+
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+/**
+ * One e-class inside an {@link EGraph}: the set of {@link ENode}s that
+ * have been proven equivalent under the current rewrites.
+ *
+ * &lt;p&gt;Mutation (adding nodes, merging-in another class) is package-private
+ * — only {@link EGraph} drives the lifecycle so external callers cannot
+ * leave the graph in an inconsistent state.&lt;/p&gt;
+ */
+public final class EClass {
+
+    private final EClassId id;
+<span class="fc" id="L18">    private final LinkedHashSet&lt;ENode&gt; nodes = new LinkedHashSet&lt;&gt;();</span>
+    /**
+     * Parents of this class: e-nodes that mention this class as one of
+     * their children. Used by {@link EGraph#rebuild()} to detect new
+     * congruences after a {@code union(...)} call.
+     */
+<span class="fc" id="L24">    private final LinkedHashSet&lt;ENode&gt; parents = new LinkedHashSet&lt;&gt;();</span>
+
+<span class="fc" id="L26">    EClass(EClassId id, ENode initialNode) {</span>
+<span class="fc" id="L27">        this.id = id;</span>
+<span class="fc" id="L28">        this.nodes.add(initialNode);</span>
+<span class="fc" id="L29">    }</span>
+
+    /** Class identifier — stable for the lifetime of this {@link EGraph}. */
+    public EClassId id() {
+<span class="fc" id="L33">        return id;</span>
+    }
+
+    /** Unmodifiable snapshot of the e-nodes that live in this class. */
+    public Set&lt;ENode&gt; nodes() {
+<span class="fc" id="L38">        return Collections.unmodifiableSet(nodes);</span>
+    }
+
+    /** Unmodifiable snapshot of the parent e-nodes pointing at this class. */
+    public Set&lt;ENode&gt; parents() {
+<span class="fc" id="L43">        return Collections.unmodifiableSet(parents);</span>
+    }
+
+    void addNode(ENode node) {
+<span class="nc" id="L47">        nodes.add(node);</span>
+<span class="nc" id="L48">    }</span>
+
+    void addParent(ENode parent) {
+<span class="fc" id="L51">        parents.add(parent);</span>
+<span class="fc" id="L52">    }</span>
+
+    void absorb(EClass other) {
+<span class="fc" id="L55">        this.nodes.addAll(other.nodes);</span>
+<span class="fc" id="L56">        this.parents.addAll(other.parents);</span>
+<span class="fc" id="L57">    }</span>
+
+    void clearParents() {
+<span class="fc" id="L60">        parents.clear();</span>
+<span class="fc" id="L61">    }</span>
+
+    void replaceNodes(Set&lt;ENode&gt; replacement) {
+<span class="fc" id="L64">        nodes.clear();</span>
+<span class="fc" id="L65">        nodes.addAll(replacement);</span>
+<span class="fc" id="L66">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L70">        return &quot;EClass(&quot; + id + &quot;, nodes=&quot; + nodes + &quot;)&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

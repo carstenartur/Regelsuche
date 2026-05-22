@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchGraphStatsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph</a> &gt; <span class="el_source">SearchGraphStatsService.java</span></div><h1>SearchGraphStatsService.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph;
+
+import de.regelsuche.graph.GraphEdge;
+import de.regelsuche.graph.GraphSnapshot;
+import de.regelsuche.mining.RuleCandidate;
+import de.regelsuche.search.SimplificationSuccess;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Computes aggregate {@link SearchGraphStatsDto search-graph statistics}
+ * (dashboard metrics).
+ */
+public final class SearchGraphStatsService {
+
+    private SearchGraphStatsService() {
+    }
+
+    public static SearchGraphStatsDto compute(GraphSnapshot snapshot, List&lt;SimplificationSuccess&gt; successes) {
+<span class="fc" id="L26">        return compute(snapshot, successes, List.of(), 0);</span>
+    }
+
+    public static SearchGraphStatsDto compute(
+        GraphSnapshot snapshot,
+        List&lt;SimplificationSuccess&gt; successes,
+        List&lt;RuleCandidate&gt; candidates,
+        int macroRuleCount
+    ) {
+<span class="fc" id="L35">        List&lt;GraphEdge&gt; edges = snapshot.edges();</span>
+<span class="fc" id="L36">        Set&lt;String&gt; nodes = new HashSet&lt;&gt;(snapshot.nodes());</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
+<span class="fc" id="L38">            nodes.add(edge.fromExpression());</span>
+<span class="fc" id="L39">            nodes.add(edge.toExpression());</span>
+<span class="fc" id="L40">        }</span>
+
+<span class="fc" id="L42">        int nodesVisited = nodes.size();</span>
+<span class="fc" id="L43">        int edgesGenerated = edges.size();</span>
+<span class="fc" id="L44">        int maxDepthReached = edges.stream().mapToInt(GraphEdge::depth).max().orElse(0);</span>
+<span class="fc" id="L45">        int bestScore = successes.stream().mapToInt(SimplificationSuccess::improvement).max().orElse(0);</span>
+
+        // ruleUsageFrequency
+<span class="fc" id="L48">        Map&lt;String, Integer&gt; ruleUsage = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L49">        Map&lt;String, Integer&gt; ruleImprovement = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L50">        Map&lt;String, Integer&gt; outDegree = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L51">        Set&lt;String&gt; hasImprovingOutgoing = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
+<span class="fc" id="L53">            ruleUsage.merge(edge.transformationRule(), 1, Integer::sum);</span>
+<span class="fc" id="L54">            ruleImprovement.merge(edge.transformationRule(), edge.improvement(), Integer::sum);</span>
+<span class="fc" id="L55">            outDegree.merge(edge.fromExpression(), 1, Integer::sum);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (edge.improvement() &gt; 0) {</span>
+<span class="fc" id="L57">                hasImprovingOutgoing.add(edge.fromExpression());</span>
+            }
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        Map&lt;String, Integer&gt; ruleUsageFrequency = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L61">        ruleUsage.entrySet().stream()</span>
+<span class="fc" id="L62">            .sorted(Map.Entry.&lt;String, Integer&gt;comparingByValue().reversed())</span>
+<span class="fc" id="L63">            .forEach(e -&gt; ruleUsageFrequency.put(e.getKey(), e.getValue()));</span>
+
+        // averageBranchingFactor = edges / nodesWithOutgoing
+<span class="fc" id="L66">        int nodesWithOutgoing = outDegree.size();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        double averageBranchingFactor = nodesWithOutgoing == 0</span>
+<span class="fc" id="L68">            ? 0.0</span>
+<span class="fc" id="L69">            : (double) edgesGenerated / (double) nodesWithOutgoing;</span>
+
+        // mostUsefulRules: rank by total improvement, then frequency
+<span class="fc" id="L72">        List&lt;String&gt; mostUsefulRules = new ArrayList&lt;&gt;(ruleImprovement.keySet());</span>
+<span class="fc" id="L73">        mostUsefulRules.sort(</span>
+<span class="fc" id="L74">            Comparator.&lt;String&gt;comparingInt(r -&gt; -ruleImprovement.getOrDefault(r, 0))</span>
+<span class="pc" id="L75">                .thenComparingInt(r -&gt; -ruleUsage.getOrDefault(r, 0))</span>
+        );
+
+        // deadEnds: nodes that have no improving outgoing edge and are not the simplified result of a success
+<span class="fc" id="L79">        Set&lt;String&gt; successTerminals = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (SimplificationSuccess success : successes) {</span>
+<span class="fc" id="L81">            successTerminals.add(success.simplifiedExpression());</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">        int deadEnds = 0;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (String node : nodes) {</span>
+<span class="fc bfc" id="L85" title="All 4 branches covered.">            if (!hasImprovingOutgoing.contains(node) &amp;&amp; !successTerminals.contains(node)) {</span>
+<span class="fc" id="L86">                deadEnds++;</span>
+            }
+<span class="fc" id="L88">        }</span>
+
+<span class="fc" id="L90">        return new SearchGraphStatsDto(</span>
+            nodesVisited,
+            edgesGenerated,
+            deadEnds,
+            bestScore,
+            averageBranchingFactor,
+            maxDepthReached,
+            ruleUsageFrequency,
+            mostUsefulRules,
+<span class="fc" id="L99">            candidates.size(),</span>
+            macroRuleCount
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

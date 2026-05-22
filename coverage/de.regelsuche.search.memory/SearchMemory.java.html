@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchMemory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.memory</a> &gt; <span class="el_source">SearchMemory.java</span></div><h1>SearchMemory.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.memory;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Opt-in search-memory bundle attached to a
+ * {@link de.regelsuche.search.strategy.SearchProblem}.
+ *
+ * &lt;p&gt;Combines a {@link TranspositionTable} with an in-search log of
+ * {@link PruningDecision}s so a strategy can record why it dropped or kept
+ * a re-visited state without changing its return type.&lt;/p&gt;
+ *
+ * &lt;p&gt;When a {@link de.regelsuche.search.strategy.SearchProblem} carries
+ * {@code null} as its memory, strategies fall back to their classic
+ * canonical-hash-only deduplication and emit no decisions — that keeps the
+ * existing rule-mining and benchmark tests stable. Memory is wired in by
+ * {@link de.regelsuche.search.SearchProfile#DISCOVERY_PLUS} and tests that
+ * explicitly opt in.&lt;/p&gt;
+ */
+public final class SearchMemory {
+
+    private final TranspositionTable table;
+<span class="fc" id="L25">    private final List&lt;PruningDecision&gt; decisions = Collections.synchronizedList(new ArrayList&lt;&gt;());</span>
+
+    public SearchMemory() {
+<span class="fc" id="L28">        this(new InMemoryTranspositionTable());</span>
+<span class="fc" id="L29">    }</span>
+
+<span class="fc" id="L31">    public SearchMemory(TranspositionTable table) {</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (table == null) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(&quot;table must not be null&quot;);</span>
+        }
+<span class="fc" id="L35">        this.table = table;</span>
+<span class="fc" id="L36">    }</span>
+
+    public TranspositionTable table() {
+<span class="fc" id="L39">        return table;</span>
+    }
+
+    public void recordDecision(PruningDecision decision) {
+<span class="fc" id="L43">        decisions.add(decision);</span>
+<span class="fc" id="L44">    }</span>
+
+    public List&lt;PruningDecision&gt; decisions() {
+<span class="fc" id="L47">        synchronized (decisions) {</span>
+<span class="fc" id="L48">            return List.copyOf(decisions);</span>
+        }
+    }
+
+    public void clearDecisions() {
+<span class="nc" id="L53">        decisions.clear();</span>
+<span class="nc" id="L54">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

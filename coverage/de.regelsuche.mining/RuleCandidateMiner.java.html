@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleCandidateMiner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">RuleCandidateMiner.java</span></div><h1>RuleCandidateMiner.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.equivalence.EquivalenceService;
+import de.regelsuche.equivalence.SymPyEquivalenceService;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+public class RuleCandidateMiner {
+    private final KnownRuleRepository knownRules;
+    private final PatternGeneralizer patternGeneralizer;
+    private final CandidateValidator validator;
+
+    public RuleCandidateMiner(KnownRuleRepository knownRules) {
+<span class="fc" id="L16">        this(knownRules, new SymPyEquivalenceService());</span>
+<span class="fc" id="L17">    }</span>
+
+<span class="fc" id="L19">    public RuleCandidateMiner(KnownRuleRepository knownRules, EquivalenceService equivalenceService) {</span>
+<span class="fc" id="L20">        this.knownRules = knownRules;</span>
+<span class="fc" id="L21">        this.patternGeneralizer = new PatternGeneralizer();</span>
+<span class="fc" id="L22">        this.validator = new CandidateValidator(equivalenceService);</span>
+<span class="fc" id="L23">    }</span>
+
+    public List&lt;RuleCandidate&gt; mine(List&lt;SuccessfulTransformationPath&gt; paths) {
+<span class="fc" id="L26">        return mine(paths, DiscoverySettings.defaults());</span>
+    }
+
+    public List&lt;RuleCandidate&gt; mine(List&lt;SuccessfulTransformationPath&gt; paths, DiscoverySettings settings) {
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        DiscoverySettings effective = settings == null ? DiscoverySettings.defaults() : settings;</span>
+<span class="fc" id="L31">        int minExamples = Math.max(1, effective.minExamplesPerCandidate());</span>
+<span class="fc" id="L32">        CandidateProofStatus minReusableStatus = effective.minReusableStatus();</span>
+<span class="fc" id="L33">        Map&lt;String, List&lt;SuccessfulTransformationPath&gt;&gt; clusters = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (SuccessfulTransformationPath path : paths) {</span>
+<span class="fc" id="L35">            clusters.computeIfAbsent(patternGeneralizer.skeleton(path), key -&gt; new ArrayList&lt;&gt;()).add(path);</span>
+<span class="fc" id="L36">        }</span>
+
+<span class="fc" id="L38">        Map&lt;String, CandidateBucket&gt; buckets = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (List&lt;SuccessfulTransformationPath&gt; cluster : clusters.values()) {</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if (cluster.size() &lt; minExamples) {</span>
+<span class="fc" id="L41">                continue;</span>
+            }
+<span class="fc" id="L43">            patternGeneralizer.generalize(cluster)</span>
+<span class="fc" id="L44">                .filter(validator::validate)</span>
+<span class="fc" id="L45">                .ifPresent(pattern -&gt; {</span>
+<span class="fc" id="L46">                    String hash = RulePatternCanonicalizer.hash(pattern.leftPattern(), pattern.rightPattern());</span>
+<span class="fc" id="L47">                    buckets.computeIfAbsent(</span>
+                        hash,
+<span class="fc" id="L49">                        key -&gt; new CandidateBucket(</span>
+<span class="fc" id="L50">                            pattern.leftPattern(),</span>
+<span class="fc" id="L51">                            pattern.rightPattern(),</span>
+<span class="fc" id="L52">                            pattern.parameterRelations(),</span>
+<span class="fc" id="L53">                            validator.proofStatus(pattern),</span>
+                            hash
+                        )
+<span class="fc" id="L56">                    ).addAll(cluster);</span>
+<span class="fc" id="L57">                });</span>
+<span class="fc" id="L58">        }</span>
+
+<span class="fc" id="L60">        return buckets.values().stream()</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            .filter(bucket -&gt; bucket.paths.size() &gt;= minExamples)</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            .filter(bucket -&gt; minReusableStatus == null</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                || bucket.proofStatus.ordinal() &gt;= minReusableStatus.ordinal())</span>
+<span class="fc" id="L64">            .map(bucket -&gt; bucket.toCandidate(knownRules))</span>
+<span class="fc" id="L65">            .toList();</span>
+    }
+
+    private static final class CandidateBucket {
+        private final String leftPattern;
+        private final String rightPattern;
+        private final List&lt;String&gt; parameterRelations;
+        private final CandidateProofStatus proofStatus;
+        private final String hash;
+<span class="fc" id="L74">        private final List&lt;SuccessfulTransformationPath&gt; paths = new ArrayList&lt;&gt;();</span>
+
+        private CandidateBucket(
+            String leftPattern,
+            String rightPattern,
+            List&lt;String&gt; parameterRelations,
+            CandidateProofStatus proofStatus,
+            String hash
+<span class="fc" id="L82">        ) {</span>
+<span class="fc" id="L83">            this.leftPattern = leftPattern;</span>
+<span class="fc" id="L84">            this.rightPattern = rightPattern;</span>
+<span class="fc" id="L85">            this.parameterRelations = List.copyOf(parameterRelations);</span>
+<span class="fc" id="L86">            this.proofStatus = proofStatus;</span>
+<span class="fc" id="L87">            this.hash = hash;</span>
+<span class="fc" id="L88">        }</span>
+
+        private void addAll(List&lt;SuccessfulTransformationPath&gt; paths) {
+<span class="fc" id="L91">            this.paths.addAll(paths);</span>
+<span class="fc" id="L92">        }</span>
+
+        private RuleCandidate toCandidate(KnownRuleRepository knownRules) {
+<span class="fc" id="L95">            double average = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).average().orElse(0);</span>
+<span class="fc" id="L96">            int maximum = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).max().orElse(0);</span>
+<span class="fc" id="L97">            boolean equivalenceVerified = paths.stream().allMatch(SuccessfulTransformationPath::equivalenceVerified);</span>
+<span class="fc" id="L98">            List&lt;String&gt; supportingIds = paths.stream()</span>
+<span class="fc" id="L99">                .map(SuccessfulTransformationPath::id)</span>
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">                .filter(id -&gt; id != null &amp;&amp; !id.isBlank())</span>
+<span class="fc" id="L101">                .distinct()</span>
+<span class="fc" id="L102">                .toList();</span>
+<span class="fc" id="L103">            return new RuleCandidate(</span>
+                leftPattern,
+                rightPattern,
+<span class="fc" id="L106">                paths.size(),</span>
+                average,
+                maximum,
+                equivalenceVerified,
+                true,
+<span class="pc bpc" id="L111" title="3 of 4 branches missed.">                leftPattern.contains(&quot;A&quot;) || rightPattern.contains(&quot;A&quot;),</span>
+                parameterRelations,
+<span class="fc" id="L113">                knownRules.statusFor(leftPattern, rightPattern),</span>
+                proofStatus,
+                hash,
+                supportingIds
+            );
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Matrix.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.linalg</a> &gt; <span class="el_source">Matrix.java</span></div><h1>Matrix.java</h1><pre class="source lang-java linenums">package de.regelsuche.linalg;
+
+import java.util.Arrays;
+import java.util.Objects;
+
+/**
+ * Immutable real matrix with the operations used by the linalg demo:
+ * matrix-vector multiplication, matrix-matrix multiplication (for small
+ * dimensions) and a small-system inversion needed by
+ * {@link LinearSystem}.
+ *
+ * &lt;p&gt;Storage is row-major. The class intentionally stays minimal — heavy
+ * lifting (e.g. dense factorisations) is out of scope here.&lt;/p&gt;
+ */
+public final class Matrix {
+    private final int rows;
+    private final int columns;
+    private final double[][] entries;
+
+<span class="fc" id="L20">    public Matrix(double[][] entries) {</span>
+<span class="fc" id="L21">        Objects.requireNonNull(entries, &quot;entries&quot;);</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (entries.length == 0) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(&quot;Matrix must have at least one row&quot;);</span>
+        }
+<span class="fc" id="L25">        int columns = entries[0].length;</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (columns == 0) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;Matrix must have at least one column&quot;);</span>
+        }
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (double[] row : entries) {</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">            if (row.length != columns) {</span>
+<span class="nc" id="L31">                throw new IllegalArgumentException(&quot;Inconsistent row lengths&quot;);</span>
+            }
+        }
+<span class="fc" id="L34">        this.rows = entries.length;</span>
+<span class="fc" id="L35">        this.columns = columns;</span>
+<span class="fc" id="L36">        this.entries = new double[rows][columns];</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (int i = 0; i &lt; rows; i++) {</span>
+<span class="fc" id="L38">            System.arraycopy(entries[i], 0, this.entries[i], 0, columns);</span>
+        }
+<span class="fc" id="L40">    }</span>
+
+    public int rows() {
+<span class="fc" id="L43">        return rows;</span>
+    }
+
+    public int columns() {
+<span class="nc" id="L47">        return columns;</span>
+    }
+
+    public double get(int row, int column) {
+<span class="fc" id="L51">        return entries[row][column];</span>
+    }
+
+    public Vector multiply(Vector vector) {
+<span class="fc" id="L55">        Objects.requireNonNull(vector, &quot;vector&quot;);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (vector.dimension() != columns) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L58">                &quot;Matrix columns (&quot; + columns + &quot;) do not match vector dimension (&quot; + vector.dimension() + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L60">        double[] result = new double[rows];</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (int i = 0; i &lt; rows; i++) {</span>
+<span class="fc" id="L62">            double sum = 0.0;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            for (int j = 0; j &lt; columns; j++) {</span>
+<span class="fc" id="L64">                sum += entries[i][j] * vector.get(j);</span>
+            }
+<span class="fc" id="L66">            result[i] = sum;</span>
+        }
+<span class="fc" id="L68">        return new Vector(result);</span>
+    }
+
+    public Matrix multiply(Matrix other) {
+<span class="fc" id="L72">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (other.rows != columns) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(</span>
+                &quot;Matrix multiplication dimension mismatch: &quot; + rows + &quot;x&quot; + columns
+                    + &quot; * &quot; + other.rows + &quot;x&quot; + other.columns);
+        }
+<span class="fc" id="L78">        double[][] product = new double[rows][other.columns];</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (int i = 0; i &lt; rows; i++) {</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            for (int k = 0; k &lt; columns; k++) {</span>
+<span class="fc" id="L81">                double aik = entries[i][k];</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                if (aik == 0.0) {</span>
+<span class="nc" id="L83">                    continue;</span>
+                }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                for (int j = 0; j &lt; other.columns; j++) {</span>
+<span class="fc" id="L86">                    product[i][j] += aik * other.entries[k][j];</span>
+                }
+            }
+        }
+<span class="fc" id="L90">        return new Matrix(product);</span>
+    }
+
+    public boolean isSquare() {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        return rows == columns;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L99" title="All 4 branches missed.">        return obj instanceof Matrix other</span>
+            &amp;&amp; other.rows == rows
+            &amp;&amp; other.columns == columns
+<span class="nc bnc" id="L102" title="All 4 branches missed.">            &amp;&amp; Arrays.deepEquals(this.entries, other.entries);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L107">        return Arrays.deepHashCode(entries);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

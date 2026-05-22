@@ -1,0 +1,2204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebWorkbenchServer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">WebWorkbenchServer.java</span></div><h1>WebWorkbenchServer.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import com.sun.net.httpserver.BasicAuthenticator;
+import com.sun.net.httpserver.HttpContext;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsServer;
+import de.regelsuche.api.ExportQueryService;
+import de.regelsuche.api.RuleInventoryQueryService;
+import de.regelsuche.api.TransformationQueryService;
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.example.AlgebraicExampleGenerator;
+import de.regelsuche.explain.ExplanationService;
+import de.regelsuche.export.DefaultTransformationImportService;
+import de.regelsuche.export.ExportBundle;
+import de.regelsuche.export.TransformationExportService;
+import de.regelsuche.graph.ExpressionGraphStore;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.json.JsonReader;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.DiscoverySettings;
+import de.regelsuche.mining.KnownRuleRepository;
+import de.regelsuche.mining.RuleCandidate;
+import de.regelsuche.mining.RuleCandidateListener;
+import de.regelsuche.mining.RuleCandidateMiner;
+import de.regelsuche.mining.RuleDiscoveryService;
+import de.regelsuche.notify.NoOpNotifier;
+import de.regelsuche.notify.SimplificationNotifier;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchProfile;
+import de.regelsuche.search.TransformationSearchService;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.SymPyTransformationEngine;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyStore;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+
+/**
+ * Minimal embedded web workbench backed by the JDK's built-in
+ * {@link HttpServer}. Implements the bare-bones REST surface from the issue
+ * (search, graph view, paths, rule candidates, inventory, exports) and serves
+ * a small static HTML/JS UI bundled as a classpath resource.
+ *
+ * &lt;p&gt;This intentionally avoids any heavy web framework dependency. It is
+ * sufficient for local exploration of discovered transformations.&lt;/p&gt;
+ */
+public class WebWorkbenchServer {
+    private final String host;
+    private final int port;
+    private final ExpressionGraphStore graphStore;
+    private final RuleInventoryRepository inventoryRepository;
+    private final TransformationExportService exportService;
+    private final WebSecurityConfig securityConfig;
+
+    private final TransformationQueryService transformationQuery;
+    private final RuleInventoryQueryService inventoryQuery;
+    private final ExportQueryService exportQuery;
+<span class="fc" id="L74">    private final ExplanationService explanationService = new ExplanationService();</span>
+    private final de.regelsuche.search.memory.SearchMemory searchMemory;
+    private final de.regelsuche.proof.ProofBridgeService leanProofBridgeService;
+    private final de.regelsuche.proof.ProofBridgeService smtProofBridgeService;
+    private final de.regelsuche.proof.ProofWorkbenchService proofWorkbenchService;
+    private final de.regelsuche.didactic.analytics.DidacticEventStore didacticEventStore;
+    private final de.regelsuche.didactic.analytics.DidacticAnalyticsService didacticAnalytics;
+    private final de.regelsuche.didactic.StudentStepValidator didacticStepValidator;
+
+    private HttpServer server;
+<span class="fc" id="L84">    private final de.regelsuche.didactic.export.EducationalExporter didacticExporter =</span>
+        new de.regelsuche.didactic.export.EducationalExporter();
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService
+    ) {
+<span class="fc" id="L94">        this(host, port, graphStore, inventoryRepository, exportService, WebSecurityConfig.none());</span>
+<span class="fc" id="L95">    }</span>
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig
+    ) {
+<span class="fc" id="L105">        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, null);</span>
+<span class="fc" id="L106">    }</span>
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        de.regelsuche.search.memory.SearchMemory searchMemory
+    ) {
+<span class="fc" id="L117">        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, searchMemory,</span>
+<span class="fc" id="L118">            defaultProofBridgeService(new de.regelsuche.proof.LeanProofBridge()),</span>
+<span class="fc" id="L119">            defaultProofBridgeService(new de.regelsuche.proof.SmtProofBridge()));</span>
+<span class="fc" id="L120">    }</span>
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        de.regelsuche.search.memory.SearchMemory searchMemory,
+        de.regelsuche.proof.ProofBridgeService leanProofBridgeService,
+        de.regelsuche.proof.ProofBridgeService smtProofBridgeService
+    ) {
+<span class="fc" id="L133">        this(host, port, graphStore, inventoryRepository, exportService,</span>
+            securityConfig, searchMemory, leanProofBridgeService, smtProofBridgeService, null);
+<span class="fc" id="L135">    }</span>
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        de.regelsuche.search.memory.SearchMemory searchMemory,
+        de.regelsuche.proof.ProofBridgeService leanProofBridgeService,
+        de.regelsuche.proof.ProofBridgeService smtProofBridgeService,
+        de.regelsuche.proof.ProofWorkbenchService proofWorkbenchService
+<span class="fc" id="L148">    ) {</span>
+<span class="fc" id="L149">        this.host = host;</span>
+<span class="fc" id="L150">        this.port = port;</span>
+<span class="fc" id="L151">        this.graphStore = graphStore;</span>
+<span class="fc" id="L152">        this.inventoryRepository = inventoryRepository;</span>
+<span class="fc" id="L153">        this.exportService = exportService;</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        this.securityConfig = securityConfig == null ? WebSecurityConfig.none() : securityConfig;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        this.searchMemory = searchMemory == null ? new de.regelsuche.search.memory.SearchMemory() : searchMemory;</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        this.leanProofBridgeService = leanProofBridgeService == null</span>
+<span class="fc" id="L157">            ? defaultProofBridgeService(new de.regelsuche.proof.LeanProofBridge())</span>
+<span class="fc" id="L158">            : leanProofBridgeService;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        this.smtProofBridgeService = smtProofBridgeService == null</span>
+<span class="fc" id="L160">            ? defaultProofBridgeService(new de.regelsuche.proof.SmtProofBridge())</span>
+<span class="fc" id="L161">            : smtProofBridgeService;</span>
+<span class="fc" id="L162">        this.proofWorkbenchService = proofWorkbenchService;</span>
+<span class="fc" id="L163">        this.transformationQuery = new TransformationQueryService(graphStore);</span>
+<span class="fc" id="L164">        this.inventoryQuery = new RuleInventoryQueryService(graphStore, inventoryRepository);</span>
+<span class="fc" id="L165">        this.exportQuery = new ExportQueryService(graphStore, inventoryRepository);</span>
+<span class="fc" id="L166">        this.didacticEventStore = createDidacticEventStore();</span>
+<span class="fc" id="L167">        this.didacticAnalytics = new de.regelsuche.didactic.analytics.DidacticAnalyticsService(didacticEventStore);</span>
+<span class="fc" id="L168">        this.didacticStepValidator = new de.regelsuche.didactic.StudentStepValidator(new SymPyEquivalenceService());</span>
+<span class="fc" id="L169">    }</span>
+
+    private static de.regelsuche.proof.ProofBridgeService defaultProofBridgeService(
+        de.regelsuche.proof.ProofBridge bridge
+    ) {
+<span class="fc" id="L174">        return new de.regelsuche.proof.ProofBridgeService(bridge);</span>
+    }
+
+    private static de.regelsuche.didactic.analytics.DidacticEventStore createDidacticEventStore() {
+<span class="fc" id="L178">        Map&lt;String, String&gt; env = System.getenv();</span>
+<span class="fc" id="L179">        String jsonPath = readConfig(env, &quot;REGELSUCHE_DIDACTIC_EVENT_STORE&quot;);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (!jsonPath.isBlank()) {</span>
+            try {
+<span class="nc" id="L182">                return new de.regelsuche.didactic.analytics.JsonFileDidacticEventStore(Path.of(jsonPath));</span>
+<span class="nc" id="L183">            } catch (IOException ex) {</span>
+<span class="nc" id="L184">                throw new IllegalStateException(&quot;Unable to initialize didactic event store at &quot; + jsonPath, ex);</span>
+            }
+        }
+<span class="fc" id="L187">        int maxEvents = parsePositiveInt(readConfig(env, &quot;REGELSUCHE_DIDACTIC_EVENT_MAX&quot;), 5000);</span>
+<span class="fc" id="L188">        return new de.regelsuche.didactic.analytics.InMemoryDidacticEventStore(maxEvents);</span>
+    }
+
+    private static String readConfig(Map&lt;String, String&gt; env, String key) {
+<span class="fc" id="L192">        String value = env.get(key);</span>
+<span class="pc bpc" id="L193" title="3 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L194">            value = System.getProperty(key);</span>
+        }
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim();</span>
+    }
+
+    private static int parsePositiveInt(String value, int fallback) {
+<span class="pc bpc" id="L200" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L201">            return fallback;</span>
+        }
+        try {
+<span class="nc" id="L204">            int parsed = Integer.parseInt(value.trim());</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            return parsed &gt; 0 ? parsed : fallback;</span>
+<span class="nc" id="L206">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L207">            return fallback;</span>
+        }
+    }
+
+    public void start() throws IOException {
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (securityConfig.isTlsEnabled()) {</span>
+<span class="nc" id="L213">            HttpsServer httpsServer = HttpsServer.create(new InetSocketAddress(host, port), 0);</span>
+<span class="nc" id="L214">            httpsServer.setHttpsConfigurator(buildHttpsConfigurator(securityConfig));</span>
+<span class="nc" id="L215">            server = httpsServer;</span>
+<span class="nc" id="L216">        } else {</span>
+<span class="fc" id="L217">            server = HttpServer.create(new InetSocketAddress(host, port), 0);</span>
+        }
+<span class="fc" id="L219">        secure(server.createContext(&quot;/api/search&quot;, this::handleSearch));</span>
+<span class="fc" id="L220">        secure(server.createContext(&quot;/api/discover&quot;, this::handleDiscover));</span>
+<span class="fc" id="L221">        secure(server.createContext(&quot;/api/paths&quot;, this::handlePaths));</span>
+<span class="fc" id="L222">        secure(server.createContext(&quot;/api/graph&quot;, this::handleGraph));</span>
+<span class="fc" id="L223">        secure(server.createContext(&quot;/api/search-graph&quot;, this::handleSearchGraph));</span>
+<span class="fc" id="L224">        secure(server.createContext(&quot;/api/identities&quot;, this::handleIdentities));</span>
+<span class="fc" id="L225">        secure(server.createContext(&quot;/api/candidates&quot;, this::handleCandidates));</span>
+<span class="fc" id="L226">        secure(server.createContext(&quot;/api/inventory&quot;, this::handleInventory));</span>
+<span class="fc" id="L227">        secure(server.createContext(&quot;/api/exports&quot;, this::handleExports));</span>
+<span class="fc" id="L228">        secure(server.createContext(&quot;/api/explain&quot;, this::handleExplain));</span>
+<span class="fc" id="L229">        secure(server.createContext(&quot;/api/analyze&quot;, this::handleAnalyze));</span>
+<span class="fc" id="L230">        secure(server.createContext(&quot;/api/demo&quot;, this::handleDemo));</span>
+<span class="fc" id="L231">        secure(server.createContext(&quot;/api/memory&quot;, this::handleMemory));</span>
+<span class="fc" id="L232">        secure(server.createContext(&quot;/api/proof-status&quot;, this::handleProofStatus));</span>
+<span class="fc" id="L233">        secure(server.createContext(&quot;/api/proof-bridge&quot;, this::handleProofBridge));</span>
+<span class="fc" id="L234">        secure(server.createContext(&quot;/api/proof/jobs&quot;, this::handleProofJobs));</span>
+<span class="fc" id="L235">        secure(server.createContext(&quot;/api/benchmark&quot;, this::handleBenchmark));</span>
+<span class="fc" id="L236">        secure(server.createContext(&quot;/api/didactic&quot;, this::handleDidactic));</span>
+<span class="fc" id="L237">        secure(server.createContext(&quot;/&quot;, this::handleStatic));</span>
+<span class="fc" id="L238">        server.setExecutor(null);</span>
+<span class="fc" id="L239">        server.start();</span>
+<span class="fc" id="L240">    }</span>
+
+    private void secure(HttpContext context) {
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (!securityConfig.isAuthEnabled()) {</span>
+<span class="fc" id="L244">            return;</span>
+        }
+<span class="fc" id="L246">        context.setAuthenticator(new BasicAuthenticator(securityConfig.realm()) {</span>
+            @Override
+            public boolean checkCredentials(String suppliedUsername, String suppliedPassword) {
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                return constantTimeEquals(suppliedUsername, securityConfig.username())</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">                    &amp;&amp; constantTimeEquals(suppliedPassword, securityConfig.password());</span>
+            }
+        });
+<span class="fc" id="L253">    }</span>
+
+    private static boolean constantTimeEquals(String left, String right) {
+<span class="pc bpc" id="L256" title="2 of 4 branches missed.">        if (left == null || right == null) {</span>
+<span class="nc" id="L257">            return false;</span>
+        }
+<span class="fc" id="L259">        byte[] a = left.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L260">        byte[] b = right.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (a.length != b.length) {</span>
+            // Still iterate to avoid trivially leaking length differences via timing.
+<span class="fc" id="L263">            int diff = a.length ^ b.length;</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            for (int i = 0; i &lt; Math.min(a.length, b.length); i++) {</span>
+<span class="fc" id="L265">                diff |= a[i] ^ b[i];</span>
+            }
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            return diff == 0;</span>
+        }
+<span class="fc" id="L269">        int diff = 0;</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="fc" id="L271">            diff |= a[i] ^ b[i];</span>
+        }
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        return diff == 0;</span>
+    }
+
+    private static HttpsConfigurator buildHttpsConfigurator(WebSecurityConfig config) {
+        try {
+<span class="nc" id="L278">            KeyStore keystore = KeyStore.getInstance(config.keystoreType());</span>
+<span class="nc" id="L279">            try (InputStream input = Files.newInputStream(config.keystorePath())) {</span>
+<span class="nc" id="L280">                keystore.load(input, config.keystorePassword());</span>
+            }
+            KeyManagerFactory keyManagerFactory =
+<span class="nc" id="L283">                KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());</span>
+<span class="nc" id="L284">            keyManagerFactory.init(keystore, config.keystorePassword());</span>
+<span class="nc" id="L285">            SSLContext sslContext = SSLContext.getInstance(&quot;TLS&quot;);</span>
+<span class="nc" id="L286">            sslContext.init(keyManagerFactory.getKeyManagers(), null, null);</span>
+<span class="nc" id="L287">            return new HttpsConfigurator(sslContext);</span>
+<span class="nc" id="L288">        } catch (Exception ex) {</span>
+<span class="nc" id="L289">            throw new IllegalStateException(&quot;Unable to initialize TLS context&quot;, ex);</span>
+        }
+    }
+
+    public void stop() {
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (server != null) {</span>
+<span class="fc" id="L295">            server.stop(0);</span>
+        }
+<span class="fc" id="L297">    }</span>
+
+    public int boundPort() {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        return server == null ? -1 : server.getAddress().getPort();</span>
+    }
+
+    private void handleSearch(HttpExchange exchange) throws IOException {
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L305">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L306">            return;</span>
+        }
+<span class="fc" id="L308">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
+<span class="fc" id="L309">        String expression = stringValue(body, &quot;expression&quot;, &quot;&quot;);</span>
+<span class="fc" id="L310">        String typeName = stringValue(body, &quot;type&quot;, InputType.TERM.name()).toUpperCase(Locale.ROOT);</span>
+<span class="fc" id="L311">        String profileName = stringValue(body, &quot;profile&quot;, SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);</span>
+<span class="fc" id="L312">        String goalName = stringValue(body, &quot;goal&quot;, &quot;&quot;).toUpperCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
+<span class="nc" id="L314">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
+<span class="nc" id="L315">            return;</span>
+        }
+        InputType type;
+        SearchProfile profile;
+        de.regelsuche.scoring.cost.TransformationGoal goal;
+        try {
+<span class="fc" id="L321">            type = InputType.valueOf(typeName);</span>
+<span class="fc" id="L322">            profile = SearchProfile.valueOf(profileName);</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            goal = goalName.isBlank()</span>
+<span class="fc" id="L324">                ? profile.defaultGoal()</span>
+<span class="fc" id="L325">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
+<span class="fc" id="L326">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L327">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="nc" id="L328">            return;</span>
+<span class="fc" id="L329">        }</span>
+<span class="fc" id="L330">        TransformationSearchService search = new TransformationSearchService(</span>
+            new SymPyTransformationEngine(),
+            graphStore,
+<span class="fc" id="L333">            profile.heuristic(),</span>
+            new NoOpNotifier(),
+<span class="fc" id="L335">            profile.newStrategy()</span>
+        );
+        try {
+<span class="fc" id="L338">            search.submit(new InputRequest(type, expression), goal).join();</span>
+<span class="fc" id="L339">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L340">            writer.beginObject();</span>
+<span class="fc" id="L341">            writer.property(&quot;profile&quot;, profile.name());</span>
+<span class="fc" id="L342">            writer.property(&quot;goal&quot;, goal.name());</span>
+<span class="fc" id="L343">            writer.property(&quot;inputType&quot;, type.name());</span>
+<span class="fc" id="L344">            writer.property(&quot;expression&quot;, expression);</span>
+<span class="fc" id="L345">            writer.property(&quot;successes&quot;, search.getSuccesses().size());</span>
+<span class="fc" id="L346">            search.getBestSolution().ifPresentOrElse(</span>
+                best -&gt; {
+<span class="fc" id="L348">                    writer.property(&quot;bestExpression&quot;, best.simplifiedExpression());</span>
+<span class="fc" id="L349">                    writer.property(&quot;improvement&quot;, best.improvement());</span>
+<span class="fc" id="L350">                },</span>
+<span class="nc" id="L351">                () -&gt; writer.nullProperty(&quot;bestExpression&quot;)</span>
+            );
+<span class="fc" id="L353">            writer.endObject();</span>
+<span class="fc" id="L354">            sendJson(exchange, 200, writer.toString());</span>
+        } finally {
+<span class="fc" id="L356">            search.shutdown();</span>
+        }
+<span class="fc" id="L358">    }</span>
+
+    private void handleDiscover(HttpExchange exchange) throws IOException {
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L362">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L363">            return;</span>
+        }
+<span class="nc" id="L365">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
+<span class="nc" id="L366">        int min = intValue(body, &quot;min&quot;, 1);</span>
+<span class="nc" id="L367">        int max = intValue(body, &quot;max&quot;, 3);</span>
+<span class="nc" id="L368">        RuleDiscoveryService discovery = new RuleDiscoveryService(</span>
+            new AlgebraicExampleGenerator(),
+            new AstRewriteTransformationEngine(),
+            new SymPyEquivalenceService(),
+            new ExpressionScorer(),
+            graphStore,
+            new RuleCandidateMiner(new KnownRuleRepository()),
+            RuleCandidateListener.NOOP,
+            new de.regelsuche.search.strategy.BestFirstSearchStrategy(),
+<span class="nc" id="L377">            DiscoverySettings.collectingEquivalentPaths()</span>
+        );
+        try {
+<span class="nc" id="L380">            List&lt;RuleCandidate&gt; candidates = discovery.discover(min, max);</span>
+<span class="nc" id="L381">            JsonWriter writer = new JsonWriter();</span>
+<span class="nc" id="L382">            writer.beginObject();</span>
+<span class="nc" id="L383">            writer.property(&quot;ruleCandidates&quot;, candidates.size());</span>
+<span class="nc" id="L384">            writer.property(&quot;transformations&quot;, graphStore.discoveredTransformations().size());</span>
+<span class="nc" id="L385">            writer.endObject();</span>
+<span class="nc" id="L386">            sendJson(exchange, 200, writer.toString());</span>
+        } finally {
+<span class="nc" id="L388">            discovery.shutdown();</span>
+        }
+<span class="nc" id="L390">    }</span>
+
+    private void handlePaths(HttpExchange exchange) throws IOException {
+<span class="fc" id="L393">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc" id="L394">        String suffix = path.substring(&quot;/api/paths&quot;.length());</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        if (suffix.startsWith(&quot;/&quot;)) {</span>
+<span class="fc" id="L396">            suffix = suffix.substring(1);</span>
+        }
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">        if (suffix.startsWith(&quot;compare&quot;)) {</span>
+<span class="nc" id="L399">            handlePathComparison(exchange);</span>
+<span class="nc" id="L400">            return;</span>
+        }
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (suffix.isEmpty()) {</span>
+<span class="fc" id="L403">            String sortParam = queryParam(exchange, &quot;sort&quot;, &quot;score&quot;);</span>
+<span class="fc" id="L404">            int limit = parseIntParam(queryParam(exchange, &quot;limit&quot;, &quot;0&quot;), 0);</span>
+<span class="fc" id="L405">            de.regelsuche.paths.PathSorters.Mode mode = de.regelsuche.paths.PathSorters.Mode.parse(sortParam);</span>
+<span class="fc" id="L406">            List&lt;de.regelsuche.discovery.DiscoveredTransformation&gt; sorted =</span>
+<span class="fc" id="L407">                new de.regelsuche.paths.PathSorters().sort(graphStore.discoveredTransformations(), mode);</span>
+<span class="pc bpc" id="L408" title="1 of 4 branches missed.">            if (limit &gt; 0 &amp;&amp; sorted.size() &gt; limit) {</span>
+<span class="nc" id="L409">                sorted = sorted.subList(0, limit);</span>
+            }
+<span class="fc" id="L411">            List&lt;de.regelsuche.api.TransformationPathDto&gt; dtos = sorted.stream()</span>
+<span class="fc" id="L412">                .map(de.regelsuche.api.TransformationPathDto::from)</span>
+<span class="fc" id="L413">                .toList();</span>
+<span class="fc" id="L414">            sendJson(exchange, 200, dtoListToJson(&quot;transformations&quot;, dtos));</span>
+<span class="fc" id="L415">            return;</span>
+        }
+        // /api/paths/{id} or /api/paths/{id}/replay
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        if (suffix.endsWith(&quot;/replay&quot;)) {</span>
+<span class="fc" id="L419">            String pathId = suffix.substring(0, suffix.length() - &quot;/replay&quot;.length());</span>
+<span class="fc" id="L420">            var match = graphStore.discoveredTransformations().stream()</span>
+<span class="fc" id="L421">                .filter(t -&gt; t.id().equals(pathId))</span>
+<span class="fc" id="L422">                .findFirst();</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">            if (match.isEmpty()) {</span>
+<span class="nc" id="L424">                sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L425">                return;</span>
+            }
+<span class="fc" id="L427">            sendJson(exchange, 200, replayJson(de.regelsuche.api.PathReplayDto.from(match.get(), explanationService)));</span>
+<span class="fc" id="L428">            return;</span>
+        }
+<span class="nc" id="L430">        final String singleId = suffix;</span>
+<span class="nc" id="L431">        transformationQuery.pathById(singleId).ifPresentOrElse(</span>
+            dto -&gt; {
+                try {
+<span class="nc" id="L434">                    sendJson(exchange, 200, singleDtoJson(dto));</span>
+<span class="nc" id="L435">                } catch (IOException ex) {</span>
+                    // already logged by JDK HttpServer
+<span class="nc" id="L437">                }</span>
+<span class="nc" id="L438">            },</span>
+            () -&gt; {
+                try {
+<span class="nc" id="L441">                    sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L442">                } catch (IOException ignored) {</span>
+<span class="nc" id="L443">                }</span>
+<span class="nc" id="L444">            }</span>
+        );
+<span class="nc" id="L446">    }</span>
+
+    private void handleSearchGraph(HttpExchange exchange) throws IOException {
+<span class="fc" id="L449">        de.regelsuche.api.searchgraph.SearchGraphDto graph = buildSearchGraph();</span>
+<span class="fc" id="L450">        String filterExpr = queryParam(exchange, &quot;filter&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">        if (!filterExpr.isBlank()) {</span>
+<span class="nc" id="L452">            graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);</span>
+        }
+<span class="fc" id="L454">        sendJson(exchange, 200, de.regelsuche.api.searchgraph.SearchGraphJsonSerializer.toJson(graph));</span>
+<span class="fc" id="L455">    }</span>
+
+    private void handlePathComparison(HttpExchange exchange) throws IOException {
+<span class="nc" id="L458">        String leftId = queryParam(exchange, &quot;left&quot;, &quot;&quot;);</span>
+<span class="nc" id="L459">        String rightId = queryParam(exchange, &quot;right&quot;, &quot;&quot;);</span>
+<span class="nc bnc" id="L460" title="All 4 branches missed.">        if (leftId.isBlank() || rightId.isBlank()) {</span>
+<span class="nc" id="L461">            sendStatus(exchange, 400, &quot;left and right query parameters are required&quot;);</span>
+<span class="nc" id="L462">            return;</span>
+        }
+<span class="nc" id="L464">        var transformations = graphStore.discoveredTransformations();</span>
+<span class="nc" id="L465">        var leftMatch = transformations.stream().filter(t -&gt; t.id().equals(leftId)).findFirst();</span>
+<span class="nc" id="L466">        var rightMatch = transformations.stream().filter(t -&gt; t.id().equals(rightId)).findFirst();</span>
+<span class="nc bnc" id="L467" title="All 4 branches missed.">        if (leftMatch.isEmpty() || rightMatch.isEmpty()) {</span>
+<span class="nc" id="L468">            sendStatus(exchange, 404, &quot;left or right path not found&quot;);</span>
+<span class="nc" id="L469">            return;</span>
+        }
+<span class="nc" id="L471">        de.regelsuche.paths.PathComparisonDto dto =</span>
+<span class="nc" id="L472">            new de.regelsuche.paths.PathComparisonService().compare(leftMatch.get(), rightMatch.get());</span>
+<span class="nc" id="L473">        sendJson(exchange, 200, pathComparisonToJson(dto));</span>
+<span class="nc" id="L474">    }</span>
+
+    private String pathComparisonToJson(de.regelsuche.paths.PathComparisonDto dto) {
+<span class="nc" id="L477">        JsonWriter writer = new JsonWriter();</span>
+<span class="nc" id="L478">        writer.beginObject();</span>
+<span class="nc" id="L479">        writer.property(&quot;leftPathId&quot;, dto.leftPathId());</span>
+<span class="nc" id="L480">        writer.property(&quot;rightPathId&quot;, dto.rightPathId());</span>
+<span class="nc" id="L481">        writer.stringArray(&quot;sharedNodes&quot;, dto.sharedNodes());</span>
+<span class="nc" id="L482">        writer.stringArray(&quot;sharedRules&quot;, dto.sharedRules());</span>
+<span class="nc" id="L483">        writer.stringArray(&quot;leftOnlySteps&quot;, dto.leftOnlySteps());</span>
+<span class="nc" id="L484">        writer.stringArray(&quot;rightOnlySteps&quot;, dto.rightOnlySteps());</span>
+<span class="nc" id="L485">        writer.array(&quot;leftScoreSeries&quot;, w -&gt; dto.leftScoreSeries().forEach(w::value));</span>
+<span class="nc" id="L486">        writer.array(&quot;rightScoreSeries&quot;, w -&gt; dto.rightScoreSeries().forEach(w::value));</span>
+<span class="nc" id="L487">        writer.property(&quot;leftTeachingScore&quot;, dto.leftTeachingScore());</span>
+<span class="nc" id="L488">        writer.property(&quot;rightTeachingScore&quot;, dto.rightTeachingScore());</span>
+<span class="nc" id="L489">        writer.property(&quot;leftProofStatus&quot;, dto.leftProofStatus().name());</span>
+<span class="nc" id="L490">        writer.property(&quot;rightProofStatus&quot;, dto.rightProofStatus().name());</span>
+<span class="nc" id="L491">        writer.property(&quot;leftAssumptionSteps&quot;, dto.leftAssumptionSteps());</span>
+<span class="nc" id="L492">        writer.property(&quot;rightAssumptionSteps&quot;, dto.rightAssumptionSteps());</span>
+<span class="nc" id="L493">        writer.property(&quot;shorterPath&quot;, dto.shorterPath());</span>
+<span class="nc" id="L494">        writer.property(&quot;teachingPreferredPath&quot;, dto.teachingPreferredPath());</span>
+<span class="nc" id="L495">        writer.property(&quot;fewerAssumptionsPath&quot;, dto.fewerAssumptionsPath());</span>
+<span class="nc" id="L496">        writer.endObject();</span>
+<span class="nc" id="L497">        return writer.toString();</span>
+    }
+
+    private void handleIdentities(HttpExchange exchange) throws IOException {
+<span class="fc" id="L501">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc" id="L502">        String suffix = path.substring(&quot;/api/identities&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="fc" id="L503">        de.regelsuche.mining.MacroRuleMiner macroMiner = new de.regelsuche.mining.MacroRuleMiner();</span>
+<span class="fc" id="L504">        de.regelsuche.mining.KnownRuleRepository known = new de.regelsuche.mining.KnownRuleRepository();</span>
+<span class="fc" id="L505">        var macros = macroMiner.mine(graphStore.discoveredTransformations());</span>
+
+<span class="pc bpc" id="L507" title="3 of 4 branches missed.">        if (suffix.endsWith(&quot;/promote&quot;) &amp;&amp; &quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L508">            String identityId = suffix.substring(0, suffix.length() - &quot;/promote&quot;.length());</span>
+<span class="nc" id="L509">            var match = macros.stream().filter(m -&gt; m.id().equals(identityId)).findFirst();</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">            if (match.isEmpty()) {</span>
+<span class="nc" id="L511">                sendStatus(exchange, 404, &quot;identity not found&quot;);</span>
+<span class="nc" id="L512">                return;</span>
+            }
+<span class="nc" id="L514">            var candidate = match.get();</span>
+            // Use the macro miner's own stable id rather than the truncated
+            // 32-bit hashCode (which can collide and overwrite existing rules).
+<span class="nc" id="L517">            String ruleId = &quot;macro-&quot; + candidate.id();</span>
+<span class="nc" id="L518">            de.regelsuche.inventory.ReusableRule rule = new de.regelsuche.inventory.ReusableRule(</span>
+                ruleId,
+<span class="nc" id="L520">                candidate.leftPattern(),</span>
+<span class="nc" id="L521">                candidate.rightPattern(),</span>
+<span class="nc" id="L522">                List.of(),</span>
+<span class="nc" id="L523">                candidate.proofStatus(),</span>
+<span class="nc" id="L524">                known.statusFor(candidate.leftPattern(), candidate.rightPattern()),</span>
+<span class="nc" id="L525">                candidate.occurrences(),</span>
+<span class="nc" id="L526">                candidate.compressionRatio(),</span>
+<span class="nc" id="L527">                java.time.Instant.now()</span>
+            );
+<span class="nc" id="L529">            inventoryRepository.save(rule);</span>
+            // Discovery+ domain tag: infer from the macro's atomic rule-id
+            // sequence (equation_*/inequality_*/calculus_*/linalg_* …) and
+            // store it as an inventory tag so the UI can filter by domain.
+<span class="nc" id="L533">            String domain = new de.regelsuche.mining.MacroDomainInferrer()</span>
+<span class="nc" id="L534">                .inferDomain(candidate);</span>
+<span class="nc" id="L535">            inventoryRepository.addTag(ruleId, domain);</span>
+<span class="nc" id="L536">            sendJson(exchange, 200,</span>
+<span class="nc" id="L537">                &quot;{\&quot;promotedRuleId\&quot;:\&quot;&quot; + escapeJson(ruleId) + &quot;\&quot;,\&quot;domain\&quot;:\&quot;&quot;</span>
+<span class="nc" id="L538">                    + escapeJson(domain) + &quot;\&quot;}&quot;);</span>
+<span class="nc" id="L539">            return;</span>
+        }
+<span class="pc bpc" id="L541" title="3 of 4 branches missed.">        if (!suffix.isEmpty() &amp;&amp; !&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L542">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L543">            return;</span>
+        }
+
+        // GET /api/identities -&gt; list
+<span class="fc" id="L547">        de.regelsuche.mining.MacroDomainInferrer domainInferrer =</span>
+            new de.regelsuche.mining.MacroDomainInferrer();
+<span class="fc" id="L549">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L550">        writer.beginObject();</span>
+<span class="fc" id="L551">        writer.array(&quot;identities&quot;, w -&gt; macros.forEach(macro -&gt; {</span>
+<span class="nc" id="L552">            var dto = de.regelsuche.api.IdentityReportDto.from(</span>
+<span class="nc" id="L553">                macro, known.statusFor(macro.leftPattern(), macro.rightPattern()));</span>
+<span class="nc" id="L554">            w.objectValue(inner -&gt; {</span>
+<span class="nc" id="L555">                inner.property(&quot;id&quot;, dto.id());</span>
+<span class="nc" id="L556">                inner.property(&quot;leftPattern&quot;, dto.leftPattern());</span>
+<span class="nc" id="L557">                inner.property(&quot;rightPattern&quot;, dto.rightPattern());</span>
+<span class="nc" id="L558">                inner.stringArray(&quot;ruleIdSequence&quot;, dto.ruleIdSequence());</span>
+<span class="nc" id="L559">                inner.property(&quot;occurrences&quot;, dto.occurrences());</span>
+<span class="nc" id="L560">                inner.property(&quot;compressionRatio&quot;, dto.compressionRatio());</span>
+<span class="nc" id="L561">                inner.property(&quot;proofStatus&quot;, dto.proofStatus().name());</span>
+<span class="nc" id="L562">                inner.property(&quot;knownRuleStatus&quot;, dto.knownRuleStatus().name());</span>
+<span class="nc" id="L563">                inner.stringArray(&quot;supportingTransformationIds&quot;, dto.supportingTransformationIds());</span>
+<span class="nc" id="L564">                inner.property(&quot;domain&quot;, domainInferrer.inferDomain(macro));</span>
+<span class="nc" id="L565">            });</span>
+<span class="nc" id="L566">        }));</span>
+<span class="fc" id="L567">        writer.endObject();</span>
+<span class="fc" id="L568">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L569">    }</span>
+
+    private List&lt;de.regelsuche.search.SimplificationSuccess&gt; successesFromGraph() {
+        // Build SimplificationSuccess records from the discovered transformations
+        // we already have in the graph store. This avoids needing a running search
+        // service to render /api/search-graph after the fact.
+<span class="fc" id="L575">        java.util.List&lt;de.regelsuche.search.SimplificationSuccess&gt; result = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L576" title="All 2 branches covered.">        for (de.regelsuche.discovery.DiscoveredTransformation transformation : graphStore.discoveredTransformations()) {</span>
+<span class="fc" id="L577">            result.add(new de.regelsuche.search.SimplificationSuccess(</span>
+<span class="fc" id="L578">                transformation.originalExpression(),</span>
+<span class="fc" id="L579">                transformation.improvedExpression(),</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">                transformation.steps().isEmpty() ? &quot;&quot; : transformation.steps().getLast().ruleId(),</span>
+<span class="fc" id="L581">                transformation.steps().size(),</span>
+<span class="fc" id="L582">                transformation.totalImprovement(),</span>
+<span class="fc" id="L583">                transformation.discoveredAt()</span>
+            ));
+<span class="fc" id="L585">        }</span>
+<span class="fc" id="L586">        return result;</span>
+    }
+
+    private static int parseIntParam(String value, int fallback) {
+        try {
+<span class="fc" id="L591">            return Integer.parseInt(value);</span>
+<span class="nc" id="L592">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L593">            return fallback;</span>
+        }
+    }
+
+    private static String escapeJson(String value) {
+<span class="nc" id="L598">        return value.replace(&quot;\\&quot;, &quot;\\\\&quot;).replace(&quot;\&quot;&quot;, &quot;\\\&quot;&quot;);</span>
+    }
+
+    private String replayJson(de.regelsuche.api.PathReplayDto dto) {
+<span class="fc" id="L602">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L603">        writer.beginObject();</span>
+<span class="fc" id="L604">        writer.property(&quot;pathId&quot;, dto.pathId());</span>
+<span class="fc" id="L605">        writer.array(&quot;steps&quot;, w -&gt; dto.steps().forEach(step -&gt;</span>
+<span class="fc" id="L606">            w.objectValue(inner -&gt; {</span>
+<span class="fc" id="L607">                inner.property(&quot;stepIndex&quot;, step.stepIndex());</span>
+<span class="fc" id="L608">                inner.property(&quot;fromExpression&quot;, step.fromExpression());</span>
+<span class="fc" id="L609">                inner.property(&quot;fromLatex&quot;, step.fromLatex());</span>
+<span class="fc" id="L610">                inner.property(&quot;toExpression&quot;, step.toExpression());</span>
+<span class="fc" id="L611">                inner.property(&quot;toLatex&quot;, step.toLatex());</span>
+<span class="fc" id="L612">                inner.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L613">                inner.property(&quot;ruleExplanation&quot;, step.ruleExplanation());</span>
+<span class="fc" id="L614">                inner.property(&quot;scoreDelta&quot;, step.scoreDelta());</span>
+<span class="fc" id="L615">                inner.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="fc" id="L616">            })));</span>
+<span class="fc" id="L617">        writer.endObject();</span>
+<span class="fc" id="L618">        return writer.toString();</span>
+    }
+
+    private void handleGraph(HttpExchange exchange) throws IOException {
+<span class="nc" id="L622">        String path = exchange.getRequestURI().getPath();</span>
+<span class="nc" id="L623">        String suffix = path.substring(&quot;/api/graph&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        if (suffix.isEmpty()) {</span>
+<span class="nc" id="L625">            sendText(exchange, 200, exportService.exportMermaid(graphStore.discoveredTransformations()));</span>
+        } else {
+<span class="nc" id="L627">            List&lt;DiscoveredTransformation&gt; filtered = graphStore.discoveredTransformations().stream()</span>
+<span class="nc" id="L628">                .filter(t -&gt; t.id().equals(suffix))</span>
+<span class="nc" id="L629">                .toList();</span>
+<span class="nc" id="L630">            sendText(exchange, 200, exportService.exportMermaid(filtered));</span>
+        }
+<span class="nc" id="L632">    }</span>
+
+    private void handleCandidates(HttpExchange exchange) throws IOException {
+<span class="nc" id="L635">        StringBuilder json = new StringBuilder(&quot;{\&quot;candidates\&quot;:[&quot;);</span>
+<span class="nc" id="L636">        boolean first = true;</span>
+<span class="nc bnc" id="L637" title="All 2 branches missed.">        for (var dto : inventoryQuery.ruleCandidateDtos()) {</span>
+<span class="nc bnc" id="L638" title="All 2 branches missed.">            if (!first) {</span>
+<span class="nc" id="L639">                json.append(',');</span>
+            }
+<span class="nc" id="L641">            first = false;</span>
+<span class="nc" id="L642">            JsonWriter writer = new JsonWriter();</span>
+<span class="nc" id="L643">            writer.beginObject();</span>
+<span class="nc" id="L644">            writer.property(&quot;leftPattern&quot;, dto.leftPattern());</span>
+<span class="nc" id="L645">            writer.property(&quot;rightPattern&quot;, dto.rightPattern());</span>
+<span class="nc" id="L646">            writer.property(&quot;examplesCount&quot;, dto.examplesCount());</span>
+<span class="nc" id="L647">            writer.property(&quot;averageScoreImprovement&quot;, dto.averageScoreImprovement());</span>
+<span class="nc" id="L648">            writer.property(&quot;maximumScoreImprovement&quot;, dto.maximumScoreImprovement());</span>
+<span class="nc" id="L649">            writer.property(&quot;equivalenceVerified&quot;, dto.equivalenceVerified());</span>
+<span class="nc" id="L650">            writer.property(&quot;status&quot;, dto.status());</span>
+<span class="nc" id="L651">            writer.property(&quot;proofStatus&quot;, dto.proofStatus());</span>
+<span class="nc" id="L652">            writer.endObject();</span>
+<span class="nc" id="L653">            json.append(writer);</span>
+<span class="nc" id="L654">        }</span>
+<span class="nc" id="L655">        json.append(&quot;]}&quot;);</span>
+<span class="nc" id="L656">        sendJson(exchange, 200, json.toString());</span>
+<span class="nc" id="L657">    }</span>
+
+    private void handleInventory(HttpExchange exchange) throws IOException {
+<span class="fc" id="L660">        String method = exchange.getRequestMethod();</span>
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">        if (&quot;GET&quot;.equalsIgnoreCase(method)) {</span>
+<span class="fc" id="L662">            StringBuilder json = new StringBuilder(&quot;{\&quot;rules\&quot;:[&quot;);</span>
+<span class="fc" id="L663">            boolean first = true;</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">            for (var dto : inventoryQuery.reusableRules()) {</span>
+<span class="nc bnc" id="L665" title="All 2 branches missed.">                if (!first) {</span>
+<span class="nc" id="L666">                    json.append(',');</span>
+                }
+<span class="nc" id="L668">                first = false;</span>
+<span class="nc" id="L669">                JsonWriter writer = new JsonWriter();</span>
+<span class="nc" id="L670">                writer.beginObject();</span>
+<span class="nc" id="L671">                writer.property(&quot;id&quot;, dto.id());</span>
+<span class="nc" id="L672">                writer.property(&quot;leftPattern&quot;, dto.leftPattern());</span>
+<span class="nc" id="L673">                writer.property(&quot;rightPattern&quot;, dto.rightPattern());</span>
+<span class="nc" id="L674">                writer.property(&quot;proofStatus&quot;, dto.proofStatus());</span>
+<span class="nc" id="L675">                writer.property(&quot;enabled&quot;, inventoryRepository.isEnabled(dto.id()));</span>
+<span class="nc" id="L676">                writer.stringArray(&quot;tags&quot;, List.copyOf(inventoryRepository.tagsOf(dto.id())));</span>
+<span class="nc" id="L677">                writer.endObject();</span>
+<span class="nc" id="L678">                json.append(writer);</span>
+<span class="nc" id="L679">            }</span>
+<span class="fc" id="L680">            json.append(&quot;]}&quot;);</span>
+<span class="fc" id="L681">            sendJson(exchange, 200, json.toString());</span>
+<span class="fc" id="L682">            return;</span>
+        }
+<span class="nc bnc" id="L684" title="All 2 branches missed.">        if (&quot;POST&quot;.equalsIgnoreCase(method)) {</span>
+            // POST /api/inventory/import with JSON body { &quot;json&quot;: &quot;...&quot; } imports a bundle.
+<span class="nc" id="L686">            Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
+<span class="nc" id="L687">            String bundleJson = stringValue(body, &quot;json&quot;, &quot;&quot;);</span>
+<span class="nc bnc" id="L688" title="All 2 branches missed.">            if (bundleJson.isBlank()) {</span>
+<span class="nc" id="L689">                sendStatus(exchange, 400, &quot;missing 'json' field&quot;);</span>
+<span class="nc" id="L690">                return;</span>
+            }
+<span class="nc" id="L692">            ExportBundle bundle = new DefaultTransformationImportService().importJson(bundleJson);</span>
+<span class="nc" id="L693">            inventoryRepository.importBundle(bundle);</span>
+<span class="nc" id="L694">            sendJson(exchange, 200, &quot;{\&quot;imported\&quot;:&quot; + bundle.reusableRules().size() + &quot;}&quot;);</span>
+<span class="nc" id="L695">            return;</span>
+        }
+<span class="nc" id="L697">        sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L698">    }</span>
+
+    private void handleExports(HttpExchange exchange) throws IOException {
+<span class="fc" id="L701">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc" id="L702">        String format = path.substring(&quot;/api/exports&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">        if (format.isEmpty()) {</span>
+<span class="nc" id="L704">            sendJson(exchange, 200, exportService.exportBundle(exportQuery.bundle()));</span>
+<span class="nc" id="L705">            return;</span>
+        }
+        // Sub-resource exports: /api/exports/cluster/{id}.md, /path/{id}.tex, /identity/{id}.md
+<span class="pc bpc" id="L708" title="3 of 4 branches missed.">        if (format.startsWith(&quot;cluster/&quot;) &amp;&amp; format.endsWith(&quot;.md&quot;)) {</span>
+<span class="nc" id="L709">            String clusterId = format.substring(&quot;cluster/&quot;.length(), format.length() - &quot;.md&quot;.length());</span>
+<span class="nc" id="L710">            sendText(exchange, 200, renderClusterMarkdown(clusterId));</span>
+<span class="nc" id="L711">            return;</span>
+        }
+<span class="pc bpc" id="L713" title="3 of 4 branches missed.">        if (format.startsWith(&quot;path/&quot;) &amp;&amp; format.endsWith(&quot;.tex&quot;)) {</span>
+<span class="nc" id="L714">            String pathId = format.substring(&quot;path/&quot;.length(), format.length() - &quot;.tex&quot;.length());</span>
+<span class="nc" id="L715">            String tex = renderPathLatex(pathId);</span>
+<span class="nc bnc" id="L716" title="All 2 branches missed.">            if (tex == null) {</span>
+<span class="nc" id="L717">                sendStatus(exchange, 404, &quot;path not found: &quot; + pathId);</span>
+<span class="nc" id="L718">                return;</span>
+            }
+<span class="nc" id="L720">            sendText(exchange, 200, tex);</span>
+<span class="nc" id="L721">            return;</span>
+        }
+<span class="pc bpc" id="L723" title="3 of 4 branches missed.">        if (format.startsWith(&quot;identity/&quot;) &amp;&amp; format.endsWith(&quot;.md&quot;)) {</span>
+<span class="nc" id="L724">            String identityId = format.substring(&quot;identity/&quot;.length(), format.length() - &quot;.md&quot;.length());</span>
+<span class="nc" id="L725">            String md = renderIdentityMarkdown(identityId);</span>
+<span class="nc bnc" id="L726" title="All 2 branches missed.">            if (md == null) {</span>
+<span class="nc" id="L727">                sendStatus(exchange, 404, &quot;identity not found: &quot; + identityId);</span>
+<span class="nc" id="L728">                return;</span>
+            }
+<span class="nc" id="L730">            sendText(exchange, 200, md);</span>
+<span class="nc" id="L731">            return;</span>
+        }
+<span class="fc bfc" id="L733" title="All 2 branches covered.">        if (format.equals(&quot;bundle.zip&quot;)) {</span>
+<span class="fc" id="L734">            byte[] zipBytes = buildReportBundleZip();</span>
+<span class="fc" id="L735">            exchange.getResponseHeaders().add(&quot;Content-Type&quot;, &quot;application/zip&quot;);</span>
+<span class="fc" id="L736">            exchange.getResponseHeaders().add(</span>
+                &quot;Content-Disposition&quot;, &quot;attachment; filename=\&quot;regelsuche-report-bundle.zip\&quot;&quot;);
+<span class="fc" id="L738">            exchange.sendResponseHeaders(200, zipBytes.length);</span>
+<span class="fc" id="L739">            try (OutputStream body = exchange.getResponseBody()) {</span>
+<span class="fc" id="L740">                body.write(zipBytes);</span>
+            }
+<span class="fc" id="L742">            return;</span>
+        }
+<span class="fc bfc" id="L744" title="All 2 branches covered.">        if (format.startsWith(&quot;search-analysis-report&quot;)) {</span>
+<span class="fc" id="L745">            var report = new de.regelsuche.export.SearchAnalysisReportService();</span>
+<span class="fc" id="L746">            var ctx = analysisReportContext();</span>
+<span class="pc bpc" id="L747" title="1 of 4 branches missed.">            switch (format) {</span>
+<span class="fc" id="L748">                case &quot;search-analysis-report.md&quot; -&gt; sendText(exchange, 200, report.renderMarkdown(ctx));</span>
+<span class="fc" id="L749">                case &quot;search-analysis-report.tex&quot; -&gt; sendText(exchange, 200, report.renderLatex(ctx));</span>
+<span class="fc" id="L750">                case &quot;search-analysis-report.json&quot; -&gt; sendJson(exchange, 200, report.renderJson(ctx));</span>
+<span class="nc" id="L751">                default -&gt; sendStatus(exchange, 404, &quot;unknown analysis report format: &quot; + format);</span>
+            }
+<span class="fc" id="L753">            return;</span>
+        }
+<span class="fc" id="L755">        List&lt;DiscoveredTransformation&gt; transformations = graphStore.discoveredTransformations();</span>
+<span class="pc bpc" id="L756" title="4 of 10 branches missed.">        switch (format.toLowerCase(Locale.ROOT)) {</span>
+<span class="nc" id="L757">            case &quot;markdown&quot;, &quot;md&quot; -&gt; sendText(exchange, 200, exportService.exportMarkdown(transformations));</span>
+<span class="nc" id="L758">            case &quot;latex&quot;, &quot;tex&quot; -&gt; sendText(exchange, 200, exportService.exportLatex(transformations));</span>
+<span class="fc" id="L759">            case &quot;mermaid&quot;, &quot;mmd&quot; -&gt; sendText(exchange, 200, exportService.exportMermaid(transformations));</span>
+<span class="nc" id="L760">            case &quot;json&quot; -&gt; sendJson(exchange, 200, exportService.exportBundle(exportQuery.bundle()));</span>
+            case &quot;search-graph&quot;, &quot;search-graph.json&quot; -&gt; {
+<span class="fc" id="L762">                var graph = buildSearchGraph();</span>
+<span class="fc" id="L763">                String filterExpr = queryParam(exchange, &quot;filter&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L764" title="1 of 2 branches missed.">                if (!filterExpr.isBlank()) {</span>
+<span class="nc" id="L765">                    graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);</span>
+                }
+<span class="fc" id="L767">                sendJson(exchange, 200, exportService.exportSearchGraphJson(graph));</span>
+<span class="fc" id="L768">            }</span>
+            case &quot;search-graph.mmd&quot; -&gt; {
+<span class="fc" id="L770">                var graph = buildSearchGraph();</span>
+<span class="fc" id="L771">                String filterExpr = queryParam(exchange, &quot;filter&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">                if (!filterExpr.isBlank()) {</span>
+<span class="nc" id="L773">                    graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);</span>
+                }
+<span class="fc" id="L775">                sendText(exchange, 200, exportService.exportSearchGraphMermaid(graph));</span>
+<span class="fc" id="L776">            }</span>
+            case &quot;search-graph.graphml&quot; -&gt; {
+<span class="fc" id="L778">                var graph = buildSearchGraph();</span>
+<span class="fc" id="L779">                String filterExpr = queryParam(exchange, &quot;filter&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L780" title="1 of 2 branches missed.">                if (!filterExpr.isBlank()) {</span>
+<span class="nc" id="L781">                    graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);</span>
+                }
+<span class="fc" id="L783">                sendText(exchange, 200, exportService.exportSearchGraphGraphMl(graph));</span>
+<span class="fc" id="L784">            }</span>
+<span class="fc" id="L785">            case &quot;best-path.md&quot;, &quot;best-path&quot; -&gt; sendText(exchange, 200, exportService.exportBestPathMarkdown(transformations));</span>
+            case &quot;identity-report.tex&quot;, &quot;identity-report&quot; -&gt; {
+<span class="fc" id="L787">                var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);</span>
+<span class="fc" id="L788">                var known = new de.regelsuche.mining.KnownRuleRepository();</span>
+<span class="fc" id="L789">                var identities = macros.stream()</span>
+<span class="pc" id="L790">                    .map(m -&gt; de.regelsuche.api.IdentityReportDto.from(</span>
+<span class="nc" id="L791">                        m, known.statusFor(m.leftPattern(), m.rightPattern())))</span>
+<span class="fc" id="L792">                    .toList();</span>
+<span class="fc" id="L793">                sendText(exchange, 200, exportService.exportIdentityReportLatex(</span>
+<span class="fc" id="L794">                    buildSearchGraph(), transformations, graphStore.ruleCandidates(), identities));</span>
+<span class="fc" id="L795">            }</span>
+<span class="nc" id="L796">            default -&gt; sendStatus(exchange, 404, &quot;unknown format: &quot; + format);</span>
+        }
+<span class="fc" id="L798">    }</span>
+
+    private String renderClusterMarkdown(String clusterId) {
+<span class="nc" id="L801">        de.regelsuche.api.searchgraph.SearchGraphDto graph = buildSearchGraph();</span>
+<span class="nc" id="L802">        de.regelsuche.api.searchgraph.SearchGraphClusterDto cluster = graph.clusters().stream()</span>
+<span class="nc" id="L803">            .filter(c -&gt; c.id().equals(clusterId))</span>
+<span class="nc" id="L804">            .findFirst()</span>
+<span class="nc" id="L805">            .orElse(null);</span>
+<span class="nc bnc" id="L806" title="All 2 branches missed.">        if (cluster == null) {</span>
+<span class="nc" id="L807">            return &quot;# Cluster nicht gefunden: &quot; + clusterId + &quot;\n&quot;;</span>
+        }
+<span class="nc" id="L809">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L810">        sb.append(&quot;# Cluster: &quot;).append(cluster.label()).append(&quot;\n\n&quot;);</span>
+<span class="nc" id="L811">        sb.append(&quot;- **Id:** `&quot;).append(cluster.id()).append(&quot;`\n&quot;);</span>
+<span class="nc" id="L812">        sb.append(&quot;- **Typ:** &quot;).append(cluster.type().name()).append(&quot;\n&quot;);</span>
+<span class="nc" id="L813">        sb.append(&quot;- **Cohesion:** &quot;).append(String.format(Locale.ROOT, &quot;%.3f&quot;, cluster.cohesionScore())).append(&quot;\n&quot;);</span>
+<span class="nc" id="L814">        sb.append(&quot;- **Knoten:** &quot;).append(cluster.nodeIds().size()).append(&quot;\n&quot;);</span>
+<span class="nc bnc" id="L815" title="All 2 branches missed.">        if (!cluster.supportingPathIds().isEmpty()) {</span>
+<span class="nc" id="L816">            sb.append(&quot;- **Supporting paths:** &quot;).append(String.join(&quot;, &quot;, cluster.supportingPathIds())).append(&quot;\n&quot;);</span>
+        }
+<span class="nc" id="L818">        sb.append(&quot;\n## Knoten\n\n&quot;);</span>
+<span class="nc bnc" id="L819" title="All 2 branches missed.">        for (String n : cluster.nodeIds()) {</span>
+<span class="nc" id="L820">            sb.append(&quot;- `&quot;).append(n).append(&quot;`\n&quot;);</span>
+<span class="nc" id="L821">        }</span>
+<span class="nc" id="L822">        return sb.toString();</span>
+    }
+
+    private String renderPathLatex(String pathId) {
+<span class="nc" id="L826">        var match = graphStore.discoveredTransformations().stream()</span>
+<span class="nc" id="L827">            .filter(t -&gt; t.id().equals(pathId))</span>
+<span class="nc" id="L828">            .findFirst();</span>
+<span class="nc bnc" id="L829" title="All 2 branches missed.">        if (match.isEmpty()) {</span>
+<span class="nc" id="L830">            return null;</span>
+        }
+<span class="nc" id="L832">        return new de.regelsuche.export.AstLatexRenderer().renderPath(match.get());</span>
+    }
+
+    private String renderIdentityMarkdown(String identityId) {
+<span class="nc" id="L836">        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(graphStore.discoveredTransformations());</span>
+<span class="nc" id="L837">        var match = macros.stream().filter(m -&gt; m.id().equals(identityId)).findFirst();</span>
+<span class="nc bnc" id="L838" title="All 2 branches missed.">        if (match.isEmpty()) {</span>
+<span class="nc" id="L839">            return null;</span>
+        }
+<span class="nc" id="L841">        var macro = match.get();</span>
+<span class="nc" id="L842">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L843">        sb.append(&quot;# Identität &quot;).append(macro.id()).append(&quot;\n\n&quot;);</span>
+<span class="nc" id="L844">        sb.append(&quot;- **Pattern:** `&quot;).append(macro.leftPattern()).append(&quot;` → `&quot;)</span>
+<span class="nc" id="L845">            .append(macro.rightPattern()).append(&quot;`\n&quot;);</span>
+<span class="nc" id="L846">        sb.append(&quot;- **Sequenz:** &quot;).append(String.join(&quot; → &quot;, macro.ruleIdSequence())).append(&quot;\n&quot;);</span>
+<span class="nc" id="L847">        sb.append(&quot;- **Vorkommen:** &quot;).append(macro.occurrences()).append(&quot;\n&quot;);</span>
+<span class="nc" id="L848">        sb.append(&quot;- **Proof:** &quot;).append(macro.proofStatus().name()).append(&quot;\n&quot;);</span>
+<span class="nc" id="L849">        sb.append(&quot;- **Supporting Pfade:** &quot;)</span>
+<span class="nc" id="L850">            .append(String.join(&quot;, &quot;, macro.supportingTransformationIds())).append(&quot;\n&quot;);</span>
+<span class="nc" id="L851">        return sb.toString();</span>
+    }
+
+    private de.regelsuche.api.searchgraph.SearchGraphDto buildSearchGraph() {
+<span class="fc" id="L855">        var transformations = graphStore.discoveredTransformations();</span>
+<span class="fc" id="L856">        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);</span>
+<span class="fc" id="L857">        return new de.regelsuche.api.searchgraph.SearchGraphAssembler().assemble(</span>
+<span class="fc" id="L858">            graphStore.snapshot(),</span>
+<span class="fc" id="L859">            successesFromGraph(),</span>
+<span class="fc" id="L860">            graphStore.ruleCandidates(),</span>
+<span class="fc" id="L861">            macros.size(),</span>
+            transformations
+        );
+    }
+
+    private void handleExplain(HttpExchange exchange) throws IOException {
+<span class="nc" id="L867">        String path = exchange.getRequestURI().getPath();</span>
+<span class="nc" id="L868">        String suffix = path.substring(&quot;/api/explain&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="nc bnc" id="L869" title="All 2 branches missed.">        if (suffix.isEmpty()) {</span>
+<span class="nc" id="L870">            sendStatus(exchange, 400, &quot;expected /api/explain/{pathId}&quot;);</span>
+<span class="nc" id="L871">            return;</span>
+        }
+<span class="nc" id="L873">        String form = queryParam(exchange, &quot;form&quot;, &quot;SCHOOL&quot;).toUpperCase(Locale.ROOT);</span>
+        ExplanationService.Form formEnum;
+        try {
+<span class="nc" id="L876">            formEnum = ExplanationService.Form.valueOf(form);</span>
+<span class="nc" id="L877">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L878">            sendStatus(exchange, 400, &quot;invalid form: &quot; + form);</span>
+<span class="nc" id="L879">            return;</span>
+<span class="nc" id="L880">        }</span>
+<span class="nc" id="L881">        var match = graphStore.discoveredTransformations().stream()</span>
+<span class="nc" id="L882">            .filter(t -&gt; t.id().equals(suffix))</span>
+<span class="nc" id="L883">            .findFirst();</span>
+<span class="nc bnc" id="L884" title="All 2 branches missed.">        if (match.isEmpty()) {</span>
+<span class="nc" id="L885">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L886">            return;</span>
+        }
+<span class="nc bnc" id="L888" title="All 2 branches missed.">        if (formEnum == ExplanationService.Form.JSON) {</span>
+<span class="nc" id="L889">            sendJson(exchange, 200, explanationService.renderPath(match.get(), formEnum));</span>
+        } else {
+<span class="nc" id="L891">            sendText(exchange, 200, explanationService.renderPath(match.get(), formEnum));</span>
+        }
+<span class="nc" id="L893">    }</span>
+
+    private void handleAnalyze(HttpExchange exchange) throws IOException {
+<span class="nc" id="L896">        String path = exchange.getRequestURI().getPath();</span>
+<span class="nc" id="L897">        String suffix = path.substring(&quot;/api/analyze&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="nc bnc" id="L898" title="All 2 branches missed.">        if (!&quot;move&quot;.equals(suffix)) {</span>
+<span class="nc" id="L899">            sendStatus(exchange, 404, &quot;expected /api/analyze/move?expression=...&quot;);</span>
+<span class="nc" id="L900">            return;</span>
+        }
+<span class="nc" id="L902">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
+<span class="nc bnc" id="L903" title="All 2 branches missed.">        if (expression.isBlank()) {</span>
+<span class="nc" id="L904">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
+<span class="nc" id="L905">            return;</span>
+        }
+<span class="nc" id="L907">        de.regelsuche.api.searchgraph.SearchGraphDto graph = buildSearchGraph();</span>
+<span class="nc" id="L908">        de.regelsuche.analyze.MoveAnalysisDto analysis =</span>
+<span class="nc" id="L909">            new de.regelsuche.analyze.MoveAnalysisService().analyze(graph, expression);</span>
+<span class="nc" id="L910">        sendJson(exchange, 200, moveAnalysisToJson(analysis));</span>
+<span class="nc" id="L911">    }</span>
+
+    /**
+     * Didactic learning-system endpoints (PR 17):
+     * &lt;ul&gt;
+     *   &lt;li&gt;{@code POST /api/didactic/step-check} —
+     *       body {@code {&quot;currentExpression&quot;: &quot;...&quot;, &quot;studentStep&quot;: &quot;...&quot;,
+     *       &quot;difficulty&quot;: &quot;MITTELSTUFE&quot;}}; returns the
+     *       {@link de.regelsuche.didactic.StudentStepValidator.Result}.&lt;/li&gt;
+     *   &lt;li&gt;{@code POST /api/didactic/hint/{pathId}} —
+     *       body {@code {&quot;currentExpression&quot;: &quot;...&quot;, &quot;pedagogyProfile&quot;:
+     *       &quot;SCHOOL&quot;}}; returns the graduated hint sequence for the next
+     *       step of the named derivation.&lt;/li&gt;
+     *   &lt;li&gt;{@code GET  /api/didactic/misconceptions} — lists the built-in
+     *       misconception catalogue.&lt;/li&gt;
+     * &lt;/ul&gt;
+     */
+    private void handleDidactic(HttpExchange exchange) throws IOException {
+<span class="fc" id="L929">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc" id="L930">        String suffix = path.substring(&quot;/api/didactic&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L931" title="All 2 branches covered.">        if (suffix.startsWith(&quot;step-check&quot;)) {</span>
+<span class="fc" id="L932">            handleDidacticStepCheck(exchange);</span>
+<span class="fc" id="L933">            return;</span>
+        }
+<span class="fc bfc" id="L935" title="All 2 branches covered.">        if (suffix.startsWith(&quot;hint/&quot;)) {</span>
+<span class="fc" id="L936">            handleDidacticHint(exchange, suffix.substring(&quot;hint/&quot;.length()));</span>
+<span class="fc" id="L937">            return;</span>
+        }
+<span class="pc bpc" id="L939" title="1 of 2 branches missed.">        if (suffix.startsWith(&quot;hint&quot;)) {</span>
+<span class="nc" id="L940">            sendStatus(exchange, 400, &quot;expected /api/didactic/hint/{pathId}&quot;);</span>
+<span class="nc" id="L941">            return;</span>
+        }
+<span class="fc bfc" id="L943" title="All 2 branches covered.">        if (suffix.startsWith(&quot;misconceptions&quot;)) {</span>
+<span class="fc" id="L944">            handleDidacticMisconceptions(exchange);</span>
+<span class="fc" id="L945">            return;</span>
+        }
+<span class="fc bfc" id="L947" title="All 2 branches covered.">        if (suffix.startsWith(&quot;analytics&quot;)) {</span>
+<span class="fc" id="L948">            handleDidacticAnalytics(exchange);</span>
+<span class="fc" id="L949">            return;</span>
+        }
+<span class="fc bfc" id="L951" title="All 2 branches covered.">        if (suffix.startsWith(&quot;replay/&quot;)) {</span>
+<span class="fc" id="L952">            handleDidacticReplay(exchange, suffix.substring(&quot;replay/&quot;.length()));</span>
+<span class="fc" id="L953">            return;</span>
+        }
+<span class="pc bpc" id="L955" title="1 of 2 branches missed.">        if (suffix.startsWith(&quot;replay&quot;)) {</span>
+<span class="nc" id="L956">            sendStatus(exchange, 400, &quot;expected /api/didactic/replay/{pathId}&quot;);</span>
+<span class="nc" id="L957">            return;</span>
+        }
+<span class="pc bpc" id="L959" title="1 of 2 branches missed.">        if (suffix.startsWith(&quot;export/&quot;)) {</span>
+<span class="fc" id="L960">            handleDidacticExport(exchange, suffix.substring(&quot;export/&quot;.length()));</span>
+<span class="fc" id="L961">            return;</span>
+        }
+<span class="nc bnc" id="L963" title="All 2 branches missed.">        if (suffix.startsWith(&quot;export&quot;)) {</span>
+<span class="nc" id="L964">            sendStatus(exchange, 400,</span>
+                &quot;expected /api/didactic/export/{worksheet|solution|teacher}/{pathId}.md&quot;);
+<span class="nc" id="L966">            return;</span>
+        }
+<span class="nc bnc" id="L968" title="All 2 branches missed.">        if (suffix.isEmpty()) {</span>
+<span class="nc" id="L969">            JsonWriter writer = new JsonWriter();</span>
+<span class="nc" id="L970">            writer.beginObject();</span>
+<span class="nc" id="L971">            writer.object(&quot;endpoints&quot;, inner -&gt; {</span>
+<span class="nc" id="L972">                inner.property(&quot;stepCheck&quot;, &quot;/api/didactic/step-check&quot;);</span>
+<span class="nc" id="L973">                inner.property(&quot;hint&quot;, &quot;/api/didactic/hint/{pathId}&quot;);</span>
+<span class="nc" id="L974">                inner.property(&quot;misconceptions&quot;, &quot;/api/didactic/misconceptions&quot;);</span>
+<span class="nc" id="L975">                inner.property(&quot;analytics&quot;, &quot;/api/didactic/analytics&quot;);</span>
+<span class="nc" id="L976">                inner.property(&quot;replay&quot;, &quot;/api/didactic/replay/{pathId}&quot;);</span>
+<span class="nc" id="L977">                inner.property(&quot;exportWorksheet&quot;, &quot;/api/didactic/export/worksheet/{pathId}.md&quot;);</span>
+<span class="nc" id="L978">                inner.property(&quot;exportSolution&quot;,  &quot;/api/didactic/export/solution/{pathId}.md&quot;);</span>
+<span class="nc" id="L979">                inner.property(&quot;exportTeacher&quot;,   &quot;/api/didactic/export/teacher/{pathId}.md&quot;);</span>
+<span class="nc" id="L980">            });</span>
+<span class="nc" id="L981">            writer.endObject();</span>
+<span class="nc" id="L982">            sendJson(exchange, 200, writer.toString());</span>
+<span class="nc" id="L983">            return;</span>
+        }
+<span class="nc" id="L985">        sendStatus(exchange, 404, &quot;unknown didactic endpoint: &quot; + suffix);</span>
+<span class="nc" id="L986">    }</span>
+
+    private void handleDidacticStepCheck(HttpExchange exchange) throws IOException {
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L990">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L991">            return;</span>
+        }
+<span class="fc" id="L993">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
+<span class="fc" id="L994">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>
+<span class="fc" id="L995">        String studentStep       = stringValue(body, &quot;studentStep&quot;, &quot;&quot;);</span>
+<span class="fc" id="L996">        String difficulty        = stringValue(body, &quot;difficulty&quot;, &quot;MITTELSTUFE&quot;);</span>
+<span class="pc bpc" id="L997" title="2 of 4 branches missed.">        if (currentExpression.isBlank() || studentStep.isBlank()) {</span>
+<span class="nc" id="L998">            sendStatus(exchange, 400,</span>
+                &quot;currentExpression and studentStep are required&quot;);
+<span class="nc" id="L1000">            return;</span>
+        }
+        de.regelsuche.didactic.DifficultyLevel level;
+        try {
+<span class="fc" id="L1004">            level = de.regelsuche.didactic.DifficultyLevel.valueOf(</span>
+<span class="fc" id="L1005">                difficulty.toUpperCase(Locale.ROOT));</span>
+<span class="fc" id="L1006">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L1007">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
+<span class="fc" id="L1008">            return;</span>
+<span class="fc" id="L1009">        }</span>
+<span class="fc" id="L1010">        de.regelsuche.didactic.StudentStepValidator.Result result =</span>
+<span class="fc" id="L1011">            didacticStepValidator.validate(currentExpression, studentStep, level);</span>
+
+<span class="fc" id="L1013">        didacticEventStore.record(de.regelsuche.didactic.analytics.DidacticEvent.stepCheck(</span>
+<span class="fc" id="L1014">            java.time.Instant.now(),</span>
+            level,
+<span class="fc" id="L1016">            result.correct(),</span>
+<span class="fc" id="L1017">            result.didacticallyAppropriate(),</span>
+<span class="fc" id="L1018">            result.misconception().map(de.regelsuche.didactic.MisconceptionRule::id).orElse(null)</span>
+        ));
+
+<span class="fc" id="L1021">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1022">        writer.beginObject();</span>
+<span class="fc" id="L1023">        writer.property(&quot;correct&quot;, result.correct());</span>
+<span class="fc" id="L1024">        writer.property(&quot;didacticallyAppropriate&quot;, result.didacticallyAppropriate());</span>
+<span class="fc" id="L1025">        writer.property(&quot;message&quot;, result.message());</span>
+<span class="fc" id="L1026">        writer.property(&quot;difficulty&quot;, level.name());</span>
+<span class="fc" id="L1027">        result.misconception().ifPresent(rule -&gt; writer.object(&quot;misconception&quot;, inner -&gt; {</span>
+<span class="fc" id="L1028">            inner.property(&quot;id&quot;, rule.id());</span>
+<span class="fc" id="L1029">            inner.property(&quot;wrongRulePattern&quot;, rule.wrongRulePattern());</span>
+<span class="fc" id="L1030">            inner.property(&quot;typicalCause&quot;, rule.typicalCause());</span>
+<span class="fc" id="L1031">            inner.property(&quot;explanation&quot;, rule.explanation());</span>
+<span class="fc" id="L1032">            inner.property(&quot;correctionSuggestion&quot;, rule.correctionSuggestion());</span>
+<span class="fc" id="L1033">        }));</span>
+<span class="fc" id="L1034">        writer.endObject();</span>
+<span class="fc" id="L1035">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1036">    }</span>
+
+    private void handleDidacticHint(HttpExchange exchange, String pathId) throws IOException {
+<span class="fc bfc" id="L1039" title="All 2 branches covered.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="fc" id="L1040">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="fc" id="L1041">            return;</span>
+        }
+<span class="pc bpc" id="L1043" title="1 of 2 branches missed.">        if (pathId.isBlank()) {</span>
+<span class="nc" id="L1044">            sendStatus(exchange, 400, &quot;expected /api/didactic/hint/{pathId}&quot;);</span>
+<span class="nc" id="L1045">            return;</span>
+        }
+<span class="fc" id="L1047">        var match = graphStore.discoveredTransformations().stream()</span>
+<span class="fc" id="L1048">            .filter(t -&gt; t.id().equals(pathId))</span>
+<span class="fc" id="L1049">            .findFirst();</span>
+<span class="fc bfc" id="L1050" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
+<span class="fc" id="L1051">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="fc" id="L1052">            return;</span>
+        }
+<span class="fc" id="L1054">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
+<span class="fc" id="L1055">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>
+<span class="fc" id="L1056">        String profile = stringValue(body, &quot;pedagogyProfile&quot;, &quot;SCHOOL&quot;);</span>
+
+        de.regelsuche.didactic.PedagogyProfile profileEnum;
+        try {
+<span class="fc" id="L1060">            profileEnum = de.regelsuche.didactic.PedagogyProfile.valueOf(</span>
+<span class="fc" id="L1061">                profile.toUpperCase(Locale.ROOT));</span>
+<span class="nc" id="L1062">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L1063">            sendStatus(exchange, 400, &quot;invalid pedagogyProfile: &quot; + profile);</span>
+<span class="nc" id="L1064">            return;</span>
+<span class="fc" id="L1065">        }</span>
+<span class="fc" id="L1066">        var hints = new de.regelsuche.didactic.HintGenerator()</span>
+<span class="fc" id="L1067">            .hintsFor(match.get(), currentExpression, profileEnum);</span>
+
+<span class="pc bpc" id="L1069" title="1 of 2 branches missed.">        de.regelsuche.didactic.HintGenerator.Strength deliveredStrength = hints.isEmpty()</span>
+<span class="nc" id="L1070">            ? null</span>
+<span class="fc" id="L1071">            : hints.get(hints.size() - 1).strength();</span>
+<span class="fc" id="L1072">        didacticEventStore.record(de.regelsuche.didactic.analytics.DidacticEvent.hint(</span>
+<span class="fc" id="L1073">            java.time.Instant.now(),</span>
+            pathId,
+            profileEnum,
+            deliveredStrength
+        ));
+
+<span class="fc" id="L1079">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1080">        writer.beginObject();</span>
+<span class="fc" id="L1081">        writer.property(&quot;pathId&quot;, pathId);</span>
+<span class="fc" id="L1082">        writer.property(&quot;pedagogyProfile&quot;, profileEnum.name());</span>
+<span class="fc" id="L1083">        writer.array(&quot;hints&quot;, arr -&gt; hints.forEach(hint -&gt;</span>
+<span class="fc" id="L1084">            arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L1085">                inner.property(&quot;strength&quot;, hint.strength().name());</span>
+<span class="fc" id="L1086">                inner.property(&quot;text&quot;, hint.text());</span>
+<span class="fc" id="L1087">            })));</span>
+<span class="fc" id="L1088">        writer.endObject();</span>
+<span class="fc" id="L1089">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1090">    }</span>
+
+    private void handleDidacticMisconceptions(HttpExchange exchange) throws IOException {
+<span class="fc" id="L1093">        var detector = new de.regelsuche.didactic.MisconceptionDetector();</span>
+<span class="fc" id="L1094">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1095">        writer.beginObject();</span>
+<span class="fc" id="L1096">        writer.array(&quot;misconceptions&quot;, arr -&gt; detector.catalogue().forEach(rule -&gt;</span>
+<span class="fc" id="L1097">            arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L1098">                inner.property(&quot;id&quot;, rule.id());</span>
+<span class="fc" id="L1099">                inner.property(&quot;wrongRulePattern&quot;, rule.wrongRulePattern());</span>
+<span class="fc" id="L1100">                inner.property(&quot;typicalCause&quot;, rule.typicalCause());</span>
+<span class="fc" id="L1101">                inner.property(&quot;explanation&quot;, rule.explanation());</span>
+<span class="fc" id="L1102">                inner.property(&quot;correctionSuggestion&quot;, rule.correctionSuggestion());</span>
+<span class="fc" id="L1103">            })));</span>
+<span class="fc" id="L1104">        writer.endObject();</span>
+<span class="fc" id="L1105">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1106">    }</span>
+
+    private void handleDidacticAnalytics(HttpExchange exchange) throws IOException {
+<span class="fc" id="L1109">        var snapshot = didacticAnalytics.snapshot();</span>
+<span class="fc" id="L1110">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1111">        writer.beginObject();</span>
+<span class="fc" id="L1112">        writer.property(&quot;totalEvents&quot;, snapshot.totalEvents());</span>
+<span class="fc" id="L1113">        writer.property(&quot;stepChecks&quot;, snapshot.stepChecks());</span>
+<span class="fc" id="L1114">        writer.property(&quot;hints&quot;, snapshot.hints());</span>
+<span class="fc" id="L1115">        writer.property(&quot;correctSteps&quot;, snapshot.correctSteps());</span>
+<span class="fc" id="L1116">        writer.property(&quot;didacticallyAppropriateSteps&quot;, snapshot.didacticallyAppropriateSteps());</span>
+<span class="fc" id="L1117">        writer.property(&quot;accuracy&quot;, snapshot.accuracy());</span>
+<span class="fc" id="L1118">        writer.property(&quot;appropriateness&quot;, snapshot.appropriateness());</span>
+<span class="fc" id="L1119">        writer.object(&quot;misconceptionFrequency&quot;, inner -&gt; snapshot.misconceptionFrequency()</span>
+<span class="fc" id="L1120">            .forEach(inner::property));</span>
+<span class="fc" id="L1121">        writer.object(&quot;stepChecksByDifficulty&quot;, inner -&gt; snapshot.stepChecksByDifficulty()</span>
+<span class="fc" id="L1122">            .forEach((k, v) -&gt; inner.property(k.name(), v)));</span>
+<span class="fc" id="L1123">        writer.object(&quot;hintsByStrength&quot;, inner -&gt; snapshot.hintsByStrength()</span>
+<span class="fc" id="L1124">            .forEach((k, v) -&gt; inner.property(k.name(), v)));</span>
+<span class="fc" id="L1125">        writer.object(&quot;hintsByProfile&quot;, inner -&gt; snapshot.hintsByProfile()</span>
+<span class="fc" id="L1126">            .forEach((k, v) -&gt; inner.property(k.name(), v)));</span>
+<span class="fc" id="L1127">        writer.endObject();</span>
+<span class="fc" id="L1128">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1129">    }</span>
+
+    private void handleDidacticReplay(HttpExchange exchange, String pathId) throws IOException {
+<span class="pc bpc" id="L1132" title="1 of 2 branches missed.">        if (pathId.isBlank()) {</span>
+<span class="nc" id="L1133">            sendStatus(exchange, 400, &quot;expected /api/didactic/replay/{pathId}&quot;);</span>
+<span class="nc" id="L1134">            return;</span>
+        }
+<span class="fc" id="L1136">        var match = graphStore.discoveredTransformations().stream()</span>
+<span class="fc" id="L1137">            .filter(t -&gt; t.id().equals(pathId))</span>
+<span class="fc" id="L1138">            .findFirst();</span>
+<span class="fc bfc" id="L1139" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
+<span class="fc" id="L1140">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="fc" id="L1141">            return;</span>
+        }
+<span class="fc" id="L1143">        var derivation = match.get();</span>
+<span class="fc" id="L1144">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1145">        writer.beginObject();</span>
+<span class="fc" id="L1146">        writer.property(&quot;pathId&quot;, pathId);</span>
+<span class="fc" id="L1147">        writer.property(&quot;originalExpression&quot;, derivation.originalExpression());</span>
+<span class="fc" id="L1148">        writer.property(&quot;improvedExpression&quot;, derivation.improvedExpression());</span>
+<span class="fc" id="L1149">        writer.array(&quot;steps&quot;, arr -&gt; derivation.steps().forEach(step -&gt;</span>
+<span class="fc" id="L1150">            arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L1151">                inner.property(&quot;index&quot;, step.index());</span>
+<span class="fc" id="L1152">                inner.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
+<span class="fc" id="L1153">                inner.property(&quot;afterExpression&quot;, step.afterExpression());</span>
+<span class="fc" id="L1154">                inner.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L1155">                inner.property(&quot;ruleKind&quot;, step.ruleKind().name());</span>
+<span class="fc" id="L1156">                inner.property(&quot;explanation&quot;, step.explanation());</span>
+<span class="fc" id="L1157">                inner.array(&quot;diffTokens&quot;, tokensArr -&gt;</span>
+<span class="fc" id="L1158">                    de.regelsuche.didactic.SymbolDiff.diff(</span>
+<span class="fc" id="L1159">                            step.beforeExpression(), step.afterExpression())</span>
+<span class="fc" id="L1160">                        .forEach(token -&gt; tokensArr.objectValue(tokenObj -&gt; {</span>
+<span class="fc" id="L1161">                            tokenObj.property(&quot;text&quot;, token.text());</span>
+<span class="fc" id="L1162">                            tokenObj.property(&quot;change&quot;, token.change().name());</span>
+<span class="fc" id="L1163">                        })));</span>
+<span class="fc" id="L1164">            })));</span>
+<span class="fc" id="L1165">        writer.endObject();</span>
+<span class="fc" id="L1166">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1167">    }</span>
+
+    private void handleDidacticExport(HttpExchange exchange, String suffix) throws IOException {
+        // suffix is e.g. &quot;worksheet/some-path-id.md&quot;
+<span class="fc" id="L1171">        int slash = suffix.indexOf('/');</span>
+<span class="pc bpc" id="L1172" title="2 of 4 branches missed.">        if (slash &lt;= 0 || slash &gt;= suffix.length() - 1) {</span>
+<span class="nc" id="L1173">            sendStatus(exchange, 400,</span>
+                &quot;expected /api/didactic/export/{worksheet|solution|teacher}/{pathId}.md&quot;);
+<span class="nc" id="L1175">            return;</span>
+        }
+<span class="fc" id="L1177">        String kind = suffix.substring(0, slash);</span>
+<span class="fc" id="L1178">        String rest = suffix.substring(slash + 1);</span>
+<span class="pc bpc" id="L1179" title="1 of 2 branches missed.">        if (rest.endsWith(&quot;.md&quot;)) {</span>
+<span class="fc" id="L1180">            rest = rest.substring(0, rest.length() - 3);</span>
+        }
+<span class="pc bpc" id="L1182" title="1 of 2 branches missed.">        if (rest.isBlank()) {</span>
+<span class="nc" id="L1183">            sendStatus(exchange, 400, &quot;missing pathId&quot;);</span>
+<span class="nc" id="L1184">            return;</span>
+        }
+<span class="fc" id="L1186">        final String pathId = rest;</span>
+<span class="fc" id="L1187">        var match = graphStore.discoveredTransformations().stream()</span>
+<span class="fc" id="L1188">            .filter(t -&gt; t.id().equals(pathId))</span>
+<span class="fc" id="L1189">            .findFirst();</span>
+<span class="pc bpc" id="L1190" title="1 of 2 branches missed.">        if (match.isEmpty()) {</span>
+<span class="nc" id="L1191">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1192">            return;</span>
+        }
+<span class="fc bfc" id="L1194" title="All 4 branches covered.">        String body = switch (kind.toLowerCase(Locale.ROOT)) {</span>
+<span class="fc" id="L1195">            case &quot;worksheet&quot; -&gt; didacticExporter.worksheet(match.get());</span>
+<span class="fc" id="L1196">            case &quot;solution&quot;  -&gt; didacticExporter.solution(match.get());</span>
+<span class="fc" id="L1197">            case &quot;teacher&quot;   -&gt; didacticExporter.teacherMode(match.get());</span>
+<span class="fc" id="L1198">            default          -&gt; null;</span>
+        };
+<span class="fc bfc" id="L1200" title="All 2 branches covered.">        if (body == null) {</span>
+<span class="nc" id="L1201">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
+<span class="nc" id="L1202">            return;</span>
+        }
+<span class="fc" id="L1204">        send(exchange, 200, &quot;text/markdown; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L1205">    }</span>
+
+    private String moveAnalysisToJson(de.regelsuche.analyze.MoveAnalysisDto a) {
+<span class="nc" id="L1208">        JsonWriter w = new JsonWriter();</span>
+<span class="nc" id="L1209">        w.beginObject();</span>
+<span class="nc" id="L1210">        w.property(&quot;expression&quot;, a.expression());</span>
+<span class="nc" id="L1211">        w.property(&quot;reason&quot;, a.reason());</span>
+<span class="nc" id="L1212">        w.property(&quot;mostUsefulRule&quot;, a.mostUsefulRule());</span>
+<span class="nc bnc" id="L1213" title="All 2 branches missed.">        if (a.bestMove() != null) {</span>
+<span class="nc" id="L1214">            w.object(&quot;bestMove&quot;, inner -&gt; writeMove(inner, a.bestMove()));</span>
+        }
+<span class="nc" id="L1216">        w.array(&quot;alternatives&quot;, arr -&gt; {</span>
+<span class="nc bnc" id="L1217" title="All 2 branches missed.">            for (var m : a.alternatives()) {</span>
+<span class="nc" id="L1218">                arr.objectValue(o -&gt; writeMove(o, m));</span>
+<span class="nc" id="L1219">            }</span>
+<span class="nc" id="L1220">        });</span>
+<span class="nc" id="L1221">        w.array(&quot;deadEnds&quot;, arr -&gt; {</span>
+<span class="nc bnc" id="L1222" title="All 2 branches missed.">            for (var m : a.deadEnds()) {</span>
+<span class="nc" id="L1223">                arr.objectValue(o -&gt; writeMove(o, m));</span>
+<span class="nc" id="L1224">            }</span>
+<span class="nc" id="L1225">        });</span>
+<span class="nc" id="L1226">        w.endObject();</span>
+<span class="nc" id="L1227">        return w.toString();</span>
+    }
+
+    private static void writeMove(JsonWriter w, de.regelsuche.analyze.MoveAnalysisDto.Move m) {
+<span class="nc" id="L1231">        w.property(&quot;ruleId&quot;, m.ruleId());</span>
+<span class="nc" id="L1232">        w.property(&quot;ruleKind&quot;, m.ruleKind());</span>
+<span class="nc" id="L1233">        w.property(&quot;toExpression&quot;, m.toExpression());</span>
+<span class="nc" id="L1234">        w.property(&quot;toLatex&quot;, m.toLatex());</span>
+<span class="nc" id="L1235">        w.property(&quot;scoreDelta&quot;, m.scoreDelta());</span>
+<span class="nc" id="L1236">        w.property(&quot;deadEnd&quot;, m.deadEnd());</span>
+<span class="nc" id="L1237">        w.property(&quot;isBest&quot;, m.isBest());</span>
+<span class="nc" id="L1238">        w.property(&quot;equivalencePreserving&quot;, m.equivalencePreserving());</span>
+<span class="nc" id="L1239">        w.stringArray(&quot;assumptions&quot;, m.assumptions());</span>
+<span class="nc" id="L1240">        w.stringArray(&quot;pathIds&quot;, m.pathIds());</span>
+<span class="nc" id="L1241">    }</span>
+
+    private de.regelsuche.export.SearchAnalysisReportService.SearchAnalysisReportContext analysisReportContext() {
+<span class="fc" id="L1244">        var transformations = graphStore.discoveredTransformations();</span>
+<span class="fc" id="L1245">        var best = transformations.stream()</span>
+<span class="fc" id="L1246">            .max(java.util.Comparator.comparingInt(DiscoveredTransformation::totalImprovement))</span>
+<span class="fc" id="L1247">            .orElse(null);</span>
+        java.util.List&lt;DiscoveredTransformation&gt; alternatives;
+<span class="fc bfc" id="L1249" title="All 2 branches covered.">        if (best != null) {</span>
+<span class="fc bfc" id="L1250" title="All 2 branches covered.">            alternatives = transformations.stream().filter(t -&gt; !t.id().equals(best.id())).toList();</span>
+        } else {
+<span class="fc" id="L1252">            alternatives = java.util.List.of();</span>
+        }
+<span class="fc" id="L1254">        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);</span>
+<span class="fc" id="L1255">        var known = new de.regelsuche.mining.KnownRuleRepository();</span>
+<span class="fc" id="L1256">        var identities = macros.stream()</span>
+<span class="fc" id="L1257">            .map(m -&gt; de.regelsuche.api.IdentityReportDto.from(m, known.statusFor(m.leftPattern(), m.rightPattern())))</span>
+<span class="fc" id="L1258">            .toList();</span>
+<span class="fc" id="L1259">        java.util.Set&lt;String&gt; assumptions = new java.util.LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L1260" title="All 2 branches covered.">        for (var t : transformations) {</span>
+<span class="fc bfc" id="L1261" title="All 2 branches covered.">            for (var step : t.steps()) {</span>
+<span class="pc bpc" id="L1262" title="1 of 2 branches missed.">                if (!step.equivalencePreserving()) {</span>
+<span class="nc" id="L1263">                    assumptions.add(&quot;Pfad &quot; + t.id() + &quot;, Schritt &quot; + step.index() + &quot;: &quot; + step.ruleId());</span>
+                }
+<span class="fc" id="L1265">            }</span>
+<span class="fc" id="L1266">        }</span>
+<span class="fc" id="L1267">        return new de.regelsuche.export.SearchAnalysisReportService.SearchAnalysisReportContext(</span>
+<span class="fc bfc" id="L1268" title="All 2 branches covered.">            best == null ? &quot;&quot; : best.originalExpression(),</span>
+            &quot;DISCOVERY&quot;,
+<span class="fc" id="L1270">            java.util.List.of(&quot;core&quot;),</span>
+<span class="fc" id="L1271">            buildSearchGraph(),</span>
+            best,
+            alternatives,
+            macros,
+            identities,
+            new java.util.ArrayList&lt;&gt;(assumptions),
+<span class="fc" id="L1277">            inventoryRepository.findAll()</span>
+        );
+    }
+
+    private String runMacroLearningDemo() {
+<span class="fc" id="L1282">        String[] expressions = {&quot;(x+1)^2&quot;, &quot;(x+2)^2&quot;, &quot;(x+3)^2&quot;, &quot;(x+7)^2&quot;};</span>
+<span class="fc" id="L1283">        de.regelsuche.learning.MacroRuleLearningService learner =</span>
+            new de.regelsuche.learning.MacroRuleLearningService(inventoryRepository);
+<span class="fc" id="L1285">        de.regelsuche.canonical.ExpressionCanonicalizer canonicalizer =</span>
+            new de.regelsuche.canonical.ExpressionCanonicalizer();
+<span class="fc" id="L1287">        de.regelsuche.scoring.ExpressionScorer scorer = new de.regelsuche.scoring.ExpressionScorer();</span>
+<span class="fc" id="L1288">        de.regelsuche.transform.TransformationEngine engine =</span>
+            new de.regelsuche.transform.AstRewriteTransformationEngine(
+<span class="fc" id="L1290">                de.regelsuche.demo.DemoRuleSet.rules());</span>
+<span class="fc" id="L1291">        de.regelsuche.equivalence.SymPyEquivalenceService equivalence =</span>
+            new de.regelsuche.equivalence.SymPyEquivalenceService();
+<span class="fc" id="L1293">        List&lt;java.util.Map&lt;String, Object&gt;&gt; stepReports = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc" id="L1294">        List&lt;de.regelsuche.mining.SuccessfulTransformationPath&gt; aggregated = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc" id="L1295">        long firstRunSteps = -1, firstRunMillis = -1, lastRunSteps = -1, lastRunMillis = -1;</span>
+<span class="fc" id="L1296">        boolean usedLearnedRule = false;</span>
+<span class="fc" id="L1297">        double lastConfidence = 0.0;</span>
+<span class="fc" id="L1298">        List&lt;Double&gt; confidenceTrace = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L1299" title="All 2 branches covered.">        for (int i = 0; i &lt; expressions.length; i++) {</span>
+<span class="fc" id="L1300">            String expr = expressions[i];</span>
+<span class="fc" id="L1301">            long t0 = System.nanoTime();</span>
+<span class="fc" id="L1302">            String root = canonicalizer.canonicalize(expr);</span>
+<span class="fc" id="L1303">            de.regelsuche.scoring.ExpressionScore before = scorer.score(root);</span>
+<span class="fc" id="L1304">            de.regelsuche.search.SearchProfile profile = de.regelsuche.search.SearchProfile.DISCOVERY_PLUS;</span>
+<span class="fc" id="L1305">            de.regelsuche.search.strategy.SearchProblem problem =</span>
+                new de.regelsuche.search.strategy.SearchProblem(
+<span class="fc" id="L1307">                    root, engine, scorer, canonicalizer, profile.heuristic(), searchMemory);</span>
+<span class="fc" id="L1308">            List&lt;de.regelsuche.search.strategy.SearchState&gt; states =</span>
+<span class="fc" id="L1309">                profile.newStrategy().search(problem);</span>
+<span class="fc" id="L1310">            long elapsed = (System.nanoTime() - t0) / 1_000_000L;</span>
+<span class="fc" id="L1311">            int stepsOnBest = 0;</span>
+<span class="fc" id="L1312">            de.regelsuche.search.strategy.SearchState best = null;</span>
+<span class="fc" id="L1313">            boolean usedLearnedHere = false;</span>
+<span class="fc bfc" id="L1314" title="All 2 branches covered.">            for (de.regelsuche.search.strategy.SearchState s : states) {</span>
+<span class="pc bpc" id="L1315" title="1 of 4 branches missed.">                if (s.depth() == 0 || !equivalence.areEquivalent(root, s.expression())) {</span>
+<span class="nc" id="L1316">                    continue;</span>
+                }
+<span class="pc bpc" id="L1318" title="1 of 4 branches missed.">                if (best == null || s.depth() &lt; best.depth()) {</span>
+<span class="fc" id="L1319">                    best = s;</span>
+                }
+<span class="fc" id="L1321">                aggregated.add(new de.regelsuche.mining.SuccessfulTransformationPath(</span>
+<span class="fc" id="L1322">                    &quot;macro-&quot; + i + &quot;-d&quot; + s.depth() + &quot;-&quot; + Integer.toHexString(s.canonicalHash().hashCode()),</span>
+<span class="fc" id="L1323">                    root, s.expression(), s.path(), s.appliedRuleIds(),</span>
+<span class="fc" id="L1324">                    before, s.score(), true, &quot;macro-demo&quot;,</span>
+<span class="fc" id="L1325">                    java.util.Map.of(&quot;variable&quot;, &quot;x&quot;)));</span>
+<span class="fc bfc" id="L1326" title="All 2 branches covered.">                for (String rid : s.appliedRuleIds()) {</span>
+<span class="pc bpc" id="L1327" title="2 of 4 branches missed.">                    if (rid != null &amp;&amp; rid.startsWith(&quot;macro_&quot;)) {</span>
+<span class="nc" id="L1328">                        usedLearnedHere = true;</span>
+                    }
+<span class="fc" id="L1330">                }</span>
+<span class="fc" id="L1331">            }</span>
+<span class="pc bpc" id="L1332" title="1 of 2 branches missed.">            if (best != null) {</span>
+<span class="fc" id="L1333">                stepsOnBest = best.appliedRuleIds().size();</span>
+            }
+<span class="fc" id="L1335">            de.regelsuche.learning.MacroLearningResult learning = learner.learn(aggregated);</span>
+<span class="fc bfc" id="L1336" title="All 2 branches covered.">            double confidence = learning.touchedRules().isEmpty()</span>
+<span class="fc" id="L1337">                ? 0.0 : learning.touchedRules().get(0).confidenceScore();</span>
+<span class="fc" id="L1338">            confidenceTrace.add(confidence);</span>
+<span class="fc" id="L1339">            lastConfidence = confidence;</span>
+<span class="fc bfc" id="L1340" title="All 2 branches covered.">            if (i == 0) {</span>
+<span class="fc" id="L1341">                firstRunSteps = stepsOnBest;</span>
+<span class="fc" id="L1342">                firstRunMillis = elapsed;</span>
+            }
+<span class="fc bfc" id="L1344" title="All 2 branches covered.">            if (i == expressions.length - 1) {</span>
+<span class="fc" id="L1345">                lastRunSteps = stepsOnBest;</span>
+<span class="fc" id="L1346">                lastRunMillis = elapsed;</span>
+<span class="fc" id="L1347">                usedLearnedRule = usedLearnedHere;</span>
+            }
+<span class="fc" id="L1349">            stepReports.add(java.util.Map.of(</span>
+<span class="fc" id="L1350">                &quot;index&quot;, i,</span>
+                &quot;expression&quot;, expr,
+<span class="fc" id="L1352">                &quot;stepCount&quot;, stepsOnBest,</span>
+<span class="fc" id="L1353">                &quot;elapsedMillis&quot;, elapsed,</span>
+<span class="fc" id="L1354">                &quot;confidenceScore&quot;, confidence,</span>
+<span class="fc" id="L1355">                &quot;learnedRulesActive&quot;, inventoryRepository.findEnabled().stream()</span>
+<span class="fc" id="L1356">                    .filter(r -&gt; r.id().startsWith(&quot;macro_&quot;)).count()</span>
+            ));
+        }
+<span class="fc" id="L1359">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
+<span class="fc" id="L1360">        w.beginObject();</span>
+<span class="fc" id="L1361">        w.property(&quot;id&quot;, &quot;macro-learning&quot;);</span>
+<span class="fc" id="L1362">        w.property(&quot;title&quot;, &quot;System lernt eine Makroregel&quot;);</span>
+<span class="fc" id="L1363">        w.property(&quot;usedLearnedRule&quot;, usedLearnedRule);</span>
+<span class="fc" id="L1364">        w.property(&quot;finalConfidenceScore&quot;, lastConfidence);</span>
+<span class="fc" id="L1365">        w.array(&quot;confidenceTrace&quot;, arr -&gt; confidenceTrace.forEach(v -&gt; arr.value(v.toString())));</span>
+<span class="fc" id="L1366">        final long fSteps = firstRunSteps, fMs = firstRunMillis;</span>
+<span class="fc" id="L1367">        final long lSteps = lastRunSteps, lMs = lastRunMillis;</span>
+<span class="fc" id="L1368">        w.object(&quot;speedup&quot;, s -&gt; {</span>
+<span class="fc" id="L1369">            s.property(&quot;firstRunSteps&quot;, fSteps);</span>
+<span class="fc" id="L1370">            s.property(&quot;firstRunMillis&quot;, fMs);</span>
+<span class="fc" id="L1371">            s.property(&quot;lastRunSteps&quot;, lSteps);</span>
+<span class="fc" id="L1372">            s.property(&quot;lastRunMillis&quot;, lMs);</span>
+<span class="fc" id="L1373">        });</span>
+<span class="fc" id="L1374">        w.array(&quot;steps&quot;, arr -&gt; stepReports.forEach(rep -&gt; arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L1375">            inner.property(&quot;index&quot;, (int) rep.get(&quot;index&quot;));</span>
+<span class="fc" id="L1376">            inner.property(&quot;expression&quot;, (String) rep.get(&quot;expression&quot;));</span>
+<span class="fc" id="L1377">            inner.property(&quot;stepCount&quot;, (int) rep.get(&quot;stepCount&quot;));</span>
+<span class="fc" id="L1378">            inner.property(&quot;elapsedMillis&quot;, (long) rep.get(&quot;elapsedMillis&quot;));</span>
+<span class="fc" id="L1379">            inner.property(&quot;confidenceScore&quot;, (double) rep.get(&quot;confidenceScore&quot;));</span>
+<span class="fc" id="L1380">            inner.property(&quot;learnedRulesActive&quot;, (long) rep.get(&quot;learnedRulesActive&quot;));</span>
+<span class="fc" id="L1381">        })));</span>
+<span class="fc" id="L1382">        w.endObject();</span>
+<span class="fc" id="L1383">        return w.toString();</span>
+    }
+
+    private void handleMemory(HttpExchange exchange) throws IOException {
+<span class="fc" id="L1387">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc" id="L1388">        String suffix = path.substring(&quot;/api/memory&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="fc" id="L1389">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
+<span class="pc bpc" id="L1390" title="4 of 6 branches missed.">        switch (suffix) {</span>
+            case &quot;states&quot; -&gt; {
+<span class="nc" id="L1392">                w.beginObject();</span>
+<span class="nc" id="L1393">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
+<span class="nc" id="L1394">                w.array(&quot;entries&quot;, arr -&gt; searchMemory.table().entries().forEach(e -&gt;</span>
+<span class="nc" id="L1395">                    arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L1396">                        inner.property(&quot;canonicalHash&quot;, e.canonicalHash());</span>
+<span class="nc" id="L1397">                        inner.property(&quot;canonicalExpression&quot;, e.canonicalExpression());</span>
+<span class="nc" id="L1398">                        inner.property(&quot;bestScore&quot;, e.bestScore());</span>
+<span class="nc" id="L1399">                        inner.property(&quot;minDepthSeen&quot;, e.minDepthSeen());</span>
+<span class="nc" id="L1400">                        inner.property(&quot;bestKnownPathId&quot;, e.bestKnownPathId());</span>
+<span class="nc" id="L1401">                        inner.stringArray(&quot;reachedByRuleIds&quot;,</span>
+<span class="nc" id="L1402">                            new java.util.ArrayList&lt;&gt;(e.reachedByRuleIds()));</span>
+<span class="nc" id="L1403">                        inner.property(&quot;visitCount&quot;, e.visitCount());</span>
+<span class="nc" id="L1404">                        inner.property(&quot;firstSeen&quot;, e.firstSeen().toString());</span>
+<span class="nc" id="L1405">                        inner.property(&quot;lastSeen&quot;, e.lastSeen().toString());</span>
+<span class="nc" id="L1406">                    })));</span>
+<span class="nc" id="L1407">                w.endObject();</span>
+<span class="nc" id="L1408">                sendJson(exchange, 200, w.toString());</span>
+<span class="nc" id="L1409">            }</span>
+<span class="nc" id="L1410">            case &quot;pruning&quot; -&gt; sendJson(exchange, 200, renderPruningDecisionsJson());</span>
+            case &quot;macros&quot; -&gt; {
+<span class="nc" id="L1412">                w.beginObject();</span>
+<span class="nc" id="L1413">                w.array(&quot;macros&quot;, arr -&gt; inventoryRepository.findAll().stream()</span>
+<span class="nc bnc" id="L1414" title="All 4 branches missed.">                    .filter(r -&gt; r.occurrenceCount() &gt; 0 || r.confidenceScore() &gt; 0)</span>
+<span class="nc" id="L1415">                    .forEach(r -&gt; arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L1416">                        inner.property(&quot;id&quot;, r.id());</span>
+<span class="nc" id="L1417">                        inner.property(&quot;leftPattern&quot;, r.leftPattern());</span>
+<span class="nc" id="L1418">                        inner.property(&quot;rightPattern&quot;, r.rightPattern());</span>
+<span class="nc" id="L1419">                        inner.property(&quot;occurrenceCount&quot;, r.occurrenceCount());</span>
+<span class="nc" id="L1420">                        inner.property(&quot;confidenceScore&quot;, r.confidenceScore());</span>
+<span class="nc" id="L1421">                        inner.property(&quot;averageImprovement&quot;, r.averageImprovement());</span>
+<span class="nc" id="L1422">                        inner.stringArray(&quot;supportingPathIds&quot;, r.supportingPathIds());</span>
+<span class="nc" id="L1423">                        inner.property(&quot;enabled&quot;, inventoryRepository.isEnabled(r.id()));</span>
+<span class="nc" id="L1424">                    })));</span>
+<span class="nc" id="L1425">                w.endObject();</span>
+<span class="nc" id="L1426">                sendJson(exchange, 200, w.toString());</span>
+<span class="nc" id="L1427">            }</span>
+            case &quot;universal&quot; -&gt; {
+                // Surfaces the top universal patterns + cross-task rule
+                // coverage so the workbench UI can show &quot;the moves that work
+                // everywhere&quot; — see GlobalMemoryService for the scoring rule.
+<span class="fc" id="L1432">                de.regelsuche.search.memory.GlobalMemoryService global =</span>
+<span class="fc" id="L1433">                    new de.regelsuche.search.memory.GlobalMemoryService(searchMemory.table());</span>
+<span class="fc" id="L1434">                java.time.Instant now = java.time.Instant.now();</span>
+<span class="fc" id="L1435">                var topPatterns = global.topUniversalPatterns(20, now);</span>
+<span class="fc" id="L1436">                java.util.Map&lt;String, Integer&gt; coverage = global.ruleCoverage();</span>
+<span class="fc" id="L1437">                w.beginObject();</span>
+<span class="fc" id="L1438">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
+<span class="fc" id="L1439">                w.array(&quot;patterns&quot;, arr -&gt; topPatterns.forEach(entry -&gt;</span>
+<span class="nc" id="L1440">                    arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L1441">                        inner.property(&quot;canonicalHash&quot;, entry.canonicalHash());</span>
+<span class="nc" id="L1442">                        inner.property(&quot;canonicalExpression&quot;, entry.canonicalExpression());</span>
+<span class="nc" id="L1443">                        inner.property(&quot;universalityScore&quot;, global.universalityScore(entry, now));</span>
+<span class="nc" id="L1444">                        inner.property(&quot;visitCount&quot;, entry.visitCount());</span>
+<span class="nc" id="L1445">                        inner.property(&quot;bestScore&quot;, entry.bestScore());</span>
+<span class="nc" id="L1446">                        inner.property(&quot;minDepthSeen&quot;, entry.minDepthSeen());</span>
+<span class="nc" id="L1447">                        inner.property(&quot;bestKnownPathId&quot;, entry.bestKnownPathId());</span>
+<span class="nc" id="L1448">                        inner.stringArray(&quot;reachedByRuleIds&quot;,</span>
+<span class="nc" id="L1449">                            new java.util.ArrayList&lt;&gt;(entry.reachedByRuleIds()));</span>
+<span class="nc" id="L1450">                        inner.property(&quot;firstSeen&quot;, entry.firstSeen().toString());</span>
+<span class="nc" id="L1451">                        inner.property(&quot;lastSeen&quot;, entry.lastSeen().toString());</span>
+<span class="nc" id="L1452">                    })));</span>
+<span class="fc" id="L1453">                w.array(&quot;ruleCoverage&quot;, arr -&gt; coverage.forEach((ruleId, count) -&gt;</span>
+<span class="nc" id="L1454">                    arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L1455">                        inner.property(&quot;ruleId&quot;, ruleId);</span>
+<span class="nc" id="L1456">                        inner.property(&quot;coverage&quot;, count);</span>
+<span class="nc" id="L1457">                    })));</span>
+<span class="fc" id="L1458">                w.endObject();</span>
+<span class="fc" id="L1459">                sendJson(exchange, 200, w.toString());</span>
+<span class="fc" id="L1460">            }</span>
+            case &quot;&quot; -&gt; {
+<span class="fc" id="L1462">                w.beginObject();</span>
+<span class="fc" id="L1463">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
+<span class="fc" id="L1464">                w.property(&quot;pruningDecisions&quot;, searchMemory.decisions().size());</span>
+<span class="fc" id="L1465">                w.object(&quot;links&quot;, l -&gt; {</span>
+<span class="fc" id="L1466">                    l.property(&quot;states&quot;, &quot;/api/memory/states&quot;);</span>
+<span class="fc" id="L1467">                    l.property(&quot;pruning&quot;, &quot;/api/memory/pruning&quot;);</span>
+<span class="fc" id="L1468">                    l.property(&quot;macros&quot;, &quot;/api/memory/macros&quot;);</span>
+<span class="fc" id="L1469">                    l.property(&quot;universal&quot;, &quot;/api/memory/universal&quot;);</span>
+<span class="fc" id="L1470">                });</span>
+<span class="fc" id="L1471">                w.endObject();</span>
+<span class="fc" id="L1472">                sendJson(exchange, 200, w.toString());</span>
+<span class="fc" id="L1473">            }</span>
+<span class="nc" id="L1474">            default -&gt; sendStatus(exchange, 404, &quot;unknown memory endpoint: &quot; + suffix);</span>
+        }
+<span class="fc" id="L1476">    }</span>
+
+    private void handleDemo(HttpExchange exchange) throws IOException {
+<span class="fc" id="L1479">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc" id="L1480">        String suffix = path.substring(&quot;/api/demo&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L1481" title="All 2 branches covered.">        if (suffix.isEmpty()) {</span>
+            // List all available demos.
+<span class="fc" id="L1483">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1484">            writer.beginObject();</span>
+<span class="fc" id="L1485">            writer.array(&quot;demos&quot;, arr -&gt; de.regelsuche.demo.DemoCatalog.all().values().forEach(demo -&gt;</span>
+<span class="fc" id="L1486">                arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L1487">                    inner.property(&quot;id&quot;, demo.id());</span>
+<span class="fc" id="L1488">                    inner.property(&quot;title&quot;, demo.title());</span>
+<span class="fc" id="L1489">                    inner.property(&quot;description&quot;, demo.description());</span>
+<span class="fc" id="L1490">                    inner.property(&quot;expression&quot;, demo.expression());</span>
+<span class="fc" id="L1491">                    inner.property(&quot;inputType&quot;, demo.inputType().name());</span>
+<span class="fc" id="L1492">                    inner.property(&quot;profile&quot;, demo.profile().name());</span>
+<span class="fc" id="L1493">                    inner.property(&quot;expectedHighlight&quot;, demo.expectedHighlight());</span>
+<span class="fc" id="L1494">                    inner.property(&quot;expectedResultExpression&quot;, demo.expectedResultExpression());</span>
+<span class="fc" id="L1495">                    inner.property(&quot;domain&quot;, demo.domain());</span>
+<span class="fc" id="L1496">                })));</span>
+<span class="fc" id="L1497">            writer.endObject();</span>
+<span class="fc" id="L1498">            sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1499">            return;</span>
+        }
+<span class="fc" id="L1501">        de.regelsuche.demo.DemoCatalog.Demo demo = de.regelsuche.demo.DemoCatalog.byId(suffix);</span>
+<span class="pc bpc" id="L1502" title="1 of 2 branches missed.">        if (demo == null) {</span>
+<span class="nc" id="L1503">            sendStatus(exchange, 404, &quot;unknown demo: &quot; + suffix);</span>
+<span class="nc" id="L1504">            return;</span>
+        }
+<span class="fc" id="L1506">        String method = exchange.getRequestMethod();</span>
+<span class="pc bpc" id="L1507" title="2 of 4 branches missed.">        if (!&quot;GET&quot;.equalsIgnoreCase(method) &amp;&amp; !&quot;POST&quot;.equalsIgnoreCase(method)) {</span>
+<span class="nc" id="L1508">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L1509">            return;</span>
+        }
+<span class="pc bpc" id="L1511" title="1 of 4 branches missed.">        if (&quot;macro-learning&quot;.equals(demo.id()) &amp;&amp; &quot;POST&quot;.equalsIgnoreCase(method)) {</span>
+<span class="fc" id="L1512">            sendJson(exchange, 200, runMacroLearningDemo());</span>
+<span class="fc" id="L1513">            return;</span>
+        }
+<span class="fc" id="L1515">        de.regelsuche.demo.DemoService demoService =</span>
+            new de.regelsuche.demo.DemoService(graphStore,
+                new de.regelsuche.transform.AstRewriteTransformationEngine(
+<span class="fc" id="L1518">                    de.regelsuche.demo.DemoRuleSet.rules()),</span>
+                searchMemory);
+<span class="fc" id="L1520">        demoService.useProofBridge(leanProofBridgeService);</span>
+<span class="fc" id="L1521">        de.regelsuche.demo.DemoService.DemoRunResult result = demoService.run(demo);</span>
+<span class="fc" id="L1522">        sendJson(exchange, 200, renderDemoBundle(result));</span>
+<span class="fc" id="L1523">    }</span>
+
+    private String renderDemoBundle(de.regelsuche.demo.DemoService.DemoRunResult result) {
+<span class="fc" id="L1526">        de.regelsuche.demo.DemoCatalog.Demo demo = result.demo();</span>
+<span class="fc" id="L1527">        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(graphStore.discoveredTransformations());</span>
+<span class="fc" id="L1528">        var known = new de.regelsuche.mining.KnownRuleRepository();</span>
+<span class="fc" id="L1529">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1530">        writer.beginObject();</span>
+<span class="fc" id="L1531">        writer.property(&quot;id&quot;, demo.id());</span>
+<span class="fc" id="L1532">        writer.property(&quot;title&quot;, demo.title());</span>
+<span class="fc" id="L1533">        writer.property(&quot;description&quot;, demo.description());</span>
+<span class="fc" id="L1534">        writer.property(&quot;expression&quot;, demo.expression());</span>
+<span class="fc" id="L1535">        writer.property(&quot;inputType&quot;, demo.inputType().name());</span>
+<span class="fc" id="L1536">        writer.property(&quot;profile&quot;, demo.profile().name());</span>
+<span class="fc" id="L1537">        writer.property(&quot;expectedHighlight&quot;, demo.expectedHighlight());</span>
+<span class="fc" id="L1538">        writer.property(&quot;expectedResultExpression&quot;, demo.expectedResultExpression());</span>
+<span class="fc" id="L1539">        writer.property(&quot;domain&quot;, demo.domain());</span>
+<span class="fc" id="L1540">        writer.property(&quot;expressionType&quot;, result.expressionType().name());</span>
+<span class="fc" id="L1541">        writer.property(&quot;comparatorFlipped&quot;, result.comparatorFlipped());</span>
+<span class="fc bfc" id="L1542" title="All 2 branches covered.">        if (!result.inputLatex().isEmpty()) {</span>
+<span class="fc" id="L1543">            writer.property(&quot;inputLatex&quot;, result.inputLatex());</span>
+        }
+<span class="fc bfc" id="L1545" title="All 2 branches covered.">        if (!result.resultLatex().isEmpty()) {</span>
+<span class="fc" id="L1546">            writer.property(&quot;resultLatex&quot;, result.resultLatex());</span>
+        }
+<span class="fc bfc" id="L1548" title="All 2 branches covered.">        if (result.proofOutcome() != null) {</span>
+<span class="fc" id="L1549">            writer.object(&quot;proofOutcome&quot;, po -&gt; {</span>
+<span class="fc" id="L1550">                var outcome = result.proofOutcome();</span>
+<span class="fc" id="L1551">                po.property(&quot;proofStatus&quot;, outcome.candidate().proofStatus().name());</span>
+<span class="fc bfc" id="L1552" title="All 2 branches covered.">                if (outcome.execution() != null) {</span>
+<span class="fc" id="L1553">                    po.property(&quot;proverStatus&quot;, outcome.execution().status().name());</span>
+<span class="fc" id="L1554">                    po.property(&quot;exitCode&quot;, outcome.execution().exitCode());</span>
+<span class="fc" id="L1555">                    po.property(&quot;stdout&quot;, outcome.execution().stdout());</span>
+<span class="fc" id="L1556">                    po.property(&quot;stderr&quot;, outcome.execution().stderr());</span>
+<span class="fc" id="L1557">                    po.property(&quot;elapsedMillis&quot;, outcome.execution().durationMillis());</span>
+                }
+<span class="pc bpc" id="L1559" title="1 of 2 branches missed.">                if (outcome.attempt() != null) {</span>
+<span class="fc" id="L1560">                    po.property(&quot;artifact&quot;, outcome.attempt().artifact());</span>
+<span class="fc" id="L1561">                    po.property(&quot;tool&quot;, outcome.attempt().tool());</span>
+                }
+<span class="fc" id="L1563">            });</span>
+        }
+<span class="fc" id="L1565">        writer.property(&quot;canonicalTargetExpression&quot;,</span>
+<span class="pc bpc" id="L1566" title="1 of 2 branches missed.">            result.canonicalTargetExpression() == null ? &quot;&quot; : result.canonicalTargetExpression());</span>
+<span class="fc" id="L1567">        writer.property(&quot;rootExpression&quot;, result.rootExpression());</span>
+<span class="fc" id="L1568">        writer.property(&quot;targetReached&quot;, result.targetReached());</span>
+<span class="fc" id="L1569">        writer.stringArray(&quot;assumptions&quot;, result.assumptions());</span>
+<span class="fc" id="L1570">        writer.object(&quot;metrics&quot;, m -&gt; {</span>
+<span class="fc" id="L1571">            m.property(&quot;nodes&quot;, result.nodesSaved());</span>
+<span class="fc" id="L1572">            m.property(&quot;edges&quot;, result.edgesSaved());</span>
+<span class="fc" id="L1573">            m.property(&quot;pathsDiscovered&quot;, result.pathsDiscovered());</span>
+<span class="fc" id="L1574">            m.property(&quot;elapsedMillis&quot;, result.elapsedMillis());</span>
+<span class="fc" id="L1575">            m.property(&quot;identitiesFound&quot;, macros.size());</span>
+<span class="fc" id="L1576">            m.property(&quot;appliedRuleCount&quot;, result.appliedRuleIds().size());</span>
+<span class="fc" id="L1577">        });</span>
+<span class="fc" id="L1578">        writePath(writer, &quot;selectedPath&quot;, result.selectedPath());</span>
+<span class="fc" id="L1579">        writePath(writer, &quot;bestPath&quot;, result.bestPath());</span>
+<span class="fc" id="L1580">        writePath(writer, &quot;targetPath&quot;, result.targetPath());</span>
+<span class="fc" id="L1581">        writer.array(&quot;identities&quot;, arr -&gt; macros.forEach(macro -&gt;</span>
+<span class="fc" id="L1582">            arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L1583">                inner.property(&quot;id&quot;, macro.id());</span>
+<span class="fc" id="L1584">                inner.property(&quot;leftPattern&quot;, macro.leftPattern());</span>
+<span class="fc" id="L1585">                inner.property(&quot;rightPattern&quot;, macro.rightPattern());</span>
+<span class="fc" id="L1586">                inner.property(&quot;occurrences&quot;, macro.occurrences());</span>
+<span class="fc" id="L1587">                inner.property(&quot;compressionRatio&quot;, macro.compressionRatio());</span>
+<span class="fc" id="L1588">                inner.property(&quot;proofStatus&quot;, macro.proofStatus().name());</span>
+<span class="fc" id="L1589">                inner.property(&quot;knownRuleStatus&quot;,</span>
+<span class="fc" id="L1590">                    known.statusFor(macro.leftPattern(), macro.rightPattern()).name());</span>
+<span class="fc" id="L1591">                inner.property(&quot;domain&quot;,</span>
+<span class="fc" id="L1592">                    new de.regelsuche.mining.MacroDomainInferrer().inferDomain(macro));</span>
+<span class="fc" id="L1593">            })));</span>
+<span class="fc" id="L1594">        writer.object(&quot;links&quot;, l -&gt; {</span>
+<span class="fc" id="L1595">            l.property(&quot;searchGraph&quot;, &quot;/api/search-graph&quot;);</span>
+<span class="fc" id="L1596">            l.property(&quot;paths&quot;, &quot;/api/paths&quot;);</span>
+<span class="fc" id="L1597">            l.property(&quot;identities&quot;, &quot;/api/identities&quot;);</span>
+<span class="fc" id="L1598">            l.property(&quot;candidates&quot;, &quot;/api/candidates&quot;);</span>
+<span class="fc" id="L1599">            l.property(&quot;inventory&quot;, &quot;/api/inventory&quot;);</span>
+<span class="fc" id="L1600">            l.property(&quot;reportMarkdown&quot;, &quot;/api/exports/search-analysis-report.md&quot;);</span>
+<span class="fc" id="L1601">            l.property(&quot;reportLatex&quot;, &quot;/api/exports/search-analysis-report.tex&quot;);</span>
+<span class="fc" id="L1602">            l.property(&quot;reportJson&quot;, &quot;/api/exports/search-analysis-report.json&quot;);</span>
+<span class="fc" id="L1603">            l.property(&quot;searchGraphMermaid&quot;, &quot;/api/exports/search-graph.mmd&quot;);</span>
+<span class="fc" id="L1604">            l.property(&quot;searchGraphGraphMl&quot;, &quot;/api/exports/search-graph.graphml&quot;);</span>
+<span class="fc" id="L1605">            l.property(&quot;reportBundleZip&quot;, &quot;/api/exports/bundle.zip&quot;);</span>
+<span class="fc" id="L1606">            l.property(&quot;analyzeMove&quot;, &quot;/api/analyze/move?expression=&quot; + demo.expression());</span>
+<span class="fc" id="L1607">        });</span>
+<span class="fc" id="L1608">        writer.endObject();</span>
+<span class="fc" id="L1609">        return writer.toString();</span>
+    }
+
+    private static void writePath(JsonWriter writer, String key,
+                                  de.regelsuche.discovery.DiscoveredTransformation path) {
+<span class="pc bpc" id="L1614" title="1 of 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L1615">            writer.nullProperty(key);</span>
+<span class="nc" id="L1616">            return;</span>
+        }
+<span class="fc" id="L1618">        writer.object(key, b -&gt; {</span>
+<span class="fc" id="L1619">            b.property(&quot;id&quot;, path.id());</span>
+<span class="fc" id="L1620">            b.property(&quot;originalExpression&quot;, path.originalExpression());</span>
+<span class="fc" id="L1621">            b.property(&quot;improvedExpression&quot;, path.improvedExpression());</span>
+<span class="fc" id="L1622">            b.property(&quot;totalImprovement&quot;, path.totalImprovement());</span>
+<span class="fc" id="L1623">            b.property(&quot;steps&quot;, path.steps().size());</span>
+<span class="fc" id="L1624">            b.property(&quot;proofStatus&quot;, path.validationStatus().name());</span>
+<span class="fc" id="L1625">            b.array(&quot;stepDetails&quot;, arr -&gt; path.steps().forEach(step -&gt;</span>
+<span class="fc" id="L1626">                arr.objectValue(s -&gt; {</span>
+<span class="fc" id="L1627">                    s.property(&quot;index&quot;, step.index());</span>
+<span class="fc" id="L1628">                    s.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
+<span class="fc" id="L1629">                    s.property(&quot;afterExpression&quot;, step.afterExpression());</span>
+<span class="fc" id="L1630">                    s.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L1631">                    s.property(&quot;ruleKind&quot;, step.ruleKind().name());</span>
+<span class="fc" id="L1632">                    s.property(&quot;scoreBefore&quot;, step.scoreBefore());</span>
+<span class="fc" id="L1633">                    s.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
+<span class="fc" id="L1634">                    s.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="fc" id="L1635">                })));</span>
+<span class="fc" id="L1636">        });</span>
+<span class="fc" id="L1637">    }</span>
+
+    private void handleProofStatus(HttpExchange exchange) throws IOException {
+<span class="nc bnc" id="L1640" title="All 2 branches missed.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L1641">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L1642">            return;</span>
+        }
+<span class="nc" id="L1644">        JsonWriter writer = new JsonWriter();</span>
+<span class="nc" id="L1645">        writer.beginObject();</span>
+<span class="nc" id="L1646">        writer.array(&quot;statuses&quot;, arr -&gt;</span>
+<span class="nc" id="L1647">            de.regelsuche.proof.ProofStatusDescription.all().values().forEach(d -&gt;</span>
+<span class="nc" id="L1648">                arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L1649">                    inner.property(&quot;status&quot;, d.status().name());</span>
+<span class="nc" id="L1650">                    inner.property(&quot;ordinal&quot;, d.status().ordinal());</span>
+<span class="nc" id="L1651">                    inner.property(&quot;label&quot;, d.label());</span>
+<span class="nc" id="L1652">                    inner.property(&quot;descriptionDe&quot;, d.summaryDe());</span>
+<span class="nc" id="L1653">                    inner.property(&quot;descriptionEn&quot;, d.summaryEn());</span>
+<span class="nc" id="L1654">                })));</span>
+<span class="nc" id="L1655">        writer.endObject();</span>
+<span class="nc" id="L1656">        sendJson(exchange, 200, writer.toString());</span>
+<span class="nc" id="L1657">    }</span>
+
+    /**
+     * POST /api/proof-bridge — body {@code {&quot;leftPattern&quot;: &quot;...&quot;, &quot;rightPattern&quot;: &quot;...&quot;,
+     * &quot;assumptions&quot;: [&quot;x != 0&quot;, ...], &quot;tool&quot;: &quot;lean4&quot;|&quot;smt&quot;}}.
+     *
+     * &lt;p&gt;Runs the configured {@link de.regelsuche.proof.ProofBridgeService}
+     * (Lean / SMT) and returns prover status, exit code, stdout, stderr,
+     * elapsed time, and the generated proof script so the UI's &quot;Proof prüfen&quot;
+     * button can render the full execution result. Only a successful prover
+     * run actually promotes the candidate to {@code FORMALLY_PROVED}; without
+     * an executor configured we report {@code SCRIPT_GENERATED}.&lt;/p&gt;
+     */
+    private void handleProofBridge(HttpExchange exchange) throws IOException {
+<span class="pc bpc" id="L1671" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L1672">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L1673">            return;</span>
+        }
+<span class="fc" id="L1675">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
+<span class="fc" id="L1676">        String left = stringValue(body, &quot;leftPattern&quot;, &quot;&quot;);</span>
+<span class="fc" id="L1677">        String right = stringValue(body, &quot;rightPattern&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L1678" title="2 of 4 branches missed.">        if (left.isBlank() || right.isBlank()) {</span>
+<span class="nc" id="L1679">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
+<span class="nc" id="L1680">            return;</span>
+        }
+<span class="fc" id="L1682">        String tool = stringValue(body, &quot;tool&quot;, &quot;lean4&quot;).toLowerCase(java.util.Locale.ROOT);</span>
+        de.regelsuche.proof.ProofBridgeService service =
+<span class="pc bpc" id="L1684" title="1 of 2 branches missed.">            &quot;smt&quot;.equals(tool) ? smtProofBridgeService : leanProofBridgeService;</span>
+<span class="fc" id="L1685">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc" id="L1686">        Object raw = body.get(&quot;assumptions&quot;);</span>
+<span class="fc bfc" id="L1687" title="All 2 branches covered.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="pc bpc" id="L1688" title="1 of 2 branches missed.">            for (Object item : list) {</span>
+<span class="nc bnc" id="L1689" title="All 2 branches missed.">                if (item != null) {</span>
+<span class="nc" id="L1690">                    assumptions.add(new de.regelsuche.assumption.Assumption(</span>
+<span class="nc" id="L1691">                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));</span>
+                }
+<span class="nc" id="L1693">            }</span>
+        }
+<span class="fc" id="L1695">        de.regelsuche.mining.RuleCandidate candidate = new de.regelsuche.mining.RuleCandidate(</span>
+            left, right, 1, 1.0, 1, true, true, false,
+<span class="fc" id="L1697">            List.of(),</span>
+            de.regelsuche.mining.RuleStatus.NEW,
+            de.regelsuche.mining.CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+<span class="fc" id="L1700">            Integer.toHexString((left + &quot;-&gt;&quot; + right).hashCode()),</span>
+<span class="fc" id="L1701">            List.of()</span>
+        );
+<span class="fc" id="L1703">        de.regelsuche.proof.ProofBridgeService.ProofAttemptOutcome outcome =</span>
+<span class="fc" id="L1704">            service.attemptWithDetails(candidate, assumptions);</span>
+
+<span class="fc" id="L1706">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1707">        writer.beginObject();</span>
+<span class="fc" id="L1708">        writer.property(&quot;leftPattern&quot;, left);</span>
+<span class="fc" id="L1709">        writer.property(&quot;rightPattern&quot;, right);</span>
+<span class="fc" id="L1710">        writer.property(&quot;tool&quot;, tool);</span>
+<span class="fc" id="L1711">        writer.property(&quot;proofStatus&quot;, outcome.candidate().proofStatus().name());</span>
+<span class="fc bfc" id="L1712" title="All 2 branches covered.">        if (outcome.execution() != null) {</span>
+<span class="fc" id="L1713">            writer.property(&quot;proverStatus&quot;, outcome.execution().status().name());</span>
+<span class="fc" id="L1714">            writer.property(&quot;exitCode&quot;, outcome.execution().exitCode());</span>
+<span class="fc" id="L1715">            writer.property(&quot;stdout&quot;, outcome.execution().stdout());</span>
+<span class="fc" id="L1716">            writer.property(&quot;stderr&quot;, outcome.execution().stderr());</span>
+<span class="fc" id="L1717">            writer.property(&quot;elapsedMillis&quot;, outcome.execution().durationMillis());</span>
+        } else {
+            // No executor configured — be explicit so the UI can show the
+            // &quot;script generated only&quot; state instead of leaving the field
+            // absent.
+<span class="fc" id="L1722">            writer.property(&quot;proverStatus&quot;,</span>
+<span class="fc" id="L1723">                de.regelsuche.proof.ProverExecutionResult.Status.SCRIPT_GENERATED.name());</span>
+<span class="fc" id="L1724">            writer.property(&quot;exitCode&quot;, -1);</span>
+<span class="fc" id="L1725">            writer.property(&quot;stdout&quot;, &quot;&quot;);</span>
+<span class="fc" id="L1726">            writer.property(&quot;stderr&quot;, &quot;&quot;);</span>
+<span class="fc" id="L1727">            writer.property(&quot;elapsedMillis&quot;, 0L);</span>
+        }
+<span class="pc bpc" id="L1729" title="1 of 2 branches missed.">        if (outcome.attempt() != null) {</span>
+<span class="fc" id="L1730">            writer.property(&quot;artifact&quot;, outcome.attempt().artifact());</span>
+<span class="fc" id="L1731">            writer.property(&quot;artifactTool&quot;, outcome.attempt().tool());</span>
+        }
+<span class="fc" id="L1733">        writer.endObject();</span>
+<span class="fc" id="L1734">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1735">    }</span>
+
+    // ── Proof Job REST API ─────────────────────────────────────────────────
+    //
+    // Routes (all under {@code /api/proof/jobs}, registered as a single
+    // prefix context):
+    //   GET    /api/proof/jobs                              → list all jobs
+    //   POST   /api/proof/jobs                              → submit a new job
+    //   GET    /api/proof/jobs/{id}                         → job details
+    //   POST   /api/proof/jobs/{id}/cancel                  → cancel
+    //   GET    /api/proof/jobs/{id}/artifacts               → bundle file list
+    //   GET    /api/proof/jobs/{id}/artifacts/{name}        → fetch file body
+
+    private void handleProofJobs(HttpExchange exchange) throws IOException {
+<span class="pc bpc" id="L1749" title="1 of 2 branches missed.">        if (proofWorkbenchService == null) {</span>
+<span class="nc" id="L1750">            sendStatus(exchange, 503, &quot;proof workbench disabled &quot;</span>
+                + &quot;(set REGELSUCHE_PROOF_ENABLED=true)&quot;);
+<span class="nc" id="L1752">            return;</span>
+        }
+<span class="fc" id="L1754">        String path = exchange.getRequestURI().getPath();</span>
+        // Strip &quot;/api/proof/jobs&quot; prefix and split.
+<span class="fc" id="L1756">        String suffix = path.substring(&quot;/api/proof/jobs&quot;.length());</span>
+<span class="fc" id="L1757">        String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);</span>
+
+<span class="pc bpc" id="L1759" title="1 of 4 branches missed.">        if (suffix.isEmpty() || &quot;/&quot;.equals(suffix)) {</span>
+<span class="fc bfc" id="L1760" title="All 2 branches covered.">            if (&quot;GET&quot;.equals(method)) {</span>
+<span class="fc" id="L1761">                handleProofJobList(exchange);</span>
+<span class="pc bpc" id="L1762" title="1 of 2 branches missed.">            } else if (&quot;POST&quot;.equals(method)) {</span>
+<span class="fc" id="L1763">                handleProofJobCreate(exchange);</span>
+            } else {
+<span class="nc" id="L1765">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+            }
+<span class="fc" id="L1767">            return;</span>
+        }
+
+<span class="fc" id="L1770">        String[] parts = suffix.substring(1).split(&quot;/&quot;, -1);</span>
+<span class="fc" id="L1771">        String jobId = parts[0];</span>
+<span class="fc bfc" id="L1772" title="All 2 branches covered.">        if (parts.length == 1) {</span>
+<span class="pc bpc" id="L1773" title="1 of 2 branches missed.">            if (&quot;GET&quot;.equals(method)) {</span>
+<span class="fc" id="L1774">                handleProofJobGet(exchange, jobId);</span>
+            } else {
+<span class="nc" id="L1776">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+            }
+<span class="fc" id="L1778">            return;</span>
+        }
+<span class="fc bfc" id="L1780" title="All 4 branches covered.">        if (parts.length == 2 &amp;&amp; &quot;cancel&quot;.equals(parts[1])) {</span>
+<span class="pc bpc" id="L1781" title="1 of 2 branches missed.">            if (&quot;POST&quot;.equals(method)) {</span>
+<span class="fc" id="L1782">                handleProofJobCancel(exchange, jobId);</span>
+            } else {
+<span class="nc" id="L1784">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+            }
+<span class="fc" id="L1786">            return;</span>
+        }
+<span class="pc bpc" id="L1788" title="1 of 4 branches missed.">        if (parts.length == 2 &amp;&amp; &quot;artifacts&quot;.equals(parts[1])) {</span>
+<span class="pc bpc" id="L1789" title="1 of 2 branches missed.">            if (&quot;GET&quot;.equals(method)) {</span>
+<span class="fc" id="L1790">                handleProofJobArtifactList(exchange, jobId);</span>
+            } else {
+<span class="nc" id="L1792">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+            }
+<span class="fc" id="L1794">            return;</span>
+        }
+<span class="pc bpc" id="L1796" title="3 of 4 branches missed.">        if (parts.length == 3 &amp;&amp; &quot;artifacts&quot;.equals(parts[1])) {</span>
+<span class="nc bnc" id="L1797" title="All 2 branches missed.">            if (&quot;GET&quot;.equals(method)) {</span>
+<span class="nc" id="L1798">                handleProofJobArtifactRead(exchange, jobId, parts[2]);</span>
+            } else {
+<span class="nc" id="L1800">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+            }
+<span class="nc" id="L1802">            return;</span>
+        }
+<span class="fc" id="L1804">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="fc" id="L1805">    }</span>
+
+    private void handleProofJobList(HttpExchange exchange) throws IOException {
+<span class="fc" id="L1808">        var jobs = proofWorkbenchService.listJobs();</span>
+<span class="fc" id="L1809">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1810">        writer.beginObject();</span>
+<span class="fc" id="L1811">        writer.array(&quot;jobs&quot;, arr -&gt; jobs.forEach(job -&gt;</span>
+<span class="fc" id="L1812">            arr.objectValue(o -&gt; writeProofJobJson(o, job))));</span>
+<span class="fc" id="L1813">        writer.endObject();</span>
+<span class="fc" id="L1814">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1815">    }</span>
+
+    private void handleProofJobCreate(HttpExchange exchange) throws IOException {
+<span class="fc" id="L1818">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
+<span class="fc" id="L1819">        String left = stringValue(body, &quot;leftPattern&quot;, &quot;&quot;).trim();</span>
+<span class="fc" id="L1820">        String right = stringValue(body, &quot;rightPattern&quot;, &quot;&quot;).trim();</span>
+<span class="pc bpc" id="L1821" title="1 of 4 branches missed.">        if (left.isBlank() || right.isBlank()) {</span>
+<span class="fc" id="L1822">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
+<span class="fc" id="L1823">            return;</span>
+        }
+<span class="fc" id="L1825">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
+<span class="fc bfc" id="L1826" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
+<span class="fc" id="L1827">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
+<span class="fc" id="L1828">            return;</span>
+        }
+<span class="fc" id="L1830">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
+<span class="fc bfc" id="L1831" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
+<span class="fc" id="L1832">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="fc" id="L1833">            return;</span>
+        }
+<span class="fc" id="L1835">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc" id="L1836">        Object raw = body.get(&quot;assumptions&quot;);</span>
+<span class="pc bpc" id="L1837" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="nc bnc" id="L1838" title="All 2 branches missed.">            for (Object item : list) {</span>
+<span class="nc bnc" id="L1839" title="All 2 branches missed.">                if (item == null) {</span>
+<span class="nc" id="L1840">                    continue;</span>
+                }
+<span class="nc bnc" id="L1842" title="All 2 branches missed.">                if (item instanceof Map&lt;?, ?&gt; map) {</span>
+<span class="nc" id="L1843">                    Object exprRaw = map.get(&quot;expression&quot;);</span>
+<span class="nc bnc" id="L1844" title="All 2 branches missed.">                    String expr = exprRaw == null ? &quot;&quot; : String.valueOf(exprRaw);</span>
+<span class="nc" id="L1845">                    Object kindObj = map.get(&quot;kind&quot;);</span>
+<span class="nc bnc" id="L1846" title="All 2 branches missed.">                    String kindRaw = kindObj == null ? &quot;CUSTOM&quot; : String.valueOf(kindObj);</span>
+                    de.regelsuche.assumption.Assumption.Kind kind;
+                    try {
+<span class="nc" id="L1849">                        kind = de.regelsuche.assumption.Assumption.Kind.valueOf(</span>
+<span class="nc" id="L1850">                            kindRaw.toUpperCase(Locale.ROOT));</span>
+<span class="nc" id="L1851">                    } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L1852">                        kind = de.regelsuche.assumption.Assumption.Kind.CUSTOM;</span>
+<span class="nc" id="L1853">                    }</span>
+<span class="nc" id="L1854">                    assumptions.add(new de.regelsuche.assumption.Assumption(kind, expr));</span>
+<span class="nc" id="L1855">                } else {</span>
+<span class="nc" id="L1856">                    assumptions.add(new de.regelsuche.assumption.Assumption(</span>
+<span class="nc" id="L1857">                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));</span>
+                }
+<span class="nc" id="L1859">            }</span>
+        }
+<span class="fc" id="L1861">        String jobId = proofWorkbenchService.submit(left, right, assumptions, priority);</span>
+<span class="fc" id="L1862">        var job = proofWorkbenchService.getJob(jobId).orElse(null);</span>
+<span class="fc" id="L1863">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1864">        writer.beginObject();</span>
+<span class="fc" id="L1865">        writer.property(&quot;jobId&quot;, jobId);</span>
+<span class="pc bpc" id="L1866" title="1 of 2 branches missed.">        if (job != null) {</span>
+<span class="fc" id="L1867">            writer.property(&quot;status&quot;, job.status().name());</span>
+<span class="fc" id="L1868">            writer.property(&quot;workerId&quot;, job.workerType());</span>
+        }
+<span class="fc" id="L1870">        writer.endObject();</span>
+<span class="fc" id="L1871">        sendJson(exchange, 201, writer.toString());</span>
+<span class="fc" id="L1872">    }</span>
+
+    private void handleProofJobGet(HttpExchange exchange, String jobId) throws IOException {
+<span class="fc" id="L1875">        var job = proofWorkbenchService.getJob(jobId);</span>
+<span class="fc bfc" id="L1876" title="All 2 branches covered.">        if (job.isEmpty()) {</span>
+<span class="fc" id="L1877">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
+<span class="fc" id="L1878">            return;</span>
+        }
+<span class="fc" id="L1880">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1881">        writer.beginObject();</span>
+<span class="fc" id="L1882">        writeProofJobJson(writer, job.get());</span>
+<span class="fc" id="L1883">        writer.endObject();</span>
+<span class="fc" id="L1884">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1885">    }</span>
+
+    private void handleProofJobCancel(HttpExchange exchange, String jobId) throws IOException {
+<span class="fc" id="L1888">        var cancelled = proofWorkbenchService.cancel(jobId);</span>
+<span class="pc bpc" id="L1889" title="1 of 2 branches missed.">        if (cancelled.isEmpty()) {</span>
+<span class="nc" id="L1890">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
+<span class="nc" id="L1891">            return;</span>
+        }
+<span class="fc" id="L1893">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1894">        writer.beginObject();</span>
+<span class="fc" id="L1895">        writeProofJobJson(writer, cancelled.get());</span>
+<span class="fc" id="L1896">        writer.endObject();</span>
+<span class="fc" id="L1897">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1898">    }</span>
+
+    private void handleProofJobArtifactList(HttpExchange exchange, String jobId) throws IOException {
+<span class="pc bpc" id="L1901" title="1 of 2 branches missed.">        if (proofWorkbenchService.getJob(jobId).isEmpty()) {</span>
+<span class="nc" id="L1902">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
+<span class="nc" id="L1903">            return;</span>
+        }
+<span class="fc" id="L1905">        var names = proofWorkbenchService.listArtifacts(jobId);</span>
+<span class="fc" id="L1906">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1907">        writer.beginObject();</span>
+<span class="fc" id="L1908">        writer.property(&quot;jobId&quot;, jobId);</span>
+<span class="fc" id="L1909">        writer.array(&quot;artifacts&quot;, arr -&gt; names.forEach(arr::value));</span>
+<span class="fc" id="L1910">        writer.endObject();</span>
+<span class="fc" id="L1911">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1912">    }</span>
+
+    private void handleProofJobArtifactRead(HttpExchange exchange, String jobId, String name) throws IOException {
+        // Defence-in-depth: refuse traversal even though the artifact repo
+        // already validates ids.
+<span class="nc bnc" id="L1917" title="All 6 branches missed.">        if (name.contains(&quot;..&quot;) || name.contains(&quot;/&quot;) || name.contains(&quot;\\&quot;)) {</span>
+<span class="nc" id="L1918">            sendStatus(exchange, 400, &quot;invalid artifact name&quot;);</span>
+<span class="nc" id="L1919">            return;</span>
+        }
+<span class="nc" id="L1921">        var body = proofWorkbenchService.readArtifact(jobId, name);</span>
+<span class="nc bnc" id="L1922" title="All 2 branches missed.">        if (body.isEmpty()) {</span>
+<span class="nc" id="L1923">            sendStatus(exchange, 404, &quot;artifact not found: &quot; + jobId + &quot;/&quot; + name);</span>
+<span class="nc" id="L1924">            return;</span>
+        }
+<span class="nc" id="L1926">        String contentType = &quot;text/plain; charset=utf-8&quot;;</span>
+<span class="nc bnc" id="L1927" title="All 2 branches missed.">        if (name.endsWith(&quot;.json&quot;)) {</span>
+<span class="nc" id="L1928">            contentType = &quot;application/json; charset=utf-8&quot;;</span>
+        }
+<span class="nc" id="L1930">        send(exchange, 200, contentType, body.get());</span>
+<span class="nc" id="L1931">    }</span>
+
+    private void writeProofJobJson(JsonWriter writer, de.regelsuche.proof.ProofJob job) {
+<span class="fc" id="L1934">        writer.property(&quot;id&quot;, job.id());</span>
+<span class="fc" id="L1935">        writer.property(&quot;leftPattern&quot;, job.leftPattern());</span>
+<span class="fc" id="L1936">        writer.property(&quot;rightPattern&quot;, job.rightPattern());</span>
+<span class="fc" id="L1937">        writer.property(&quot;status&quot;, job.status().name());</span>
+<span class="fc" id="L1938">        writer.property(&quot;priority&quot;, job.priority());</span>
+<span class="fc" id="L1939">        writer.property(&quot;retryCount&quot;, job.retryCount());</span>
+<span class="fc" id="L1940">        writer.property(&quot;maxRetries&quot;, job.maxRetries());</span>
+<span class="fc" id="L1941">        writer.property(&quot;workerId&quot;, job.workerType());</span>
+<span class="fc" id="L1942">        writer.property(&quot;createdAt&quot;, job.createdAt().toString());</span>
+<span class="fc" id="L1943">        writer.property(&quot;updatedAt&quot;, job.updatedAt().toString());</span>
+<span class="pc bpc" id="L1944" title="1 of 2 branches missed.">        writer.property(&quot;proofStatus&quot;, job.resultStatus() == null ? &quot;&quot; : job.resultStatus().name());</span>
+<span class="fc" id="L1945">        writer.property(&quot;errorMessage&quot;, job.errorMessage());</span>
+<span class="fc" id="L1946">        writer.array(&quot;assumptions&quot;, arr -&gt; job.assumptions().forEach(a -&gt;</span>
+<span class="nc" id="L1947">            arr.objectValue(o -&gt; {</span>
+<span class="nc" id="L1948">                o.property(&quot;kind&quot;, a.kind().name());</span>
+<span class="nc" id="L1949">                o.property(&quot;expression&quot;, a.expression());</span>
+<span class="nc" id="L1950">            })));</span>
+<span class="fc" id="L1951">    }</span>
+
+    private void handleBenchmark(HttpExchange exchange) throws IOException {
+<span class="pc bpc" id="L1954" title="1 of 2 branches missed.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L1955">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L1956">            return;</span>
+        }
+<span class="fc" id="L1958">        long started = System.nanoTime();</span>
+<span class="fc" id="L1959">        var suite = new de.regelsuche.benchmark.BenchmarkSuite();</span>
+<span class="fc" id="L1960">        List&lt;de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult&gt; results = suite.runAll();</span>
+<span class="fc" id="L1961">        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;</span>
+<span class="fc" id="L1962">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L1963">        writer.beginObject();</span>
+<span class="fc" id="L1964">        writer.property(&quot;elapsedMillis&quot;, elapsedMillis);</span>
+<span class="fc" id="L1965">        writer.array(&quot;scenarios&quot;, scenarios -&gt; results.forEach(scenario -&gt;</span>
+<span class="fc" id="L1966">            scenarios.objectValue(s -&gt; {</span>
+<span class="fc" id="L1967">                s.property(&quot;name&quot;, scenario.name());</span>
+<span class="fc" id="L1968">                s.array(&quot;results&quot;, rows -&gt; scenario.results().forEach(row -&gt;</span>
+<span class="fc" id="L1969">                    rows.objectValue(r -&gt; {</span>
+<span class="fc" id="L1970">                        r.property(&quot;strategy&quot;, row.strategyName());</span>
+<span class="fc" id="L1971">                        r.property(&quot;expression&quot;, row.expression());</span>
+<span class="fc" id="L1972">                        r.property(&quot;exploredStates&quot;, row.exploredStates());</span>
+<span class="fc" id="L1973">                        r.property(&quot;visitedStates&quot;, row.visitedStates());</span>
+<span class="fc" id="L1974">                        r.property(&quot;bestImprovement&quot;, row.bestImprovement());</span>
+<span class="fc" id="L1975">                        r.property(&quot;shortestImprovingDepth&quot;, row.shortestImprovingDepth());</span>
+<span class="fc" id="L1976">                        r.property(&quot;expandedSteps&quot;, row.expandedSteps());</span>
+<span class="fc" id="L1977">                        r.property(&quot;distinctRules&quot;, row.distinctRules());</span>
+<span class="fc" id="L1978">                        r.property(&quot;elapsedMillis&quot;, row.elapsedMillis());</span>
+<span class="fc" id="L1979">                        r.property(&quot;proofStatus&quot;, row.proofStatus().name());</span>
+<span class="fc" id="L1980">                        r.property(&quot;found&quot;, row.found());</span>
+                        // Quality metrics (&quot;Ampelstatus&quot; surface).
+<span class="fc bfc" id="L1982" title="All 2 branches covered.">                        if (row.expectedResultMatched() != null) {</span>
+<span class="fc" id="L1983">                            r.property(&quot;expectedResultMatched&quot;, row.expectedResultMatched());</span>
+                        } else {
+<span class="fc" id="L1985">                            r.nullProperty(&quot;expectedResultMatched&quot;);</span>
+                        }
+<span class="fc" id="L1987">                        r.property(&quot;prunedStates&quot;, row.prunedStates());</span>
+<span class="fc" id="L1988">                        r.property(&quot;eGraphClasses&quot;, row.eGraphClasses());</span>
+<span class="fc" id="L1989">                        r.property(&quot;eGraphNodes&quot;, row.eGraphNodes());</span>
+<span class="fc" id="L1990">                        r.property(&quot;saturationSavings&quot;, row.saturationSavings());</span>
+<span class="fc" id="L1991">                        r.property(&quot;learnedRuleUsed&quot;, row.learnedRuleUsed());</span>
+<span class="fc" id="L1992">                        r.property(&quot;exportBundleValid&quot;, row.exportBundleValid());</span>
+<span class="fc" id="L1993">                        r.property(&quot;quality&quot;, row.qualityLabel());</span>
+<span class="fc" id="L1994">                    })));</span>
+<span class="fc" id="L1995">            })));</span>
+<span class="fc" id="L1996">        writer.endObject();</span>
+<span class="fc" id="L1997">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L1998">    }</span>
+
+    private byte[] buildReportBundleZip() throws IOException {
+<span class="fc" id="L2001">        var report = new de.regelsuche.export.SearchAnalysisReportService();</span>
+<span class="fc" id="L2002">        var ctx = analysisReportContext();</span>
+<span class="fc" id="L2003">        var transformations = graphStore.discoveredTransformations();</span>
+<span class="fc" id="L2004">        var graph = buildSearchGraph();</span>
+<span class="fc" id="L2005">        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();</span>
+<span class="fc" id="L2006">        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {</span>
+<span class="fc" id="L2007">            putZipEntry(zip, &quot;search-analysis-report.md&quot;, report.renderMarkdown(ctx));</span>
+<span class="fc" id="L2008">            putZipEntry(zip, &quot;search-analysis-report.tex&quot;, report.renderLatex(ctx));</span>
+<span class="fc" id="L2009">            putZipEntry(zip, &quot;search-analysis-report.json&quot;, report.renderJson(ctx));</span>
+<span class="fc" id="L2010">            putZipEntry(zip, &quot;transformations.md&quot;, exportService.exportMarkdown(transformations));</span>
+<span class="fc" id="L2011">            putZipEntry(zip, &quot;transformations.tex&quot;, exportService.exportLatex(transformations));</span>
+<span class="fc" id="L2012">            putZipEntry(zip, &quot;transformations.json&quot;, exportService.exportBundle(exportQuery.bundle()));</span>
+<span class="fc" id="L2013">            putZipEntry(zip, &quot;search-graph.mmd&quot;, exportService.exportSearchGraphMermaid(graph));</span>
+<span class="fc" id="L2014">            putZipEntry(zip, &quot;search-graph.graphml&quot;, exportService.exportSearchGraphGraphMl(graph));</span>
+<span class="fc" id="L2015">            putZipEntry(zip, &quot;search-graph.json&quot;, exportService.exportSearchGraphJson(graph));</span>
+<span class="fc" id="L2016">            putZipEntry(zip, &quot;best-path.md&quot;, exportService.exportBestPathMarkdown(transformations));</span>
+<span class="fc" id="L2017">            putZipEntry(zip, &quot;rule-inventory.json&quot;,</span>
+<span class="fc" id="L2018">                exportService.exportJson(List.of(), List.of(), inventoryRepository.findAll()));</span>
+<span class="fc" id="L2019">            putZipEntry(zip, &quot;pruning-decisions.json&quot;, renderPruningDecisionsJson());</span>
+        }
+<span class="fc" id="L2021">        return out.toByteArray();</span>
+    }
+
+    private String renderPruningDecisionsJson() {
+<span class="fc" id="L2025">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
+<span class="fc" id="L2026">        w.beginObject();</span>
+<span class="fc" id="L2027">        w.property(&quot;count&quot;, searchMemory.decisions().size());</span>
+<span class="fc" id="L2028">        w.array(&quot;decisions&quot;, arr -&gt; searchMemory.decisions().forEach(d -&gt;</span>
+<span class="fc" id="L2029">            arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L2030">                inner.property(&quot;expression&quot;, d.expression());</span>
+<span class="fc" id="L2031">                inner.property(&quot;canonicalHash&quot;, d.canonicalHash());</span>
+<span class="fc" id="L2032">                inner.property(&quot;reason&quot;, d.reason().name());</span>
+<span class="fc" id="L2033">                inner.property(&quot;explanation&quot;, d.explanation());</span>
+<span class="fc" id="L2034">            })));</span>
+<span class="fc" id="L2035">        w.endObject();</span>
+<span class="fc" id="L2036">        return w.toString();</span>
+    }
+
+    private static void putZipEntry(java.util.zip.ZipOutputStream zip, String name, String content)
+        throws IOException {
+<span class="fc" id="L2041">        java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(name);</span>
+<span class="fc" id="L2042">        zip.putNextEntry(entry);</span>
+<span class="pc bpc" id="L2043" title="1 of 2 branches missed.">        if (content != null) {</span>
+<span class="fc" id="L2044">            zip.write(content.getBytes(StandardCharsets.UTF_8));</span>
+        }
+<span class="fc" id="L2046">        zip.closeEntry();</span>
+<span class="fc" id="L2047">    }</span>
+
+    private void handleStatic(HttpExchange exchange) throws IOException {
+<span class="fc" id="L2050">        String path = exchange.getRequestURI().getPath();</span>
+<span class="pc bpc" id="L2051" title="3 of 4 branches missed.">        if (&quot;/&quot;.equals(path) || &quot;/index.html&quot;.equals(path)) {</span>
+<span class="fc" id="L2052">            sendStaticResource(exchange, &quot;/web/index.html&quot;, &quot;text/html; charset=utf-8&quot;);</span>
+<span class="nc bnc" id="L2053" title="All 2 branches missed.">        } else if (path.startsWith(&quot;/static/&quot;)) {</span>
+<span class="nc" id="L2054">            String resource = &quot;/web&quot; + path.substring(&quot;/static&quot;.length());</span>
+<span class="nc" id="L2055">            sendStaticResource(exchange, resource, mimeFor(resource));</span>
+<span class="nc" id="L2056">        } else {</span>
+<span class="nc" id="L2057">            sendStatus(exchange, 404, &quot;not found&quot;);</span>
+        }
+<span class="fc" id="L2059">    }</span>
+
+    private String mimeFor(String resource) {
+<span class="nc bnc" id="L2062" title="All 2 branches missed.">        if (resource.endsWith(&quot;.html&quot;)) {</span>
+<span class="nc" id="L2063">            return &quot;text/html; charset=utf-8&quot;;</span>
+        }
+<span class="nc bnc" id="L2065" title="All 2 branches missed.">        if (resource.endsWith(&quot;.js&quot;)) {</span>
+<span class="nc" id="L2066">            return &quot;application/javascript; charset=utf-8&quot;;</span>
+        }
+<span class="nc bnc" id="L2068" title="All 2 branches missed.">        if (resource.endsWith(&quot;.css&quot;)) {</span>
+<span class="nc" id="L2069">            return &quot;text/css; charset=utf-8&quot;;</span>
+        }
+<span class="nc" id="L2071">        return &quot;application/octet-stream&quot;;</span>
+    }
+
+    private void sendStaticResource(HttpExchange exchange, String resource, String contentType) throws IOException {
+<span class="fc" id="L2075">        try (InputStream stream = WebWorkbenchServer.class.getResourceAsStream(resource)) {</span>
+<span class="pc bpc" id="L2076" title="1 of 2 branches missed.">            if (stream == null) {</span>
+<span class="nc" id="L2077">                sendStatus(exchange, 404, &quot;missing resource: &quot; + resource);</span>
+<span class="nc" id="L2078">                return;</span>
+            }
+<span class="fc" id="L2080">            ByteArrayOutputStream buffer = new ByteArrayOutputStream();</span>
+<span class="fc" id="L2081">            stream.transferTo(buffer);</span>
+<span class="fc" id="L2082">            byte[] bytes = buffer.toByteArray();</span>
+<span class="fc" id="L2083">            exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
+<span class="fc" id="L2084">            exchange.sendResponseHeaders(200, bytes.length);</span>
+<span class="fc" id="L2085">            try (OutputStream body = exchange.getResponseBody()) {</span>
+<span class="fc" id="L2086">                body.write(bytes);</span>
+            }
+<span class="nc bnc" id="L2088" title="All 2 branches missed.">        }</span>
+<span class="fc" id="L2089">    }</span>
+
+    private String dtoListToJson(String wrapper, List&lt;?&gt; dtos) {
+        // Reuse the existing export JSON shape for transformations.
+<span class="fc" id="L2093">        StringBuilder builder = new StringBuilder(&quot;{\&quot;&quot; + wrapper + &quot;\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L2094" title="All 2 branches covered.">        for (int i = 0; i &lt; dtos.size(); i++) {</span>
+<span class="fc bfc" id="L2095" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L2096">                builder.append(',');</span>
+            }
+<span class="fc" id="L2098">            builder.append(singleDtoJson(dtos.get(i)));</span>
+        }
+<span class="fc" id="L2100">        builder.append(&quot;]}&quot;);</span>
+<span class="fc" id="L2101">        return builder.toString();</span>
+    }
+
+    private String singleDtoJson(Object dto) {
+<span class="pc bpc" id="L2105" title="1 of 2 branches missed.">        if (dto instanceof de.regelsuche.api.TransformationPathDto pathDto) {</span>
+<span class="fc" id="L2106">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2107">            writer.beginObject();</span>
+<span class="fc" id="L2108">            writer.property(&quot;id&quot;, pathDto.id());</span>
+<span class="fc" id="L2109">            writer.property(&quot;originalExpression&quot;, pathDto.originalExpression());</span>
+<span class="fc" id="L2110">            writer.property(&quot;improvedExpression&quot;, pathDto.improvedExpression());</span>
+<span class="fc" id="L2111">            writer.property(&quot;originalScore&quot;, pathDto.originalScore());</span>
+<span class="fc" id="L2112">            writer.property(&quot;improvedScore&quot;, pathDto.improvedScore());</span>
+<span class="fc" id="L2113">            writer.property(&quot;totalImprovement&quot;, pathDto.totalImprovement());</span>
+<span class="fc" id="L2114">            writer.property(&quot;validationStatus&quot;, pathDto.validationStatus());</span>
+<span class="pc bpc" id="L2115" title="1 of 2 branches missed.">            writer.property(&quot;discoveredAt&quot;, pathDto.discoveredAt() == null ? &quot;&quot; : pathDto.discoveredAt().toString());</span>
+<span class="fc" id="L2116">            writer.array(&quot;steps&quot;, w -&gt; pathDto.steps().forEach(step -&gt;</span>
+<span class="fc" id="L2117">                w.objectValue(inner -&gt; {</span>
+<span class="fc" id="L2118">                    inner.property(&quot;index&quot;, step.index());</span>
+<span class="fc" id="L2119">                    inner.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
+<span class="fc" id="L2120">                    inner.property(&quot;afterExpression&quot;, step.afterExpression());</span>
+<span class="fc" id="L2121">                    inner.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L2122">                    inner.property(&quot;ruleKind&quot;, step.ruleKind());</span>
+<span class="fc" id="L2123">                    inner.property(&quot;scoreBefore&quot;, step.scoreBefore());</span>
+<span class="fc" id="L2124">                    inner.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
+<span class="fc" id="L2125">                    inner.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="fc" id="L2126">                })));</span>
+<span class="fc" id="L2127">            writer.endObject();</span>
+<span class="fc" id="L2128">            return writer.toString();</span>
+        }
+<span class="nc" id="L2130">        return &quot;{}&quot;;</span>
+    }
+
+    private Map&lt;String, Object&gt; readJsonObject(HttpExchange exchange) throws IOException {
+<span class="fc" id="L2134">        try (InputStream stream = exchange.getRequestBody()) {</span>
+<span class="fc" id="L2135">            int limit = securityConfig.maxRequestBytes();</span>
+<span class="fc" id="L2136">            byte[] buffer = stream.readNBytes(limit + 1);</span>
+<span class="pc bpc" id="L2137" title="1 of 2 branches missed.">            if (buffer.length &gt; limit) {</span>
+<span class="nc" id="L2138">                throw new IOException(&quot;request body exceeds limit of &quot; + limit + &quot; bytes&quot;);</span>
+            }
+<span class="fc" id="L2140">            String text = new String(buffer, StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L2141" title="1 of 2 branches missed.">            if (text.isBlank()) {</span>
+<span class="nc" id="L2142">                return Map.of();</span>
+            }
+<span class="fc" id="L2144">            return new JsonReader(text).readObject();</span>
+<span class="nc bnc" id="L2145" title="All 2 branches missed.">        }</span>
+    }
+
+    private String stringValue(Map&lt;String, Object&gt; body, String key, String fallback) {
+<span class="fc" id="L2149">        Object raw = body.get(key);</span>
+<span class="fc bfc" id="L2150" title="All 2 branches covered.">        return raw == null ? fallback : String.valueOf(raw);</span>
+    }
+
+    private int intValue(Map&lt;String, Object&gt; body, String key, int fallback) {
+<span class="fc" id="L2154">        Object raw = body.get(key);</span>
+<span class="fc bfc" id="L2155" title="All 2 branches covered.">        if (raw == null) {</span>
+<span class="fc" id="L2156">            return fallback;</span>
+        }
+<span class="pc bpc" id="L2158" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
+<span class="fc" id="L2159">            return number.intValue();</span>
+        }
+        try {
+<span class="nc" id="L2162">            return Integer.parseInt(String.valueOf(raw));</span>
+<span class="nc" id="L2163">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L2164">            return fallback;</span>
+        }
+    }
+
+    private String queryParam(HttpExchange exchange, String name, String fallback) {
+<span class="fc" id="L2169">        String query = exchange.getRequestURI().getRawQuery();</span>
+<span class="pc bpc" id="L2170" title="1 of 4 branches missed.">        if (query == null || query.isBlank()) {</span>
+<span class="fc" id="L2171">            return fallback;</span>
+        }
+<span class="fc" id="L2173">        Map&lt;String, String&gt; parsed = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L2174" title="All 2 branches covered.">        for (String part : query.split(&quot;&amp;&quot;)) {</span>
+<span class="fc" id="L2175">            int idx = part.indexOf('=');</span>
+<span class="pc bpc" id="L2176" title="1 of 2 branches missed.">            if (idx &gt; 0) {</span>
+<span class="fc" id="L2177">                parsed.put(part.substring(0, idx), part.substring(idx + 1));</span>
+            }
+        }
+<span class="fc" id="L2180">        return parsed.getOrDefault(name, fallback);</span>
+    }
+
+    private void sendJson(HttpExchange exchange, int status, String body) throws IOException {
+<span class="fc" id="L2184">        send(exchange, status, &quot;application/json; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L2185">    }</span>
+
+    private void sendText(HttpExchange exchange, int status, String body) throws IOException {
+<span class="fc" id="L2188">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L2189">    }</span>
+
+    private void sendStatus(HttpExchange exchange, int status, String body) throws IOException {
+<span class="fc" id="L2192">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L2193">    }</span>
+
+    private void send(HttpExchange exchange, int status, String contentType, String body) throws IOException {
+<span class="fc" id="L2196">        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L2197">        exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
+<span class="fc" id="L2198">        exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L2199">        try (OutputStream stream = exchange.getResponseBody()) {</span>
+<span class="fc" id="L2200">            stream.write(bytes);</span>
+        }
+<span class="fc" id="L2202">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

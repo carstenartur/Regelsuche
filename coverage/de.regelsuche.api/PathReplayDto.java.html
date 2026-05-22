@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PathReplayDto.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api</a> &gt; <span class="el_source">PathReplayDto.java</span></div><h1>PathReplayDto.java</h1><pre class="source lang-java linenums">package de.regelsuche.api;
+
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.explain.ExplanationService;
+import java.util.List;
+
+/**
+ * Step-wise replay representation of a {@link DiscoveredTransformation}.
+ *
+ * &lt;p&gt;Returned by {@code GET /api/paths/{id}/replay} (Step 2). Each step
+ * carries both raw and LaTeX-rendered expressions plus a human-readable
+ * rule explanation, suitable for the replay UI tab.&lt;/p&gt;
+ */
+public record PathReplayDto(
+    String pathId,
+    List&lt;ReplayStep&gt; steps
+) {
+<span class="fc" id="L19">    public PathReplayDto {</span>
+<span class="pc bpc" id="L20" title="2 of 4 branches missed.">        if (pathId == null || pathId.isBlank()) {</span>
+<span class="nc" id="L21">            throw new IllegalArgumentException(&quot;pathId is required&quot;);</span>
+        }
+<span class="fc" id="L23">        steps = List.copyOf(steps);</span>
+<span class="fc" id="L24">    }</span>
+
+<span class="fc" id="L26">    public record ReplayStep(</span>
+        int stepIndex,
+        String fromExpression,
+        String fromLatex,
+        String toExpression,
+        String toLatex,
+        String ruleId,
+        String ruleExplanation,
+        int scoreDelta,
+        boolean equivalencePreserving
+    ) {
+    }
+
+    public static PathReplayDto from(DiscoveredTransformation path, ExplanationService explanationService) {
+<span class="fc" id="L40">        List&lt;TransformationStep&gt; steps = path.steps();</span>
+<span class="fc" id="L41">        List&lt;ReplayStep&gt; replaySteps = new java.util.ArrayList&lt;&gt;(steps.size());</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (TransformationStep step : steps) {</span>
+<span class="fc" id="L43">            replaySteps.add(new ReplayStep(</span>
+<span class="fc" id="L44">                step.index(),</span>
+<span class="fc" id="L45">                step.beforeExpression(),</span>
+<span class="fc" id="L46">                toLatex(step.beforeExpression()),</span>
+<span class="fc" id="L47">                step.afterExpression(),</span>
+<span class="fc" id="L48">                toLatex(step.afterExpression()),</span>
+<span class="fc" id="L49">                step.ruleId(),</span>
+<span class="fc" id="L50">                explanationService.renderStep(step, ExplanationService.Form.SCHOOL),</span>
+<span class="fc" id="L51">                step.scoreAfter() - step.scoreBefore(),</span>
+<span class="fc" id="L52">                step.equivalencePreserving()</span>
+            ));
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">        return new PathReplayDto(path.id(), replaySteps);</span>
+    }
+
+<span class="fc" id="L58">    private static final de.regelsuche.export.AstLatexRenderer LATEX = new de.regelsuche.export.AstLatexRenderer();</span>
+
+    private static String toLatex(String expression) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : LATEX.renderExpression(expression);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.json</a> &gt; <span class="el_source">JsonReader.java</span></div><h1>JsonReader.java</h1><pre class="source lang-java linenums">package de.regelsuche.json;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Small recursive descent JSON reader to keep export round-trips
+ * self-contained without pulling in an external dependency.
+ */
+public final class JsonReader {
+    private final String source;
+    private int index;
+
+<span class="fc" id="L16">    public JsonReader(String source) {</span>
+<span class="fc" id="L17">        this.source = source;</span>
+<span class="fc" id="L18">        this.index = 0;</span>
+<span class="fc" id="L19">    }</span>
+
+    public Map&lt;String, Object&gt; readObject() {
+<span class="fc" id="L22">        skipWhitespace();</span>
+<span class="fc" id="L23">        expect('{');</span>
+<span class="fc" id="L24">        Map&lt;String, Object&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L25">        skipWhitespace();</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (peek('}')) {</span>
+<span class="nc" id="L27">            index++;</span>
+<span class="nc" id="L28">            return values;</span>
+        }
+        do {
+<span class="fc" id="L31">            String key = readString();</span>
+<span class="fc" id="L32">            skipWhitespace();</span>
+<span class="fc" id="L33">            expect(':');</span>
+<span class="fc" id="L34">            values.put(key, readValue());</span>
+<span class="fc" id="L35">            skipWhitespace();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        } while (consume(','));</span>
+<span class="fc" id="L37">        expect('}');</span>
+<span class="fc" id="L38">        return values;</span>
+    }
+
+    public List&lt;Object&gt; readArray() {
+<span class="fc" id="L42">        skipWhitespace();</span>
+<span class="fc" id="L43">        expect('[');</span>
+<span class="fc" id="L44">        List&lt;Object&gt; values = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L45">        skipWhitespace();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (peek(']')) {</span>
+<span class="fc" id="L47">            index++;</span>
+<span class="fc" id="L48">            return values;</span>
+        }
+        do {
+<span class="fc" id="L51">            values.add(readValue());</span>
+<span class="fc" id="L52">            skipWhitespace();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        } while (consume(','));</span>
+<span class="fc" id="L54">        expect(']');</span>
+<span class="fc" id="L55">        return values;</span>
+    }
+
+    private Object readValue() {
+<span class="fc" id="L59">        skipWhitespace();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (peek('{')) {</span>
+<span class="fc" id="L61">            return readObject();</span>
+        }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (peek('[')) {</span>
+<span class="fc" id="L64">            return readArray();</span>
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (peek('&quot;')) {</span>
+<span class="fc" id="L67">            return readString();</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (source.startsWith(&quot;true&quot;, index)) {</span>
+<span class="fc" id="L70">            index += 4;</span>
+<span class="fc" id="L71">            return true;</span>
+        }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (source.startsWith(&quot;false&quot;, index)) {</span>
+<span class="fc" id="L74">            index += 5;</span>
+<span class="fc" id="L75">            return false;</span>
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (source.startsWith(&quot;null&quot;, index)) {</span>
+<span class="fc" id="L78">            index += 4;</span>
+<span class="fc" id="L79">            return null;</span>
+        }
+<span class="fc" id="L81">        return readNumber();</span>
+    }
+
+    private String readString() {
+<span class="fc" id="L85">        expect('&quot;');</span>
+<span class="fc" id="L86">        StringBuilder builder = new StringBuilder();</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        while (index &lt; source.length()) {</span>
+<span class="fc" id="L88">            char current = source.charAt(index++);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (current == '&quot;') {</span>
+<span class="fc" id="L90">                return builder.toString();</span>
+            }
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (current == '\\') {</span>
+<span class="nc" id="L93">                char escaped = source.charAt(index++);</span>
+<span class="nc bnc" id="L94" title="All 10 branches missed.">                builder.append(switch (escaped) {</span>
+<span class="nc" id="L95">                    case '&quot;' -&gt; '&quot;';</span>
+<span class="nc" id="L96">                    case '\\' -&gt; '\\';</span>
+<span class="nc" id="L97">                    case '/' -&gt; '/';</span>
+<span class="nc" id="L98">                    case 'n' -&gt; '\n';</span>
+<span class="nc" id="L99">                    case 'r' -&gt; '\r';</span>
+<span class="nc" id="L100">                    case 't' -&gt; '\t';</span>
+<span class="nc" id="L101">                    case 'b' -&gt; '\b';</span>
+<span class="nc" id="L102">                    case 'f' -&gt; '\f';</span>
+<span class="nc" id="L103">                    case 'u' -&gt; readUnicodeEscape();</span>
+<span class="nc" id="L104">                    default -&gt; escaped;</span>
+                });
+<span class="nc" id="L106">            } else {</span>
+<span class="fc" id="L107">                builder.append(current);</span>
+            }
+<span class="fc" id="L109">        }</span>
+<span class="nc" id="L110">        throw new IllegalArgumentException(&quot;Unterminated string&quot;);</span>
+    }
+
+    private char readUnicodeEscape() {
+<span class="nc" id="L114">        String hex = source.substring(index, index + 4);</span>
+<span class="nc" id="L115">        index += 4;</span>
+<span class="nc" id="L116">        return (char) Integer.parseInt(hex, 16);</span>
+    }
+
+    private Number readNumber() {
+<span class="fc" id="L120">        int start = index;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (peek('-')) {</span>
+<span class="fc" id="L122">            index++;</span>
+        }
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        while (index &lt; source.length()) {</span>
+<span class="fc" id="L125">            char current = source.charAt(index);</span>
+<span class="pc bpc" id="L126" title="4 of 12 branches missed.">            if (!Character.isDigit(current) &amp;&amp; current != '.' &amp;&amp; current != 'e' &amp;&amp; current != 'E' &amp;&amp; current != '+' &amp;&amp; current != '-') {</span>
+<span class="fc" id="L127">                break;</span>
+            }
+<span class="fc" id="L129">            index++;</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">        String value = source.substring(start, index);</span>
+<span class="pc bpc" id="L132" title="2 of 6 branches missed.">        if (value.contains(&quot;.&quot;) || value.contains(&quot;e&quot;) || value.contains(&quot;E&quot;)) {</span>
+<span class="fc" id="L133">            return Double.parseDouble(value);</span>
+        }
+        try {
+<span class="fc" id="L136">            return Integer.parseInt(value);</span>
+<span class="nc" id="L137">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L138">            return Long.parseLong(value);</span>
+        }
+    }
+
+    private boolean consume(char expected) {
+<span class="fc" id="L143">        skipWhitespace();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (peek(expected)) {</span>
+<span class="fc" id="L145">            index++;</span>
+<span class="fc" id="L146">            return true;</span>
+        }
+<span class="fc" id="L148">        return false;</span>
+    }
+
+    private boolean peek(char expected) {
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">        return index &lt; source.length() &amp;&amp; source.charAt(index) == expected;</span>
+    }
+
+    private void expect(char expected) {
+<span class="fc" id="L156">        skipWhitespace();</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (!peek(expected)) {</span>
+<span class="nc" id="L158">            throw new IllegalArgumentException(&quot;Expected &quot; + expected + &quot; at position &quot; + index + &quot; in &quot; + source);</span>
+        }
+<span class="fc" id="L160">        index++;</span>
+<span class="fc" id="L161">    }</span>
+
+    private void skipWhitespace() {
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        while (index &lt; source.length() &amp;&amp; Character.isWhitespace(source.charAt(index))) {</span>
+<span class="nc" id="L165">            index++;</span>
+        }
+<span class="fc" id="L167">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

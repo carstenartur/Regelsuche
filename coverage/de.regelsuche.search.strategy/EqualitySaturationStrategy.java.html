@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EqualitySaturationStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.strategy</a> &gt; <span class="el_source">EqualitySaturationStrategy.java</span></div><h1>EqualitySaturationStrategy.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.strategy;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.egraph.EClassId;
+import de.regelsuche.egraph.EGraph;
+import de.regelsuche.egraph.ENode;
+import de.regelsuche.egraph.EqualitySaturation;
+import de.regelsuche.egraph.SaturationStats;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Equality-saturation search strategy.
+ *
+ * &lt;p&gt;This strategy delegates exploration to {@link EqualitySaturation}
+ * rather than to the path-based BFS / Best-First / A-star / MCTS
+ * strategies. It adds the root expression to a fresh {@link EGraph},
+ * saturates it with the {@link RewriteRule}s exposed by the {@link
+ * AstRewriteTransformationEngine} (or with the default rule set if the
+ * problem's engine is not the AST engine), extracts the cheapest
+ * representative, and returns two {@link SearchState}s: the root and
+ * the extracted best form.&lt;/p&gt;
+ *
+ * &lt;p&gt;The applied-rule id of the extracted state is set to {@value
+ * #SATURATION_RULE_ID} so the UI / report layer can detect that equality
+ * saturation was used (instead of an ordered list of rewrites). The
+ * detailed per-iteration {@link SaturationStats} of the most recent run
+ * are exposed via {@link #lastStats()} so callers can surface them.&lt;/p&gt;
+ */
+public final class EqualitySaturationStrategy implements SearchStrategy {
+
+    /**
+     * Sentinel rule id used on the extracted {@link SearchState} so the
+     * UI / report layer can detect that equality saturation produced the
+     * result rather than an ordered chain of rewrites.
+     */
+    public static final String SATURATION_RULE_ID = &quot;equality-saturation&quot;;
+
+    private final EqualitySaturation.Config config;
+<span class="fc" id="L49">    private final ExpressionParser parser = new ExpressionParser();</span>
+    private SaturationStats lastStats;
+
+    public EqualitySaturationStrategy() {
+<span class="fc" id="L53">        this(EqualitySaturation.Config.defaults());</span>
+<span class="fc" id="L54">    }</span>
+
+<span class="fc" id="L56">    public EqualitySaturationStrategy(EqualitySaturation.Config config) {</span>
+<span class="fc" id="L57">        this.config = Objects.requireNonNull(config, &quot;config&quot;);</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Statistics from the most recent {@link #search} invocation, or
+     * {@code null} if the strategy has not been run yet.
+     */
+    public SaturationStats lastStats() {
+<span class="fc" id="L65">        return lastStats;</span>
+    }
+
+    @Override
+    public List&lt;SearchState&gt; search(SearchProblem problem) {
+<span class="fc" id="L70">        String root = problem.rootExpression().trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+        Expr rootAst;
+        try {
+<span class="fc" id="L73">            rootAst = parser.parse(new InputRequest(InputType.TERM, root)).terms().getFirst();</span>
+<span class="nc" id="L74">        } catch (RuntimeException ex) {</span>
+            // Unparseable input: behave like the other strategies and
+            // return just the root state with the input as-is.
+<span class="nc" id="L77">            ExpressionScore rootScore = problem.scorer().score(root);</span>
+<span class="nc" id="L78">            return List.of(rootState(root, rootScore, problem));</span>
+<span class="fc" id="L79">        }</span>
+
+<span class="fc" id="L81">        EGraph eGraph = new EGraph();</span>
+<span class="fc" id="L82">        EClassId rootId = eGraph.addExpression(rootAst);</span>
+
+        // PR 2b uses a fixed 0/1 extraction cost (see nodeCost) so the
+        // strategy stays goal-agnostic; richer per-cost-model node costs
+        // can plug into the same hook in a follow-up.
+<span class="fc" id="L87">        List&lt;RewriteRule&gt; rules = resolveRules(problem);</span>
+<span class="fc" id="L88">        EqualitySaturation saturation = new EqualitySaturation(rules, config);</span>
+<span class="fc" id="L89">        EqualitySaturation.Result result = saturation.saturate(</span>
+            eGraph,
+            rootId,
+            EqualitySaturationStrategy::nodeCost
+        );
+<span class="fc" id="L94">        lastStats = result.stats();</span>
+
+<span class="fc" id="L96">        String extracted = ExpressionFormatter.format(result.expression());</span>
+<span class="fc" id="L97">        ExpressionScore rootScore = problem.scorer().score(root);</span>
+<span class="fc" id="L98">        SearchState rootState = rootState(root, rootScore, problem);</span>
+
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (extracted.equals(root)) {</span>
+            // No useful rewrite — still return the root so callers see a
+            // result. The lastStats() expose how much work was done.
+<span class="nc" id="L103">            return List.of(rootState);</span>
+        }
+
+<span class="fc" id="L106">        ExpressionScore extractedScore = problem.scorer().score(extracted);</span>
+<span class="fc" id="L107">        int improvement = rootScore.weightedTotal() - extractedScore.weightedTotal();</span>
+<span class="fc" id="L108">        SearchState extractedState = new SearchState(</span>
+            extracted,
+            1,
+            extractedScore,
+<span class="fc" id="L112">            List.of(root, extracted),</span>
+<span class="fc" id="L113">            List.of(SATURATION_RULE_ID),</span>
+<span class="fc" id="L114">            Set.of(SATURATION_RULE_ID + &quot;:&quot; + extracted),</span>
+            0,
+<span class="fc" id="L116">            problem.canonicalizer().stableHash(extracted),</span>
+            root,
+            SATURATION_RULE_ID,
+            RewriteKind.NORMALIZE,
+            false,
+<span class="fc" id="L121">            -Math.max(0, improvement),</span>
+            true,
+            improvement,
+<span class="fc" id="L124">            List.of(RewriteKind.NORMALIZE),</span>
+<span class="fc" id="L125">            List.of(Boolean.TRUE)</span>
+        );
+<span class="fc" id="L127">        return List.of(rootState, extractedState);</span>
+    }
+
+    private SearchState rootState(String root, ExpressionScore rootScore, SearchProblem problem) {
+<span class="fc" id="L131">        return new SearchState(</span>
+            root,
+            0,
+            rootScore,
+<span class="fc" id="L135">            List.of(root),</span>
+<span class="fc" id="L136">            List.of(),</span>
+<span class="fc" id="L137">            Set.of(),</span>
+            0,
+<span class="fc" id="L139">            problem.canonicalizer().stableHash(root),</span>
+            null,
+            null,
+            RewriteKind.NORMALIZE,
+            false,
+            0,
+            true,
+            0
+        );
+    }
+
+    private List&lt;RewriteRule&gt; resolveRules(SearchProblem problem) {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (problem.engine() instanceof AstRewriteTransformationEngine astEngine) {</span>
+<span class="fc" id="L152">            return astEngine.rules();</span>
+        }
+<span class="nc" id="L154">        return AstRewriteTransformationEngine.defaultRules();</span>
+    }
+
+    /**
+     * Per-node extraction cost: 1 per inner node (operator, function),
+     * 0 per leaf (variable, number). This matches the historical
+     * {@link de.regelsuche.scoring.cost.OperatorCountCost} contract and
+     * is the most defensible &quot;cheapest = smallest&quot; baseline.
+     *
+     * &lt;p&gt;Goal-specific cost models attached to the {@link SearchProblem}
+     * still drive the surrounding path-based search comparator via {@link
+     * SearchProblem#costModel()} — extraction cost only re-orders nodes
+     * &lt;em&gt;inside&lt;/em&gt; the saturated e-graph, where every alternative is
+     * already algebraically equivalent.&lt;/p&gt;
+     */
+    static int nodeCost(ENode node) {
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        return node.isLeaf() ? 0 : 1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstLatexRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.export</a> &gt; <span class="el_source">AstLatexRenderer.java</span></div><h1>AstLatexRenderer.java</h1><pre class="source lang-java linenums">package de.regelsuche.export;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.parse.ParsedInput;
+import java.util.List;
+
+/**
+ * AST-based LaTeX renderer.
+ *
+ * &lt;p&gt;Parses an expression with {@link ExpressionParser} and recursively
+ * pretty-prints the resulting AST as LaTeX. Supports:
+ * &lt;ul&gt;
+ *   &lt;li&gt;fractions as {@code \frac{·}{·}}&lt;/li&gt;
+ *   &lt;li&gt;powers as {@code {·}^{·}}&lt;/li&gt;
+ *   &lt;li&gt;roots as {@code \sqrt{·}}&lt;/li&gt;
+ *   &lt;li&gt;trigonometric and logarithmic functions ({@code \sin}, {@code \cos},
+ *       {@code \tan}, {@code \log}, {@code \ln}, {@code \exp})&lt;/li&gt;
+ *   &lt;li&gt;equations and equation systems (split on {@code ;} or newline)&lt;/li&gt;
+ *   &lt;li&gt;correct parenthesisation by operator precedence&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;When parsing fails, this renderer falls back to escaping the raw string
+ * (replacing {@code *} with {@code \cdot}) so callers always get usable
+ * LaTeX. This replaces the original naive {@code *}-substitution path.&lt;/p&gt;
+ */
+<span class="fc" id="L37">public class AstLatexRenderer implements MathRenderer {</span>
+
+<span class="fc" id="L39">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    @Override
+    public String renderExpression(String expression) {
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L44">            return &quot;&quot;;</span>
+        }
+        // Try equation/system first when there's an '='.
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (expression.contains(&quot;=&quot;)) {</span>
+            try {
+<span class="pc bpc" id="L49" title="1 of 4 branches missed.">                if (expression.contains(&quot;;&quot;) || expression.contains(&quot;\n&quot;)) {</span>
+<span class="fc" id="L50">                    ParsedInput parsed = parser.parse(new InputRequest(InputType.SYSTEM, expression));</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                    if (!parsed.equations().isEmpty()) {</span>
+<span class="fc" id="L52">                        return renderSystem(parsed.equations());</span>
+                    }
+                }
+<span class="fc" id="L55">                Equation equation = parser.parseEquation(expression);</span>
+<span class="fc" id="L56">                return renderEquation(equation);</span>
+<span class="nc" id="L57">            } catch (RuntimeException ignored) {</span>
+                // fall through to raw fallback
+            }
+        }
+        try {
+<span class="fc" id="L62">            Expr expr = parser.parseTerm(expression);</span>
+<span class="fc" id="L63">            return render(expr, /* parentPrecedence */ 0);</span>
+<span class="fc" id="L64">        } catch (RuntimeException ex) {</span>
+            // Fallback: textual replacement for unparseable input
+<span class="fc" id="L66">            return expression.replace(&quot;*&quot;, &quot; \\cdot &quot;);</span>
+        }
+    }
+
+    @Override
+    public String renderStep(TransformationStep step) {
+<span class="nc" id="L72">        return renderExpression(step.beforeExpression()) + &quot; &amp;\\rightarrow &quot; + renderExpression(step.afterExpression());</span>
+    }
+
+    @Override
+    public String renderPath(DiscoveredTransformation path) {
+<span class="fc" id="L77">        StringBuilder body = new StringBuilder();</span>
+<span class="fc" id="L78">        body.append(&quot;\\begin{align*}\n&quot;);</span>
+<span class="fc" id="L79">        List&lt;TransformationStep&gt; steps = path.steps();</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (steps.isEmpty()) {</span>
+<span class="nc" id="L81">            body.append(renderExpression(path.originalExpression()))</span>
+<span class="nc" id="L82">                .append(&quot; &amp;\\rightarrow &quot;)</span>
+<span class="nc" id="L83">                .append(renderExpression(path.improvedExpression()))</span>
+<span class="nc" id="L84">                .append(&quot; \\tag{0}\\\\\n&quot;);</span>
+        } else {
+<span class="fc" id="L86">            body.append(renderExpression(steps.get(0).beforeExpression()))</span>
+<span class="fc" id="L87">                .append(&quot; &amp;\\rightarrow &quot;)</span>
+<span class="fc" id="L88">                .append(renderExpression(steps.get(0).afterExpression()))</span>
+<span class="fc" id="L89">                .append(&quot; &amp;&amp; \\text{(&quot;)</span>
+<span class="fc" id="L90">                .append(escapeText(steps.get(0).ruleId()))</span>
+<span class="fc" id="L91">                .append(&quot;)} \\tag{1}\\\\\n&quot;);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            for (int i = 1; i &lt; steps.size(); i++) {</span>
+<span class="fc" id="L93">                body.append(&quot;        &amp;\\rightarrow &quot;)</span>
+<span class="fc" id="L94">                    .append(renderExpression(steps.get(i).afterExpression()))</span>
+<span class="fc" id="L95">                    .append(&quot; &amp;&amp; \\text{(&quot;)</span>
+<span class="fc" id="L96">                    .append(escapeText(steps.get(i).ruleId()))</span>
+<span class="fc" id="L97">                    .append(&quot;)} \\tag{&quot;)</span>
+<span class="fc" id="L98">                    .append(i + 1)</span>
+<span class="fc" id="L99">                    .append(&quot;}\\\\\n&quot;);</span>
+            }
+        }
+<span class="fc" id="L102">        body.append(&quot;\\end{align*}\n&quot;);</span>
+<span class="fc" id="L103">        body.append(&quot;\\textbf{Score:} &quot;)</span>
+<span class="fc" id="L104">            .append(path.originalScore().weightedTotal())</span>
+<span class="fc" id="L105">            .append(&quot; \\to &quot;)</span>
+<span class="fc" id="L106">            .append(path.improvedScore().weightedTotal())</span>
+<span class="fc" id="L107">            .append(&quot;\\\\\n&quot;);</span>
+<span class="fc" id="L108">        body.append(&quot;\\textbf{Status:} &quot;).append(path.validationStatus());</span>
+<span class="fc" id="L109">        return body.toString();</span>
+    }
+
+    /** Render an arbitrary {@link Expr} with parent precedence context. */
+    public String render(Expr expr, int parentPrecedence) {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (expr instanceof NumberExpr number) {</span>
+<span class="fc" id="L115">            return formatNumber(number.value());</span>
+        }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
+<span class="fc" id="L118">            return variable.name();</span>
+        }
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (expr instanceof FunctionExpr fn) {</span>
+<span class="fc" id="L121">            return renderFunction(fn);</span>
+        }
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L124">            return renderBinary(binary, parentPrecedence);</span>
+        }
+<span class="nc" id="L126">        return &quot;&quot;;</span>
+    }
+
+    private String renderBinary(BinaryExpr binary, int parentPrecedence) {
+<span class="fc" id="L130">        BinaryOperator op = binary.operator();</span>
+<span class="fc bfc" id="L131" title="All 5 branches covered.">        String result = switch (op) {</span>
+<span class="fc" id="L132">            case ADD -&gt; render(binary.left(), op.precedence()) + &quot; + &quot; + render(binary.right(), op.precedence());</span>
+<span class="fc" id="L133">            case SUB -&gt; render(binary.left(), op.precedence()) + &quot; - &quot; + render(binary.right(), op.precedence() + 1);</span>
+<span class="fc" id="L134">            case MUL -&gt; render(binary.left(), op.precedence()) + &quot; \\cdot &quot; + render(binary.right(), op.precedence());</span>
+<span class="fc" id="L135">            case DIV -&gt; &quot;\\frac{&quot; + render(binary.left(), 0) + &quot;}{&quot; + render(binary.right(), 0) + &quot;}&quot;;</span>
+            case POW -&gt; {
+<span class="fc" id="L137">                String base = render(binary.left(), op.precedence() + 1);</span>
+<span class="fc" id="L138">                String exponent = render(binary.right(), 0);</span>
+<span class="fc" id="L139">                yield &quot;{&quot; + base + &quot;}^{&quot; + exponent + &quot;}&quot;;</span>
+            }
+        };
+        // Division renders as \frac{} which is self-bracketing; no extra parens.
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (op == BinaryOperator.DIV) {</span>
+<span class="fc" id="L144">            return result;</span>
+        }
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (op.precedence() &lt; parentPrecedence) {</span>
+<span class="fc" id="L147">            return &quot;\\left(&quot; + result + &quot;\\right)&quot;;</span>
+        }
+<span class="fc" id="L149">        return result;</span>
+    }
+
+    private String renderFunction(FunctionExpr fn) {
+<span class="fc" id="L153">        String name = fn.name().toLowerCase();</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        String latexName = switch (name) {</span>
+<span class="fc" id="L155">            case &quot;sin&quot;, &quot;cos&quot;, &quot;tan&quot;, &quot;log&quot;, &quot;ln&quot;, &quot;exp&quot; -&gt; &quot;\\&quot; + name;</span>
+<span class="fc" id="L156">            case &quot;sqrt&quot; -&gt; &quot;\\sqrt&quot;;</span>
+<span class="nc" id="L157">            case &quot;abs&quot; -&gt; &quot;\\left|&quot;;</span>
+<span class="fc" id="L158">            default -&gt; &quot;\\operatorname{&quot; + name + &quot;}&quot;;</span>
+        };
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">        if (&quot;sqrt&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="fc" id="L161">            return &quot;\\sqrt{&quot; + render(fn.arguments().get(0), 0) + &quot;}&quot;;</span>
+        }
+<span class="pc bpc" id="L163" title="3 of 4 branches missed.">        if (&quot;abs&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="nc" id="L164">            return &quot;\\left|&quot; + render(fn.arguments().get(0), 0) + &quot;\\right|&quot;;</span>
+        }
+<span class="fc" id="L166">        StringBuilder sb = new StringBuilder(latexName).append(&quot;\\left(&quot;);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int i = 0; i &lt; fn.arguments().size(); i++) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L169">                sb.append(&quot;, &quot;);</span>
+            }
+<span class="fc" id="L171">            sb.append(render(fn.arguments().get(i), 0));</span>
+        }
+<span class="fc" id="L173">        return sb.append(&quot;\\right)&quot;).toString();</span>
+    }
+
+    private String renderEquation(Equation equation) {
+<span class="fc" id="L177">        return render(equation.left(), 0) + &quot; = &quot; + render(equation.right(), 0);</span>
+    }
+
+    private String renderSystem(List&lt;Equation&gt; equations) {
+<span class="fc" id="L181">        StringBuilder sb = new StringBuilder(&quot;\\begin{cases}\n&quot;);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (int i = 0; i &lt; equations.size(); i++) {</span>
+<span class="fc" id="L183">            sb.append(renderEquation(equations.get(i)));</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (i + 1 &lt; equations.size()) {</span>
+<span class="fc" id="L185">                sb.append(&quot; \\\\&quot;);</span>
+            }
+<span class="fc" id="L187">            sb.append('\n');</span>
+        }
+<span class="fc" id="L189">        return sb.append(&quot;\\end{cases}&quot;).toString();</span>
+    }
+
+    private static String formatNumber(double value) {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (value == (long) value) {</span>
+<span class="fc" id="L194">            return Long.toString((long) value);</span>
+        }
+<span class="nc" id="L196">        return Double.toString(value);</span>
+    }
+
+    private static String escapeText(String value) {
+<span class="fc" id="L200">        return value.replace(&quot;_&quot;, &quot;\\_&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

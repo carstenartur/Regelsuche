@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymPyTransformationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">SymPyTransformationEngine.java</span></div><h1>SymPyTransformationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Value;
+
+<span class="fc" id="L13">public class SymPyTransformationEngine implements TransformationEngine {</span>
+<span class="fc" id="L14">    private final TransformationEngine astRewriteFallback = new AstRewriteTransformationEngine();</span>
+<span class="fc" id="L15">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    @Override
+    public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc" id="L19">        Set&lt;Transformation&gt; transformations = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L20">        transformations.addAll(astRewriteFallback.transform(expression));</span>
+<span class="fc" id="L21">        List&lt;Transformation&gt; symPyResults = trySymPy(expression);</span>
+<span class="fc" id="L22">        transformations.addAll(symPyResults);</span>
+<span class="fc" id="L23">        return new ArrayList&lt;&gt;(transformations);</span>
+    }
+
+    private List&lt;Transformation&gt; trySymPy(String expression) {
+        String normalizedInput;
+        try {
+<span class="fc" id="L29">            normalizedInput = ExpressionFormatter.format(parser.parseTerm(expression));</span>
+<span class="nc" id="L30">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L31">            return List.of();</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">        String escaped = toSymPyPowerSyntax(normalizedInput).replace(&quot;\\&quot;, &quot;\\\\&quot;).replace(&quot;'&quot;, &quot;\\'&quot;);</span>
+<span class="fc" id="L34">        String script = &quot;import sympy as sp\\n&quot;</span>
+            + &quot;from sympy.parsing.sympy_parser import parse_expr\\n&quot;
+            + &quot;expr = parse_expr('&quot; + escaped + &quot;', evaluate=False)\\n&quot;
+            + &quot;results = [str(sp.simplify(expr)), str(sp.expand(expr)), str(sp.factor(expr))]\\n&quot;
+            + &quot;results&quot;;
+
+<span class="nc" id="L40">        try (Context context = Context.newBuilder(&quot;python&quot;).build()) {</span>
+<span class="nc" id="L41">            Value result = context.eval(&quot;python&quot;, script);</span>
+<span class="nc" id="L42">            Set&lt;String&gt; unique = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            for (int i = 0; i &lt; result.getArraySize(); i++) {</span>
+<span class="nc" id="L44">                unique.add(toProjectSyntax(result.getArrayElement(i).asString()));</span>
+            }
+<span class="nc" id="L46">            List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">            for (String candidate : unique) {</span>
+<span class="nc bnc" id="L48" title="All 4 branches missed.">                if (!candidate.isBlank() &amp;&amp; !candidate.equals(normalizedInput)) {</span>
+<span class="nc" id="L49">                    transformations.add(new Transformation(&quot;sympy&quot;, candidate));</span>
+                }
+<span class="nc" id="L51">            }</span>
+<span class="nc" id="L52">            return transformations;</span>
+<span class="fc" id="L53">        } catch (RuntimeException | LinkageError ignored) {</span>
+<span class="fc" id="L54">            return List.of();</span>
+        }
+    }
+
+    private String toProjectSyntax(String expression) {
+<span class="nc" id="L59">        String candidate = expression.replace(&quot;**&quot;, &quot;^&quot;);</span>
+        try {
+<span class="nc" id="L61">            Expr parsed = parser.parseTerm(candidate);</span>
+<span class="nc" id="L62">            return ExpressionFormatter.format(parsed);</span>
+<span class="nc" id="L63">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L64">            return candidate;</span>
+        }
+    }
+
+    private String toSymPyPowerSyntax(String expression) {
+<span class="fc" id="L69">        return expression.replace(&quot;^&quot;, &quot;**&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

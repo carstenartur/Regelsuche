@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonFileProofArtifactRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">JsonFileProofArtifactRepository.java</span></div><h1>JsonFileProofArtifactRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Stream;
+
+/**
+ * {@link ProofArtifactRepository} that stores every artifact as a flat file
+ * under a configurable {@code proofs/} root directory.
+ *
+ * &lt;p&gt;Artifact ids are used as file names verbatim, so callers are responsible
+ * for choosing safe ids (typically {@code &lt;jobId&gt;&lt;.suffix&gt;}). The repository
+ * refuses ids containing path separators to avoid directory traversal.&lt;/p&gt;
+ */
+public final class JsonFileProofArtifactRepository implements ProofArtifactRepository {
+
+    private final Path rootDirectory;
+
+<span class="fc" id="L25">    public JsonFileProofArtifactRepository(Path rootDirectory) throws IOException {</span>
+<span class="fc" id="L26">        this.rootDirectory = Objects.requireNonNull(rootDirectory, &quot;rootDirectory&quot;);</span>
+<span class="fc" id="L27">        Files.createDirectories(rootDirectory);</span>
+<span class="fc" id="L28">    }</span>
+
+    /** @return the root directory where artifacts are stored. */
+    public Path rootDirectory() {
+<span class="nc" id="L32">        return rootDirectory;</span>
+    }
+
+    @Override
+    public Path store(String artifactId, String body) throws IOException {
+<span class="fc" id="L37">        validateId(artifactId);</span>
+<span class="fc" id="L38">        Path target = rootDirectory.resolve(artifactId);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        Files.writeString(target, body == null ? &quot;&quot; : body, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L40">        return target.toAbsolutePath();</span>
+    }
+
+    @Override
+    public Optional&lt;String&gt; read(String artifactId) throws IOException {
+<span class="fc" id="L45">        validateId(artifactId);</span>
+<span class="fc" id="L46">        Path target = rootDirectory.resolve(artifactId);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (!Files.isRegularFile(target)) {</span>
+<span class="fc" id="L48">            return Optional.empty();</span>
+        }
+<span class="fc" id="L50">        return Optional.of(Files.readString(target, StandardCharsets.UTF_8));</span>
+    }
+
+    @Override
+    public Optional&lt;Path&gt; pathOf(String artifactId) {
+        try {
+<span class="fc" id="L56">            validateId(artifactId);</span>
+<span class="nc" id="L57">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L58">            return Optional.empty();</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        Path target = rootDirectory.resolve(artifactId);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        return Files.isRegularFile(target) ? Optional.of(target.toAbsolutePath()) : Optional.empty();</span>
+    }
+
+    @Override
+    public List&lt;String&gt; listArtifactIds() {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (!Files.isDirectory(rootDirectory)) {</span>
+<span class="nc" id="L67">            return List.of();</span>
+        }
+<span class="fc" id="L69">        List&lt;String&gt; ids = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L70">        try (Stream&lt;Path&gt; stream = Files.list(rootDirectory)) {</span>
+<span class="fc" id="L71">            stream.filter(Files::isRegularFile)</span>
+<span class="fc" id="L72">                .map(p -&gt; p.getFileName().toString())</span>
+<span class="fc" id="L73">                .sorted()</span>
+<span class="fc" id="L74">                .forEach(ids::add);</span>
+<span class="nc" id="L75">        } catch (IOException ex) {</span>
+<span class="nc" id="L76">            return List.of();</span>
+<span class="fc" id="L77">        }</span>
+<span class="fc" id="L78">        return ids;</span>
+    }
+
+    @Override
+    public void delete(String artifactId) throws IOException {
+<span class="fc" id="L83">        validateId(artifactId);</span>
+<span class="fc" id="L84">        Files.deleteIfExists(rootDirectory.resolve(artifactId));</span>
+<span class="fc" id="L85">    }</span>
+
+    // ── Per-job bundle: &lt;root&gt;/&lt;jobId&gt;/&lt;name&gt; ──────────────────────────────
+
+    @Override
+    public Path storeJobArtifact(String jobId, String name, String body) throws IOException {
+<span class="fc" id="L91">        validateId(jobId);</span>
+<span class="fc" id="L92">        validateId(name);</span>
+<span class="fc" id="L93">        Path jobDir = rootDirectory.resolve(jobId);</span>
+<span class="fc" id="L94">        Files.createDirectories(jobDir);</span>
+<span class="fc" id="L95">        Path target = jobDir.resolve(name);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        Files.writeString(target, body == null ? &quot;&quot; : body, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L97">        return target.toAbsolutePath();</span>
+    }
+
+    @Override
+    public Optional&lt;String&gt; readJobArtifact(String jobId, String name) throws IOException {
+<span class="fc" id="L102">        validateId(jobId);</span>
+<span class="fc" id="L103">        validateId(name);</span>
+<span class="fc" id="L104">        Path target = rootDirectory.resolve(jobId).resolve(name);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (!Files.isRegularFile(target)) {</span>
+<span class="fc" id="L106">            return Optional.empty();</span>
+        }
+<span class="fc" id="L108">        return Optional.of(Files.readString(target, StandardCharsets.UTF_8));</span>
+    }
+
+    @Override
+    public Optional&lt;Path&gt; jobArtifactPath(String jobId, String name) {
+        try {
+<span class="fc" id="L114">            validateId(jobId);</span>
+<span class="fc" id="L115">            validateId(name);</span>
+<span class="nc" id="L116">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L117">            return Optional.empty();</span>
+<span class="fc" id="L118">        }</span>
+<span class="fc" id="L119">        Path target = rootDirectory.resolve(jobId).resolve(name);</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        return Files.isRegularFile(target) ? Optional.of(target.toAbsolutePath()) : Optional.empty();</span>
+    }
+
+    @Override
+    public List&lt;String&gt; listJobArtifacts(String jobId) {
+        try {
+<span class="fc" id="L126">            validateId(jobId);</span>
+<span class="nc" id="L127">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L128">            return List.of();</span>
+<span class="fc" id="L129">        }</span>
+<span class="fc" id="L130">        Path jobDir = rootDirectory.resolve(jobId);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (!Files.isDirectory(jobDir)) {</span>
+<span class="fc" id="L132">            return List.of();</span>
+        }
+<span class="fc" id="L134">        List&lt;String&gt; names = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L135">        try (Stream&lt;Path&gt; stream = Files.list(jobDir)) {</span>
+<span class="fc" id="L136">            stream.filter(Files::isRegularFile)</span>
+<span class="fc" id="L137">                .map(p -&gt; p.getFileName().toString())</span>
+<span class="fc" id="L138">                .sorted()</span>
+<span class="fc" id="L139">                .forEach(names::add);</span>
+<span class="nc" id="L140">        } catch (IOException ex) {</span>
+<span class="nc" id="L141">            return List.of();</span>
+<span class="fc" id="L142">        }</span>
+<span class="fc" id="L143">        return names;</span>
+    }
+
+    private static void validateId(String artifactId) {
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        if (artifactId == null || artifactId.isBlank()) {</span>
+<span class="fc" id="L148">            throw new IllegalArgumentException(&quot;artifactId must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">        if (artifactId.contains(&quot;/&quot;) || artifactId.contains(&quot;\\&quot;)</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            || artifactId.contains(&quot;..&quot;)) {</span>
+<span class="fc" id="L152">            throw new IllegalArgumentException(&quot;artifactId must not contain path separators&quot;);</span>
+        }
+<span class="fc" id="L154">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

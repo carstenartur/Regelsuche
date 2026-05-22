@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Neo4jSearchGraphRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph</a> &gt; <span class="el_source">Neo4jSearchGraphRepository.java</span></div><h1>Neo4jSearchGraphRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.neo4j.driver.AuthTokens;
+import org.neo4j.driver.Driver;
+import org.neo4j.driver.GraphDatabase;
+import org.neo4j.driver.Record;
+import org.neo4j.driver.Session;
+
+/**
+ * Neo4j-backed {@link SearchGraphRepository}.
+ *
+ * &lt;p&gt;Persists each search run twice:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;strong&gt;Snapshot:&lt;/strong&gt; the full {@link SearchGraphRecord} JSON is
+ *       stored on {@code (:SearchRun.body)} so {@link #findById} and
+ *       {@link #findAll} can rehydrate the complete record (including replays,
+ *       macro rules, identities and exports).&lt;/li&gt;
+ *   &lt;li&gt;&lt;strong&gt;Native graph:&lt;/strong&gt; nodes and edges are also materialised
+ *       as
+ *       {@code (:SearchRun)-[:HAS_NODE]-&gt;(:ExpressionNode)} and
+ *       {@code (:ExpressionNode)-[:REWRITES_TO {ruleId, ruleKind, scoreDelta, pathIds, assumptions}]-&gt;(:ExpressionNode)}
+ *       plus {@code (:TransformationPath)-[:USES_EDGE {stepIndex}]-&gt;(:REWRITES_TO)},
+ *       {@code (:MacroRuleCandidate)-[:SUPPORTED_BY]-&gt;(:TransformationPath)} and
+ *       {@code (:IdentityReport)} so the graph becomes Cypher-queryable.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;Reuses the project's existing {@code org.neo4j.driver:neo4j-java-driver}
+ * dependency — no new libraries.&lt;/p&gt;
+ */
+public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
+
+    private final Driver driver;
+
+<span class="nc" id="L40">    public Neo4jSearchGraphRepository(String uri, String username, String password) {</span>
+<span class="nc" id="L41">        this.driver = GraphDatabase.driver(uri, AuthTokens.basic(username, password));</span>
+<span class="nc" id="L42">    }</span>
+
+    /** Test-only seam: provide an existing {@link Driver} (e.g. embedded harness). */
+<span class="nc" id="L45">    public Neo4jSearchGraphRepository(Driver driver) {</span>
+<span class="nc" id="L46">        this.driver = driver;</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public void save(SearchGraphRecord record) {
+<span class="nc" id="L51">        String json = SearchGraphRecordCodec.toJson(record);</span>
+<span class="nc" id="L52">        try (Session session = driver.session()) {</span>
+            // 1. Upsert SearchRun + JSON snapshot (so the record is fully round-trippable).
+<span class="nc" id="L54">            Map&lt;String, Object&gt; runParams = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L55">            runParams.put(&quot;id&quot;, record.id());</span>
+<span class="nc" id="L56">            runParams.put(&quot;createdAt&quot;, record.createdAt().toString());</span>
+<span class="nc" id="L57">            runParams.put(&quot;searchProfile&quot;, record.searchProfile());</span>
+<span class="nc" id="L58">            runParams.put(&quot;domains&quot;, record.domains());</span>
+<span class="nc" id="L59">            runParams.put(&quot;body&quot;, json);</span>
+<span class="nc" id="L60">            session.run(</span>
+                &quot;MERGE (r:SearchRun:SearchGraphRecord {id: $id}) &quot;
+                    + &quot;SET r.createdAt = $createdAt, r.searchProfile = $searchProfile, &quot;
+                    + &quot;r.domains = $domains, r.body = $body&quot;,
+                runParams
+            );
+            // 2. Clean previous structured graph for idempotent re-saves of the same run.
+<span class="nc" id="L67">            session.run(</span>
+                &quot;MATCH (r:SearchRun {id: $id})-[:HAS_NODE|HAS_PATH|HAS_MACRO|HAS_IDENTITY]-&gt;(x) &quot;
+                    + &quot;DETACH DELETE x&quot;,
+<span class="nc" id="L70">                Map.of(&quot;id&quot;, record.id())</span>
+            );
+<span class="nc" id="L72">            persistGraph(session, record);</span>
+        }
+<span class="nc" id="L74">    }</span>
+
+    private void persistGraph(Session session, SearchGraphRecord record) {
+<span class="nc" id="L77">        SearchGraphDto graph = record.graph();</span>
+        // Nodes
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        for (SearchGraphNodeDto node : graph.nodes()) {</span>
+<span class="nc" id="L80">            Map&lt;String, Object&gt; p = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L81">            p.put(&quot;runId&quot;, record.id());</span>
+<span class="nc" id="L82">            p.put(&quot;id&quot;, node.id());</span>
+<span class="nc" id="L83">            p.put(&quot;expression&quot;, node.expression());</span>
+<span class="nc" id="L84">            p.put(&quot;latex&quot;, node.latex());</span>
+<span class="nc" id="L85">            p.put(&quot;score&quot;, node.score());</span>
+<span class="nc" id="L86">            p.put(&quot;depth&quot;, node.depth());</span>
+<span class="nc" id="L87">            p.put(&quot;visitedCount&quot;, node.visitedCount());</span>
+<span class="nc" id="L88">            p.put(&quot;isBest&quot;, node.isBest());</span>
+<span class="nc" id="L89">            p.put(&quot;isDeadEnd&quot;, node.isDeadEnd());</span>
+<span class="nc" id="L90">            p.put(&quot;candidateStatus&quot;, node.candidateStatus().name());</span>
+<span class="nc" id="L91">            p.put(&quot;clusterId&quot;, node.clusterId());</span>
+<span class="nc" id="L92">            session.run(</span>
+                &quot;MATCH (r:SearchRun {id: $runId}) &quot;
+                    + &quot;MERGE (n:ExpressionNode {runId: $runId, id: $id}) &quot;
+                    + &quot;SET n.expression = $expression, n.latex = $latex, n.score = $score, &quot;
+                    + &quot;n.depth = $depth, n.visitedCount = $visitedCount, n.isBest = $isBest, &quot;
+                    + &quot;n.isDeadEnd = $isDeadEnd, n.candidateStatus = $candidateStatus, &quot;
+                    + &quot;n.clusterId = $clusterId &quot;
+                    + &quot;MERGE (r)-[:HAS_NODE]-&gt;(n)&quot;,
+                p
+            );
+<span class="nc" id="L102">        }</span>
+        // Edges
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (SearchGraphEdgeDto edge : graph.edges()) {</span>
+<span class="nc" id="L105">            Map&lt;String, Object&gt; p = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L106">            p.put(&quot;runId&quot;, record.id());</span>
+<span class="nc" id="L107">            p.put(&quot;from&quot;, edge.from());</span>
+<span class="nc" id="L108">            p.put(&quot;to&quot;, edge.to());</span>
+<span class="nc" id="L109">            p.put(&quot;ruleId&quot;, edge.ruleId());</span>
+<span class="nc" id="L110">            p.put(&quot;ruleKind&quot;, edge.ruleKind().name());</span>
+<span class="nc" id="L111">            p.put(&quot;scoreDelta&quot;, edge.scoreDelta());</span>
+<span class="nc" id="L112">            p.put(&quot;pathIds&quot;, edge.pathIds());</span>
+<span class="nc" id="L113">            p.put(&quot;assumptions&quot;, edge.assumptions());</span>
+<span class="nc" id="L114">            p.put(&quot;equivalencePreserving&quot;, edge.equivalencePreserving());</span>
+<span class="nc" id="L115">            session.run(</span>
+                &quot;MATCH (from:ExpressionNode {runId: $runId, id: $from}) &quot;
+                    + &quot;MATCH (to:ExpressionNode {runId: $runId, id: $to}) &quot;
+                    + &quot;MERGE (from)-[e:REWRITES_TO {ruleId: $ruleId}]-&gt;(to) &quot;
+                    + &quot;SET e.ruleKind = $ruleKind, e.scoreDelta = $scoreDelta, &quot;
+                    + &quot;e.pathIds = $pathIds, e.assumptions = $assumptions, &quot;
+                    + &quot;e.equivalencePreserving = $equivalencePreserving&quot;,
+                p
+            );
+<span class="nc" id="L124">        }</span>
+        // Transformation paths from replays
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        for (de.regelsuche.api.PathReplayDto replay : record.replays()) {</span>
+<span class="nc" id="L127">            Map&lt;String, Object&gt; p = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L128">            p.put(&quot;runId&quot;, record.id());</span>
+<span class="nc" id="L129">            p.put(&quot;pathId&quot;, replay.pathId());</span>
+<span class="nc" id="L130">            p.put(&quot;stepCount&quot;, replay.steps().size());</span>
+<span class="nc" id="L131">            session.run(</span>
+                &quot;MATCH (r:SearchRun {id: $runId}) &quot;
+                    + &quot;MERGE (p:TransformationPath {runId: $runId, id: $pathId}) &quot;
+                    + &quot;SET p.stepCount = $stepCount &quot;
+                    + &quot;MERGE (r)-[:HAS_PATH]-&gt;(p)&quot;,
+                p
+            );
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            for (de.regelsuche.api.PathReplayDto.ReplayStep step : replay.steps()) {</span>
+<span class="nc" id="L139">                Map&lt;String, Object&gt; ep = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L140">                ep.put(&quot;runId&quot;, record.id());</span>
+<span class="nc" id="L141">                ep.put(&quot;pathId&quot;, replay.pathId());</span>
+<span class="nc" id="L142">                ep.put(&quot;from&quot;, step.fromExpression());</span>
+<span class="nc" id="L143">                ep.put(&quot;to&quot;, step.toExpression());</span>
+<span class="nc" id="L144">                ep.put(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="nc" id="L145">                ep.put(&quot;stepIndex&quot;, step.stepIndex());</span>
+<span class="nc" id="L146">                session.run(</span>
+                    &quot;MATCH (p:TransformationPath {runId: $runId, id: $pathId}) &quot;
+                        + &quot;MATCH (from:ExpressionNode {runId: $runId, id: $from}) &quot;
+                        + &quot;MATCH (from)-[e:REWRITES_TO {ruleId: $ruleId}]-&gt;&quot;
+                        + &quot;(:ExpressionNode {runId: $runId, id: $to}) &quot;
+                        + &quot;MERGE (p)-[u:USES_EDGE {stepIndex: $stepIndex}]-&gt;(e)&quot;,
+                    ep
+                );
+<span class="nc" id="L154">            }</span>
+<span class="nc" id="L155">        }</span>
+        // Macro rule candidates
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        for (de.regelsuche.mining.MacroRuleCandidate macro : record.macroRules()) {</span>
+<span class="nc" id="L158">            Map&lt;String, Object&gt; p = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L159">            p.put(&quot;runId&quot;, record.id());</span>
+<span class="nc" id="L160">            p.put(&quot;id&quot;, macro.id());</span>
+<span class="nc" id="L161">            p.put(&quot;leftPattern&quot;, macro.leftPattern());</span>
+<span class="nc" id="L162">            p.put(&quot;rightPattern&quot;, macro.rightPattern());</span>
+<span class="nc" id="L163">            p.put(&quot;ruleIdSequence&quot;, macro.ruleIdSequence());</span>
+<span class="nc" id="L164">            p.put(&quot;occurrences&quot;, macro.occurrences());</span>
+<span class="nc" id="L165">            p.put(&quot;compressionRatio&quot;, macro.compressionRatio());</span>
+<span class="nc" id="L166">            p.put(&quot;proofStatus&quot;, macro.proofStatus().name());</span>
+<span class="nc" id="L167">            p.put(&quot;supportingTransformationIds&quot;, macro.supportingTransformationIds());</span>
+<span class="nc" id="L168">            session.run(</span>
+                &quot;MATCH (r:SearchRun {id: $runId}) &quot;
+                    + &quot;MERGE (m:MacroRuleCandidate {runId: $runId, id: $id}) &quot;
+                    + &quot;SET m.leftPattern = $leftPattern, m.rightPattern = $rightPattern, &quot;
+                    + &quot;m.ruleIdSequence = $ruleIdSequence, m.occurrences = $occurrences, &quot;
+                    + &quot;m.compressionRatio = $compressionRatio, m.proofStatus = $proofStatus, &quot;
+                    + &quot;m.supportingTransformationIds = $supportingTransformationIds &quot;
+                    + &quot;MERGE (r)-[:HAS_MACRO]-&gt;(m) &quot;
+                    + &quot;WITH m, $supportingTransformationIds AS pids, $runId AS rid &quot;
+                    + &quot;UNWIND pids AS pid &quot;
+                    + &quot;MATCH (p:TransformationPath {runId: rid, id: pid}) &quot;
+                    + &quot;MERGE (m)-[:SUPPORTED_BY]-&gt;(p)&quot;,
+                p
+            );
+<span class="nc" id="L182">        }</span>
+        // Identity reports
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        for (de.regelsuche.api.IdentityReportDto identity : record.identities()) {</span>
+<span class="nc" id="L185">            Map&lt;String, Object&gt; p = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L186">            p.put(&quot;runId&quot;, record.id());</span>
+<span class="nc" id="L187">            p.put(&quot;id&quot;, identity.id());</span>
+<span class="nc" id="L188">            p.put(&quot;leftPattern&quot;, identity.leftPattern());</span>
+<span class="nc" id="L189">            p.put(&quot;rightPattern&quot;, identity.rightPattern());</span>
+<span class="nc" id="L190">            p.put(&quot;ruleIdSequence&quot;, identity.ruleIdSequence());</span>
+<span class="nc" id="L191">            p.put(&quot;occurrences&quot;, identity.occurrences());</span>
+<span class="nc" id="L192">            p.put(&quot;compressionRatio&quot;, identity.compressionRatio());</span>
+<span class="nc" id="L193">            p.put(&quot;proofStatus&quot;, identity.proofStatus().name());</span>
+<span class="nc" id="L194">            p.put(&quot;knownRuleStatus&quot;, identity.knownRuleStatus().name());</span>
+<span class="nc" id="L195">            p.put(&quot;supportingTransformationIds&quot;, identity.supportingTransformationIds());</span>
+<span class="nc" id="L196">            session.run(</span>
+                &quot;MATCH (r:SearchRun {id: $runId}) &quot;
+                    + &quot;MERGE (i:IdentityReport {runId: $runId, id: $id}) &quot;
+                    + &quot;SET i.leftPattern = $leftPattern, i.rightPattern = $rightPattern, &quot;
+                    + &quot;i.ruleIdSequence = $ruleIdSequence, i.occurrences = $occurrences, &quot;
+                    + &quot;i.compressionRatio = $compressionRatio, i.proofStatus = $proofStatus, &quot;
+                    + &quot;i.knownRuleStatus = $knownRuleStatus, &quot;
+                    + &quot;i.supportingTransformationIds = $supportingTransformationIds &quot;
+                    + &quot;MERGE (r)-[:HAS_IDENTITY]-&gt;(i)&quot;,
+                p
+            );
+<span class="nc" id="L207">        }</span>
+<span class="nc" id="L208">    }</span>
+
+    @Override
+    public Optional&lt;SearchGraphRecord&gt; findById(String id) {
+<span class="nc" id="L212">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L213">            var result = session.run(</span>
+                &quot;MATCH (r:SearchRun {id: $id}) RETURN r.body AS body&quot;,
+<span class="nc" id="L215">                Map.of(&quot;id&quot;, id)</span>
+            );
+<span class="nc bnc" id="L217" title="All 2 branches missed.">            if (!result.hasNext()) {</span>
+<span class="nc" id="L218">                return Optional.empty();</span>
+            }
+<span class="nc" id="L220">            String body = result.next().get(&quot;body&quot;).asString(&quot;&quot;);</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            return body.isBlank() ? Optional.empty() : Optional.of(SearchGraphRecordCodec.fromJson(body));</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        }</span>
+    }
+
+    @Override
+    public List&lt;SearchGraphRecord&gt; findAll() {
+<span class="nc" id="L227">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L228">            var result = session.run(</span>
+                &quot;MATCH (r:SearchRun) RETURN r.body AS body, r.createdAt AS createdAt &quot;
+                    + &quot;ORDER BY r.createdAt ASC&quot;
+            );
+<span class="nc" id="L232">            List&lt;SearchGraphRecord&gt; records = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            while (result.hasNext()) {</span>
+<span class="nc" id="L234">                Record row = result.next();</span>
+<span class="nc" id="L235">                String body = row.get(&quot;body&quot;).asString(&quot;&quot;);</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">                if (!body.isBlank()) {</span>
+<span class="nc" id="L237">                    records.add(SearchGraphRecordCodec.fromJson(body));</span>
+                }
+<span class="nc" id="L239">            }</span>
+<span class="nc" id="L240">            return records;</span>
+        }
+    }
+
+    @Override
+    public void delete(String id) {
+<span class="nc" id="L246">        try (Session session = driver.session()) {</span>
+            // Delete all related structured nodes first, then the SearchRun itself.
+<span class="nc" id="L248">            session.run(</span>
+                &quot;MATCH (r:SearchRun {id: $id})-[:HAS_NODE|HAS_PATH|HAS_MACRO|HAS_IDENTITY]-&gt;(x) &quot;
+                    + &quot;DETACH DELETE x&quot;,
+<span class="nc" id="L251">                Map.of(&quot;id&quot;, id)</span>
+            );
+<span class="nc" id="L253">            session.run(&quot;MATCH (r:SearchRun {id: $id}) DETACH DELETE r&quot;, Map.of(&quot;id&quot;, id));</span>
+        }
+<span class="nc" id="L255">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc" id="L259">        driver.close();</span>
+<span class="nc" id="L260">    }</span>
+
+    /** Unused helper retained for symmetry with other repos that timestamp accesses. */
+    @SuppressWarnings(&quot;unused&quot;)
+    private static Instant nowOr(Instant supplied) {
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        return supplied == null ? Instant.now() : supplied;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

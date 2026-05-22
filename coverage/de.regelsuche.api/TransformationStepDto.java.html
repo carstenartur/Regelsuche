@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransformationStepDto.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api</a> &gt; <span class="el_source">TransformationStepDto.java</span></div><h1>TransformationStepDto.java</h1><pre class="source lang-java linenums">package de.regelsuche.api;
+
+import de.regelsuche.discovery.TransformationStep;
+
+<span class="fc" id="L5">public record TransformationStepDto(</span>
+    int index,
+    String beforeExpression,
+    String afterExpression,
+    String ruleId,
+    String ruleKind,
+    int scoreBefore,
+    int scoreAfter,
+    boolean equivalencePreserving,
+    String explanation
+) {
+    public static TransformationStepDto from(TransformationStep step) {
+<span class="fc" id="L17">        return new TransformationStepDto(</span>
+<span class="fc" id="L18">            step.index(),</span>
+<span class="fc" id="L19">            step.beforeExpression(),</span>
+<span class="fc" id="L20">            step.afterExpression(),</span>
+<span class="fc" id="L21">            step.ruleId(),</span>
+<span class="fc" id="L22">            step.ruleKind().name(),</span>
+<span class="fc" id="L23">            step.scoreBefore(),</span>
+<span class="fc" id="L24">            step.scoreAfter(),</span>
+<span class="fc" id="L25">            step.equivalencePreserving(),</span>
+<span class="fc" id="L26">            step.explanation()</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

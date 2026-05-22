@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AlgebraicExampleGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.example</a> &gt; <span class="el_source">AlgebraicExampleGenerator.java</span></div><h1>AlgebraicExampleGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.example;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+<span class="fc" id="L8">public class AlgebraicExampleGenerator {</span>
+    public List&lt;String&gt; generateSmallIntegerExamples(int min, int max) {
+<span class="fc" id="L10">        Set&lt;String&gt; examples = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L11" title="All 2 branches covered.">        for (int a = min; a &lt;= max; a++) {</span>
+<span class="pc bpc" id="L12" title="1 of 2 branches missed.">            if (a == 0) {</span>
+<span class="nc" id="L13">                continue;</span>
+            }
+<span class="fc" id="L15">            int abs = Math.abs(a);</span>
+<span class="fc" id="L16">            examples.add(&quot;(x + &quot; + abs + &quot;)^2&quot;);</span>
+<span class="fc" id="L17">            examples.add(&quot;(x - &quot; + abs + &quot;)^2&quot;);</span>
+<span class="fc" id="L18">            examples.add(&quot;(x + &quot; + abs + &quot;)*(x - &quot; + abs + &quot;)&quot;);</span>
+<span class="fc" id="L19">            examples.add(&quot;x^2 + &quot; + (2 * abs) + &quot;*x + &quot; + (abs * abs));</span>
+<span class="fc" id="L20">            examples.add(&quot;x^2 - &quot; + (2 * abs) + &quot;*x + &quot; + (abs * abs));</span>
+<span class="fc" id="L21">            examples.add(&quot;x^2 + &quot; + (2 * abs) + &quot;*x&quot;);</span>
+<span class="fc" id="L22">            examples.add(&quot;x^2 - &quot; + (2 * abs) + &quot;*x&quot;);</span>
+        }
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        for (int b = min; b &lt;= max; b++) {</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            for (int c = min; c &lt;= max; c++) {</span>
+<span class="fc" id="L26">                examples.add(&quot;x^2 + &quot; + b + &quot;*x + &quot; + c);</span>
+<span class="fc" id="L27">                examples.add(&quot;2*x^2 + &quot; + b + &quot;*x + &quot; + c);</span>
+            }
+        }
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        for (String variable : List.of(&quot;x&quot;, &quot;y&quot;)) {</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for (int a = min; a &lt;= max; a++) {</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                if (a == 0) {</span>
+<span class="nc" id="L33">                    continue;</span>
+                }
+<span class="fc" id="L35">                int abs = Math.abs(a);</span>
+<span class="fc" id="L36">                examples.add(variable + &quot;^3 + &quot; + abs + &quot;*&quot; + variable + &quot;^2 + &quot; + (abs * abs) + &quot;*&quot; + variable);</span>
+<span class="fc" id="L37">                examples.add(&quot;(&quot; + variable + &quot; + &quot; + abs + &quot;)*(&quot; + variable + &quot;^2 + &quot; + abs + &quot;)&quot;);</span>
+<span class="fc" id="L38">                examples.add(variable + &quot;^4 + &quot; + (2 * abs) + &quot;*&quot; + variable + &quot;^2 + &quot; + (abs * abs));</span>
+            }
+<span class="fc" id="L40">        }</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (int a = min; a &lt;= max; a++) {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (a == 0) {</span>
+<span class="nc" id="L43">                continue;</span>
+            }
+<span class="fc" id="L45">            int abs = Math.abs(a);</span>
+<span class="fc" id="L46">            examples.add(&quot;(x + y + &quot; + abs + &quot;)^2&quot;);</span>
+<span class="fc" id="L47">            examples.add(&quot;(x + &quot; + abs + &quot;)*(y + &quot; + abs + &quot;)&quot;);</span>
+<span class="fc" id="L48">            examples.add(&quot;x^2 + 2*&quot; + abs + &quot;*x + y^2 + 2*&quot; + abs + &quot;*y + &quot; + (2 * abs * abs));</span>
+        }
+<span class="fc" id="L50">        return new ArrayList&lt;&gt;(examples);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

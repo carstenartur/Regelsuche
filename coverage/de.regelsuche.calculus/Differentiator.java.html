@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Differentiator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.calculus</a> &gt; <span class="el_source">Differentiator.java</span></div><h1>Differentiator.java</h1><pre class="source lang-java linenums">package de.regelsuche.calculus;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Symbolic differentiator for the AST.
+ *
+ * &lt;p&gt;Implements the elementary rules:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;constant rule: {@code d/dx c = 0},&lt;/li&gt;
+ *   &lt;li&gt;variable rule: {@code d/dx x = 1}, {@code d/dx y = 0} for {@code y != x},&lt;/li&gt;
+ *   &lt;li&gt;sum/difference rule: {@code d/dx (f ± g) = f' ± g'},&lt;/li&gt;
+ *   &lt;li&gt;product rule: {@code d/dx (f * g) = f'*g + f*g'},&lt;/li&gt;
+ *   &lt;li&gt;quotient rule: {@code d/dx (f / g) = (f'*g - f*g') / g^2},&lt;/li&gt;
+ *   &lt;li&gt;power rule (constant exponent {@code n}): {@code d/dx x^n = n * x^(n-1)};
+ *       chain-rule generalisation {@code d/dx u^n = n*u^(n-1) * u'},&lt;/li&gt;
+ *   &lt;li&gt;standard functions with chain rule:
+ *       {@code sin(u) -&gt; cos(u)*u'}, {@code cos(u) -&gt; -sin(u)*u'},
+ *       {@code exp(u) -&gt; exp(u)*u'}, {@code log(u) -&gt; u'/u}.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;The output AST is not simplified beyond a tiny constant-folding pass
+ * for {@code 0 + x}, {@code 1 * x} and friends, so downstream simplification
+ * is the responsibility of {@link de.regelsuche.transform.AstRewriteTransformationEngine}
+ * or callers that want canonical output.&lt;/p&gt;
+ */
+<span class="fc" id="L34">public final class Differentiator {</span>
+
+    public Expr differentiate(Expr expr, String variable) {
+<span class="fc" id="L37">        Objects.requireNonNull(expr, &quot;expr&quot;);</span>
+<span class="fc" id="L38">        Objects.requireNonNull(variable, &quot;variable&quot;);</span>
+<span class="fc" id="L39">        return simplify(diff(expr, variable));</span>
+    }
+
+    private Expr diff(Expr expr, String variable) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (expr instanceof NumberExpr) {</span>
+<span class="fc" id="L44">            return new NumberExpr(0);</span>
+        }
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (expr instanceof VariableExpr varExpr) {</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            return new NumberExpr(varExpr.name().equals(variable) ? 1 : 0);</span>
+        }
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L50">            Expr u = binary.left();</span>
+<span class="fc" id="L51">            Expr v = binary.right();</span>
+<span class="fc" id="L52">            Expr du = diff(u, variable);</span>
+<span class="fc" id="L53">            Expr dv = diff(v, variable);</span>
+<span class="pc bpc" id="L54" title="2 of 5 branches missed.">            return switch (binary.operator()) {</span>
+<span class="fc" id="L55">                case ADD -&gt; new BinaryExpr(du, BinaryOperator.ADD, dv);</span>
+<span class="nc" id="L56">                case SUB -&gt; new BinaryExpr(du, BinaryOperator.SUB, dv);</span>
+<span class="fc" id="L57">                case MUL -&gt; new BinaryExpr(</span>
+                    new BinaryExpr(du, BinaryOperator.MUL, v),
+                    BinaryOperator.ADD,
+                    new BinaryExpr(u, BinaryOperator.MUL, dv)
+                );
+<span class="nc" id="L62">                case DIV -&gt; new BinaryExpr(</span>
+                    new BinaryExpr(
+                        new BinaryExpr(du, BinaryOperator.MUL, v),
+                        BinaryOperator.SUB,
+                        new BinaryExpr(u, BinaryOperator.MUL, dv)
+                    ),
+                    BinaryOperator.DIV,
+                    new BinaryExpr(v, BinaryOperator.POW, new NumberExpr(2))
+                );
+<span class="fc" id="L71">                case POW -&gt; powerRule(u, v, du, variable);</span>
+            };
+        }
+<span class="pc bpc" id="L74" title="2 of 4 branches missed.">        if (expr instanceof FunctionExpr fn &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="fc" id="L75">            Expr u = fn.arguments().get(0);</span>
+<span class="fc" id="L76">            Expr du = diff(u, variable);</span>
+<span class="pc bpc" id="L77" title="2 of 5 branches missed.">            Expr outer = switch (fn.name()) {</span>
+<span class="fc" id="L78">                case &quot;sin&quot; -&gt; new FunctionExpr(&quot;cos&quot;, u);</span>
+<span class="nc" id="L79">                case &quot;cos&quot; -&gt; new BinaryExpr(</span>
+                    new NumberExpr(0),
+                    BinaryOperator.SUB,
+                    new FunctionExpr(&quot;sin&quot;, u)
+                );
+<span class="fc" id="L84">                case &quot;exp&quot; -&gt; new FunctionExpr(&quot;exp&quot;, u);</span>
+<span class="fc" id="L85">                case &quot;log&quot;, &quot;ln&quot; -&gt; new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, u);</span>
+<span class="pc" id="L86">                default -&gt; null;</span>
+            };
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (outer != null) {</span>
+<span class="fc" id="L89">                return new BinaryExpr(outer, BinaryOperator.MUL, du);</span>
+            }
+        }
+<span class="nc" id="L92">        throw new UnsupportedOperationException(</span>
+<span class="nc" id="L93">            &quot;Differentiator has no rule for &quot; + expr.getClass().getSimpleName() + &quot;: &quot; + expr);</span>
+    }
+
+    private Expr powerRule(Expr base, Expr exponent, Expr baseDerivative, String variable) {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (exponent instanceof NumberExpr n) {</span>
+<span class="fc" id="L98">            double power = n.value();</span>
+            // n * base^(n-1) * base'
+<span class="fc" id="L100">            Expr coefficient = new NumberExpr(power);</span>
+<span class="fc" id="L101">            Expr reducedPower = new BinaryExpr(</span>
+                base,
+                BinaryOperator.POW,
+                new NumberExpr(power - 1)
+            );
+<span class="fc" id="L106">            Expr core = new BinaryExpr(coefficient, BinaryOperator.MUL, reducedPower);</span>
+<span class="fc" id="L107">            return new BinaryExpr(core, BinaryOperator.MUL, baseDerivative);</span>
+        }
+        // d/dx u^v = u^v * (v' * ln u + v * u'/u)
+<span class="nc" id="L110">        Expr dv = diff(exponent, variable);</span>
+<span class="nc" id="L111">        Expr lnBase = new FunctionExpr(&quot;ln&quot;, base);</span>
+<span class="nc" id="L112">        Expr first = new BinaryExpr(dv, BinaryOperator.MUL, lnBase);</span>
+<span class="nc" id="L113">        Expr second = new BinaryExpr(</span>
+            exponent,
+            BinaryOperator.MUL,
+            new BinaryExpr(baseDerivative, BinaryOperator.DIV, base)
+        );
+<span class="nc" id="L118">        Expr factor = new BinaryExpr(first, BinaryOperator.ADD, second);</span>
+<span class="nc" id="L119">        Expr power = new BinaryExpr(base, BinaryOperator.POW, exponent);</span>
+<span class="nc" id="L120">        return new BinaryExpr(power, BinaryOperator.MUL, factor);</span>
+    }
+
+    /**
+     * Lightweight constant-folding pass that simplifies the syntactic noise
+     * inherent to the chain rule (e.g. {@code &lt;expr&gt; * 1 -&gt; &lt;expr&gt;},
+     * {@code 0 + x -&gt; x}). It deliberately stays AST-local and does not
+     * attempt full simplification.
+     */
+    public static Expr simplify(Expr expr) {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L131">            Expr left = simplify(binary.left());</span>
+<span class="fc" id="L132">            Expr right = simplify(binary.right());</span>
+<span class="fc" id="L133">            return foldBinary(left, binary.operator(), right);</span>
+        }
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (expr instanceof FunctionExpr fn) {</span>
+<span class="fc" id="L136">            List&lt;Expr&gt; args = fn.arguments().stream().map(Differentiator::simplify).toList();</span>
+<span class="fc" id="L137">            return new FunctionExpr(fn.name(), args);</span>
+        }
+<span class="fc" id="L139">        return expr;</span>
+    }
+
+    private static Expr foldBinary(Expr left, BinaryOperator op, Expr right) {
+<span class="pc bpc" id="L143" title="1 of 6 branches missed.">        switch (op) {</span>
+            case ADD -&gt; {
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                if (isNumber(left, 0)) {</span>
+<span class="nc" id="L146">                    return right;</span>
+                }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (isNumber(right, 0)) {</span>
+<span class="nc" id="L149">                    return left;</span>
+                }
+<span class="pc bpc" id="L151" title="3 of 4 branches missed.">                if (left instanceof NumberExpr l &amp;&amp; right instanceof NumberExpr r) {</span>
+<span class="nc" id="L152">                    return new NumberExpr(l.value() + r.value());</span>
+                }
+<span class="fc" id="L154">            }</span>
+            case SUB -&gt; {
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                if (isNumber(right, 0)) {</span>
+<span class="nc" id="L157">                    return left;</span>
+                }
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">                if (left instanceof NumberExpr l &amp;&amp; right instanceof NumberExpr r) {</span>
+<span class="nc" id="L160">                    return new NumberExpr(l.value() - r.value());</span>
+                }
+<span class="fc" id="L162">            }</span>
+            case MUL -&gt; {
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">                if (isNumber(left, 0) || isNumber(right, 0)) {</span>
+<span class="nc" id="L165">                    return new NumberExpr(0);</span>
+                }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">                if (isNumber(left, 1)) {</span>
+<span class="fc" id="L168">                    return right;</span>
+                }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                if (isNumber(right, 1)) {</span>
+<span class="fc" id="L171">                    return left;</span>
+                }
+<span class="pc bpc" id="L173" title="1 of 4 branches missed.">                if (left instanceof NumberExpr l &amp;&amp; right instanceof NumberExpr r) {</span>
+<span class="nc" id="L174">                    return new NumberExpr(l.value() * r.value());</span>
+                }
+<span class="fc" id="L176">            }</span>
+            case DIV -&gt; {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                if (isNumber(right, 1)) {</span>
+<span class="nc" id="L179">                    return left;</span>
+                }
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                if (isNumber(left, 0)) {</span>
+<span class="nc" id="L182">                    return new NumberExpr(0);</span>
+                }
+            }
+            case POW -&gt; {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                if (isNumber(right, 1)) {</span>
+<span class="fc" id="L187">                    return left;</span>
+                }
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                if (isNumber(right, 0)) {</span>
+<span class="nc" id="L190">                    return new NumberExpr(1);</span>
+                }
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                if (isNumber(left, 1)) {</span>
+<span class="nc" id="L193">                    return new NumberExpr(1);</span>
+                }
+            }
+            default -&gt; {
+            }
+        }
+<span class="fc" id="L199">        return new BinaryExpr(left, op, right);</span>
+    }
+
+    private static boolean isNumber(Expr expr, double value) {
+<span class="fc bfc" id="L203" title="All 4 branches covered.">        return expr instanceof NumberExpr number &amp;&amp; number.value() == value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

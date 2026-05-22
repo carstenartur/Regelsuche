@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Neo4jRuleInventoryRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">Neo4jRuleInventoryRepository.java</span></div><h1>Neo4jRuleInventoryRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.mining.RuleStatus;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.neo4j.driver.AuthTokens;
+import org.neo4j.driver.Driver;
+import org.neo4j.driver.GraphDatabase;
+import org.neo4j.driver.Record;
+import org.neo4j.driver.Session;
+import org.neo4j.driver.Value;
+
+public class Neo4jRuleInventoryRepository implements RuleInventoryRepository {
+    private final Driver driver;
+
+<span class="nc" id="L21">    public Neo4jRuleInventoryRepository(String uri, String username, String password) {</span>
+<span class="nc" id="L22">        this.driver = GraphDatabase.driver(uri, AuthTokens.basic(username, password));</span>
+<span class="nc" id="L23">    }</span>
+
+    @Override
+    public void save(ReusableRule rule) {
+<span class="nc" id="L27">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L28">            java.util.HashMap&lt;String, Object&gt; params = new java.util.HashMap&lt;&gt;();</span>
+<span class="nc" id="L29">            params.put(&quot;id&quot;, rule.id());</span>
+<span class="nc" id="L30">            params.put(&quot;leftPattern&quot;, rule.leftPattern());</span>
+<span class="nc" id="L31">            params.put(&quot;rightPattern&quot;, rule.rightPattern());</span>
+<span class="nc" id="L32">            params.put(&quot;parameterRelations&quot;, rule.parameterRelations());</span>
+<span class="nc" id="L33">            params.put(&quot;proofStatus&quot;, rule.proofStatus().name());</span>
+<span class="nc" id="L34">            params.put(&quot;knownRuleStatus&quot;, rule.knownRuleStatus().name());</span>
+<span class="nc" id="L35">            params.put(&quot;supportingExamples&quot;, rule.supportingExamples());</span>
+<span class="nc" id="L36">            params.put(&quot;averageImprovement&quot;, rule.averageImprovement());</span>
+<span class="nc" id="L37">            params.put(&quot;createdAt&quot;, rule.createdAt().toString());</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">            params.put(&quot;canonicalHash&quot;, rule.canonicalHash() == null ? &quot;&quot; : rule.canonicalHash());</span>
+<span class="nc" id="L39">            params.put(&quot;usageCount&quot;, rule.usageCount());</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">            params.put(&quot;lastUsedAt&quot;, rule.lastUsedAt() == null ? null : rule.lastUsedAt().toString());</span>
+<span class="nc" id="L41">            session.run(</span>
+                &quot;MERGE (rule:ReusableRule {id: $id}) &quot;
+                    + &quot;SET rule.leftPattern = $leftPattern, rule.rightPattern = $rightPattern, &quot;
+                    + &quot;rule.parameterRelations = $parameterRelations, rule.proofStatus = $proofStatus, &quot;
+                    + &quot;rule.knownRuleStatus = $knownRuleStatus, rule.supportingExamples = $supportingExamples, &quot;
+                    + &quot;rule.averageImprovement = $averageImprovement, rule.createdAt = $createdAt, &quot;
+                    + &quot;rule.canonicalHash = $canonicalHash, &quot;
+                    + &quot;rule.usageCount = $usageCount, &quot;
+                    + &quot;rule.lastUsedAt = $lastUsedAt, &quot;
+                    + &quot;rule.enabled = coalesce(rule.enabled, true), &quot;
+                    + &quot;rule.tags = coalesce(rule.tags, [])&quot;,
+                params
+            );
+        }
+<span class="nc" id="L55">    }</span>
+
+    @Override
+    public List&lt;ReusableRule&gt; findAll() {
+<span class="nc" id="L59">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L60">            var result = session.run(</span>
+                &quot;MATCH (rule:ReusableRule) RETURN rule.id AS id, rule.leftPattern AS leftPattern, &quot;
+                    + &quot;rule.rightPattern AS rightPattern, rule.parameterRelations AS parameterRelations, &quot;
+                    + &quot;rule.proofStatus AS proofStatus, rule.knownRuleStatus AS knownRuleStatus, &quot;
+                    + &quot;rule.supportingExamples AS supportingExamples, rule.averageImprovement AS averageImprovement, &quot;
+                    + &quot;rule.createdAt AS createdAt, rule.canonicalHash AS canonicalHash, &quot;
+                    + &quot;rule.usageCount AS usageCount, rule.lastUsedAt AS lastUsedAt &quot;
+                    + &quot;ORDER BY id&quot;
+            );
+<span class="nc" id="L69">            List&lt;ReusableRule&gt; rules = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            while (result.hasNext()) {</span>
+<span class="nc" id="L71">                Record record = result.next();</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                List&lt;String&gt; relations = record.get(&quot;parameterRelations&quot;).isNull()</span>
+<span class="nc" id="L73">                    ? List.of()</span>
+<span class="nc" id="L74">                    : record.get(&quot;parameterRelations&quot;).asList(Value::asString);</span>
+<span class="nc" id="L75">                String lastUsedRaw = record.get(&quot;lastUsedAt&quot;).asString(&quot;&quot;);</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                Instant lastUsed = lastUsedRaw.isBlank() ? null : Instant.parse(lastUsedRaw);</span>
+<span class="nc" id="L77">                rules.add(new ReusableRule(</span>
+<span class="nc" id="L78">                    record.get(&quot;id&quot;).asString(),</span>
+<span class="nc" id="L79">                    record.get(&quot;leftPattern&quot;).asString(),</span>
+<span class="nc" id="L80">                    record.get(&quot;rightPattern&quot;).asString(),</span>
+                    relations,
+<span class="nc" id="L82">                    CandidateProofStatus.valueOf(record.get(&quot;proofStatus&quot;).asString(CandidateProofStatus.OBSERVED.name())),</span>
+<span class="nc" id="L83">                    RuleStatus.valueOf(record.get(&quot;knownRuleStatus&quot;).asString(RuleStatus.NEW.name())),</span>
+<span class="nc" id="L84">                    record.get(&quot;supportingExamples&quot;).asInt(0),</span>
+<span class="nc" id="L85">                    record.get(&quot;averageImprovement&quot;).asDouble(0),</span>
+<span class="nc" id="L86">                    Instant.parse(record.get(&quot;createdAt&quot;).asString(Instant.EPOCH.toString())),</span>
+<span class="nc" id="L87">                    record.get(&quot;canonicalHash&quot;).asString(&quot;&quot;),</span>
+                    lastUsed,
+<span class="nc" id="L89">                    record.get(&quot;usageCount&quot;).asInt(0)</span>
+                ));
+<span class="nc" id="L91">            }</span>
+<span class="nc" id="L92">            return rules;</span>
+        }
+    }
+
+    /**
+     * Increment {@code usageCount} and refresh {@code lastUsedAt} on the
+     * Neo4j node. Idempotent on missing rule ids (no-op).
+     */
+    public void recordUsage(String ruleId, Instant when) {
+<span class="nc" id="L101">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L102">            session.run(</span>
+                &quot;MATCH (rule:ReusableRule {id: $id}) &quot;
+                    + &quot;SET rule.usageCount = coalesce(rule.usageCount, 0) + 1, &quot;
+                    + &quot;rule.lastUsedAt = $when&quot;,
+<span class="nc" id="L106">                Map.of(&quot;id&quot;, ruleId, &quot;when&quot;, when.toString())</span>
+            );
+        }
+<span class="nc" id="L109">    }</span>
+
+    @Override
+    public void setEnabled(String ruleId, boolean enabled) {
+<span class="nc" id="L113">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L114">            session.run(</span>
+                &quot;MATCH (rule:ReusableRule {id: $id}) SET rule.enabled = $enabled&quot;,
+<span class="nc" id="L116">                Map.of(&quot;id&quot;, ruleId, &quot;enabled&quot;, enabled)</span>
+            );
+        }
+<span class="nc" id="L119">    }</span>
+
+    @Override
+    public boolean isEnabled(String ruleId) {
+<span class="nc" id="L123">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L124">            var result = session.run(</span>
+                &quot;MATCH (rule:ReusableRule {id: $id}) RETURN coalesce(rule.enabled, true) AS enabled&quot;,
+<span class="nc" id="L126">                Map.of(&quot;id&quot;, ruleId)</span>
+            );
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (result.hasNext()) {</span>
+<span class="nc" id="L129">                return result.next().get(&quot;enabled&quot;).asBoolean(true);</span>
+            }
+<span class="nc" id="L131">            return true;</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        }</span>
+    }
+
+    @Override
+    public void addTag(String ruleId, String tag) {
+<span class="nc" id="L137">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L138">            session.run(</span>
+                &quot;MATCH (rule:ReusableRule {id: $id}) &quot;
+                    + &quot;SET rule.tags = coalesce(rule.tags, []) + &quot;
+                    + &quot;CASE WHEN $tag IN coalesce(rule.tags, []) THEN [] ELSE [$tag] END&quot;,
+<span class="nc" id="L142">                Map.of(&quot;id&quot;, ruleId, &quot;tag&quot;, tag)</span>
+            );
+        }
+<span class="nc" id="L145">    }</span>
+
+    @Override
+    public void removeTag(String ruleId, String tag) {
+<span class="nc" id="L149">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L150">            session.run(</span>
+                &quot;MATCH (rule:ReusableRule {id: $id}) &quot;
+                    + &quot;SET rule.tags = [t IN coalesce(rule.tags, []) WHERE t &lt;&gt; $tag]&quot;,
+<span class="nc" id="L153">                Map.of(&quot;id&quot;, ruleId, &quot;tag&quot;, tag)</span>
+            );
+        }
+<span class="nc" id="L156">    }</span>
+
+    @Override
+    public Set&lt;String&gt; tagsOf(String ruleId) {
+<span class="nc" id="L160">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L161">            var result = session.run(</span>
+                &quot;MATCH (rule:ReusableRule {id: $id}) RETURN coalesce(rule.tags, []) AS tags&quot;,
+<span class="nc" id="L163">                Map.of(&quot;id&quot;, ruleId)</span>
+            );
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (result.hasNext()) {</span>
+<span class="nc" id="L166">                List&lt;String&gt; tags = result.next().get(&quot;tags&quot;).asList(Value::asString);</span>
+<span class="nc" id="L167">                return new LinkedHashSet&lt;&gt;(tags);</span>
+            }
+<span class="nc" id="L169">            return Set.of();</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        }</span>
+    }
+
+    @Override
+    public void close() {
+<span class="nc" id="L175">        driver.close();</span>
+<span class="nc" id="L176">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

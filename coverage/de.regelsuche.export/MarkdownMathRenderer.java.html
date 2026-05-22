@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MarkdownMathRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.export</a> &gt; <span class="el_source">MarkdownMathRenderer.java</span></div><h1>MarkdownMathRenderer.java</h1><pre class="source lang-java linenums">package de.regelsuche.export;
+
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.scoring.ExpressionScore;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+<span class="fc" id="L10">public class MarkdownMathRenderer implements MathRenderer {</span>
+    @Override
+    public String renderExpression(String expression) {
+<span class="fc" id="L13">        return &quot;$$\n&quot; + expression + &quot;\n$$&quot;;</span>
+    }
+
+    @Override
+    public String renderStep(TransformationStep step) {
+<span class="fc" id="L18">        return step.beforeExpression() + &quot; \\rightarrow &quot; + step.afterExpression();</span>
+    }
+
+    @Override
+    public String renderPath(DiscoveredTransformation path) {
+<span class="fc" id="L23">        String numberedSteps = IntStream.range(0, path.steps().size())</span>
+<span class="fc" id="L24">            .mapToObj(i -&gt; (i + 1) + &quot;. `&quot; + renderStep(path.steps().get(i)) + &quot;` _(Regel: &quot;</span>
+<span class="fc" id="L25">                + path.steps().get(i).ruleId() + &quot;)_&quot;)</span>
+<span class="fc" id="L26">            .collect(Collectors.joining(&quot;\n&quot;));</span>
+<span class="fc" id="L27">        return &quot;### Gefundene Umformung: &quot; + path.originalExpression() + &quot; → &quot; + path.improvedExpression() + &quot;\n\n&quot;</span>
+            + &quot;#### Ausgang\n&quot;
+<span class="fc" id="L29">            + renderExpression(path.originalExpression()) + &quot;\n\n&quot;</span>
+            + &quot;#### Rechenweg\n&quot;
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            + (numberedSteps.isEmpty() ? &quot;_keine atomaren Schritte aufgezeichnet_\n&quot; : numberedSteps + &quot;\n&quot;) + &quot;\n&quot;</span>
+            + &quot;#### Bewertung\n&quot;
+<span class="fc" id="L33">            + renderScoreTable(path.originalScore(), path.improvedScore()) + &quot;\n\n&quot;</span>
+            + &quot;#### Status\n&quot;
+<span class="fc" id="L35">            + path.validationStatus();</span>
+    }
+
+    static String renderDocument(List&lt;DiscoveredTransformation&gt; transformations, MathRenderer renderer) {
+<span class="fc" id="L39">        StringBuilder builder = new StringBuilder(&quot;# Gefundene Umformungen\n\n&quot;);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (!transformations.isEmpty()) {</span>
+<span class="fc" id="L41">            builder.append(&quot;## Inhaltsverzeichnis\n\n&quot;);</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (int i = 0; i &lt; transformations.size(); i++) {</span>
+<span class="fc" id="L43">                DiscoveredTransformation transformation = transformations.get(i);</span>
+<span class="fc" id="L44">                builder.append(i + 1).append(&quot;. &quot;)</span>
+<span class="fc" id="L45">                    .append(transformation.originalExpression()).append(&quot; → &quot;)</span>
+<span class="fc" id="L46">                    .append(transformation.improvedExpression())</span>
+<span class="fc" id="L47">                    .append(&quot; _(Δ=&quot;).append(transformation.totalImprovement()).append(&quot;, &quot;)</span>
+<span class="fc" id="L48">                    .append(transformation.validationStatus()).append(&quot;)_\n&quot;);</span>
+            }
+<span class="fc" id="L50">            builder.append('\n');</span>
+        }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (int i = 0; i &lt; transformations.size(); i++) {</span>
+<span class="fc" id="L53">            DiscoveredTransformation transformation = transformations.get(i);</span>
+<span class="fc" id="L54">            builder.append(&quot;## &quot;).append(i + 1).append(&quot;. &quot;)</span>
+<span class="fc" id="L55">                .append(transformation.originalExpression()).append(&quot; → &quot;)</span>
+<span class="fc" id="L56">                .append(transformation.improvedExpression()).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L57">            builder.append(renderer.renderPath(transformation));</span>
+<span class="fc" id="L58">            builder.append(&quot;\n\n&quot;);</span>
+        }
+<span class="fc" id="L60">        return builder.toString();</span>
+    }
+
+    private String renderScoreTable(ExpressionScore before, ExpressionScore after) {
+<span class="fc" id="L64">        return &quot;| Eigenschaft | Vorher | Nachher |\n&quot;</span>
+            + &quot;|---|---:|---:|\n&quot;
+<span class="fc" id="L66">            + row(&quot;String-Länge&quot;, before.stringLength(), after.stringLength())</span>
+<span class="fc" id="L67">            + row(&quot;AST-Knoten&quot;, before.astNodeCount(), after.astNodeCount())</span>
+<span class="fc" id="L68">            + row(&quot;Operatoren&quot;, before.operatorCount(), after.operatorCount())</span>
+<span class="fc" id="L69">            + row(&quot;Verschachtelung&quot;, before.nestingDepth(), after.nestingDepth())</span>
+<span class="fc" id="L70">            + row(&quot;Gewichteter Score&quot;, before.weightedTotal(), after.weightedTotal());</span>
+    }
+
+    private String row(String label, int before, int after) {
+<span class="fc" id="L74">        return &quot;| &quot; + label + &quot; | &quot; + before + &quot; | &quot; + after + &quot; |\n&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

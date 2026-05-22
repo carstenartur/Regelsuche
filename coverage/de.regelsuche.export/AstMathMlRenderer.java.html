@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstMathMlRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.export</a> &gt; <span class="el_source">AstMathMlRenderer.java</span></div><h1>AstMathMlRenderer.java</h1><pre class="source lang-java linenums">package de.regelsuche.export;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.List;
+
+/**
+ * AST-based MathML renderer.
+ *
+ * &lt;p&gt;Companion to {@link AstLatexRenderer}: produces Presentation MathML
+ * (mo/mn/mi/mfrac/msup/msqrt/...). Mainly used as data source for tools that
+ * cannot consume LaTeX. Falls back to wrapping the raw expression in an
+ * {@code &lt;mtext&gt;} element when parsing fails.&lt;/p&gt;
+ */
+<span class="fc" id="L25">public class AstMathMlRenderer implements MathRenderer {</span>
+
+<span class="fc" id="L27">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    @Override
+    public String renderExpression(String expression) {
+<span class="pc bpc" id="L31" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L32">            return &quot;&lt;math xmlns=\&quot;http://www.w3.org/1998/Math/MathML\&quot;&gt;&lt;/math&gt;&quot;;</span>
+        }
+        try {
+<span class="pc bpc" id="L35" title="5 of 6 branches missed.">            if (expression.contains(&quot;=&quot;) &amp;&amp; !expression.contains(&quot;;&quot;) &amp;&amp; !expression.contains(&quot;\n&quot;)) {</span>
+<span class="nc" id="L36">                Equation equation = parser.parseEquation(expression);</span>
+<span class="nc" id="L37">                return wrap(render(equation.left()) + &quot;&lt;mo&gt;=&lt;/mo&gt;&quot; + render(equation.right()));</span>
+            }
+<span class="pc bpc" id="L39" title="5 of 6 branches missed.">            if (expression.contains(&quot;=&quot;) &amp;&amp; (expression.contains(&quot;;&quot;) || expression.contains(&quot;\n&quot;))) {</span>
+<span class="nc" id="L40">                StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">                for (Equation eq : parser.parse(new InputRequest(InputType.SYSTEM, expression)).equations()) {</span>
+<span class="nc" id="L42">                    sb.append(&quot;&lt;mrow&gt;&quot;).append(render(eq.left())).append(&quot;&lt;mo&gt;=&lt;/mo&gt;&quot;)</span>
+<span class="nc" id="L43">                        .append(render(eq.right())).append(&quot;&lt;/mrow&gt;&quot;);</span>
+<span class="nc" id="L44">                }</span>
+<span class="nc" id="L45">                return wrap(&quot;&lt;mfenced open=\&quot;{\&quot; close=\&quot;\&quot; separators=\&quot;\&quot;&gt;&quot; + sb + &quot;&lt;/mfenced&gt;&quot;);</span>
+            }
+<span class="fc" id="L47">            Expr expr = parser.parseTerm(expression);</span>
+<span class="fc" id="L48">            return wrap(render(expr));</span>
+<span class="nc" id="L49">        } catch (RuntimeException ex) {</span>
+<span class="nc" id="L50">            return wrap(&quot;&lt;mtext&gt;&quot; + escape(expression) + &quot;&lt;/mtext&gt;&quot;);</span>
+        }
+    }
+
+    @Override
+    public String renderStep(TransformationStep step) {
+<span class="nc" id="L56">        return renderExpression(step.beforeExpression()) + &quot;\n&lt;mo&gt;&amp;#x2192;&lt;/mo&gt;\n&quot;</span>
+<span class="nc" id="L57">            + renderExpression(step.afterExpression());</span>
+    }
+
+    @Override
+    public String renderPath(DiscoveredTransformation path) {
+<span class="nc" id="L62">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L63">        sb.append(&quot;&lt;mrow&gt;&quot;);</span>
+<span class="nc" id="L64">        List&lt;TransformationStep&gt; steps = path.steps();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (steps.isEmpty()) {</span>
+<span class="nc" id="L66">            sb.append(renderExpression(path.originalExpression()))</span>
+<span class="nc" id="L67">                .append(&quot;&lt;mo&gt;&amp;#x2192;&lt;/mo&gt;&quot;)</span>
+<span class="nc" id="L68">                .append(renderExpression(path.improvedExpression()));</span>
+        } else {
+<span class="nc" id="L70">            sb.append(renderExpression(steps.get(0).beforeExpression()));</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            for (TransformationStep step : steps) {</span>
+<span class="nc" id="L72">                sb.append(&quot;&lt;mo&gt;&amp;#x2192;&lt;/mo&gt;&quot;);</span>
+<span class="nc" id="L73">                sb.append(renderExpression(step.afterExpression()));</span>
+<span class="nc" id="L74">            }</span>
+        }
+<span class="nc" id="L76">        sb.append(&quot;&lt;/mrow&gt;&quot;);</span>
+<span class="nc" id="L77">        return sb.toString();</span>
+    }
+
+    private String wrap(String inner) {
+<span class="fc" id="L81">        return &quot;&lt;math xmlns=\&quot;http://www.w3.org/1998/Math/MathML\&quot;&gt;&lt;mrow&gt;&quot; + inner + &quot;&lt;/mrow&gt;&lt;/math&gt;&quot;;</span>
+    }
+
+    private String render(Expr expr) {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (expr instanceof NumberExpr number) {</span>
+<span class="fc" id="L86">            double value = number.value();</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            return &quot;&lt;mn&gt;&quot; + (value == (long) value ? Long.toString((long) value) : Double.toString(value)) + &quot;&lt;/mn&gt;&quot;;</span>
+        }
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
+<span class="fc" id="L90">            return &quot;&lt;mi&gt;&quot; + escape(variable.name()) + &quot;&lt;/mi&gt;&quot;;</span>
+        }
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (expr instanceof FunctionExpr fn) {</span>
+<span class="nc" id="L93">            return renderFunction(fn);</span>
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L96">            return renderBinary(binary);</span>
+        }
+<span class="nc" id="L98">        return &quot;&quot;;</span>
+    }
+
+    private String renderBinary(BinaryExpr binary) {
+<span class="fc" id="L102">        BinaryOperator op = binary.operator();</span>
+<span class="pc bpc" id="L103" title="3 of 5 branches missed.">        return switch (op) {</span>
+<span class="fc" id="L104">            case ADD -&gt; &quot;&lt;mrow&gt;&quot; + render(binary.left()) + &quot;&lt;mo&gt;+&lt;/mo&gt;&quot; + render(binary.right()) + &quot;&lt;/mrow&gt;&quot;;</span>
+<span class="nc" id="L105">            case SUB -&gt; &quot;&lt;mrow&gt;&quot; + render(binary.left()) + &quot;&lt;mo&gt;-&lt;/mo&gt;&quot; + render(binary.right()) + &quot;&lt;/mrow&gt;&quot;;</span>
+<span class="nc" id="L106">            case MUL -&gt; &quot;&lt;mrow&gt;&quot; + render(binary.left()) + &quot;&lt;mo&gt;&amp;#x22C5;&lt;/mo&gt;&quot; + render(binary.right()) + &quot;&lt;/mrow&gt;&quot;;</span>
+<span class="fc" id="L107">            case DIV -&gt; &quot;&lt;mfrac&gt;&quot; + render(binary.left()) + render(binary.right()) + &quot;&lt;/mfrac&gt;&quot;;</span>
+<span class="nc" id="L108">            case POW -&gt; &quot;&lt;msup&gt;&quot; + render(binary.left()) + render(binary.right()) + &quot;&lt;/msup&gt;&quot;;</span>
+        };
+    }
+
+    private String renderFunction(FunctionExpr fn) {
+<span class="nc" id="L113">        String name = fn.name().toLowerCase();</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (&quot;sqrt&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="nc" id="L115">            return &quot;&lt;msqrt&gt;&quot; + render(fn.arguments().get(0)) + &quot;&lt;/msqrt&gt;&quot;;</span>
+        }
+<span class="nc bnc" id="L117" title="All 4 branches missed.">        if (&quot;abs&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="nc" id="L118">            return &quot;&lt;mrow&gt;&lt;mo&gt;|&lt;/mo&gt;&quot; + render(fn.arguments().get(0)) + &quot;&lt;mo&gt;|&lt;/mo&gt;&lt;/mrow&gt;&quot;;</span>
+        }
+<span class="nc" id="L120">        StringBuilder sb = new StringBuilder(&quot;&lt;mrow&gt;&lt;mi&gt;&quot;).append(escape(name)).append(&quot;&lt;/mi&gt;&lt;mo&gt;(&lt;/mo&gt;&quot;);</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        for (int i = 0; i &lt; fn.arguments().size(); i++) {</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L123">                sb.append(&quot;&lt;mo&gt;,&lt;/mo&gt;&quot;);</span>
+            }
+<span class="nc" id="L125">            sb.append(render(fn.arguments().get(i)));</span>
+        }
+<span class="nc" id="L127">        return sb.append(&quot;&lt;mo&gt;)&lt;/mo&gt;&lt;/mrow&gt;&quot;).toString();</span>
+    }
+
+    private static String escape(String value) {
+<span class="fc" id="L131">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

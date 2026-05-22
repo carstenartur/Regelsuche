@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonFileRuleInventoryRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence</a> &gt; <span class="el_source">JsonFileRuleInventoryRepository.java</span></div><h1>JsonFileRuleInventoryRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence;
+
+import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.inventory.ReusableRule;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+/**
+ * File-backed {@code RuleInventoryRepository} used by the killer-demo's
+ * standard mode.
+ *
+ * &lt;p&gt;Extends {@link InMemoryRuleInventoryRepository} so reads stay in
+ * memory (fast). Persists to {@code storagePath / inventory.json} on every
+ * write — using the in-memory repo's existing {@code persistTo} /
+ * {@code loadFrom} JSON format so the file is round-trip compatible with
+ * the existing {@code inventory import/export} CLI flow.&lt;/p&gt;
+ */
+public final class JsonFileRuleInventoryRepository extends InMemoryRuleInventoryRepository {
+
+    public static final String STORAGE_FILE = &quot;inventory.json&quot;;
+
+    private final Path storageDirectory;
+    private final Path file;
+
+<span class="fc" id="L26">    public JsonFileRuleInventoryRepository(Path storageDirectory) {</span>
+<span class="fc" id="L27">        this.storageDirectory = storageDirectory;</span>
+<span class="fc" id="L28">        this.file = storageDirectory.resolve(STORAGE_FILE);</span>
+        try {
+<span class="fc" id="L30">            Files.createDirectories(storageDirectory);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            if (Files.exists(file)) {</span>
+<span class="fc" id="L32">                hydrate();</span>
+            }
+<span class="nc" id="L34">        } catch (IOException ex) {</span>
+<span class="nc" id="L35">            throw new RuntimeException(&quot;Failed to initialize JSON file inventory at &quot; + storageDirectory, ex);</span>
+<span class="fc" id="L36">        }</span>
+<span class="fc" id="L37">    }</span>
+
+    public Path storagePath() {
+<span class="nc" id="L40">        return storageDirectory;</span>
+    }
+
+    public Path filePath() {
+<span class="nc" id="L44">        return file;</span>
+    }
+
+    private void hydrate() throws IOException {
+<span class="fc" id="L48">        InMemoryRuleInventoryRepository loaded = InMemoryRuleInventoryRepository.loadFrom(file);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (ReusableRule rule : loaded.findAll()) {</span>
+<span class="fc" id="L50">            super.save(rule);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (!loaded.isEnabled(rule.id())) {</span>
+<span class="nc" id="L52">                super.setEnabled(rule.id(), false);</span>
+            }
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            for (String tag : loaded.tagsOf(rule.id())) {</span>
+<span class="fc" id="L55">                super.addTag(rule.id(), tag);</span>
+<span class="fc" id="L56">            }</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">    }</span>
+
+    private void persist() {
+        try {
+<span class="fc" id="L62">            persistTo(file);</span>
+<span class="nc" id="L63">        } catch (IOException ex) {</span>
+<span class="nc" id="L64">            throw new RuntimeException(&quot;Failed to persist inventory to &quot; + file, ex);</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">    }</span>
+
+    @Override
+    public synchronized void save(ReusableRule rule) {
+<span class="fc" id="L70">        super.save(rule);</span>
+<span class="fc" id="L71">        persist();</span>
+<span class="fc" id="L72">    }</span>
+
+    @Override
+    public void setEnabled(String ruleId, boolean enabled) {
+<span class="nc" id="L76">        super.setEnabled(ruleId, enabled);</span>
+<span class="nc" id="L77">        persist();</span>
+<span class="nc" id="L78">    }</span>
+
+    @Override
+    public void addTag(String ruleId, String tag) {
+<span class="fc" id="L82">        super.addTag(ruleId, tag);</span>
+<span class="fc" id="L83">        persist();</span>
+<span class="fc" id="L84">    }</span>
+
+    @Override
+    public void removeTag(String ruleId, String tag) {
+<span class="nc" id="L88">        super.removeTag(ruleId, tag);</span>
+<span class="nc" id="L89">        persist();</span>
+<span class="nc" id="L90">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

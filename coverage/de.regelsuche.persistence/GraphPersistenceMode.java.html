@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphPersistenceMode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence</a> &gt; <span class="el_source">GraphPersistenceMode.java</span></div><h1>GraphPersistenceMode.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence;
+
+/**
+ * Persistence backend selector for the killer-demo workbench.
+ *
+ * &lt;p&gt;The killer-demo's standard mode (single Docker image, one
+ * {@code docker run}) must run without external infrastructure. The
+ * {@link #IN_MEMORY} and {@link #JSON_FILE} backends satisfy that
+ * requirement; {@link #REMOTE_NEO4J} is reserved for the optional Full Mode
+ * shipped via {@code docker compose}.&lt;/p&gt;
+ *
+ * &lt;p&gt;{@link #EMBEDDED_NEO4J} is declared so the configuration surface stays
+ * stable, but the current distribution does not bundle the embedded Neo4j
+ * server (it would require pulling in the GPL-licensed {@code neo4j}
+ * artifact in addition to the Apache-licensed Java driver). When
+ * {@code EMBEDDED_NEO4J} is requested today, {@link PersistenceContext}
+ * transparently falls back to {@link #JSON_FILE} at the configured path and
+ * emits a clear log line — the Docker image stays a single, self-contained
+ * artifact and the demo flow keeps working.&lt;/p&gt;
+ */
+<span class="fc" id="L21">public enum GraphPersistenceMode {</span>
+    /** Everything lives in JVM memory — fastest, no disk I/O, lost on exit. */
+<span class="fc" id="L23">    IN_MEMORY,</span>
+
+    /**
+     * File-backed local persistence (no external service required). The
+     * killer-demo's Docker image defaults to this mode.
+     */
+<span class="fc" id="L29">    JSON_FILE,</span>
+
+    /**
+     * Embedded Neo4j (in-process, single user). Not bundled with the current
+     * distribution; routed to {@link #JSON_FILE} as a documented fallback.
+     */
+<span class="fc" id="L35">    EMBEDDED_NEO4J,</span>
+
+    /**
+     * Remote Neo4j server reached via {@code bolt://}. Used by the optional
+     * Full Mode (see {@code docker-compose.yml}).
+     */
+<span class="fc" id="L41">    REMOTE_NEO4J</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
