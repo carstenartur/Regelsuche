@@ -1624,6 +1624,7 @@ public class WebWorkbenchServer {
                         r.property("strategy", row.strategyName());
                         r.property("expression", row.expression());
                         r.property("exploredStates", row.exploredStates());
+                        r.property("visitedStates", row.visitedStates());
                         r.property("bestImprovement", row.bestImprovement());
                         r.property("shortestImprovingDepth", row.shortestImprovingDepth());
                         r.property("expandedSteps", row.expandedSteps());
@@ -1631,6 +1632,19 @@ public class WebWorkbenchServer {
                         r.property("elapsedMillis", row.elapsedMillis());
                         r.property("proofStatus", row.proofStatus().name());
                         r.property("found", row.found());
+                        // Quality metrics ("Ampelstatus" surface).
+                        if (row.expectedResultMatched() != null) {
+                            r.property("expectedResultMatched", row.expectedResultMatched());
+                        } else {
+                            r.nullProperty("expectedResultMatched");
+                        }
+                        r.property("prunedStates", row.prunedStates());
+                        r.property("eGraphClasses", row.eGraphClasses());
+                        r.property("eGraphNodes", row.eGraphNodes());
+                        r.property("saturationSavings", row.saturationSavings());
+                        r.property("learnedRuleUsed", row.learnedRuleUsed());
+                        r.property("exportBundleValid", row.exportBundleValid());
+                        r.property("quality", row.qualityLabel());
                     })));
             })));
         writer.endObject();

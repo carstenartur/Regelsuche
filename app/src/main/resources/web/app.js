@@ -775,14 +775,35 @@
             const foundLabel = r.found
                 ? '<span class="benchmark-ok">ja</span>'
                 : '<span class="benchmark-miss">nein</span>';
+            const expectedLabel = (r.expectedResultMatched === true)
+                ? '<span class="benchmark-ok">✓</span>'
+                : (r.expectedResultMatched === false)
+                    ? '<span class="benchmark-miss">✗</span>'
+                    : '<span class="hint">—</span>';
+            const qualityLabel = r.quality === 'OK'
+                ? '<span class="benchmark-ok">✅</span>'
+                : r.quality === 'WARN'
+                    ? '<span class="benchmark-warn">⚠️</span>'
+                    : r.quality === 'FAIL'
+                        ? '<span class="benchmark-miss">❌</span>'
+                        : '';
+            const eGraph = (r.eGraphClasses || 0) + ' / ' + (r.eGraphNodes || 0);
+            const learned = r.learnedRuleUsed
+                ? '<span class="benchmark-ok">✓</span>'
+                : '<span class="hint">–</span>';
             return '<tr>'
+                + '<td>' + qualityLabel + '</td>'
                 + '<td><code>' + escapeHtml(r.strategy || '') + '</code></td>'
                 + '<td><code>' + escapeHtml(r.expression || '') + '</code></td>'
                 + '<td>' + foundLabel + '</td>'
+                + '<td>' + expectedLabel + '</td>'
                 + '<td>' + (r.elapsedMillis != null ? r.elapsedMillis + ' ms' : '–') + '</td>'
-                + '<td>' + (r.exploredStates || 0) + '</td>'
-                + '<td>' + (r.expandedSteps || 0) + '</td>'
-                + '<td>' + (r.distinctRules || 0) + '</td>'
+                + '<td>' + (r.visitedStates || r.exploredStates || 0) + '</td>'
+                + '<td>' + (r.prunedStates || 0) + '</td>'
+                + '<td>' + eGraph + '</td>'
+                + '<td>' + (r.saturationSavings != null
+                    ? (r.saturationSavings * 100).toFixed(1) + '%' : '–') + '</td>'
+                + '<td>' + learned + '</td>'
                 + '<td>' + renderProofStatusBadge(r.proofStatus) + '</td>'
                 + '</tr>';
         }).join('');
@@ -790,8 +811,10 @@
             + '<h3>Szenario: <code>' + escapeHtml(scenario.name || '') + '</code></h3>'
             + '<table class="benchmark-table">'
             + '<thead><tr>'
-            + '<th>Strategie</th><th>Ausdruck</th><th>Gefunden</th><th>Laufzeit</th>'
-            + '<th>Besuchte Zustände</th><th>Schritte</th><th>Regeln</th><th>Proof-Status</th>'
+            + '<th>Status</th><th>Strategie</th><th>Ausdruck</th><th>Gefunden</th>'
+            + '<th>Erw. getroffen</th><th>Laufzeit</th>'
+            + '<th>Besucht</th><th>Geprunt</th><th>e-Klassen / -Knoten</th>'
+            + '<th>Sat-Sparung</th><th>Lernregel</th><th>Proof-Status</th>'
             + '</tr></thead>'
             + '<tbody>' + rows + '</tbody>'
             + '</table>'

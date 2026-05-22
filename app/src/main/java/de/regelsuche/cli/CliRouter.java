@@ -27,6 +27,7 @@ import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.SymPyTransformationEngine;
 import de.regelsuche.transform.TransformationEngine;
 import java.io.PrintStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -298,6 +299,30 @@ public class CliRouter {
                 out.println();
             }
         }
+        // Optional report rendering: --report=<md-path> and --summary=<json-path>
+        // power the `./gradlew benchmarkReport` workflow that ships
+        // docs/benchmark-report.md and docs/assets/benchmark-summary.json.
+        if (options.containsKey("report") || options.containsKey("summary")) {
+            de.regelsuche.benchmark.BenchmarkReportRenderer renderer =
+                new de.regelsuche.benchmark.BenchmarkReportRenderer();
+            try {
+                if (options.containsKey("report")) {
+                    Path reportPath = Paths.get(options.get("report"));
+                    Files.createDirectories(reportPath.toAbsolutePath().getParent());
+                    Files.writeString(reportPath, renderer.renderMarkdown(results));
+                    out.println("Wrote benchmark report: " + reportPath);
+                }
+                if (options.containsKey("summary")) {
+                    Path summaryPath = Paths.get(options.get("summary"));
+                    Files.createDirectories(summaryPath.toAbsolutePath().getParent());
+                    Files.writeString(summaryPath, renderer.renderJsonSummary(results));
+                    out.println("Wrote benchmark summary: " + summaryPath);
+                }
+            } catch (java.io.IOException ex) {
+                out.println("Failed to write benchmark artefact: " + ex.getMessage());
+                return 2;
+            }
+        }
         return 0;
     }
 
@@ -480,12 +505,22 @@ public class CliRouter {
         while (index < args.length) {
             String current = args[index];
             if (current.startsWith("--")) {
-                String key = current.substring(2);
+                String body = current.substring(2);
+                String key;
                 String value;
-                if (index + 1 < args.length && !args[index + 1].startsWith("--")) {
+                int eq = body.indexOf('=');
+                if (eq >= 0) {
+                    // Support --key=value as well, which is more friendly for
+                    // Gradle-generated argument lists (no whitespace round-trip).
+                    key = body.substring(0, eq);
+                    value = body.substring(eq + 1);
+                    index++;
+                } else if (index + 1 < args.length && !args[index + 1].startsWith("--")) {
+                    key = body;
                     value = args[index + 1];
                     index += 2;
                 } else {
+                    key = body;
                     value = "true";
                     index++;
                 }

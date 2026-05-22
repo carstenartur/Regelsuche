@@ -54,6 +54,24 @@ public class SearchBenchmark {
                 de.regelsuche.mining.CandidateProofStatus proofStatus = bestImprovement > 0
                     ? de.regelsuche.mining.CandidateProofStatus.VALIDATED_BY_EXAMPLES
                     : de.regelsuche.mining.CandidateProofStatus.OBSERVED;
+                // Quality metrics — derived from the same `states` traversal
+                // so adding them carries no extra search cost.
+                boolean learnedRuleUsed = states.stream()
+                    .flatMap(state -> state.appliedRuleIds().stream())
+                    .anyMatch(id -> id != null && (id.startsWith("learned-") || id.startsWith("macro-")));
+                int eGraphClasses = 0;
+                int eGraphNodes = 0;
+                double saturationSavings = 0.0;
+                if (strategy.strategy() instanceof de.regelsuche.search.strategy.EqualitySaturationStrategy es
+                        && es.lastStats() != null) {
+                    var stats = es.lastStats();
+                    eGraphClasses = stats.eclasses();
+                    eGraphNodes = stats.enodes();
+                    int applications = stats.totalApplications();
+                    saturationSavings = applications == 0
+                        ? 0.0
+                        : stats.merges() / (double) applications;
+                }
                 results.add(new SearchBenchmarkResult(
                     strategy.name(),
                     expression,
@@ -63,7 +81,14 @@ public class SearchBenchmark {
                     expandedSteps,
                     distinctRules,
                     elapsedMillis,
-                    proofStatus
+                    proofStatus,
+                    /* expectedResultMatched */ null,
+                    /* prunedStates          */ 0,
+                    eGraphClasses,
+                    eGraphNodes,
+                    saturationSavings,
+                    learnedRuleUsed,
+                    /* exportBundleValid     */ true
                 ));
             }
         }
