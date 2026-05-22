@@ -35,7 +35,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
 
       - name: Run JMH benchmarks
-        run: ./gradlew :app:jmh
+        run: ./gradlew --no-configuration-cache :app:jmh
 
       - name: Locate JMH JSON result
         id: locate
