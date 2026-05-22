@@ -1,12 +1,12 @@
 package de.regelsuche.api.searchgraph;
 
 import de.regelsuche.json.JsonReader;
+import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -93,17 +93,7 @@ public final class JsonFileSearchGraphRepository implements SearchGraphRepositor
         }
         body.append("]}");
         try {
-            Path parent = file.toAbsolutePath().getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-            Files.writeString(tmp, body, StandardCharsets.UTF_8);
-            try {
-                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException ex) {
-                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
-            }
+            AtomicJsonFile.writeUtf8(file, body.toString());
         } catch (IOException ex) {
             throw new UncheckedIOException("Failed to persist search-graph repository: " + file, ex);
         }

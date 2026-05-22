@@ -13,6 +13,8 @@ jobs:
   unit-test:
     name: Unit & integration tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to publish reports to gh-pages
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -20,14 +22,96 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v3
-      - name: Build & Test
-        run: ./gradlew build
+      - name: Build, test, coverage
+        run: ./gradlew build jacocoTestReport
+      - name: Generate badge JSON for coverage & tests
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import json, os, glob, xml.etree.ElementTree as ET
+
+          GREEN, YELLOW = 80, 60
+
+          def colour(pct):
+              if pct >= GREEN:
+                  return 'brightgreen'
+              if pct >= YELLOW:
+                  return 'yellow'
+              return 'red'
+
+          # ── Coverage badge (JaCoCo INSTRUCTION counters) ──────────────────
+          covered = missed = 0
+          for jacoco_file in glob.glob('**/build/reports/jacoco/**/jacocoTestReport.xml',
+                                        recursive=True):
+              for counter in ET.parse(jacoco_file).getroot().iter('counter'):
+                  if counter.get('type') == 'INSTRUCTION':
+                      covered += int(counter.get('covered', 0))
+                      missed  += int(counter.get('missed', 0))
+          total = covered + missed
+          pct = round(covered / total * 100) if total else 0
+          coverage = {"schemaVersion": 1, "label": "coverage",
+                      "message": f"{pct}%", "color": colour(pct)}
+
+          os.makedirs('public/coverage', exist_ok=True)
+          with open('public/coverage/badge.json', 'w') as f:
+              json.dump(coverage, f)
+
+          # Mirror the JaCoCo HTML report so gh-pages can serve it.
+          import shutil
+          for html_dir in glob.glob('**/build/reports/jacoco/test/html',
+                                     recursive=True):
+              shutil.copytree(html_dir, 'public/coverage', dirs_exist_ok=True)
+
+          # ── Tests badge (Surefire / JUnit XML) ────────────────────────────
+          tests = failures = errors = 0
+          xml_files = []
+          for root_dir in ('app/build/test-results/test', 'app/build/test-results/e2eTest'):
+              xml_files.extend(glob.glob(f'{root_dir}/TEST-*.xml'))
+          for path in xml_files:
+              root = ET.parse(path).getroot()
+              tests    += int(root.get('tests',    0))
+              failures += int(root.get('failures', 0))
+              errors   += int(root.get('errors',   0))
+          failed = failures + errors
+          passed = tests - failed
+          if failed:
+              msg, colr = f"{failed}/{tests} failed", 'red'
+          else:
+              msg, colr = f"{passed} passed", 'brightgreen'
+          tests_badge = {"schemaVersion": 1, "label": "tests",
+                         "message": msg, "color": colr}
+          os.makedirs('public/tests', exist_ok=True)
+          with open('public/tests/badge.json', 'w') as f:
+              json.dump(tests_badge, f)
+
+          # Mirror the JUnit HTML report so gh-pages can serve it.
+          for html_dir in glob.glob('app/build/reports/tests/test'):
+              shutil.copytree(html_dir, 'public/tests', dirs_exist_ok=True)
+
+          print(f"Coverage: {pct}%   Tests: {tests} ({failed} failed)")
+          EOF
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: app/build/reports/jacoco/test/**
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports
           path: '**/build/reports/tests/**'
+      - name: Deploy coverage badge & report to GitHub Pages
+        if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: public
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Update coverage + test report (${{ github.sha }})'
 
   browser-e2e:
     name: Browser end-to-end (Playwright)
