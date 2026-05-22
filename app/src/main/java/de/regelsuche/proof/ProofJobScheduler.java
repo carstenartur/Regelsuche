@@ -58,6 +58,7 @@ public final class ProofJobScheduler implements AutoCloseable {
     private final ProofJobRepository jobRepository;
     private final ProofCache proofCache;
     private final RuleInventoryRepository inventoryRepository;
+    private final ProofArtifactRepository artifactRepository;
     private final long jobTimeoutMillis;
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
@@ -98,10 +99,27 @@ public final class ProofJobScheduler implements AutoCloseable {
         RuleInventoryRepository inventoryRepository,
         Duration jobTimeout
     ) {
+        this(worker, jobRepository, proofCache, inventoryRepository, null, jobTimeout);
+    }
+
+    /**
+     * Full constructor. Pass a non-null {@code artifactRepository} to have the
+     * scheduler write a structured {@code proofs/<jobId>/} bundle for every
+     * completed job (proof body, captured streams, metadata.json).
+     */
+    public ProofJobScheduler(
+        ProofWorker worker,
+        ProofJobRepository jobRepository,
+        ProofCache proofCache,
+        RuleInventoryRepository inventoryRepository,
+        ProofArtifactRepository artifactRepository,
+        Duration jobTimeout
+    ) {
         this.worker = worker;
         this.jobRepository = jobRepository;
         this.proofCache = proofCache;
         this.inventoryRepository = inventoryRepository;
+        this.artifactRepository = artifactRepository;
         this.jobTimeoutMillis = Math.max(100L, jobTimeout.toMillis());
     }
 
@@ -234,6 +252,7 @@ public final class ProofJobScheduler implements AutoCloseable {
 
             CandidateProofStatus status = result.status();
             proofCache.put(cacheKey, status);
+            writeArtifactBundle(job, result, status, null);
             jobRepository.save(job.withDone(status));
 
             // Update RuleInventory if we have a positive result
@@ -256,11 +275,114 @@ public final class ProofJobScheduler implements AutoCloseable {
     }
 
     private void handleFailure(ProofJob job, String reason) {
+        writeArtifactBundle(job, null, CandidateProofStatus.OBSERVED, reason);
         if (job.canRetry()) {
             jobRepository.save(job.withRetry());
         } else {
             jobRepository.save(job.withFailed(reason));
         }
+    }
+
+    /**
+     * Persist a structured per-job artifact bundle. Always writes
+     * {@code metadata.json}; writes {@code proof.<ext>} when the result has a
+     * non-empty body. {@code stdout.txt} / {@code stderr.txt} are placeholders
+     * today — once {@link ProofWorker.Result} carries captured streams they'll
+     * become populated automatically.
+     */
+    private void writeArtifactBundle(
+        ProofJob job,
+        ProofWorker.Result result,
+        CandidateProofStatus status,
+        String errorReason
+    ) {
+        if (artifactRepository == null) {
+            return;
+        }
+        try {
+            String tool = result == null ? worker.workerId() : result.tool();
+            String body = result == null ? "" : result.artifact();
+            long durationMs = result == null ? 0L : result.durationMillis();
+            if (body != null && !body.isBlank()) {
+                String suffix = bodyExtension(tool);
+                artifactRepository.storeJobArtifact(job.id(), "proof" + suffix, body);
+            }
+            // Placeholder stdout/stderr so the bundle layout is uniform.
+            artifactRepository.storeJobArtifact(job.id(), "stdout.txt", "");
+            artifactRepository.storeJobArtifact(job.id(), "stderr.txt",
+                errorReason == null ? "" : errorReason);
+            String metadata = renderMetadataJson(job, tool, status, durationMs, errorReason);
+            artifactRepository.storeJobArtifact(job.id(), "metadata.json", metadata);
+        } catch (java.io.IOException ex) {
+            // Never let artifact-write errors derail the scheduler loop.
+            System.err.println("Failed to persist artifact bundle for job "
+                + job.id() + ": " + ex.getMessage());
+        }
+    }
+
+    private static String bodyExtension(String tool) {
+        if (tool == null) {
+            return ".txt";
+        }
+        String lower = tool.toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("lean")) {
+            return ".lean";
+        }
+        if (lower.contains("smt")) {
+            return ".smt2";
+        }
+        return ".txt";
+    }
+
+    private static String renderMetadataJson(
+        ProofJob job,
+        String tool,
+        CandidateProofStatus status,
+        long durationMillis,
+        String errorReason
+    ) {
+        StringBuilder builder = new StringBuilder("{");
+        builder.append("\"jobId\":").append(jsonString(job.id()));
+        builder.append(",\"workerId\":").append(jsonString(job.workerType()));
+        builder.append(",\"tool\":").append(jsonString(tool));
+        builder.append(",\"status\":").append(jsonString(status == null ? "" : status.name()));
+        builder.append(",\"durationMillis\":").append(durationMillis);
+        builder.append(",\"leftPattern\":").append(jsonString(job.leftPattern()));
+        builder.append(",\"rightPattern\":").append(jsonString(job.rightPattern()));
+        builder.append(",\"priority\":").append(job.priority());
+        builder.append(",\"retryCount\":").append(job.retryCount());
+        builder.append(",\"maxRetries\":").append(job.maxRetries());
+        builder.append(",\"createdAt\":").append(jsonString(job.createdAt().toString()));
+        builder.append(",\"completedAt\":").append(jsonString(java.time.Instant.now().toString()));
+        builder.append(",\"error\":").append(jsonString(errorReason == null ? "" : errorReason));
+        builder.append('}');
+        return builder.toString();
+    }
+
+    private static String jsonString(String value) {
+        if (value == null) {
+            return "\"\"";
+        }
+        StringBuilder builder = new StringBuilder("\"");
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\' -> builder.append("\\\\");
+                case '"' -> builder.append("\\\"");
+                case '\n' -> builder.append("\\n");
+                case '\r' -> builder.append("\\r");
+                case '\t' -> builder.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        builder.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        builder.append(c);
+                    }
+                }
+            }
+        }
+        builder.append('"');
+        return builder.toString();
     }
 
     private void updateInventory(ProofJob job, CandidateProofStatus status) {

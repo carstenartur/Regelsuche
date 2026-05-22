@@ -349,9 +349,48 @@ public class CliRouter {
                 persistenceContext.transpositionTable());
         }
 
+        // Resolve the proof workbench. When REGELSUCHE_PROOF_ENABLED is true
+        // (the default) the scheduler is constructed with persistent JSON
+        // stores so jobs/cache/artifacts survive restarts and are exposed via
+        // /api/proof/jobs and the Workbench UI.
+        de.regelsuche.proof.ProofConfig proofConfig =
+            de.regelsuche.proof.ProofConfig.fromEnvironment(persistenceConfig.storagePath());
+        de.regelsuche.proof.ProofWorkbenchService proofWorkbench = null;
+        de.regelsuche.proof.ProofJobScheduler proofScheduler = null;
+        if (proofConfig.enabled()) {
+            try {
+                de.regelsuche.proof.JsonFileProofJobRepository jobs =
+                    new de.regelsuche.proof.JsonFileProofJobRepository(proofConfig.jobStorePath());
+                de.regelsuche.proof.JsonFileProofCache cache =
+                    new de.regelsuche.proof.JsonFileProofCache(proofConfig.cachePath());
+                de.regelsuche.proof.JsonFileProofArtifactRepository artifacts =
+                    new de.regelsuche.proof.JsonFileProofArtifactRepository(proofConfig.artifactPath());
+                de.regelsuche.proof.ProofWorker worker = new de.regelsuche.proof.CompositeProofWorker(
+                    java.util.List.of(
+                        new de.regelsuche.proof.LeanProofWorker(proofConfig.artifactPath()),
+                        new de.regelsuche.proof.SmtProofWorker(proofConfig.artifactPath())
+                    )
+                );
+                proofScheduler = new de.regelsuche.proof.ProofJobScheduler(
+                    worker, jobs, cache, activeInventory, artifacts,
+                    java.time.Duration.ofSeconds(60)
+                );
+                proofScheduler.start();
+                proofWorkbench = new de.regelsuche.proof.ProofWorkbenchService(
+                    proofScheduler, jobs, artifacts);
+                out.println("Proof workbench enabled: jobs=" + proofConfig.jobStorePath()
+                    + ", cache=" + proofConfig.cachePath()
+                    + ", artifacts=" + proofConfig.artifactPath());
+            } catch (java.io.IOException ex) {
+                out.println("Proof workbench initialisation failed (" + ex.getMessage()
+                    + "); REST endpoints will report 503.");
+            }
+        }
+
         try {
             de.regelsuche.web.WebWorkbenchServer server = new de.regelsuche.web.WebWorkbenchServer(
-                host, port, activeGraphStore, activeInventory, exportService, securityConfig, activeSearchMemory
+                host, port, activeGraphStore, activeInventory, exportService, securityConfig, activeSearchMemory,
+                null, null, proofWorkbench
             );
             server.start();
             String scheme = securityConfig.isTlsEnabled() ? "https" : "http";
@@ -371,6 +410,9 @@ public class CliRouter {
             out.println("serve failed: " + ex.getMessage());
             return 2;
         } finally {
+            if (proofScheduler != null) {
+                proofScheduler.close();
+            }
             if (persistenceContext != null) {
                 persistenceContext.close();
             }

@@ -1209,8 +1209,151 @@
                     populateReplayPaths().finally(() => $('replayPathSelect').dataset.loaded = '1');
                 } else if (which === 'memory' && $('memoryStates') && !$('memoryStates').dataset.loaded) {
                     loadMemory().finally(() => $('memoryStates').dataset.loaded = '1');
+                } else if (which === 'proofJobs' && $('proofJobList') && !$('proofJobList').dataset.loaded) {
+                    loadProofJobs().finally(() => $('proofJobList').dataset.loaded = '1');
                 }
             });
         });
+
+        /* Proof-Jobs UI bindings */
+        const submitBtn = $('proofJobSubmit');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', submitProofJob);
+        }
+        const reloadBtn = $('proofJobReload');
+        if (reloadBtn) {
+            reloadBtn.addEventListener('click', loadProofJobs);
+        }
     });
+
+    /* ─── Proof Jobs ─── */
+
+    function submitProofJob() {
+        const message = $('proofJobMessage');
+        const left = ($('proofJobLeft').value || '').trim();
+        const right = ($('proofJobRight').value || '').trim();
+        if (!left || !right) {
+            if (message) { message.textContent = 'Left- und Right-Pattern sind erforderlich.'; }
+            return;
+        }
+        const priority = parseInt($('proofJobPriority').value || '0', 10);
+        const rawAssumptions = ($('proofJobAssumptions').value || '').split(/\r?\n/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+            .map((expression) => ({ kind: 'CUSTOM', expression }));
+        const body = JSON.stringify({
+            leftPattern: left,
+            rightPattern: right,
+            assumptions: rawAssumptions,
+            priority,
+        });
+        fetch('/api/proof/jobs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+        }).then((response) => {
+            if (response.status === 503) {
+                if (message) { message.textContent = 'Proof-Workbench ist deaktiviert (REGELSUCHE_PROOF_ENABLED=false).'; }
+                return null;
+            }
+            return response.json();
+        }).then((json) => {
+            if (json && json.jobId) {
+                if (message) { message.textContent = 'Job eingereicht: ' + json.jobId; }
+                loadProofJobs();
+            }
+        }).catch((err) => {
+            if (message) { message.textContent = 'Fehler: ' + err; }
+        });
+    }
+
+    function loadProofJobs() {
+        const container = $('proofJobList');
+        if (!container) { return Promise.resolve(); }
+        return fetch('/api/proof/jobs').then((response) => {
+            if (response.status === 503) {
+                container.innerHTML = '<div class="item">Proof-Workbench ist deaktiviert.</div>';
+                return null;
+            }
+            return response.json();
+        }).then((json) => {
+            if (!json) { return; }
+            renderProofJobs(json.jobs || []);
+        }).catch((err) => {
+            container.innerHTML = '<div class="item">Fehler beim Laden: ' + err + '</div>';
+        });
+    }
+
+    function renderProofJobs(jobs) {
+        const container = $('proofJobList');
+        container.innerHTML = '';
+        if (jobs.length === 0) {
+            container.innerHTML = '<div class="item">Noch keine Jobs eingereicht.</div>';
+            return;
+        }
+        jobs.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+            .forEach((job) => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                const isTerminal = job.status === 'DONE' || job.status === 'FAILED' || job.status === 'CANCELLED';
+                const cancelBtn = isTerminal ? ''
+                    : ' <button class="proof-cancel" data-id="' + escapeHtml(job.id) + '">Cancel</button>';
+                const artifactBtn = ' <button class="proof-artifacts" data-id="' + escapeHtml(job.id) + '">Artefakte</button>';
+                div.innerHTML = '<div><b>' + escapeHtml(job.leftPattern) + ' → '
+                    + escapeHtml(job.rightPattern) + '</b></div>'
+                    + '<div>Status: <code>' + escapeHtml(job.status) + '</code>'
+                    + ' · Worker: ' + escapeHtml(job.workerId)
+                    + ' · Priorität: ' + job.priority
+                    + ' · Retries: ' + job.retryCount + '/' + job.maxRetries
+                    + (job.proofStatus ? ' · Proof: <code>' + escapeHtml(job.proofStatus) + '</code>' : '')
+                    + '</div>'
+                    + '<div class="hint">ID: <code>' + escapeHtml(job.id) + '</code>'
+                    + ' · created ' + escapeHtml(job.createdAt) + '</div>'
+                    + (job.errorMessage ? '<div class="hint">Fehler: ' + escapeHtml(job.errorMessage) + '</div>' : '')
+                    + '<div class="actions">' + artifactBtn + cancelBtn + '</div>';
+                container.appendChild(div);
+            });
+        container.querySelectorAll('.proof-cancel').forEach((btn) => {
+            btn.addEventListener('click', () => cancelProofJob(btn.dataset.id));
+        });
+        container.querySelectorAll('.proof-artifacts').forEach((btn) => {
+            btn.addEventListener('click', () => loadProofArtifacts(btn.dataset.id));
+        });
+    }
+
+    function cancelProofJob(jobId) {
+        fetch('/api/proof/jobs/' + encodeURIComponent(jobId) + '/cancel', { method: 'POST' })
+            .then(() => loadProofJobs());
+    }
+
+    function loadProofArtifacts(jobId) {
+        const container = $('proofJobArtifacts');
+        if (!container) { return; }
+        container.innerHTML = '<div class="item">Lade Artefakte für ' + escapeHtml(jobId) + ' …</div>';
+        fetch('/api/proof/jobs/' + encodeURIComponent(jobId) + '/artifacts')
+            .then((response) => response.json())
+            .then((json) => {
+                container.innerHTML = '';
+                const header = document.createElement('div');
+                header.className = 'item';
+                header.innerHTML = '<b>Bundle für Job</b> <code>' + escapeHtml(jobId) + '</code>';
+                container.appendChild(header);
+                (json.artifacts || []).forEach((name) => {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    const url = '/api/proof/jobs/' + encodeURIComponent(jobId)
+                        + '/artifacts/' + encodeURIComponent(name);
+                    div.innerHTML = '<a href="' + url + '" target="_blank">' + escapeHtml(name) + '</a>';
+                    container.appendChild(div);
+                });
+                if (!json.artifacts || json.artifacts.length === 0) {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    div.textContent = 'Noch keine Artefakte (Job läuft eventuell noch).';
+                    container.appendChild(div);
+                }
+            }).catch((err) => {
+                container.innerHTML = '<div class="item">Fehler: ' + escapeHtml(String(err)) + '</div>';
+            });
+    }
 })();

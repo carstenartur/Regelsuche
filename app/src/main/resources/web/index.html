@@ -24,6 +24,7 @@
         <button class="tab" data-tab="compare">Vergleich</button>
         <button class="tab" data-tab="inventory">Inventar</button>
         <button class="tab" data-tab="memory">Suchgedächtnis</button>
+        <button class="tab" data-tab="proofJobs">Proof-Jobs</button>
         <button class="tab" data-tab="exports">Exporte</button>
         <button class="tab" data-tab="help">Hilfe</button>
     </nav>
@@ -337,6 +338,36 @@
             <div id="memoryPruning" class="list"></div>
             <h3>Gelernte Makroregeln</h3>
             <div id="memoryMacros" class="list"></div>
+        </div>
+    </section>
+
+    <!-- ─────────── Proof Jobs tab ─────────── -->
+    <section id="tab-proofJobs" class="tab-panel">
+        <div class="card">
+            <h2>Proof-Jobs</h2>
+            <p class="hint">Asynchrone Proof-Pipeline (Lean/SMT). Jobs werden in
+                <code>$REGELSUCHE_PROOF_JOB_STORE</code> persistiert; Artefakte
+                landen unter <code>$REGELSUCHE_PROOF_ARTIFACT_PATH/&lt;jobId&gt;/</code>
+                (<code>proof.lean</code>, <code>stdout.txt</code>, <code>stderr.txt</code>,
+                <code>metadata.json</code>).</p>
+            <h3>Neuen Job einreichen</h3>
+            <div class="form-grid">
+                <label>Left pattern <input id="proofJobLeft" type="text" placeholder="z.B. A + 0"></label>
+                <label>Right pattern <input id="proofJobRight" type="text" placeholder="z.B. A"></label>
+                <label>Assumptions (eine pro Zeile, optional)
+                    <textarea id="proofJobAssumptions" rows="2" placeholder="b != 0"></textarea>
+                </label>
+                <label>Priorität <input id="proofJobPriority" type="number" value="0" min="0"></label>
+            </div>
+            <div class="actions">
+                <button id="proofJobSubmit" class="primary">Job einreichen</button>
+                <button id="proofJobReload">Aktualisieren</button>
+            </div>
+            <p id="proofJobMessage" class="hint"></p>
+            <h3>Jobs</h3>
+            <div id="proofJobList" class="list"></div>
+            <h3>Artefakte</h3>
+            <div id="proofJobArtifacts" class="list"></div>
         </div>
     </section>
 

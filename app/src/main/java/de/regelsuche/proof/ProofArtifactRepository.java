@@ -34,4 +34,40 @@ public interface ProofArtifactRepository {
 
     /** Delete the artifact (no-op if not present). */
     void delete(String artifactId) throws IOException;
+
+    // ── Per-job artifact bundle ────────────────────────────────────────────
+    //
+    // A proof attempt typically produces several related files: the prover
+    // input ({@code proof.lean}, {@code proof.smt2}), the captured streams
+    // ({@code stdout.txt}, {@code stderr.txt}) and a small {@code
+    // metadata.json}. Grouping them per job keeps the {@code proofs/} root
+    // tidy and matches what the Workbench UI expects.
+
+    /**
+     * Store {@code body} as {@code <jobId>/<name>}. Returns the absolute
+     * on-disk path. Default delegates to the flat {@link #store} API using
+     * {@code <jobId>-<name>} as the synthesized id.
+     */
+    default Path storeJobArtifact(String jobId, String name, String body) throws IOException {
+        return store(jobId + "-" + name, body);
+    }
+
+    /** @return the body of the artifact {@code name} stored for {@code jobId}. */
+    default Optional<String> readJobArtifact(String jobId, String name) throws IOException {
+        return read(jobId + "-" + name);
+    }
+
+    /** @return the absolute on-disk path for a per-job artifact. */
+    default Optional<Path> jobArtifactPath(String jobId, String name) {
+        return pathOf(jobId + "-" + name);
+    }
+
+    /** @return all artifact names belonging to {@code jobId}, sorted. */
+    default List<String> listJobArtifacts(String jobId) {
+        String prefix = jobId + "-";
+        return listArtifactIds().stream()
+            .filter(id -> id.startsWith(prefix))
+            .map(id -> id.substring(prefix.length()))
+            .toList();
+    }
 }

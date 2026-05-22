@@ -86,3 +86,36 @@ jobs:
           name: docs-videos
           path: docs/assets/videos/**
 
+
+  proof-image:
+    name: Build Dockerfile.proof & verify provers
+    runs-on: ubuntu-latest
+    needs: unit-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build proof image (Z3 + cvc5; Lean opt-in)
+        run: docker build -f Dockerfile.proof -t regelsuche-proof:ci .
+      - name: Verify Z3 is present inside the image
+        run: docker run --rm --entrypoint z3 regelsuche-proof:ci --version
+      - name: Verify cvc5 is present inside the image
+        run: docker run --rm --entrypoint cvc5 regelsuche-proof:ci --version
+      - name: Smoke-check the proof workbench REST surface
+        run: |
+          docker run -d --rm --name regelsuche-proof-smoke \
+            -p 18080:8080 regelsuche-proof:ci
+          # Wait for the workbench to come up
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:18080/api/proof/jobs >/dev/null; then
+              echo "Workbench responded after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          # Submit a tiny job and poll until it is listed.
+          curl -sf -X POST http://127.0.0.1:18080/api/proof/jobs \
+            -H 'Content-Type: application/json' \
+            -d '{"leftPattern":"a+0","rightPattern":"a","priority":0}' \
+            | tee /tmp/submit.json
+          curl -sf http://127.0.0.1:18080/api/proof/jobs | tee /tmp/list.json
+          grep '"jobId"' /tmp/submit.json
+          docker stop regelsuche-proof-smoke

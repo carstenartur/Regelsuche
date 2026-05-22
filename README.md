@@ -61,6 +61,16 @@ Das startet App + Neo4j 5 Community + persistentes Volume und setzt
   `linear-algebra` getaggt.
 * **Proof-Bridge** generiert ein Lean/SMT-Skript pro Pfad. `FORMALLY_PROVED`
   wird nur gesetzt, wenn der Prover den Beweis bestätigt.
+* **Proof-Workbench** — persistente Job-Queue mit REST-API
+  (`POST /api/proof/jobs`, `GET /api/proof/jobs/{id}`,
+  `POST /api/proof/jobs/{id}/cancel`,
+  `GET /api/proof/jobs/{id}/artifacts`) plus eigener UI-Tab. Jobs, Cache und
+  Artefakt-Bundle (`proof.lean`, `proof.smt2`, `stdout.txt`, `stderr.txt`,
+  `metadata.json` pro Job) werden via `REGELSUCHE_PROOF_ENABLED`,
+  `REGELSUCHE_PROOF_ARTIFACT_PATH`, `REGELSUCHE_PROOF_JOB_STORE` und
+  `REGELSUCHE_PROOF_CACHE` konfiguriert. Für echte Prover gibt es
+  `Dockerfile.proof` (Z3 + cvc5 vorinstalliert, Lean optional via
+  `--build-arg INSTALL_LEAN=true`).
 * **Persistenz** als einzelner JSON-File (Killer-Demo-Modus) oder echtes
   Neo4j 5 (Full Mode via `docker compose up`).
 * **Export-Bundle** mit Markdown, LaTeX, JSON, Mermaid, GraphML und dem
