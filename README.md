@@ -13,9 +13,9 @@
 
 ![Binomial-Demo](docs/assets/screenshots/binomial-graph.png)
 
-## 30 Sekunden (Killer-Demo Standard)
+## 30 Sekunden (Demo Standard)
 
-**Der Standardmodus der Killer-Demo läuft ohne externe Infrastruktur:**
+**Der Standardmodus der Demo läuft ohne externe Infrastruktur:**
 
 ```bash
 docker build -t regelsuche .
