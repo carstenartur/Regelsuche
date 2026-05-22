@@ -1457,4 +1457,161 @@
                 container.innerHTML = '<div class="item">Fehler: ' + escapeHtml(String(err)) + '</div>';
             });
     }
+    // ───────────────────────── Didaktik tab (PR 17) ─────────────────────────
+    function didaktikPathId() {
+        const el = $('didaktikPathId');
+        return el ? el.value.trim() : '';
+    }
+    function didaktikProfile() {
+        const el = $('didaktikProfile');
+        return el ? el.value : 'SCHOOL';
+    }
+    function didaktikCurrent() {
+        const el = $('didaktikCurrent');
+        return el ? el.value : '';
+    }
+
+    function renderDidaktikDiff(tokens) {
+        return (tokens || []).map((t) => {
+            const cls = 'diff-' + (t.change || 'UNCHANGED').toLowerCase();
+            return '<span class="' + cls + '">' + escapeHtml(t.text || '') + '</span>';
+        }).join(' ');
+    }
+
+    function loadDidaktikReplay() {
+        const id = didaktikPathId();
+        const container = $('didaktikReplay');
+        if (!container) { return; }
+        if (!id) { container.innerHTML = '<p class="hint">Pfad-ID erforderlich.</p>'; return; }
+        container.innerHTML = '<p class="hint">Lade Replay …</p>';
+        fetch('/api/didactic/replay/' + encodeURIComponent(id))
+            .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+            .then((json) => {
+                const steps = json.steps || [];
+                if (steps.length === 0) {
+                    container.innerHTML = '<p class="hint">Keine Schritte für ' + escapeHtml(id) + '.</p>';
+                    return;
+                }
+                container.innerHTML = '<h4>Replay (' + escapeHtml(json.originalExpression || '')
+                    + ' → ' + escapeHtml(json.improvedExpression || '') + ')</h4>'
+                    + steps.map((s, i) => '<div class="didaktik-step">'
+                        + '<b>Schritt ' + (i + 1) + ':</b> '
+                        + '<code>' + escapeHtml(s.beforeExpression) + '</code> → '
+                        + '<code>' + escapeHtml(s.afterExpression) + '</code>'
+                        + '<div class="didaktik-step-diff">' + renderDidaktikDiff(s.diffTokens) + '</div>'
+                        + (s.explanation ? '<div class="hint">' + escapeHtml(s.explanation) + '</div>' : '')
+                        + '</div>').join('');
+            })
+            .catch((status) => {
+                container.innerHTML = '<p class="hint">Fehler: ' + escapeHtml(String(status)) + '</p>';
+            });
+    }
+
+    function loadDidaktikHint() {
+        const id = didaktikPathId();
+        const container = $('didaktikHints');
+        if (!container) { return; }
+        if (!id) { container.innerHTML = '<p class="hint">Pfad-ID erforderlich.</p>'; return; }
+        container.innerHTML = '<p class="hint">Lade Hinweise …</p>';
+        fetch('/api/didactic/hint/' + encodeURIComponent(id), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                currentExpression: didaktikCurrent(),
+                pedagogyProfile: didaktikProfile()
+            })
+        })
+            .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+            .then((json) => {
+                const hints = json.hints || [];
+                if (hints.length === 0) {
+                    container.innerHTML = '<p class="hint">Keine Hinweise verfügbar.</p>';
+                    return;
+                }
+                container.innerHTML = '<h4>Hinweise</h4>' + hints.map((h) =>
+                    '<div class="didaktik-hint didaktik-hint-' + (h.strength || '').toLowerCase() + '">'
+                    + '<b>' + escapeHtml(h.strength || '') + ':</b> '
+                    + escapeHtml(h.text || '')
+                    + '</div>').join('');
+            })
+            .catch((status) => {
+                container.innerHTML = '<p class="hint">Fehler: ' + escapeHtml(String(status)) + '</p>';
+            });
+    }
+
+    function runDidaktikStepCheck() {
+        const container = $('didaktikStepResult');
+        if (!container) { return; }
+        const current = ($('didaktikStepCurrent') || {}).value || '';
+        const step = ($('didaktikStepStudent') || {}).value || '';
+        const difficulty = ($('didaktikDifficulty') || {}).value || 'MITTELSTUFE';
+        if (!current.trim() || !step.trim()) {
+            container.innerHTML = '<p class="hint">Beide Ausdrücke erforderlich.</p>';
+            return;
+        }
+        container.innerHTML = '<p class="hint">Prüfe …</p>';
+        fetch('/api/didactic/step-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                currentExpression: current, studentStep: step, difficulty: difficulty
+            })
+        })
+            .then((r) => r.ok ? r.json() : r.text().then((t) => Promise.reject(t)))
+            .then((json) => {
+                const status = json.correct
+                    ? (json.didacticallyAppropriate ? '✅ akzeptiert' : '⚠️ korrekt, aber zu komplex')
+                    : '❌ nicht akzeptiert';
+                let html = '<div><b>' + status + '</b></div>'
+                    + '<div class="hint">' + escapeHtml(json.message || '') + '</div>';
+                if (json.misconception) {
+                    html += '<div class="didaktik-misconception">'
+                        + '<b>Fehlvorstellung:</b> ' + escapeHtml(json.misconception.id || '') + '<br>'
+                        + escapeHtml(json.misconception.explanation || '')
+                        + '</div>';
+                }
+                container.innerHTML = html;
+            })
+            .catch((err) => {
+                container.innerHTML = '<p class="hint">Fehler: ' + escapeHtml(String(err)) + '</p>';
+            });
+    }
+
+    function loadDidaktikAnalytics() {
+        const container = $('didaktikAnalytics');
+        if (!container) { return; }
+        fetch('/api/didactic/analytics')
+            .then((r) => r.json())
+            .then((json) => { container.textContent = JSON.stringify(json, null, 2); })
+            .catch((err) => { container.textContent = 'Fehler: ' + String(err); });
+    }
+
+    function updateDidaktikExportLinks() {
+        const id = didaktikPathId();
+        const base = '/api/didactic/export/';
+        const setHref = (elId, kind) => {
+            const a = $(elId);
+            if (!a) { return; }
+            a.href = id ? (base + kind + '/' + encodeURIComponent(id) + '.md') : '#';
+        };
+        setHref('didaktikExportWorksheet', 'worksheet');
+        setHref('didaktikExportSolution', 'solution');
+        setHref('didaktikExportTeacher', 'teacher');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const wireClick = (id, fn) => {
+            const el = $(id);
+            if (el) { el.addEventListener('click', fn); }
+        };
+        wireClick('didaktikReplayBtn', loadDidaktikReplay);
+        wireClick('didaktikHintBtn', loadDidaktikHint);
+        wireClick('didaktikStepBtn', runDidaktikStepCheck);
+        wireClick('didaktikAnalyticsBtn', loadDidaktikAnalytics);
+        const pathInput = $('didaktikPathId');
+        if (pathInput) {
+            pathInput.addEventListener('input', updateDidaktikExportLinks);
+            updateDidaktikExportLinks();
+        }
+    });
 })();

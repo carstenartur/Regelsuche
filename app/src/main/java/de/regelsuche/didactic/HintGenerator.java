@@ -41,13 +41,25 @@ public final class HintGenerator {
     }
 
     private final ExplanationService explanations;
+    private final LlmHintPhraser phraser;
 
     public HintGenerator() {
         this(new ExplanationService());
     }
 
     public HintGenerator(ExplanationService explanations) {
+        this(explanations, new LlmHintPhraser.NoOpLlmHintPhraser());
+    }
+
+    /**
+     * Construct a {@code HintGenerator} that pipes every emitted hint
+     * through an {@link LlmHintPhraser}. Pass
+     * {@link LlmHintPhraser.NoOpLlmHintPhraser} (or use the no-arg
+     * constructor) to disable rephrasing.
+     */
+    public HintGenerator(ExplanationService explanations, LlmHintPhraser phraser) {
         this.explanations = Objects.requireNonNull(explanations, "explanations");
+        this.phraser      = Objects.requireNonNull(phraser, "phraser");
     }
 
     /**
@@ -81,9 +93,9 @@ public final class HintGenerator {
         Objects.requireNonNull(profile, "profile");
 
         List<Hint> hints = new ArrayList<>(3);
-        hints.add(new Hint(Strength.SMALL,     smallHint(step, profile)));
-        hints.add(new Hint(Strength.STRONG,    strongHint(step, profile)));
-        hints.add(new Hint(Strength.FULL_STEP, fullStepHint(step)));
+        hints.add(phraser.rephrase(new Hint(Strength.SMALL,     smallHint(step, profile)), profile));
+        hints.add(phraser.rephrase(new Hint(Strength.STRONG,    strongHint(step, profile)), profile));
+        hints.add(phraser.rephrase(new Hint(Strength.FULL_STEP, fullStepHint(step)), profile));
         return hints;
     }
 

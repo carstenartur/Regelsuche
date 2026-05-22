@@ -129,6 +129,11 @@ bereit:
 | `POST`  | `/api/didactic/step-check`        | `{"currentExpression":"…","studentStep":"…","difficulty":"MITTELSTUFE"}` → `Result`-JSON      |
 | `POST`  | `/api/didactic/hint/{pathId}`     | `{"currentExpression":"…","pedagogyProfile":"SCHOOL"}` → gestufte Hinweise                    |
 | `GET`   | `/api/didactic/misconceptions`    | listet den eingebauten `MisconceptionRule`-Katalog                                            |
+| `GET`   | `/api/didactic/replay/{pathId}`   | Schritte plus token-Level `SymbolDiff` für die Replay-Ansicht                                 |
+| `GET`   | `/api/didactic/analytics`         | aggregierter Snapshot (Misconception-Häufigkeit, Hinweis-Nutzung, Genauigkeit)                |
+| `GET`   | `/api/didactic/export/worksheet/{pathId}.md` | Arbeitsblatt (Aufgabe + Leerzeilen)                                                |
+| `GET`   | `/api/didactic/export/solution/{pathId}.md`  | Musterlösung (alle Schritte mit Begründung)                                        |
+| `GET`   | `/api/didactic/export/teacher/{pathId}.md`   | Lehrermodus (Schritte + Symbol-Diff + pädagogische Hinweise)                       |
 
 `GET /api/didactic` liefert die Endpunkt-Übersicht.
 
@@ -138,18 +143,11 @@ Suchpipeline einhängt — ohne Änderungen an den Strategien.
 
 ## Was bewusst noch nicht enthalten ist
 
-Damit dieser PR überschaubar bleibt, sind die folgenden Punkte der
-Spezifikation **vorbereitet** (durch die hier eingeführten Services),
-aber noch nicht ausgeliefert:
+## Was bewusst noch nicht enthalten ist
 
-- Didaktik-Replay-Ansicht in der Web-Workbench-UI mit
-  `SymbolDiff`-Highlighting;
-- Demo-Gallery-Einträge „Mehrere Lösungswege", „Typischer Fehler",
-  „Hinweis-Modus", „Schrittprüfung";
-- Didaktik-Analytics (Persistenz, Dashboard);
-- Bildungsspezifische Exportformate (Arbeitsblatt, Musterlösung,
-  Lehrermodus-PDF/HTML);
-- Optionale LLM-gestützte Formulierung der Erklärungen und Hinweise.
+- Optional LLM-gestützte Formulierung kann über die Schnittstelle
+  `LlmHintPhraser` angebunden werden — diese Sitzung liefert nur den
+  No-Op-Adapter; konkrete Modell-Aufrufe sind bewusst extern gehalten.
 
 Sie können auf der hier eingeführten API direkt aufgebaut werden, ohne
 weitere Refactorings an der Suchpipeline.

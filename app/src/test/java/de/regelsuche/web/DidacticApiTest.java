@@ -106,6 +106,72 @@ class DidacticApiTest {
         assertTrue(body.contains("inequality_missing_flip"), body);
     }
 
+    @Test
+    void replayReturnsSymbolDiffPerStep() throws IOException {
+        HttpURLConnection connection = open("GET", "/api/didactic/replay/sample-derivation-id");
+        assertEquals(200, connection.getResponseCode());
+        String body = new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(body.contains("\"diffTokens\""), body);
+        assertTrue(body.contains("\"change\":\"UNCHANGED\"")
+            || body.contains("\"change\":\"ADDED\"")
+            || body.contains("\"change\":\"REMOVED\""), body);
+    }
+
+    @Test
+    void replayReturns404ForUnknownPath() throws IOException {
+        HttpURLConnection connection = open("GET", "/api/didactic/replay/no-such-id");
+        assertEquals(404, connection.getResponseCode());
+    }
+
+    @Test
+    void exportWorksheetSolutionAndTeacherReturnMarkdown() throws IOException {
+        for (String kind : new String[]{"worksheet", "solution", "teacher"}) {
+            HttpURLConnection connection = open(
+                "GET", "/api/didactic/export/" + kind + "/sample-derivation-id.md");
+            assertEquals(200, connection.getResponseCode(), () -> "kind=" + kind);
+            String body = new String(connection.getInputStream().readAllBytes(),
+                StandardCharsets.UTF_8);
+            assertTrue(body.startsWith("# "), () -> kind + " body: " + body);
+            assertTrue(connection.getContentType().startsWith("text/markdown"),
+                () -> "expected text/markdown for " + kind + " but got "
+                    + connection.getContentType());
+        }
+    }
+
+    @Test
+    void exportUnknownKindReturns404() throws IOException {
+        HttpURLConnection connection = open(
+            "GET", "/api/didactic/export/poster/sample-derivation-id.md");
+        assertEquals(404, connection.getResponseCode());
+    }
+
+    @Test
+    void analyticsRecordsStepCheckAndHintEvents() throws IOException {
+        // baseline
+        String empty = getString("/api/didactic/analytics");
+        assertTrue(empty.contains("\"totalEvents\":0"), empty);
+
+        // trigger one of each kind
+        postJson("/api/didactic/step-check",
+            "{\"currentExpression\":\"x + 0\",\"studentStep\":\"x\","
+                + "\"difficulty\":\"GRUNDSCHULE\"}");
+        postJson("/api/didactic/hint/sample-derivation-id",
+            "{\"currentExpression\":\"a*(b + c)\",\"pedagogyProfile\":\"SCHOOL\"}");
+
+        String after = getString("/api/didactic/analytics");
+        assertTrue(after.contains("\"stepChecks\":1"), after);
+        assertTrue(after.contains("\"hints\":1"), after);
+        assertTrue(after.contains("\"GRUNDSCHULE\":1"), after);
+        assertTrue(after.contains("\"SCHOOL\":1"), after);
+    }
+
+    private String getString(String path) throws IOException {
+        HttpURLConnection connection = open("GET", path);
+        assertEquals(200, connection.getResponseCode(),
+            () -> "expected 200 from " + path);
+        return new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    }
+
     // -------- helpers --------
 
     private String postJson(String path, String payload) throws IOException {

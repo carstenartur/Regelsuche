@@ -26,6 +26,7 @@
         <button class="tab" data-tab="memory">Suchgedächtnis</button>
         <button class="tab" data-tab="proofJobs">Proof-Jobs</button>
         <button class="tab" data-tab="exports">Exporte</button>
+        <button class="tab" data-tab="didaktik">Didaktik</button>
         <button class="tab" data-tab="help">Hilfe</button>
     </nav>
 </header>
@@ -407,6 +408,79 @@
                 <a class="export-button" href="/api/exports/best-path.md" target="_blank">Bester Pfad (.md)</a>
                 <a class="export-button" href="/api/exports/identity-report.tex" target="_blank">Identitätsbericht (.tex)</a>
             </div>
+        </div>
+    </section>
+
+    <!-- ─────────── Didaktik tab (PR 17) ─────────── -->
+    <section id="tab-didaktik" class="tab-panel">
+        <div class="card">
+            <h2>Didaktik</h2>
+            <p class="hint">
+                Replay mit Symbol-Diff, gestufte Hinweise, Schrittprüfung und Analytics für die
+                didaktische Schicht. Pfad-ID aus dem Tab <strong>Pfade</strong> übernehmen.
+            </p>
+            <div class="didaktik-controls">
+                <label>
+                    Pfad-ID
+                    <input type="text" id="didaktikPathId" placeholder="z. B. transformation-3">
+                </label>
+                <label>
+                    Pädagogik-Profil
+                    <select id="didaktikProfile">
+                        <option value="SCHOOL">SCHOOL</option>
+                        <option value="CONCISE">CONCISE</option>
+                        <option value="VERY_DETAILED">VERY_DETAILED</option>
+                        <option value="ELEGANT">ELEGANT</option>
+                        <option value="EXAM_FRIENDLY">EXAM_FRIENDLY</option>
+                    </select>
+                </label>
+                <label>
+                    Aktueller Ausdruck (für Hinweise)
+                    <input type="text" id="didaktikCurrent" placeholder="z. B. a*(b + c)">
+                </label>
+                <button id="didaktikReplayBtn">Replay laden</button>
+                <button id="didaktikHintBtn">Hinweis abrufen</button>
+            </div>
+            <div id="didaktikReplay" class="didaktik-replay"></div>
+            <div id="didaktikHints" class="didaktik-hints"></div>
+        </div>
+
+        <div class="card">
+            <h3>Schrittprüfung</h3>
+            <div class="didaktik-controls">
+                <label>
+                    Aktueller Ausdruck
+                    <input type="text" id="didaktikStepCurrent" placeholder="z. B. (a + b) / b">
+                </label>
+                <label>
+                    Studentischer Schritt
+                    <input type="text" id="didaktikStepStudent" placeholder="z. B. a">
+                </label>
+                <label>
+                    Schwierigkeit
+                    <select id="didaktikDifficulty">
+                        <option value="GRUNDSCHULE">GRUNDSCHULE</option>
+                        <option value="MITTELSTUFE" selected>MITTELSTUFE</option>
+                        <option value="OBERSTUFE">OBERSTUFE</option>
+                        <option value="UNIVERSITAET">UNIVERSITAET</option>
+                        <option value="EXPERTE">EXPERTE</option>
+                    </select>
+                </label>
+                <button id="didaktikStepBtn">Schritt prüfen</button>
+            </div>
+            <div id="didaktikStepResult" class="didaktik-step-result"></div>
+        </div>
+
+        <div class="card">
+            <h3>Analytics & Exporte</h3>
+            <button id="didaktikAnalyticsBtn">Analytics aktualisieren</button>
+            <pre id="didaktikAnalytics" class="didaktik-analytics"></pre>
+            <div class="export-grid">
+                <a class="export-button" id="didaktikExportWorksheet" href="#" target="_blank">Arbeitsblatt (.md)</a>
+                <a class="export-button" id="didaktikExportSolution" href="#" target="_blank">Musterlösung (.md)</a>
+                <a class="export-button" id="didaktikExportTeacher" href="#" target="_blank">Lehrermodus (.md)</a>
+            </div>
+            <p class="hint">Exporte werden für die oben gewählte Pfad-ID erzeugt.</p>
         </div>
     </section>
 

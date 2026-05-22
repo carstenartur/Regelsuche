@@ -77,6 +77,12 @@ public class WebWorkbenchServer {
     private final de.regelsuche.proof.ProofWorkbenchService proofWorkbenchService;
 
     private HttpServer server;
+    private final de.regelsuche.didactic.analytics.DidacticEventStore didacticEventStore =
+        new de.regelsuche.didactic.analytics.InMemoryDidacticEventStore();
+    private final de.regelsuche.didactic.analytics.DidacticAnalyticsService didacticAnalytics =
+        new de.regelsuche.didactic.analytics.DidacticAnalyticsService(didacticEventStore);
+    private final de.regelsuche.didactic.export.EducationalExporter didacticExporter =
+        new de.regelsuche.didactic.export.EducationalExporter();
 
     public WebWorkbenchServer(
         String host,
@@ -901,6 +907,27 @@ public class WebWorkbenchServer {
             handleDidacticMisconceptions(exchange);
             return;
         }
+        if (suffix.startsWith("analytics")) {
+            handleDidacticAnalytics(exchange);
+            return;
+        }
+        if (suffix.startsWith("replay/")) {
+            handleDidacticReplay(exchange, suffix.substring("replay/".length()));
+            return;
+        }
+        if (suffix.startsWith("replay")) {
+            sendStatus(exchange, 400, "expected /api/didactic/replay/{pathId}");
+            return;
+        }
+        if (suffix.startsWith("export/")) {
+            handleDidacticExport(exchange, suffix.substring("export/".length()));
+            return;
+        }
+        if (suffix.startsWith("export")) {
+            sendStatus(exchange, 400,
+                "expected /api/didactic/export/{worksheet|solution|teacher}/{pathId}.md");
+            return;
+        }
         if (suffix.isEmpty()) {
             JsonWriter writer = new JsonWriter();
             writer.beginObject();
@@ -908,6 +935,11 @@ public class WebWorkbenchServer {
                 inner.property("stepCheck", "/api/didactic/step-check");
                 inner.property("hint", "/api/didactic/hint/{pathId}");
                 inner.property("misconceptions", "/api/didactic/misconceptions");
+                inner.property("analytics", "/api/didactic/analytics");
+                inner.property("replay", "/api/didactic/replay/{pathId}");
+                inner.property("exportWorksheet", "/api/didactic/export/worksheet/{pathId}.md");
+                inner.property("exportSolution",  "/api/didactic/export/solution/{pathId}.md");
+                inner.property("exportTeacher",   "/api/didactic/export/teacher/{pathId}.md");
             });
             writer.endObject();
             sendJson(exchange, 200, writer.toString());
@@ -942,6 +974,14 @@ public class WebWorkbenchServer {
             new de.regelsuche.didactic.StudentStepValidator(new SymPyEquivalenceService());
         de.regelsuche.didactic.StudentStepValidator.Result result =
             validator.validate(currentExpression, studentStep, level);
+
+        didacticEventStore.record(de.regelsuche.didactic.analytics.DidacticEvent.stepCheck(
+            java.time.Instant.now(),
+            level,
+            result.correct(),
+            result.didacticallyAppropriate(),
+            result.misconception().map(de.regelsuche.didactic.MisconceptionRule::id).orElse(null)
+        ));
 
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
@@ -992,6 +1032,16 @@ public class WebWorkbenchServer {
         var hints = new de.regelsuche.didactic.HintGenerator()
             .hintsFor(match.get(), currentExpression, profileEnum);
 
+        de.regelsuche.didactic.HintGenerator.Strength deliveredStrength = hints.isEmpty()
+            ? null
+            : hints.get(hints.size() - 1).strength();
+        didacticEventStore.record(de.regelsuche.didactic.analytics.DidacticEvent.hint(
+            java.time.Instant.now(),
+            pathId,
+            profileEnum,
+            deliveredStrength
+        ));
+
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("pathId", pathId);
@@ -1019,6 +1069,105 @@ public class WebWorkbenchServer {
             })));
         writer.endObject();
         sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleDidacticAnalytics(HttpExchange exchange) throws IOException {
+        var snapshot = didacticAnalytics.snapshot();
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("totalEvents", snapshot.totalEvents());
+        writer.property("stepChecks", snapshot.stepChecks());
+        writer.property("hints", snapshot.hints());
+        writer.property("correctSteps", snapshot.correctSteps());
+        writer.property("didacticallyAppropriateSteps", snapshot.didacticallyAppropriateSteps());
+        writer.property("accuracy", snapshot.accuracy());
+        writer.property("appropriateness", snapshot.appropriateness());
+        writer.object("misconceptionFrequency", inner -> snapshot.misconceptionFrequency()
+            .forEach(inner::property));
+        writer.object("stepChecksByDifficulty", inner -> snapshot.stepChecksByDifficulty()
+            .forEach((k, v) -> inner.property(k.name(), v)));
+        writer.object("hintsByStrength", inner -> snapshot.hintsByStrength()
+            .forEach((k, v) -> inner.property(k.name(), v)));
+        writer.object("hintsByProfile", inner -> snapshot.hintsByProfile()
+            .forEach((k, v) -> inner.property(k.name(), v)));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleDidacticReplay(HttpExchange exchange, String pathId) throws IOException {
+        if (pathId.isBlank()) {
+            sendStatus(exchange, 400, "expected /api/didactic/replay/{pathId}");
+            return;
+        }
+        var match = graphStore.discoveredTransformations().stream()
+            .filter(t -> t.id().equals(pathId))
+            .findFirst();
+        if (match.isEmpty()) {
+            sendStatus(exchange, 404, "path not found");
+            return;
+        }
+        var derivation = match.get();
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("pathId", pathId);
+        writer.property("originalExpression", derivation.originalExpression());
+        writer.property("improvedExpression", derivation.improvedExpression());
+        writer.array("steps", arr -> derivation.steps().forEach(step ->
+            arr.objectValue(inner -> {
+                inner.property("index", step.index());
+                inner.property("beforeExpression", step.beforeExpression());
+                inner.property("afterExpression", step.afterExpression());
+                inner.property("ruleId", step.ruleId());
+                inner.property("ruleKind", step.ruleKind().name());
+                inner.property("explanation", step.explanation());
+                inner.array("diffTokens", tokensArr ->
+                    de.regelsuche.didactic.SymbolDiff.diff(
+                            step.beforeExpression(), step.afterExpression())
+                        .forEach(token -> tokensArr.objectValue(tokenObj -> {
+                            tokenObj.property("text", token.text());
+                            tokenObj.property("change", token.change().name());
+                        })));
+            })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleDidacticExport(HttpExchange exchange, String suffix) throws IOException {
+        // suffix is e.g. "worksheet/some-path-id.md"
+        int slash = suffix.indexOf('/');
+        if (slash <= 0 || slash >= suffix.length() - 1) {
+            sendStatus(exchange, 400,
+                "expected /api/didactic/export/{worksheet|solution|teacher}/{pathId}.md");
+            return;
+        }
+        String kind = suffix.substring(0, slash);
+        String rest = suffix.substring(slash + 1);
+        if (rest.endsWith(".md")) {
+            rest = rest.substring(0, rest.length() - 3);
+        }
+        if (rest.isBlank()) {
+            sendStatus(exchange, 400, "missing pathId");
+            return;
+        }
+        final String pathId = rest;
+        var match = graphStore.discoveredTransformations().stream()
+            .filter(t -> t.id().equals(pathId))
+            .findFirst();
+        if (match.isEmpty()) {
+            sendStatus(exchange, 404, "path not found");
+            return;
+        }
+        String body = switch (kind.toLowerCase(Locale.ROOT)) {
+            case "worksheet" -> didacticExporter.worksheet(match.get());
+            case "solution"  -> didacticExporter.solution(match.get());
+            case "teacher"   -> didacticExporter.teacherMode(match.get());
+            default          -> null;
+        };
+        if (body == null) {
+            sendStatus(exchange, 404, "unknown export kind: " + kind);
+            return;
+        }
+        send(exchange, 200, "text/markdown; charset=utf-8", body);
     }
 
     private String moveAnalysisToJson(de.regelsuche.analyze.MoveAnalysisDto a) {
