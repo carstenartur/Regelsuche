@@ -13,6 +13,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.parse.ParsedInput;
 import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
@@ -70,11 +71,15 @@ public class TransformationSearchService {
     }
 
     public CompletableFuture<Void> submit(InputRequest input) {
+        return submit(input, null);
+    }
+
+    public CompletableFuture<Void> submit(InputRequest input, TransformationGoal goal) {
         ParsedInput parsed = parser.parse(input);
         List<String> roots = collectRoots(parsed);
         List<CompletableFuture<Void>> jobs = new ArrayList<>();
         for (String root : roots) {
-            jobs.add(CompletableFuture.runAsync(() -> explore(root), executorService));
+            jobs.add(CompletableFuture.runAsync(() -> explore(root, goal), executorService));
         }
         return CompletableFuture.allOf(jobs.toArray(CompletableFuture[]::new));
     }
@@ -110,8 +115,9 @@ public class TransformationSearchService {
         return roots;
     }
 
-    private void explore(String root) {
-        SearchProblem problem = new SearchProblem(root, engine, scorer, canonicalizer, heuristic);
+    private void explore(String root, TransformationGoal goal) {
+        SearchProblem problem = new SearchProblem(root, engine, scorer, canonicalizer, heuristic)
+            .withGoal(goal);
         for (SearchState state : searchStrategy.search(problem)) {
             boolean alreadyVisited = !globallyVisited.add(state.canonicalHash() + ":" + state.appliedRuleApplications());
             if (alreadyVisited && state.improvement() <= 0) {

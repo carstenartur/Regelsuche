@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -268,8 +269,17 @@ public final class ProofJobScheduler implements AutoCloseable {
             Thread.currentThread().interrupt();
             runningFutures.remove(job.id());
             jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
+        } catch (CancellationException ex) {
+            runningFutures.remove(job.id());
+            cancelRequests.remove(job.id());
+            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
         } catch (Exception ex) {
             runningFutures.remove(job.id());
+            if (cancelRequests.contains(job.id())) {
+                cancelRequests.remove(job.id());
+                jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
+                return;
+            }
             handleFailure(job, ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());
         }
     }

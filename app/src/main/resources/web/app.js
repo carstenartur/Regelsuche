@@ -1243,17 +1243,19 @@
                 patterns.forEach((p) => {
                     const div = document.createElement('div');
                     div.className = 'list-item';
-                    const rules = (p.reachedByRuleIds || []).join(', ') || '—';
+                    const rules = escapeHtml((p.reachedByRuleIds || []).join(', ') || '—');
+                    const pathId = p.bestKnownPathId ? String(p.bestKnownPathId) : '';
+                    const escapedPathId = escapeHtml(pathId);
                     const pathLink = p.bestKnownPathId
-                        ? ' · best path: <a href="#" data-path="' + p.bestKnownPathId
-                            + '" class="universal-path">' + p.bestKnownPathId + '</a>'
+                        ? ' · best path: <a href="#" data-path="' + escapedPathId
+                            + '" class="universal-path">' + escapedPathId + '</a>'
                         : '';
                     div.innerHTML =
-                        '<div><strong>' + (p.canonicalExpression || '') + '</strong></div>'
-                        + '<div class="hint">universality: <b>' + p.universalityScore + '</b>'
-                        + ' · visits: ' + p.visitCount
-                        + ' · bestScore: ' + p.bestScore
-                        + ' · depth: ' + p.minDepthSeen + '</div>'
+                        '<div><strong>' + escapeHtml(p.canonicalExpression || '') + '</strong></div>'
+                        + '<div class="hint">universality: <b>' + escapeHtml(String(p.universalityScore ?? '')) + '</b>'
+                        + ' · visits: ' + escapeHtml(String(p.visitCount ?? ''))
+                        + ' · bestScore: ' + escapeHtml(String(p.bestScore ?? ''))
+                        + ' · depth: ' + escapeHtml(String(p.minDepthSeen ?? '')) + '</div>'
                         + '<div class="hint">rules: ' + rules + pathLink + '</div>';
                     out.appendChild(div);
                 });

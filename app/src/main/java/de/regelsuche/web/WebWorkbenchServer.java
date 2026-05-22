@@ -291,7 +291,7 @@ public class WebWorkbenchServer {
             profile.newStrategy()
         );
         try {
-            search.submit(new InputRequest(type, expression)).join();
+            search.submit(new InputRequest(type, expression), goal).join();
             JsonWriter writer = new JsonWriter();
             writer.beginObject();
             writer.property("profile", profile.name());
@@ -1485,7 +1485,15 @@ public class WebWorkbenchServer {
             return;
         }
         int priority = intValue(body, "priority", 0);
-        String worker = stringValue(body, "worker", "");
+        if (priority < 0) {
+            sendStatus(exchange, 400, "priority must be >= 0");
+            return;
+        }
+        String worker = stringValue(body, "worker", "").trim();
+        if (!worker.isEmpty()) {
+            sendStatus(exchange, 400, "worker selection is not supported");
+            return;
+        }
         List<de.regelsuche.assumption.Assumption> assumptions = new java.util.ArrayList<>();
         Object raw = body.get("assumptions");
         if (raw instanceof List<?> list) {
@@ -1512,7 +1520,7 @@ public class WebWorkbenchServer {
                 }
             }
         }
-        String jobId = proofWorkbenchService.submit(left, right, assumptions, priority, worker);
+        String jobId = proofWorkbenchService.submit(left, right, assumptions, priority);
         var job = proofWorkbenchService.getJob(jobId).orElse(null);
         JsonWriter writer = new JsonWriter();
         writer.beginObject();

@@ -36,6 +36,8 @@ RUN ./gradlew --no-daemon :app:installDist -x test
 FROM eclipse-temurin:21-jre AS runtime
 
 ARG INSTALL_LEAN=false
+ARG ELAN_GIT_SHA=3d5138e1526a569a23901b8ee559032793cf445e
+ARG ELAN_INIT_SHA256=4bacca9502cb89736fe63d2685abc2947cfbf34dc87673504f1bb4c43eda9264
 
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -58,8 +60,10 @@ WORKDIR /opt/regelsuche
 # Lean stable channel weigh in around 1 GB; opt in with --build-arg
 # INSTALL_LEAN=true when you actually need the Lean worker to execute proofs.
 RUN if [ "$INSTALL_LEAN" = "true" ]; then \
-        curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
-            | sh -s -- -y --default-toolchain leanprover/lean4:stable \
+        curl -fsSLo /tmp/elan-init.sh https://raw.githubusercontent.com/leanprover/elan/${ELAN_GIT_SHA}/elan-init.sh \
+        && echo "${ELAN_INIT_SHA256}  /tmp/elan-init.sh" | sha256sum -c - \
+        && sh /tmp/elan-init.sh -y --default-toolchain leanprover/lean4:stable \
+        && rm -f /tmp/elan-init.sh \
         && ln -s /root/.elan/bin/lean /usr/local/bin/lean \
         && ln -s /root/.elan/bin/lake /usr/local/bin/lake; \
     fi

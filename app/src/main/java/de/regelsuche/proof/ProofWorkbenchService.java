@@ -36,13 +36,13 @@ public final class ProofWorkbenchService {
 
     /** Submit a new job from the workbench / REST layer. */
     public String submit(String leftPattern, String rightPattern,
-                         List<Assumption> assumptions, int priority, String workerHint) {
+                         List<Assumption> assumptions, int priority) {
         RuleCandidate candidate = new RuleCandidate(
             leftPattern == null ? "" : leftPattern,
             rightPattern == null ? "" : rightPattern,
             0, 0.0, 0, false, false, false,
             List.of(), RuleStatus.NEW, CandidateProofStatus.OBSERVED,
-            workerHint == null ? "" : workerHint
+            ""
         );
         return scheduler.submit(candidate, assumptions == null ? List.of() : assumptions, priority);
     }

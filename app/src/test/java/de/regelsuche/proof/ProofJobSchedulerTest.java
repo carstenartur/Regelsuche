@@ -99,6 +99,43 @@ class ProofJobSchedulerTest {
     }
 
     @Test
+    void cancellationOfRunningJobStaysCancelled() throws InterruptedException {
+        ProofWorker slow = new ProofWorker() {
+            @Override
+            public ProofWorker.Result prove(RuleCandidate c, List<Assumption> a) {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+                return new ProofWorker.Result(c, CandidateProofStatus.FORMALLY_PROVABLE, "", "slow", 0L);
+            }
+
+            @Override
+            public String workerId() {
+                return "slow-running";
+            }
+        };
+
+        InMemoryProofJobRepository repo = new InMemoryProofJobRepository();
+        ProofJobScheduler slowScheduler = new ProofJobScheduler(
+            slow, repo, new InMemoryProofCache(), null, Duration.ofSeconds(5));
+        slowScheduler.start();
+        try {
+            String jobId = slowScheduler.submit(candidate("x", "x"), List.of(), 0);
+            assertEventually(() -> repo.findById(jobId)
+                .map(job -> job.status() == ProofJobStatus.RUNNING)
+                .orElse(false), 3000);
+            slowScheduler.cancel(jobId);
+            assertEventually(() -> repo.findById(jobId)
+                .map(job -> job.status() == ProofJobStatus.CANCELLED)
+                .orElse(false), 3000);
+        } finally {
+            slowScheduler.close();
+        }
+    }
+
+    @Test
     void cacheHitSkipsWorker() throws InterruptedException {
         // Pre-populate the cache
         ProofCacheKey key = ProofCacheKey.of("A*1", "A", List.of(), "lean4");

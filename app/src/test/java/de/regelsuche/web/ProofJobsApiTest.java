@@ -130,6 +130,30 @@ class ProofJobsApiTest {
     }
 
     @Test
+    void submitWithNegativePriorityIs400() throws IOException {
+        HttpURLConnection submit = open("/api/proof/jobs", "POST");
+        submit.setDoOutput(true);
+        submit.setRequestProperty("Content-Type", "application/json");
+        try (OutputStream os = submit.getOutputStream()) {
+            os.write("{\"leftPattern\":\"a+0\",\"rightPattern\":\"a\",\"priority\":-1}"
+                .getBytes(StandardCharsets.UTF_8));
+        }
+        assertEquals(400, submit.getResponseCode());
+    }
+
+    @Test
+    void submitWithWorkerHintIs400() throws IOException {
+        HttpURLConnection submit = open("/api/proof/jobs", "POST");
+        submit.setDoOutput(true);
+        submit.setRequestProperty("Content-Type", "application/json");
+        try (OutputStream os = submit.getOutputStream()) {
+            os.write("{\"leftPattern\":\"a+0\",\"rightPattern\":\"a\",\"worker\":\"lean4\"}"
+                .getBytes(StandardCharsets.UTF_8));
+        }
+        assertEquals(400, submit.getResponseCode());
+    }
+
+    @Test
     void unknownJobIs404() throws IOException {
         HttpURLConnection connection = open("/api/proof/jobs/does-not-exist", "GET");
         assertEquals(404, connection.getResponseCode());
