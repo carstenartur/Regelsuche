@@ -603,6 +603,7 @@ public class WebWorkbenchServer {
         writer.beginObject();
         writer.property("pathId", dto.pathId());
         writer.property("alignedDerivationLatex", dto.alignedDerivationLatex());
+        writer.property("alignedDerivationLatexWithDiff", dto.alignedDerivationLatexWithDiff());
         writer.array("steps", w -> dto.steps().forEach(step ->
             w.objectValue(inner -> {
                 inner.property("stepIndex", step.stepIndex());
@@ -614,9 +615,22 @@ public class WebWorkbenchServer {
                 inner.property("ruleExplanation", step.ruleExplanation());
                 inner.property("scoreDelta", step.scoreDelta());
                 inner.property("equivalencePreserving", step.equivalencePreserving());
+                inner.property("comparatorFlipped", step.comparatorFlipped());
+                writeReplaySpanArray(inner, "changedFromSpans", step.changedFromSpans());
+                writeReplaySpanArray(inner, "changedToSpans", step.changedToSpans());
             })));
         writer.endObject();
         return writer.toString();
+    }
+
+    private static void writeReplaySpanArray(JsonWriter writer, String key, java.util.List<int[]> spans) {
+        writer.array(key, w -> {
+            for (int[] span : spans) {
+                int start = span.length > 0 ? span[0] : 0;
+                int length = span.length > 1 ? span[1] : 0;
+                w.arrayValue(inner -> inner.value(start).value(length));
+            }
+        });
     }
 
     private void handleGraph(HttpExchange exchange) throws IOException {

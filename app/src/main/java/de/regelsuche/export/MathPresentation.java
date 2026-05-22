@@ -122,6 +122,15 @@ public final class MathPresentation {
      *       Used by {@link MathPresentation#alignedDerivationLatexWithDiff(List)}
      *       to wrap changed tokens in {@code \htmlClass{diff-old|diff-new}{…}}.</li>
      * </ul>
+     *
+     * <p>Stage 5 addition:
+     * <ul>
+     *   <li>{@link #toExpression()} — the raw (non-LaTeX) target expression, used
+     *       by {@link MathPresentation#derivationLayout(List)} to build a
+     *       screen-reader-friendly {@code aria-label} via
+     *       {@link de.regelsuche.export.layout.AstAriaRenderer}. Empty string when
+     *       not available (e.g. callers using the legacy 3-arg constructor).</li>
+     * </ul>
      */
     public record DerivationStep(
         String fromLatex,
@@ -129,7 +138,8 @@ public final class MathPresentation {
         String ruleId,
         boolean comparatorFlipped,
         List<int[]> changedFromSpans,
-        List<int[]> changedToSpans
+        List<int[]> changedToSpans,
+        String toExpression
     ) {
         public DerivationStep {
             fromLatex = fromLatex == null ? "" : fromLatex;
@@ -139,6 +149,24 @@ public final class MathPresentation {
                 ? List.of() : List.copyOf(changedFromSpans);
             changedToSpans = changedToSpans == null
                 ? List.of() : List.copyOf(changedToSpans);
+            toExpression = toExpression == null ? "" : toExpression;
+        }
+
+        /**
+         * Backward-compatible 6-arg constructor used by callers that pre-date
+         * the Stage 5 expression-for-aria addition. Sets {@code toExpression}
+         * to empty string; aria labels will be omitted for such steps.
+         */
+        public DerivationStep(
+            String fromLatex,
+            String toLatex,
+            String ruleId,
+            boolean comparatorFlipped,
+            List<int[]> changedFromSpans,
+            List<int[]> changedToSpans
+        ) {
+            this(fromLatex, toLatex, ruleId, comparatorFlipped,
+                changedFromSpans, changedToSpans, "");
         }
 
         /**
@@ -156,7 +184,8 @@ public final class MathPresentation {
                 MathDiff.diffSpans(fromLatex == null ? "" : fromLatex,
                     toLatex == null ? "" : toLatex).fromSpans(),
                 MathDiff.diffSpans(fromLatex == null ? "" : fromLatex,
-                    toLatex == null ? "" : toLatex).toSpans()
+                    toLatex == null ? "" : toLatex).toSpans(),
+                ""
             );
         }
     }
@@ -380,9 +409,15 @@ public final class MathPresentation {
                 step.toLatex(), hasDiff ? "diff-new" : null));
             rows.add(MathLayoutNode.alignedRow(rowChildren));
         }
+        // Build aria label from raw expressions when available; skip steps where
+        // only LaTeX is present (AstAriaRenderer is designed for raw expressions
+        // and would produce backslash-heavy labels from LaTeX input).
         StringBuilder aria = new StringBuilder();
         for (DerivationStep step : steps) {
-            aria.append(AstAriaRenderer.ariaLabel(step.toLatex())).append("; ");
+            String expr = step.toExpression();
+            if (!expr.isEmpty()) {
+                aria.append(AstAriaRenderer.ariaLabel(expr)).append("; ");
+            }
         }
         return new MathLayout(MathLayout.Kind.ALIGNED, rows, aria.toString().trim());
     }

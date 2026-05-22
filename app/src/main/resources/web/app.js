@@ -153,8 +153,16 @@
                         span.className = child.attributes.class;
                     }
                     const text = child.text || '';
-                    span.setAttribute('data-math', '$' + text + '$');
-                    span.textContent = '$' + text + '$';
+                    let mathStr;
+                    if (child.kind === 'ARROW_LABEL') {
+                        mathStr = text
+                            ? '$\\xrightarrow{' + text + '}$'
+                            : '$\\rightarrow$';
+                    } else {
+                        mathStr = '$' + text + '$';
+                    }
+                    span.setAttribute('data-math', mathStr);
+                    span.textContent = mathStr;
                     rowEl.appendChild(span);
                 });
                 host.appendChild(rowEl);
@@ -848,7 +856,7 @@
             `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}</div>`);
         inspector.innerHTML = rows.join('');
         if (payload && payload.latex) {
-            inspector.innerHTML += '<div class="math" data-math="$' + payload.latex + '$">$' + payload.latex + '$</div>';
+            inspector.innerHTML += '<div class="math" data-math="$' + escapeHtml(payload.latex) + '$">$' + escapeHtml(payload.latex) + '$</div>';
         }
         window.renderMath(inspector);
     }
