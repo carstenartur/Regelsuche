@@ -5,8 +5,8 @@ Suche von „lernende Rewrite-Schleife" hin zu „mathematische
 Suchintelligenz" weiterentwickeln. Die Reihenfolge ist nach Hebelwirkung
 und technischer Abhängigkeit sortiert.
 
-Stand: **PR 1, PR 3, PR 6, PR 2a und PR 2b sind umgesetzt**;
-PRs 4 und 5 sind als Folge-PRs offen.
+Stand: **PR 1 ✅, PR 2a ✅, PR 2b ✅, PR 3 ✅, PR 4 ✅ (weitgehend geliefert durch PR #13), PR 6 ✅**;
+PR 5 ist als Folge-PR offen.
 
 ## PR 1 — Strong Canonicalization &nbsp;✅ geliefert
 
@@ -86,12 +86,12 @@ Tests:
   BestFirst-Reihenfolge tatsächlich beeinflusst, jeder Goal die Suche
   steuern kann und die Legacy-Konstruktoren weiter funktionieren.
 
-Offen für eine kleine Folge-Iteration: das UI-Dropdown im
+Offen (kleine UX-Iteration): UI-Dropdown für `TransformationGoal` im
 `WebWorkbenchServer` (REST-Feld `goal` auf `/api/search`,
 `<select>`-Element neben dem bestehenden Profil-Dropdown). Die
 Server-/Search-Seite ist bereits vollständig vorbereitet.
 
-## PR 2 — E-Graphs / Equality Saturation &nbsp;🟡 teilweise geliefert (PR 2a)
+## PR 2 — E-Graphs / Equality Saturation &nbsp;✅ geliefert
 
 Größter Architekturschritt, profitiert massiv von PR 1.
 
@@ -156,26 +156,47 @@ Geliefert in `de.regelsuche.egraph` und
   `equalitySaturationRespectsIterationBudget`,
   `equalitySaturationReportsStats` plus Profile-Wiring-Test.
 
-## PR 4 — Größere mathematische Domänen (in Sub-PRs splitten)
+## PR 4 — Größere mathematische Domänen &nbsp;✅ weitgehend geliefert (PR #13)
 
-Jeder Schritt eigener PR samt eigener Demo + Tests.
+### Geliefert
 
-* **4a — Gleichungen/Ungleichungen**: `Equation`/`Inequality`-Knoten
-  (Equation existiert teilweise), Balancing-Rules, Schul-Demos.
-* **4b — Ableitungen**: `Derivative`-Knoten, Standard-Ableitungsregeln,
+* **Gleichungen** — `Equation`-Knoten + Balancing-Rules + Schul-Demos.
+* **Ungleichungen** — `Inequality`-Knoten + Umformungsregeln.
+* **Ableitungen** — `Derivative`-Knoten, Standard-Ableitungsregeln,
   Kettenregel über Pattern-Match.
-* **4c — Integrale / komplexe Zahlen / Matrizen / Vektoren**: jeweils
-  eigener PR — sonst wird die Domain-Erweiterung ein Monster.
+* **Integrator-Basis** — Grundintegrale, Linearität.
+* **Matrizen / Vektoren** — Basisknoten, elementare Rechenregeln.
+* **Workbench-Integration** — Domain-Dispatcher im `WebWorkbenchServer`.
+* **UI-Polish** — Eingabebeispiele und Fehlerhinweise in der Web-UI.
+* **Benchmark-Kategorien** — `SearchBenchmark` deckt Gleichungen,
+  Ableitungen und Matrizen ab.
+* **Domain-aware Discovery+** — `RuleCandidateMiner` erkennt
+  domain-spezifische Strukturen.
+
+### Noch offen (Folge-Iterationen)
+
+* Tiefere Integrationsregeln (Substitution, Partialbruch).
+* Kettenregel als generische Rewrite-Regel für beliebige innere Funktionen.
+* Mehr Matrix-/Vektorregeln (Determinante, Inverse, Eigenwerte).
+* Echte Gleichungssystem-Demos (lineare Systeme, Gauss-Elimination).
+* Mehr Analysis-Demos (Taylor-Reihen, Grenzwerte).
 
 ## PR 5 — Serious Proof Integration
 
-* Lean-Bridge: Tactic-Export für eine `RewriteRule`.
-* `RewriteRuleValidationService` ruft den Proof-Worker asynchron auf
-  und hebt den Status auf `FORMALLY_PROVED`, sobald der externe Prover
-  bestätigt.
-* Job-Queue für lange Beweise.
-* Infrastruktur (Lean-Installation, Cache, Worker-Container) explizit
-  dokumentieren — wahrscheinlich blockiert durch externes Setup.
+* **Lean/SMT als produktiver Proof-Worker** — nicht nur Bridge, sondern
+  vollständig integrierter asynchroner Beweiser; hebt den Status auf
+  `FORMALLY_PROVED`, sobald der externe Prover bestätigt.
+* **Job-Queue** — persistente Warteschlange für lang laufende Beweise,
+  Retry-Logik, Prioritäts-Steuerung.
+* **Cache** — belegte Beweise werden gecacht; kein doppelter Prover-Aufruf
+  für identische Regeln.
+* **Artefaktverwaltung** — Lean-Proof-Dateien als Artefakte in der
+  `RuleInventoryRepository` ablegen und versionieren.
+* **UI-Status** — Proof-Status (PENDING / PROVED / FAILED) in der
+  Workbench anzeigen; Fortschrittsanzeige im Suchgedächtnis-Tab.
+* **Docker-/CI-Setup für Prover** — Lean- und SMT-Solver-Installation in
+  einem Docker-Image dokumentieren; CI-Job für automatische
+  Proof-Verifikation.
 
 ## PR 6 — Global Mathematical Memory &nbsp;✅ geliefert
 
@@ -207,18 +228,41 @@ Tests: `GlobalMemoryServiceTest` deckt Score-Gewichtung, Top-Ranking,
 Rule-Coverage, GC-Selektivität und JSON-Roundtrip (inkl. Schema-Version
 und persistenter GC) ab.
 
-Offen für eine kleine Folge-Iteration: UI-Sektion „universelle Muster"
-im Suchgedächtnis-Tab des `WebWorkbenchServer` — Service-Seite ist
+Offen (kleine UX-Iteration): UI-Sektion „universelle Muster" im
+Suchgedächtnis-Tab des `WebWorkbenchServer` — Service-Seite ist
 vollständig vorhanden.
+
+## Offene UX-Punkte (kleine Folge-Iterationen)
+
+* **Goal-Dropdown** im Web-UI (`WebWorkbenchServer`): `<select>`-Element
+  für `TransformationGoal` neben dem Profil-Dropdown; REST-Feld `goal`
+  auf `/api/search` ist serverseitig bereits vorbereitet.
+* **Universelle Muster** im Suchgedächtnis-Tab: Tabelle der
+  `topUniversalPatterns` aus `GlobalMemoryService`; Service-Seite ist
+  vollständig vorhanden.
+* **Playwright / Testcontainers-Doku-Screenshots**: automatisierte
+  End-to-End-Screenshots für die Dokumentation generieren und in
+  `docs/assets/` ablegen.
 
 ## Empfohlene Reihenfolge
 
-`1` (erledigt) → `3` (erledigt) → `2a` (erledigt) → `6` (erledigt) → `2b` → `4a/4b/…` → `5`.
+Bereits erledigt:
+
+`1 → 3 → 2a → 6 → 2b → 4`
+
+Nächste Schritte:
+
+`5 → docs/e2e-assets → deeper-domain-rules`
 
 Begründung:
 
 * PR 1 ist Fundament — wirkt sich auf alles Folgende aus.
 * PR 3 ist klein, gibt aber sofort sichtbares Verhalten.
 * PR 2 ist groß, profitiert massiv von 1 und 3.
-* PR 6 ohne 1 verfrüht (siehe oben).
-* PRs 4 und 5 orthogonal und können danach in beliebiger Reihenfolge.
+* PR 6 ohne 1 verfrüht.
+* PR 4 ist weitgehend umgesetzt; Folgeiterationen (tiefere Domänenregeln)
+  parallel zu PR 5 möglich.
+* PR 5 braucht externes Setup (Lean/SMT-Docker) und ist daher bewusst
+  letzter großer Schritt.
+* Doku-Assets (Playwright-Screenshots) können nach PR 5 oder unabhängig
+  davon ergänzt werden.
