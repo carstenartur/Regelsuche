@@ -115,31 +115,39 @@ class ProofJobPanelBrowserFlowTest {
     @Test
     @DisplayName("Proof-Workbench: Job für a + 0 -> a einreichen und Artefakte ansehen")
     void proofJobPanelBrowserFlow() throws Exception {
-        // 1. open Proof-Jobs tab
+        // 1. start the primary search flow once so non-entry tabs become visible
+        // (body.pre-search hides them until the first search/demo interaction).
+        page.locator("#searchForm input[name='expression']").fill("x + 0");
+        page.locator("#searchForm button[type='submit']").click();
+        page.waitForFunction(
+            "() => document.body.dataset.preSearch === 'false'",
+            null, new Page.WaitForFunctionOptions().setTimeout(10_000));
+
+        // 2. open Proof-Jobs tab
         page.locator(".tab[data-tab='proofJobs']").click();
         page.waitForSelector("#tab-proofJobs.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
 
-        // 2. submit a job for "a + 0 -> a"
+        // 3. submit a job for "a + 0 -> a"
         page.locator("#proofJobLeft").fill("a + 0");
         page.locator("#proofJobRight").fill("a");
         page.locator("#proofJobSubmit").click();
 
-        // 3. poll the job list until the job appears
+        // 4. poll the job list until the job appears
         page.waitForFunction(
             "() => { var l = document.querySelector('#proofJobList');"
                 + " return l && l.innerText.includes('a + 0')"
                 + " && l.innerText.includes('Status:'); }",
             null, new Page.WaitForFunctionOptions().setTimeout(20_000));
 
-        // 4. trigger explicit reload, then verify Status badge is present
+        // 5. trigger explicit reload, then verify Status badge is present
         page.locator("#proofJobReload").click();
         page.waitForFunction(
             "() => { var l = document.querySelector('#proofJobList');"
                 + " return l && /Status:\\s*<code>(DONE|RUNNING|QUEUED)/.test(l.innerHTML); }",
             null, new Page.WaitForFunctionOptions().setTimeout(20_000));
 
-        // 5. open the artefact list for the just-submitted job. Poll until the
+        // 6. open the artefact list for the just-submitted job. Poll until the
         // stub worker has written the bundle (scheduler runs every ~250ms).
         boolean foundArtifact = false;
         for (int attempt = 0; attempt < 30 && !foundArtifact; attempt++) {
@@ -161,7 +169,7 @@ class ProofJobPanelBrowserFlowTest {
         assertTrue(foundArtifact,
             "artefact panel must show at least one proof.* / metadata / stdout entry");
 
-        // 6. capture screenshot + (optional) video
+        // 7. capture screenshot + (optional) video
         screenshot("proof-job-panel.png");
     }
 
