@@ -95,6 +95,7 @@ public final class SearchGraphRecordCodec {
     private static void writeReplay(JsonWriter writer, PathReplayDto replay) {
         writer.property("pathId", replay.pathId());
         writer.property("alignedDerivationLatex", replay.alignedDerivationLatex());
+        writer.property("alignedDerivationLatexWithDiff", replay.alignedDerivationLatexWithDiff());
         writer.array("steps", w -> replay.steps().forEach(step -> w.objectValue(inner -> {
             inner.property("stepIndex", step.stepIndex());
             inner.property("fromExpression", step.fromExpression());
@@ -105,7 +106,24 @@ public final class SearchGraphRecordCodec {
             inner.property("ruleExplanation", step.ruleExplanation());
             inner.property("scoreDelta", step.scoreDelta());
             inner.property("equivalencePreserving", step.equivalencePreserving());
+            inner.property("comparatorFlipped", step.comparatorFlipped());
+            writeSpanArray(inner, "changedFromSpans", step.changedFromSpans());
+            writeSpanArray(inner, "changedToSpans", step.changedToSpans());
         })));
+    }
+
+    /**
+     * Writes a list of {@code [start, length]} integer pairs as a JSON
+     * array of two-element arrays. Used by the Stage 3 diff payload.
+     */
+    private static void writeSpanArray(JsonWriter writer, String key, List<int[]> spans) {
+        writer.array(key, w -> {
+            for (int[] span : spans) {
+                int start = span.length > 0 ? span[0] : 0;
+                int length = span.length > 1 ? span[1] : 0;
+                w.arrayValue(inner -> inner.value(start).value(length));
+            }
+        });
     }
 
     private static void writeMacro(JsonWriter writer, MacroRuleCandidate macro) {
@@ -247,15 +265,48 @@ public final class SearchGraphRecordCodec {
                 stringValue(m.get("ruleId"), ""),
                 stringValue(m.get("ruleExplanation"), ""),
                 intValue(m.get("scoreDelta"), 0),
-                booleanValue(m.get("equivalencePreserving"), true)
+                booleanValue(m.get("equivalencePreserving"), true),
+                booleanValue(m.get("comparatorFlipped"),
+                    de.regelsuche.export.MathPresentation.detectComparatorFlip(
+                        stringValue(m.get("ruleId"), ""),
+                        stringValue(m.get("fromExpression"), ""),
+                        stringValue(m.get("toExpression"), ""))),
+                readSpanList(m.get("changedFromSpans")),
+                readSpanList(m.get("changedToSpans"))
             ))
             .toList();
         String pathId = stringValue(values.get("pathId"), "?");
         Object persisted = values.get("alignedDerivationLatex");
-        if (persisted instanceof String s && !s.isBlank()) {
-            return new PathReplayDto(pathId, steps, s);
+        Object persistedDiff = values.get("alignedDerivationLatexWithDiff");
+        String alignedPlain = persisted instanceof String s && !s.isBlank() ? s : null;
+        String alignedDiff = persistedDiff instanceof String d && !d.isBlank() ? d : null;
+        if (alignedPlain != null && alignedDiff != null) {
+            return new PathReplayDto(pathId, steps, alignedPlain, alignedDiff);
+        }
+        if (alignedPlain != null) {
+            return new PathReplayDto(pathId, steps, alignedPlain);
         }
         return new PathReplayDto(pathId, steps);
+    }
+
+    /** Read a list of {@code [start, length]} pairs back into {@code int[]} spans. */
+    private static List<int[]> readSpanList(Object raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        if (!(raw instanceof List<?> list)) {
+            return List.of();
+        }
+        List<int[]> out = new ArrayList<>(list.size());
+        for (Object element : list) {
+            if (!(element instanceof List<?> pair) || pair.size() < 2) {
+                continue;
+            }
+            int start = intValue(pair.get(0), 0);
+            int length = intValue(pair.get(1), 0);
+            out.add(new int[] { start, length });
+        }
+        return out;
     }
 
     private static MacroRuleCandidate readMacro(Map<String, Object> values) {

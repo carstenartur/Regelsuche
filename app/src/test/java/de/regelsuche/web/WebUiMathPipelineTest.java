@@ -111,4 +111,67 @@ class WebUiMathPipelineTest {
         assertTrue(open == close,
             "app.js must have balanced braces (got { = " + open + " vs } = " + close + ")");
     }
+
+    /**
+     * Stage 3 pin: replay tab uses server-side comparator-flip flag and
+     * the colour-diff classes (.diff-old / .diff-new) to highlight what
+     * changed between consecutive steps, with a .replay-derivation-focus
+     * accent on the focused row. Also regression-guards the deleted JS
+     * heuristic so the legacy ASCII-comparator check cannot sneak back
+     * in.
+     */
+    @Test
+    void appJsUsesServerComparatorFlipFlagAndDiffClasses() throws IOException {
+        Path appJs = locateAppJs();
+        if (appJs == null) {
+            return;
+        }
+        String content = Files.readString(appJs);
+        assertTrue(content.contains("alignedDerivationLatexWithDiff"),
+            "app.js must consume PathReplayDto.alignedDerivationLatexWithDiff");
+        assertTrue(content.contains("wrapDiffLatex"),
+            "app.js must expose a wrapDiffLatex() helper for per-step diff highlighting");
+        assertTrue(content.contains("htmlClass{"),
+            "app.js must emit \\htmlClass{…} wrappers around changed spans");
+        assertTrue(content.contains("replay-derivation-focus"),
+            "app.js must mark the focused replay row with .replay-derivation-focus");
+        assertTrue(content.contains("step.comparatorFlipped === true"),
+            "Stage 3: comparator-flip notice must be driven by the server flag");
+        // Regression-guard the deleted JS heuristic: the old fallback
+        // looked at /(<|>)/ in step.fromExpression to decide whether
+        // to show the flip notice. It is now exclusively driven by the
+        // server flag.
+        assertFalse(content.contains("/(<|>)/.test(String(step.fromExpression"),
+            "Legacy JS comparator-flip heuristic must not be re-introduced");
+    }
+
+    @Test
+    void styleCssDefinesDiffAndFlipNoticeTokens() throws IOException {
+        Path styleCss = locateStyleCss();
+        if (styleCss == null) {
+            return;
+        }
+        String content = Files.readString(styleCss);
+        assertTrue(content.contains(".diff-old"), "missing .diff-old rule");
+        assertTrue(content.contains(".diff-new"), "missing .diff-new rule");
+        assertTrue(content.contains(".replay-flip-notice"),
+            "missing .replay-flip-notice rule");
+        assertTrue(content.contains(".replay-derivation-focus"),
+            "missing .replay-derivation-focus accent rule");
+        assertTrue(content.contains("--diff-old") && content.contains("--diff-new"),
+            "diff CSS custom properties must be defined for token reuse");
+    }
+
+    private static Path locateStyleCss() {
+        Path[] candidates = {
+            Path.of("src", "main", "resources", "web", "style.css"),
+            Path.of("app", "src", "main", "resources", "web", "style.css")
+        };
+        for (Path c : candidates) {
+            if (Files.isRegularFile(c)) {
+                return c;
+            }
+        }
+        return null;
+    }
 }

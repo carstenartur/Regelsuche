@@ -127,6 +127,14 @@ public final class JsonWriter {
         return endObject();
     }
 
+    /** Emit a nested array value inside an array context. */
+    public JsonWriter arrayValue(Consumer<JsonWriter> body) {
+        comma();
+        beginArray();
+        body.accept(this);
+        return endArray();
+    }
+
     private void comma() {
         if (firstEntry.isEmpty()) {
             return;

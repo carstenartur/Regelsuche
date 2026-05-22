@@ -236,6 +236,30 @@ footer { text-align: center; padding: 1rem; color: #9ca3af; font-size: 0.8rem; }
     font-size: 0.95rem;
 }
 .replay-derivation-math { overflow-x: auto; }
+
+/* ─── Stage 3 — colour-diff highlighting and comparator-flip notice ─── */
+:root {
+    --diff-old: #b91c1c;       /* red 700 */
+    --diff-new: #047857;       /* emerald 700 */
+    --danger:   #dc2626;       /* red 600 */
+}
+.diff-old {
+    color: var(--diff-old);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+.diff-new {
+    color: var(--diff-new);
+    font-weight: 600;
+}
+.replay-flip-notice {
+    border-left: 4px solid var(--danger);
+    padding-left: 0.6rem;
+}
+.replay-derivation-focus {
+    background: linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%);
+    box-shadow: inset 3px 0 0 #6366f1;
+}
 .latex { font-style: italic; color: #4b5563; }
 .graph-inspector { background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; margin-top: 0.5rem; border-radius: 6px; font-size: 0.9rem; }
 table.compare { border-collapse: collapse; width: 100%; margin-bottom: 0.75rem; }

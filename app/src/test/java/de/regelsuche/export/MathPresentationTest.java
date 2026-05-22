@@ -1,6 +1,7 @@
 package de.regelsuche.export;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,5 +72,52 @@ class MathPresentationTest {
             new MathPresentation.DerivationStep("a", "b", "")
         ));
         assertTrue(latex.contains("&\\rightarrow b"), latex);
+    }
+
+    @Test
+    void detectComparatorFlipDetectsLessToGreater() {
+        assertTrue(MathPresentation.detectComparatorFlip(
+            "inequality_multiply_both_sides", "x < 3", "-x > -3"));
+        assertTrue(MathPresentation.detectComparatorFlip(
+            "inequality_divide_both_sides", "x \\le 3", "-x \\ge -3"));
+    }
+
+    @Test
+    void detectComparatorFlipReturnsFalseWhenComparatorUnchanged() {
+        assertFalse(MathPresentation.detectComparatorFlip(
+            "inequality_multiply_both_sides", "x < 3", "2x < 6"));
+    }
+
+    @Test
+    void detectComparatorFlipReturnsFalseForUnrelatedRule() {
+        assertFalse(MathPresentation.detectComparatorFlip(
+            "polynomial_distribute", "x < 3", "x > 3"));
+    }
+
+    @Test
+    void alignedDerivationLatexWithDiffWrapsChangedTokensInHtmlClass() {
+        // The token that changes between the two rows is `+1` -> `+2`.
+        MathPresentation.DerivationStep step =
+            new MathPresentation.DerivationStep("x+1", "x+2", "polynomial_collect_like_terms");
+        String latex = math.alignedDerivationLatexWithDiff(java.util.List.of(step));
+        assertTrue(latex.contains("\\htmlClass{diff-new}{"),
+            "Stage 3 diff wrapper missing: " + latex);
+        assertTrue(latex.contains("\\begin{aligned}"), latex);
+    }
+
+    @Test
+    void alignedDerivationLatexWithDiffReturnsBlankForEmptyOrNull() {
+        assertEquals("", math.alignedDerivationLatexWithDiff(null));
+        assertEquals("", math.alignedDerivationLatexWithDiff(java.util.List.of()));
+    }
+
+    @Test
+    void derivationStepBackCompatConstructorPopulatesDiffAndFlip() {
+        MathPresentation.DerivationStep step = new MathPresentation.DerivationStep(
+            "x<3", "-x>-3", "inequality_multiply_both_sides");
+        assertTrue(step.comparatorFlipped(),
+            "comparator flip must be inferred server-side");
+        assertFalse(step.changedToSpans().isEmpty(),
+            "diff spans must be computed by the back-compat ctor");
     }
 }

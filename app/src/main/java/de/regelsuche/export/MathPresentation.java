@@ -104,13 +104,105 @@ public final class MathPresentation {
      * to match the {@code toLatex} of step <em>n</em>; the renderer
      * only emits the very first {@code fromLatex} and then chains the
      * {@code toLatex} of each subsequent step underneath.
+     *
+     * <p>Stage 3 additions:
+     * <ul>
+     *   <li>{@link #comparatorFlipped()} — set to {@code true} when the
+     *       transition flipped an inequality comparator (e.g. {@code <}
+     *       became {@code >}) and the rule id is one of the
+     *       {@code inequality_multiply_both_sides} /
+     *       {@code inequality_divide_both_sides} pair.</li>
+     *   <li>{@link #changedFromSpans()} / {@link #changedToSpans()} —
+     *       token-level diff spans (start offset + length, both in code
+     *       points) over {@code fromLatex} / {@code toLatex} respectively.
+     *       Used by {@link MathPresentation#alignedDerivationLatexWithDiff(List)}
+     *       to wrap changed tokens in {@code \htmlClass{diff-old|diff-new}{…}}.</li>
+     * </ul>
      */
-    public record DerivationStep(String fromLatex, String toLatex, String ruleId) {
+    public record DerivationStep(
+        String fromLatex,
+        String toLatex,
+        String ruleId,
+        boolean comparatorFlipped,
+        List<int[]> changedFromSpans,
+        List<int[]> changedToSpans
+    ) {
         public DerivationStep {
             fromLatex = fromLatex == null ? "" : fromLatex;
             toLatex = toLatex == null ? "" : toLatex;
             ruleId = ruleId == null ? "" : ruleId;
+            changedFromSpans = changedFromSpans == null
+                ? List.of() : List.copyOf(changedFromSpans);
+            changedToSpans = changedToSpans == null
+                ? List.of() : List.copyOf(changedToSpans);
         }
+
+        /**
+         * Backward-compatible 3-arg constructor used by existing callers
+         * (and by the codec readers that pre-date the diff annotations).
+         * Computes the diff spans from the from/to LaTeX strings and the
+         * comparator-flip flag from the rule id and the from/to texts.
+         */
+        public DerivationStep(String fromLatex, String toLatex, String ruleId) {
+            this(
+                fromLatex == null ? "" : fromLatex,
+                toLatex == null ? "" : toLatex,
+                ruleId == null ? "" : ruleId,
+                detectComparatorFlip(ruleId, fromLatex, toLatex),
+                MathDiff.diffSpans(fromLatex == null ? "" : fromLatex,
+                    toLatex == null ? "" : toLatex).fromSpans(),
+                MathDiff.diffSpans(fromLatex == null ? "" : fromLatex,
+                    toLatex == null ? "" : toLatex).toSpans()
+            );
+        }
+    }
+
+    /**
+     * Stage 3 — comparator-flip heuristic moved server-side from the
+     * legacy front-end check. Returns {@code true} when the rule id is
+     * one of the inequality multiply/divide pair AND the from/to texts
+     * each contain a comparator AND those comparators have opposite
+     * directions (e.g. {@code <} became {@code >} or {@code \le} became
+     * {@code \ge}).
+     */
+    public static boolean detectComparatorFlip(String ruleId, String fromText, String toText) {
+        if (ruleId == null) {
+            return false;
+        }
+        boolean rulePair = ruleId.equals("inequality_multiply_both_sides")
+            || ruleId.equals("inequality_divide_both_sides");
+        if (!rulePair) {
+            return false;
+        }
+        if (fromText == null || toText == null) {
+            return false;
+        }
+        int fromDir = comparatorDirection(fromText);
+        int toDir = comparatorDirection(toText);
+        return fromDir != 0 && toDir != 0 && fromDir != toDir;
+    }
+
+    /** +1 for {@code <}/{@code \le}, -1 for {@code >}/{@code \ge}, 0 otherwise. */
+    private static int comparatorDirection(String text) {
+        if (text == null) {
+            return 0;
+        }
+        // Prefer LaTeX comparator macros when present; fall back to ASCII.
+        if (text.contains("\\le") || text.contains("\\leq") || text.contains("\\lt")) {
+            return +1;
+        }
+        if (text.contains("\\ge") || text.contains("\\geq") || text.contains("\\gt")) {
+            return -1;
+        }
+        int firstLt = text.indexOf('<');
+        int firstGt = text.indexOf('>');
+        if (firstLt >= 0 && (firstGt < 0 || firstLt < firstGt)) {
+            return +1;
+        }
+        if (firstGt >= 0 && (firstLt < 0 || firstGt < firstLt)) {
+            return -1;
+        }
+        return 0;
     }
 
     /**
@@ -143,6 +235,100 @@ public final class MathPresentation {
             out.append(step.toLatex());
         }
         out.append("\n\\end{aligned}");
+        return out.toString();
+    }
+
+    /**
+     * Stage 3 — same aligned block as {@link #alignedDerivationLatex(List)},
+     * but with changed substrings of every step's {@code toLatex} (and
+     * the very first {@code fromLatex}) wrapped in
+     * {@code \htmlClass{diff-old}{…}} / {@code \htmlClass{diff-new}{…}}
+     * markers. KaTeX trust mode is already enabled in the front-end
+     * pipeline so these classes survive into the rendered DOM and pick
+     * up the CSS tokens emitted by {@code style.css}.
+     *
+     * <p>Returns the same plain block as
+     * {@link #alignedDerivationLatex(List)} when no diff spans are
+     * present so callers do not need to special-case the empty-diff
+     * case.</p>
+     */
+    public String alignedDerivationLatexWithDiff(List<DerivationStep> steps) {
+        if (steps == null || steps.isEmpty()) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder(96 + steps.size() * 48);
+        out.append("\\begin{aligned}\n");
+        // The first row carries the source expression. We only know what
+        // "changed" once a transition is applied, so the very first row
+        // shows the unmodified fromLatex of step 0.
+        out.append(steps.get(0).fromLatex());
+        for (DerivationStep step : steps) {
+            out.append(" \\\\\n");
+            String arrow = ruleLatex(step.ruleId());
+            if (arrow.isEmpty()) {
+                out.append("&\\rightarrow ");
+            } else {
+                out.append("&\\xrightarrow{").append(arrow).append("} ");
+            }
+            out.append(wrapDiff(step.toLatex(), step.changedToSpans(), "diff-new"));
+        }
+        out.append("\n\\end{aligned}");
+        return out.toString();
+    }
+
+    /**
+     * Wraps the byte ranges in {@code spans} of {@code latex} with
+     * {@code \htmlClass{<cssClass>}{…}}. Spans are interpreted as a
+     * sequence of half-open intervals over the {@code latex} string;
+     * out-of-range or overlapping spans are coalesced/clipped.
+     */
+    static String wrapDiff(String latex, List<int[]> spans, String cssClass) {
+        if (latex == null || latex.isEmpty() || spans == null || spans.isEmpty()) {
+            return latex == null ? "" : latex;
+        }
+        java.util.List<int[]> norm = new java.util.ArrayList<>(spans.size());
+        for (int[] span : spans) {
+            if (span == null || span.length < 2) {
+                continue;
+            }
+            int start = Math.max(0, span[0]);
+            int length = Math.max(0, span[1]);
+            int end = Math.min(latex.length(), start + length);
+            if (end <= start) {
+                continue;
+            }
+            norm.add(new int[] { start, end });
+        }
+        if (norm.isEmpty()) {
+            return latex;
+        }
+        norm.sort((a, b) -> Integer.compare(a[0], b[0]));
+        // Coalesce overlapping spans so the rendered LaTeX stays valid.
+        java.util.List<int[]> merged = new java.util.ArrayList<>(norm.size());
+        int[] current = norm.get(0).clone();
+        for (int i = 1; i < norm.size(); i++) {
+            int[] next = norm.get(i);
+            if (next[0] <= current[1]) {
+                current[1] = Math.max(current[1], next[1]);
+            } else {
+                merged.add(current);
+                current = next.clone();
+            }
+        }
+        merged.add(current);
+        StringBuilder out = new StringBuilder(latex.length() + merged.size() * (cssClass.length() + 16));
+        int cursor = 0;
+        for (int[] span : merged) {
+            if (span[0] > cursor) {
+                out.append(latex, cursor, span[0]);
+            }
+            out.append("\\htmlClass{").append(cssClass).append("}{")
+                .append(latex, span[0], span[1]).append("}");
+            cursor = span[1];
+        }
+        if (cursor < latex.length()) {
+            out.append(latex, cursor, latex.length());
+        }
         return out.toString();
     }
 }

@@ -82,6 +82,12 @@
                         { left: '\\(', right: '\\)', display: false },
                         { left: '\\[', right: '\\]', display: true }
                     ],
+                    // Stage 3: enable KaTeX trust mode so the
+                    // `\htmlClass{diff-old|diff-new}{…}` markers emitted
+                    // by `MathPresentation.alignedDerivationLatexWithDiff`
+                    // survive into the rendered DOM as styleable spans.
+                    trust: true,
+                    strict: 'ignore',
                     throwOnError: false
                 });
                 return;
@@ -962,6 +968,7 @@
             const data = await response.json();
             replayState.steps = data.steps || [];
             replayState.alignedDerivationLatex = data.alignedDerivationLatex || '';
+            replayState.alignedDerivationLatexWithDiff = data.alignedDerivationLatexWithDiff || '';
             replayState.index = 0;
             renderReplayStep();
         } catch (ex) {
@@ -979,18 +986,33 @@
         const ruleId = step.ruleId || '';
         // Math-domain-specific extras for the four PR-#13 demos.
         const extras = renderReplayDomainExtras(step, ruleId);
+        // Stage 3: prefer the diff-annotated derivation block when the
+        // backend provides it (alignedDerivationLatexWithDiff) so changed
+        // tokens are colour-coded inline. Falls back to the plain block.
         const derivationBlock = renderAlignedDerivationBlock(
-            replayState.alignedDerivationLatex, replayState.index);
+            replayState.alignedDerivationLatexWithDiff
+                || replayState.alignedDerivationLatex,
+            replayState.index);
+        // Per-step: wrap changed spans in the from/to LaTeX in
+        // \htmlClass{diff-old|diff-new}{…} so the per-step view shows
+        // the same colour-diff highlight inline. KaTeX trust mode is
+        // already enabled in renderMath().
+        const fromDiff = wrapDiffLatex(step.fromLatex || '',
+            step.changedFromSpans, 'diff-old');
+        const toDiff = wrapDiffLatex(step.toLatex || '',
+            step.changedToSpans, 'diff-new');
+        const fromInline = '$' + fromDiff + '$';
+        const toInline = '$' + toDiff + '$';
         canvas.innerHTML = derivationBlock
             + '<div class="replay-step">'
             + '<div class="replay-step-index">Schritt ' + (step.stepIndex + 1)
             + ' / ' + replayState.steps.length + '</div>'
             + '<div class="replay-from"><strong>Vorher:</strong> '
             + '<code>' + escapeHtml(step.fromExpression) + '</code><br>'
-            + '<span class="math" data-math="$' + escapeHtml(step.fromLatex) + '$">$' + escapeHtml(step.fromLatex) + '$</span></div>'
+            + '<span class="math" data-math="' + escapeHtml(fromInline) + '">' + escapeHtml(fromInline) + '</span></div>'
             + '<div class="replay-to"><strong>Nachher:</strong> '
             + '<code>' + escapeHtml(step.toExpression) + '</code><br>'
-            + '<span class="math" data-math="$' + escapeHtml(step.toLatex) + '$">$' + escapeHtml(step.toLatex) + '$</span></div>'
+            + '<span class="math" data-math="' + escapeHtml(toInline) + '">' + escapeHtml(toInline) + '</span></div>'
             + '<div class="replay-rule"><strong>Regel:</strong> <code>'
             + escapeHtml(ruleId) + '</code></div>'
             + extras
@@ -1003,6 +1025,45 @@
     }
 
     /**
+     * Stage 3 — wraps the given `[start, length]` character spans of
+     * `latex` in `\htmlClass{<cssClass>}{…}` so KaTeX (with trust mode)
+     * surfaces them as colour-diff highlights in the rendered DOM.
+     * Mirrors `MathPresentation.wrapDiff(...)` on the server side so the
+     * per-step inline view matches the aligned-derivation block.
+     */
+    function wrapDiffLatex(latex, spans, cssClass) {
+        if (!latex || !spans || !spans.length) { return latex || ''; }
+        const norm = [];
+        for (const span of spans) {
+            if (!span || span.length < 2) { continue; }
+            const start = Math.max(0, span[0] | 0);
+            const end = Math.min(latex.length, start + (span[1] | 0));
+            if (end <= start) { continue; }
+            norm.push([start, end]);
+        }
+        if (!norm.length) { return latex; }
+        norm.sort((a, b) => a[0] - b[0]);
+        const merged = [norm[0].slice()];
+        for (let i = 1; i < norm.length; i++) {
+            const last = merged[merged.length - 1];
+            if (norm[i][0] <= last[1]) {
+                last[1] = Math.max(last[1], norm[i][1]);
+            } else {
+                merged.push(norm[i].slice());
+            }
+        }
+        let out = '';
+        let cursor = 0;
+        for (const [s, e] of merged) {
+            if (s > cursor) { out += latex.substring(cursor, s); }
+            out += '\\htmlClass{' + cssClass + '}{' + latex.substring(s, e) + '}';
+            cursor = e;
+        }
+        if (cursor < latex.length) { out += latex.substring(cursor); }
+        return out;
+    }
+
+    /**
      * Stage 2: render the whole derivation as one `\begin{aligned}` block
      * with a highlighted row for the currently focused step. The block is
      * provided by the backend (PathReplayDto.alignedDerivationLatex) so
@@ -1012,7 +1073,11 @@
     function renderAlignedDerivationBlock(latex, focusIndex) {
         if (!latex) return '';
         const display = '$$' + latex + '$$';
-        return '<div class="replay-derivation-block" data-focus-step="' + focusIndex + '">'
+        // Stage 3: focused step gets a row-highlight class on the wrapper
+        // so the CSS can scope the .replay-derivation-focus accent rule
+        // (KaTeX renders the aligned block as a single math node, so the
+        // class lives on the wrapper rather than per-row).
+        return '<div class="replay-derivation-block replay-derivation-focus" data-focus-step="' + focusIndex + '">'
             + '<div class="replay-derivation-title">Rechenweg</div>'
             + '<div class="math replay-derivation-math" data-math="' + escapeHtml(display) + '">'
             + escapeHtml(display)
@@ -1025,15 +1090,16 @@
      *  - inequality_* steps that flip the comparator show a red "Vergleichszeichen gedreht" Hinweis,
      *  - calculus_* steps render a Regelkarte (Potenzregel/Summenregel/Produktregel),
      *  - linalg_/matrix_/vector_ steps show a bmatrix preview block.
+     *
+     * Stage 3: the comparator-flip detection is driven exclusively by the
+     * server-side `step.comparatorFlipped` flag emitted by
+     * `PathReplayDto.from(...)`. The legacy JS heuristic
+     * (rule id + ascii-comparator regex) has been removed so the JS and
+     * codec agree on the flag.
      */
     function renderReplayDomainExtras(step, ruleId) {
         const out = [];
-        const flipping = ruleId === 'inequality_multiply_both_sides'
-            || ruleId === 'inequality_divide_both_sides';
-        const flipped = step.comparatorFlipped === true
-            || (flipping && /(<|>)/.test(String(step.fromExpression || ''))
-                && /(<|>)/.test(String(step.toExpression || '')));
-        if (flipping && flipped) {
+        if (step.comparatorFlipped === true) {
             out.push('<div class="status error replay-flip-notice">'
                 + '<strong>⚠️ Vergleichszeichen wurde gedreht.</strong> '
                 + 'Multiplikation/Division mit einem negativen Faktor dreht das '
