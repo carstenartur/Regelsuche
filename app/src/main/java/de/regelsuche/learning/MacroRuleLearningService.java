@@ -86,6 +86,15 @@ public class MacroRuleLearningService {
             CandidateProofStatus.VALIDATED_BY_EXAMPLES
         );
         List<RuleCandidate> candidates = miner.mine(paths, settings);
+        // Index paths by id so we can recover the atomic rule-id sequence for
+        // each candidate and tag the resulting reusable rule with its domain
+        // (equations / inequalities / calculus / linear-algebra / algebra).
+        java.util.Map<String, List<String>> rulesByPathId = new java.util.HashMap<>();
+        for (SuccessfulTransformationPath p : paths) {
+            rulesByPathId.put(p.id(), p.rules());
+        }
+        de.regelsuche.mining.MacroDomainInferrer inferrer =
+            new de.regelsuche.mining.MacroDomainInferrer();
         List<ReusableRule> updated = new ArrayList<>();
         List<ReusableRule> activated = new ArrayList<>();
         for (RuleCandidate candidate : candidates) {
@@ -101,6 +110,18 @@ public class MacroRuleLearningService {
                 .findFirst()
                 .orElse(rule);
             inventory.setEnabled(effective.id(), shouldEnable);
+            // Domain tag (Discovery+): infer once from the atomic rule-ids of
+            // the supporting paths. Stored as a free-form inventory tag so the
+            // UI / inventory queries can filter by domain.
+            List<String> mergedRuleIds = new ArrayList<>();
+            for (String supportingId : candidate.supportingTransformationIds()) {
+                List<String> rules = rulesByPathId.get(supportingId);
+                if (rules != null) {
+                    mergedRuleIds.addAll(rules);
+                }
+            }
+            String domain = inferrer.inferFromRuleIds(mergedRuleIds);
+            inventory.addTag(effective.id(), domain);
             updated.add(effective);
             if (shouldEnable && (ruleBefore == null || !inventory.isEnabled(ruleBefore.id())
                 || ruleBefore.occurrenceCount() < minOccurrences)) {

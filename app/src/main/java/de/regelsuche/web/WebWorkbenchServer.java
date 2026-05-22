@@ -428,7 +428,15 @@ public class WebWorkbenchServer {
                 java.time.Instant.now()
             );
             inventoryRepository.save(rule);
-            sendJson(exchange, 200, "{\"promotedRuleId\":\"" + escapeJson(ruleId) + "\"}");
+            // Discovery+ domain tag: infer from the macro's atomic rule-id
+            // sequence (equation_*/inequality_*/calculus_*/linalg_* …) and
+            // store it as an inventory tag so the UI can filter by domain.
+            String domain = new de.regelsuche.mining.MacroDomainInferrer()
+                .inferDomain(candidate);
+            inventoryRepository.addTag(ruleId, domain);
+            sendJson(exchange, 200,
+                "{\"promotedRuleId\":\"" + escapeJson(ruleId) + "\",\"domain\":\""
+                    + escapeJson(domain) + "\"}");
             return;
         }
         if (!suffix.isEmpty() && !"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -437,6 +445,8 @@ public class WebWorkbenchServer {
         }
 
         // GET /api/identities -> list
+        de.regelsuche.mining.MacroDomainInferrer domainInferrer =
+            new de.regelsuche.mining.MacroDomainInferrer();
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.array("identities", w -> macros.forEach(macro -> {
@@ -452,6 +462,7 @@ public class WebWorkbenchServer {
                 inner.property("proofStatus", dto.proofStatus().name());
                 inner.property("knownRuleStatus", dto.knownRuleStatus().name());
                 inner.stringArray("supportingTransformationIds", dto.supportingTransformationIds());
+                inner.property("domain", domainInferrer.inferDomain(macro));
             });
         }));
         writer.endObject();
@@ -1149,6 +1160,8 @@ public class WebWorkbenchServer {
                 inner.property("proofStatus", macro.proofStatus().name());
                 inner.property("knownRuleStatus",
                     known.statusFor(macro.leftPattern(), macro.rightPattern()).name());
+                inner.property("domain",
+                    new de.regelsuche.mining.MacroDomainInferrer().inferDomain(macro));
             })));
         writer.object("links", l -> {
             l.property("searchGraph", "/api/search-graph");

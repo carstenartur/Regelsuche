@@ -195,12 +195,156 @@
             .join(' ');
         $('demoSummary').innerHTML =
             banner
+            + renderMathDomainPanel(data)
             + (proofTag ? '<p>Proof-Status des selektierten Pfades: ' + proofTag + '</p>' : '')
             + bestMoveBlock
             + assumptionsBlock
             + '<table>' + tableRows + '</table>'
+            + renderProofBridgePanel(data)
             + idList
             + '<div class="demo-actions">' + linkList + '</div>';
+        wireProofBridgeButton(data);
+    }
+
+    /**
+     * Math-domain panels rendered inline in the demo summary:
+     *  - math-equation: Lösungsweg in Schulform (one row per step),
+     *  - math-inequality: Hinweis "Vergleichszeichen wurde gedreht" when comparatorFlipped,
+     *  - math-derivative: Regelkarte mit der angewendeten Ableitungsregel,
+     *  - math-matrix: bmatrix-Vorschau der LaTeX-Ein- und -Ausgabe.
+     */
+    function renderMathDomainPanel(data) {
+        if (!data || typeof data.id !== 'string' || !data.id.startsWith('math-')) {
+            return '';
+        }
+        const selected = data.selectedPath || data.bestPath || {};
+        const steps = selected.steps || [];
+        let html = '';
+        if (data.id === 'math-equation') {
+            const rows = steps.map((s, i) =>
+                '<tr><td>' + (i + 1) + '.</td>'
+                + '<td><code>' + escapeHtml(s.beforeExpression || '') + '</code></td>'
+                + '<td><code>' + escapeHtml(s.afterExpression || '') + '</code></td>'
+                + '<td><code>' + escapeHtml(s.ruleId || '') + '</code></td></tr>').join('');
+            html += '<div class="math-domain-panel math-equation-panel">'
+                + '<h4>Lösungsweg (Schulform)</h4>'
+                + '<table class="math-equation-steps"><thead><tr>'
+                + '<th>#</th><th>vorher</th><th>nachher</th><th>Regel</th>'
+                + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        }
+        if (data.id === 'math-inequality' && data.comparatorFlipped) {
+            html += '<div class="status error math-domain-panel math-inequality-panel">'
+                + '<strong>⚠️ Vergleichszeichen wurde gedreht.</strong> '
+                + 'Multiplikation/Division mit einem negativen Faktor dreht '
+                + 'das Vergleichszeichen um.</div>';
+        }
+        if (data.id === 'math-derivative') {
+            const card = steps.map((s) => derivativeRuleLabel(s.ruleId || ''))
+                .find((c) => c);
+            if (card) {
+                html += '<div class="math-domain-panel math-derivative-panel">'
+                    + '<h4>Angewandte Regel: ' + escapeHtml(card.title) + '</h4>'
+                    + '<p>' + escapeHtml(card.body) + '</p></div>';
+            }
+        }
+        if (data.id === 'math-matrix') {
+            const inputLatex = data.inputLatex || '';
+            const resultLatex = data.resultLatex || '';
+            if (inputLatex || resultLatex) {
+                html += '<div class="math-domain-panel math-matrix-panel">'
+                    + '<h4>Matrix-Vorschau (bmatrix)</h4>'
+                    + '<div class="latex">$' + escapeHtml(inputLatex) + '$</div>'
+                    + '<div class="hint">→</div>'
+                    + '<div class="latex">$' + escapeHtml(resultLatex) + '$</div>'
+                    + '</div>';
+            }
+        }
+        return html;
+    }
+
+    /**
+     * "Proof prüfen" button for math-domain demos. It POSTs the selected
+     * path's first→last expressions to /api/proof-bridge and renders the
+     * full execution result (prover status, stdout, stderr, exit code, generated script).
+     */
+    function renderProofBridgePanel(data) {
+        if (!data || typeof data.id !== 'string' || !data.id.startsWith('math-')) {
+            return '';
+        }
+        const selected = data.selectedPath || data.bestPath || {};
+        const left = selected.originalExpression || data.expression || '';
+        const right = selected.improvedExpression || '';
+        if (!left || !right) {
+            return '';
+        }
+        return '<div class="proof-bridge-panel">'
+            + '<h4>Proof-Bridge</h4>'
+            + '<p class="hint">Generiert ein Lean-/SMT-Skript und führt es aus, '
+            + 'sofern ein Prover installiert ist. <strong>FORMALLY_PROVED</strong> '
+            + 'wird ausschließlich gesetzt, wenn der Prover erfolgreich war.</p>'
+            + '<button id="proofBridgeRun" class="primary" '
+            + 'data-left="' + escapeHtml(left) + '" '
+            + 'data-right="' + escapeHtml(right) + '">Proof prüfen</button>'
+            + '<div id="proofBridgeResult"></div>'
+            + '</div>';
+    }
+
+    function wireProofBridgeButton(data) {
+        const btn = document.getElementById('proofBridgeRun');
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+            const target = document.getElementById('proofBridgeResult');
+            const left = btn.dataset.left || '';
+            const right = btn.dataset.right || '';
+            btn.disabled = true;
+            target.innerHTML = '<div class="hint">Prover wird aufgerufen …</div>';
+            try {
+                const assumptions = (data.assumptions || []).map((a) => String(a));
+                const response = await fetch('/api/proof-bridge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        leftPattern: left,
+                        rightPattern: right,
+                        assumptions: assumptions,
+                        tool: 'lean4'
+                    })
+                });
+                const raw = await response.text();
+                if (!response.ok) {
+                    target.innerHTML = '<div class="status error">HTTP '
+                        + response.status + ': ' + escapeHtml(raw) + '</div>';
+                    return;
+                }
+                const result = JSON.parse(raw);
+                const formallyProved = result.proofStatus === 'FORMALLY_PROVED';
+                const statusClass = formallyProved ? 'ok'
+                    : (result.proverStatus === 'PROVER_FAILED' ? 'error' : 'warn');
+                target.innerHTML = '<div class="status ' + statusClass + ' proof-bridge-summary">'
+                    + '<strong>Proof-Status:</strong> '
+                    + escapeHtml(result.proofStatus || '–')
+                    + ' · <strong>Prover-Status:</strong> '
+                    + escapeHtml(result.proverStatus || '–')
+                    + ' · <strong>Exit-Code:</strong> '
+                    + (result.exitCode != null ? result.exitCode : '–')
+                    + ' · <strong>Laufzeit:</strong> '
+                    + (result.elapsedMillis != null ? result.elapsedMillis + ' ms' : '–')
+                    + '</div>'
+                    + (result.stdout ? '<details open><summary>stdout</summary>'
+                        + '<pre>' + escapeHtml(result.stdout) + '</pre></details>' : '')
+                    + (result.stderr ? '<details><summary>stderr</summary>'
+                        + '<pre>' + escapeHtml(result.stderr) + '</pre></details>' : '')
+                    + (result.artifact ? '<details><summary>generiertes Skript ('
+                        + escapeHtml(result.artifactTool || result.tool || '')
+                        + ')</summary><pre>' + escapeHtml(result.artifact)
+                        + '</pre></details>' : '');
+            } catch (ex) {
+                target.innerHTML = '<div class="status error">Netzwerkfehler: '
+                    + escapeHtml(String(ex)) + '</div>';
+            } finally {
+                btn.disabled = false;
+            }
+        });
     }
 
     /* ─── Proof-status legend (loaded lazily, cached) ─── */
@@ -580,12 +724,42 @@
                 host.innerHTML = '<div class="hint">Keine Benchmark-Szenarien gefunden.</div>';
                 return;
             }
-            host.innerHTML = scenarios.map(renderBenchmarkScenario).join('')
+            host.innerHTML = renderBenchmarkGroups(scenarios)
                 + '<p class="hint">Gesamtlaufzeit: ' + (data.elapsedMillis || 0) + ' ms</p>';
         } catch (ex) {
             host.innerHTML = '<div class="status error">Netzwerkfehler: ' + ex + '</div>';
         }
     }
+    /**
+     * Groups raw benchmark scenarios into the five UI categories Algebra /
+     * Gleichungen / Ungleichungen / Analysis / Lineare Algebra so the
+     * dashboard shows them as labelled sections.
+     */
+    function renderBenchmarkGroups(scenarios) {
+        const groups = [
+            { label: 'Algebra', match: (n) => ['known-identities',
+                'polynomial-simplification', 'rational-simplification',
+                'search-explosion'].indexOf(n) >= 0, items: [] },
+            { label: 'Gleichungen', match: (n) => n === 'equations', items: [] },
+            { label: 'Ungleichungen', match: (n) => n === 'inequalities', items: [] },
+            { label: 'Analysis', match: (n) => n === 'calculus', items: [] },
+            { label: 'Lineare Algebra', match: (n) => n === 'linear-algebra', items: [] },
+            { label: 'Sonstige', match: () => true, items: [] }
+        ];
+        scenarios.forEach((sc) => {
+            for (const g of groups) {
+                if (g.match(sc.name || '')) { g.items.push(sc); break; }
+            }
+        });
+        return groups
+            .filter((g) => g.items.length > 0)
+            .map((g) => '<section class="benchmark-group">'
+                + '<h3 class="benchmark-group-title">' + escapeHtml(g.label) + '</h3>'
+                + g.items.map(renderBenchmarkScenario).join('')
+                + '</section>')
+            .join('');
+    }
+
     function renderBenchmarkScenario(scenario) {
         const rows = (scenario.results || []).map((r) => {
             const foundLabel = r.found
@@ -679,6 +853,9 @@
             return;
         }
         const step = replayState.steps[replayState.index];
+        const ruleId = step.ruleId || '';
+        // Math-domain-specific extras for the four PR-#13 demos.
+        const extras = renderReplayDomainExtras(step, ruleId);
         canvas.innerHTML = '<div class="replay-step">'
             + '<div class="replay-step-index">Schritt ' + (step.stepIndex + 1)
             + ' / ' + replayState.steps.length + '</div>'
@@ -689,12 +866,86 @@
             + '<code>' + escapeHtml(step.toExpression) + '</code><br>'
             + '<span class="latex">$' + escapeHtml(step.toLatex) + '$</span></div>'
             + '<div class="replay-rule"><strong>Regel:</strong> <code>'
-            + escapeHtml(step.ruleId) + '</code></div>'
+            + escapeHtml(ruleId) + '</code></div>'
+            + extras
             + '<div class="replay-explanation"><pre>'
             + escapeHtml(step.ruleExplanation || '') + '</pre></div>'
             + '<div class="hint">Δ Komplexität: ' + step.scoreDelta
             + ' · Äquivalenzerhaltend: ' + step.equivalencePreserving + '</div>'
             + '</div>';
+    }
+
+    /**
+     * Domain-specific replay decorations:
+     *  - inequality_* steps that flip the comparator show a red "Vergleichszeichen gedreht" Hinweis,
+     *  - calculus_* steps render a Regelkarte (Potenzregel/Summenregel/Produktregel),
+     *  - linalg_/matrix_/vector_ steps show a bmatrix preview block.
+     */
+    function renderReplayDomainExtras(step, ruleId) {
+        const out = [];
+        const flipping = ruleId === 'inequality_multiply_both_sides'
+            || ruleId === 'inequality_divide_both_sides';
+        const flipped = step.comparatorFlipped === true
+            || (flipping && /(<|>)/.test(String(step.fromExpression || ''))
+                && /(<|>)/.test(String(step.toExpression || '')));
+        if (flipping && flipped) {
+            out.push('<div class="status error replay-flip-notice">'
+                + '<strong>⚠️ Vergleichszeichen wurde gedreht.</strong> '
+                + 'Multiplikation/Division mit einem negativen Faktor dreht das '
+                + 'Vergleichszeichen um.</div>');
+        }
+        if (ruleId.startsWith('calculus_')) {
+            const label = derivativeRuleLabel(ruleId);
+            if (label) {
+                out.push('<div class="replay-rule-card replay-derivative-card">'
+                    + '<strong>' + escapeHtml(label.title) + '</strong>'
+                    + '<div class="rule-card-body">' + escapeHtml(label.body) + '</div>'
+                    + '</div>');
+            }
+        }
+        if (ruleId.startsWith('linalg_') || ruleId.startsWith('matrix_')
+            || ruleId.startsWith('vector_')) {
+            // The backend already emits LaTeX with \begin{bmatrix} for matrix
+            // literals, but for the replay overlay we additionally tag the
+            // block so the CSS picks up the matrix theme.
+            const before = step.fromLatex || step.fromExpression || '';
+            const after = step.toLatex || step.toExpression || '';
+            out.push('<div class="replay-rule-card replay-matrix-card">'
+                + '<strong>Matrix/Vektor</strong>'
+                + '<div class="rule-card-body">$' + escapeHtml(before) + '$ → $'
+                + escapeHtml(after) + '$</div>'
+                + '</div>');
+        }
+        return out.join('');
+    }
+
+    function derivativeRuleLabel(ruleId) {
+        switch (ruleId) {
+            case 'calculus_diff_power_rule':
+                return { title: 'Potenzregel',
+                    body: 'd/dx xⁿ = n·xⁿ⁻¹' };
+            case 'calculus_diff_of_sum':
+                return { title: 'Summenregel',
+                    body: 'd/dx (f + g) = f′ + g′' };
+            case 'calculus_diff_of_difference':
+                return { title: 'Differenzregel',
+                    body: 'd/dx (f − g) = f′ − g′' };
+            case 'calculus_diff_of_product':
+                return { title: 'Produktregel',
+                    body: 'd/dx (f · g) = f′·g + f·g′' };
+            case 'calculus_diff_of_constant':
+                return { title: 'Konstantenregel',
+                    body: 'd/dx c = 0' };
+            case 'calculus_diff_of_variable':
+                return { title: 'Identitätsregel',
+                    body: 'd/dx x = 1' };
+            default:
+                if (ruleId.startsWith('calculus_diff_of_')) {
+                    return { title: 'Ableitungsregel',
+                        body: 'Standardableitung der Elementarfunktion' };
+                }
+                return null;
+        }
     }
     function escapeHtml(value) {
         if (value == null) return '';
