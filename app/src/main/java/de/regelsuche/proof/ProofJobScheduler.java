@@ -1,0 +1,291 @@
+package de.regelsuche.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.mining.RuleCandidate;
+import de.regelsuche.mining.RuleStatus;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ * Schedules and executes {@link ProofJob}s asynchronously.
+ *
+ * <p>The scheduler maintains a persistent {@link ProofJobRepository}, dispatches
+ * jobs to a {@link ProofWorker}, handles retries with configurable back-off,
+ * enforces a per-job timeout, supports cancellation, and updates the
+ * {@link RuleInventoryRepository} when a rule is formally proved.</p>
+ *
+ * <h3>Usage</h3>
+ * <pre>{@code
+ * ProofJobScheduler scheduler = new ProofJobScheduler(
+ *     worker, jobRepository, proofCache, inventoryRepository);
+ * scheduler.start();
+ *
+ * // Submit a job (returns immediately)
+ * String jobId = scheduler.submit(candidate, assumptions, priority);
+ *
+ * // Cancel a queued or running job
+ * scheduler.cancel(jobId);
+ *
+ * // Shutdown gracefully
+ * scheduler.close();
+ * }</pre>
+ *
+ * <p>The scheduler polls the repository for pending work every
+ * {@link #POLL_INTERVAL_MS} milliseconds.  This keeps the design
+ * self-contained without requiring an event-driven broker.</p>
+ */
+public final class ProofJobScheduler implements AutoCloseable {
+
+    private static final long POLL_INTERVAL_MS = 500L;
+    private static final long DEFAULT_JOB_TIMEOUT_MS = 30_000L;
+
+    private final ProofWorker worker;
+    private final ProofJobRepository jobRepository;
+    private final ProofCache proofCache;
+    private final RuleInventoryRepository inventoryRepository;
+    private final long jobTimeoutMillis;
+
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
+        r -> {
+            Thread t = new Thread(r, "proof-job-scheduler");
+            t.setDaemon(true);
+            return t;
+        });
+
+    /** Running futures keyed by job id — for cancellation. */
+    private final Map<String, Future<?>> runningFutures = new ConcurrentHashMap<>();
+
+    /** Job ids that have been explicitly cancelled by the caller. */
+    private final Set<String> cancelRequests = ConcurrentHashMap.newKeySet();
+
+    public ProofJobScheduler(
+        ProofWorker worker,
+        ProofJobRepository jobRepository,
+        ProofCache proofCache,
+        RuleInventoryRepository inventoryRepository
+    ) {
+        this(worker, jobRepository, proofCache, inventoryRepository,
+            Duration.ofMillis(DEFAULT_JOB_TIMEOUT_MS));
+    }
+
+    public ProofJobScheduler(
+        ProofWorker worker,
+        ProofJobRepository jobRepository,
+        ProofCache proofCache,
+        RuleInventoryRepository inventoryRepository,
+        Duration jobTimeout
+    ) {
+        this.worker = worker;
+        this.jobRepository = jobRepository;
+        this.proofCache = proofCache;
+        this.inventoryRepository = inventoryRepository;
+        this.jobTimeoutMillis = Math.max(100L, jobTimeout.toMillis());
+    }
+
+    /**
+     * Start the scheduler's polling loop.  Must be called before
+     * {@link #submit}.
+     */
+    public void start() {
+        scheduler.scheduleWithFixedDelay(
+            this::processPending,
+            0L,
+            POLL_INTERVAL_MS,
+            TimeUnit.MILLISECONDS
+        );
+    }
+
+    /**
+     * Submit a new proof job for the given candidate.
+     *
+     * @param candidate   the rule to prove
+     * @param assumptions side conditions
+     * @param priority    lower value = higher priority (0 = most urgent)
+     * @return the new job id
+     */
+    public String submit(RuleCandidate candidate, List<Assumption> assumptions, int priority) {
+        String id = UUID.randomUUID().toString();
+        ProofJob job = new ProofJob(
+            id,
+            candidate.leftPattern(),
+            candidate.rightPattern(),
+            assumptions,
+            priority,
+            worker.workerId()
+        );
+        jobRepository.save(job);
+        return id;
+    }
+
+    /**
+     * Request cancellation of a job.  If the job is QUEUED it is cancelled
+     * immediately; if it is RUNNING the running future is interrupted.
+     *
+     * @param jobId job to cancel
+     * @return the updated job snapshot, or empty if not found
+     */
+    public Optional<ProofJob> cancel(String jobId) {
+        Optional<ProofJob> found = jobRepository.findById(jobId);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+        ProofJob job = found.get();
+        if (job.status().isTerminal()) {
+            return Optional.of(job);
+        }
+        cancelRequests.add(jobId);
+        // Interrupt a running future if present
+        Future<?> future = runningFutures.get(jobId);
+        if (future != null) {
+            future.cancel(true);
+        }
+        ProofJob cancelled = job.withStatus(ProofJobStatus.CANCELLED);
+        jobRepository.save(cancelled);
+        return Optional.of(cancelled);
+    }
+
+    /**
+     * @return a snapshot of the job with {@code id}, if present.
+     */
+    public Optional<ProofJob> get(String jobId) {
+        return jobRepository.findById(jobId);
+    }
+
+    // ── internal poll loop ─────────────────────────────────────────────────
+
+    private void processPending() {
+        Optional<ProofJob> next = jobRepository.findNextQueued();
+        if (next.isEmpty()) {
+            return;
+        }
+        ProofJob job = next.get();
+
+        // Honour pending cancellation requests
+        if (cancelRequests.contains(job.id())) {
+            cancelRequests.remove(job.id());
+            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
+            return;
+        }
+
+        // Check proof cache before dispatching
+        ProofCacheKey cacheKey = ProofCacheKey.of(
+            job.leftPattern(), job.rightPattern(), job.assumptions(), worker.workerId());
+        Optional<CandidateProofStatus> cached = proofCache.get(cacheKey);
+        if (cached.isPresent()) {
+            jobRepository.save(job.withDone(cached.get()));
+            return;
+        }
+
+        // Mark as RUNNING
+        jobRepository.save(job.withStatus(ProofJobStatus.RUNNING));
+
+        // Build a minimal RuleCandidate for the worker
+        RuleCandidate candidate = new RuleCandidate(
+            job.leftPattern(),
+            job.rightPattern(),
+            0,
+            0.0,
+            0,
+            false,
+            false,
+            false,
+            List.of(),
+            RuleStatus.NEW,
+            CandidateProofStatus.OBSERVED,
+            ""
+        );
+
+        // Submit to thread pool with timeout
+        Future<ProofWorker.Result> future = Executors.newVirtualThreadPerTaskExecutor()
+            .submit(() -> worker.prove(candidate, job.assumptions()));
+        runningFutures.put(job.id(), future);
+        try {
+            ProofWorker.Result result = future.get(jobTimeoutMillis, TimeUnit.MILLISECONDS);
+            runningFutures.remove(job.id());
+
+            if (cancelRequests.contains(job.id())) {
+                cancelRequests.remove(job.id());
+                jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
+                return;
+            }
+
+            CandidateProofStatus status = result.status();
+            proofCache.put(cacheKey, status);
+            jobRepository.save(job.withDone(status));
+
+            // Update RuleInventory if we have a positive result
+            if (inventoryRepository != null && status.isPositive()) {
+                updateInventory(job, status);
+            }
+
+        } catch (TimeoutException ex) {
+            future.cancel(true);
+            runningFutures.remove(job.id());
+            handleFailure(job, "timeout after " + jobTimeoutMillis + "ms");
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            runningFutures.remove(job.id());
+            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
+        } catch (Exception ex) {
+            runningFutures.remove(job.id());
+            handleFailure(job, ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());
+        }
+    }
+
+    private void handleFailure(ProofJob job, String reason) {
+        if (job.canRetry()) {
+            jobRepository.save(job.withRetry());
+        } else {
+            jobRepository.save(job.withFailed(reason));
+        }
+    }
+
+    private void updateInventory(ProofJob job, CandidateProofStatus status) {
+        inventoryRepository.findAll().stream()
+            .filter(r -> r.leftPattern().equals(job.leftPattern())
+                && r.rightPattern().equals(job.rightPattern()))
+            .findFirst()
+            .ifPresent(rule -> {
+                if (rule.proofStatus().ordinal() < status.ordinal()) {
+                    inventoryRepository.save(new ReusableRule(
+                        rule.id(),
+                        rule.leftPattern(),
+                        rule.rightPattern(),
+                        rule.parameterRelations(),
+                        status,
+                        rule.knownRuleStatus(),
+                        rule.supportingExamples(),
+                        rule.averageImprovement(),
+                        rule.createdAt(),
+                        rule.canonicalHash(),
+                        Instant.now(),
+                        rule.usageCount()
+                    ));
+                }
+            });
+    }
+
+    @Override
+    public void close() {
+        scheduler.shutdownNow();
+        try {
+            scheduler.awaitTermination(2, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
