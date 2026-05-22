@@ -265,15 +265,20 @@ public class WebWorkbenchServer {
         String expression = stringValue(body, "expression", "");
         String typeName = stringValue(body, "type", InputType.TERM.name()).toUpperCase(Locale.ROOT);
         String profileName = stringValue(body, "profile", SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);
+        String goalName = stringValue(body, "goal", "").toUpperCase(Locale.ROOT);
         if (expression.isBlank()) {
             sendStatus(exchange, 400, "expression must not be blank");
             return;
         }
         InputType type;
         SearchProfile profile;
+        de.regelsuche.scoring.cost.TransformationGoal goal;
         try {
             type = InputType.valueOf(typeName);
             profile = SearchProfile.valueOf(profileName);
+            goal = goalName.isBlank()
+                ? profile.defaultGoal()
+                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);
         } catch (IllegalArgumentException ex) {
             sendStatus(exchange, 400, ex.getMessage());
             return;
@@ -290,6 +295,7 @@ public class WebWorkbenchServer {
             JsonWriter writer = new JsonWriter();
             writer.beginObject();
             writer.property("profile", profile.name());
+            writer.property("goal", goal.name());
             writer.property("inputType", type.name());
             writer.property("expression", expression);
             writer.property("successes", search.getSuccesses().size());
@@ -1081,6 +1087,39 @@ public class WebWorkbenchServer {
                 w.endObject();
                 sendJson(exchange, 200, w.toString());
             }
+            case "universal" -> {
+                // Surfaces the top universal patterns + cross-task rule
+                // coverage so the workbench UI can show "the moves that work
+                // everywhere" — see GlobalMemoryService for the scoring rule.
+                de.regelsuche.search.memory.GlobalMemoryService global =
+                    new de.regelsuche.search.memory.GlobalMemoryService(searchMemory.table());
+                java.time.Instant now = java.time.Instant.now();
+                var topPatterns = global.topUniversalPatterns(20, now);
+                java.util.Map<String, Integer> coverage = global.ruleCoverage();
+                w.beginObject();
+                w.property("size", searchMemory.table().size());
+                w.array("patterns", arr -> topPatterns.forEach(entry ->
+                    arr.objectValue(inner -> {
+                        inner.property("canonicalHash", entry.canonicalHash());
+                        inner.property("canonicalExpression", entry.canonicalExpression());
+                        inner.property("universalityScore", global.universalityScore(entry, now));
+                        inner.property("visitCount", entry.visitCount());
+                        inner.property("bestScore", entry.bestScore());
+                        inner.property("minDepthSeen", entry.minDepthSeen());
+                        inner.property("bestKnownPathId", entry.bestKnownPathId());
+                        inner.stringArray("reachedByRuleIds",
+                            new java.util.ArrayList<>(entry.reachedByRuleIds()));
+                        inner.property("firstSeen", entry.firstSeen().toString());
+                        inner.property("lastSeen", entry.lastSeen().toString());
+                    })));
+                w.array("ruleCoverage", arr -> coverage.forEach((ruleId, count) ->
+                    arr.objectValue(inner -> {
+                        inner.property("ruleId", ruleId);
+                        inner.property("coverage", count);
+                    })));
+                w.endObject();
+                sendJson(exchange, 200, w.toString());
+            }
             case "" -> {
                 w.beginObject();
                 w.property("size", searchMemory.table().size());
@@ -1089,6 +1128,7 @@ public class WebWorkbenchServer {
                     l.property("states", "/api/memory/states");
                     l.property("pruning", "/api/memory/pruning");
                     l.property("macros", "/api/memory/macros");
+                    l.property("universal", "/api/memory/universal");
                 });
                 w.endObject();
                 sendJson(exchange, 200, w.toString());

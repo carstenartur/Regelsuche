@@ -81,13 +81,19 @@ Das startet App + Neo4j 5 Community + persistentes Volume und setzt
 * [Getting Started](docs/getting-started.md) — Docker, lokaler Gradle-Lauf,
   wichtige Endpunkte, optionaler Neo4j-Mode.
 * [Architektur](docs/architecture.md) — Module, Datenflüsse, Persistenz.
-* [Such-Intelligenz](docs/search-intelligence-roadmap.md) und
+* [Nutzer-Workflows](docs/user-workflows.md) — Lehrer/Schüler,
+  Forscher, CAS-Vergleich, Proof-Workflow.
+* [Such-Intelligenz](docs/search-intelligence.md) und
   [Equality-Saturation](docs/equality-saturation.md).
 * [Math-Domains](docs/math-domains.md) — semantische Domänen, Replay-Karten,
   Discovery-Tags.
 * [Proof-Bridge](docs/proof-bridge.md) — vom Pfad zum formalen Beweis.
+* [Proof-Workbench](docs/proof-workbench.md) — persistente Jobs, REST,
+  Artefakt-Bundle, Dockerfile.proof.
 * [Macro-Rules](docs/macro-rules.md) — wie das System eigene Regeln lernt.
 * [Testing](docs/testing.md) — Unit-, Browser-E2E- und Doc-Asset-Pipelines.
+* [Developer Guide](docs/developer-guide.md) — Repo-Layout, Build-Kommandos,
+  Konventionen, neue Endpunkte hinzufügen.
 
 Eine Komplett-Übersicht der Dokumentation findet sich unter
 [`docs/`](docs/). Die historische Langfassung dieses README ist

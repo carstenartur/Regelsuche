@@ -403,6 +403,9 @@
             profile: form.profile.value,
             domains: domains
         };
+        if (form.goal && form.goal.value) {
+            payload.goal = form.goal.value;
+        }
         setStatus('Suche läuft …');
         $('searchOutput').textContent = '';
         try {
@@ -1113,17 +1116,20 @@
     }
     async function loadMemory() {
         try {
-            const [statesResp, pruningResp, macrosResp] = await Promise.all([
+            const [statesResp, pruningResp, macrosResp, universalResp] = await Promise.all([
                 fetch('/api/memory/states'),
                 fetch('/api/memory/pruning'),
                 fetch('/api/memory/macros'),
+                fetch('/api/memory/universal'),
             ]);
             const states = await statesResp.json();
             const pruning = await pruningResp.json();
             const macros = await macrosResp.json();
+            const universal = await universalResp.json();
             renderMemoryStates(states);
             renderMemoryPruning(pruning);
             renderMemoryMacros(macros);
+            renderMemoryUniversal(universal);
         } catch (e) {
             console.error('loadMemory failed', e);
         }
@@ -1187,6 +1193,61 @@
                 + ' · enabled: ' + m.enabled + '</div>';
             out.appendChild(div);
         });
+    }
+    function renderMemoryUniversal(data) {
+        const out = $('memoryUniversal');
+        if (out) {
+            out.innerHTML = '';
+            const patterns = (data && data.patterns) || [];
+            if (patterns.length === 0) {
+                out.textContent = 'Noch keine universellen Muster — starte einen DISCOVERY_PLUS-Suchlauf.';
+            } else {
+                patterns.forEach((p) => {
+                    const div = document.createElement('div');
+                    div.className = 'list-item';
+                    const rules = (p.reachedByRuleIds || []).join(', ') || '—';
+                    const pathLink = p.bestKnownPathId
+                        ? ' · best path: <a href="#" data-path="' + p.bestKnownPathId
+                            + '" class="universal-path">' + p.bestKnownPathId + '</a>'
+                        : '';
+                    div.innerHTML =
+                        '<div><strong>' + (p.canonicalExpression || '') + '</strong></div>'
+                        + '<div class="hint">universality: <b>' + p.universalityScore + '</b>'
+                        + ' · visits: ' + p.visitCount
+                        + ' · bestScore: ' + p.bestScore
+                        + ' · depth: ' + p.minDepthSeen + '</div>'
+                        + '<div class="hint">rules: ' + rules + pathLink + '</div>';
+                    out.appendChild(div);
+                });
+                out.querySelectorAll('a.universal-path').forEach((a) => {
+                    a.addEventListener('click', (evt) => {
+                        evt.preventDefault();
+                        // Hand off to the Paths tab so the user can replay the
+                        // supporting transformation directly.
+                        const pathId = a.dataset.path;
+                        if (typeof window !== 'undefined') {
+                            window.location.hash = '#path=' + encodeURIComponent(pathId);
+                        }
+                    });
+                });
+            }
+        }
+        const cov = $('memoryRuleCoverage');
+        if (cov) {
+            cov.innerHTML = '';
+            const coverage = (data && data.ruleCoverage) || [];
+            if (coverage.length === 0) {
+                cov.textContent = 'Keine Coverage-Daten.';
+            } else {
+                coverage.slice(0, 30).forEach((c) => {
+                    const div = document.createElement('div');
+                    div.className = 'list-item';
+                    div.innerHTML = '<span class="badge">' + c.coverage + '</span> '
+                        + '<code>' + c.ruleId + '</code>';
+                    cov.appendChild(div);
+                });
+            }
+        }
     }
 
     /* ─── Auto-load on page open ─── */
