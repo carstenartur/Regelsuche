@@ -222,6 +222,106 @@ footer { text-align: center; padding: 1rem; color: #9ca3af; font-size: 0.8rem; }
 .replay-from, .replay-to, .replay-rule { margin: 0.3rem 0; }
 .replay-explanation pre { background: white; border: 1px solid #e5e7eb; padding: 0.5rem; }
 .replay-canvas code { background: #e0e7ff; padding: 0 0.25rem; border-radius: 3px; }
+.replay-derivation-block {
+    background: #ffffff;
+    border: 1px solid #c7d2fe;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+}
+.replay-derivation-title {
+    font-weight: 600;
+    color: #4338ca;
+    margin-bottom: 0.4rem;
+    font-size: 0.95rem;
+}
+.replay-derivation-math { overflow-x: auto; }
+
+/* ─── Stage 3 — colour-diff highlighting and comparator-flip notice ─── */
+:root {
+    --diff-old: #b91c1c;       /* red 700 */
+    --diff-new: #047857;       /* emerald 700 */
+    --danger:   #dc2626;       /* red 600 */
+}
+.diff-old {
+    color: var(--diff-old);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+.diff-new {
+    color: var(--diff-new);
+    font-weight: 600;
+}
+.replay-flip-notice {
+    border-left: 4px solid var(--danger);
+    padding-left: 0.6rem;
+}
+.replay-derivation-focus {
+    background: linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%);
+    box-shadow: inset 3px 0 0 #6366f1;
+}
+
+/* ─── Stage 4 — KaTeX graph-node HTML overlays ─── */
+.graph-overlay-layer {
+    /* Positioned absolutely over the cytoscape canvas; the canvas is
+     * promoted to `position: relative` by `graphMathOverlay.install()`. */
+    pointer-events: none;
+}
+.graph-node-math {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translate3d(0, 0, 0) translate(-50%, -50%);
+    transition: transform 200ms ease, opacity 200ms ease;
+    background: #ffffff;
+    color: #1f2937;
+    border: 1px solid #c7d2fe;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    pointer-events: auto;
+    white-space: nowrap;
+    z-index: 2;
+}
+.graph-node-math.is-best {
+    border-color: #10b981;
+    background: #ecfdf5;
+    color: #065f46;
+}
+.graph-node-math.is-dead-end {
+    border-color: #9ca3af;
+    background: #f3f4f6;
+    color: #4b5563;
+    opacity: 0.85;
+}
+.graph-edge-math {
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.85);
+    border: none;
+    box-shadow: none;
+    padding: 0 2px;
+}
+
+/* ─── Stage 5 — layout-aware aligned rows ─── */
+.math-aligned-rows {
+    display: grid;
+    grid-auto-rows: minmax(1.6rem, auto);
+    gap: 0.15rem;
+}
+.math-aligned-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.1rem 0.25rem;
+    border-radius: 4px;
+}
+.math-aligned-row:hover {
+    background: #eef2ff;
+}
+.math-aligned-row[data-row-index]:focus-within {
+    outline: 2px solid #6366f1;
+}
 .latex { font-style: italic; color: #4b5563; }
 .graph-inspector { background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; margin-top: 0.5rem; border-radius: 6px; font-size: 0.9rem; }
 table.compare { border-collapse: collapse; width: 100%; margin-bottom: 0.75rem; }
@@ -365,3 +465,9 @@ table.compare thead th { background: #eff6ff; }
 .diff-added { background: #d4edda; color: #155724; padding: 0 2px; border-radius: 2px; }
 .diff-removed { background: #f8d7da; color: #721c24; padding: 0 2px;
   border-radius: 2px; text-decoration: line-through; }
+
+/* KaTeX/MathJax central pipeline */
+.math { display: inline-block; }
+.math-fallback { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }
+.math-fallback code { background: transparent; padding: 0; }

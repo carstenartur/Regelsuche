@@ -31,7 +31,153 @@
     }
     // Fire-and-forget; functions guard on `typeof cytoscape === 'function'`.
     loadCdnScript('https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js');
+    // KaTeX is preferred for math typesetting (fast, App-feel). MathJax is
+    // loaded as a fallback for constructs that KaTeX does not support, and
+    // also as the renderer used by legacy call sites until they are migrated
+    // to the central renderMath(root) pipeline. The KaTeX stylesheet is
+    // injected so the page works without a static <link> in index.html.
+    function loadCdnStylesheet(href) {
+        return new Promise((resolve) => {
+            const l = document.createElement('link');
+            l.rel = 'stylesheet';
+            l.href = href;
+            l.crossOrigin = 'anonymous';
+            l.referrerPolicy = 'no-referrer';
+            l.onload = () => resolve(true);
+            l.onerror = () => resolve(false);
+            document.head.appendChild(l);
+        });
+    }
+    loadCdnStylesheet('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css');
+    loadCdnScript('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js').then((ok) => {
+        if (!ok) { return; }
+        loadCdnScript('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js').then(() => {
+            // Typeset whatever is already on screen once KaTeX is ready.
+            window.renderMath(document.body);
+        });
+    });
     loadCdnScript('https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js');
+
+    /**
+     * Central math typesetter. Walks `root` for nodes carrying inline LaTeX
+     * (`[data-math]`, `.math`, or the legacy `.latex` class) and renders
+     * them via KaTeX when available, falling back to MathJax, and finally
+     * leaving the raw LaTeX visible inside a `<code>` block tagged
+     * `math-fallback` so the formula remains legible without any CDN.
+     *
+     * All UI surfaces (replay, demo summary, search-graph inspector,
+     * matrix preview, hints, proof panel, export preview) must call this
+     * helper instead of invoking MathJax directly so the rendering path
+     * stays uniform.
+     */
+    window.renderMath = function renderMath(root) {
+        if (!root) { return; }
+        const nodes = root.querySelectorAll('[data-math], .math, .latex');        if (typeof window.renderMathInElement === 'function') {
+            try {
+                window.renderMathInElement(root, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\(', right: '\\)', display: false },
+                        { left: '\\[', right: '\\]', display: true }
+                    ],
+                    // Stage 3: enable KaTeX trust mode so the
+                    // `\htmlClass{diff-old|diff-new}{…}` markers emitted
+                    // by `MathPresentation.alignedDerivationLatexWithDiff`
+                    // survive into the rendered DOM as styleable spans.
+                    trust: true,
+                    strict: 'ignore',
+                    throwOnError: false
+                });
+                return;
+            } catch (_) {
+                // fall through to MathJax / plain fallback below
+            }
+        }
+        if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+            window.MathJax.typesetPromise([root]).catch(() => {});
+            return;
+        }
+        // No renderer available — surface the raw LaTeX in a <code> block so
+        // the formula is still legible.
+        nodes.forEach((node) => {
+            if (node.classList.contains('math-fallback')) { return; }
+            const raw = node.getAttribute('data-math') || node.textContent || '';
+            node.innerHTML = '';
+            const code = document.createElement('code');
+            code.textContent = raw;
+            node.appendChild(code);
+            node.classList.add('math-fallback');
+        });
+    };
+
+    /**
+     * Stage 5 — layout-aware math renderer. Prefers the structured
+     * {@code MathLayout} (when present) over the raw LaTeX string so the
+     * front-end can apply CSS-grid-based aligned-row rendering, emit
+     * diff CSS classes as plain DOM attributes (no KaTeX trust mode
+     * required), and inject the AST-derived `aria-label` on the host
+     * element for screen-reader accessibility.
+     *
+     * Falls back to {@link window.renderMath} on the raw LaTeX string
+     * when no layout is available, so all existing call sites keep
+     * working unchanged.
+     */
+    window.renderMathLayout = function renderMathLayout(layout, host) {
+        if (!host) { return; }
+        if (!layout || typeof layout !== 'object') {
+            window.renderMath(host);
+            return;
+        }
+        if (layout.aria) {
+            host.setAttribute('aria-label', String(layout.aria));
+        }
+        const kind = layout.kind || 'INLINE';
+        if (kind === 'ALIGNED' && Array.isArray(layout.nodes)) {
+            // Render each aligned row as a CSS-grid row so the
+            // front-end can attach per-row hover / highlight / diff
+            // styles without LaTeX surgery. The plain LaTeX fallback
+            // for the whole block is still available via the layout's
+            // `toLatex()` server-side counterpart.
+            host.classList.add('math-aligned-rows');
+            host.innerHTML = '';
+            layout.nodes.forEach((row, idx) => {
+                if (!row || row.kind !== 'ALIGNED_ROW') { return; }
+                const rowEl = document.createElement('div');
+                rowEl.className = 'math-aligned-row';
+                rowEl.setAttribute('data-row-index', String(idx));
+                (row.children || []).forEach((child) => {
+                    if (!child) { return; }
+                    const span = document.createElement('span');
+                    if (child.attributes && child.attributes.class) {
+                        span.className = child.attributes.class;
+                    }
+                    const text = child.text || '';
+                    let mathStr;
+                    if (child.kind === 'ARROW_LABEL') {
+                        mathStr = text
+                            ? '$\\xrightarrow{' + text + '}$'
+                            : '$\\rightarrow$';
+                    } else {
+                        mathStr = '$' + text + '$';
+                    }
+                    span.setAttribute('data-math', mathStr);
+                    span.textContent = mathStr;
+                    rowEl.appendChild(span);
+                });
+                host.appendChild(rowEl);
+            });
+            window.renderMath(host);
+            return;
+        }
+        // INLINE / DISPLAY: render the concatenated fragment string via
+        // the existing KaTeX pipeline.
+        const text = (layout.nodes || []).map((n) => n && n.text ? n.text : '').join('');
+        const wrapped = kind === 'DISPLAY' ? ('$$' + text + '$$') : ('$' + text + '$');
+        host.setAttribute('data-math', wrapped);
+        host.textContent = wrapped;
+        window.renderMath(host);
+    };
 
     const $ = (id) => document.getElementById(id);
     const setStatus = (msg, level = '') => {
@@ -225,6 +371,7 @@
             + idList
             + '<div class="demo-actions">' + linkList + '</div>';
         wireProofBridgeButton(data);
+        window.renderMath($('demoSummary'));
     }
 
     /**
@@ -274,9 +421,9 @@
             if (inputLatex || resultLatex) {
                 html += '<div class="math-domain-panel math-matrix-panel">'
                     + '<h4>Matrix-Vorschau (bmatrix)</h4>'
-                    + '<div class="latex">$' + escapeHtml(inputLatex) + '$</div>'
+                    + '<div class="math" data-math="$' + escapeHtml(inputLatex) + '$">$' + escapeHtml(inputLatex) + '$</div>'
                     + '<div class="hint">→</div>'
-                    + '<div class="latex">$' + escapeHtml(resultLatex) + '$</div>'
+                    + '<div class="math" data-math="$' + escapeHtml(resultLatex) + '$">$' + escapeHtml(resultLatex) + '$</div>'
                     + '</div>';
             }
         }
@@ -549,7 +696,12 @@
             container: canvas,
             elements: elements,
             style: [
-                { selector: 'node', style: { 'label': 'data(label)', 'font-size': 10, 'background-color': '#3b82f6', 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center' } },
+                // Stage 4: node labels are rendered as KaTeX HTML overlays
+                // (see graphMathOverlay) so the in-canvas label is hidden
+                // by setting its color to transparent. We still keep the
+                // text-content available for screen readers via the
+                // overlay's aria-label.
+                { selector: 'node', style: { 'label': '', 'font-size': 10, 'background-color': '#3b82f6', 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center' } },
                 { selector: 'node[?payload.isBest]', style: { 'background-color': '#10b981' } },
                 { selector: 'node[?payload.isDeadEnd]', style: { 'background-color': '#9ca3af' } },
                 { selector: 'edge', style: { 'label': 'data(label)', 'font-size': 8, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle' } }
@@ -558,11 +710,144 @@
         });
         cy.on('tap', 'node', evt => showInspector(evt.target.data('payload')));
         cy.on('tap', 'edge', evt => showInspector(evt.target.data('payload')));
+        // Stage 4: expose for browser tests; harmless in production.
+        window.__cyForTests = cy;
+        // Stage 4: install the KaTeX HTML-overlay layer over the cy
+        // canvas. The overlay re-projects each node's bounding box back
+        // to container coordinates on layoutstop / pan / zoom / position
+        // so the math nodes track the underlying Cytoscape positions
+        // smoothly via CSS transitions.
+        graphMathOverlay.install(cy, canvas);
         if (inspector) {
             inspector.style.display = 'block';
             inspector.innerHTML = '<em>Klicke auf einen Knoten oder eine Kante, um Details anzuzeigen.</em>';
         }
     }
+
+    /**
+     * Stage 4 — KaTeX graph-node HTML overlays. Renders each Cytoscape
+     * node's expression (via `payload.expressionLatex`) as an absolutely
+     * positioned `.graph-node-math` div inside a `.graph-overlay-layer`
+     * wrapper that sits over the canvas. The overlay layer is repositioned
+     * after `layoutstop` / `pan` / `zoom` / `position` events using each
+     * node's rendered bounding box, and CSS transitions keep the motion
+     * smooth.
+     *
+     * Optionally also projects edge `ruleLatex` captions as midpoint
+     * labels when the canvas carries `data-graph-math-edges` (so we can
+     * ship nodes-only first if the layout layer needs tuning).
+     */
+    const graphMathOverlay = (() => {
+        function ensureLayer(canvas) {
+            let layer = canvas.querySelector('.graph-overlay-layer');
+            if (!layer) {
+                layer = document.createElement('div');
+                layer.className = 'graph-overlay-layer';
+                layer.style.position = 'absolute';
+                layer.style.left = '0';
+                layer.style.top = '0';
+                layer.style.right = '0';
+                layer.style.bottom = '0';
+                layer.style.pointerEvents = 'none';
+                // The canvas itself must be a positioning context.
+                const computed = window.getComputedStyle(canvas).position;
+                if (computed === 'static') {
+                    canvas.style.position = 'relative';
+                }
+                canvas.appendChild(layer);
+            }
+            return layer;
+        }
+        function projectNode(node) {
+            // Returns the rendered bounding box of `node` in the
+            // container's coordinate system. Cytoscape's
+            // `renderedBoundingBox()` is already in container px after
+            // pan/zoom, so no extra math is needed.
+            const bb = node.renderedBoundingBox({ includeLabels: false });
+            return { x: bb.x1, y: bb.y1, w: bb.w, h: bb.h };
+        }
+        function syncOverlays(cy, layer) {
+            const showEdges = layer.parentElement
+                && layer.parentElement.hasAttribute('data-graph-math-edges');
+            const nodeIds = new Set();
+            cy.nodes().forEach((node) => {
+                const id = node.id();
+                nodeIds.add(id);
+                let host = layer.querySelector('[data-node-id="' + cssEscape(id) + '"]');
+                const payload = node.data('payload') || {};
+                const latex = payload.expressionLatex
+                    || payload.latex
+                    || payload.expression
+                    || id;
+                if (!host) {
+                    host = document.createElement('div');
+                    host.className = 'graph-node-math';
+                    host.setAttribute('data-node-id', id);
+                    host.setAttribute('data-math', '$' + latex + '$');
+                    host.textContent = '$' + latex + '$';
+                    if (payload.expression) {
+                        host.setAttribute('aria-label', String(payload.expression));
+                    }
+                    layer.appendChild(host);
+                }
+                if (payload.isBest) { host.classList.add('is-best'); } else { host.classList.remove('is-best'); }
+                if (payload.isDeadEnd) { host.classList.add('is-dead-end'); } else { host.classList.remove('is-dead-end'); }
+                const box = projectNode(node);
+                // Use translate3d so the GPU compositor can animate the
+                // CSS transition smoothly; the matching `.graph-node-math`
+                // CSS rule defines `transition: transform 200ms ease`.
+                host.style.transform = 'translate3d(' + (box.x + box.w / 2) + 'px,'
+                    + (box.y + box.h / 2) + 'px, 0) translate(-50%, -50%)';
+            });
+            // Optional edge captions.
+            if (showEdges) {
+                cy.edges().forEach((edge) => {
+                    const id = 'edge:' + edge.id();
+                    nodeIds.add(id);
+                    let host = layer.querySelector('[data-node-id="' + cssEscape(id) + '"]');
+                    const payload = edge.data('payload') || {};
+                    const latex = payload.ruleLatex || payload.ruleId || '';
+                    if (!latex) { return; }
+                    if (!host) {
+                        host = document.createElement('div');
+                        host.className = 'graph-node-math graph-edge-math';
+                        host.setAttribute('data-node-id', id);
+                        host.setAttribute('data-math', '$' + latex + '$');
+                        host.textContent = '$' + latex + '$';
+                        layer.appendChild(host);
+                    }
+                    const bb = edge.renderedBoundingBox();
+                    const cx = (bb.x1 + bb.x2) / 2;
+                    const cy2 = (bb.y1 + bb.y2) / 2;
+                    host.style.transform = 'translate3d(' + cx + 'px,' + cy2 + 'px, 0) translate(-50%, -50%)';
+                });
+            }
+            // Garbage-collect overlays for removed elements.
+            layer.querySelectorAll('[data-node-id]').forEach((host) => {
+                if (!nodeIds.has(host.getAttribute('data-node-id'))) {
+                    host.remove();
+                }
+            });
+            // Route every freshly added/updated math host through the
+            // central renderMath() pipeline so KaTeX takes over.
+            window.renderMath(layer);
+        }
+        function cssEscape(value) {
+            if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+                return CSS.escape(value);
+            }
+            return String(value).replace(/[^a-zA-Z0-9_-]/g, (c) => '\\' + c);
+        }
+        function install(cy, canvas) {
+            const layer = ensureLayer(canvas);
+            // Initial sync; subsequent updates are wired to Cytoscape
+            // events so the overlay stays aligned with the canvas.
+            const sync = () => syncOverlays(cy, layer);
+            cy.on('layoutstop pan zoom position', sync);
+            cy.ready(sync);
+        }
+        return { install, syncOverlays, ensureLayer };
+    })();
 
     function showInspector(payload) {
         const inspector = $('graphInspector');
@@ -570,10 +855,10 @@
         const rows = Object.entries(payload || {}).map(([k, v]) =>
             `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}</div>`);
         inspector.innerHTML = rows.join('');
-        if (payload && payload.latex && window.MathJax && window.MathJax.typesetPromise) {
-            inspector.innerHTML += '<div class="latex">$' + payload.latex + '$</div>';
-            window.MathJax.typesetPromise([inspector]).catch(() => {});
+        if (payload && payload.latex) {
+            inspector.innerHTML += '<div class="math" data-math="$' + escapeHtml(payload.latex) + '$">$' + escapeHtml(payload.latex) + '$</div>';
         }
+        window.renderMath(inspector);
     }
 
     /* ─── Compare tab ─── */
@@ -837,7 +1122,7 @@
     }
 
     /* ─── Replay tab ─── */
-    let replayState = { steps: [], index: 0, timer: null };
+    let replayState = { steps: [], index: 0, timer: null, alignedDerivationLatex: '' };
     if ($('replayLoad')) {
         $('replayLoad').addEventListener('click', loadReplay);
         $('replayPrev').addEventListener('click', () => { stopReplay(); stepReplay(-1); });
@@ -887,6 +1172,8 @@
             const response = await fetch('/api/paths/' + encodeURIComponent(pathId) + '/replay');
             const data = await response.json();
             replayState.steps = data.steps || [];
+            replayState.alignedDerivationLatex = data.alignedDerivationLatex || '';
+            replayState.alignedDerivationLatexWithDiff = data.alignedDerivationLatexWithDiff || '';
             replayState.index = 0;
             renderReplayStep();
         } catch (ex) {
@@ -904,15 +1191,33 @@
         const ruleId = step.ruleId || '';
         // Math-domain-specific extras for the four PR-#13 demos.
         const extras = renderReplayDomainExtras(step, ruleId);
-        canvas.innerHTML = '<div class="replay-step">'
+        // Stage 3: prefer the diff-annotated derivation block when the
+        // backend provides it (alignedDerivationLatexWithDiff) so changed
+        // tokens are colour-coded inline. Falls back to the plain block.
+        const derivationBlock = renderAlignedDerivationBlock(
+            replayState.alignedDerivationLatexWithDiff
+                || replayState.alignedDerivationLatex,
+            replayState.index);
+        // Per-step: wrap changed spans in the from/to LaTeX in
+        // \htmlClass{diff-old|diff-new}{…} so the per-step view shows
+        // the same colour-diff highlight inline. KaTeX trust mode is
+        // already enabled in renderMath().
+        const fromDiff = wrapDiffLatex(step.fromLatex || '',
+            step.changedFromSpans, 'diff-old');
+        const toDiff = wrapDiffLatex(step.toLatex || '',
+            step.changedToSpans, 'diff-new');
+        const fromInline = '$' + fromDiff + '$';
+        const toInline = '$' + toDiff + '$';
+        canvas.innerHTML = derivationBlock
+            + '<div class="replay-step">'
             + '<div class="replay-step-index">Schritt ' + (step.stepIndex + 1)
             + ' / ' + replayState.steps.length + '</div>'
             + '<div class="replay-from"><strong>Vorher:</strong> '
             + '<code>' + escapeHtml(step.fromExpression) + '</code><br>'
-            + '<span class="latex">$' + escapeHtml(step.fromLatex) + '$</span></div>'
+            + '<span class="math" data-math="' + escapeHtml(fromInline) + '">' + escapeHtml(fromInline) + '</span></div>'
             + '<div class="replay-to"><strong>Nachher:</strong> '
             + '<code>' + escapeHtml(step.toExpression) + '</code><br>'
-            + '<span class="latex">$' + escapeHtml(step.toLatex) + '$</span></div>'
+            + '<span class="math" data-math="' + escapeHtml(toInline) + '">' + escapeHtml(toInline) + '</span></div>'
             + '<div class="replay-rule"><strong>Regel:</strong> <code>'
             + escapeHtml(ruleId) + '</code></div>'
             + extras
@@ -921,6 +1226,68 @@
             + '<div class="hint">Δ Komplexität: ' + step.scoreDelta
             + ' · Äquivalenzerhaltend: ' + step.equivalencePreserving + '</div>'
             + '</div>';
+        window.renderMath(canvas);
+    }
+
+    /**
+     * Stage 3 — wraps the given `[start, length]` character spans of
+     * `latex` in `\htmlClass{<cssClass>}{…}` so KaTeX (with trust mode)
+     * surfaces them as colour-diff highlights in the rendered DOM.
+     * Mirrors `MathPresentation.wrapDiff(...)` on the server side so the
+     * per-step inline view matches the aligned-derivation block.
+     */
+    function wrapDiffLatex(latex, spans, cssClass) {
+        if (!latex || !spans || !spans.length) { return latex || ''; }
+        const norm = [];
+        for (const span of spans) {
+            if (!span || span.length < 2) { continue; }
+            const start = Math.max(0, span[0] | 0);
+            const end = Math.min(latex.length, start + (span[1] | 0));
+            if (end <= start) { continue; }
+            norm.push([start, end]);
+        }
+        if (!norm.length) { return latex; }
+        norm.sort((a, b) => a[0] - b[0]);
+        const merged = [norm[0].slice()];
+        for (let i = 1; i < norm.length; i++) {
+            const last = merged[merged.length - 1];
+            if (norm[i][0] <= last[1]) {
+                last[1] = Math.max(last[1], norm[i][1]);
+            } else {
+                merged.push(norm[i].slice());
+            }
+        }
+        let out = '';
+        let cursor = 0;
+        for (const [s, e] of merged) {
+            if (s > cursor) { out += latex.substring(cursor, s); }
+            out += '\\htmlClass{' + cssClass + '}{' + latex.substring(s, e) + '}';
+            cursor = e;
+        }
+        if (cursor < latex.length) { out += latex.substring(cursor); }
+        return out;
+    }
+
+    /**
+     * Stage 2: render the whole derivation as one `\begin{aligned}` block
+     * with a highlighted row for the currently focused step. The block is
+     * provided by the backend (PathReplayDto.alignedDerivationLatex) so
+     * the same rule-arrow style is reused across server-rendered
+     * exports and the interactive UI.
+     */
+    function renderAlignedDerivationBlock(latex, focusIndex) {
+        if (!latex) return '';
+        const display = '$$' + latex + '$$';
+        // Stage 3: focused step gets a row-highlight class on the wrapper
+        // so the CSS can scope the .replay-derivation-focus accent rule
+        // (KaTeX renders the aligned block as a single math node, so the
+        // class lives on the wrapper rather than per-row).
+        return '<div class="replay-derivation-block replay-derivation-focus" data-focus-step="' + focusIndex + '">'
+            + '<div class="replay-derivation-title">Rechenweg</div>'
+            + '<div class="math replay-derivation-math" data-math="' + escapeHtml(display) + '">'
+            + escapeHtml(display)
+            + '</div>'
+            + '</div>';
     }
 
     /**
@@ -928,15 +1295,16 @@
      *  - inequality_* steps that flip the comparator show a red "Vergleichszeichen gedreht" Hinweis,
      *  - calculus_* steps render a Regelkarte (Potenzregel/Summenregel/Produktregel),
      *  - linalg_/matrix_/vector_ steps show a bmatrix preview block.
+     *
+     * Stage 3: the comparator-flip detection is driven exclusively by the
+     * server-side `step.comparatorFlipped` flag emitted by
+     * `PathReplayDto.from(...)`. The legacy JS heuristic
+     * (rule id + ascii-comparator regex) has been removed so the JS and
+     * codec agree on the flag.
      */
     function renderReplayDomainExtras(step, ruleId) {
         const out = [];
-        const flipping = ruleId === 'inequality_multiply_both_sides'
-            || ruleId === 'inequality_divide_both_sides';
-        const flipped = step.comparatorFlipped === true
-            || (flipping && /(<|>)/.test(String(step.fromExpression || ''))
-                && /(<|>)/.test(String(step.toExpression || '')));
-        if (flipping && flipped) {
+        if (step.comparatorFlipped === true) {
             out.push('<div class="status error replay-flip-notice">'
                 + '<strong>⚠️ Vergleichszeichen wurde gedreht.</strong> '
                 + 'Multiplikation/Division mit einem negativen Faktor dreht das '

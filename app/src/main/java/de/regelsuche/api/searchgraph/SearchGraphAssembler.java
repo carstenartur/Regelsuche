@@ -143,7 +143,9 @@ public final class SearchGraphAssembler {
                 isBest,
                 isDeadEnd,
                 status,
-                clusterId
+                clusterId,
+                de.regelsuche.api.searchgraph.SearchExpression.classify(expr),
+                de.regelsuche.export.MathPresentation.DEFAULT.latex(expr)
             ));
         }
 

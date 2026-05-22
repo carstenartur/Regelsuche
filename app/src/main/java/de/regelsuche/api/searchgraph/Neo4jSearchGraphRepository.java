@@ -82,6 +82,7 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
             p.put("id", node.id());
             p.put("expression", node.expression());
             p.put("latex", node.latex());
+            p.put("expressionLatex", node.expressionLatex());
             p.put("score", node.score());
             p.put("depth", node.depth());
             p.put("visitedCount", node.visitedCount());
@@ -92,7 +93,8 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
             session.run(
                 "MATCH (r:SearchRun {id: $runId}) "
                     + "MERGE (n:ExpressionNode {runId: $runId, id: $id}) "
-                    + "SET n.expression = $expression, n.latex = $latex, n.score = $score, "
+                    + "SET n.expression = $expression, n.latex = $latex, "
+                    + "n.expressionLatex = $expressionLatex, n.score = $score, "
                     + "n.depth = $depth, n.visitedCount = $visitedCount, n.isBest = $isBest, "
                     + "n.isDeadEnd = $isDeadEnd, n.candidateStatus = $candidateStatus, "
                     + "n.clusterId = $clusterId "

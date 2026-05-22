@@ -76,6 +76,66 @@ class SearchGraphRepositoryTest {
         assertFalse(again.findById("session-a").isPresent());
     }
 
+    @Test
+    void codecRoundTripsStage3ReplayDiffPayload() {
+        // Build a replay step with explicit comparator-flip and diff spans
+        // and assert all three fields survive a JSON round-trip.
+        PathReplayDto.ReplayStep step = new PathReplayDto.ReplayStep(
+            0, "x<3", "x<3", "-x>-3", "-x>-3",
+            "inequality_multiply_both_sides", "expl", -2, true,
+            true,
+            List.of(new int[] { 0, 1 }, new int[] { 2, 1 }),
+            List.of(new int[] { 1, 1 })
+        );
+        PathReplayDto replay = new PathReplayDto("path-flip", List.of(step));
+        Map<String, Integer> rules = new LinkedHashMap<>();
+        SearchGraphStatsDto stats = new SearchGraphStatsDto(
+            0, 0, 0, 0, 0.0, 0, rules, List.of(), 0, 0
+        );
+        SearchGraphRecord record = new SearchGraphRecord(
+            "session-stage3",
+            Instant.parse("2026-02-02T00:00:00Z"),
+            "DISCOVERY",
+            List.of(),
+            new SearchGraphDto(List.of(), List.of(), List.of(), stats),
+            List.of(replay),
+            List.of(),
+            List.of(),
+            Map.of()
+        );
+
+        String json = SearchGraphRecordCodec.toJson(record);
+        SearchGraphRecord parsed = SearchGraphRecordCodec.fromJson(json);
+
+        PathReplayDto.ReplayStep round = parsed.replays().get(0).steps().get(0);
+        assertTrue(round.comparatorFlipped(),
+            "comparatorFlipped must round-trip");
+        assertEquals(2, round.changedFromSpans().size(),
+            "changedFromSpans must round-trip");
+        assertEquals(1, round.changedToSpans().size(),
+            "changedToSpans must round-trip");
+        assertEquals(0, round.changedFromSpans().get(0)[0]);
+        assertEquals(1, round.changedFromSpans().get(0)[1]);
+        assertEquals(2, round.changedFromSpans().get(1)[0]);
+        assertEquals(1, round.changedToSpans().get(0)[0]);
+    }
+
+    @Test
+    void codecRoundTripsExpressionLatexForNodes() {
+        SearchGraphRecord original = sampleRecord("session-stage4");
+        String json = SearchGraphRecordCodec.toJson(original);
+        SearchGraphRecord parsed = SearchGraphRecordCodec.fromJson(json);
+        for (int i = 0; i < original.graph().nodes().size(); i++) {
+            SearchGraphNodeDto in = original.graph().nodes().get(i);
+            SearchGraphNodeDto out = parsed.graph().nodes().get(i);
+            assertNotNull(out.expressionLatex());
+            assertFalse(out.expressionLatex().isBlank(),
+                "expressionLatex must round-trip non-blank for " + in.id());
+            assertEquals(in.expressionLatex(), out.expressionLatex(),
+                "expressionLatex must round-trip via the codec for " + in.id());
+        }
+    }
+
     private static SearchGraphRecord sampleRecord(String id) {
         SearchGraphNodeDto node = new SearchGraphNodeDto(
             "x", "x", "x", 3, 0, 1, false, false,

@@ -21,7 +21,8 @@ public record SearchGraphNodeDto(
     boolean isDeadEnd,
     CandidateProofStatus candidateStatus,
     String clusterId,
-    SearchExpression expressionType
+    SearchExpression expressionType,
+    String expressionLatex
 ) {
     public SearchGraphNodeDto {
         if (id == null || id.isBlank()) {
@@ -34,6 +35,43 @@ public record SearchGraphNodeDto(
         candidateStatus = candidateStatus == null ? CandidateProofStatus.OBSERVED : candidateStatus;
         clusterId = clusterId == null ? "" : clusterId;
         expressionType = expressionType == null ? SearchExpression.classify(expression) : expressionType;
+        // Stage 4: dedicated `expressionLatex` that is always routed
+        // through the central `MathPresentation.latex(...)` pipeline so
+        // the Cytoscape KaTeX overlay layer receives a guaranteed-non-
+        // blank, canonically-rendered LaTeX string per node. Falls back
+        // to the legacy `latex` field (or a fresh `MathPresentation`
+        // render of `expression`) when callers do not set it explicitly.
+        if (expressionLatex == null || expressionLatex.isBlank()) {
+            if (!latex.isBlank()) {
+                expressionLatex = latex;
+            } else {
+                expressionLatex = de.regelsuche.export.MathPresentation.DEFAULT.latex(expression);
+            }
+        }
+    }
+
+    /**
+     * Backwards-compatible constructor used by callers that pre-date
+     * the Stage 4 {@code expressionLatex} field. Routes through the
+     * compact ctor so {@code expressionLatex} is populated from the
+     * existing {@code latex} string (or, failing that, from a fresh
+     * {@code MathPresentation.latex(expression)} render).
+     */
+    public SearchGraphNodeDto(
+        String id,
+        String expression,
+        String latex,
+        int score,
+        int depth,
+        int visitedCount,
+        boolean isBest,
+        boolean isDeadEnd,
+        CandidateProofStatus candidateStatus,
+        String clusterId,
+        SearchExpression expressionType
+    ) {
+        this(id, expression, latex, score, depth, visitedCount, isBest, isDeadEnd,
+            candidateStatus, clusterId, expressionType, null);
     }
 
     /**
@@ -55,6 +93,20 @@ public record SearchGraphNodeDto(
         String clusterId
     ) {
         this(id, expression, latex, score, depth, visitedCount, isBest, isDeadEnd,
-            candidateStatus, clusterId, SearchExpression.classify(expression));
+            candidateStatus, clusterId, SearchExpression.classify(expression), null);
+    }
+
+    /**
+     * Stage 5 — structured {@link de.regelsuche.export.layout.MathLayout MathLayout}
+     * for the node's expression. Derived on demand from {@link #expressionLatex()}
+     * via {@link de.regelsuche.export.MathPresentation#layout(String)} with an
+     * ARIA label sourced from the raw {@link #expression()}. Layout-aware
+     * front-end overlays consume this via {@code renderMathLayout(layout, host)}.
+     */
+    public de.regelsuche.export.layout.MathLayout layout() {
+        return de.regelsuche.export.layout.MathLayout.fromLatexFragment(
+            expressionLatex,
+            de.regelsuche.export.layout.AstAriaRenderer.ariaLabel(expression)
+        );
     }
 }

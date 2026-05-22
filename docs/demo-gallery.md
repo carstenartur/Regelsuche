@@ -54,7 +54,7 @@ weggelassen, damit nichts „rauschen“ erzeugt.
   erscheinen **nicht** hier, sondern ausschließlich im
   *Suchgedächtnis → Universelle Muster*.
 - **Annahmen** — Voraussetzungen, unter denen das Ergebnis gilt
-  (z. B. `x ≠ 0`).
+  (z. B. $x \neq 0$).
 - **Proof-Status** — ob und wie das Ergebnis formal abgesichert ist.
 - **Export** — wie der Rechenweg weitergenutzt werden kann.
 - **Warum ist das interessant?** — eine kurze Produktstory pro Demo.
@@ -93,15 +93,34 @@ Diese Begriffe werden in der UI zusätzlich als Tooltips angeboten
 ![Suchgraph der Binomischen Formel mit hervorgehobenem besten Rechenweg.](assets/screenshots/binomial-graph.png)
 
 *Der Screenshot zeigt den Suchgraphen mit hervorgehobenem besten
-Rechenweg von `(x+3)²` zum vollständig ausmultiplizierten Polynom.*
+Rechenweg von $(x+3)^2$ zum vollständig ausmultiplizierten Polynom.*
 
-- **Eingabe** — Anzeigeform: `(x + 3)²` · Technische Eingabe:
+- **Eingabe** — Anzeigeform:
+
+  $$
+  (x + 3)^2
+  $$
+
+  Technische Eingabe:
+
   ```text
   (x+3)^2
   ```
-- **Ergebnis** — Anzeigeform: `x² + 6·x + 9`
+- **Ergebnis** — Anzeigeform:
+
+  $$
+  x^2 + 6x + 9
+  $$
 - **Rechenweg**:
-  `(x + 3)² → x·(x + 3) + 3·(x + 3) → x² + 3·x + 3·x + 9 → x² + 6·x + 9`
+
+  $$
+  \begin{aligned}
+  (x+3)^2
+  &\rightarrow x(x+3) + 3(x+3) \\
+  &\rightarrow x^2 + 3x + 3x + 9 \\
+  &\rightarrow x^2 + 6x + 9
+  \end{aligned}
+  $$
 - **Verwendete Regeln** — Distributivgesetz und Zusammenfassen
   gleichartiger Terme (jeweils mehrfach im Replay angewendet).
 - **Annahmen** — keine.
@@ -125,23 +144,41 @@ dieser Weg ist das, was im Unterricht zählt.
 
 ![Replay der Bruchkürzung mit sichtbar ausgewiesener Annahme.](assets/screenshots/rational-graph.png)
 
-*Der Screenshot zeigt den Suchgraphen sowie die Annahme `x ≠ 0`,
+*Der Screenshot zeigt den Suchgraphen sowie die Annahme $x \neq 0$,
 unter der die Kürzung gültig ist.*
 
-- **Eingabe** — Anzeigeform: `(x · y) / (x · z)` · Technische Eingabe:
+- **Eingabe** — Anzeigeform:
+
+  $$
+  \frac{x \cdot y}{x \cdot z}
+  $$
+
+  Technische Eingabe:
+
   ```text
   (x*y)/(x*z)
   ```
-- **Ergebnis** — Anzeigeform: `y / z`, gültig unter `x ≠ 0`
-- **Rechenweg** — Kürzen des gemeinsamen Faktors `x` aus Zähler und
+- **Ergebnis** — Anzeigeform:
+
+  $$
+  \frac{x y}{x z} \rightarrow \frac{y}{z}
+  \qquad \text{unter der Annahme } x \neq 0
+  $$
+- **Rechenweg** — Kürzen des gemeinsamen Faktors $x$ aus Zähler und
   Nenner.
 - **Verwendete Regeln** — Faktorisieren, Kürzen unter Annahme.
-- **Annahmen** — `x ≠ 0` (wird im Summary-Panel sichtbar ausgewiesen).
+- **Annahmen** —
+
+  $$
+  x \neq 0
+  $$
+
+  (wird im Summary-Panel sichtbar ausgewiesen).
 - **Proof-Status** — symbolisch geprüft, unter angegebener Annahme.
 
 ### Warum ist das interessant?
 
-Das System kürzt nur unter der **sichtbaren** Annahme `x ≠ 0`. So
+Das System kürzt nur unter der **sichtbaren** Annahme $x \neq 0$. So
 bleibt der mathematische Sicherheitsabstand zwischen „algebraisch
 hübsch“ und „in allen Fällen erlaubt“ erhalten.
 
@@ -162,11 +199,22 @@ hübsch“ und „in allen Fällen erlaubt“ erhalten.
 Vergleichszeichen kippt; der zweite zeigt die Replay-Karte, in der
 genau dieser Schritt rot markiert ist.*
 
-- **Eingabe** — Anzeigeform: `-2·x < 4` · Technische Eingabe:
+- **Eingabe** — Anzeigeform:
+
+  $$
+  -2x < 4
+  $$
+
+  Technische Eingabe:
+
   ```text
   -2*x < 4
   ```
-- **Ergebnis** — Anzeigeform: `x > -2`
+- **Ergebnis** — Anzeigeform:
+
+  $$
+  -2x < 4 \rightarrow x > -2
+  $$
 - **Rechenweg** — Beide Seiten durch `-2` teilen; dabei dreht sich
   das Vergleichszeichen.
 - **Verwendete Regeln** — Division beider Seiten durch eine negative
@@ -229,11 +277,22 @@ dass jemand händisch neue Regeln programmiert.
 *Der Screenshot zeigt den Suchgraphen, der die Pythagoras-Identität
 als Pfad findet.*
 
-- **Eingabe** — Anzeigeform: `sin(x)² + cos(x)²` · Technische Eingabe:
+- **Eingabe** — Anzeigeform:
+
+  $$
+  \sin(x)^2 + \cos(x)^2
+  $$
+
+  Technische Eingabe:
+
   ```text
   sin(x)^2 + cos(x)^2
   ```
-- **Ergebnis** — Anzeigeform: `1`
+- **Ergebnis** — Anzeigeform:
+
+  $$
+  \sin(x)^2 + \cos(x)^2 \rightarrow 1
+  $$
 - **Rechenweg** — Anwenden der Pythagoras-Identität.
 - **Verwendete Regeln** — trigonometrische Pythagoras-Identität.
 - **Annahmen** — keine.
@@ -258,11 +317,22 @@ echter Pfad im Suchraum gefunden.
 *Der Screenshot zeigt, wie das Produkt zweier Linearfaktoren über
 Distributivgesetz und Zusammenfassen zum Polynom expandiert wird.*
 
-- **Eingabe** — Anzeigeform: `(x + 1)·(x + 2)` · Technische Eingabe:
+- **Eingabe** — Anzeigeform:
+
+  $$
+  (x + 1)(x + 2)
+  $$
+
+  Technische Eingabe:
+
   ```text
   (x+1)*(x+2)
   ```
-- **Ergebnis** — Anzeigeform: `x² + 3·x + 2`
+- **Ergebnis** — Anzeigeform:
+
+  $$
+  (x + 1)(x + 2) \rightarrow x^2 + 3x + 2
+  $$
 - **Verwendete Regeln** — Distributivgesetz, Zusammenfassen.
 - **Annahmen** — keine.
 - **Proof-Status** — symbolisch geprüft.
@@ -286,11 +356,22 @@ allgemeineren Beispiel — ein guter Vergleichspunkt.
 *Der Screenshot zeigt den Schulform-Lösungsweg einer linearen
 Gleichung.*
 
-- **Eingabe** — Anzeigeform: `x + 3 = 7` · Technische Eingabe:
+- **Eingabe** — Anzeigeform:
+
+  $$
+  x + 3 = 7
+  $$
+
+  Technische Eingabe:
+
   ```text
   x + 3 = 7
   ```
-- **Ergebnis** — Anzeigeform: `x = 4`
+- **Ergebnis** — Anzeigeform:
+
+  $$
+  x + 3 = 7 \rightarrow x = 4
+  $$
 - **Verwendete Regeln** — Äquivalenzumformung (Subtraktion auf beiden
   Seiten).
 - **Annahmen** — keine.
@@ -315,11 +396,22 @@ wie er an der Tafel aussehen würde.
 *Der Screenshot zeigt die Regelkarte, die die Anwendung der Potenzregel
 erklärt.*
 
-- **Eingabe** — Anzeigeform: `d/dx x³` · Technische Eingabe:
+- **Eingabe** — Anzeigeform:
+
+  $$
+  \frac{d}{dx} x^3
+  $$
+
+  Technische Eingabe:
+
   ```text
   d/dx x^3
   ```
-- **Ergebnis** — Anzeigeform: `3·x²`
+- **Ergebnis** — Anzeigeform:
+
+  $$
+  \frac{d}{dx} x^3 \rightarrow 3x^2
+  $$
 - **Verwendete Regeln** — Potenzregel der Differentialrechnung.
 - **Annahmen** — keine.
 - **Proof-Status** — symbolisch geprüft.
@@ -345,11 +437,28 @@ auch *welche* Ableitungsregel angewendet wurde.
 *Der erste Screenshot zeigt eine echte `bmatrix`-Vorschau; der zweite
 zeigt die Replay-Karte für die Anwendung der Matrixdistributivität.*
 
-- **Eingabe** — Anzeigeform: `A·(B + C)` · Technische Eingabe:
+- **Eingabe** — Anzeigeform:
+
+  $$
+  A(B + C)
+  $$
+
+  mit konkreten Matrizen z. B.
+
+  $$
+  A = \begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}
+  $$
+
+  Technische Eingabe:
+
   ```text
   A*(B + C)
   ```
-- **Ergebnis** — Anzeigeform: `A·B + A·C`
+- **Ergebnis** — Anzeigeform:
+
+  $$
+  A(B + C) \rightarrow AB + AC
+  $$
 - **Verwendete Regeln** — Distributivität der Matrixmultiplikation.
 - **Annahmen** — passende Dimensionen.
 - **Proof-Status** — symbolisch geprüft.
@@ -408,7 +517,13 @@ Beweiser bestätigt“.
 *Der Screenshot zeigt das Proof-Job-Panel mit Statusübersicht und den
 Links zu den erzeugten Artefakten.*
 
-- **Eingabe** — Anzeigeform: `a + 0 → a` · Technische Eingabe im Panel:
+- **Eingabe** — Anzeigeform:
+
+  $$
+  a + 0 \rightarrow a
+  $$
+
+  Technische Eingabe im Panel:
   Felder „Left = `a + 0`“, „Right = `a`“.
 - **Ergebnis** — ein abgeschlossener Job mit Artefakt-Bundle.
 - **Verwendete Regeln** — die zu beweisende Identität selbst.

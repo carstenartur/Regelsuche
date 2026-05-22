@@ -50,6 +50,7 @@ public final class SearchGraphRecordCodec {
             inner.property("id", node.id());
             inner.property("expression", node.expression());
             inner.property("latex", node.latex());
+            inner.property("expressionLatex", node.expressionLatex());
             inner.property("score", node.score());
             inner.property("depth", node.depth());
             inner.property("visitedCount", node.visitedCount());
@@ -62,6 +63,7 @@ public final class SearchGraphRecordCodec {
             inner.property("from", edge.from());
             inner.property("to", edge.to());
             inner.property("ruleId", edge.ruleId());
+            inner.property("ruleLatex", edge.ruleLatex());
             inner.property("ruleKind", edge.ruleKind().name());
             inner.property("scoreDelta", edge.scoreDelta());
             inner.stringArray("assumptions", edge.assumptions());
@@ -93,6 +95,8 @@ public final class SearchGraphRecordCodec {
 
     private static void writeReplay(JsonWriter writer, PathReplayDto replay) {
         writer.property("pathId", replay.pathId());
+        writer.property("alignedDerivationLatex", replay.alignedDerivationLatex());
+        writer.property("alignedDerivationLatexWithDiff", replay.alignedDerivationLatexWithDiff());
         writer.array("steps", w -> replay.steps().forEach(step -> w.objectValue(inner -> {
             inner.property("stepIndex", step.stepIndex());
             inner.property("fromExpression", step.fromExpression());
@@ -103,7 +107,24 @@ public final class SearchGraphRecordCodec {
             inner.property("ruleExplanation", step.ruleExplanation());
             inner.property("scoreDelta", step.scoreDelta());
             inner.property("equivalencePreserving", step.equivalencePreserving());
+            inner.property("comparatorFlipped", step.comparatorFlipped());
+            writeSpanArray(inner, "changedFromSpans", step.changedFromSpans());
+            writeSpanArray(inner, "changedToSpans", step.changedToSpans());
         })));
+    }
+
+    /**
+     * Writes a list of {@code [start, length]} integer pairs as a JSON
+     * array of two-element arrays. Used by the Stage 3 diff payload.
+     */
+    private static void writeSpanArray(JsonWriter writer, String key, List<int[]> spans) {
+        writer.array(key, w -> {
+            for (int[] span : spans) {
+                int start = span.length > 0 ? span[0] : 0;
+                int length = span.length > 1 ? span[1] : 0;
+                w.arrayValue(inner -> inner.value(start).value(length));
+            }
+        });
     }
 
     private static void writeMacro(JsonWriter writer, MacroRuleCandidate macro) {
@@ -180,21 +201,29 @@ public final class SearchGraphRecordCodec {
                 booleanValue(m.get("isBest"), false),
                 booleanValue(m.get("isDeadEnd"), false),
                 CandidateProofStatus.valueOf(stringValue(m.get("candidateStatus"), CandidateProofStatus.OBSERVED.name())),
-                stringValue(m.get("clusterId"), "")
+                stringValue(m.get("clusterId"), ""),
+                SearchExpression.classify(stringValue(m.get("expression"), "")),
+                m.get("expressionLatex") == null ? null : String.valueOf(m.get("expressionLatex"))
             ))
             .toList();
         List<SearchGraphEdgeDto> edges = readList(values.get("edges")).stream()
             .map(SearchGraphRecordCodec::asMap)
-            .map(m -> new SearchGraphEdgeDto(
-                stringValue(m.get("from"), ""),
-                stringValue(m.get("to"), ""),
-                stringValue(m.get("ruleId"), ""),
-                RewriteKind.valueOf(stringValue(m.get("ruleKind"), RewriteKind.NORMALIZE.name())),
-                intValue(m.get("scoreDelta"), 0),
-                stringList(m.get("assumptions")),
-                stringList(m.get("pathIds")),
-                booleanValue(m.get("equivalencePreserving"), true)
-            ))
+            .map(m -> {
+                String ruleId = stringValue(m.get("ruleId"), "");
+                String ruleLatex = stringValue(m.get("ruleLatex"),
+                    de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(ruleId));
+                return new SearchGraphEdgeDto(
+                    stringValue(m.get("from"), ""),
+                    stringValue(m.get("to"), ""),
+                    ruleId,
+                    ruleLatex,
+                    RewriteKind.valueOf(stringValue(m.get("ruleKind"), RewriteKind.NORMALIZE.name())),
+                    intValue(m.get("scoreDelta"), 0),
+                    stringList(m.get("assumptions")),
+                    stringList(m.get("pathIds")),
+                    booleanValue(m.get("equivalencePreserving"), true)
+                );
+            })
             .toList();
         List<SearchGraphClusterDto> clusters = readList(values.get("clusters")).stream()
             .map(SearchGraphRecordCodec::asMap)
@@ -239,10 +268,48 @@ public final class SearchGraphRecordCodec {
                 stringValue(m.get("ruleId"), ""),
                 stringValue(m.get("ruleExplanation"), ""),
                 intValue(m.get("scoreDelta"), 0),
-                booleanValue(m.get("equivalencePreserving"), true)
+                booleanValue(m.get("equivalencePreserving"), true),
+                booleanValue(m.get("comparatorFlipped"),
+                    de.regelsuche.export.MathPresentation.detectComparatorFlip(
+                        stringValue(m.get("ruleId"), ""),
+                        stringValue(m.get("fromExpression"), ""),
+                        stringValue(m.get("toExpression"), ""))),
+                readSpanList(m.get("changedFromSpans")),
+                readSpanList(m.get("changedToSpans"))
             ))
             .toList();
-        return new PathReplayDto(stringValue(values.get("pathId"), "?"), steps);
+        String pathId = stringValue(values.get("pathId"), "?");
+        Object persisted = values.get("alignedDerivationLatex");
+        Object persistedDiff = values.get("alignedDerivationLatexWithDiff");
+        String alignedPlain = persisted instanceof String s && !s.isBlank() ? s : null;
+        String alignedDiff = persistedDiff instanceof String d && !d.isBlank() ? d : null;
+        if (alignedPlain != null && alignedDiff != null) {
+            return new PathReplayDto(pathId, steps, alignedPlain, alignedDiff);
+        }
+        if (alignedPlain != null) {
+            return new PathReplayDto(pathId, steps, alignedPlain);
+        }
+        return new PathReplayDto(pathId, steps);
+    }
+
+    /** Read a list of {@code [start, length]} pairs back into {@code int[]} spans. */
+    private static List<int[]> readSpanList(Object raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        if (!(raw instanceof List<?> list)) {
+            return List.of();
+        }
+        List<int[]> out = new ArrayList<>(list.size());
+        for (Object element : list) {
+            if (!(element instanceof List<?> pair) || pair.size() < 2) {
+                continue;
+            }
+            int start = intValue(pair.get(0), 0);
+            int length = intValue(pair.get(1), 0);
+            out.add(new int[] { start, length });
+        }
+        return out;
     }
 
     private static MacroRuleCandidate readMacro(Map<String, Object> values) {
