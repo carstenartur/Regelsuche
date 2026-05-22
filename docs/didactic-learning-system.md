@@ -119,18 +119,33 @@ Ausführen mit:
 ./gradlew test --tests 'de.regelsuche.didactic.*'
 ```
 
+## REST-Endpunkte
+
+Die didaktische Schicht stellt drei Endpunkte über `WebWorkbenchServer`
+bereit:
+
+| Methode | Pfad                              | Body / Query                                                                                  |
+|---------|-----------------------------------|-----------------------------------------------------------------------------------------------|
+| `POST`  | `/api/didactic/step-check`        | `{"currentExpression":"…","studentStep":"…","difficulty":"MITTELSTUFE"}` → `Result`-JSON      |
+| `POST`  | `/api/didactic/hint/{pathId}`     | `{"currentExpression":"…","pedagogyProfile":"SCHOOL"}` → gestufte Hinweise                    |
+| `GET`   | `/api/didactic/misconceptions`    | listet den eingebauten `MisconceptionRule`-Katalog                                            |
+
+`GET /api/didactic` liefert die Endpunkt-Übersicht.
+
+`POST /api/search` akzeptiert zusätzlich `"goal":"DIDAKTIK"`, das das
+`DidacticCostModel` (Default `MITTELSTUFE / SCHOOL`) in die bestehende
+Suchpipeline einhängt — ohne Änderungen an den Strategien.
+
 ## Was bewusst noch nicht enthalten ist
 
 Damit dieser PR überschaubar bleibt, sind die folgenden Punkte der
 Spezifikation **vorbereitet** (durch die hier eingeführten Services),
 aber noch nicht ausgeliefert:
 
-- REST-Endpunkte `POST /api/didactic/step-check` und
-  `POST /api/didactic/hint` (Web-Layer);
 - Didaktik-Replay-Ansicht in der Web-Workbench-UI mit
   `SymbolDiff`-Highlighting;
-- Demo-Gallery-Einträge „Mehrere Lösungswege“, „Typischer Fehler“,
-  „Hinweis-Modus“, „Schrittprüfung“;
+- Demo-Gallery-Einträge „Mehrere Lösungswege", „Typischer Fehler",
+  „Hinweis-Modus", „Schrittprüfung";
 - Didaktik-Analytics (Persistenz, Dashboard);
 - Bildungsspezifische Exportformate (Arbeitsblatt, Musterlösung,
   Lehrermodus-PDF/HTML);

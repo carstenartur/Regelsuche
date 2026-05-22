@@ -24,7 +24,17 @@ public enum TransformationGoal {
      * Prefer school-book-style notation: small coefficients, shallow
      * nesting, no exotic functions in the result.
      */
-    TEACHING_FRIENDLY(new TeachingFriendlinessCost());
+    TEACHING_FRIENDLY(new TeachingFriendlinessCost()),
+
+    /**
+     * Richer didactic mode (PR 17): adds operator complexity weighting,
+     * depth-squared mental load, symbolic overload (distinct variables)
+     * and a depth budget per difficulty level. Uses the default
+     * {@code MITTELSTUFE / SCHOOL} profile pair; for explicit level /
+     * profile selection construct
+     * {@link de.regelsuche.didactic.DidacticCostModel} directly.
+     */
+    DIDAKTIK(new de.regelsuche.didactic.DidacticCostModel());
 
     private final CostModel defaultCostModel;
 
