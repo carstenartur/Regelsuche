@@ -71,6 +71,15 @@ public final class DemoService {
     }
 
     public DemoRunResult run(DemoCatalog.Demo demo) {
+        // Math-domain demos (equations, inequalities, derivatives, matrices) go
+        // through `UnifiedMathDomainWorkbench`: the workbench writes the demo
+        // into the same graph store / DiscoveredTransformation pipeline that
+        // the algebraic demos use, but with the right adapter for the domain.
+        // The HTTP layer then renders the resulting bundle through the same
+        // path as any other demo — no special-case rendering required.
+        if (demo != null && demo.id() != null && demo.id().startsWith("math-")) {
+            return runMathDomainDemo(demo);
+        }
         long started = System.nanoTime();
         String root = canonicalizer.canonicalize(demo.expression());
         ExpressionScore before = scorer.score(root);
@@ -245,6 +254,53 @@ public final class DemoService {
     }
 
     /**
+     * Optional bridge configured by the HTTP layer. When set, math-domain
+     * demos automatically request a proof attempt for the resulting rewrite
+     * so the "Proof prüfen" button surfaces the actual prover status.
+     */
+    private de.regelsuche.proof.ProofBridgeService proofBridgeService;
+
+    /** Configure (or clear) the proof bridge used for math-domain demos. */
+    public void useProofBridge(de.regelsuche.proof.ProofBridgeService service) {
+        this.proofBridgeService = service;
+    }
+
+    private DemoRunResult runMathDomainDemo(DemoCatalog.Demo demo) {
+        long started = System.nanoTime();
+        de.regelsuche.demo.UnifiedMathDomainWorkbench workbench =
+            new de.regelsuche.demo.UnifiedMathDomainWorkbench(graphStore, proofBridgeService);
+        de.regelsuche.demo.UnifiedMathDomainWorkbench.DemoExecution exec = switch (demo.id()) {
+            case "math-equation" -> workbench.runLinearEquation();
+            case "math-inequality" -> workbench.runInequalitySignFlip();
+            case "math-derivative" -> workbench.runDerivativePowerRule();
+            case "math-matrix" -> workbench.runMatrixDistributivity();
+            default -> throw new IllegalArgumentException("Unknown math-domain demo: " + demo.id());
+        };
+        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
+        DiscoveredTransformation discovered = exec.discoveredTransformation();
+        return new DemoRunResult(
+            demo,
+            exec.inputExpression(),
+            exec.resultExpression(),
+            /* nodesSaved   */ 1 + exec.edges().size(),
+            /* edgesSaved   */ exec.edges().size(),
+            /* pathsDiscovered */ 1,
+            discovered,
+            discovered,
+            discovered,
+            /* targetReached */ true,
+            exec.steps().stream().map(TransformationStep::ruleId).toList(),
+            exec.assumptions().stream().map(Assumption::expression).toList(),
+            elapsedMillis,
+            exec.expressionType(),
+            exec.comparatorFlipped(),
+            exec.inputLatex(),
+            exec.resultLatex(),
+            exec.proofOutcome()
+        );
+    }
+
+    /**
      * Outcome of a single demo run – used by the HTTP layer to build the
      * response bundle (graph metrics, best path, links to existing endpoints).
      */
@@ -261,7 +317,45 @@ public final class DemoService {
         boolean targetReached,
         List<String> appliedRuleIds,
         List<String> assumptions,
-        long elapsedMillis
+        long elapsedMillis,
+        de.regelsuche.api.searchgraph.SearchExpression expressionType,
+        boolean comparatorFlipped,
+        String inputLatex,
+        String resultLatex,
+        de.regelsuche.proof.ProofBridgeService.ProofAttemptOutcome proofOutcome
     ) {
+        public DemoRunResult {
+            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);
+            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
+            expressionType = expressionType == null
+                ? de.regelsuche.api.searchgraph.SearchExpression.TERM
+                : expressionType;
+            inputLatex = inputLatex == null ? "" : inputLatex;
+            resultLatex = resultLatex == null ? "" : resultLatex;
+        }
+
+        /** Backwards-compatible 13-arg constructor used by existing call-sites/tests. */
+        public DemoRunResult(
+            DemoCatalog.Demo demo,
+            String rootExpression,
+            String canonicalTargetExpression,
+            int nodesSaved,
+            int edgesSaved,
+            int pathsDiscovered,
+            DiscoveredTransformation bestPath,
+            DiscoveredTransformation targetPath,
+            DiscoveredTransformation selectedPath,
+            boolean targetReached,
+            List<String> appliedRuleIds,
+            List<String> assumptions,
+            long elapsedMillis
+        ) {
+            this(demo, rootExpression, canonicalTargetExpression, nodesSaved, edgesSaved,
+                pathsDiscovered, bestPath, targetPath, selectedPath, targetReached,
+                appliedRuleIds, assumptions, elapsedMillis,
+                de.regelsuche.api.searchgraph.SearchExpression.classify(
+                    demo == null ? "" : demo.expression()),
+                false, "", "", null);
+        }
     }
 }

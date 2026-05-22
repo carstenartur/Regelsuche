@@ -44,7 +44,48 @@ public final class BenchmarkSuite {
         all.add(run("search-explosion", List.of(
             "(x + a)*(x + b)*(x + c)"
         ), SearchProfile.EXHAUSTIVE_SMALL.heuristic()));
+        // Math-domain categories (PR #13 follow-up): each is a single
+        // representative run through `UnifiedMathDomainWorkbench`, surfaced as
+        // a benchmark row so the dashboard shows it next to the algebraic
+        // scenarios. The result carries `found`, `elapsedMillis`,
+        // `exploredStates`, `expandedSteps` (= solver steps), `proofStatus`,
+        // and assumptions/equalitySaturationSavings via the dedicated row.
+        all.add(runMathDomain("equations",
+            de.regelsuche.demo.UnifiedMathDomainWorkbench::runLinearEquation));
+        all.add(runMathDomain("inequalities",
+            de.regelsuche.demo.UnifiedMathDomainWorkbench::runInequalitySignFlip));
+        all.add(runMathDomain("calculus",
+            de.regelsuche.demo.UnifiedMathDomainWorkbench::runDerivativePowerRule));
+        all.add(runMathDomain("linear-algebra",
+            de.regelsuche.demo.UnifiedMathDomainWorkbench::runMatrixDistributivity));
         return all;
+    }
+
+    private BenchmarkSuiteResult runMathDomain(
+        String name,
+        java.util.function.Function<de.regelsuche.demo.UnifiedMathDomainWorkbench,
+            de.regelsuche.demo.UnifiedMathDomainWorkbench.DemoExecution> runner
+    ) {
+        long started = System.nanoTime();
+        de.regelsuche.demo.UnifiedMathDomainWorkbench workbench =
+            new de.regelsuche.demo.UnifiedMathDomainWorkbench();
+        de.regelsuche.demo.UnifiedMathDomainWorkbench.DemoExecution exec = runner.apply(workbench);
+        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
+        SearchBenchmarkResult row = new SearchBenchmarkResult(
+            /* strategyName     */ "math-domain",
+            /* expression       */ exec.inputExpression(),
+            /* exploredStates   */ exec.edges().size() + 1,
+            /* bestImprovement  */ Math.max(1, exec.steps().size()),
+            /* shortestImprovingDepth */ exec.steps().size(),
+            /* expandedSteps    */ exec.steps().size(),
+            /* distinctRules    */ (int) exec.steps().stream()
+                .map(de.regelsuche.discovery.TransformationStep::ruleId).distinct().count(),
+            /* elapsedMillis    */ elapsedMillis,
+            /* proofStatus      */ exec.proofStatus() == null
+                ? de.regelsuche.mining.CandidateProofStatus.SYMBOLICALLY_VERIFIED
+                : exec.proofStatus()
+        );
+        return new BenchmarkSuiteResult(name, List.of(row));
     }
 
     public BenchmarkSuiteResult run(String name, List<String> expressions, SearchHeuristic heuristic) {

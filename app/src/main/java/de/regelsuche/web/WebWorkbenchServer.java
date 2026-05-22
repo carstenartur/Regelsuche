@@ -72,6 +72,8 @@ public class WebWorkbenchServer {
     private final ExportQueryService exportQuery;
     private final ExplanationService explanationService = new ExplanationService();
     private final de.regelsuche.search.memory.SearchMemory searchMemory;
+    private final de.regelsuche.proof.ProofBridgeService leanProofBridgeService;
+    private final de.regelsuche.proof.ProofBridgeService smtProofBridgeService;
 
     private HttpServer server;
 
@@ -105,6 +107,22 @@ public class WebWorkbenchServer {
         WebSecurityConfig securityConfig,
         de.regelsuche.search.memory.SearchMemory searchMemory
     ) {
+        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, searchMemory,
+            defaultProofBridgeService(new de.regelsuche.proof.LeanProofBridge()),
+            defaultProofBridgeService(new de.regelsuche.proof.SmtProofBridge()));
+    }
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        de.regelsuche.search.memory.SearchMemory searchMemory,
+        de.regelsuche.proof.ProofBridgeService leanProofBridgeService,
+        de.regelsuche.proof.ProofBridgeService smtProofBridgeService
+    ) {
         this.host = host;
         this.port = port;
         this.graphStore = graphStore;
@@ -112,9 +130,21 @@ public class WebWorkbenchServer {
         this.exportService = exportService;
         this.securityConfig = securityConfig == null ? WebSecurityConfig.none() : securityConfig;
         this.searchMemory = searchMemory == null ? new de.regelsuche.search.memory.SearchMemory() : searchMemory;
+        this.leanProofBridgeService = leanProofBridgeService == null
+            ? defaultProofBridgeService(new de.regelsuche.proof.LeanProofBridge())
+            : leanProofBridgeService;
+        this.smtProofBridgeService = smtProofBridgeService == null
+            ? defaultProofBridgeService(new de.regelsuche.proof.SmtProofBridge())
+            : smtProofBridgeService;
         this.transformationQuery = new TransformationQueryService(graphStore);
         this.inventoryQuery = new RuleInventoryQueryService(graphStore, inventoryRepository);
         this.exportQuery = new ExportQueryService(graphStore, inventoryRepository);
+    }
+
+    private static de.regelsuche.proof.ProofBridgeService defaultProofBridgeService(
+        de.regelsuche.proof.ProofBridge bridge
+    ) {
+        return new de.regelsuche.proof.ProofBridgeService(bridge);
     }
 
     public void start() throws IOException {
@@ -139,6 +169,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/demo", this::handleDemo));
         secure(server.createContext("/api/memory", this::handleMemory));
         secure(server.createContext("/api/proof-status", this::handleProofStatus));
+        secure(server.createContext("/api/proof-bridge", this::handleProofBridge));
         secure(server.createContext("/api/benchmark", this::handleBenchmark));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
@@ -427,7 +458,15 @@ public class WebWorkbenchServer {
                 java.time.Instant.now()
             );
             inventoryRepository.save(rule);
-            sendJson(exchange, 200, "{\"promotedRuleId\":\"" + escapeJson(ruleId) + "\"}");
+            // Discovery+ domain tag: infer from the macro's atomic rule-id
+            // sequence (equation_*/inequality_*/calculus_*/linalg_* …) and
+            // store it as an inventory tag so the UI can filter by domain.
+            String domain = new de.regelsuche.mining.MacroDomainInferrer()
+                .inferDomain(candidate);
+            inventoryRepository.addTag(ruleId, domain);
+            sendJson(exchange, 200,
+                "{\"promotedRuleId\":\"" + escapeJson(ruleId) + "\",\"domain\":\""
+                    + escapeJson(domain) + "\"}");
             return;
         }
         if (!suffix.isEmpty() && !"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -436,6 +475,8 @@ public class WebWorkbenchServer {
         }
 
         // GET /api/identities -> list
+        de.regelsuche.mining.MacroDomainInferrer domainInferrer =
+            new de.regelsuche.mining.MacroDomainInferrer();
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.array("identities", w -> macros.forEach(macro -> {
@@ -451,6 +492,7 @@ public class WebWorkbenchServer {
                 inner.property("proofStatus", dto.proofStatus().name());
                 inner.property("knownRuleStatus", dto.knownRuleStatus().name());
                 inner.stringArray("supportingTransformationIds", dto.supportingTransformationIds());
+                inner.property("domain", domainInferrer.inferDomain(macro));
             });
         }));
         writer.endObject();
@@ -1053,6 +1095,7 @@ public class WebWorkbenchServer {
                     inner.property("profile", demo.profile().name());
                     inner.property("expectedHighlight", demo.expectedHighlight());
                     inner.property("expectedResultExpression", demo.expectedResultExpression());
+                    inner.property("domain", demo.domain());
                 })));
             writer.endObject();
             sendJson(exchange, 200, writer.toString());
@@ -1077,6 +1120,7 @@ public class WebWorkbenchServer {
                 new de.regelsuche.transform.AstRewriteTransformationEngine(
                     de.regelsuche.demo.DemoRuleSet.rules()),
                 searchMemory);
+        demoService.useProofBridge(leanProofBridgeService);
         de.regelsuche.demo.DemoService.DemoRunResult result = demoService.run(demo);
         sendJson(exchange, 200, renderDemoBundle(result));
     }
@@ -1095,6 +1139,32 @@ public class WebWorkbenchServer {
         writer.property("profile", demo.profile().name());
         writer.property("expectedHighlight", demo.expectedHighlight());
         writer.property("expectedResultExpression", demo.expectedResultExpression());
+        writer.property("domain", demo.domain());
+        writer.property("expressionType", result.expressionType().name());
+        writer.property("comparatorFlipped", result.comparatorFlipped());
+        if (!result.inputLatex().isEmpty()) {
+            writer.property("inputLatex", result.inputLatex());
+        }
+        if (!result.resultLatex().isEmpty()) {
+            writer.property("resultLatex", result.resultLatex());
+        }
+        if (result.proofOutcome() != null) {
+            writer.object("proofOutcome", po -> {
+                var outcome = result.proofOutcome();
+                po.property("proofStatus", outcome.candidate().proofStatus().name());
+                if (outcome.execution() != null) {
+                    po.property("proverStatus", outcome.execution().status().name());
+                    po.property("exitCode", outcome.execution().exitCode());
+                    po.property("stdout", outcome.execution().stdout());
+                    po.property("stderr", outcome.execution().stderr());
+                    po.property("elapsedMillis", outcome.execution().durationMillis());
+                }
+                if (outcome.attempt() != null) {
+                    po.property("artifact", outcome.attempt().artifact());
+                    po.property("tool", outcome.attempt().tool());
+                }
+            });
+        }
         writer.property("canonicalTargetExpression",
             result.canonicalTargetExpression() == null ? "" : result.canonicalTargetExpression());
         writer.property("rootExpression", result.rootExpression());
@@ -1121,6 +1191,8 @@ public class WebWorkbenchServer {
                 inner.property("proofStatus", macro.proofStatus().name());
                 inner.property("knownRuleStatus",
                     known.statusFor(macro.leftPattern(), macro.rightPattern()).name());
+                inner.property("domain",
+                    new de.regelsuche.mining.MacroDomainInferrer().inferDomain(macro));
             })));
         writer.object("links", l -> {
             l.property("searchGraph", "/api/search-graph");
@@ -1183,6 +1255,84 @@ public class WebWorkbenchServer {
                     inner.property("descriptionDe", d.summaryDe());
                     inner.property("descriptionEn", d.summaryEn());
                 })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    /**
+     * POST /api/proof-bridge — body {@code {"leftPattern": "...", "rightPattern": "...",
+     * "assumptions": ["x != 0", ...], "tool": "lean4"|"smt"}}.
+     *
+     * <p>Runs the configured {@link de.regelsuche.proof.ProofBridgeService}
+     * (Lean / SMT) and returns prover status, exit code, stdout, stderr,
+     * elapsed time, and the generated proof script so the UI's "Proof prüfen"
+     * button can render the full execution result. Only a successful prover
+     * run actually promotes the candidate to {@code FORMALLY_PROVED}; without
+     * an executor configured we report {@code SCRIPT_GENERATED}.</p>
+     */
+    private void handleProofBridge(HttpExchange exchange) throws IOException {
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        Map<String, Object> body = readJsonObject(exchange);
+        String left = stringValue(body, "leftPattern", "");
+        String right = stringValue(body, "rightPattern", "");
+        if (left.isBlank() || right.isBlank()) {
+            sendStatus(exchange, 400, "leftPattern and rightPattern are required");
+            return;
+        }
+        String tool = stringValue(body, "tool", "lean4").toLowerCase(java.util.Locale.ROOT);
+        de.regelsuche.proof.ProofBridgeService service =
+            "smt".equals(tool) ? smtProofBridgeService : leanProofBridgeService;
+        List<de.regelsuche.assumption.Assumption> assumptions = new java.util.ArrayList<>();
+        Object raw = body.get("assumptions");
+        if (raw instanceof List<?> list) {
+            for (Object item : list) {
+                if (item != null) {
+                    assumptions.add(new de.regelsuche.assumption.Assumption(
+                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));
+                }
+            }
+        }
+        de.regelsuche.mining.RuleCandidate candidate = new de.regelsuche.mining.RuleCandidate(
+            left, right, 1, 1.0, 1, true, true, false,
+            List.of(),
+            de.regelsuche.mining.RuleStatus.NEW,
+            de.regelsuche.mining.CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+            Integer.toHexString((left + "->" + right).hashCode()),
+            List.of()
+        );
+        de.regelsuche.proof.ProofBridgeService.ProofAttemptOutcome outcome =
+            service.attemptWithDetails(candidate, assumptions);
+
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("leftPattern", left);
+        writer.property("rightPattern", right);
+        writer.property("tool", tool);
+        writer.property("proofStatus", outcome.candidate().proofStatus().name());
+        if (outcome.execution() != null) {
+            writer.property("proverStatus", outcome.execution().status().name());
+            writer.property("exitCode", outcome.execution().exitCode());
+            writer.property("stdout", outcome.execution().stdout());
+            writer.property("stderr", outcome.execution().stderr());
+            writer.property("elapsedMillis", outcome.execution().durationMillis());
+        } else {
+            // No executor configured — be explicit so the UI can show the
+            // "script generated only" state instead of leaving the field
+            // absent.
+            writer.property("proverStatus",
+                de.regelsuche.proof.ProverExecutionResult.Status.SCRIPT_GENERATED.name());
+            writer.property("exitCode", -1);
+            writer.property("stdout", "");
+            writer.property("stderr", "");
+            writer.property("elapsedMillis", 0L);
+        }
+        if (outcome.attempt() != null) {
+            writer.property("artifact", outcome.attempt().artifact());
+            writer.property("artifactTool", outcome.attempt().tool());
+        }
         writer.endObject();
         sendJson(exchange, 200, writer.toString());
     }

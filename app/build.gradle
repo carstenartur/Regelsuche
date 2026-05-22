@@ -27,3 +27,60 @@ application {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+// ─── Professional end-to-end demo tests ────────────────────────────────
+//
+// A dedicated source set so the browser stack (Playwright, Testcontainers,
+// screenshot/video recording) is not pulled into the normal unit-test
+// classpath. The `e2eTest` task is opt-in: `./gradlew e2eTest` runs the
+// flows headlessly; `./gradlew e2eTest -Pregelsuche.recordDocs=true` also
+// updates the screenshots / videos under `docs/assets/`.
+sourceSets {
+    e2eTest {
+        java.srcDir 'src/e2eTest/java'
+        resources.srcDir 'src/e2eTest/resources'
+        compileClasspath += sourceSets.main.output + sourceSets.test.output
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+    }
+}
+
+configurations {
+    e2eTestImplementation.extendsFrom testImplementation
+    e2eTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+dependencies {
+    e2eTestImplementation 'com.microsoft.playwright:playwright:1.49.0'
+    e2eTestImplementation 'org.testcontainers:testcontainers:1.20.4'
+    e2eTestImplementation 'org.testcontainers:junit-jupiter:1.20.4'
+}
+
+tasks.register('installPlaywrightBrowsers', JavaExec) {
+    description = 'Downloads the Chromium browser that Playwright drives.'
+    group = 'verification'
+    classpath = sourceSets.e2eTest.runtimeClasspath
+    mainClass = 'com.microsoft.playwright.CLI'
+    args 'install', '--with-deps', 'chromium'
+    // The Playwright CLI tries to invoke sudo for apt deps; the --with-deps
+    // call no-ops cleanly on systems where the deps are already present.
+    ignoreExitValue = true
+}
+
+tasks.register('e2eTest', Test) {
+    description = 'Browser-driven end-to-end demo flows (Playwright). Use ' +
+        '-Pregelsuche.recordDocs=true to refresh docs/assets/{screenshots,videos}.'
+    group = 'verification'
+    dependsOn tasks.named('installPlaywrightBrowsers')
+    testClassesDirs = sourceSets.e2eTest.output.classesDirs
+    classpath = sourceSets.e2eTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('test')
+    // System property is consumed by BrowserDemoFlowTest.
+    systemProperty 'regelsuche.recordDocs',
+        providers.gradleProperty('regelsuche.recordDocs').getOrElse('false')
+    // Surface useful Playwright output during long-running browser runs.
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = true
+    }
+}

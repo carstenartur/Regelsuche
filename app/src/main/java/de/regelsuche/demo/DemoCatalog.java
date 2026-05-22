@@ -24,8 +24,23 @@ public final class DemoCatalog {
         InputType inputType,
         SearchProfile profile,
         String expectedHighlight,
-        String expectedResultExpression
+        String expectedResultExpression,
+        String domain
     ) {
+        /** Backwards-compatible constructor: domain defaults to {@code "algebra"}. */
+        public Demo(
+            String id,
+            String title,
+            String description,
+            String expression,
+            InputType inputType,
+            SearchProfile profile,
+            String expectedHighlight,
+            String expectedResultExpression
+        ) {
+            this(id, title, description, expression, inputType, profile,
+                expectedHighlight, expectedResultExpression, "algebra");
+        }
     }
 
     private static final Map<String, Demo> DEMOS = buildDemos();
@@ -87,6 +102,62 @@ public final class DemoCatalog {
             SearchProfile.DISCOVERY_PLUS,
             "(a+b)^2 wird als gelernte Regel angewandt",
             "49 + 14 * x + x ^ 2"
+        ));
+        // ---------------- math-domain demos (PR #13/follow-up) ----------------
+        // These four entries flow through `UnifiedMathDomainWorkbench` instead
+        // of the generic atomic-rule engine. They demonstrate that linear
+        // equations, inequalities, derivatives and matrix distributivity
+        // appear as first-class citizens in the same workbench UI, replay,
+        // proof bridge and macro-rule learning pipeline as the algebraic
+        // demos — no special UI path.
+        map.put("math-equation", new Demo(
+            "math-equation",
+            "Lineare Gleichung",
+            "x + 3 = 7 wird durch Isolieren der Variablen schrittweise zu x = 4 umgeformt. "
+                + "Die Schritte erscheinen als reguläre Transformationsschritte im SearchGraph "
+                + "und Replay.",
+            "x + 3 = 7",
+            InputType.EQUATION,
+            SearchProfile.DISCOVERY,
+            "x + 3 = 7 ⇒ x = 4",
+            "x = 4",
+            "equations"
+        ));
+        map.put("math-inequality", new Demo(
+            "math-inequality",
+            "Ungleichung mit Vorzeichen-Flip",
+            "-2*x < 4 wird zu x > -2 umgeformt. Replay markiert die Division durch einen "
+                + "negativen Faktor, die das Vergleichszeichen dreht.",
+            "-2*x < 4",
+            InputType.TERM,
+            SearchProfile.DISCOVERY,
+            "Division durch negativen Faktor dreht das Vergleichszeichen",
+            "x > -2",
+            "inequalities"
+        ));
+        map.put("math-derivative", new Demo(
+            "math-derivative",
+            "Ableitung – Potenzregel",
+            "d/dx x^3 wird durch die Anwendung der Potenzregel als gewöhnliche RewriteRule "
+                + "zu 3*x^2 umgeformt. Replay zeigt 'Potenzregel angewendet'.",
+            "diff(x ^ 3, x)",
+            InputType.TERM,
+            SearchProfile.DISCOVERY,
+            "d/dx x^n = n*x^(n-1)",
+            "3 * x ^ 2",
+            "calculus"
+        ));
+        map.put("math-matrix", new Demo(
+            "math-matrix",
+            "Matrix-Distributivität",
+            "A*(B+C) wird durch Distributivität zu A*B + A*C umgeformt. Die LaTeX-Ausgabe "
+                + "rendert konkrete Matrizen als \\begin{bmatrix}.",
+            "A * (B + C)",
+            InputType.TERM,
+            SearchProfile.DISCOVERY,
+            "A*(B+C) = A*B + A*C",
+            "A * B + A * C",
+            "linear-algebra"
         ));
         return java.util.Collections.unmodifiableMap(map);
     }

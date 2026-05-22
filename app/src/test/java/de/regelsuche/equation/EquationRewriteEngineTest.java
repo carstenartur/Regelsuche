@@ -75,9 +75,9 @@ class EquationRewriteEngineTest {
     }
 
     @Test
-    void defaultEngineExposesAllThreeRules() {
+    void defaultEngineExposesAllFiveRules() {
         EquationRewriteEngine engine = new EquationRewriteEngine();
-        assertEquals(3, engine.rules().size());
+        assertEquals(5, engine.rules().size());
         assertNotNull(engine.rules().get(0).description());
     }
 }

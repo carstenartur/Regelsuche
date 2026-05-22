@@ -20,7 +20,8 @@ public record SearchGraphNodeDto(
     boolean isBest,
     boolean isDeadEnd,
     CandidateProofStatus candidateStatus,
-    String clusterId
+    String clusterId,
+    SearchExpression expressionType
 ) {
     public SearchGraphNodeDto {
         if (id == null || id.isBlank()) {
@@ -32,5 +33,28 @@ public record SearchGraphNodeDto(
         latex = latex == null ? "" : latex;
         candidateStatus = candidateStatus == null ? CandidateProofStatus.OBSERVED : candidateStatus;
         clusterId = clusterId == null ? "" : clusterId;
+        expressionType = expressionType == null ? SearchExpression.classify(expression) : expressionType;
+    }
+
+    /**
+     * Backwards-compatible constructor used by callers that pre-date
+     * the typed-expression integration. The {@link #expressionType()}
+     * is inferred from the raw {@code expression} string via
+     * {@link SearchExpression#classify(String)}.
+     */
+    public SearchGraphNodeDto(
+        String id,
+        String expression,
+        String latex,
+        int score,
+        int depth,
+        int visitedCount,
+        boolean isBest,
+        boolean isDeadEnd,
+        CandidateProofStatus candidateStatus,
+        String clusterId
+    ) {
+        this(id, expression, latex, score, depth, visitedCount, isBest, isDeadEnd,
+            candidateStatus, clusterId, SearchExpression.classify(expression));
     }
 }

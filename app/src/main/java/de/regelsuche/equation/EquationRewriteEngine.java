@@ -25,7 +25,13 @@ public final class EquationRewriteEngine {
     private final List<EquationRule> rules;
 
     public EquationRewriteEngine() {
-        this(List.of(new AddBothSidesRule(), new MultiplyBothSidesRule(), new ApplyInjectiveFunctionRule()));
+        this(List.of(
+            new AddBothSidesRule(),
+            new SubtractBothSidesRule(),
+            new MultiplyBothSidesRule(),
+            new DivideBothSidesRule(),
+            new ApplyInjectiveFunctionRule()
+        ));
     }
 
     public EquationRewriteEngine(List<EquationRule> rules) {
@@ -67,6 +73,69 @@ public final class EquationRewriteEngine {
                     new Equation(left, right),
                     "Addiere " + ExpressionFormatter.format(operand) + " auf beiden Seiten",
                     List.of()
+                ));
+            }
+            return steps;
+        }
+    }
+
+    /** {@code a = b ⇒ a - c = b - c}. Symmetric to add but emitted explicitly so search/proof bridges can attribute the step honestly. */
+    public static final class SubtractBothSidesRule implements EquationRule {
+        @Override
+        public String id() {
+            return "equation_subtract_both_sides";
+        }
+
+        @Override
+        public String description() {
+            return "Auf beiden Seiten denselben Term subtrahieren";
+        }
+
+        @Override
+        public List<EquationStep> apply(Equation equation, EquationRewriteContext context) {
+            List<EquationStep> steps = new ArrayList<>();
+            for (Expr operand : context.candidateOperands()) {
+                BinaryExpr left = new BinaryExpr(equation.left(), BinaryOperator.SUB, operand);
+                BinaryExpr right = new BinaryExpr(equation.right(), BinaryOperator.SUB, operand);
+                steps.add(new EquationStep(
+                    id(),
+                    new Equation(left, right),
+                    "Subtrahiere " + ExpressionFormatter.format(operand) + " auf beiden Seiten",
+                    List.of()
+                ));
+            }
+            return steps;
+        }
+    }
+
+    /** {@code a = b ⇒ a/c = b/c} with the assumption {@code c != 0}. */
+    public static final class DivideBothSidesRule implements EquationRule {
+        @Override
+        public String id() {
+            return "equation_divide_both_sides";
+        }
+
+        @Override
+        public String description() {
+            return "Beide Seiten durch denselben (von 0 verschiedenen) Term dividieren";
+        }
+
+        @Override
+        public List<EquationStep> apply(Equation equation, EquationRewriteContext context) {
+            List<EquationStep> steps = new ArrayList<>();
+            for (Expr operand : context.candidateOperands()) {
+                if (operand instanceof NumberExpr numberExpr && numberExpr.value() == 0.0) {
+                    // Division by zero is undefined.
+                    continue;
+                }
+                BinaryExpr left = new BinaryExpr(equation.left(), BinaryOperator.DIV, operand);
+                BinaryExpr right = new BinaryExpr(equation.right(), BinaryOperator.DIV, operand);
+                String operandString = ExpressionFormatter.format(operand);
+                steps.add(new EquationStep(
+                    id(),
+                    new Equation(left, right),
+                    "Dividiere beide Seiten durch " + operandString,
+                    List.of(Assumption.nonZero(operandString))
                 ));
             }
             return steps;

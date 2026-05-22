@@ -290,3 +290,38 @@ table.compare thead th { background: #eff6ff; }
 .benchmark-table thead th { background: #f9fafb; }
 .benchmark-ok    { color: #065f46; font-weight: 600; }
 .benchmark-miss  { color: #991b1b; font-weight: 600; }
+
+/* ── Math-domain UI polish (PR #13 follow-up) ───────────────────────── */
+.math-domain-panel {
+  margin: 12px 0; padding: 12px 14px;
+  border-left: 4px solid #6366f1; background: #f5f7ff; border-radius: 4px;
+}
+.math-inequality-panel { border-left-color: #b91c1c; background: #fef2f2; }
+.math-derivative-panel { border-left-color: #047857; background: #ecfdf5; }
+.math-matrix-panel     { border-left-color: #7c3aed; background: #f5f3ff; }
+.math-equation-steps th, .math-equation-steps td {
+  border-bottom: 1px solid #e5e7eb; padding: 4px 8px; text-align: left;
+}
+.replay-flip-notice {
+  margin: 8px 0; padding: 8px 10px; border-radius: 4px;
+}
+.replay-rule-card {
+  margin: 8px 0; padding: 8px 10px;
+  border: 1px solid #d1d5db; border-radius: 4px; background: #f9fafb;
+}
+.replay-derivative-card { border-color: #047857; background: #ecfdf5; }
+.replay-matrix-card     { border-color: #7c3aed; background: #f5f3ff; }
+.benchmark-group { margin: 20px 0; }
+.benchmark-group-title {
+  margin: 8px 0; padding-bottom: 4px; border-bottom: 2px solid #cbd5e1;
+  color: #1e293b;
+}
+.proof-bridge-panel {
+  margin: 16px 0; padding: 12px 14px;
+  border: 1px dashed #6366f1; border-radius: 6px; background: #fafbff;
+}
+.proof-bridge-panel pre {
+  background: #0f172a; color: #f1f5f9; padding: 10px;
+  border-radius: 4px; overflow-x: auto; max-height: 320px;
+}
+.proof-bridge-summary { margin: 8px 0; }
