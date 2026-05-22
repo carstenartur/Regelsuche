@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -65,6 +66,14 @@ public final class ProofJobScheduler implements AutoCloseable {
             t.setDaemon(true);
             return t;
         });
+
+    /**
+     * Single executor that runs every individual proof attempt. Using a
+     * shared virtual-thread-per-task executor avoids the per-job leak that
+     * existed in the first PR 15 cut, where every {@code processPending()}
+     * call instantiated (and never closed) a fresh executor.
+     */
+    private final ExecutorService workerExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     /** Running futures keyed by job id — for cancellation. */
     private final Map<String, Future<?>> runningFutures = new ConcurrentHashMap<>();
@@ -209,8 +218,8 @@ public final class ProofJobScheduler implements AutoCloseable {
             ""
         );
 
-        // Submit to thread pool with timeout
-        Future<ProofWorker.Result> future = Executors.newVirtualThreadPerTaskExecutor()
+        // Submit to the shared worker executor with timeout
+        Future<ProofWorker.Result> future = workerExecutor
             .submit(() -> worker.prove(candidate, job.assumptions()));
         runningFutures.put(job.id(), future);
         try {
@@ -282,10 +291,21 @@ public final class ProofJobScheduler implements AutoCloseable {
     @Override
     public void close() {
         scheduler.shutdownNow();
+        workerExecutor.shutdownNow();
         try {
             scheduler.awaitTermination(2, TimeUnit.SECONDS);
+            workerExecutor.awaitTermination(2, TimeUnit.SECONDS);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /**
+     * @return whether the shared worker executor has fully shut down. Exposed
+     *         primarily for tests that verify {@link #close()} cleans up
+     *         executor resources.
+     */
+    public boolean isWorkerExecutorTerminated() {
+        return workerExecutor.isTerminated();
     }
 }

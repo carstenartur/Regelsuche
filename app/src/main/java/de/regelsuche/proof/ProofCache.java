@@ -22,6 +22,23 @@ public interface ProofCache {
      */
     void put(ProofCacheKey key, CandidateProofStatus status);
 
+    /**
+     * @return the full {@link ProofCacheEntry} if cached. Default delegates to
+     *         {@link #get(ProofCacheKey)} so legacy in-memory implementations
+     *         keep working with status-only semantics.
+     */
+    default Optional<ProofCacheEntry> getEntry(ProofCacheKey key) {
+        return get(key).map(ProofCacheEntry::ofStatus);
+    }
+
+    /**
+     * Store the full entry. Default implementation discards the extra metadata
+     * by delegating to {@link #put(ProofCacheKey, CandidateProofStatus)}.
+     */
+    default void putEntry(ProofCacheKey key, ProofCacheEntry entry) {
+        put(key, entry.status());
+    }
+
     /** @return the current number of cache entries. */
     int size();
 
