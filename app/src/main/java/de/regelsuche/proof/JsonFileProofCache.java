@@ -2,12 +2,12 @@ package de.regelsuche.proof;
 
 import de.regelsuche.inventory.MiniJson;
 import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -144,14 +144,7 @@ public final class JsonFileProofCache implements ProofCache {
             builder.append('\n');
         }
         builder.append("  ]\n}\n");
-        Path tmp = file.resolveSibling(file.getFileName().toString() + ".tmp");
-        Files.writeString(tmp, builder.toString(), StandardCharsets.UTF_8);
-        try {
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException ex) {
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
-        }
+        AtomicJsonFile.writeUtf8(file, builder.toString());
     }
 
     private static CandidateProofStatus safeStatus(String name) {

@@ -159,6 +159,60 @@ public final class DemoCatalog {
             "A * B + A * C",
             "linear-algebra"
         ));
+        // ---------------- didactic demos (PR 17) ----------------
+        // These four entries are reachable through the same DemoService
+        // pipeline but are tagged with domain="didactic" so the UI can
+        // route them to the Didaktik panel (replay with SymbolDiff,
+        // hint mode, step check).
+        map.put("didaktik-multipath", new Demo(
+            "didaktik-multipath",
+            "Mehrere Lösungswege",
+            "(x+1)*(x+2) lässt sich auf mehreren Wegen vereinfachen: erst ausmultiplizieren "
+                + "und zusammenfassen, oder erst ein Argument vereinfachen. Der Didaktik-Modus "
+                + "macht alle Wege sichtbar und vergleichbar.",
+            "(x+1)*(x+2)",
+            InputType.TERM,
+            SearchProfile.DISCOVERY,
+            "Mehrere äquivalente Pfade zum gleichen Ziel",
+            "2 + 3 * x + x ^ 2",
+            "didactic"
+        ));
+        map.put("didaktik-typischer-fehler", new Demo(
+            "didaktik-typischer-fehler",
+            "Typischer Fehler",
+            "Aus (a+b)/b kürzen Lernende oft fälschlich das b zu a. Der Didaktik-Modus "
+                + "erkennt diese Fehlvorstellung und liefert eine Korrektur-Erklärung.",
+            "(a + b) / b",
+            InputType.TERM,
+            SearchProfile.DISCOVERY,
+            "Falsches Kürzen einer Summe im Zähler erkannt",
+            "1 + a / b",
+            "didactic"
+        ));
+        map.put("didaktik-hinweis", new Demo(
+            "didaktik-hinweis",
+            "Hinweis-Modus",
+            "a*(b+c) soll ausmultipliziert werden. Der Hinweis-Modus liefert gestufte Hilfen: "
+                + "vom kleinen Tipp über die Regelnennung bis zum vollständigen nächsten Schritt.",
+            "a * (b + c)",
+            InputType.TERM,
+            SearchProfile.DISCOVERY,
+            "Gestufte Hinweise: SMALL → STRONG → FULL_STEP",
+            "a * b + a * c",
+            "didactic"
+        ));
+        map.put("didaktik-schrittpruefung", new Demo(
+            "didaktik-schrittpruefung",
+            "Schrittprüfung",
+            "Die Lernenden geben einen Zwischenschritt ein. Der StudentStepValidator prüft "
+                + "auf Äquivalenz, Schwierigkeitsbudget und typische Fehlvorstellungen.",
+            "2 * (x + 3)",
+            InputType.TERM,
+            SearchProfile.DISCOVERY,
+            "Schritt akzeptiert oder typischer Fehler erkannt",
+            "2 * x + 6",
+            "didactic"
+        ));
         return java.util.Collections.unmodifiableMap(map);
     }
 

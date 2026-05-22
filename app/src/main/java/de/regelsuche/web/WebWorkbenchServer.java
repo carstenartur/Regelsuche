@@ -42,6 +42,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyStore;
 import java.util.HashMap;
 import java.util.List;
@@ -75,8 +76,13 @@ public class WebWorkbenchServer {
     private final de.regelsuche.proof.ProofBridgeService leanProofBridgeService;
     private final de.regelsuche.proof.ProofBridgeService smtProofBridgeService;
     private final de.regelsuche.proof.ProofWorkbenchService proofWorkbenchService;
+    private final de.regelsuche.didactic.analytics.DidacticEventStore didacticEventStore;
+    private final de.regelsuche.didactic.analytics.DidacticAnalyticsService didacticAnalytics;
+    private final de.regelsuche.didactic.StudentStepValidator didacticStepValidator;
 
     private HttpServer server;
+    private final de.regelsuche.didactic.export.EducationalExporter didacticExporter =
+        new de.regelsuche.didactic.export.EducationalExporter();
 
     public WebWorkbenchServer(
         String host,
@@ -157,12 +163,49 @@ public class WebWorkbenchServer {
         this.transformationQuery = new TransformationQueryService(graphStore);
         this.inventoryQuery = new RuleInventoryQueryService(graphStore, inventoryRepository);
         this.exportQuery = new ExportQueryService(graphStore, inventoryRepository);
+        this.didacticEventStore = createDidacticEventStore();
+        this.didacticAnalytics = new de.regelsuche.didactic.analytics.DidacticAnalyticsService(didacticEventStore);
+        this.didacticStepValidator = new de.regelsuche.didactic.StudentStepValidator(new SymPyEquivalenceService());
     }
 
     private static de.regelsuche.proof.ProofBridgeService defaultProofBridgeService(
         de.regelsuche.proof.ProofBridge bridge
     ) {
         return new de.regelsuche.proof.ProofBridgeService(bridge);
+    }
+
+    private static de.regelsuche.didactic.analytics.DidacticEventStore createDidacticEventStore() {
+        Map<String, String> env = System.getenv();
+        String jsonPath = readConfig(env, "REGELSUCHE_DIDACTIC_EVENT_STORE");
+        if (!jsonPath.isBlank()) {
+            try {
+                return new de.regelsuche.didactic.analytics.JsonFileDidacticEventStore(Path.of(jsonPath));
+            } catch (IOException ex) {
+                throw new IllegalStateException("Unable to initialize didactic event store at " + jsonPath, ex);
+            }
+        }
+        int maxEvents = parsePositiveInt(readConfig(env, "REGELSUCHE_DIDACTIC_EVENT_MAX"), 5000);
+        return new de.regelsuche.didactic.analytics.InMemoryDidacticEventStore(maxEvents);
+    }
+
+    private static String readConfig(Map<String, String> env, String key) {
+        String value = env.get(key);
+        if (value == null || value.isBlank()) {
+            value = System.getProperty(key);
+        }
+        return value == null ? "" : value.trim();
+    }
+
+    private static int parsePositiveInt(String value, int fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            return parsed > 0 ? parsed : fallback;
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
     }
 
     public void start() throws IOException {
@@ -190,6 +233,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/proof-bridge", this::handleProofBridge));
         secure(server.createContext("/api/proof/jobs", this::handleProofJobs));
         secure(server.createContext("/api/benchmark", this::handleBenchmark));
+        secure(server.createContext("/api/didactic", this::handleDidactic));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
         server.start();
@@ -864,6 +908,300 @@ public class WebWorkbenchServer {
         de.regelsuche.analyze.MoveAnalysisDto analysis =
             new de.regelsuche.analyze.MoveAnalysisService().analyze(graph, expression);
         sendJson(exchange, 200, moveAnalysisToJson(analysis));
+    }
+
+    /**
+     * Didactic learning-system endpoints (PR 17):
+     * <ul>
+     *   <li>{@code POST /api/didactic/step-check} —
+     *       body {@code {"currentExpression": "...", "studentStep": "...",
+     *       "difficulty": "MITTELSTUFE"}}; returns the
+     *       {@link de.regelsuche.didactic.StudentStepValidator.Result}.</li>
+     *   <li>{@code POST /api/didactic/hint/{pathId}} —
+     *       body {@code {"currentExpression": "...", "pedagogyProfile":
+     *       "SCHOOL"}}; returns the graduated hint sequence for the next
+     *       step of the named derivation.</li>
+     *   <li>{@code GET  /api/didactic/misconceptions} — lists the built-in
+     *       misconception catalogue.</li>
+     * </ul>
+     */
+    private void handleDidactic(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String suffix = path.substring("/api/didactic".length()).replaceFirst("^/", "");
+        if (suffix.startsWith("step-check")) {
+            handleDidacticStepCheck(exchange);
+            return;
+        }
+        if (suffix.startsWith("hint/")) {
+            handleDidacticHint(exchange, suffix.substring("hint/".length()));
+            return;
+        }
+        if (suffix.startsWith("hint")) {
+            sendStatus(exchange, 400, "expected /api/didactic/hint/{pathId}");
+            return;
+        }
+        if (suffix.startsWith("misconceptions")) {
+            handleDidacticMisconceptions(exchange);
+            return;
+        }
+        if (suffix.startsWith("analytics")) {
+            handleDidacticAnalytics(exchange);
+            return;
+        }
+        if (suffix.startsWith("replay/")) {
+            handleDidacticReplay(exchange, suffix.substring("replay/".length()));
+            return;
+        }
+        if (suffix.startsWith("replay")) {
+            sendStatus(exchange, 400, "expected /api/didactic/replay/{pathId}");
+            return;
+        }
+        if (suffix.startsWith("export/")) {
+            handleDidacticExport(exchange, suffix.substring("export/".length()));
+            return;
+        }
+        if (suffix.startsWith("export")) {
+            sendStatus(exchange, 400,
+                "expected /api/didactic/export/{worksheet|solution|teacher}/{pathId}.md");
+            return;
+        }
+        if (suffix.isEmpty()) {
+            JsonWriter writer = new JsonWriter();
+            writer.beginObject();
+            writer.object("endpoints", inner -> {
+                inner.property("stepCheck", "/api/didactic/step-check");
+                inner.property("hint", "/api/didactic/hint/{pathId}");
+                inner.property("misconceptions", "/api/didactic/misconceptions");
+                inner.property("analytics", "/api/didactic/analytics");
+                inner.property("replay", "/api/didactic/replay/{pathId}");
+                inner.property("exportWorksheet", "/api/didactic/export/worksheet/{pathId}.md");
+                inner.property("exportSolution",  "/api/didactic/export/solution/{pathId}.md");
+                inner.property("exportTeacher",   "/api/didactic/export/teacher/{pathId}.md");
+            });
+            writer.endObject();
+            sendJson(exchange, 200, writer.toString());
+            return;
+        }
+        sendStatus(exchange, 404, "unknown didactic endpoint: " + suffix);
+    }
+
+    private void handleDidacticStepCheck(HttpExchange exchange) throws IOException {
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        Map<String, Object> body = readJsonObject(exchange);
+        String currentExpression = stringValue(body, "currentExpression", "");
+        String studentStep       = stringValue(body, "studentStep", "");
+        String difficulty        = stringValue(body, "difficulty", "MITTELSTUFE");
+        if (currentExpression.isBlank() || studentStep.isBlank()) {
+            sendStatus(exchange, 400,
+                "currentExpression and studentStep are required");
+            return;
+        }
+        de.regelsuche.didactic.DifficultyLevel level;
+        try {
+            level = de.regelsuche.didactic.DifficultyLevel.valueOf(
+                difficulty.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            sendStatus(exchange, 400, "invalid difficulty: " + difficulty);
+            return;
+        }
+        de.regelsuche.didactic.StudentStepValidator.Result result =
+            didacticStepValidator.validate(currentExpression, studentStep, level);
+
+        didacticEventStore.record(de.regelsuche.didactic.analytics.DidacticEvent.stepCheck(
+            java.time.Instant.now(),
+            level,
+            result.correct(),
+            result.didacticallyAppropriate(),
+            result.misconception().map(de.regelsuche.didactic.MisconceptionRule::id).orElse(null)
+        ));
+
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("correct", result.correct());
+        writer.property("didacticallyAppropriate", result.didacticallyAppropriate());
+        writer.property("message", result.message());
+        writer.property("difficulty", level.name());
+        result.misconception().ifPresent(rule -> writer.object("misconception", inner -> {
+            inner.property("id", rule.id());
+            inner.property("wrongRulePattern", rule.wrongRulePattern());
+            inner.property("typicalCause", rule.typicalCause());
+            inner.property("explanation", rule.explanation());
+            inner.property("correctionSuggestion", rule.correctionSuggestion());
+        }));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleDidacticHint(HttpExchange exchange, String pathId) throws IOException {
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        if (pathId.isBlank()) {
+            sendStatus(exchange, 400, "expected /api/didactic/hint/{pathId}");
+            return;
+        }
+        var match = graphStore.discoveredTransformations().stream()
+            .filter(t -> t.id().equals(pathId))
+            .findFirst();
+        if (match.isEmpty()) {
+            sendStatus(exchange, 404, "path not found");
+            return;
+        }
+        Map<String, Object> body = readJsonObject(exchange);
+        String currentExpression = stringValue(body, "currentExpression", "");
+        String profile = stringValue(body, "pedagogyProfile", "SCHOOL");
+
+        de.regelsuche.didactic.PedagogyProfile profileEnum;
+        try {
+            profileEnum = de.regelsuche.didactic.PedagogyProfile.valueOf(
+                profile.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            sendStatus(exchange, 400, "invalid pedagogyProfile: " + profile);
+            return;
+        }
+        var hints = new de.regelsuche.didactic.HintGenerator()
+            .hintsFor(match.get(), currentExpression, profileEnum);
+
+        de.regelsuche.didactic.HintGenerator.Strength deliveredStrength = hints.isEmpty()
+            ? null
+            : hints.get(hints.size() - 1).strength();
+        didacticEventStore.record(de.regelsuche.didactic.analytics.DidacticEvent.hint(
+            java.time.Instant.now(),
+            pathId,
+            profileEnum,
+            deliveredStrength
+        ));
+
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("pathId", pathId);
+        writer.property("pedagogyProfile", profileEnum.name());
+        writer.array("hints", arr -> hints.forEach(hint ->
+            arr.objectValue(inner -> {
+                inner.property("strength", hint.strength().name());
+                inner.property("text", hint.text());
+            })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleDidacticMisconceptions(HttpExchange exchange) throws IOException {
+        var detector = new de.regelsuche.didactic.MisconceptionDetector();
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.array("misconceptions", arr -> detector.catalogue().forEach(rule ->
+            arr.objectValue(inner -> {
+                inner.property("id", rule.id());
+                inner.property("wrongRulePattern", rule.wrongRulePattern());
+                inner.property("typicalCause", rule.typicalCause());
+                inner.property("explanation", rule.explanation());
+                inner.property("correctionSuggestion", rule.correctionSuggestion());
+            })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleDidacticAnalytics(HttpExchange exchange) throws IOException {
+        var snapshot = didacticAnalytics.snapshot();
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("totalEvents", snapshot.totalEvents());
+        writer.property("stepChecks", snapshot.stepChecks());
+        writer.property("hints", snapshot.hints());
+        writer.property("correctSteps", snapshot.correctSteps());
+        writer.property("didacticallyAppropriateSteps", snapshot.didacticallyAppropriateSteps());
+        writer.property("accuracy", snapshot.accuracy());
+        writer.property("appropriateness", snapshot.appropriateness());
+        writer.object("misconceptionFrequency", inner -> snapshot.misconceptionFrequency()
+            .forEach(inner::property));
+        writer.object("stepChecksByDifficulty", inner -> snapshot.stepChecksByDifficulty()
+            .forEach((k, v) -> inner.property(k.name(), v)));
+        writer.object("hintsByStrength", inner -> snapshot.hintsByStrength()
+            .forEach((k, v) -> inner.property(k.name(), v)));
+        writer.object("hintsByProfile", inner -> snapshot.hintsByProfile()
+            .forEach((k, v) -> inner.property(k.name(), v)));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleDidacticReplay(HttpExchange exchange, String pathId) throws IOException {
+        if (pathId.isBlank()) {
+            sendStatus(exchange, 400, "expected /api/didactic/replay/{pathId}");
+            return;
+        }
+        var match = graphStore.discoveredTransformations().stream()
+            .filter(t -> t.id().equals(pathId))
+            .findFirst();
+        if (match.isEmpty()) {
+            sendStatus(exchange, 404, "path not found");
+            return;
+        }
+        var derivation = match.get();
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("pathId", pathId);
+        writer.property("originalExpression", derivation.originalExpression());
+        writer.property("improvedExpression", derivation.improvedExpression());
+        writer.array("steps", arr -> derivation.steps().forEach(step ->
+            arr.objectValue(inner -> {
+                inner.property("index", step.index());
+                inner.property("beforeExpression", step.beforeExpression());
+                inner.property("afterExpression", step.afterExpression());
+                inner.property("ruleId", step.ruleId());
+                inner.property("ruleKind", step.ruleKind().name());
+                inner.property("explanation", step.explanation());
+                inner.array("diffTokens", tokensArr ->
+                    de.regelsuche.didactic.SymbolDiff.diff(
+                            step.beforeExpression(), step.afterExpression())
+                        .forEach(token -> tokensArr.objectValue(tokenObj -> {
+                            tokenObj.property("text", token.text());
+                            tokenObj.property("change", token.change().name());
+                        })));
+            })));
+        writer.endObject();
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void handleDidacticExport(HttpExchange exchange, String suffix) throws IOException {
+        // suffix is e.g. "worksheet/some-path-id.md"
+        int slash = suffix.indexOf('/');
+        if (slash <= 0 || slash >= suffix.length() - 1) {
+            sendStatus(exchange, 400,
+                "expected /api/didactic/export/{worksheet|solution|teacher}/{pathId}.md");
+            return;
+        }
+        String kind = suffix.substring(0, slash);
+        String rest = suffix.substring(slash + 1);
+        if (rest.endsWith(".md")) {
+            rest = rest.substring(0, rest.length() - 3);
+        }
+        if (rest.isBlank()) {
+            sendStatus(exchange, 400, "missing pathId");
+            return;
+        }
+        final String pathId = rest;
+        var match = graphStore.discoveredTransformations().stream()
+            .filter(t -> t.id().equals(pathId))
+            .findFirst();
+        if (match.isEmpty()) {
+            sendStatus(exchange, 404, "path not found");
+            return;
+        }
+        String body = switch (kind.toLowerCase(Locale.ROOT)) {
+            case "worksheet" -> didacticExporter.worksheet(match.get());
+            case "solution"  -> didacticExporter.solution(match.get());
+            case "teacher"   -> didacticExporter.teacherMode(match.get());
+            default          -> null;
+        };
+        if (body == null) {
+            sendStatus(exchange, 404, "unknown export kind: " + kind);
+            return;
+        }
+        send(exchange, 200, "text/markdown; charset=utf-8", body);
     }
 
     private String moveAnalysisToJson(de.regelsuche.analyze.MoveAnalysisDto a) {

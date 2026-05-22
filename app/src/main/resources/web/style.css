@@ -345,3 +345,23 @@ table.compare thead th { background: #eff6ff; }
   border-radius: 4px; overflow-x: auto; max-height: 320px;
 }
 .proof-bridge-summary { margin: 8px 0; }
+
+/* Didaktik tab (PR 17) */
+.didaktik-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 12px; }
+.didaktik-controls label { display: flex; flex-direction: column; font-size: 0.85em; }
+.didaktik-controls input, .didaktik-controls select { padding: 4px 6px; min-width: 220px; }
+.didaktik-controls button { padding: 6px 12px; }
+.didaktik-replay, .didaktik-hints, .didaktik-step-result { margin-top: 12px; }
+.didaktik-step { padding: 8px; border-left: 3px solid #ccc; margin: 6px 0; background: #fafafa; }
+.didaktik-step-diff { font-family: monospace; margin-top: 4px; }
+.didaktik-hint { padding: 6px 10px; margin: 4px 0; border-radius: 4px; background: #f0f4f8; }
+.didaktik-hint-small { border-left: 3px solid #4caf50; }
+.didaktik-hint-strong { border-left: 3px solid #ff9800; }
+.didaktik-hint-full_step { border-left: 3px solid #f44336; }
+.didaktik-misconception { margin-top: 8px; padding: 8px; background: #fce8e6; border-radius: 4px; }
+.didaktik-analytics { background: #0f172a; color: #f1f5f9; padding: 10px;
+  border-radius: 4px; overflow-x: auto; max-height: 320px; }
+.diff-unchanged { color: #444; }
+.diff-added { background: #d4edda; color: #155724; padding: 0 2px; border-radius: 2px; }
+.diff-removed { background: #f8d7da; color: #721c24; padding: 0 2px;
+  border-radius: 2px; text-decoration: line-through; }

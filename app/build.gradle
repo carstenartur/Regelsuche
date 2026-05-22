@@ -1,5 +1,7 @@
 plugins {
     id 'application'
+    id 'jacoco'
+    id 'me.champeau.jmh' version '0.7.2'
 }
 
 repositories {
@@ -26,6 +28,43 @@ application {
 
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+// ─── Coverage (JaCoCo) ────────────────────────────────────────────────
+//
+// Generates HTML + XML reports under `app/build/reports/jacoco/test/`.
+// XML feeds the shields.io endpoint badge built by the CI workflow.
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestReport')
+}
+
+// ─── JMH micro-benchmarks ─────────────────────────────────────────────
+//
+// Source set `src/jmh/java`. Run with `./gradlew :app:jmh`. CI publishes the
+// JSON result via benchmark-action/github-action-benchmark to gh-pages.
+jmh {
+    resultFormat = 'JSON'
+    resultsFile = layout.buildDirectory.file('reports/jmh/result.json')
+    fork = 1
+    warmupIterations = 2
+    iterations = 3
+    timeOnIteration = '1s'
+    warmup = '1s'
+    failOnError = true
 }
 
 // ─── Professional end-to-end demo tests ────────────────────────────────

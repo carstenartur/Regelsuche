@@ -3,9 +3,15 @@
 [![CI/CD](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/coverage/badge.json)](https://carstenartur.github.io/Regelsuche/coverage/)
 [![Tests](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/tests/badge.json)](https://carstenartur.github.io/Regelsuche/tests/)
+[![Benchmarks](https://github.com/carstenartur/Regelsuche/actions/workflows/benchmark.yml/badge.svg?branch=main)](https://carstenartur.github.io/Regelsuche/dev/bench/)
+[![Release](https://github.com/carstenartur/Regelsuche/actions/workflows/release.yml/badge.svg)](https://github.com/carstenartur/Regelsuche/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![SBOM](https://img.shields.io/badge/SBOM-CycloneDX-informational?logo=owasp&style=flat)](https://github.com/carstenartur/Regelsuche/dependency-graph/sbom)
-[![GitHub release](https://img.shields.io/github/v/release/carstenartur/Regelsuche?style=flat-square)](https://github.com/carstenartur/Regelsuche/releases)
+[![GitHub release](https://img.shields.io/github/v/release/carstenartur/Regelsuche?display_name=tag&sort=semver)](https://github.com/carstenartur/Regelsuche/releases)
+
+📊 **[Coverage report](https://carstenartur.github.io/Regelsuche/coverage/)** ·
+📋 **[Test report](https://carstenartur.github.io/Regelsuche/tests/)** ·
+⚡ **[Performance charts](https://carstenartur.github.io/Regelsuche/dev/bench/)**
 
 > **Regelsuche macht mathematische Umformungsräume sichtbar.**
 > Knoten sind Ausdrücke, Kanten sind Umformungen, Pfade sind Rechenwege —
@@ -137,5 +143,9 @@ Pull Requests sind willkommen — bitte beachte:
 * Screenshots in [docs/demo-gallery.md](docs/demo-gallery.md) werden
   ausschließlich über `./gradlew e2eTest -Pregelsuche.recordDocs=true`
   aktualisiert — niemals händisch ersetzen.
+* Nutzerseitige Texte (Demo-Gallery, UI, Replay-Karten, Berichte)
+  bitte gegen die
+  [Documentation Quality Checklist](docs/documentation-quality-checklist.md)
+  prüfen.
 
 Lizenz: [MIT](LICENSE).
