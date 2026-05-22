@@ -72,8 +72,7 @@
      */
     window.renderMath = function renderMath(root) {
         if (!root) { return; }
-        const nodes = root.querySelectorAll('[data-math], .math, .latex');
-        if (typeof window.renderMathInElement === 'function') {
+        const nodes = root.querySelectorAll('[data-math], .math, .latex');        if (typeof window.renderMathInElement === 'function') {
             try {
                 window.renderMathInElement(root, {
                     delimiters: [
@@ -110,6 +109,66 @@
             node.appendChild(code);
             node.classList.add('math-fallback');
         });
+    };
+
+    /**
+     * Stage 5 — layout-aware math renderer. Prefers the structured
+     * {@code MathLayout} (when present) over the raw LaTeX string so the
+     * front-end can apply CSS-grid-based aligned-row rendering, emit
+     * diff CSS classes as plain DOM attributes (no KaTeX trust mode
+     * required), and inject the AST-derived `aria-label` on the host
+     * element for screen-reader accessibility.
+     *
+     * Falls back to {@link window.renderMath} on the raw LaTeX string
+     * when no layout is available, so all existing call sites keep
+     * working unchanged.
+     */
+    window.renderMathLayout = function renderMathLayout(layout, host) {
+        if (!host) { return; }
+        if (!layout || typeof layout !== 'object') {
+            window.renderMath(host);
+            return;
+        }
+        if (layout.aria) {
+            host.setAttribute('aria-label', String(layout.aria));
+        }
+        const kind = layout.kind || 'INLINE';
+        if (kind === 'ALIGNED' && Array.isArray(layout.nodes)) {
+            // Render each aligned row as a CSS-grid row so the
+            // front-end can attach per-row hover / highlight / diff
+            // styles without LaTeX surgery. The plain LaTeX fallback
+            // for the whole block is still available via the layout's
+            // `toLatex()` server-side counterpart.
+            host.classList.add('math-aligned-rows');
+            host.innerHTML = '';
+            layout.nodes.forEach((row, idx) => {
+                if (!row || row.kind !== 'ALIGNED_ROW') { return; }
+                const rowEl = document.createElement('div');
+                rowEl.className = 'math-aligned-row';
+                rowEl.setAttribute('data-row-index', String(idx));
+                (row.children || []).forEach((child) => {
+                    if (!child) { return; }
+                    const span = document.createElement('span');
+                    if (child.attributes && child.attributes.class) {
+                        span.className = child.attributes.class;
+                    }
+                    const text = child.text || '';
+                    span.setAttribute('data-math', '$' + text + '$');
+                    span.textContent = '$' + text + '$';
+                    rowEl.appendChild(span);
+                });
+                host.appendChild(rowEl);
+            });
+            window.renderMath(host);
+            return;
+        }
+        // INLINE / DISPLAY: render the concatenated fragment string via
+        // the existing KaTeX pipeline.
+        const text = (layout.nodes || []).map((n) => n && n.text ? n.text : '').join('');
+        const wrapped = kind === 'DISPLAY' ? ('$$' + text + '$$') : ('$' + text + '$');
+        host.setAttribute('data-math', wrapped);
+        host.textContent = wrapped;
+        window.renderMath(host);
     };
 
     const $ = (id) => document.getElementById(id);

@@ -135,6 +135,19 @@ public record PathReplayDto(
                 MathDiff.diffSpans(fromLatex, toLatex).toSpans()
             );
         }
+
+        /**
+         * Stage 5 — structured {@link de.regelsuche.export.layout.MathLayout MathLayout}
+         * for this step (the "to" side, which is what the UI shows for the
+         * step's result row). Derived on demand from {@link #toLatex()}
+         * and {@link #toExpression()}.
+         */
+        public de.regelsuche.export.layout.MathLayout layout() {
+            return de.regelsuche.export.layout.MathLayout.fromLatexFragment(
+                toLatex,
+                de.regelsuche.export.layout.AstAriaRenderer.ariaLabel(toExpression)
+            );
+        }
     }
 
     public static PathReplayDto from(DiscoveredTransformation path, ExplanationService explanationService) {
@@ -168,5 +181,28 @@ public record PathReplayDto(
 
     private static String toLatex(String expression) {
         return MATH.latex(expression);
+    }
+
+    /**
+     * Stage 5 — structured aligned-derivation
+     * {@link de.regelsuche.export.layout.MathLayout MathLayout} for this
+     * replay. Derived on demand from the contained steps via
+     * {@link MathPresentation#derivationLayout(java.util.List)} so the
+     * record itself stays codec-compatible while still exposing the
+     * layout pipeline to layout-aware front-ends and exports.
+     */
+    public de.regelsuche.export.layout.MathLayout derivationLayout() {
+        List<MathPresentation.DerivationStep> derivation = new ArrayList<>(steps.size());
+        for (ReplayStep step : steps) {
+            derivation.add(new MathPresentation.DerivationStep(
+                step.fromLatex(),
+                step.toLatex(),
+                step.ruleId(),
+                step.comparatorFlipped(),
+                step.changedFromSpans(),
+                step.changedToSpans()
+            ));
+        }
+        return MATH.derivationLayout(derivation);
     }
 }

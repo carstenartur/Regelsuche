@@ -94,3 +94,49 @@ Erweiterung von `resources/web/index.html` und `app.js`:
 5. ✅ **UI** – Graph (Mermaid), Replay, Identitäten, Dashboard. Cytoscape-Vendoring
    ist als spätere Option dokumentiert, aber nicht enthalten, um die Repo-Größe
    nicht aufzublähen.
+
+## Stage 4 — KaTeX-Knoten-Overlays
+
+Seit Stage 4 zeichnet der Graph-Tab die Knoten-Labels nicht mehr als
+Plain-Text in den Cytoscape-Canvas, sondern als absolut positionierte
+KaTeX-HTML-Overlays in einem `.graph-overlay-layer`-Wrapper, der über
+dem Canvas liegt:
+
+* Backend: `SearchGraphNodeDto.expressionLatex` (durch
+  `MathPresentation.latex(...)` geroutet) wird vom
+  `SearchGraphAssembler`, `SearchGraphJsonSerializer`,
+  `SearchGraphRecordCodec` und den drei Repository-Backends
+  (`InMemorySearchGraphRepository`, `JsonFileSearchGraphRepository`,
+  `Neo4jSearchGraphRepository`) durchgereicht.
+* Frontend: das `graphMathOverlay`-Modul in `app.js` hängt sich an die
+  Cytoscape-Ereignisse `layoutstop`, `pan`, `zoom`, `position` und
+  projiziert die Bounding-Box jedes Knotens zurück in
+  Container-Koordinaten. Pro Knoten existiert ein
+  `<div class="graph-node-math" data-node-id="…">` mit gerendertem
+  KaTeX-Ausdruck; CSS-Transitions
+  (`transition: transform 200ms ease, opacity 200ms ease;`) halten die
+  Bewegung weich.
+* Farb-Tokens: `.graph-node-math.is-best` und `.is-dead-end` spiegeln
+  die bestehende Cytoscape-Style-Logik wider.
+* Optional: Kanten-Labels (`ruleLatex`) erhalten dieselbe Behandlung,
+  sobald der Canvas-Container das Attribut
+  `data-graph-math-edges` trägt; per Default sind nur die Knoten als
+  KaTeX-Overlay aktiv, um die Performance der initialen Layout-Phase
+  nicht zu gefährden.
+
+## Stage 5 — Strukturierte Layout-Beschreibung
+
+`SearchGraphNodeDto.layout()` und `SearchGraphEdgeDto.layout()` liefern
+eine `MathLayout` mit ARIA-Label (aus `AstAriaRenderer`). Die
+KaTeX-Overlays konsumieren das `aria-label` zusätzlich als Screenreader-
+Text, ohne den sichtbaren KaTeX-Render zu ändern.
+
+## Tests
+
+* Stage 4 Backend: `SearchGraphNodeDtoTest`,
+  `SearchGraphRepositoryTest#codecRoundTripsExpressionLatexForNodes`.
+* Stage 4 Frontend: `WebUiMathPipelineTest#appJsInstallsKatexGraphOverlay`
+  pinnt das `graphMathOverlay`-Modul, den `.graph-overlay-layer`-Wrapper
+  und den `renderMath()`-Aufruf nach `layoutstop`.
+* Stage 4 E2E: `de.regelsuche.e2e.GraphOverlayBrowserFlowTest` (Playwright,
+  läuft unter `:app:e2eTest`).

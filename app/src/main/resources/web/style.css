@@ -302,6 +302,26 @@ footer { text-align: center; padding: 1rem; color: #9ca3af; font-size: 0.8rem; }
     box-shadow: none;
     padding: 0 2px;
 }
+
+/* ─── Stage 5 — layout-aware aligned rows ─── */
+.math-aligned-rows {
+    display: grid;
+    grid-auto-rows: minmax(1.6rem, auto);
+    gap: 0.15rem;
+}
+.math-aligned-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.1rem 0.25rem;
+    border-radius: 4px;
+}
+.math-aligned-row:hover {
+    background: #eef2ff;
+}
+.math-aligned-row[data-row-index]:focus-within {
+    outline: 2px solid #6366f1;
+}
 .latex { font-style: italic; color: #4b5563; }
 .graph-inspector { background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.75rem; margin-top: 0.5rem; border-radius: 6px; font-size: 0.9rem; }
 table.compare { border-collapse: collapse; width: 100%; margin-bottom: 0.75rem; }

@@ -95,4 +95,18 @@ public record SearchGraphNodeDto(
         this(id, expression, latex, score, depth, visitedCount, isBest, isDeadEnd,
             candidateStatus, clusterId, SearchExpression.classify(expression), null);
     }
+
+    /**
+     * Stage 5 — structured {@link de.regelsuche.export.layout.MathLayout MathLayout}
+     * for the node's expression. Derived on demand from {@link #expressionLatex()}
+     * via {@link de.regelsuche.export.MathPresentation#layout(String)} with an
+     * ARIA label sourced from the raw {@link #expression()}. Layout-aware
+     * front-end overlays consume this via {@code renderMathLayout(layout, host)}.
+     */
+    public de.regelsuche.export.layout.MathLayout layout() {
+        return de.regelsuche.export.layout.MathLayout.fromLatexFragment(
+            expressionLatex,
+            de.regelsuche.export.layout.AstAriaRenderer.ariaLabel(expression)
+        );
+    }
 }

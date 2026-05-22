@@ -222,4 +222,40 @@ class WebUiMathPipelineTest {
                 && content.contains(".graph-node-math.is-dead-end"),
             "missing best/dead-end color tokens that mirror the cytoscape block");
     }
+
+    /**
+     * Stage 5 pin: the front-end exposes a {@code renderMathLayout}
+     * helper that prefers the structured layout when available, sets
+     * the host's {@code aria-label} from the layout's aria field, and
+     * renders aligned rows under a {@code .math-aligned-rows} grid.
+     */
+    @Test
+    void appJsDefinesLayoutAwareRenderer() throws IOException {
+        Path appJs = locateAppJs();
+        if (appJs == null) {
+            return;
+        }
+        String content = Files.readString(appJs);
+        assertTrue(content.contains("renderMathLayout"),
+            "app.js must define a renderMathLayout(layout, host) helper");
+        assertTrue(content.contains("math-aligned-rows"),
+            "app.js must emit a .math-aligned-rows grid wrapper for ALIGNED layouts");
+        assertTrue(content.contains("math-aligned-row"),
+            "app.js must emit per-row .math-aligned-row elements for aligned layouts");
+        assertTrue(content.contains("setAttribute('aria-label'"),
+            "app.js must inject the layout's aria label as aria-label on the host");
+    }
+
+    @Test
+    void styleCssDefinesLayoutAwareAlignedRowRules() throws IOException {
+        Path styleCss = locateStyleCss();
+        if (styleCss == null) {
+            return;
+        }
+        String content = Files.readString(styleCss);
+        assertTrue(content.contains(".math-aligned-rows"),
+            "missing .math-aligned-rows CSS-grid wrapper rule");
+        assertTrue(content.contains(".math-aligned-row"),
+            "missing per-row .math-aligned-row rule");
+    }
 }

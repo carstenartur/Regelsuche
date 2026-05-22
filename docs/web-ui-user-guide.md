@@ -85,3 +85,30 @@ Schnellreferenz für Syntax und Workflow.
 * LaTeX wird als Text dargestellt; eine eingebettete Render-Engine
   (KaTeX/MathJax) ist bewusst nicht enthalten, um keinerlei externe
   CDN-Zugriffe zu erzwingen.
+
+## Math-Rendering-Pipeline (Stages 3–5)
+
+Die Web-UI bündelt die Darstellung mathematischer Ausdrücke in einer
+einzigen Pipeline, die in drei Stufen ausgebaut wurde:
+
+* **Stage 3 — Farb-Diff & Vergleichszeichen-Hinweis.** Der Replay-Tab
+  hebt geänderte Tokens zwischen zwei aufeinanderfolgenden Schritten
+  farblich hervor (`.diff-old`, `.diff-new`) und zeigt bei Regeln, die
+  ein Vergleichszeichen drehen, einen roten Hinweis
+  (`.replay-flip-notice`) an. Das Flag wird ausschließlich vom
+  Backend (`PathReplayDto.ReplayStep.comparatorFlipped`) gesetzt, die
+  Diff-Spans liefert `MathDiff` über einen Token-Diff von
+  `fromLatex` / `toLatex`. Details: `docs/replay-mode.md`.
+* **Stage 4 — KaTeX-Graph-Overlays.** Der Such-Graph-Tab rendert
+  Knoten-Labels als KaTeX-HTML-Overlays über dem Cytoscape-Canvas und
+  hält sie per CSS-Transition mit Pan/Zoom synchron. Quellfeld:
+  `SearchGraphNodeDto.expressionLatex`. Details:
+  `docs/visual-search-graph.md`.
+* **Stage 5 — Layout-Pipeline.** `MathPresentation.layout(...)` /
+  `derivationLayout(...)` liefern eine strukturierte `MathLayout`
+  (`INLINE` / `DISPLAY` / `ALIGNED`) mit `ariaLabel`. Die Front-End-
+  Funktion `renderMathLayout(layout, host)` bevorzugt das Layout
+  gegenüber dem reinen LaTeX-String, rendert `ALIGNED`-Blöcke als
+  CSS-Grid (`.math-aligned-rows`) und blendet das `aria-label` als
+  Screenreader-Text ein. KaTeX-Trust-Mode wird für Diffs nur auf dem
+  String-Fallback-Pfad benötigt.

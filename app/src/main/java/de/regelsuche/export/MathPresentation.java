@@ -1,5 +1,9 @@
 package de.regelsuche.export;
 
+import de.regelsuche.export.layout.AstAriaRenderer;
+import de.regelsuche.export.layout.MathLayout;
+import de.regelsuche.export.layout.MathLayoutNode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -330,5 +334,56 @@ public final class MathPresentation {
             out.append(latex, cursor, latex.length());
         }
         return out.toString();
+    }
+
+    /**
+     * Stage 5 — produces a structured {@link MathLayout} for a single
+     * expression. By default returns a single-fragment inline layout
+     * whose {@link MathLayoutNode#toLatex()} round-trips to
+     * {@link #latex(String)}, plus an ARIA label derived from the raw
+     * expression via {@link AstAriaRenderer}.
+     */
+    public MathLayout layout(String expression) {
+        String latex = latex(expression);
+        String aria = AstAriaRenderer.ariaLabel(expression);
+        return MathLayout.fromLatexFragment(latex, aria);
+    }
+
+    /**
+     * Stage 5 — structured aligned-derivation layout. Each step
+     * becomes one {@link MathLayoutNode.Kind#ALIGNED_ROW} composed of
+     * a from-fragment + arrow-label + to-fragment. Diff spans from the
+     * step's {@code changedFromSpans} / {@code changedToSpans} are
+     * surfaced as {@code "diff-old"} / {@code "diff-new"} CSS classes
+     * on the corresponding fragment nodes, so the front-end can render
+     * colour-diff highlights as DOM attributes (no KaTeX trust mode
+     * required for diffs in the layout-aware path).
+     */
+    public MathLayout derivationLayout(List<DerivationStep> steps) {
+        if (steps == null || steps.isEmpty()) {
+            return new MathLayout(MathLayout.Kind.ALIGNED, List.of(), "");
+        }
+        List<MathLayoutNode> rows = new ArrayList<>(steps.size() + 1);
+        // First row: the source expression (no arrow label).
+        rows.add(MathLayoutNode.alignedRow(List.of(
+            MathLayoutNode.fragment(steps.get(0).fromLatex())
+        )));
+        for (DerivationStep step : steps) {
+            List<MathLayoutNode> rowChildren = new ArrayList<>(2);
+            rowChildren.add(MathLayoutNode.arrowLabel(ruleLatex(step.ruleId())));
+            // Wrap the entire to-fragment as a single fragment node with
+            // a `diff-new` CSS class when at least one diff span is
+            // present (the per-character splitting lives on the
+            // string-based path that consumes \htmlClass wrappers).
+            boolean hasDiff = step.changedToSpans() != null && !step.changedToSpans().isEmpty();
+            rowChildren.add(MathLayoutNode.fragment(
+                step.toLatex(), hasDiff ? "diff-new" : null));
+            rows.add(MathLayoutNode.alignedRow(rowChildren));
+        }
+        StringBuilder aria = new StringBuilder();
+        for (DerivationStep step : steps) {
+            aria.append(AstAriaRenderer.ariaLabel(step.toLatex())).append("; ");
+        }
+        return new MathLayout(MathLayout.Kind.ALIGNED, rows, aria.toString().trim());
     }
 }
