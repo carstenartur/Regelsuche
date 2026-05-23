@@ -21,7 +21,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Build, test, coverage
         run: ./gradlew build jacocoTestReport
       - name: Generate badge JSON for coverage & tests
@@ -123,7 +123,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
@@ -151,7 +151,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
@@ -180,7 +180,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Run benchmark + render report
         run: ./gradlew benchmarkReport
       - name: Upload benchmark report (Markdown)
@@ -238,7 +238,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
