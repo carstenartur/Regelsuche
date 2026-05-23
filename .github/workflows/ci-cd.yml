@@ -92,13 +92,13 @@ jobs:
           EOF
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: app/build/reports/jacoco/test/**
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unit-test-reports
           path: '**/build/reports/tests/**'
@@ -133,7 +133,7 @@ jobs:
         run: ./gradlew e2eTest
       - name: Upload E2E reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-test-reports
           path: |
@@ -160,12 +160,12 @@ jobs:
       - name: Record screenshots and videos
         run: ./gradlew e2eTest -Pregelsuche.recordDocs=true
       - name: Upload screenshots
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-screenshots
           path: docs/assets/screenshots/**
       - name: Upload videos
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-videos
           path: docs/assets/videos/**
@@ -184,12 +184,12 @@ jobs:
       - name: Run benchmark + render report
         run: ./gradlew benchmarkReport
       - name: Upload benchmark report (Markdown)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-report
           path: docs/benchmark-report.md
       - name: Upload benchmark summary (JSON)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-summary
           path: docs/assets/benchmark-summary.json
@@ -250,7 +250,7 @@ jobs:
         run: ./gradlew dockerE2eTest
       - name: Upload Docker E2E reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docker-e2e-test-reports
           path: |
