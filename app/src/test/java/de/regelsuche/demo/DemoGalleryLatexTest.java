@@ -109,6 +109,15 @@ class DemoGalleryLatexTest {
             "Matrix demo result must be AB + AC in LaTeX form");
     }
 
+    @Test
+    void demoGalleryHasNoIndentedDisplayMathBlocks() {
+        String outsideCode = stripFencedCodeBlocks(gallery);
+        assertFalse(outsideCode.matches("(?sm).*^[ \\t]+\\$\\$.*"),
+            "Display math blocks must not be indented in docs/demo-gallery.md");
+        assertFalse(outsideCode.matches("(?sm).*^[ \\t]+\\\\begin\\{(?:aligned|bmatrix)\\}.*"),
+            "aligned/bmatrix blocks must not be indented in docs/demo-gallery.md");
+    }
+
     private String sectionFor(String headingFragment) {
         Pattern p = Pattern.compile("(?m)^## .*" + Pattern.quote(headingFragment) + ".*$");
         Matcher m = p.matcher(gallery);
