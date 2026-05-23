@@ -1216,8 +1216,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1216">            default          -&gt; null;</span>
         };
 <span class="fc bfc" id="L1218" title="All 2 branches covered.">        if (body == null) {</span>
-<span class="fc" id="L1219">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
-<span class="fc" id="L1220">            return;</span>
+<span class="nc" id="L1219">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
+<span class="nc" id="L1220">            return;</span>
         }
 <span class="fc" id="L1222">        send(exchange, 200, &quot;text/markdown; charset=utf-8&quot;, body);</span>
 <span class="fc" id="L1223">    }</span>
