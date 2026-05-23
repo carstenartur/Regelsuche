@@ -136,6 +136,22 @@ class SearchGraphRepositoryTest {
         }
     }
 
+    @Test
+    void codecJsonContainsLayoutForGraphAndReplayPayloads() {
+        SearchGraphRecord record = sampleRecord("session-stage5");
+
+        String json = SearchGraphRecordCodec.toJson(record);
+
+        assertTrue(json.contains("\"layout\":{\"kind\""),
+            "codec JSON must include a layout object for math-bearing nodes/edges/steps");
+        assertTrue(json.contains("\"derivationLayout\":{\"kind\":\"ALIGNED\""),
+            "codec JSON must include the replay derivationLayout object");
+        assertTrue(json.contains("\"nodes\":[{"),
+            "codec JSON must still contain the graph nodes array");
+        assertTrue(json.contains("\"aria\""),
+            "layout JSON must carry the aria label for the frontend renderer");
+    }
+
     private static SearchGraphRecord sampleRecord(String id) {
         SearchGraphNodeDto node = new SearchGraphNodeDto(
             "x", "x", "x", 3, 0, 1, false, false,

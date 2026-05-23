@@ -2,6 +2,7 @@ package de.regelsuche.api.searchgraph;
 
 import de.regelsuche.api.IdentityReportDto;
 import de.regelsuche.api.PathReplayDto;
+import de.regelsuche.export.layout.MathLayoutJsonWriter;
 import de.regelsuche.json.JsonReader;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.mining.CandidateProofStatus;
@@ -51,6 +52,7 @@ public final class SearchGraphRecordCodec {
             inner.property("expression", node.expression());
             inner.property("latex", node.latex());
             inner.property("expressionLatex", node.expressionLatex());
+            MathLayoutJsonWriter.write(inner, "layout", node.layout());
             inner.property("score", node.score());
             inner.property("depth", node.depth());
             inner.property("visitedCount", node.visitedCount());
@@ -64,6 +66,7 @@ public final class SearchGraphRecordCodec {
             inner.property("to", edge.to());
             inner.property("ruleId", edge.ruleId());
             inner.property("ruleLatex", edge.ruleLatex());
+            MathLayoutJsonWriter.write(inner, "layout", edge.layout());
             inner.property("ruleKind", edge.ruleKind().name());
             inner.property("scoreDelta", edge.scoreDelta());
             inner.stringArray("assumptions", edge.assumptions());
@@ -97,6 +100,7 @@ public final class SearchGraphRecordCodec {
         writer.property("pathId", replay.pathId());
         writer.property("alignedDerivationLatex", replay.alignedDerivationLatex());
         writer.property("alignedDerivationLatexWithDiff", replay.alignedDerivationLatexWithDiff());
+        MathLayoutJsonWriter.write(writer, "derivationLayout", replay.derivationLayout());
         writer.array("steps", w -> replay.steps().forEach(step -> w.objectValue(inner -> {
             inner.property("stepIndex", step.stepIndex());
             inner.property("fromExpression", step.fromExpression());
@@ -110,6 +114,7 @@ public final class SearchGraphRecordCodec {
             inner.property("comparatorFlipped", step.comparatorFlipped());
             writeSpanArray(inner, "changedFromSpans", step.changedFromSpans());
             writeSpanArray(inner, "changedToSpans", step.changedToSpans());
+            MathLayoutJsonWriter.write(inner, "layout", step.layout());
         })));
     }
 
@@ -191,20 +196,22 @@ public final class SearchGraphRecordCodec {
     private static SearchGraphDto readGraph(Map<String, Object> values) {
         List<SearchGraphNodeDto> nodes = readList(values.get("nodes")).stream()
             .map(SearchGraphRecordCodec::asMap)
-            .map(m -> new SearchGraphNodeDto(
-                stringValue(m.get("id"), ""),
-                stringValue(m.get("expression"), ""),
-                stringValue(m.get("latex"), ""),
-                intValue(m.get("score"), 0),
-                intValue(m.get("depth"), 0),
-                intValue(m.get("visitedCount"), 0),
-                booleanValue(m.get("isBest"), false),
-                booleanValue(m.get("isDeadEnd"), false),
-                CandidateProofStatus.valueOf(stringValue(m.get("candidateStatus"), CandidateProofStatus.OBSERVED.name())),
-                stringValue(m.get("clusterId"), ""),
-                SearchExpression.classify(stringValue(m.get("expression"), "")),
-                m.get("expressionLatex") == null ? null : String.valueOf(m.get("expressionLatex"))
-            ))
+            .map(m -> {
+                return new SearchGraphNodeDto(
+                    stringValue(m.get("id"), ""),
+                    stringValue(m.get("expression"), ""),
+                    stringValue(m.get("latex"), ""),
+                    intValue(m.get("score"), 0),
+                    intValue(m.get("depth"), 0),
+                    intValue(m.get("visitedCount"), 0),
+                    booleanValue(m.get("isBest"), false),
+                    booleanValue(m.get("isDeadEnd"), false),
+                    CandidateProofStatus.valueOf(stringValue(m.get("candidateStatus"), CandidateProofStatus.OBSERVED.name())),
+                    stringValue(m.get("clusterId"), ""),
+                    SearchExpression.classify(stringValue(m.get("expression"), "")),
+                    m.get("expressionLatex") == null ? null : String.valueOf(m.get("expressionLatex"))
+                );
+            })
             .toList();
         List<SearchGraphEdgeDto> edges = readList(values.get("edges")).stream()
             .map(SearchGraphRecordCodec::asMap)
@@ -259,24 +266,26 @@ public final class SearchGraphRecordCodec {
     private static PathReplayDto readReplay(Map<String, Object> values) {
         List<PathReplayDto.ReplayStep> steps = readList(values.get("steps")).stream()
             .map(SearchGraphRecordCodec::asMap)
-            .map(m -> new PathReplayDto.ReplayStep(
-                intValue(m.get("stepIndex"), 0),
-                stringValue(m.get("fromExpression"), ""),
-                stringValue(m.get("fromLatex"), ""),
-                stringValue(m.get("toExpression"), ""),
-                stringValue(m.get("toLatex"), ""),
-                stringValue(m.get("ruleId"), ""),
-                stringValue(m.get("ruleExplanation"), ""),
-                intValue(m.get("scoreDelta"), 0),
-                booleanValue(m.get("equivalencePreserving"), true),
-                booleanValue(m.get("comparatorFlipped"),
-                    de.regelsuche.export.MathPresentation.detectComparatorFlip(
-                        stringValue(m.get("ruleId"), ""),
-                        stringValue(m.get("fromExpression"), ""),
-                        stringValue(m.get("toExpression"), ""))),
-                readSpanList(m.get("changedFromSpans")),
-                readSpanList(m.get("changedToSpans"))
-            ))
+            .map(m -> {
+                return new PathReplayDto.ReplayStep(
+                    intValue(m.get("stepIndex"), 0),
+                    stringValue(m.get("fromExpression"), ""),
+                    stringValue(m.get("fromLatex"), ""),
+                    stringValue(m.get("toExpression"), ""),
+                    stringValue(m.get("toLatex"), ""),
+                    stringValue(m.get("ruleId"), ""),
+                    stringValue(m.get("ruleExplanation"), ""),
+                    intValue(m.get("scoreDelta"), 0),
+                    booleanValue(m.get("equivalencePreserving"), true),
+                    booleanValue(m.get("comparatorFlipped"),
+                        de.regelsuche.export.MathPresentation.detectComparatorFlip(
+                            stringValue(m.get("ruleId"), ""),
+                            stringValue(m.get("fromExpression"), ""),
+                            stringValue(m.get("toExpression"), ""))),
+                    readSpanList(m.get("changedFromSpans")),
+                    readSpanList(m.get("changedToSpans"))
+                );
+            })
             .toList();
         String pathId = stringValue(values.get("pathId"), "?");
         Object persisted = values.get("alignedDerivationLatex");

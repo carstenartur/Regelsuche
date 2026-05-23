@@ -16,6 +16,7 @@ import de.regelsuche.explain.ExplanationService;
 import de.regelsuche.export.DefaultTransformationImportService;
 import de.regelsuche.export.ExportBundle;
 import de.regelsuche.export.TransformationExportService;
+import de.regelsuche.export.layout.MathLayoutJsonWriter;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
@@ -604,6 +605,7 @@ public class WebWorkbenchServer {
         writer.property("pathId", dto.pathId());
         writer.property("alignedDerivationLatex", dto.alignedDerivationLatex());
         writer.property("alignedDerivationLatexWithDiff", dto.alignedDerivationLatexWithDiff());
+        MathLayoutJsonWriter.write(writer, "derivationLayout", dto.derivationLayout());
         writer.array("steps", w -> dto.steps().forEach(step ->
             w.objectValue(inner -> {
                 inner.property("stepIndex", step.stepIndex());
@@ -618,6 +620,7 @@ public class WebWorkbenchServer {
                 inner.property("comparatorFlipped", step.comparatorFlipped());
                 writeReplaySpanArray(inner, "changedFromSpans", step.changedFromSpans());
                 writeReplaySpanArray(inner, "changedToSpans", step.changedToSpans());
+                MathLayoutJsonWriter.write(inner, "layout", step.layout());
             })));
         writer.endObject();
         return writer.toString();
@@ -2068,6 +2071,8 @@ public class WebWorkbenchServer {
         } else if (path.startsWith("/static/")) {
             String resource = "/web" + path.substring("/static".length());
             sendStaticResource(exchange, resource, mimeFor(resource));
+        } else if (path.startsWith("/vendor/") || path.equals("/app.js") || path.equals("/style.css")) {
+            sendStaticResource(exchange, "/web" + path, mimeFor(path));
         } else {
             sendStatus(exchange, 404, "not found");
         }
@@ -2082,6 +2087,18 @@ public class WebWorkbenchServer {
         }
         if (resource.endsWith(".css")) {
             return "text/css; charset=utf-8";
+        }
+        if (resource.endsWith(".woff2")) {
+            return "font/woff2";
+        }
+        if (resource.endsWith(".woff")) {
+            return "font/woff";
+        }
+        if (resource.endsWith(".ttf")) {
+            return "font/ttf";
+        }
+        if (resource.endsWith(".svg")) {
+            return "image/svg+xml";
         }
         return "application/octet-stream";
     }

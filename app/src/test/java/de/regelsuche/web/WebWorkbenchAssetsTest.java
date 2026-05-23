@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Verifies that the embedded web workbench assets are present on the
  * classpath in the expected layout. The asset paths must stay stable for
- * {@code WebWorkbenchServer} to serve them via {@code /static/*}.
+ * {@code WebWorkbenchServer} to serve them via the bundled root-relative
+ * asset paths.
  */
 class WebWorkbenchAssetsTest {
 
@@ -26,9 +27,10 @@ class WebWorkbenchAssetsTest {
     void webUiServesWorkbenchAssets() throws IOException {
         String html = resourceAsString("/web/index.html");
         assertTrue(html.contains("<title>Regelsuche Workbench</title>"));
-        // Must reference the JS/CSS bundle and the static prefix used by the server.
-        assertTrue(html.contains("/static/style.css"));
-        assertTrue(html.contains("/static/app.js"));
+        assertTrue(html.contains("style.css"));
+        assertTrue(html.contains("app.js"));
+        assertTrue(html.contains("vendor/katex/katex.min.css"));
+        assertTrue(html.contains("vendor/katex/katex.min.js"));
         // Tab navigation backbone must be present so the UI is actually a SPA.
         assertTrue(html.contains("data-tab=\"workbench\""));
         assertTrue(html.contains("data-tab=\"candidates\""));

@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Regelsuche Workbench</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <script defer src="vendor/katex/katex.min.js"></script>
+    <script defer src="vendor/katex/contrib/auto-render.min.js"></script>
 </head>
 <body class="pre-search" data-pre-search="true">
 <header>
@@ -209,8 +212,8 @@
             </div>
             <p class="hint">Im interaktiven Modus rendert <code>cytoscape.js</code> den Suchgraph als
                 zoom-/pan-/klickbare Visualisierung mit Inspector-Panel.
-                Fällt automatisch auf die Mermaid-Quelltext-Ansicht zurück, wenn das CDN nicht erreichbar ist.
-                LaTeX im Inspector wird über <code>MathJax</code> gerendert.</p>
+                Falls das Asset nicht geladen werden kann, bleibt die Mermaid-Quelltext-Ansicht als Fallback.
+                LaTeX im Inspector wird direkt über <code>KaTeX</code> gerendert.</p>
             <div id="graphCanvas" class="graph-canvas" style="height:520px;border:1px solid #ddd;border-radius:8px;background:#fafafa;display:none;"></div>
             <div id="graphInspector" class="graph-inspector" style="display:none;"></div>
             <pre id="graphOutput" class="output mono"></pre>
@@ -514,6 +517,6 @@
     <small>Regelsuche · lokales Web-Frontend · für Trial &amp; Discovery, nicht für Produktion.</small>
 </footer>
 
-<script src="/static/app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

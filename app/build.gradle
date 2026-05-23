@@ -8,6 +8,10 @@ repositories {
     mavenCentral()
 }
 
+def vendorWebRoot = layout.projectDirectory.dir('src/main/resources/web/vendor')
+def vendorKatexDir = vendorWebRoot.dir('katex')
+def vendorCytoscapeDir = vendorWebRoot.dir('cytoscape')
+
 dependencies {
     implementation 'org.neo4j.driver:neo4j-java-driver:6.1.0'
     implementation 'org.graalvm.polyglot:polyglot:24.2.1'
@@ -86,12 +90,74 @@ sourceSets {
 configurations {
     e2eTestImplementation.extendsFrom testImplementation
     e2eTestRuntimeOnly.extendsFrom testRuntimeOnly
+    webAssets
+}
+
+def vendorJar = { String artifact ->
+    def jar = configurations.webAssets.resolve().find { it.name.startsWith(artifact + '-') }
+    if (jar == null) {
+        throw new GradleException("Missing web asset jar for ${artifact}")
+    }
+    jar
+}
+
+tasks.register('vendorKatexAssets', Sync) {
+    from({ zipTree(vendorJar('katex')) }) {
+        include 'META-INF/resources/webjars/katex/*/dist/katex.min.css'
+        include 'META-INF/resources/webjars/katex/*/dist/katex.min.js'
+        include 'META-INF/resources/webjars/katex/*/dist/contrib/auto-render.min.js'
+        include 'META-INF/resources/webjars/katex/*/dist/fonts/**'
+        include 'META-INF/resources/webjars/katex/*/LICENSE'
+        include 'META-INF/resources/webjars/katex/*/README.md'
+        eachFile { file ->
+            file.path = file.path.replaceFirst(
+                /^META-INF\/resources\/webjars\/katex\/[^\/]+\/dist\//, '')
+            file.path = file.path.replaceFirst(
+                /^META-INF\/resources\/webjars\/katex\/[^\/]+\//, '')
+        }
+        includeEmptyDirs = false
+    }
+    into(vendorKatexDir)
+}
+
+tasks.register('vendorCytoscapeAssets', Sync) {
+    from({ zipTree(vendorJar('cytoscape')) }) {
+        include 'META-INF/resources/webjars/cytoscape/*/dist/cytoscape.min.js'
+        include 'META-INF/resources/webjars/cytoscape/*/LICENSE'
+        include 'META-INF/resources/webjars/cytoscape/*/README.md'
+        eachFile { file ->
+            file.path = file.path.replaceFirst(
+                /^META-INF\/resources\/webjars\/cytoscape\/[^\/]+\/dist\//, '')
+            file.path = file.path.replaceFirst(
+                /^META-INF\/resources\/webjars\/cytoscape\/[^\/]+\//, '')
+        }
+        includeEmptyDirs = false
+    }
+    into(vendorCytoscapeDir)
+}
+
+tasks.register('vendorWebAssets') {
+    description = 'Vendors KaTeX and Cytoscape assets from WebJars into src/main/resources/web/vendor.'
+    group = 'build setup'
+    dependsOn tasks.named('vendorKatexAssets'), tasks.named('vendorCytoscapeAssets')
+}
+
+tasks.named('processResources') {
+    dependsOn tasks.named('vendorWebAssets')
+}
+
+tasks.named('processE2eTestResources') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 dependencies {
     e2eTestImplementation 'com.microsoft.playwright:playwright:1.49.0'
     e2eTestImplementation 'org.testcontainers:testcontainers:1.20.4'
     e2eTestImplementation 'org.testcontainers:junit-jupiter:1.20.4'
+    webAssets 'org.webjars.npm:katex:0.16.11'
+    // 3.28.1 is not published as a WebJar on Maven Central; 3.27.0 is the
+    // closest available self-hostable npm WebJar.
+    webAssets 'org.webjars.npm:cytoscape:3.27.0'
 }
 
 tasks.register('installPlaywrightBrowsers', JavaExec) {
@@ -130,6 +196,14 @@ tasks.register('e2eTest', Test) {
     // System property is consumed by BrowserDemoFlowTest.
     systemProperty 'regelsuche.recordDocs',
         providers.gradleProperty('regelsuche.recordDocs').getOrElse('false')
+    systemProperty 'regelsuche.updateScreenshots',
+        providers.gradleProperty('regelsuche.updateScreenshots').getOrElse('false')
+    // Visual-regression suite (MathRenderingVisualTest) is opt-in: pixel
+    // baselines drift across rendering environments, so CI keeps it off
+    // by default. Run locally with -Pregelsuche.runVisualTests=true and
+    // refresh baselines with -Pregelsuche.updateScreenshots=true.
+    systemProperty 'regelsuche.runVisualTests',
+        providers.gradleProperty('regelsuche.runVisualTests').getOrElse('false')
     // Surface useful Playwright output during long-running browser runs.
     testLogging {
         events 'passed', 'skipped', 'failed'

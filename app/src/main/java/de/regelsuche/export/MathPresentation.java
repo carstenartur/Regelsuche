@@ -1,8 +1,10 @@
 package de.regelsuche.export;
 
 import de.regelsuche.export.layout.AstAriaRenderer;
+import de.regelsuche.export.layout.AstDiff;
 import de.regelsuche.export.layout.MathLayout;
 import de.regelsuche.export.layout.MathLayoutNode;
+import de.regelsuche.parse.ExpressionParser;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -43,13 +45,19 @@ public final class MathPresentation {
     );
 
     private final AstLatexRenderer renderer;
+    private final ExpressionParser parser;
 
     public MathPresentation() {
-        this(new AstLatexRenderer());
+        this(new AstLatexRenderer(), new ExpressionParser());
     }
 
     public MathPresentation(AstLatexRenderer renderer) {
+        this(renderer, new ExpressionParser());
+    }
+
+    public MathPresentation(AstLatexRenderer renderer, ExpressionParser parser) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
+        this.parser = Objects.requireNonNull(parser, "parser");
     }
 
     /**
@@ -139,7 +147,8 @@ public final class MathPresentation {
         boolean comparatorFlipped,
         List<int[]> changedFromSpans,
         List<int[]> changedToSpans,
-        String toExpression
+        String toExpression,
+        String fromExpression
     ) {
         public DerivationStep {
             fromLatex = fromLatex == null ? "" : fromLatex;
@@ -150,12 +159,33 @@ public final class MathPresentation {
             changedToSpans = changedToSpans == null
                 ? List.of() : List.copyOf(changedToSpans);
             toExpression = toExpression == null ? "" : toExpression;
+            fromExpression = fromExpression == null ? "" : fromExpression;
+        }
+
+        /**
+         * Backward-compatible 7-arg constructor used by callers that pre-date
+         * the Stage 5 from-expression addition. Sets {@code fromExpression}
+         * to empty string; AST diff will fall back to span-based diff for the
+         * first step when {@code fromExpression} is unavailable.
+         */
+        public DerivationStep(
+            String fromLatex,
+            String toLatex,
+            String ruleId,
+            boolean comparatorFlipped,
+            List<int[]> changedFromSpans,
+            List<int[]> changedToSpans,
+            String toExpression
+        ) {
+            this(fromLatex, toLatex, ruleId, comparatorFlipped,
+                changedFromSpans, changedToSpans, toExpression, "");
         }
 
         /**
          * Backward-compatible 6-arg constructor used by callers that pre-date
          * the Stage 5 expression-for-aria addition. Sets {@code toExpression}
-         * to empty string; aria labels will be omitted for such steps.
+         * and {@code fromExpression} to empty string; aria labels and AST diff
+         * will be omitted for such steps.
          */
         public DerivationStep(
             String fromLatex,
@@ -166,7 +196,7 @@ public final class MathPresentation {
             List<int[]> changedToSpans
         ) {
             this(fromLatex, toLatex, ruleId, comparatorFlipped,
-                changedFromSpans, changedToSpans, "");
+                changedFromSpans, changedToSpans, "", "");
         }
 
         /**
@@ -185,6 +215,7 @@ public final class MathPresentation {
                     toLatex == null ? "" : toLatex).fromSpans(),
                 MathDiff.diffSpans(fromLatex == null ? "" : fromLatex,
                     toLatex == null ? "" : toLatex).toSpans(),
+                "",
                 ""
             );
         }
@@ -285,6 +316,7 @@ public final class MathPresentation {
      * present so callers do not need to special-case the empty-diff
      * case.</p>
      */
+    @Deprecated(forRemoval = false)
     public String alignedDerivationLatexWithDiff(List<DerivationStep> steps) {
         if (steps == null || steps.isEmpty()) {
             return "";
@@ -378,6 +410,25 @@ public final class MathPresentation {
         return MathLayout.fromLatexFragment(latex, aria);
     }
 
+    public MathLayout layoutWithDiff(
+        String fromExpression,
+        String toExpression,
+        String fallbackLatex,
+        List<int[]> fallbackSpans
+    ) {
+        String latex = (fallbackLatex == null || fallbackLatex.isBlank()) ? latex(toExpression) : fallbackLatex;
+        String aria = AstAriaRenderer.ariaLabel(toExpression);
+        AstDiff.Result diff = astDiff(fromExpression, toExpression);
+        if (diff != null && !diff.toNodes().isEmpty()) {
+            return new MathLayout(MathLayout.Kind.INLINE, diff.toNodes(), aria);
+        }
+        return new MathLayout(
+            MathLayout.Kind.INLINE,
+            List.of(MathLayoutNode.fragment(latex, hasSpans(fallbackSpans) ? "diff-new" : null)),
+            aria
+        );
+    }
+
     /**
      * Stage 5 — structured aligned-derivation layout. Each step
      * becomes one {@link MathLayoutNode.Kind#ALIGNED_ROW} composed of
@@ -389,29 +440,33 @@ public final class MathPresentation {
      * required for diffs in the layout-aware path).
      */
     public MathLayout derivationLayout(List<DerivationStep> steps) {
+        return alignedDerivationLayoutWithDiff(steps);
+    }
+
+    public MathLayout alignedDerivationLayoutWithDiff(List<DerivationStep> steps) {
         if (steps == null || steps.isEmpty()) {
             return new MathLayout(MathLayout.Kind.ALIGNED, List.of(), "");
         }
         List<MathLayoutNode> rows = new ArrayList<>(steps.size() + 1);
-        // First row: the source expression (no arrow label).
         rows.add(MathLayoutNode.alignedRow(List.of(
-            MathLayoutNode.fragment(steps.get(0).fromLatex())
+            MathLayoutNode.fragment(
+                steps.get(0).fromLatex(),
+                hasSpans(steps.get(0).changedFromSpans()) ? "diff-old" : null)
         )));
+        String previousExpression = steps.get(0).fromExpression();
         for (DerivationStep step : steps) {
             List<MathLayoutNode> rowChildren = new ArrayList<>(2);
             rowChildren.add(MathLayoutNode.arrowLabel(ruleLatex(step.ruleId())));
-            // Wrap the entire to-fragment as a single fragment node with
-            // a `diff-new` CSS class when at least one diff span is
-            // present (the per-character splitting lives on the
-            // string-based path that consumes \htmlClass wrappers).
-            boolean hasDiff = step.changedToSpans() != null && !step.changedToSpans().isEmpty();
-            rowChildren.add(MathLayoutNode.fragment(
-                step.toLatex(), hasDiff ? "diff-new" : null));
+            AstDiff.Result diff = astDiff(previousExpression, step.toExpression());
+            if (diff != null && !diff.toNodes().isEmpty()) {
+                rowChildren.addAll(diff.toNodes());
+            } else {
+                rowChildren.add(MathLayoutNode.fragment(
+                    step.toLatex(), hasSpans(step.changedToSpans()) ? "diff-new" : null));
+            }
             rows.add(MathLayoutNode.alignedRow(rowChildren));
+            previousExpression = step.toExpression();
         }
-        // Build aria label from raw expressions when available; skip steps where
-        // only LaTeX is present (AstAriaRenderer is designed for raw expressions
-        // and would produce backslash-heavy labels from LaTeX input).
         StringBuilder aria = new StringBuilder();
         for (DerivationStep step : steps) {
             String expr = step.toExpression();
@@ -420,5 +475,21 @@ public final class MathPresentation {
             }
         }
         return new MathLayout(MathLayout.Kind.ALIGNED, rows, aria.toString().trim());
+    }
+
+    private AstDiff.Result astDiff(String fromExpression, String toExpression) {
+        if (fromExpression == null || fromExpression.isBlank()
+            || toExpression == null || toExpression.isBlank()) {
+            return null;
+        }
+        try {
+            return AstDiff.diff(parser.parseTerm(fromExpression), parser.parseTerm(toExpression), renderer);
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private static boolean hasSpans(List<int[]> spans) {
+        return spans != null && !spans.isEmpty();
     }
 }
