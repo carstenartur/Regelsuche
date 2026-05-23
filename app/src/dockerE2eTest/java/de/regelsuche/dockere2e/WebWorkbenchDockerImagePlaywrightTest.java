@@ -88,15 +88,18 @@ class WebWorkbenchDockerImagePlaywrightTest {
                 new Page.WaitForSelectorOptions().setState(WaitForSelectorState.VISIBLE));
             page.click("button.demo-button[data-demo='binomial']");
 
-            // Wait for the demo summary to be populated (mirrors the proven
-            // waitForDemoSummary helper in BrowserDemoFlowTest).
-            page.waitForFunction(
-                "() => { const el = document.querySelector('#demoSummary');"
-                    + " return el && el.innerHTML.length > 50; }",
-                null,
-                new Page.WaitForFunctionOptions().setTimeout(60_000));
+            // Wait for the deterministic completion event: runDemo() sets
+            // #demoStatus to class "status ok" only after the /api/demo POST
+            // resolves and renderDemoSummary has populated #demoSummary (which
+            // also triggers window.renderMath → KaTeX). This is a true DOM
+            // mutation event, not polling; the timeout is just a safety bound.
+            page.waitForSelector("#demoStatus.ok",
+                new Page.WaitForSelectorOptions()
+                    .setState(WaitForSelectorState.ATTACHED)
+                    .setTimeout(60_000));
 
-            // Wait for KaTeX to render (at least one .katex element must be present)
+            // Wait for KaTeX to insert at least one rendered node (mutation
+            // event on the .katex selector, fired as soon as auto-render runs).
             page.waitForSelector(".katex",
                 new Page.WaitForSelectorOptions()
                     .setState(WaitForSelectorState.ATTACHED)
