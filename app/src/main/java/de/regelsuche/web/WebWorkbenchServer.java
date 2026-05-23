@@ -2066,6 +2066,10 @@ public class WebWorkbenchServer {
 
     private void handleStatic(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
+        if (path.contains("..")) {
+            sendStatus(exchange, 400, "bad request");
+            return;
+        }
         if ("/".equals(path) || "/index.html".equals(path)) {
             sendStaticResource(exchange, "/web/index.html", "text/html; charset=utf-8");
         } else if (path.startsWith("/static/")) {
@@ -2099,6 +2103,9 @@ public class WebWorkbenchServer {
         }
         if (resource.endsWith(".svg")) {
             return "image/svg+xml";
+        }
+        if (resource.endsWith(".json") || resource.endsWith(".map")) {
+            return "application/json; charset=utf-8";
         }
         return "application/octet-stream";
     }

@@ -1,11 +1,12 @@
 # Testing
 
-Regelsuche fährt drei Test-Schichten, alle als Gradle-Tasks:
+Regelsuche fährt vier Test-Schichten, alle als Gradle-Tasks:
 
 | Schicht | Gradle-Task | Was läuft? | Wo? |
 | --- | --- | --- | --- |
 | Unit & Integration | `./gradlew test` | JUnit-5-Tests aller Module (`app/src/test/java`) | im JVM, kein Browser |
 | Browser-E2E | `./gradlew e2eTest` | Playwright steuert Chromium gegen die echte `WebWorkbenchServer`-Instanz | `app/src/e2eTest/java` |
+| Docker-Image-E2E | `./gradlew dockerE2eTest` | Testcontainers baut das Dockerfile, fährt den Container hoch und prüft Asset-Serving und KaTeX-Rendering | `app/src/dockerE2eTest/java` |
 | Doku-Assets | `./gradlew e2eTest -Pregelsuche.recordDocs=true` | gleiche Tests + Screenshots/Videos für die [Demo-Gallery](demo-gallery.md) | Output unter `docs/assets/` |
 | Benchmark-Report | `./gradlew benchmarkReport` | rendert `docs/benchmark-report.md` + `docs/assets/benchmark-summary.json` aus der `BenchmarkSuite` | JVM, kein Browser |
 
@@ -30,11 +31,35 @@ Chromium ins lokale `~/.cache/ms-playwright/`. Dieser Schritt ist
 idempotent.
 
 Die Browser-Tests verwenden bewusst eine in-Process-Server-Variante statt
-Testcontainers, weil das den gleichen Production-Code-Pfad zehnmal schneller
-prüft. `org.testcontainers:testcontainers` ist im
-`e2eTestImplementation`-Classpath vorhanden, damit eine zukünftige
-Docker-Image-Variante (z. B. Full-Mode mit Neo4j) mit minimaler Änderung
-ergänzt werden kann.
+Testcontainers für schnelle Feedback-Loops — ein In-Process-Start ist eine
+Größenordnung schneller als ein Docker-Container-Start.
+
+Für Asset-Serving-Regressions (z. B. den `/vendor/`-Static-Path-Bug, der im
+Mai 2026 die Mathe-Darstellung über mehrere PRs hinweg gebrochen hat) gibt es
+den ergänzenden `dockerE2eTest`-Layer (siehe unten).
+
+## `./gradlew dockerE2eTest`
+
+Baut das Standard-`Dockerfile` via Testcontainers' `ImageFromDockerfile`,
+fährt den Container auf einem zufälligen Port hoch und prüft via HTTP-Client
+und Playwright, dass:
+
+- `/`, `/app.js`, `/style.css` mit korrekten MIME-Typen geliefert werden,
+- `/vendor/katex/katex.min.css`, `/vendor/katex/katex.min.js`,
+  `/vendor/katex/contrib/auto-render.min.js` mit Status 200 und korrekten
+  Content-Types ausgeliefert werden,
+- KaTeX-Fonts (`*.woff2`) mit `font/woff2` ausgeliefert werden,
+- `/vendor/cytoscape/cytoscape.min.js` mit Status 200 ausgeliefert wird,
+- Path-Traversal-Versuche (`/vendor/../../../../etc/passwd`) mit 4xx
+  abgelehnt werden,
+- nach Klick auf den Demo-Button „Binomische Formel" mindestens ein
+  `.katex`-Element im DOM vorhanden ist (KaTeX hat wirklich gerendert).
+
+**Wann laufen diese Tests?** Der Task ist nicht in `check` eingehängt; er
+läuft explizit im CI-Job `docker-image-e2e` oder lokal mit
+`./gradlew dockerE2eTest` (Docker muss verfügbar sein). Ohne erreichbaren
+Docker-Daemon skippen sich die Tests automatisch (via
+`DockerClientFactory.instance().isDockerAvailable()`).
 
 ## `./gradlew e2eTest -Pregelsuche.recordDocs=true`
 
@@ -52,7 +77,7 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
 
 ## CI-Integration
 
-`.github/workflows/ci-cd.yml` fährt vier voneinander unabhängige Jobs:
+`.github/workflows/ci-cd.yml` fährt sechs voneinander unabhängige Jobs:
 
 * `unit-test` — `./gradlew test`
 * `browser-e2e` — installiert Chromium und ruft `./gradlew e2eTest` auf
@@ -62,11 +87,17 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
   [`LandingPageBrowserFlowTest`](../app/src/e2eTest/java/de/regelsuche/e2e/LandingPageBrowserFlowTest.java)
   und den Proof-Job-Flow `proofJobPanelBrowserFlow` aus
   [`ProofJobPanelBrowserFlowTest`](../app/src/e2eTest/java/de/regelsuche/e2e/ProofJobPanelBrowserFlowTest.java) ab)
+* `docker-image-e2e` — baut das Standard-Dockerfile, fährt den Container via
+  Testcontainers hoch und verifiziert via HTTP-Client + Playwright das
+  Asset-Serving und KaTeX-Rendering (schützt vor dem `/vendor/`-Bug und
+  ähnlichen Regressions).
 * `docs-assets` — nur auf `main`: `./gradlew e2eTest -Pregelsuche.recordDocs=true`
   und lädt die frischen Screenshots/Videos als CI-Artifact hoch.
 * `benchmark-report` — `./gradlew benchmarkReport` rendert die aktuelle
   Qualitäts-Übersicht und lädt `docs/benchmark-report.md` +
   `docs/assets/benchmark-summary.json` als Artefakte hoch.
+* `proof-image` — baut `Dockerfile.proof`, prüft die enthaltenen Prover
+  (`z3`, `cvc5`) und macht einen REST-Smoketest gegen `/api/proof/jobs`.
 
 Bei roten E2E-Tests lädt der Workflow zusätzlich die Playwright-Trace-Dateien
 und den `e2eTest`-HTML-Report hoch, damit Fehler ohne lokalen Re-Run
