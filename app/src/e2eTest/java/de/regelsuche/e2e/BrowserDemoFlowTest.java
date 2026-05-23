@@ -142,7 +142,7 @@ class BrowserDemoFlowTest {
         runDemoAndVerify(
             "binomial",
             List.of("x ^ 2", "6 * x", "9"));
-        screenshot("binomial-graph.png");
+        screenshotGraphCanvas("binomial-graph.png");
     }
 
     @Test
@@ -155,7 +155,7 @@ class BrowserDemoFlowTest {
         // cancellation safe.
         assertTrue(page.locator("#demoSummary").innerText().contains("x"),
             "rational summary must mention the x != 0 assumption");
-        screenshot("rational-graph.png");
+        screenshotGraphCanvas("rational-graph.png");
     }
 
     @Test
@@ -164,7 +164,7 @@ class BrowserDemoFlowTest {
         runDemoAndVerify(
             "trigonometry",
             List.of("= 1"));
-        screenshot("trigonometry-graph.png");
+        screenshotGraphCanvas("trigonometry-graph.png");
     }
 
     @Test
@@ -173,7 +173,7 @@ class BrowserDemoFlowTest {
         runDemoAndVerify(
             "polynomial-expansion",
             List.of("x ^ 2", "3 * x", "2"));
-        screenshot("polynomial-expansion-graph.png");
+        screenshotGraphCanvas("polynomial-expansion-graph.png");
     }
 
     @Test
@@ -455,6 +455,58 @@ class BrowserDemoFlowTest {
             .setPath(target)
             .setType(ScreenshotType.PNG)
             .setFullPage(true));
+        assertNotNull(target);
+    }
+
+    /**
+     * Captures the interactive graph view rather than the full page so the
+     * recorded {@code *-graph.png} screenshots show the Cytoscape canvas
+     * with its KaTeX overlay layer instead of the demo-summary section.
+     *
+     * <p>Switches to the Graph tab (re-)triggering {@code #reloadGraph}, then
+     * tries to wait for at least one {@code .graph-overlay-layer
+     * .graph-node-math} element so the screenshot includes the KaTeX
+     * overlays. If the interactive Cytoscape view is unavailable (e.g.
+     * because the vendored bundle is not loaded in the sandbox) it falls
+     * back to a full-page screenshot so the recording still captures the
+     * Mermaid fallback.</p>
+     */
+    private void screenshotGraphCanvas(String fileName) {
+        if (!RECORD_DOCS) return;
+        page.locator(".tab[data-tab='graph']").click();
+        page.waitForSelector("#tab-graph.active",
+            new Page.WaitForSelectorOptions().setTimeout(5_000));
+        // Force a fresh render so the overlay reflects the latest demo.
+        page.locator("#reloadGraph").click();
+        boolean interactive = false;
+        try {
+            page.waitForSelector("#graphCanvas .graph-overlay-layer .graph-node-math",
+                new Page.WaitForSelectorOptions().setTimeout(15_000));
+            interactive = true;
+        } catch (RuntimeException ignored) {
+            // Cytoscape may be unavailable in restricted sandboxes; we still
+            // emit a full-page screenshot so the docs gallery has *some*
+            // recording for this demo.
+        }
+        Path target = SCREENSHOT_DIR.resolve(fileName);
+        try {
+            Files.createDirectories(target.getParent());
+        } catch (IOException ignored) { /* best-effort */ }
+        if (interactive) {
+            // Scroll the canvas into view and let CSS transitions on the
+            // KaTeX overlay settle before snapping.
+            page.locator("#graphCanvas").scrollIntoViewIfNeeded();
+            page.waitForTimeout(200);
+            page.locator("#graphCanvas").screenshot(
+                new com.microsoft.playwright.Locator.ScreenshotOptions()
+                    .setPath(target)
+                    .setType(ScreenshotType.PNG));
+        } else {
+            page.screenshot(new Page.ScreenshotOptions()
+                .setPath(target)
+                .setType(ScreenshotType.PNG)
+                .setFullPage(true));
+        }
         assertNotNull(target);
     }
 }

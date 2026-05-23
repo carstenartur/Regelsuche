@@ -284,19 +284,31 @@
         const proofStatus = selected.proofStatus || selected.validationStatus || '';
 
         // Honest banner: identity recognised OR "no identity found, best path was…".
+        // Stage 4+: the banner is now KaTeX-typeset via `mathSpan(…)` so the
+        // headline mathematical statement is rendered as proper math instead
+        // of raw ASCII (`^`, `*`, `/`). The plain-text expression is mirrored
+        // into the `aria-label` so screen readers keep hearing the structure.
         const banner = targetReached
             ? '<div class="status ok demo-banner">'
                 + '<strong>Identität erkannt:</strong> '
-                + escapeHtml(selected.originalExpression || data.expression || '')
-                + ' = '
-                + escapeHtml(selected.improvedExpression || '')
+                + mathSpan(
+                    selected.originalExpressionLatex,
+                    selected.originalExpression || data.expression || '')
+                + ' <span class="demo-banner-equals" aria-hidden="true">=</span> '
+                + mathSpan(
+                    selected.improvedExpressionLatex,
+                    selected.improvedExpression || '')
                 + '</div>'
             : '<div class="status warn demo-banner">'
                 + '<strong>Keine Identität gefunden.</strong> Bester gefundener Umformungsweg: '
                 + (selected.improvedExpression
-                    ? escapeHtml(selected.originalExpression || data.expression || '')
-                      + ' → '
-                      + escapeHtml(selected.improvedExpression)
+                    ? mathSpan(
+                        selected.originalExpressionLatex,
+                        selected.originalExpression || data.expression || '')
+                      + ' <span class="demo-banner-arrow" aria-hidden="true">→</span> '
+                      + mathSpan(
+                          selected.improvedExpressionLatex,
+                          selected.improvedExpression)
                     : '<em>kein Verbesserungsweg im Suchbudget gefunden</em>')
                 + '</div>';
 
@@ -310,33 +322,87 @@
         const bestMove = stepDetails.length
             ? stepDetails[0]
             : null;
+        // Stage 4+: best-move now shows a KaTeX-typeset before→after row
+        // first, with the raw ASCII expressions retained inside <code>
+        // blocks so screen readers / fallback environments and any
+        // existing assertions on the textual content keep working.
         const bestMoveBlock = bestMove
-            ? '<h4>Best Move</h4><p><code>' + escapeHtml(bestMove.beforeExpression || '')
+            ? '<h4>Best Move</h4>'
+                + '<p class="best-move-math">'
+                + mathSpan(bestMove.beforeLatex, bestMove.beforeExpression || '')
+                + ' <span class="best-move-arrow" aria-hidden="true">→</span> '
+                + mathSpan(bestMove.afterLatex, bestMove.afterExpression || '')
+                + '</p>'
+                + '<p class="best-move-source"><code>' + escapeHtml(bestMove.beforeExpression || '')
                 + ' → ' + escapeHtml(bestMove.afterExpression || '')
                 + '</code> · Regel <code>' + escapeHtml(bestMove.ruleId || '') + '</code></p>'
             : '';
 
+        // Stage 4+: the "Treffer (selectedPath)" cell is the headline result
+        // line. We build it as raw HTML (KaTeX-typeset before/after + the
+        // original ASCII inside a <code> block) and emit it via the
+        // table-rows pipeline as a {html: …} marker that the renderer
+        // below copies verbatim instead of escaping.
+        const trefferHtml = selected.improvedExpression
+            ? '<span class="treffer-math">'
+                + mathSpan(selected.originalExpressionLatex,
+                          selected.originalExpression || '')
+                + ' <span class="treffer-arrow" aria-hidden="true">→</span> '
+                + mathSpan(selected.improvedExpressionLatex,
+                          selected.improvedExpression)
+                + '</span>'
+                + ' <code class="treffer-source">'
+                + escapeHtml(selected.originalExpression || '')
+                + ' → '
+                + escapeHtml(selected.improvedExpression)
+                + '</code>'
+                + ' (' + stepCount + ' Schritte, Verbesserung '
+                + escapeHtml(String(selected.totalImprovement || 0)) + ')'
+            : '–';
+
+        // Stage 4+: "Eingabe" cell also carries the user expression which may
+        // contain `^`, `*` … so we render it through `mathSpan(…)` and
+        // mirror the ASCII into a <code> block, matching the Treffer/best-move
+        // pattern.
+        const eingabeHtml = data.expression
+            ? mathSpan(data.expressionLatex, data.expression)
+                + ' <code class="eingabe-source">' + escapeHtml(data.expression) + '</code>'
+            : '';
+
         const rows = [
-            ['Eingabe', data.expression || ''],
+            ['Eingabe', { html: eingabeHtml }],
             ['Profil', data.profile || ''],
-            ['Treffer (selectedPath)',
-                selected.improvedExpression
-                    ? selected.originalExpression + ' → ' + selected.improvedExpression
-                      + ' (' + stepCount + ' Schritte, Verbesserung '
-                      + (selected.totalImprovement || 0) + ')'
-                    : '–'],
+            ['Treffer (selectedPath)', { html: trefferHtml }],
             ['Proof-Status', proofStatus || '–'],
-            ['Erwartete Identität', data.expectedHighlight || ''],
+            ['Erwartete Identität', data.expectedHighlight
+                ? { html: '<code class="expected-highlight">'
+                    + escapeHtml(data.expectedHighlight) + '</code>' }
+                : ''],
             ['Knoten / Kanten', (m.nodes || 0) + ' / ' + (m.edges || 0)],
             ['Pfade entdeckt', m.pathsDiscovered || 0],
             ['Identitäten gefunden', m.identitiesFound || 0],
             ['Laufzeit', (m.elapsedMillis || 0) + ' ms']
         ];
-        const tableRows = rows.map((r) =>
-            '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(String(r[1])) + '</td></tr>').join('');
+        const tableRows = rows.map((r) => {
+            const value = r[1];
+            const cell = (value && typeof value === 'object' && typeof value.html === 'string')
+                ? value.html
+                : escapeHtml(String(value));
+            return '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + cell + '</td></tr>';
+        }).join('');
+        // Stage 4+: identities list keeps the <code> block (for screen
+        // readers and the visual-regression rule "ASCII `^` only inside
+        // <code>"), prefixed by KaTeX-typeset pattern endpoints.
         const idList = identities.length
             ? '<h4>Erkannte Identitäten</h4><ul>' + identities.map((i) =>
-                '<li><code>' + escapeHtml(i.leftPattern) + ' → ' + escapeHtml(i.rightPattern)
+                '<li>'
+                  + '<span class="identity-math">'
+                  + mathSpan(i.leftPatternLatex, i.leftPattern || '')
+                  + ' <span class="identity-arrow" aria-hidden="true">→</span> '
+                  + mathSpan(i.rightPatternLatex, i.rightPattern || '')
+                  + '</span> '
+                  + '<code class="identity-source">' + escapeHtml(i.leftPattern || '')
+                  + ' → ' + escapeHtml(i.rightPattern || '')
                   + '</code> · ' + renderProofStatusBadge(i.proofStatus) + '</li>').join('') + '</ul>'
             : '';
         const links = data.links || {};
@@ -537,6 +603,32 @@
         return String(s).replace(/[&<>"']/g, (c) => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
         }[c]));
+    }
+
+    /**
+     * Builds the HTML for an inline math span the central
+     * {@link window.renderMath} typesetter will pick up via
+     * {@code [data-math]}.
+     *
+     * <p>The returned markup carries an {@code aria-label} with the
+     * plain-text expression so screen readers still hear the structure
+     * even when KaTeX is unavailable (the {@code .math} node is also the
+     * fallback's {@code <code>}-wrapping anchor, so the raw LaTeX stays
+     * visible in CDN-less environments).</p>
+     *
+     * @param {string} latex   the LaTeX source (preferred form, e.g. {@code x^{2}})
+     * @param {string} [ascii] the original ASCII expression for accessibility / fallback
+     * @returns {string} HTML for a {@code <span class="math">} element
+     */
+    function mathSpan(latex, ascii) {
+        const tex = (latex == null ? '' : String(latex)).trim();
+        const plain = (ascii == null ? '' : String(ascii)).trim();
+        if (!tex && !plain) { return ''; }
+        const body = tex || plain;
+        const aria = plain || tex;
+        return '<span class="math" data-math="$' + escapeHtml(body) + '$"'
+            + ' aria-label="' + escapeHtml(aria) + '">'
+            + '$' + escapeHtml(body) + '$</span>';
     }
 
     document.querySelectorAll('.demo-button').forEach((btn) => {
