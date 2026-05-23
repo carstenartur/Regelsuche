@@ -18,9 +18,6 @@ dependencies {
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    webAssets 'org.webjars.npm:katex:0.16.11'
-    webAssets 'org.webjars.npm:cytoscape:3.28.1'
 }
 
 java {
@@ -97,51 +94,62 @@ configurations {
 }
 
 def vendorJar = { String artifact ->
-    configurations.webAssets.resolve().find { it.name.startsWith(artifact + '-') }
-        ?: throw new GradleException("Missing web asset jar for ${artifact}")
+    def jar = configurations.webAssets.resolve().find { it.name.startsWith(artifact + '-') }
+    if (jar == null) {
+        throw new GradleException("Missing web asset jar for ${artifact}")
+    }
+    jar
+}
+
+tasks.register('vendorKatexAssets', Sync) {
+    from({ zipTree(vendorJar('katex')) }) {
+        include 'META-INF/resources/webjars/katex/*/dist/katex.min.css'
+        include 'META-INF/resources/webjars/katex/*/dist/katex.min.js'
+        include 'META-INF/resources/webjars/katex/*/dist/contrib/auto-render.min.js'
+        include 'META-INF/resources/webjars/katex/*/dist/fonts/**'
+        eachFile { file ->
+            file.path = file.path.replaceFirst(
+                /^META-INF\/resources\/webjars\/katex\/[^\/]+\/dist\//, '')
+        }
+        includeEmptyDirs = false
+    }
+    into(vendorKatexDir)
+}
+
+tasks.register('vendorCytoscapeAssets', Sync) {
+    from({ zipTree(vendorJar('cytoscape')) }) {
+        include 'META-INF/resources/webjars/cytoscape/*/dist/cytoscape.min.js'
+        eachFile { file ->
+            file.path = file.path.replaceFirst(
+                /^META-INF\/resources\/webjars\/cytoscape\/[^\/]+\/dist\//, '')
+        }
+        includeEmptyDirs = false
+    }
+    into(vendorCytoscapeDir)
 }
 
 tasks.register('vendorWebAssets') {
     description = 'Vendors KaTeX and Cytoscape assets from WebJars into src/main/resources/web/vendor.'
     group = 'build setup'
-    inputs.files(configurations.webAssets)
-    outputs.dirs(vendorKatexDir, vendorCytoscapeDir)
-    doLast {
-        delete(vendorKatexDir.asFile, vendorCytoscapeDir.asFile)
-        copy {
-            from(zipTree(vendorJar('katex')))
-            include 'META-INF/resources/webjars/katex/*/dist/katex.min.css'
-            include 'META-INF/resources/webjars/katex/*/dist/katex.min.js'
-            include 'META-INF/resources/webjars/katex/*/dist/contrib/auto-render.min.js'
-            include 'META-INF/resources/webjars/katex/*/dist/fonts/**'
-            eachFile { file ->
-                file.path = file.path.replaceFirst(
-                    /^META-INF\/resources\/webjars\/katex\/[^\/]+\/dist\//, '')
-            }
-            includeEmptyDirs = false
-            into(vendorKatexDir)
-        }
-        copy {
-            from(zipTree(vendorJar('cytoscape')))
-            include 'META-INF/resources/webjars/cytoscape/*/dist/cytoscape.min.js'
-            eachFile { file ->
-                file.path = file.path.replaceFirst(
-                    /^META-INF\/resources\/webjars\/cytoscape\/[^\/]+\/dist\//, '')
-            }
-            includeEmptyDirs = false
-            into(vendorCytoscapeDir)
-        }
-    }
+    dependsOn tasks.named('vendorKatexAssets'), tasks.named('vendorCytoscapeAssets')
 }
 
 tasks.named('processResources') {
     dependsOn tasks.named('vendorWebAssets')
 }
 
+tasks.named('processE2eTestResources') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 dependencies {
     e2eTestImplementation 'com.microsoft.playwright:playwright:1.49.0'
     e2eTestImplementation 'org.testcontainers:testcontainers:1.20.4'
     e2eTestImplementation 'org.testcontainers:junit-jupiter:1.20.4'
+    webAssets 'org.webjars.npm:katex:0.16.11'
+    // 3.28.1 is not published as a WebJar on Maven Central; 3.27.0 is the
+    // closest available self-hostable npm WebJar.
+    webAssets 'org.webjars.npm:cytoscape:3.27.0'
 }
 
 tasks.register('installPlaywrightBrowsers', JavaExec) {

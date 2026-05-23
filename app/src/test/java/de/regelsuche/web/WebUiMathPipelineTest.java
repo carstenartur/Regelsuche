@@ -55,18 +55,20 @@ class WebUiMathPipelineTest {
         }
         String html = Files.readString(indexHtml);
         String content = Files.readString(appJs);
-        assertTrue(html.contains("katex.min.css"),
+        assertTrue(html.contains("vendor/katex/katex.min.css"),
             "index.html must statically include KaTeX CSS");
-        assertTrue(html.contains("katex.min.js"),
+        assertTrue(html.contains("vendor/katex/katex.min.js"),
             "index.html must statically include KaTeX JS");
-        assertTrue(html.contains("auto-render.min.js"),
+        assertTrue(html.contains("vendor/katex/contrib/auto-render.min.js"),
             "index.html must statically include the KaTeX auto-render extension");
         assertTrue(content.contains("renderMath"),
             "app.js must expose a central renderMath() helper");
         assertTrue(content.contains("renderMath(document.body)"),
             "app.js must render math on DOMContentLoaded once static KaTeX is ready");
-        assertFalse(content.contains("loadCdnScript('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js')"),
-            "app.js must not lazy-load KaTeX anymore");
+        assertFalse(html.contains("cdn.jsdelivr.net"),
+            "index.html must not reference jsDelivr anymore");
+        assertFalse(content.contains("unpkg.com"),
+            "app.js must not reference unpkg-hosted assets anymore");
     }
 
     @Test
@@ -160,16 +162,20 @@ class WebUiMathPipelineTest {
             return;
         }
         String content = Files.readString(appJs);
-        assertTrue(content.contains("alignedDerivationLatexWithDiff"),
-            "app.js must consume PathReplayDto.alignedDerivationLatexWithDiff");
-        assertTrue(content.contains("wrapDiffLatex"),
-            "app.js must expose a wrapDiffLatex() helper for per-step diff highlighting");
-        assertTrue(content.contains("htmlClass{"),
-            "app.js must emit \\htmlClass{…} wrappers around changed spans");
+        assertTrue(content.contains("renderMathLayout(replayState.derivationLayout, derivationHost)"),
+            "app.js must render the replay block via renderMathLayout()");
+        assertTrue(content.contains("renderMathLayout(step.layout, toHost)"),
+            "app.js must render replay steps via the structured step layout");
+        assertTrue(content.contains("trust: false"),
+            "KaTeX trust mode must be disabled once layout rendering is primary");
         assertTrue(content.contains("replay-derivation-focus"),
             "app.js must mark the focused replay row with .replay-derivation-focus");
         assertTrue(content.contains("step.comparatorFlipped === true"),
             "Stage 3: comparator-flip notice must be driven by the server flag");
+        assertFalse(content.contains("wrapDiffLatex("),
+            "Legacy string-based diff wrapping must not remain in app.js");
+        assertFalse(content.contains("htmlClass{"),
+            "app.js must not emit \\htmlClass{…} wrappers anymore");
         // Regression-guard the deleted JS heuristic: the old fallback
         // looked at /(<|>)/ in step.fromExpression to decide whether
         // to show the flip notice. It is now exclusively driven by the

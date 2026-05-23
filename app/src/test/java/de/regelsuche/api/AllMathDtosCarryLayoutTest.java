@@ -73,6 +73,9 @@ class AllMathDtosCarryLayoutTest {
         assertFalse(layout.toLatex().isBlank());
         assertFalse(layout.ariaLabel().isBlank(),
             "ReplayStep.layout() must carry an aria-label for screen readers");
+        assertTrue(layout.nodes().stream()
+                .anyMatch(node -> "diff-new".equals(node.attributes().get("class"))),
+            "ReplayStep.layout() must surface diff classes in the structured layout");
     }
 
     @Test
