@@ -1550,6 +1550,15 @@ public class WebWorkbenchServer {
         writer.property("title", demo.title());
         writer.property("description", demo.description());
         writer.property("expression", demo.expression());
+        // Stage 4+: ship a LaTeX rendering of the raw user expression
+        // alongside the original ASCII string so the front-end demo banner
+        // and "Eingabe" cells can typeset it via KaTeX instead of falling
+        // back to a hand-styled ASCII fragment with literal `^`, `*`, `/`.
+        String expressionLatex =
+            de.regelsuche.export.MathPresentation.DEFAULT.latex(demo.expression());
+        if (!expressionLatex.isEmpty()) {
+            writer.property("expressionLatex", expressionLatex);
+        }
         writer.property("inputType", demo.inputType().name());
         writer.property("profile", demo.profile().name());
         writer.property("expectedHighlight", demo.expectedHighlight());
@@ -1601,6 +1610,19 @@ public class WebWorkbenchServer {
                 inner.property("id", macro.id());
                 inner.property("leftPattern", macro.leftPattern());
                 inner.property("rightPattern", macro.rightPattern());
+                // Stage 4+: KaTeX-ready LaTeX of the pattern endpoints so
+                // the identities list in the demo summary can render the
+                // pattern visually instead of as raw `*`/`^` ASCII.
+                String leftPatternLatex = de.regelsuche.export.MathPresentation.DEFAULT
+                    .latex(macro.leftPattern());
+                String rightPatternLatex = de.regelsuche.export.MathPresentation.DEFAULT
+                    .latex(macro.rightPattern());
+                if (!leftPatternLatex.isEmpty()) {
+                    inner.property("leftPatternLatex", leftPatternLatex);
+                }
+                if (!rightPatternLatex.isEmpty()) {
+                    inner.property("rightPatternLatex", rightPatternLatex);
+                }
                 inner.property("occurrences", macro.occurrences());
                 inner.property("compressionRatio", macro.compressionRatio());
                 inner.property("proofStatus", macro.proofStatus().name());
@@ -1633,10 +1655,25 @@ public class WebWorkbenchServer {
             writer.nullProperty(key);
             return;
         }
+        // Use the central MathPresentation so the LaTeX rendering goes
+        // through the AST-based renderer (with safe fallback) rather than
+        // raw string concatenation.
+        de.regelsuche.export.MathPresentation latex = de.regelsuche.export.MathPresentation.DEFAULT;
         writer.object(key, b -> {
             b.property("id", path.id());
             b.property("originalExpression", path.originalExpression());
             b.property("improvedExpression", path.improvedExpression());
+            // Stage 4+: dedicated LaTeX fields for the path endpoints so
+            // the front-end can typeset the demo-summary banner and the
+            // "Treffer (selectedPath)" row with KaTeX instead of ASCII.
+            String originalLatex = latex.latex(path.originalExpression());
+            String improvedLatex = latex.latex(path.improvedExpression());
+            if (!originalLatex.isEmpty()) {
+                b.property("originalExpressionLatex", originalLatex);
+            }
+            if (!improvedLatex.isEmpty()) {
+                b.property("improvedExpressionLatex", improvedLatex);
+            }
             b.property("totalImprovement", path.totalImprovement());
             b.property("steps", path.steps().size());
             b.property("proofStatus", path.validationStatus().name());
@@ -1645,6 +1682,18 @@ public class WebWorkbenchServer {
                     s.property("index", step.index());
                     s.property("beforeExpression", step.beforeExpression());
                     s.property("afterExpression", step.afterExpression());
+                    // Stage 4+: matching LaTeX fields per step so the
+                    // best-move block and replay views can KaTeX-typeset
+                    // before/after expressions without a client-side
+                    // ASCII fallback.
+                    String beforeLatex = latex.latex(step.beforeExpression());
+                    String afterLatex = latex.latex(step.afterExpression());
+                    if (!beforeLatex.isEmpty()) {
+                        s.property("beforeLatex", beforeLatex);
+                    }
+                    if (!afterLatex.isEmpty()) {
+                        s.property("afterLatex", afterLatex);
+                    }
                     s.property("ruleId", step.ruleId());
                     s.property("ruleKind", step.ruleKind().name());
                     s.property("scoreBefore", step.scoreBefore());
