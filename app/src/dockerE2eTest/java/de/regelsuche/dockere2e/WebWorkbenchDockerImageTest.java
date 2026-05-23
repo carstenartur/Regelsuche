@@ -1,8 +1,6 @@
 package de.regelsuche.dockere2e;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.ImageFromDockerfile;
@@ -17,7 +15,6 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Docker-image-based integration tests that verify the real container correctly
@@ -29,7 +26,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * <p>The tests skip automatically when Docker is not available on the host.</p>
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class WebWorkbenchDockerImageTest {
 
     private static final String PROJECT_ROOT =
@@ -39,21 +36,11 @@ class WebWorkbenchDockerImageTest {
     @Container
     @SuppressWarnings("resource")
     static final GenericContainer<?> CONTAINER =
-        dockerAvailable()
-            ? new GenericContainer<>(
-                new ImageFromDockerfile()
-                    .withFileFromPath(".", Path.of(PROJECT_ROOT)))
-                .withExposedPorts(8080)
-                .waitingFor(Wait.forHttp("/").forStatusCode(200))
-            : new GenericContainer<>("scratch");
-
-    private static boolean dockerAvailable() {
-        try {
-            return DockerClientFactory.instance().isDockerAvailable();
-        } catch (Exception e) {
-            return false;
-        }
-    }
+        new GenericContainer<>(
+            new ImageFromDockerfile()
+                .withFileFromPath(".", Path.of(PROJECT_ROOT)))
+            .withExposedPorts(8080)
+            .waitingFor(Wait.forHttp("/").forStatusCode(200));
 
     private HttpClient client() {
         return HttpClient.newHttpClient();
@@ -64,7 +51,6 @@ class WebWorkbenchDockerImageTest {
     }
 
     private HttpResponse<String> get(String path) throws Exception {
-        assumeTrue(dockerAvailable(), "Docker not available – skipping Docker-image test");
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl() + path))
             .build();
@@ -72,7 +58,6 @@ class WebWorkbenchDockerImageTest {
     }
 
     private HttpResponse<byte[]> getBytes(String path) throws Exception {
-        assumeTrue(dockerAvailable(), "Docker not available – skipping Docker-image test");
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl() + path))
             .build();

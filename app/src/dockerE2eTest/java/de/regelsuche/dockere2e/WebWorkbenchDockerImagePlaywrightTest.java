@@ -9,7 +9,6 @@ import com.microsoft.playwright.options.WaitForSelectorState;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.ImageFromDockerfile;
@@ -35,7 +34,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * <p>These tests skip when Docker is not available or when Playwright browsers
  * have not been installed ({@code ./gradlew installPlaywrightBrowsers}).</p>
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class WebWorkbenchDockerImagePlaywrightTest {
 
     private static final String PROJECT_ROOT =
@@ -45,28 +44,17 @@ class WebWorkbenchDockerImagePlaywrightTest {
     @Container
     @SuppressWarnings("resource")
     static final GenericContainer<?> CONTAINER =
-        dockerAvailable()
-            ? new GenericContainer<>(
-                new ImageFromDockerfile()
-                    .withFileFromPath(".", Path.of(PROJECT_ROOT)))
-                .withExposedPorts(8080)
-                .waitingFor(Wait.forHttp("/").forStatusCode(200))
-            : new GenericContainer<>("scratch");
-
-    private static boolean dockerAvailable() {
-        try {
-            return DockerClientFactory.instance().isDockerAvailable();
-        } catch (Exception e) {
-            return false;
-        }
-    }
+        new GenericContainer<>(
+            new ImageFromDockerfile()
+                .withFileFromPath(".", Path.of(PROJECT_ROOT)))
+            .withExposedPorts(8080)
+            .waitingFor(Wait.forHttp("/").forStatusCode(200));
 
     private static Playwright playwright;
     private static Browser browser;
 
     @BeforeAll
     static void startPlaywright() {
-        assumeTrue(dockerAvailable(), "Docker not available – skipping Docker-image Playwright tests");
         try {
             playwright = Playwright.create();
             browser = playwright.chromium().launch(
@@ -149,8 +137,7 @@ class WebWorkbenchDockerImagePlaywrightTest {
 
             // Filter out benign errors (e.g. favicon 404 which is expected)
             List<String> significantErrors = errors.stream()
-                .filter(e -> !e.contains("favicon"))
-                .filter(e -> !e.contains("404"))
+                .filter(e -> !e.contains("favicon.ico"))
                 .toList();
 
             assertTrue(significantErrors.isEmpty(),

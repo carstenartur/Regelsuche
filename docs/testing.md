@@ -77,7 +77,7 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
 
 ## CI-Integration
 
-`.github/workflows/ci-cd.yml` fährt fünf voneinander unabhängige Jobs:
+`.github/workflows/ci-cd.yml` fährt sechs voneinander unabhängige Jobs:
 
 * `unit-test` — `./gradlew test`
 * `browser-e2e` — installiert Chromium und ruft `./gradlew e2eTest` auf
@@ -96,6 +96,8 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
 * `benchmark-report` — `./gradlew benchmarkReport` rendert die aktuelle
   Qualitäts-Übersicht und lädt `docs/benchmark-report.md` +
   `docs/assets/benchmark-summary.json` als Artefakte hoch.
+* `proof-image` — baut `Dockerfile.proof`, prüft die enthaltenen Prover
+  (`z3`, `cvc5`) und macht einen REST-Smoketest gegen `/api/proof/jobs`.
 
 Bei roten E2E-Tests lädt der Workflow zusätzlich die Playwright-Trace-Dateien
 und den `e2eTest`-HTML-Report hoch, damit Fehler ohne lokalen Re-Run
