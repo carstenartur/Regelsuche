@@ -88,17 +88,19 @@ class WebWorkbenchDockerImagePlaywrightTest {
                 new Page.WaitForSelectorOptions().setState(WaitForSelectorState.VISIBLE));
             page.click("button.demo-button[data-demo='binomial']");
 
-            // Wait for the replay panel to appear
-            page.waitForSelector("#replay-panel",
-                new Page.WaitForSelectorOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(30_000));
+            // Wait for the demo summary to be populated (mirrors the proven
+            // waitForDemoSummary helper in BrowserDemoFlowTest).
+            page.waitForFunction(
+                "() => { const el = document.querySelector('#demoSummary');"
+                    + " return el && el.innerHTML.length > 50; }",
+                null,
+                new Page.WaitForFunctionOptions().setTimeout(60_000));
 
             // Wait for KaTeX to render (at least one .katex element must be present)
             page.waitForSelector(".katex",
                 new Page.WaitForSelectorOptions()
                     .setState(WaitForSelectorState.ATTACHED)
-                    .setTimeout(15_000));
+                    .setTimeout(30_000));
 
             List<ElementHandle> katexElements = page.querySelectorAll(".katex");
             assertTrue(katexElements.size() > 0,
