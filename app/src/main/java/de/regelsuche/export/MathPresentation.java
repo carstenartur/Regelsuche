@@ -147,7 +147,8 @@ public final class MathPresentation {
         boolean comparatorFlipped,
         List<int[]> changedFromSpans,
         List<int[]> changedToSpans,
-        String toExpression
+        String toExpression,
+        String fromExpression
     ) {
         public DerivationStep {
             fromLatex = fromLatex == null ? "" : fromLatex;
@@ -158,12 +159,33 @@ public final class MathPresentation {
             changedToSpans = changedToSpans == null
                 ? List.of() : List.copyOf(changedToSpans);
             toExpression = toExpression == null ? "" : toExpression;
+            fromExpression = fromExpression == null ? "" : fromExpression;
+        }
+
+        /**
+         * Backward-compatible 7-arg constructor used by callers that pre-date
+         * the Stage 5 from-expression addition. Sets {@code fromExpression}
+         * to empty string; AST diff will fall back to span-based diff for the
+         * first step when {@code fromExpression} is unavailable.
+         */
+        public DerivationStep(
+            String fromLatex,
+            String toLatex,
+            String ruleId,
+            boolean comparatorFlipped,
+            List<int[]> changedFromSpans,
+            List<int[]> changedToSpans,
+            String toExpression
+        ) {
+            this(fromLatex, toLatex, ruleId, comparatorFlipped,
+                changedFromSpans, changedToSpans, toExpression, "");
         }
 
         /**
          * Backward-compatible 6-arg constructor used by callers that pre-date
          * the Stage 5 expression-for-aria addition. Sets {@code toExpression}
-         * to empty string; aria labels will be omitted for such steps.
+         * and {@code fromExpression} to empty string; aria labels and AST diff
+         * will be omitted for such steps.
          */
         public DerivationStep(
             String fromLatex,
@@ -174,7 +196,7 @@ public final class MathPresentation {
             List<int[]> changedToSpans
         ) {
             this(fromLatex, toLatex, ruleId, comparatorFlipped,
-                changedFromSpans, changedToSpans, "");
+                changedFromSpans, changedToSpans, "", "");
         }
 
         /**
@@ -193,6 +215,7 @@ public final class MathPresentation {
                     toLatex == null ? "" : toLatex).fromSpans(),
                 MathDiff.diffSpans(fromLatex == null ? "" : fromLatex,
                     toLatex == null ? "" : toLatex).toSpans(),
+                "",
                 ""
             );
         }
@@ -430,7 +453,7 @@ public final class MathPresentation {
                 steps.get(0).fromLatex(),
                 hasSpans(steps.get(0).changedFromSpans()) ? "diff-old" : null)
         )));
-        String previousExpression = "";
+        String previousExpression = steps.get(0).fromExpression();
         for (DerivationStep step : steps) {
             List<MathLayoutNode> rowChildren = new ArrayList<>(2);
             rowChildren.add(MathLayoutNode.arrowLabel(ruleLatex(step.ruleId())));

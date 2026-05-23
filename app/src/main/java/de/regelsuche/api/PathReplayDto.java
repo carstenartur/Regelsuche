@@ -75,7 +75,8 @@ public record PathReplayDto(
                 step.comparatorFlipped(),
                 step.changedFromSpans(),
                 step.changedToSpans(),
-                step.toExpression()
+                step.toExpression(),
+                step.fromExpression()
             ));
         }
         return withDiff
@@ -204,7 +205,8 @@ public record PathReplayDto(
                 step.comparatorFlipped(),
                 step.changedFromSpans(),
                 step.changedToSpans(),
-                step.toExpression()
+                step.toExpression(),
+                step.fromExpression()
             ));
         }
         return MATH.alignedDerivationLayoutWithDiff(derivation);

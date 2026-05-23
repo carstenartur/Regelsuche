@@ -107,9 +107,13 @@ tasks.register('vendorKatexAssets', Sync) {
         include 'META-INF/resources/webjars/katex/*/dist/katex.min.js'
         include 'META-INF/resources/webjars/katex/*/dist/contrib/auto-render.min.js'
         include 'META-INF/resources/webjars/katex/*/dist/fonts/**'
+        include 'META-INF/resources/webjars/katex/*/LICENSE'
+        include 'META-INF/resources/webjars/katex/*/README.md'
         eachFile { file ->
             file.path = file.path.replaceFirst(
                 /^META-INF\/resources\/webjars\/katex\/[^\/]+\/dist\//, '')
+            file.path = file.path.replaceFirst(
+                /^META-INF\/resources\/webjars\/katex\/[^\/]+\//, '')
         }
         includeEmptyDirs = false
     }
@@ -119,9 +123,13 @@ tasks.register('vendorKatexAssets', Sync) {
 tasks.register('vendorCytoscapeAssets', Sync) {
     from({ zipTree(vendorJar('cytoscape')) }) {
         include 'META-INF/resources/webjars/cytoscape/*/dist/cytoscape.min.js'
+        include 'META-INF/resources/webjars/cytoscape/*/LICENSE'
+        include 'META-INF/resources/webjars/cytoscape/*/README.md'
         eachFile { file ->
             file.path = file.path.replaceFirst(
                 /^META-INF\/resources\/webjars\/cytoscape\/[^\/]+\/dist\//, '')
+            file.path = file.path.replaceFirst(
+                /^META-INF\/resources\/webjars\/cytoscape\/[^\/]+\//, '')
         }
         includeEmptyDirs = false
     }

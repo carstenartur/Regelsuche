@@ -197,7 +197,6 @@ public final class SearchGraphRecordCodec {
         List<SearchGraphNodeDto> nodes = readList(values.get("nodes")).stream()
             .map(SearchGraphRecordCodec::asMap)
             .map(m -> {
-                asMap(m.get("layout"));
                 return new SearchGraphNodeDto(
                     stringValue(m.get("id"), ""),
                     stringValue(m.get("expression"), ""),
@@ -217,7 +216,6 @@ public final class SearchGraphRecordCodec {
         List<SearchGraphEdgeDto> edges = readList(values.get("edges")).stream()
             .map(SearchGraphRecordCodec::asMap)
             .map(m -> {
-                asMap(m.get("layout"));
                 String ruleId = stringValue(m.get("ruleId"), "");
                 String ruleLatex = stringValue(m.get("ruleLatex"),
                     de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(ruleId));
@@ -266,11 +264,9 @@ public final class SearchGraphRecordCodec {
     }
 
     private static PathReplayDto readReplay(Map<String, Object> values) {
-        asMap(values.get("derivationLayout"));
         List<PathReplayDto.ReplayStep> steps = readList(values.get("steps")).stream()
             .map(SearchGraphRecordCodec::asMap)
             .map(m -> {
-                asMap(m.get("layout"));
                 return new PathReplayDto.ReplayStep(
                     intValue(m.get("stepIndex"), 0),
                     stringValue(m.get("fromExpression"), ""),

@@ -1,6 +1,7 @@
 package de.regelsuche.web;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -50,9 +51,8 @@ class WebUiMathPipelineTest {
     void indexHtmlLoadsKatexStaticallyAndAppJsDefinesRenderMath() throws IOException {
         Path indexHtml = locateIndexHtml();
         Path appJs = locateAppJs();
-        if (indexHtml == null || appJs == null) {
-            return;
-        }
+        assertNotNull(indexHtml, "index.html not found in expected locations");
+        assertNotNull(appJs, "app.js not found in expected locations");
         String html = Files.readString(indexHtml);
         String content = Files.readString(appJs);
         assertTrue(html.contains("vendor/katex/katex.min.css"),
@@ -74,9 +74,7 @@ class WebUiMathPipelineTest {
     @Test
     void appJsNoLongerEmitsLegacyLatexPlaceholders() throws IOException {
         Path appJs = locateAppJs();
-        if (appJs == null) {
-            return;
-        }
+        assertNotNull(appJs, "app.js not found in expected locations");
         String content = Files.readString(appJs);
         // The legacy emission style was <span class="latex">$...$</span> /
         // <div class="latex">$...$</div> that nothing ever typeset. All
@@ -94,9 +92,8 @@ class WebUiMathPipelineTest {
     void webAssetsDoNotReferenceMathJaxAnymore() throws IOException {
         Path indexHtml = locateIndexHtml();
         Path appJs = locateAppJs();
-        if (indexHtml == null || appJs == null) {
-            return;
-        }
+        assertNotNull(indexHtml, "index.html not found in expected locations");
+        assertNotNull(appJs, "app.js not found in expected locations");
         assertFalse(Files.readString(indexHtml).toLowerCase().contains("mathjax"),
             "index.html must not reference MathJax anymore");
         assertFalse(Files.readString(appJs).toLowerCase().contains("mathjax"),
@@ -111,9 +108,7 @@ class WebUiMathPipelineTest {
     @Test
     void appJsRendersAlignedDerivationBlockForReplay() throws IOException {
         Path appJs = locateAppJs();
-        if (appJs == null) {
-            return;
-        }
+        assertNotNull(appJs, "app.js not found in expected locations");
         String content = Files.readString(appJs);
         assertTrue(content.contains("alignedDerivationLatex"),
             "app.js must read PathReplayDto.alignedDerivationLatex");
@@ -135,9 +130,7 @@ class WebUiMathPipelineTest {
     @Test
     void appJsRemainsAValidIifeWithBalancedBraces() throws IOException {
         Path appJs = locateAppJs();
-        if (appJs == null) {
-            return;
-        }
+        assertNotNull(appJs, "app.js not found in expected locations");
         String content = Files.readString(appJs);
         assertTrue(content.trim().endsWith("})();"),
             "app.js must remain a single IIFE ending with })();");
@@ -158,9 +151,7 @@ class WebUiMathPipelineTest {
     @Test
     void appJsUsesServerComparatorFlipFlagAndDiffClasses() throws IOException {
         Path appJs = locateAppJs();
-        if (appJs == null) {
-            return;
-        }
+        assertNotNull(appJs, "app.js not found in expected locations");
         String content = Files.readString(appJs);
         assertTrue(content.contains("renderMathLayout(replayState.derivationLayout, derivationHost)"),
             "app.js must render the replay block via renderMathLayout()");
@@ -187,9 +178,7 @@ class WebUiMathPipelineTest {
     @Test
     void styleCssDefinesDiffAndFlipNoticeTokens() throws IOException {
         Path styleCss = locateStyleCss();
-        if (styleCss == null) {
-            return;
-        }
+        assertNotNull(styleCss, "style.css not found in expected locations");
         String content = Files.readString(styleCss);
         assertTrue(content.contains(".diff-old"), "missing .diff-old rule");
         assertTrue(content.contains(".diff-new"), "missing .diff-new rule");
@@ -224,9 +213,7 @@ class WebUiMathPipelineTest {
     @Test
     void appJsInstallsKatexGraphOverlay() throws IOException {
         Path appJs = locateAppJs();
-        if (appJs == null) {
-            return;
-        }
+        assertNotNull(appJs, "app.js not found in expected locations");
         String content = Files.readString(appJs);
         assertTrue(content.contains("graphMathOverlay"),
             "app.js must define a graphMathOverlay module");
@@ -249,9 +236,7 @@ class WebUiMathPipelineTest {
     @Test
     void styleCssDefinesGraphOverlayTransitions() throws IOException {
         Path styleCss = locateStyleCss();
-        if (styleCss == null) {
-            return;
-        }
+        assertNotNull(styleCss, "style.css not found in expected locations");
         String content = Files.readString(styleCss);
         assertTrue(content.contains(".graph-node-math"),
             "missing .graph-node-math rule");
@@ -273,9 +258,7 @@ class WebUiMathPipelineTest {
     @Test
     void appJsDefinesLayoutAwareRenderer() throws IOException {
         Path appJs = locateAppJs();
-        if (appJs == null) {
-            return;
-        }
+        assertNotNull(appJs, "app.js not found in expected locations");
         String content = Files.readString(appJs);
         assertTrue(content.contains("renderMathLayout"),
             "app.js must define a renderMathLayout(layout, host) helper");
@@ -292,9 +275,7 @@ class WebUiMathPipelineTest {
     @Test
     void styleCssDefinesLayoutAwareAlignedRowRules() throws IOException {
         Path styleCss = locateStyleCss();
-        if (styleCss == null) {
-            return;
-        }
+        assertNotNull(styleCss, "style.css not found in expected locations");
         String content = Files.readString(styleCss);
         assertTrue(content.contains(".math-aligned-rows"),
             "missing .math-aligned-rows CSS-grid wrapper rule");
