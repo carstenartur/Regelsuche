@@ -198,6 +198,12 @@ tasks.register('e2eTest', Test) {
         providers.gradleProperty('regelsuche.recordDocs').getOrElse('false')
     systemProperty 'regelsuche.updateScreenshots',
         providers.gradleProperty('regelsuche.updateScreenshots').getOrElse('false')
+    // Visual-regression suite (MathRenderingVisualTest) is opt-in: pixel
+    // baselines drift across rendering environments, so CI keeps it off
+    // by default. Run locally with -Pregelsuche.runVisualTests=true and
+    // refresh baselines with -Pregelsuche.updateScreenshots=true.
+    systemProperty 'regelsuche.runVisualTests',
+        providers.gradleProperty('regelsuche.runVisualTests').getOrElse('false')
     // Surface useful Playwright output during long-running browser runs.
     testLogging {
         events 'passed', 'skipped', 'failed'

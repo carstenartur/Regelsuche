@@ -16,7 +16,30 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
+/**
+ * Pixel-level visual regression tests for the math-rendering pipeline.
+ *
+ * <p>These tests are intentionally gated behind the
+ * {@code regelsuche.runVisualTests} system property (default {@code false}).
+ * They compare rendered KaTeX output against committed PNG baselines, which
+ * is inherently sensitive to:</p>
+ * <ul>
+ *   <li>Font hinting / sub-pixel anti-aliasing differences between local
+ *       (typically macOS / Linux desktop) and CI (Ubuntu headless) Chromium
+ *       installs;</li>
+ *   <li>Chromium / KaTeX upgrades that legitimately change layout pixels.</li>
+ * </ul>
+ *
+ * <p>Run locally with
+ * {@code ./gradlew :app:e2eTest -Pregelsuche.runVisualTests=true} and refresh
+ * baselines with the additional {@code -Pregelsuche.updateScreenshots=true}
+ * flag whenever the rendering change is intentional. CI keeps the suite
+ * green by default; promoting these to a CI gate requires a dedicated
+ * stable-font runner (see commit history of this file for context).</p>
+ */
+@EnabledIfSystemProperty(named = "regelsuche.runVisualTests", matches = "true")
 class MathRenderingVisualTest {
 
     private static RegelsucheAppEnvironment app;
