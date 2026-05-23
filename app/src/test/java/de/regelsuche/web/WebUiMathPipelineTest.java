@@ -14,12 +14,24 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The Web-Workbench must route every mathematical expression through a
  * single {@code renderMath(root)} entry point and load <a
- * href="https://katex.org/">KaTeX</a> as the default typesetter (MathJax
- * remains loaded as a fallback). Previously the UI emitted
+ * href="https://katex.org/">KaTeX</a> as the default typesetter. Previously the UI emitted
  * {@code <span class="latex">$...$</span>} placeholders that nothing ever
  * typeset; this test prevents that regression from sneaking back in.</p>
  */
 class WebUiMathPipelineTest {
+
+    private static Path locateIndexHtml() {
+        Path[] candidates = {
+            Path.of("src", "main", "resources", "web", "index.html"),
+            Path.of("app", "src", "main", "resources", "web", "index.html")
+        };
+        for (Path c : candidates) {
+            if (Files.isRegularFile(c)) {
+                return c;
+            }
+        }
+        return null;
+    }
 
     private static Path locateAppJs() {
         Path[] candidates = {
@@ -35,20 +47,26 @@ class WebUiMathPipelineTest {
     }
 
     @Test
-    void appJsLoadsKatexAndDefinesRenderMath() throws IOException {
+    void indexHtmlLoadsKatexStaticallyAndAppJsDefinesRenderMath() throws IOException {
+        Path indexHtml = locateIndexHtml();
         Path appJs = locateAppJs();
-        if (appJs == null) {
+        if (indexHtml == null || appJs == null) {
             return;
         }
+        String html = Files.readString(indexHtml);
         String content = Files.readString(appJs);
-        assertTrue(content.contains("katex"),
-            "app.js must load KaTeX from a CDN");
-        assertTrue(content.contains("auto-render"),
-            "app.js must load the KaTeX auto-render extension");
+        assertTrue(html.contains("katex.min.css"),
+            "index.html must statically include KaTeX CSS");
+        assertTrue(html.contains("katex.min.js"),
+            "index.html must statically include KaTeX JS");
+        assertTrue(html.contains("auto-render.min.js"),
+            "index.html must statically include the KaTeX auto-render extension");
         assertTrue(content.contains("renderMath"),
             "app.js must expose a central renderMath() helper");
-        assertTrue(content.contains("MathJax"),
-            "MathJax fallback must still be wired up");
+        assertTrue(content.contains("renderMath(document.body)"),
+            "app.js must render math on DOMContentLoaded once static KaTeX is ready");
+        assertFalse(content.contains("loadCdnScript('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js')"),
+            "app.js must not lazy-load KaTeX anymore");
     }
 
     @Test
@@ -70,6 +88,19 @@ class WebUiMathPipelineTest {
             "Math-bearing nodes must carry their raw LaTeX in data-math for the CDN-failure fallback");
     }
 
+    @Test
+    void webAssetsDoNotReferenceMathJaxAnymore() throws IOException {
+        Path indexHtml = locateIndexHtml();
+        Path appJs = locateAppJs();
+        if (indexHtml == null || appJs == null) {
+            return;
+        }
+        assertFalse(Files.readString(indexHtml).toLowerCase().contains("mathjax"),
+            "index.html must not reference MathJax anymore");
+        assertFalse(Files.readString(appJs).toLowerCase().contains("mathjax"),
+            "app.js must not reference MathJax anymore");
+    }
+
     /**
      * Stage 2 pin: the replay panel must render the whole derivation
      * as a single {@code \begin{aligned}} block (provided by the
@@ -84,6 +115,8 @@ class WebUiMathPipelineTest {
         String content = Files.readString(appJs);
         assertTrue(content.contains("alignedDerivationLatex"),
             "app.js must read PathReplayDto.alignedDerivationLatex");
+        assertTrue(content.contains("derivationLayout"),
+            "app.js must prefer PathReplayDto.derivationLayout when rendering the replay block");
         assertTrue(content.contains("renderAlignedDerivationBlock"),
             "app.js must expose a renderAlignedDerivationBlock() helper for the replay tab");
         assertTrue(content.contains("replay-derivation-block"),
@@ -203,6 +236,8 @@ class WebUiMathPipelineTest {
             "app.js must gate edge captions behind data-graph-math-edges");
         assertTrue(content.contains("expressionLatex"),
             "app.js must read SearchGraphNodeDto.expressionLatex for the overlay");
+        assertTrue(content.contains("payload.layout"),
+            "graph overlays must prefer SearchGraphNodeDto/SearchGraphEdgeDto.layout when present");
     }
 
     @Test
@@ -238,6 +273,8 @@ class WebUiMathPipelineTest {
         String content = Files.readString(appJs);
         assertTrue(content.contains("renderMathLayout"),
             "app.js must define a renderMathLayout(layout, host) helper");
+        assertTrue(content.contains("step.layout"),
+            "replay step rendering must pass ReplayStep.layout to renderMathLayout()");
         assertTrue(content.contains("math-aligned-rows"),
             "app.js must emit a .math-aligned-rows grid wrapper for ALIGNED layouts");
         assertTrue(content.contains("math-aligned-row"),

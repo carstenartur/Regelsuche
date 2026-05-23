@@ -13,10 +13,9 @@
  * UI is still usable when an endpoint is missing.
  */
 (() => {
-    // Optional CDN libraries for the interactive Cytoscape graph view and
-    // MathJax-based inline LaTeX. Loaded dynamically so the static HTML
-    // contains no third-party <script src=...> tags (avoids SRI churn and
-    // means the workbench works offline with the Mermaid fallback).
+    // Optional CDN library for the interactive Cytoscape graph view.
+    // KaTeX is loaded statically from index.html so cold page loads can
+    // typeset math before the UI starts mutating the DOM.
     function loadCdnScript(src) {
         return new Promise((resolve) => {
             const s = document.createElement('script');
@@ -31,48 +30,32 @@
     }
     // Fire-and-forget; functions guard on `typeof cytoscape === 'function'`.
     loadCdnScript('https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js');
-    // KaTeX is preferred for math typesetting (fast, App-feel). MathJax is
-    // loaded as a fallback for constructs that KaTeX does not support, and
-    // also as the renderer used by legacy call sites until they are migrated
-    // to the central renderMath(root) pipeline. The KaTeX stylesheet is
-    // injected so the page works without a static <link> in index.html.
-    function loadCdnStylesheet(href) {
-        return new Promise((resolve) => {
-            const l = document.createElement('link');
-            l.rel = 'stylesheet';
-            l.href = href;
-            l.crossOrigin = 'anonymous';
-            l.referrerPolicy = 'no-referrer';
-            l.onload = () => resolve(true);
-            l.onerror = () => resolve(false);
-            document.head.appendChild(l);
-        });
+
+    function mathTargets(root) {
+        if (!root) { return []; }
+        const selector = '[data-math], .math, .latex';
+        const targets = [];
+        if (typeof root.matches === 'function' && root.matches(selector)) {
+            targets.push(root);
+        }
+        return targets.concat(Array.from(root.querySelectorAll(selector)));
     }
-    loadCdnStylesheet('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css');
-    loadCdnScript('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js').then((ok) => {
-        if (!ok) { return; }
-        loadCdnScript('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js').then(() => {
-            // Typeset whatever is already on screen once KaTeX is ready.
-            window.renderMath(document.body);
-        });
-    });
-    loadCdnScript('https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js');
 
     /**
      * Central math typesetter. Walks `root` for nodes carrying inline LaTeX
      * (`[data-math]`, `.math`, or the legacy `.latex` class) and renders
-     * them via KaTeX when available, falling back to MathJax, and finally
-     * leaving the raw LaTeX visible inside a `<code>` block tagged
+     * them via KaTeX when available, finally leaving the raw LaTeX visible inside a `<code>` block tagged
      * `math-fallback` so the formula remains legible without any CDN.
      *
      * All UI surfaces (replay, demo summary, search-graph inspector,
      * matrix preview, hints, proof panel, export preview) must call this
-     * helper instead of invoking MathJax directly so the rendering path
+     * helper so the rendering path
      * stays uniform.
      */
     window.renderMath = function renderMath(root) {
         if (!root) { return; }
-        const nodes = root.querySelectorAll('[data-math], .math, .latex');        if (typeof window.renderMathInElement === 'function') {
+        const nodes = mathTargets(root);
+        if (typeof window.renderMathInElement === 'function') {
             try {
                 window.renderMathInElement(root, {
                     delimiters: [
@@ -91,12 +74,8 @@
                 });
                 return;
             } catch (_) {
-                // fall through to MathJax / plain fallback below
+                // fall through to plain fallback below
             }
-        }
-        if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
-            window.MathJax.typesetPromise([root]).catch(() => {});
-            return;
         }
         // No renderer available — surface the raw LaTeX in a <code> block so
         // the formula is still legible.
@@ -726,7 +705,8 @@
 
     /**
      * Stage 4 — KaTeX graph-node HTML overlays. Renders each Cytoscape
-     * node's expression (via `payload.expressionLatex`) as an absolutely
+     * node's expression (preferably via `payload.layout`, else
+     * `payload.expressionLatex`) as an absolutely
      * positioned `.graph-node-math` div inside a `.graph-overlay-layer`
      * wrapper that sits over the canvas. The overlay layer is repositioned
      * after `layoutstop` / `pan` / `zoom` / `position` events using each
@@ -783,13 +763,13 @@
                     host = document.createElement('div');
                     host.className = 'graph-node-math';
                     host.setAttribute('data-node-id', id);
-                    host.setAttribute('data-math', '$' + latex + '$');
-                    host.textContent = '$' + latex + '$';
                     if (payload.expression) {
                         host.setAttribute('aria-label', String(payload.expression));
                     }
                     layer.appendChild(host);
                 }
+                host.setAttribute('data-math', '$' + latex + '$');
+                host.textContent = '$' + latex + '$';
                 if (payload.isBest) { host.classList.add('is-best'); } else { host.classList.remove('is-best'); }
                 if (payload.isDeadEnd) { host.classList.add('is-dead-end'); } else { host.classList.remove('is-dead-end'); }
                 const box = projectNode(node);
@@ -798,6 +778,7 @@
                 // CSS rule defines `transition: transform 200ms ease`.
                 host.style.transform = 'translate3d(' + (box.x + box.w / 2) + 'px,'
                     + (box.y + box.h / 2) + 'px, 0) translate(-50%, -50%)';
+                window.renderMathLayout(payload.layout, host);
             });
             // Optional edge captions.
             if (showEdges) {
@@ -812,14 +793,15 @@
                         host = document.createElement('div');
                         host.className = 'graph-node-math graph-edge-math';
                         host.setAttribute('data-node-id', id);
-                        host.setAttribute('data-math', '$' + latex + '$');
-                        host.textContent = '$' + latex + '$';
                         layer.appendChild(host);
                     }
+                    host.setAttribute('data-math', '$' + latex + '$');
+                    host.textContent = '$' + latex + '$';
                     const bb = edge.renderedBoundingBox();
                     const cx = (bb.x1 + bb.x2) / 2;
                     const cy2 = (bb.y1 + bb.y2) / 2;
                     host.style.transform = 'translate3d(' + cx + 'px,' + cy2 + 'px, 0) translate(-50%, -50%)';
+                    window.renderMathLayout(payload.layout, host);
                 });
             }
             // Garbage-collect overlays for removed elements.
@@ -828,9 +810,6 @@
                     host.remove();
                 }
             });
-            // Route every freshly added/updated math host through the
-            // central renderMath() pipeline so KaTeX takes over.
-            window.renderMath(layer);
         }
         function cssEscape(value) {
             if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
@@ -855,10 +834,12 @@
         const rows = Object.entries(payload || {}).map(([k, v]) =>
             `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}</div>`);
         inspector.innerHTML = rows.join('');
-        if (payload && payload.latex) {
-            inspector.innerHTML += '<div class="math" data-math="$' + escapeHtml(payload.latex) + '$">$' + escapeHtml(payload.latex) + '$</div>';
+        const latex = payload && (payload.expressionLatex || payload.ruleLatex || payload.latex);
+        if (latex) {
+            inspector.innerHTML += '<div class="graph-inspector-math" data-math="$'
+                + escapeHtml(latex) + '$">$' + escapeHtml(latex) + '$</div>';
+            window.renderMathLayout(payload && payload.layout, inspector.lastElementChild);
         }
-        window.renderMath(inspector);
     }
 
     /* ─── Compare tab ─── */
@@ -1122,7 +1103,7 @@
     }
 
     /* ─── Replay tab ─── */
-    let replayState = { steps: [], index: 0, timer: null, alignedDerivationLatex: '' };
+    let replayState = { steps: [], index: 0, timer: null, alignedDerivationLatex: '', derivationLayout: null };
     if ($('replayLoad')) {
         $('replayLoad').addEventListener('click', loadReplay);
         $('replayPrev').addEventListener('click', () => { stopReplay(); stepReplay(-1); });
@@ -1174,6 +1155,7 @@
             replayState.steps = data.steps || [];
             replayState.alignedDerivationLatex = data.alignedDerivationLatex || '';
             replayState.alignedDerivationLatexWithDiff = data.alignedDerivationLatexWithDiff || '';
+            replayState.derivationLayout = data.derivationLayout || null;
             replayState.index = 0;
             renderReplayStep();
         } catch (ex) {
@@ -1195,6 +1177,7 @@
         // backend provides it (alignedDerivationLatexWithDiff) so changed
         // tokens are colour-coded inline. Falls back to the plain block.
         const derivationBlock = renderAlignedDerivationBlock(
+            replayState.derivationLayout,
             replayState.alignedDerivationLatexWithDiff
                 || replayState.alignedDerivationLatex,
             replayState.index);
@@ -1207,7 +1190,6 @@
         const toDiff = wrapDiffLatex(step.toLatex || '',
             step.changedToSpans, 'diff-new');
         const fromInline = '$' + fromDiff + '$';
-        const toInline = '$' + toDiff + '$';
         canvas.innerHTML = derivationBlock
             + '<div class="replay-step">'
             + '<div class="replay-step-index">Schritt ' + (step.stepIndex + 1)
@@ -1217,7 +1199,8 @@
             + '<span class="math" data-math="' + escapeHtml(fromInline) + '">' + escapeHtml(fromInline) + '</span></div>'
             + '<div class="replay-to"><strong>Nachher:</strong> '
             + '<code>' + escapeHtml(step.toExpression) + '</code><br>'
-            + '<span class="math" data-math="' + escapeHtml(toInline) + '">' + escapeHtml(toInline) + '</span></div>'
+            + '<span class="replay-step-math" data-math="$' + escapeHtml(step.toLatex || '')
+            + '$">$' + escapeHtml(step.toLatex || '') + '$</span></div>'
             + '<div class="replay-rule"><strong>Regel:</strong> <code>'
             + escapeHtml(ruleId) + '</code></div>'
             + extras
@@ -1226,6 +1209,14 @@
             + '<div class="hint">Δ Komplexität: ' + step.scoreDelta
             + ' · Äquivalenzerhaltend: ' + step.equivalencePreserving + '</div>'
             + '</div>';
+        const derivationHost = canvas.querySelector('.replay-derivation-math');
+        if (derivationHost) {
+            window.renderMathLayout(replayState.derivationLayout, derivationHost);
+        }
+        const toHost = canvas.querySelector('.replay-step-math');
+        if (toHost) {
+            window.renderMathLayout(step.layout, toHost);
+        }
         window.renderMath(canvas);
     }
 
@@ -1275,7 +1266,7 @@
      * the same rule-arrow style is reused across server-rendered
      * exports and the interactive UI.
      */
-    function renderAlignedDerivationBlock(latex, focusIndex) {
+    function renderAlignedDerivationBlock(layout, latex, focusIndex) {
         if (!latex) return '';
         const display = '$$' + latex + '$$';
         // Stage 3: focused step gets a row-highlight class on the wrapper
@@ -1284,7 +1275,8 @@
         // class lives on the wrapper rather than per-row).
         return '<div class="replay-derivation-block replay-derivation-focus" data-focus-step="' + focusIndex + '">'
             + '<div class="replay-derivation-title">Rechenweg</div>'
-            + '<div class="math replay-derivation-math" data-math="' + escapeHtml(display) + '">'
+            + '<div class="replay-derivation-math" data-math="' + escapeHtml(display) + '"'
+            + (layout && layout.aria ? ' aria-label="' + escapeHtml(String(layout.aria)) + '"' : '') + '>'
             + escapeHtml(display)
             + '</div>'
             + '</div>';
@@ -1660,6 +1652,7 @@
 
     /* ─── Auto-load on page open ─── */
     document.addEventListener('DOMContentLoaded', () => {
+        window.renderMath(document.body);
         // Lazy-load when a tab is activated for the first time.
         document.querySelectorAll('.tab').forEach((tab) => {
             tab.addEventListener('click', () => {

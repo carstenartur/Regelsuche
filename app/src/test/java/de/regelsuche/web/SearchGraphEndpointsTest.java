@@ -56,6 +56,8 @@ class SearchGraphEndpointsTest {
         assertTrue(body.contains("\"nodes\""));
         assertTrue(body.contains("\"edges\""));
         assertTrue(body.contains("\"stats\""));
+        assertTrue(body.contains("\"layout\":{\"kind\""),
+            "/api/search-graph must expose layout JSON for math-bearing nodes/edges");
     }
 
     @Test
@@ -66,6 +68,10 @@ class SearchGraphEndpointsTest {
         assertTrue(body.contains("\"steps\""));
         assertTrue(body.contains("\"fromLatex\""));
         assertTrue(body.contains("\"ruleExplanation\""));
+        assertTrue(body.contains("\"derivationLayout\":{\"kind\":\"ALIGNED\""),
+            "/api/paths/{id}/replay must expose the structured derivation layout");
+        assertTrue(body.contains("\"layout\":{\"kind\""),
+            "/api/paths/{id}/replay must expose structured step layouts");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package de.regelsuche.api.searchgraph;
 
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.export.layout.MathLayoutJsonWriter;
 import java.util.Map;
 
 /**
@@ -22,6 +23,7 @@ public final class SearchGraphJsonSerializer {
                 inner.property("expression", node.expression());
                 inner.property("latex", node.latex());
                 inner.property("expressionLatex", node.expressionLatex());
+                MathLayoutJsonWriter.write(inner, "layout", node.layout());
                 inner.property("score", node.score());
                 inner.property("depth", node.depth());
                 inner.property("visitedCount", node.visitedCount());
@@ -35,6 +37,8 @@ public final class SearchGraphJsonSerializer {
                 inner.property("from", edge.from());
                 inner.property("to", edge.to());
                 inner.property("ruleId", edge.ruleId());
+                inner.property("ruleLatex", edge.ruleLatex());
+                MathLayoutJsonWriter.write(inner, "layout", edge.layout());
                 inner.property("ruleKind", edge.ruleKind().name());
                 inner.property("scoreDelta", edge.scoreDelta());
                 inner.stringArray("assumptions", edge.assumptions());
