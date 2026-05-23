@@ -144,9 +144,11 @@ public record PathReplayDto(
          * and {@link #toExpression()}.
          */
         public de.regelsuche.export.layout.MathLayout layout() {
-            return de.regelsuche.export.layout.MathLayout.fromLatexFragment(
+            return MATH.layoutWithDiff(
+                fromExpression,
+                toExpression,
                 toLatex,
-                de.regelsuche.export.layout.AstAriaRenderer.ariaLabel(toExpression)
+                changedToSpans
             );
         }
     }
@@ -205,6 +207,6 @@ public record PathReplayDto(
                 step.toExpression()
             ));
         }
-        return MATH.derivationLayout(derivation);
+        return MATH.alignedDerivationLayoutWithDiff(derivation);
     }
 }

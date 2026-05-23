@@ -9,7 +9,6 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.LoadState;
-import com.microsoft.playwright.options.WaitForSelectorState;
 import java.io.IOException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -77,20 +76,8 @@ class GraphOverlayBrowserFlowTest {
         page.locator("#graphInteractive").check();
         page.locator("#reloadGraph").click();
 
-        // Wait for the overlay layer + at least one graph-node-math host
-        // with a rendered KaTeX child. The cytoscape script is loaded
-        // from a CDN; if the CDN is unreachable in the test env, skip
-        // the assertions rather than fail.
-        try {
-            page.waitForSelector(".graph-overlay-layer .graph-node-math .katex",
-                new Page.WaitForSelectorOptions()
-                    .setState(WaitForSelectorState.ATTACHED)
-                    .setTimeout(15_000));
-        } catch (RuntimeException ex) {
-            // CDN-blocked environments: nothing to assert, but the JS
-            // pin tests in WebUiMathPipelineTest still cover the wiring.
-            return;
-        }
+        page.waitForSelector(".graph-overlay-layer .graph-node-math .katex",
+            new Page.WaitForSelectorOptions().setTimeout(15_000));
 
         String transformBefore = page.locator(".graph-node-math").first()
             .evaluate("el => el.style.transform").toString();

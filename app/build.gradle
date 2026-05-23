@@ -8,12 +8,19 @@ repositories {
     mavenCentral()
 }
 
+def vendorWebRoot = layout.projectDirectory.dir('src/main/resources/web/vendor')
+def vendorKatexDir = vendorWebRoot.dir('katex')
+def vendorCytoscapeDir = vendorWebRoot.dir('cytoscape')
+
 dependencies {
     implementation 'org.neo4j.driver:neo4j-java-driver:6.1.0'
     implementation 'org.graalvm.polyglot:polyglot:24.2.1'
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    webAssets 'org.webjars.npm:katex:0.16.11'
+    webAssets 'org.webjars.npm:cytoscape:3.28.1'
 }
 
 java {
@@ -86,6 +93,49 @@ sourceSets {
 configurations {
     e2eTestImplementation.extendsFrom testImplementation
     e2eTestRuntimeOnly.extendsFrom testRuntimeOnly
+    webAssets
+}
+
+def vendorJar = { String artifact ->
+    configurations.webAssets.resolve().find { it.name.startsWith(artifact + '-') }
+        ?: throw new GradleException("Missing web asset jar for ${artifact}")
+}
+
+tasks.register('vendorWebAssets') {
+    description = 'Vendors KaTeX and Cytoscape assets from WebJars into src/main/resources/web/vendor.'
+    group = 'build setup'
+    inputs.files(configurations.webAssets)
+    outputs.dirs(vendorKatexDir, vendorCytoscapeDir)
+    doLast {
+        delete(vendorKatexDir.asFile, vendorCytoscapeDir.asFile)
+        copy {
+            from(zipTree(vendorJar('katex')))
+            include 'META-INF/resources/webjars/katex/*/dist/katex.min.css'
+            include 'META-INF/resources/webjars/katex/*/dist/katex.min.js'
+            include 'META-INF/resources/webjars/katex/*/dist/contrib/auto-render.min.js'
+            include 'META-INF/resources/webjars/katex/*/dist/fonts/**'
+            eachFile { file ->
+                file.path = file.path.replaceFirst(
+                    /^META-INF\/resources\/webjars\/katex\/[^\/]+\/dist\//, '')
+            }
+            includeEmptyDirs = false
+            into(vendorKatexDir)
+        }
+        copy {
+            from(zipTree(vendorJar('cytoscape')))
+            include 'META-INF/resources/webjars/cytoscape/*/dist/cytoscape.min.js'
+            eachFile { file ->
+                file.path = file.path.replaceFirst(
+                    /^META-INF\/resources\/webjars\/cytoscape\/[^\/]+\/dist\//, '')
+            }
+            includeEmptyDirs = false
+            into(vendorCytoscapeDir)
+        }
+    }
+}
+
+tasks.named('processResources') {
+    dependsOn tasks.named('vendorWebAssets')
 }
 
 dependencies {
@@ -130,6 +180,8 @@ tasks.register('e2eTest', Test) {
     // System property is consumed by BrowserDemoFlowTest.
     systemProperty 'regelsuche.recordDocs',
         providers.gradleProperty('regelsuche.recordDocs').getOrElse('false')
+    systemProperty 'regelsuche.updateScreenshots',
+        providers.gradleProperty('regelsuche.updateScreenshots').getOrElse('false')
     // Surface useful Playwright output during long-running browser runs.
     testLogging {
         events 'passed', 'skipped', 'failed'

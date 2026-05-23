@@ -2071,6 +2071,8 @@ public class WebWorkbenchServer {
         } else if (path.startsWith("/static/")) {
             String resource = "/web" + path.substring("/static".length());
             sendStaticResource(exchange, resource, mimeFor(resource));
+        } else if (path.startsWith("/vendor/") || path.equals("/app.js") || path.equals("/style.css")) {
+            sendStaticResource(exchange, "/web" + path, mimeFor(path));
         } else {
             sendStatus(exchange, 404, "not found");
         }
@@ -2085,6 +2087,18 @@ public class WebWorkbenchServer {
         }
         if (resource.endsWith(".css")) {
             return "text/css; charset=utf-8";
+        }
+        if (resource.endsWith(".woff2")) {
+            return "font/woff2";
+        }
+        if (resource.endsWith(".woff")) {
+            return "font/woff";
+        }
+        if (resource.endsWith(".ttf")) {
+            return "font/ttf";
+        }
+        if (resource.endsWith(".svg")) {
+            return "image/svg+xml";
         }
         return "application/octet-stream";
     }
