@@ -26,13 +26,17 @@ import java.util.List;
  *
  * <p>The class is named {@code …AppEnvironment} on purpose: it represents the
  * "system under test" container the browser interacts with. We deliberately
- * do not boot the Docker image via Testcontainers here even though
- * {@code org.testcontainers:testcontainers} is on the classpath: starting an
+ * do not boot the Docker image via Testcontainers here: starting an
  * in-process server is an order of magnitude faster and uses the exact same
- * application code path. If a future flow needs a real Docker image (e.g. for
- * a Neo4j-backed run) it can compose this class with a Testcontainers
- * {@code GenericContainer} – the Playwright {@code baseUrl()} indirection
- * makes that swap a one-line change.</p>
+ * application code path. For Docker-image-level regression tests (e.g.
+ * verifying that static assets under {@code /vendor/} are actually served)
+ * see the complementary {@code dockerE2eTest} source set and
+ * {@code WebWorkbenchDockerImageTest} / {@code WebWorkbenchDockerImagePlaywrightTest}
+ * – those tests caught the May 2026 {@code /vendor/} bug that caused KaTeX
+ * to silently fail across multiple PRs. If a future flow needs a real Docker
+ * image (e.g. for a Neo4j-backed run) it can compose this class with a
+ * Testcontainers {@code GenericContainer} – the Playwright {@code baseUrl()}
+ * indirection makes that swap a one-line change.</p>
  *
  * <p>Pass {@code enableProofWorkbench=true} to wire a self-contained, in-process
  * {@link ProofWorkbenchService} backed by an always-succeeding stub worker.
