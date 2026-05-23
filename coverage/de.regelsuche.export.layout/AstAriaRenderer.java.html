@@ -29,15 +29,15 @@ public final class AstAriaRenderer {
 <span class="fc" id="L29">        StringBuilder out = new StringBuilder(t.length() + 16);</span>
 <span class="fc bfc" id="L30" title="All 2 branches covered.">        for (int i = 0; i &lt; t.length(); i++) {</span>
 <span class="fc" id="L31">            char c = t.charAt(i);</span>
-<span class="pc bpc" id="L32" title="4 of 11 branches missed.">            switch (c) {</span>
+<span class="pc bpc" id="L32" title="2 of 11 branches missed.">            switch (c) {</span>
 <span class="fc" id="L33">                case '+' -&gt; out.append(&quot; plus &quot;);</span>
 <span class="fc" id="L34">                case '-' -&gt; out.append(&quot; minus &quot;);</span>
 <span class="fc" id="L35">                case '*' -&gt; out.append(&quot; mal &quot;);</span>
 <span class="nc" id="L36">                case '/' -&gt; out.append(&quot; geteilt durch &quot;);</span>
 <span class="fc" id="L37">                case '=' -&gt; out.append(&quot; gleich &quot;);</span>
 <span class="nc" id="L38">                case '&lt;' -&gt; out.append(&quot; kleiner &quot;);</span>
-<span class="nc" id="L39">                case '&gt;' -&gt; out.append(&quot; grösser &quot;);</span>
-<span class="nc" id="L40">                case '^' -&gt; out.append(&quot; hoch &quot;);</span>
+<span class="fc" id="L39">                case '&gt;' -&gt; out.append(&quot; grösser &quot;);</span>
+<span class="fc" id="L40">                case '^' -&gt; out.append(&quot; hoch &quot;);</span>
 <span class="fc" id="L41">                case '(' -&gt; out.append(&quot; auf &quot;);</span>
 <span class="fc" id="L42">                case ')' -&gt; out.append(&quot; zu &quot;);</span>
 <span class="fc" id="L43">                default -&gt; out.append(c);</span>
