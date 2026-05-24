@@ -165,6 +165,29 @@ jobs:
         with:
           name: unit-test-reports
           path: '**/build/reports/tests/**'
+      - name: Ensure gh-pages branch exists
+        if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            echo "gh-pages branch already exists."
+            exit 0
+          fi
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+          git init "$tmp_dir"
+          cd "$tmp_dir"
+          git checkout --orphan gh-pages
+          touch .nojekyll
+          mkdir -p coverage tests dev/bench
+          printf '{"schemaVersion":1,"label":"coverage","message":"pending","color":"lightgrey"}\n' > coverage/badge.json
+          printf '{"schemaVersion":1,"label":"tests","message":"pending","color":"lightgrey"}\n' > tests/badge.json
+          git add .
+          git -c user.name='github-actions[bot]' -c user.email='github-actions[bot]@users.noreply.github.com' commit -m 'Initialize gh-pages'
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin gh-pages
       - name: Deploy coverage badge & report to GitHub Pages
         if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: peaceiris/actions-gh-pages@v4

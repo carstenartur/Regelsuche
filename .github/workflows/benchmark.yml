@@ -49,18 +49,31 @@ jobs:
           test -f "$path"
           echo "path=$path" >> "$GITHUB_OUTPUT"
 
-      - name: Check benchmark history branch
-        id: benchmark-history
+      - name: Ensure gh-pages branch exists
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No gh-pages branch found; skipping benchmark history publishing for this run."
+            echo "gh-pages branch already exists."
+            exit 0
           fi
 
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+          git init "$tmp_dir"
+          cd "$tmp_dir"
+          git checkout --orphan gh-pages
+          touch .nojekyll
+          mkdir -p coverage tests dev/bench
+          printf '{"schemaVersion":1,"label":"coverage","message":"pending","color":"lightgrey"}\n' > coverage/badge.json
+          printf '{"schemaVersion":1,"label":"tests","message":"pending","color":"lightgrey"}\n' > tests/badge.json
+          git add .
+          git -c user.name='github-actions[bot]' -c user.email='github-actions[bot]@users.noreply.github.com' commit -m 'Initialize gh-pages'
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin gh-pages
+
       - name: Publish benchmark results
-        if: steps.benchmark-history.outputs.exists == 'true'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Regelsuche JMH Benchmarks
