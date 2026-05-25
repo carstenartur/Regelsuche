@@ -90,7 +90,10 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
 * `docker-image-e2e` — baut das Standard-Dockerfile, fährt den Container via
   Testcontainers hoch und verifiziert via HTTP-Client + Playwright das
   Asset-Serving und KaTeX-Rendering (schützt vor dem `/vendor/`-Bug und
-  ähnlichen Regressions).
+  ähnlichen Regressions). Zusätzlich laufen PostgreSQL-basierte
+  Discovery-Full-Mode-Tests wie `ScientificDiscoveryPostgresE2ETest`, die
+  wissenschaftliche Seeds reproduzierbar ausführen, Replay-Artefakte erzeugen
+  und Seeds/Search-Runs/Reports/Proof-Worker-Metadaten persistieren.
 * `docs-assets` — nur auf `main`: `./gradlew e2eTest -Pregelsuche.recordDocs=true`
   und lädt die frischen Screenshots/Videos als CI-Artifact hoch.
 * `benchmark-report` — `./gradlew benchmarkReport` rendert die aktuelle

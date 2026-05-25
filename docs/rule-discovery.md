@@ -135,3 +135,30 @@ Ausdruck-Platzhalter werden in `GeneralizedPattern.expressionPlaceholderValues()
   strukturelle `HypothesisCandidate` mit der Relation
   `S_(n+1) = S_n + x^n`. Die geschlossene Form `(1-x^n)/(1-x)` wird noch nicht
   automatisch hergeleitet oder bewiesen.
+
+## Reproduzierbare wissenschaftliche Experimente
+
+Der portable Experiment-Kern liegt in `:regelsuche-experiments`:
+
+- `SeedExpression` beschreibt wissenschaftliche Seeds mit Quelle, Kategorie,
+  Tags und Annahmen.
+- `ScientificSeedCorpora.curated()` bündelt kuratierte Seeds für bekannte
+  Identitäten, DLMF-/OEIS-Proben, Matrix-/Operatorfälle und
+  Gegenbeispiel-Fallen. `fromCatalogs(...)` lädt zusätzlich lokale YAML-/JSON-
+  Kataloge.
+- `DeterministicDiscoveryExperimentRunner` sortiert Seeds deterministisch,
+  erzwingt ein globales Budget und kann Seeds parallel auswerten, ohne die
+  Report-Reihenfolge zu verändern.
+- `DiscoveryReplayArtifactWriter` schreibt CI-taugliche Replay-Artefakte:
+  `discovery-report.json`, `discovery-report.html`, `discovery-summary.png`
+  und `discovery-replay.gif`.
+
+Die wissenschaftlichen Reproduktions-Tests gehen über Runner-Mechanik hinaus:
+`ScientificDiscoveryReproductionTest` führt ausgewählte Seeds durch echte
+App-Discovery-/Demo-Pipelines (u. a. Binom, Trigonometrie, Matrix und rationale
+Vereinfachung), prüft Replay-Pfade und erzeugt Artefakte. Der
+Testcontainers-basierte `ScientificDiscoveryPostgresE2ETest` persistiert
+Seeds, Search-Runs, Experiment, Report und einen optionalen Stub-Proof-Worker-
+Status in PostgreSQL. Das Projekt nutzt keine Spring-Boot-Runtime; die
+Container-Integration erfolgt daher über JUnit/Testcontainers plus die
+Produktions-Persistenzadapter statt über `@SpringBootTest`.
