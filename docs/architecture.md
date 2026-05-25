@@ -1,13 +1,32 @@
 # Architektur
 
-Regelsuche ist ein Gradle-Multimodulprojekt (`app`-Modul) mit fünf Hauptbereichen:
+Regelsuche läuft aktuell in einem Gradle-Setup mit einem produktiven
+Code-Modul (`app`). Damit Discovery-, Persistenz- und Experiment-Features
+trotzdem isoliert weiterentwickelt werden können, wird die Architektur über
+**logische Module mit klaren Grenzen** geführt.
 
-| Paket | Verantwortlichkeit |
-| --- | --- |
-| `de.regelsuche.ast`, `parse` | AST-Modell für Terme/Gleichungen und Parser/Formatter. |
-| `de.regelsuche.transform` | Atomare Rewrite-Regeln (`RewriteRule`, `PatternRewriteRule`, `AstRewriteTransformationEngine`). |
-| `de.regelsuche.search` | Such-Heuristiken (`SearchHeuristic`, `SearchProfile`) und Strategien (`BestFirst`, `Beam`, `AStar`, `MCTS`, `Hybrid`, `RandomMonteCarlo`). |
-| `de.regelsuche.discovery`, `mining`, `inventory` | Modelle für entdeckte Umformungen, Regel-Kandidaten und das wiederverwendbare Regelinventar. |
-| `de.regelsuche.export`, `explain`, `api`, `web` | Renderer (Markdown/LaTeX/Mermaid/JSON), Erklärservice, Query-Services und eingebetteter Web-Workbench. |
+## Architektur-Leitplanken
 
-Alle Such- und Entdeckungspfade laufen über atomare Regeln und schreiben Knoten/Kanten in den `ExpressionGraphStore`. Lehrbuchformeln entstehen ausschließlich durch Verkettung atomarer Schritte.
+- mathematischer Kern bleibt technologie-agnostisch,
+- Infrastruktur bleibt austauschbar (JSON/Neo4j/Prover/HTTP),
+- neue große Komponenten bekommen zuerst stabile Interfaces,
+- Tests sind klar nach Laufzeit/Kosten geschichtet.
+
+## Logische Module (innerhalb des aktuellen `app`-Moduls)
+
+Die Zielstruktur und aktuelle Paket-Zuordnung steht in
+[module-structure.md](module-structure.md).
+
+## Abhängigkeitsregeln
+
+Die verbindlichen Richtungen und verbotenen Kanten stehen in
+[dependency-rules.md](dependency-rules.md).
+
+## Test-Schichtung
+
+Die Teststrategie inkl. schneller Core-Tests, Integrations- und Browser-E2E
+steht in [testing-strategy.md](testing-strategy.md).
+
+## ADRs
+
+Architekturentscheidungen werden unter [`docs/adr/`](adr/) versioniert.

@@ -55,9 +55,12 @@ dann den `REMOTE_NEO4J`-Persistenzmodus aktiv (siehe
 ## Nächste Schritte
 
 * [Demo-Gallery](demo-gallery.md) – Visuelle Übersicht aller Flows.
-* [Architektur](architecture.md) – Module, Datenflüsse, Persistenz-Modi.
+* [Architektur](architecture.md) – Leitplanken und Überblick.
+* [Modulstruktur](module-structure.md) – logische Module und Paketmapping.
+* [Dependency-Regeln](dependency-rules.md) – erlaubte Abhängigkeitsrichtungen.
 * [Such-Intelligenz](search-intelligence-roadmap.md) – Strategien, Beam, A\*, Equality Saturation.
 * [Math-Domains](math-domains.md) – Gleichungen, Ungleichungen, Ableitung, Lineare Algebra.
 * [Proof-Bridge](proof-bridge.md) – Vom Suchpfad zum formalen Beweis.
 * [Macro-Rules](macro-rules.md) – Wie das System eigene Regeln lernt.
 * [Testing](testing.md) – Unit-, Integrations- und Browser-E2E-Tests.
+* [Testing-Strategie](testing-strategy.md) – Schichtung für schnelle Core-Tests und stabile E2E-Layer.
