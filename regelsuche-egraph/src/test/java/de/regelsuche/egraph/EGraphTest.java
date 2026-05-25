@@ -14,6 +14,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import de.regelsuche.transform.PatternExpr;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -228,6 +229,28 @@ class EGraphTest {
             // The e-classes for (a+1) and (b+1) have different assumptions and
             // must not be silently merged.
         }
+    }
+
+    @Test
+    void matcherKeepsUnchangedRootCacheEntriesAcrossGraphVersionChanges() {
+        EGraph eGraph = new EGraph();
+        eGraph.addExpression(parse("a + b"));
+        eGraph.addExpression(parse("c + d"));
+        EGraphPatternMatcher matcher = new EGraphPatternMatcher(eGraph);
+        PatternExpr addPattern = PatternExpr.op(BinaryOperator.ADD, PatternExpr.var("L"), PatternExpr.var("R"));
+
+        assertEquals(2, matcher.matchAll("add", addPattern, null).size());
+        assertEquals(0, matcher.stats().matcherCacheHits());
+        assertEquals(2, matcher.stats().matcherCacheMisses());
+
+        eGraph.addExpression(parse("z * 1"));
+        assertEquals(2, matcher.matchAll("add", addPattern, null).size());
+
+        EGraphPatternMatcher.MatcherStats stats = matcher.stats();
+        assertTrue(stats.matcherCacheHits() >= 2,
+            "unrelated graph changes must not evict cached add-root matches");
+        assertEquals(2, stats.matcherCacheMisses(),
+            "signature selection should avoid scanning the new unrelated multiplication root");
     }
 
     private static Expr parse(String input) {
