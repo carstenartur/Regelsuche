@@ -11,9 +11,10 @@ abgenommen, der denselben Screenshot erzeugt. So bleibt die Doku immer
 aktuell — wenn die Funktion bricht, fällt der Screenshot weg, weil der
 Test rot wird.
 
-> **Hinweis zu Screenshots:** Sollte ein Bild fehlen, beschreibt der
-> Begleittext darunter, was zu sehen wäre. Die Seite bleibt also auch
-> ohne Bilder verständlich.
+> **Hinweis zu Screenshots:** Die Bilder werden im Documentation
+> Screenshot Mode als gezielte Container-Shots aufgenommen. Graphbilder
+> müssen Cytoscape plus KaTeX-Overlay zeigen; Full-Page-Fallbacks werden
+> nicht in die Dokumentation übernommen.
 
 Aktualisieren der Gallery:
 
@@ -90,10 +91,10 @@ Diese Begriffe werden in der UI zusätzlich als Tooltips angeboten
 
 ## Binomische Formel
 
-![Suchgraph der Binomischen Formel mit hervorgehobenem besten Rechenweg.](assets/screenshots/binomial-graph.png)
+![Best-Pfad-Graph der Binomischen Formel mit lesbaren KaTeX-Knoten.](assets/screenshots/binomial-graph.png)
 
-*Der Screenshot zeigt den Suchgraphen mit hervorgehobenem besten
-Rechenweg von $(x+3)^2$ zum vollständig ausmultiplizierten Polynom.*
+*Der Screenshot zeigt den auf den besten Rechenweg gefilterten Graphen
+von $(x+3)^2$ zum vollständig ausmultiplizierten Polynom.*
 
 **Eingabe** — Anzeigeform:
 
@@ -142,10 +143,10 @@ dieser Weg ist das, was im Unterricht zählt.
 
 ## Bruchkürzung mit Annahme `x ≠ 0`
 
-![Replay der Bruchkürzung mit sichtbar ausgewiesener Annahme.](assets/screenshots/rational-graph.png)
+![Summary-Karte der Bruchkürzung mit sichtbar ausgewiesener Annahme.](assets/screenshots/rational-summary.png)
 
-*Der Screenshot zeigt den Suchgraphen sowie die Annahme $x \neq 0$,
-unter der die Kürzung gültig ist.*
+*Der Screenshot zeigt die Demo-Summary-Karte mit Trefferzeile und der
+sichtbaren Annahme $x \neq 0$, unter der die Kürzung gültig ist.*
 
 **Eingabe** — Anzeigeform:
 
@@ -238,7 +239,7 @@ Stelle, an der in Klausuren am häufigsten Fehler passieren.
 
 ## Makroregel-Lernen
 
-![Zusammenfassung einer aus mehreren Beispielen gelernten Makroregel.](assets/screenshots/macro-learning-summary.png)
+![Summary-Karte einer aus mehreren Beispielen gelernten Makroregel.](assets/screenshots/macro-learning-summary.png)
 
 *Der Screenshot zeigt die Lern-Zusammenfassung: nach einigen Beispielen
 wird eine wiederkehrende Umformungsfolge als Makroregel aktiviert und
@@ -272,10 +273,10 @@ dass jemand händisch neue Regeln programmiert.
 
 ## Trigonometrische Identität
 
-![Suchgraph für sin² + cos² → 1.](assets/screenshots/trigonometry-graph.png)
+![Best-Pfad-Graph für sin² + cos² → 1.](assets/screenshots/trigonometry-graph.png)
 
-*Der Screenshot zeigt den Suchgraphen, der die Pythagoras-Identität
-als Pfad findet.*
+*Der Screenshot zeigt den auf den besten Rechenweg gefilterten Graphen,
+der die Pythagoras-Identität als Pfad findet.*
 
 **Eingabe** — Anzeigeform:
 
@@ -312,10 +313,11 @@ echter Pfad im Suchraum gefunden.
 
 ## Polynom-Expansion
 
-![Suchgraph für die Expansion eines Produkts zweier Linearfaktoren.](assets/screenshots/polynomial-expansion-graph.png)
+![Best-Pfad-Graph für die Expansion eines Produkts zweier Linearfaktoren.](assets/screenshots/polynomial-expansion-graph.png)
 
-*Der Screenshot zeigt, wie das Produkt zweier Linearfaktoren über
-Distributivgesetz und Zusammenfassen zum Polynom expandiert wird.*
+*Der Screenshot zeigt im gefilterten Best-Pfad-Graphen, wie das Produkt
+zweier Linearfaktoren über Distributivgesetz und Zusammenfassen zum
+Polynom expandiert wird.*
 
 **Eingabe** — Anzeigeform:
 
@@ -351,10 +353,10 @@ allgemeineren Beispiel — ein guter Vergleichspunkt.
 
 ## Lineare Gleichung
 
-![Replay einer linearen Gleichung in Schulform.](assets/screenshots/math-equation-school-form.png)
+![Summary-Karte einer linearen Gleichung mit Schulform-Panel.](assets/screenshots/math-equation-school-form.png)
 
-*Der Screenshot zeigt den Schulform-Lösungsweg einer linearen
-Gleichung.*
+*Der Screenshot zeigt die Demo-Summary mit dem Schulform-Lösungsweg
+einer linearen Gleichung.*
 
 **Eingabe** — Anzeigeform:
 
@@ -391,7 +393,7 @@ wie er an der Tafel aussehen würde.
 
 ## Ableitung (Regelkarte)
 
-![Regelkarte für die Anwendung der Potenzregel.](assets/screenshots/math-derivative-card.png)
+![Summary-Karte mit Regelkarte für die Anwendung der Potenzregel.](assets/screenshots/math-derivative-card.png)
 
 *Der Screenshot zeigt die Regelkarte, die die Anwendung der Potenzregel
 erklärt.*
