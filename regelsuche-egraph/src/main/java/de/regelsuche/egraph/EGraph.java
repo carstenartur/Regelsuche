@@ -11,7 +11,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +55,7 @@ public final class EGraph {
 
     private final UnionFind unionFind = new UnionFind();
     /** Map id → e-class. Stale ids (post-union) point to the merged class. */
-    private final Map<EClassId, EClass> classes = new LinkedHashMap<>();
+    private final Map<EClassId, EClass> classes = new HashMap<>();
     /** Hash-cons of canonical e-nodes to their owning class. */
     private final Map<ENode, EClassId> hashCons = new HashMap<>();
     /** Signature index: symbol/arity → candidate e-classes containing such nodes. */
@@ -67,6 +66,8 @@ public final class EGraph {
     private final LinkedHashSet<EClassId> dirtyClasses = new LinkedHashSet<>();
     /** Version increments whenever the graph structure changes. */
     private long version = 0L;
+    /** Number of currently canonical e-classes. */
+    private int canonicalClassCount = 0;
 
     /**
      * Add an e-node. Children must already be present in the graph (use
@@ -83,6 +84,7 @@ public final class EGraph {
         EClassId id = unionFind.makeSet();
         EClass eclass = new EClass(id, canonical);
         classes.put(id, eclass);
+        canonicalClassCount++;
         putHashCons(canonical, id);
         // record this node as a parent of each child class.
         for (EClassId child : canonical.children()) {
@@ -219,7 +221,7 @@ public final class EGraph {
 
     /** Number of distinct e-classes (after rebuild). */
     public int classCount() {
-        return classes().size();
+        return canonicalClassCount;
     }
 
     /** Number of distinct e-nodes currently hash-consed. */
@@ -313,6 +315,7 @@ public final class EGraph {
             EClassId hit = removeHashCons(parent);
             if (hit != null) {
                 putHashCons(parentCanonical, unionFind.find(hit));
+                markDirty(hit);
             }
             EClassId alreadyOwned = newParents.get(parentCanonical);
             if (alreadyOwned != null) {
@@ -417,6 +420,7 @@ public final class EGraph {
             survivorClass.absorb(mergedClass);
         }
         classes.put(merged, survivorClass);
+        canonicalClassCount--;
         markDirty(survivor);
         markDirty(merged);
         bumpVersion();

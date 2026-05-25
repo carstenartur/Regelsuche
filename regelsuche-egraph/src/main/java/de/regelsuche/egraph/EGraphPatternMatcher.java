@@ -76,11 +76,23 @@ public final class EGraphPatternMatcher {
     /** Every {@link Match} of {@code pattern} on the given candidate roots. */
     public List<Match> matchAll(String patternId, PatternExpr pattern, Collection<EClassId> candidates) {
         clearCacheIfVersionChanged();
+        return collectMatches(patternId, pattern, selectCandidateRoots(pattern, candidates));
+    }
+
+    /**
+     * Control path for benchmarks/regression tests: execute the same logical
+     * matcher without root-signature candidate selection.
+     */
+    public List<Match> matchAllFullScan(String patternId, PatternExpr pattern) {
+        clearCacheIfVersionChanged();
+        return collectMatches(patternId, pattern, allRoots());
+    }
+
+    private List<Match> collectMatches(String patternId, PatternExpr pattern, Collection<EClassId> roots) {
         List<Match> results = new ArrayList<>();
         // De-duplicate matches sharing the same root + bindings — multiple
         // e-nodes inside the same class can produce the same logical match.
         Set<String> seen = new LinkedHashSet<>();
-        Collection<EClassId> roots = selectCandidateRoots(pattern, candidates);
         classesScanned += roots.size();
         for (EClassId rootId : roots) {
             for (Map<String, EClassId> bindings : matchInClassMemoized(patternId, pattern, rootId)) {
@@ -188,6 +200,12 @@ public final class EGraphPatternMatcher {
     }
 
     private Collection<EClassId> selectCandidateRoots(PatternExpr pattern, Collection<EClassId> candidates) {
+        Collection<EClassId> signatureCandidates = candidatesForPatternRoot(pattern);
+        if ((candidates == null || candidates.isEmpty()) && signatureCandidates != null) {
+            List<EClassId> roots = canonicalize(signatureCandidates);
+            candidateClassesSkipped += Math.max(0, eGraph.classCount() - roots.size());
+            return roots;
+        }
         Collection<EClassId> base;
         if (candidates == null || candidates.isEmpty()) {
             List<EClassId> all = new ArrayList<>();
@@ -198,7 +216,6 @@ public final class EGraphPatternMatcher {
         } else {
             base = candidates;
         }
-        Collection<EClassId> signatureCandidates = candidatesForPatternRoot(pattern);
         if (signatureCandidates == null) {
             return canonicalize(base);
         }
@@ -212,6 +229,14 @@ public final class EGraphPatternMatcher {
             }
         }
         return filtered;
+    }
+
+    private List<EClassId> allRoots() {
+        List<EClassId> all = new ArrayList<>();
+        for (EClass eClass : eGraph.classes()) {
+            all.add(eClass.id());
+        }
+        return canonicalize(all);
     }
 
     private Collection<EClassId> candidatesForPatternRoot(PatternExpr pattern) {

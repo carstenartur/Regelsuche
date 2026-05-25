@@ -11,6 +11,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.PatternExpr;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class EqualitySaturationScalabilityTest {
@@ -101,7 +102,47 @@ class EqualitySaturationScalabilityTest {
 
     @Test
     void worklistSaturationKeepsSameResultAsFullScan() {
-        Expr root = parse("( x + 3 ) ^ 2");
+        SaturationPair pair = saturateBothWays("( x + 3 ) ^ 2");
+
+        assertEquals(
+            pair.fullScanBest(),
+            pair.worklistBest()
+        );
+        assertEquals(pair.fullScan().stats().appliedRules(), pair.worklist().stats().appliedRules());
+        assertTrue(pair.worklist().stats().classesScanned() <= pair.fullScan().stats().classesScanned());
+    }
+
+    @Test
+    void worklistSaturationMatchesFullScanAcrossExpressionCorpus() {
+        List<String> corpus = List.of(
+            "x + 0",
+            "0 + x",
+            "(x + 0) * 1",
+            "((x + 0) + 0)",
+            "a + b",
+            "b + a",
+            "(a + b) + c",
+            "a + (b + c)",
+            "(a + b) * c",
+            "c * (a + b)",
+            "(x + 3) ^ 2",
+            "((x + 1) * (x + 2)) + (x * (x + 3))",
+            "sin(0)",
+            "sin(x + 0)",
+            "log(x * 1)"
+        );
+
+        for (String expression : corpus) {
+            SaturationPair pair = saturateBothWays(expression);
+            assertEquals(pair.fullScanBest(), pair.worklistBest(),
+                "dirty worklist and full scan must extract the same best expression for " + expression);
+            assertEquals(pair.fullScan().stats().totalApplications(), pair.worklist().stats().totalApplications(),
+                "dirty worklist and full scan must fire the same total number of rules for " + expression);
+        }
+    }
+
+    private static SaturationPair saturateBothWays(String expression) {
+        Expr root = parse(expression);
         EGraph worklistGraph = new EGraph();
         EClassId worklistRoot = worklistGraph.addExpression(root);
         EqualitySaturation worklist = new EqualitySaturation(
@@ -126,12 +167,20 @@ class EqualitySaturationScalabilityTest {
             node -> node.isLeaf() ? 0 : 1
         );
 
-        assertEquals(
-            ExpressionFormatter.format(fullScanResult.expression()),
-            ExpressionFormatter.format(worklistResult.expression())
+        return new SaturationPair(
+            worklistResult,
+            fullScanResult,
+            ExpressionFormatter.format(worklistResult.expression()),
+            ExpressionFormatter.format(fullScanResult.expression())
         );
-        assertEquals(fullScanResult.stats().appliedRules(), worklistResult.stats().appliedRules());
-        assertTrue(worklistResult.stats().classesScanned() <= fullScanResult.stats().classesScanned());
+    }
+
+    private record SaturationPair(
+        EqualitySaturation.Result worklist,
+        EqualitySaturation.Result fullScan,
+        String worklistBest,
+        String fullScanBest
+    ) {
     }
 
     private static Expr parse(String input) {

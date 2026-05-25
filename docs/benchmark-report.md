@@ -2,6 +2,8 @@
 
 Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben den klassischen Suchmetriken auch Qualitätsmetriken: ob das erwartete Ergebnis getroffen wurde, wie viele Zustände geprunet wurden, e-Graph-Größe, Matcher-Scan-/Cache-Felder (`classesScanned`, `nodesScanned`, `candidateClassesSkipped`, `matchesFound`, `matcherCacheHits`, `matcherCacheMisses`), Saturation-Iterations-/Regelmetriken (`saturationIterations`, `rulesFired`), Saturation-Einsparungen, ob eine gelernte Makroregel beteiligt war und ob das Export-Bundle für diese Zeile gültig ist.
 
+Die JMH-Benchmark-Suite enthält zusätzlich getrennte E-Graph-Mikrobenchmarks für Add/Rebuild (`egraphRebuildSmall`, `egraphAddAndRebuildMedium`, `egraphAddAndRebuildLarge`) und den Matching-Crossover (`egraphPatternMatchFullScanLarge`, `egraphPatternMatchIndexedLarge`). Kleine Add/Rebuild-Regressionen durch Index-Buchhaltung sind damit sichtbar, während die Large-Matcher-Benchmarks zeigen, ab wann die reduzierten Root-Kandidatenscans die Indexkosten kompensieren.
+
 **Ampel:** ✅ OK · ⚠️ WARN · ❌ FAIL
 
 ## known-identities
