@@ -11,10 +11,13 @@ regelsuche-core
   <- regelsuche-search
   <- regelsuche-validation
   <- regelsuche-persistence
+  <- regelsuche-learning
   <- regelsuche-experiments
   <- app
 regelsuche-egraph <- regelsuche-search
 regelsuche-search <- regelsuche-experiments
+regelsuche-validation <- regelsuche-learning
+regelsuche-search <- regelsuche-learning
 regelsuche-validation <- regelsuche-experiments
 ```
 
@@ -25,6 +28,7 @@ regelsuche-validation <- regelsuche-experiments
 - `:regelsuche-validation` darf vom Core abhängen; konkrete Validierungsadapter
   dürfen hier zusätzliche technische Libraries kapseln.
 - `:regelsuche-persistence` darf vom Core abhängen und enthält nur einfache Datei-/In-Memory-Ports sowie Konfiguration; Datenbanktreiber bleiben vorerst in `:app`.
+- `:regelsuche-learning` darf von Core, Search und Validation abhängen; Discovery-/Graph-/Inventory-Orchestrierung bleibt außerhalb.
 - `:regelsuche-experiments` darf von Search und Validation abhängen; Web-/CLI-/Persistenzadapter bleiben außerhalb.
 - `:app` ist die Composition Root und darf die Module verdrahten.
 
@@ -64,6 +68,14 @@ reinen `TransformationEngine`-/Rewrite-Typen in `:regelsuche-core` liegen.
 In-Memory-/JSON-Datei-Repository). App-spezifische Composition (`PersistenceContext`)
 und Neo4j-/Graph-/Inventory-Adapter bleiben in `:app`, bis die oberen SCCs
 entkoppelt sind.
+
+## Learning-Regel
+
+`:regelsuche-learning` enthält portable Mining-Bausteine wie `RuleCandidate`,
+Pattern-/Anti-Unification-Typen, `HypothesisRepository`, `RuleCandidateMiner`
+und `SuccessfulTransformationPath`. App-spezifische Discovery-Orchestrierung,
+Graph-Speicherung und Inventory-Promotion bleiben in `:app`, solange die oberen
+SCCs bestehen.
 
 ## Experiments-Regel
 
