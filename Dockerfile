@@ -9,6 +9,15 @@ WORKDIR /workspace
 COPY gradlew gradle.properties settings.gradle ./
 COPY gradle ./gradle
 COPY app/build.gradle ./app/build.gradle
+COPY regelsuche-core/build.gradle ./regelsuche-core/build.gradle
+COPY regelsuche-egraph/build.gradle ./regelsuche-egraph/build.gradle
+COPY regelsuche-search/build.gradle ./regelsuche-search/build.gradle
+COPY regelsuche-validation/build.gradle ./regelsuche-validation/build.gradle
+COPY regelsuche-persistence/build.gradle ./regelsuche-persistence/build.gradle
+COPY regelsuche-learning/build.gradle ./regelsuche-learning/build.gradle
+COPY regelsuche-experiments/build.gradle ./regelsuche-experiments/build.gradle
+COPY regelsuche-cli/build.gradle ./regelsuche-cli/build.gradle
+COPY regelsuche-discovery/build.gradle ./regelsuche-discovery/build.gradle
 
 # Pre-warm the Gradle distribution and dependency cache. The build itself
 # fails (no sources yet), but the wrapper, distribution and dependencies are
@@ -18,6 +27,15 @@ RUN chmod +x ./gradlew \
     && ./gradlew --no-daemon --version
 
 COPY app ./app
+COPY regelsuche-core ./regelsuche-core
+COPY regelsuche-egraph ./regelsuche-egraph
+COPY regelsuche-search ./regelsuche-search
+COPY regelsuche-validation ./regelsuche-validation
+COPY regelsuche-persistence ./regelsuche-persistence
+COPY regelsuche-learning ./regelsuche-learning
+COPY regelsuche-experiments ./regelsuche-experiments
+COPY regelsuche-cli ./regelsuche-cli
+COPY regelsuche-discovery ./regelsuche-discovery
 
 # Build the runnable distribution.
 RUN ./gradlew --no-daemon :app:installDist -x test
