@@ -1,18 +1,25 @@
 # Architektur
 
-Regelsuche läuft aktuell in einem Gradle-Setup mit einem produktiven
-Code-Modul (`app`). Damit Discovery-, Persistenz- und Experiment-Features
-trotzdem isoliert weiterentwickelt werden können, wird die Architektur über
-**logische Module mit klaren Grenzen** geführt.
+Regelsuche ist jetzt ein Gradle-Multi-Projekt. Die ersten physischen Grenzen
+sind dort gezogen, wo der aktuelle Code bereits azyklisch und stabil genug ist:
+
+- `regelsuche-core` enthält den mathematischen Kern ohne Neo4j/GraalVM/Web/Testcontainer-Abhängigkeiten.
+- `regelsuche-egraph` hängt nur vom Core ab.
+- `regelsuche-validation` hängt vom Core ab und kapselt die aktuellen Validierungs-/Äquivalenzadapter.
+- `app` bleibt die Laufzeit-Hülle für CLI, Web, Persistence, Learning, Search und die noch zyklisch gekoppelten oberen Schichten.
+
+Damit ist Issue #41 nicht mehr nur dokumentiert: Gradle erzwingt die wichtigsten
+Grenzen bereits beim Kompilieren.
 
 ## Architektur-Leitplanken
 
 - mathematischer Kern bleibt technologie-agnostisch,
-- Infrastruktur bleibt austauschbar (JSON/Neo4j/Prover/HTTP),
+- E-Graph und Validierung benutzen Core-Typen über explizite Projektabhängigkeiten,
+- Infrastruktur bleibt in `app` bzw. in Adapter-Modulen,
 - neue große Komponenten bekommen zuerst stabile Interfaces,
-- Tests sind klar nach Laufzeit/Kosten geschichtet.
+- Tests sind nach Modul und Laufzeit/Kosten geschichtet.
 
-## Logische Module (innerhalb des aktuellen `app`-Moduls)
+## Modulstruktur
 
 Die Zielstruktur und aktuelle Paket-Zuordnung steht in
 [module-structure.md](module-structure.md).

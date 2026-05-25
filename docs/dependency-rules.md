@@ -1,9 +1,25 @@
 # Dependency Rules (Teil 0)
 
-Diese Regeln definieren die erlaubten Richtungen zwischen den logischen
-Modulen.
+Diese Regeln definieren die erlaubten Richtungen zwischen den Gradle-Modulen und
+den noch logischen Zielmodulen.
 
-## Erlaubte Hauptrichtungen
+## Bereits physisch erzwungene Richtungen
+
+```text
+regelsuche-core
+  <- regelsuche-egraph
+  <- regelsuche-validation
+  <- app
+```
+
+- `:regelsuche-core` darf keine Projektabhängigkeiten und keine technischen
+  Infrastruktur-Libraries deklarieren.
+- `:regelsuche-egraph` darf nur vom Core abhängen.
+- `:regelsuche-validation` darf vom Core abhängen; konkrete Validierungsadapter
+  dürfen hier zusätzliche technische Libraries kapseln.
+- `:app` ist die Composition Root und darf die Module verdrahten.
+
+## Zielrichtung für die noch nicht extrahierten Schichten
 
 ```text
 core <- search <- learning <- experiments
@@ -15,12 +31,16 @@ cli verdrahtet Laufzeit-Komponenten
 
 ## Verbindliche Kernregel
 
-Der mathematische Kern (`core`) bleibt frei von Infrastruktur-Details:
+Der mathematische Kern (`:regelsuche-core`) bleibt frei von Infrastruktur-Details:
 
 - keine Hibernate-/JPA-Annotationen,
 - keine Spring-REST-Abhängigkeiten,
 - keine Docker-/Containerlogik,
-- keine Neo4j-spezifischen Klassen.
+- keine Neo4j-spezifischen Klassen,
+- keine GraalVM/SymPy-Adapter.
+
+`SymPyTransformationEngine` bleibt deshalb als Adapter in `:app`, während die
+reinen `TransformationEngine`-/Rewrite-Typen in `:regelsuche-core` liegen.
 
 ## Interface-first für große Erweiterungen
 

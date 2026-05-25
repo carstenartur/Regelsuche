@@ -7,10 +7,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class ArchitectureBoundariesTest {
+
+    private static final Path REPO_ROOT = locateRepoRoot();
 
     @Test
     void teil0PortInterfacesExist() throws ClassNotFoundException {
@@ -29,8 +32,38 @@ class ArchitectureBoundariesTest {
         }
     }
 
+    @Test
+    void physicalArchitectureModulesAreIncluded() throws IOException {
+        String settings = Files.readString(REPO_ROOT.resolve("settings.gradle"));
+        for (String module : List.of("regelsuche-core", "regelsuche-egraph", "regelsuche-validation", "app")) {
+            assertTrue(settings.contains("'" + module + "'"),
+                () -> "settings.gradle must include :" + module);
+            assertTrue(Files.exists(REPO_ROOT.resolve(module).resolve("build.gradle")),
+                () -> "Expected Gradle build file for :" + module);
+        }
+    }
 
-    private static final Path REPO_ROOT = locateRepoRoot();
+    @Test
+    void physicalModuleDependenciesFollowTeil0Direction() throws IOException {
+        Map<String, List<String>> expectedProjectDependencies = Map.of(
+            "regelsuche-core", List.of(),
+            "regelsuche-egraph", List.of(":regelsuche-core"),
+            "regelsuche-validation", List.of(":regelsuche-core"),
+            "app", List.of(":regelsuche-core", ":regelsuche-egraph", ":regelsuche-validation")
+        );
+        for (Map.Entry<String, List<String>> entry : expectedProjectDependencies.entrySet()) {
+            String build = Files.readString(REPO_ROOT.resolve(entry.getKey()).resolve("build.gradle"));
+            List<String> declared = projectDependencyTokens(build);
+            for (String expected : entry.getValue()) {
+                assertTrue(declared.contains(expected),
+                    () -> entry.getKey() + " must depend on " + expected);
+            }
+            for (String declaredDependency : declared) {
+                assertTrue(entry.getValue().contains(declaredDependency),
+                    () -> entry.getKey() + " declares unexpected project dependency " + declaredDependency);
+            }
+        }
+    }
 
     @Test
     void architectureDocumentsExist() {
@@ -43,7 +76,6 @@ class ArchitectureBoundariesTest {
 
     @Test
     void mathematicalCoreHasNoInfrastructureImports() throws IOException {
-        List<String> corePackages = List.of("ast", "parse", "canonical", "rules", "transform");
         List<String> forbiddenTokens = List.of(
             "org.neo4j",
             "org.springframework",
@@ -51,20 +83,24 @@ class ArchitectureBoundariesTest {
             "jakarta.persistence",
             "javax.persistence",
             "testcontainers",
-            "docker"
+            "docker",
+            "org.graalvm"
         );
-        Path mainJavaRoot = REPO_ROOT.resolve("app/src/main/java/de/regelsuche");
+        Path mainJavaRoot = REPO_ROOT.resolve("regelsuche-core/src/main/java");
 
-        for (String pkg : corePackages) {
-            Path packagePath = mainJavaRoot.resolve(pkg);
-            if (!Files.exists(packagePath)) {
-                continue;
-            }
-            try (Stream<Path> files = Files.walk(packagePath)) {
-                files.filter(path -> path.toString().endsWith(".java"))
-                    .forEach(path -> assertFileHasNoForbiddenToken(path, forbiddenTokens));
-            }
+        try (Stream<Path> files = Files.walk(mainJavaRoot)) {
+            files.filter(path -> path.toString().endsWith(".java"))
+                .forEach(path -> assertFileHasNoForbiddenToken(path, forbiddenTokens));
         }
+        assertFileHasNoForbiddenToken(REPO_ROOT.resolve("regelsuche-core/build.gradle"), forbiddenTokens);
+    }
+
+    private static List<String> projectDependencyTokens(String buildFileContent) {
+        return buildFileContent.lines()
+            .filter(line -> line.contains("project(':"))
+            .map(line -> line.substring(line.indexOf("project(':") + "project('".length()))
+            .map(token -> token.substring(0, token.indexOf("')")))
+            .toList();
     }
 
     private static void assertFileHasNoForbiddenToken(Path file, List<String> forbiddenTokens) {

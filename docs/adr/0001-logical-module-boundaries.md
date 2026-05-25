@@ -1,4 +1,4 @@
-# ADR 0001: Logical module boundaries before physical split
+# ADR 0001: Physical core/egraph/validation modules first
 
 - Status: Accepted
 - Date: 2026-05-25
@@ -9,10 +9,21 @@ Discovery-, Persistenz- und Experiment-Funktionen erweitern Regelsuche stark.
 Bei direkter Weiterentwicklung ohne zusätzliche Abstraktionsebenen steigt die
 kognitive Last und es drohen Architekturdrift, God-Classes und langsame Tests.
 
+Der aktuelle Code enthält noch Import-Zyklen in den oberen Schichten
+(`api`, `discovery`, `export`, `graph`, `inventory`, `mining`, `search`, …).
+Ein vollständiger Big-Bang-Split in alle Zielmodule würde deshalb zyklische
+Gradle-Projektabhängigkeiten erzeugen.
+
 ## Decision
 
-Wir führen verbindliche **logische Modulgrenzen** ein, bevor die physische
-Aufteilung in mehrere Gradle-Module erfolgt.
+Wir ziehen die bereits azyklischen Grenzen physisch als Gradle-Subprojekte:
+
+- `:regelsuche-core`
+- `:regelsuche-egraph`
+- `:regelsuche-validation`
+
+Die oberen, noch zyklischen Schichten bleiben in `:app` und werden über die
+Teil-0-Ports entkoppelt, bevor sie in eigene Projekte extrahiert werden.
 
 Die Regeln sind in
 - [module-structure.md](../module-structure.md),
@@ -23,11 +34,13 @@ festgehalten.
 
 Zusätzlich wird per automatisiertem Test abgesichert, dass der mathematische
 Kern keine Infrastruktur-Abhängigkeiten (Neo4j, JPA/Hibernate, Spring, Docker,
-Testcontainers) importiert.
+Testcontainers, GraalVM) importiert und dass die neuen Gradle-Projekte korrekt
+verdrahtet bleiben.
 
 ## Consequences
 
-- Features können innerhalb klarer Grenzen entwickelt werden.
+- Core-, E-Graph- und Validation-Code sind nicht mehr nur logisch, sondern auch
+  durch Gradle getrennt.
 - Core-Logik bleibt isoliert und schneller testbar.
-- Die spätere physische Modultrennung wird ein kontrollierter, inkrementeller
-  Schritt statt eines Big-Bang-Refactorings.
+- Die obere SCC kann gezielt über Ports aufgelöst werden, ohne die grüne Build-
+  Linie zu verlieren.
