@@ -8,23 +8,27 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.ConsoleMessage;
 import com.microsoft.playwright.Download;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.ScreenshotType;
 import com.microsoft.playwright.options.WaitForSelectorState;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.opentest4j.TestAbortedException;
 
 /**
  * Professional end-to-end browser flows for the Regelsuche demo suite.
@@ -142,7 +146,7 @@ class BrowserDemoFlowTest {
         runDemoAndVerify(
             "binomial",
             List.of("x ^ 2", "6 * x", "9"));
-        screenshotGraphCanvas("binomial-graph.png");
+        screenshotGraphBestPath("binomial-graph.png");
     }
 
     @Test
@@ -155,7 +159,8 @@ class BrowserDemoFlowTest {
         // cancellation safe.
         assertTrue(page.locator("#demoSummary").innerText().contains("x"),
             "rational summary must mention the x != 0 assumption");
-        screenshotGraphCanvas("rational-graph.png");
+        screenshotDemoSummaryCard("rational-summary.png",
+            "#demoSummary code", true);
     }
 
     @Test
@@ -164,7 +169,7 @@ class BrowserDemoFlowTest {
         runDemoAndVerify(
             "trigonometry",
             List.of("= 1"));
-        screenshotGraphCanvas("trigonometry-graph.png");
+        screenshotGraphBestPath("trigonometry-graph.png");
     }
 
     @Test
@@ -173,7 +178,7 @@ class BrowserDemoFlowTest {
         runDemoAndVerify(
             "polynomial-expansion",
             List.of("x ^ 2", "3 * x", "2"));
-        screenshotGraphCanvas("polynomial-expansion-graph.png");
+        screenshotGraphBestPath("polynomial-expansion-graph.png");
     }
 
     @Test
@@ -185,7 +190,8 @@ class BrowserDemoFlowTest {
         page.waitForSelector("#demoSummary >> text=/Makro|Iteration|reusable/i",
             new Page.WaitForSelectorOptions().setTimeout(60_000));
         assertTrue(page.locator("#demoSummary").innerText().length() > 50);
-        screenshot("macro-learning-summary.png");
+        screenshotDemoSummaryCard("macro-learning-summary.png",
+            "#demoSummary table", false);
     }
 
     @Test
@@ -197,7 +203,8 @@ class BrowserDemoFlowTest {
         // Lösungsweg-Schulform panel must be visible.
         assertTrue(page.locator(".math-equation-panel").count() > 0,
             "math-equation must render the Lösungsweg-Schulform panel");
-        screenshot("math-equation-school-form.png");
+        screenshotDemoSummaryCard("math-equation-school-form.png",
+            ".math-equation-panel", true);
     }
 
     @Test
@@ -211,7 +218,8 @@ class BrowserDemoFlowTest {
         assertTrue(page.locator(".math-inequality-panel").innerText()
             .toLowerCase().contains("vergleichszeichen"),
             "inequality summary must contain the flip warning");
-        screenshot("inequality-flip-warning.png");
+        screenshotDemoSummaryCard("inequality-flip-warning.png",
+            ".math-inequality-panel", true);
         // Also check the replay tab decorates the flipping step.
         openReplayForLatestPath();
         // Step through until we hit a flipping rule; the renderer adds a
@@ -231,7 +239,8 @@ class BrowserDemoFlowTest {
         }
         assertTrue(foundFlip,
             "replay must surface the comparator-flip notice on one of the steps");
-        screenshot("inequality-replay.png");
+        screenshotReplayStep("inequality-replay.png",
+            ".replay-flip-notice", true);
     }
 
     @Test
@@ -242,7 +251,8 @@ class BrowserDemoFlowTest {
             List.of("3 * x ^ 2"));
         assertTrue(page.locator(".math-derivative-panel").count() > 0,
             "math-derivative must render the Potenzregel card");
-        screenshot("math-derivative-card.png");
+        screenshotDemoSummaryCard("math-derivative-card.png",
+            ".math-derivative-panel", true);
     }
 
     @Test
@@ -252,7 +262,8 @@ class BrowserDemoFlowTest {
         waitForDemoSummary("math-matrix");
         assertTrue(page.locator(".math-matrix-panel").count() > 0,
             "math-matrix must render the bmatrix preview");
-        screenshot("math-matrix-preview.png");
+        screenshotDemoSummaryCard("math-matrix-preview.png",
+            ".math-matrix-panel", true);
         // Activate the replay tab and refresh the path list synchronously
         // so the just-recorded matrix transformation is selectable.
         page.locator(".tab[data-tab='replay']").click();
@@ -300,7 +311,8 @@ class BrowserDemoFlowTest {
         }
         assertTrue(foundMatrixCard,
             "matrix replay must surface the bmatrix card on at least one step");
-        screenshot("math-matrix-replay.png");
+        screenshotReplayStep("math-matrix-replay.png",
+            ".replay-matrix-card", true);
     }
 
     @Test
@@ -326,7 +338,8 @@ class BrowserDemoFlowTest {
             assertTrue(!result.contains("FORMALLY_PROVED"),
                 "FORMALLY_PROVED must only be set when the prover confirmed");
         }
-        screenshot("proof-bridge-result.png");
+        screenshotPanel("proof-bridge-result.png", "#proofBridgeResult",
+            "#proofBridgeResult details", false);
     }
 
     @Test
@@ -346,7 +359,8 @@ class BrowserDemoFlowTest {
         long size = Files.size(saved);
         assertTrue(size > 1_000,
             "exported bundle.zip must contain more than a kilobyte (got " + size + ")");
-        screenshot("export-bundle.png");
+        screenshotPanel("export-bundle.png", "#tab-exports .card",
+            "#tab-exports .export-grid", false);
         Files.deleteIfExists(saved);
     }
 
@@ -445,76 +459,145 @@ class BrowserDemoFlowTest {
                 .setTimeout(15_000));
     }
 
-    private void screenshot(String fileName) {
+    private void screenshotDemoSummaryCard(
+            String fileName,
+            String requiredSelector,
+            boolean requireKatex) {
+        screenshotPanel(fileName, "#demoSummary", requiredSelector, requireKatex);
+    }
+
+    private void screenshotReplayStep(
+            String fileName,
+            String requiredSelector,
+            boolean requireKatex) {
+        screenshotPanel(fileName, "#replayCanvas", requiredSelector, requireKatex);
+    }
+
+    private void screenshotPanel(
+            String fileName,
+            String containerSelector,
+            String requiredSelector,
+            boolean requireKatex) {
         if (!RECORD_DOCS) return;
+        page.waitForSelector(containerSelector,
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+        page.waitForSelector(requiredSelector,
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+        Locator container = page.locator(containerSelector).first();
+        if (requireKatex) {
+            assertTrue(container.locator(".katex").count() > 0,
+                fileName + " must include at least one rendered KaTeX element");
+        }
+        container.scrollIntoViewIfNeeded();
+        page.waitForTimeout(200);
         Path target = SCREENSHOT_DIR.resolve(fileName);
-        try {
-            Files.createDirectories(target.getParent());
-        } catch (IOException ignored) { /* best-effort */ }
-        page.screenshot(new Page.ScreenshotOptions()
+        createParentDirectory(target);
+        container.screenshot(new Locator.ScreenshotOptions()
             .setPath(target)
-            .setType(ScreenshotType.PNG)
-            .setFullPage(true));
-        assertNotNull(target);
+            .setType(ScreenshotType.PNG));
+        assertScreenshotQuality(target, fileName);
     }
 
     /**
-     * Captures the interactive graph view rather than the full page so the
-     * recorded {@code *-graph.png} screenshots show the Cytoscape canvas
-     * with its KaTeX overlay layer instead of the demo-summary section.
-     *
-     * <p>Switches to the Graph tab (re-)triggering {@code #reloadGraph}, then
-     * tries to wait for at least one {@code .graph-overlay-layer
-     * .graph-node-math} element so the screenshot includes the KaTeX
-     * overlays. If the interactive Cytoscape view is unavailable (e.g.
-     * because the vendored bundle is not loaded in the sandbox) it falls
-     * back to a full-page screenshot so the recording still captures the
-     * Mermaid fallback.</p>
+     * Captures the interactive graph view filtered to the best path. A
+     * Cytoscape/KaTeX overlay is mandatory for documentation assets; fallback
+     * Mermaid/full-page captures are intentionally not written to docs.
      */
-    private void screenshotGraphCanvas(String fileName) {
+    private void screenshotGraphBestPath(String fileName) {
         if (!RECORD_DOCS) return;
         page.locator(".tab[data-tab='graph']").click();
         page.waitForSelector("#tab-graph.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
-        // Force a fresh render so the overlay reflects the latest demo.
+        page.locator("#graphFilter").fill("bestPath=true,hideDeadEnds=true");
         page.locator("#reloadGraph").click();
-        boolean interactive = false;
         page.waitForFunction(
             "() => typeof window.cytoscape === 'function' || window.__cytoscapeFailed === true",
             null,
             new Page.WaitForFunctionOptions().setTimeout(15_000));
         Boolean cytoscapeAvailable = (Boolean) page.evaluate(
             "() => typeof window.cytoscape === 'function' && window.__cytoscapeFailed !== true");
-        if (Boolean.TRUE.equals(cytoscapeAvailable)) {
-            page.waitForSelector("#graphCanvas .graph-overlay-layer .graph-node-math .katex",
-                new Page.WaitForSelectorOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(15_000));
-            interactive = true;
-        } else {
-            // Cytoscape may be unavailable in restricted sandboxes; we still
-            // emit a full-page screenshot so the docs gallery has *some*
-            // recording for this demo.
+        if (!Boolean.TRUE.equals(cytoscapeAvailable)) {
+            throw new TestAbortedException(
+                "Cytoscape unavailable; refusing to replace docs graph screenshot with fallback");
         }
+        page.waitForSelector("#graphCanvas .graph-overlay-layer .graph-node-math.is-best .katex",
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+        int renderedBestNodes = ((Number) page.evaluate(
+            "() => document.querySelectorAll("
+                + "'#graphCanvas .graph-overlay-layer .graph-node-math.is-best .katex'"
+                + ").length")).intValue();
+        assertTrue(renderedBestNodes >= 2,
+            fileName + " must show at least two KaTeX-rendered best-path nodes");
+        page.evaluate(
+            "() => {"
+                + " const cy = window.__cyForTests;"
+                + " if (cy) {"
+                + "   cy.layout({ name: 'breadthfirst', spacingFactor: 1.8 }).run();"
+                + "   cy.fit(cy.elements(), 80);"
+                + " }"
+                + "}");
         Path target = SCREENSHOT_DIR.resolve(fileName);
+        createParentDirectory(target);
+        page.locator("#graphCanvas").scrollIntoViewIfNeeded();
+        page.waitForTimeout(400);
+        page.locator("#graphCanvas").screenshot(new Locator.ScreenshotOptions()
+            .setPath(target)
+            .setType(ScreenshotType.PNG));
+        assertScreenshotQuality(target, fileName);
+    }
+
+    private void createParentDirectory(Path target) {
         try {
             Files.createDirectories(target.getParent());
-        } catch (IOException ignored) { /* best-effort */ }
-        if (interactive) {
-            // Scroll the canvas into view and let CSS transitions on the
-            // KaTeX overlay settle before snapping.
-            page.locator("#graphCanvas").scrollIntoViewIfNeeded();
-            page.waitForTimeout(200);
-            page.locator("#graphCanvas").screenshot(
-                new com.microsoft.playwright.Locator.ScreenshotOptions()
-                    .setPath(target)
-                    .setType(ScreenshotType.PNG));
-        } else {
-            page.screenshot(new Page.ScreenshotOptions()
-                .setPath(target)
-                .setType(ScreenshotType.PNG)
-                .setFullPage(true));
+        } catch (IOException ex) {
+            throw new AssertionError("Could not create screenshot directory for " + target, ex);
         }
-        assertNotNull(target);
+    }
+
+    private void assertScreenshotQuality(Path target, String fileName) {
+        assertTrue(Files.exists(target), fileName + " must be written");
+        try {
+            BufferedImage image = ImageIO.read(target.toFile());
+            assertNotNull(image, fileName + " must be a readable PNG");
+            assertTrue(image.getWidth() >= 520,
+                fileName + " must be at least 520 px wide");
+            assertTrue(image.getHeight() >= 120,
+                fileName + " must be at least 120 px high");
+            assertTrue(hasVisibleContent(image),
+                fileName + " must not be blank or nearly empty");
+        } catch (IOException ex) {
+            throw new AssertionError("Could not inspect screenshot " + target, ex);
+        }
+    }
+
+    private boolean hasVisibleContent(BufferedImage image) {
+        int stepX = Math.max(1, image.getWidth() / 80);
+        int stepY = Math.max(1, image.getHeight() / 80);
+        int min = 255;
+        int max = 0;
+        int distinct = 0;
+        int previous = -1;
+        for (int y = 0; y < image.getHeight(); y += stepY) {
+            for (int x = 0; x < image.getWidth(); x += stepX) {
+                int rgb = image.getRGB(x, y) & 0x00ffffff;
+                int r = (rgb >> 16) & 0xff;
+                int g = (rgb >> 8) & 0xff;
+                int b = rgb & 0xff;
+                int luminance = (r * 299 + g * 587 + b * 114) / 1000;
+                min = Math.min(min, luminance);
+                max = Math.max(max, luminance);
+                if (rgb != previous) {
+                    distinct++;
+                    previous = rgb;
+                }
+            }
+        }
+        return (max - min) > 24 && distinct > 20;
     }
 }
