@@ -71,7 +71,7 @@ docker compose --profile proof-worker up --build
 
 ## Migrations
 
-Versioned SQL migrations live in `app/src/main/resources/db/migration` and are applied by `DatabaseMigrationRunner` before Hibernate ORM starts. The runner records applied versions in `regelsuche_schema_history` and skips already-applied migrations, so repeated startup is safe.
+Versioned SQL migrations live in `regelsuche-persistence-hibernate/src/main/resources/db/migration` and are applied by `DatabaseMigrationRunner` before Hibernate ORM starts. The runner records applied versions in `regelsuche_schema_history` and skips already-applied migrations, so repeated startup is safe.
 
 The migrations create relational tables and JSONB columns for compact metadata. Hibernate Search with the Lucene backend is the primary full-text/facet mechanism; the PostgreSQL `search_vector` migration remains a conservative fallback for direct SQL diagnostics.
 

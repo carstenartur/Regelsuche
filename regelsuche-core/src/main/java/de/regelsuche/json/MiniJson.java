@@ -1,4 +1,4 @@
-package de.regelsuche.inventory;
+package de.regelsuche.json;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -7,11 +7,11 @@ import java.util.Map;
 
 /**
  * Minimal hand-written JSON reader used to re-hydrate
- * {@link InMemoryRuleInventoryRepository} snapshots without pulling in a
+ * small JSON snapshots without pulling in a
  * full JSON library.
  *
  * <p>It supports the very narrow subset emitted by
- * {@link InMemoryRuleInventoryRepository#persistTo(java.nio.file.Path)}:
+ * the repository persistence helpers:
  * an object with one named array of flat objects whose values are strings,
  * numbers, booleans, {@code null} or arrays of strings. Anything else will
  * be ignored or produce best-effort string values.</p>

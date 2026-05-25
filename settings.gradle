@@ -11,4 +11,16 @@ plugins {
 }
 
 rootProject.name = 'Regelsuche'
-include('regelsuche-core', 'regelsuche-egraph', 'regelsuche-search', 'regelsuche-validation', 'regelsuche-persistence', 'regelsuche-learning', 'regelsuche-experiments', 'regelsuche-cli', 'regelsuche-discovery', 'app')
+include(
+    'regelsuche-core',
+    'regelsuche-egraph',
+    'regelsuche-search',
+    'regelsuche-validation',
+    'regelsuche-persistence',
+    'regelsuche-persistence-hibernate',
+    'regelsuche-learning',
+    'regelsuche-experiments',
+    'regelsuche-cli',
+    'regelsuche-discovery',
+    'app'
+)

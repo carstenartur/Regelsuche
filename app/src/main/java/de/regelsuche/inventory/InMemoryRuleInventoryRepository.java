@@ -1,5 +1,6 @@
 package de.regelsuche.inventory;
 
+import de.regelsuche.json.MiniJson;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleStatus;
 import java.io.IOException;

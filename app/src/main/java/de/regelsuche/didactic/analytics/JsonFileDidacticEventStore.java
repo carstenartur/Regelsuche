@@ -3,7 +3,7 @@ package de.regelsuche.didactic.analytics;
 import de.regelsuche.didactic.DifficultyLevel;
 import de.regelsuche.didactic.HintGenerator;
 import de.regelsuche.didactic.PedagogyProfile;
-import de.regelsuche.inventory.MiniJson;
+import de.regelsuche.json.MiniJson;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;

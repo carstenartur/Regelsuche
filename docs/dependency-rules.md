@@ -11,6 +11,7 @@ regelsuche-core
   <- regelsuche-search
   <- regelsuche-validation
   <- regelsuche-persistence
+  <- regelsuche-persistence-hibernate
   <- regelsuche-learning
   <- regelsuche-experiments
   <- regelsuche-discovery
@@ -22,6 +23,9 @@ regelsuche-search <- regelsuche-learning
 regelsuche-validation <- regelsuche-experiments
 regelsuche-search <- regelsuche-discovery
 regelsuche-validation <- regelsuche-discovery
+regelsuche-persistence <- regelsuche-persistence-hibernate
+regelsuche-learning <- regelsuche-persistence-hibernate
+regelsuche-validation <- regelsuche-persistence-hibernate
 regelsuche-cli <- app
 ```
 
@@ -31,7 +35,8 @@ regelsuche-cli <- app
 - `:regelsuche-search` darf vom Core und vom E-Graph-Modul abhängen; JSON-/Neo4j-TranspositionTable-Adapter bleiben außerhalb.
 - `:regelsuche-validation` darf vom Core abhängen; konkrete Validierungsadapter
   dürfen hier zusätzliche technische Libraries kapseln.
-- `:regelsuche-persistence` darf vom Core abhängen und enthält nur einfache Datei-/In-Memory-Ports sowie Konfiguration; Datenbanktreiber bleiben vorerst in `:app`.
+- `:regelsuche-persistence` darf vom Core abhängen und enthält Ports/Konfiguration ohne Hibernate/JPA/Datenbanktreiber.
+- `:regelsuche-persistence-hibernate` darf Hibernate/JPA/PostgreSQL und Hibernate Search kapseln und hängt von Persistence-Ports, Learning-Hypothesen und Validation-Status ab.
 - `:regelsuche-learning` darf von Core, Search und Validation abhängen; Discovery-/Graph-/Inventory-Orchestrierung bleibt außerhalb.
 - `:regelsuche-experiments` darf von Search und Validation abhängen; Web-/CLI-/Persistenzadapter bleiben außerhalb.
 - `:regelsuche-cli` bleibt projektabhängigkeitsfrei; app-spezifisches Routing und Serverstart-Wiring bleiben in `:app`.
@@ -70,8 +75,9 @@ reinen `TransformationEngine`-/Rewrite-Typen in `:regelsuche-core` liegen.
 ## Persistence-Regel
 
 `:regelsuche-persistence` enthält persistenznahe, aber leichtgewichtige Bausteine
-(`PersistenceConfig`, `GraphPersistenceMode`, Search-Checkpoint-Port und
-In-Memory-/JSON-Datei-Repository). App-spezifische Composition (`PersistenceContext`)
+(`PersistenceConfig`, `GraphPersistenceMode`, Search-Checkpoint-Port). Hibernate,
+JPA-Entities, PostgreSQL-Migrationen, Repositories und Hibernate Search liegen in
+`:regelsuche-persistence-hibernate`. App-spezifische Composition (`PersistenceContext`)
 und Neo4j-/Graph-/Inventory-Adapter bleiben in `:app`, bis die oberen SCCs
 entkoppelt sind.
 

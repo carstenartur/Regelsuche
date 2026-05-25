@@ -1,6 +1,6 @@
 package de.regelsuche.persistence.relational;
 
-import de.regelsuche.inventory.MiniJson;
+import de.regelsuche.json.MiniJson;
 import de.regelsuche.mining.HypothesisCandidate;
 import java.util.LinkedHashMap;
 import java.util.List;
