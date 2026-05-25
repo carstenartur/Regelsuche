@@ -26,6 +26,41 @@ Defaults (per Konstruktor konfigurierbar):
 | `minSequenceLength` | 2       |
 | `maxSequenceLength` | 4       |
 
+## MacroMoves als aktive Suchabkürzungen (Discovery Epic Teil 2)
+
+Makroregeln aus dem Inventar werden über `InventoryBackedRewriteRuleProvider` aktiv
+im Move-Generator genutzt. Ein Makrozug `A → B` fasst mehrere atomare Schritte
+zusammen und verkürzt die Suchtiefe messbar.
+
+### Replay-Expansion
+
+`MacroMoveExpansion` (neu in `de.regelsuche.mining`, app-Modul) hält sowohl den
+kompakten Makrozug als auch den vollständigen atomaren Ursprungspfad:
+
+```java
+record MacroMoveExpansion(
+    String macroRuleId,
+    String fromExpression,
+    String toExpression,
+    List<TransformationStep> atomicSteps,  // expandierbarer Ursprungspfad
+    double compressionRatio,
+    boolean expanded                        // UI-Zustand: aufgeklappt/zugeklappt
+)
+```
+
+Im Replay ist der Makrozug kompakt sichtbar; `atomicSteps` enthält den vollständigen
+ursprünglichen Pfad zum Aufklappen.
+
+### Goal-aware MacroMove Selection
+
+`GoalAwareMacroMoveSelector` (neu in `de.regelsuche.mining`, app-Modul) filtert
+Inventar-Regeln nach:
+- Confidence-Score ≥ Schwellwert (Standard: 0.5)
+- Positive durchschnittliche Verbesserung (`averageImprovement > 0`)
+- Mindest-Occurrence-Count
+- Ziel-Ausrichtung: strukturelle Token-Überlappung zwischen Muster und aktuellem Ausdruck
+  (ohne Zahlen und Platzhalter, um false positives zu vermeiden)
+
 ## API
 
 ### `GET /api/identities`
@@ -68,3 +103,6 @@ kann den Status auf `VALIDATED_BY_EXAMPLES` oder höher anheben.
 - `MacroRuleMinerTest#detectsRepeatedMacroRuleSequence`
 - `MacroRuleMinerTest#respectsMinOccurrencesThreshold`
 - `SearchGraphEndpointsTest#identitiesEndpointListsAndPromotes`
+- `GoalAwareMacroMoveSelectorTest` (Discovery Epic Teil 2)
+- `DiscoveryIntegrationTest` (binomial formula, commutativity)
+
