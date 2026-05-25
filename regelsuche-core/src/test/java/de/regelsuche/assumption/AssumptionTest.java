@@ -30,7 +30,7 @@ class AssumptionTest {
     @Test
     void assumptionSignatureNormalizesAndDeduplicatesExpressions() {
         AssumptionSignature signature = AssumptionSignature.ofExpressions(
-            java.util.List.of(" b   != 0 ", "b != 0", "x > 0")
+            java.util.List.of(" b   != 0 ", "0 != b", "b≠0", "x > 0")
         );
         assertEquals(java.util.List.of("b != 0", "x > 0"), signature.normalizedAssumptions());
         assertEquals("b != 0;x > 0", signature.fingerprint());

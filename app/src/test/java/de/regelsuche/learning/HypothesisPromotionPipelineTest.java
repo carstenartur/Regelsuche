@@ -129,4 +129,37 @@ class HypothesisPromotionPipelineTest {
         assertNotNull(result.promotedRules());
     }
 
+    @Test
+    void inferredAssumptionsArePersistedInRepositoryAndResult() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        KnownRuleRepository knownRules = new KnownRuleRepository();
+        RuleCandidateMiner miner = new RuleCandidateMiner(knownRules);
+        InMemoryHypothesisRepository hypothesisRepo = new InMemoryHypothesisRepository();
+        MacroRuleLearningService learningService = new MacroRuleLearningService(
+            inventory, miner, knownRules, 3, 0.0
+        );
+        CounterexampleSearchService infersAssumption =
+            (hypothesis, budget) -> new CounterexampleSearchService.CounterexampleSearchResult(
+                Optional.empty(),
+                List.of("0 != b"),
+                List.of("test")
+            );
+        HypothesisPromotionPipeline pipe = new HypothesisPromotionPipeline(
+            miner, hypothesisRepo, infersAssumption, learningService, false
+        );
+        List<SuccessfulTransformationPath> paths = List.of(
+            path("p1", "(x + 1) ^ 2", "1 + 2 * x + x ^ 2"),
+            path("p2", "(x + 2) ^ 2", "4 + 4 * x + x ^ 2"),
+            path("p3", "(x + 3) ^ 2", "9 + 6 * x + x ^ 2")
+        );
+
+        HypothesisPromotionPipeline.PromotionResult result = pipe.run(paths);
+
+        assertFalse(result.newHypotheses().isEmpty());
+        assertTrue(result.newHypotheses().stream()
+            .allMatch(hypothesis -> hypothesis.assumptions().contains("b != 0")));
+        assertEquals(result.newHypotheses().size(), hypothesisRepo.findAll().size());
+        assertTrue(hypothesisRepo.findAll().stream()
+            .allMatch(hypothesis -> hypothesis.assumptions().contains("b != 0")));
+    }
 }

@@ -108,16 +108,7 @@ public class HypothesisPromotionPipeline {
                     .withCounterexampleStatus(true)
                     .withProofStatus(CandidateProofStatus.REJECTED);
                 // Persist with REJECTED status so downstream readers see the correct state.
-                RuleCandidate rejectedCandidate = new RuleCandidate(
-                    candidate.leftPattern(), candidate.rightPattern(),
-                    candidate.examplesCount(), candidate.averageScoreImprovement(),
-                    candidate.maximumScoreImprovement(), candidate.equivalenceVerified(),
-                    candidate.generalizationPlausible(), candidate.containsFreeParameters(),
-                    candidate.parameterRelations(), candidate.status(),
-                    CandidateProofStatus.REJECTED, candidate.canonicalHash(),
-                    candidate.supportingTransformationIds()
-                );
-                hypothesisRepository.save(hypothesis.id(), rejectedCandidate);
+                hypothesisRepository.save(hypothesis.id(), hypothesis);
                 newHypotheses.add(hypothesis);
                 continue;
             }
@@ -130,7 +121,7 @@ public class HypothesisPromotionPipeline {
             }
 
             // Store as a pending hypothesis.
-            hypothesisRepository.save(hypothesis.id(), candidate);
+            hypothesisRepository.save(hypothesis.id(), hypothesis);
             newHypotheses.add(hypothesis);
 
             // Track which paths back this validated candidate for the promotion step.

@@ -23,7 +23,7 @@ public record AssumptionSignature(List<String> normalizedAssumptions, String fin
             if (assumption == null) {
                 continue;
             }
-            String canonical = assumption.trim().replaceAll("\\s+", " ");
+            String canonical = normalizeExpression(assumption);
             if (!canonical.isBlank()) {
                 normalized.add(canonical);
             }
@@ -41,7 +41,7 @@ public record AssumptionSignature(List<String> normalizedAssumptions, String fin
             if (assumption == null) {
                 continue;
             }
-            String canonical = assumption.kind() + "|" + assumption.expression().trim().replaceAll("\\s+", " ");
+            String canonical = assumption.kind() + "|" + normalizeExpression(assumption.expression());
             if (!canonical.isBlank()) {
                 normalized.add(canonical);
             }
@@ -57,5 +57,39 @@ public record AssumptionSignature(List<String> normalizedAssumptions, String fin
         merged.addAll(right.normalizedAssumptions());
         List<String> list = List.copyOf(merged);
         return new AssumptionSignature(list, String.join(";", list));
+    }
+
+    /**
+     * Normalize common textual variants of assumptions.
+     */
+    public static String normalizeExpression(String expression) {
+        if (expression == null) {
+            return "";
+        }
+        String canonical = expression.trim()
+            .replace("≠", "!=")
+            .replaceAll("\\s+", " ")
+            .replaceAll("\\s*!=\\s*", " != ")
+            .replaceAll("\\s*>=\\s*", " >= ")
+            .replaceAll("\\s*<=\\s*", " <= ")
+            .replaceAll("\\s*>\\s*", " > ")
+            .replaceAll("\\s*<\\s*", " < ")
+            .trim();
+        int notEquals = canonical.indexOf(" != ");
+        if (notEquals >= 0) {
+            String left = canonical.substring(0, notEquals).trim();
+            String right = canonical.substring(notEquals + 4).trim();
+            if (isZero(left) && !right.isBlank()) {
+                return right + " != 0";
+            }
+            if (isZero(right) && !left.isBlank()) {
+                return left + " != 0";
+            }
+        }
+        return canonical;
+    }
+
+    private static boolean isZero(String value) {
+        return value.equals("0") || value.equals("0.0");
     }
 }

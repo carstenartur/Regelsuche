@@ -1,5 +1,6 @@
 package de.regelsuche.validation;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -48,11 +49,12 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         collectVariables(left, variables);
         collectVariables(right, variables);
         List<String> orderedVariables = new ArrayList<>(variables);
+        List<AssumptionGuard> assumptionGuards = assumptionGuards(hypothesis.assumptions());
 
         if (budget.includeEdgeCases()) {
             attemptedSources.add("edge-cases");
             Optional<Counterexample> edgeCounterexample = searchNumericAssignments(
-                left, right, orderedVariables, EDGE_VALUES, inferredAssumptions
+                left, right, orderedVariables, EDGE_VALUES, inferredAssumptions, assumptionGuards
             );
             if (edgeCounterexample.isPresent()) {
                 return new CounterexampleSearchResult(
@@ -71,7 +73,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 randomValues.add(-5.0 + (10.0 * random.nextDouble()));
             }
             Optional<Counterexample> randomCounterexample = searchNumericAssignments(
-                left, right, orderedVariables, randomValues, inferredAssumptions
+                left, right, orderedVariables, randomValues, inferredAssumptions, assumptionGuards
             );
             if (randomCounterexample.isPresent()) {
                 return new CounterexampleSearchResult(
@@ -103,7 +105,8 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         Expr right,
         List<String> orderedVariables,
         List<Double> values,
-        Set<String> inferredAssumptions
+        Set<String> inferredAssumptions,
+        List<AssumptionGuard> assumptionGuards
     ) {
         if (orderedVariables.isEmpty()) {
             Evaluation leftEvaluation = evaluate(left, Map.of());
@@ -126,6 +129,9 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 assignment.put(variable, RuntimeValue.scalar(value));
                 assignmentText.add(variable + "=" + trimDouble(value));
                 j++;
+            }
+            if (violatesAssumptions(assignment, assumptionGuards)) {
+                continue;
             }
             Evaluation leftEvaluation = evaluate(left, assignment);
             Evaluation rightEvaluation = evaluate(right, assignment);
@@ -293,8 +299,37 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
 
     private void inferNonZeroAssumptions(Evaluation evaluation, Set<String> inferredAssumptions) {
         for (String symbol : evaluation.zeroDenominatorSymbols()) {
-            inferredAssumptions.add(symbol + " != 0");
+            inferredAssumptions.add(AssumptionSignature.normalizeExpression(symbol + " != 0"));
         }
+    }
+
+    private List<AssumptionGuard> assumptionGuards(List<String> assumptions) {
+        if (assumptions == null || assumptions.isEmpty()) {
+            return List.of();
+        }
+        List<AssumptionGuard> guards = new ArrayList<>();
+        for (String assumption : AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions()) {
+            int notEquals = assumption.indexOf(" != ");
+            if (notEquals < 0) {
+                continue;
+            }
+            String left = assumption.substring(0, notEquals).trim();
+            String right = assumption.substring(notEquals + 4).trim();
+            if (right.equals("0") && !left.isBlank()) {
+                guards.add(new AssumptionGuard(left));
+            }
+        }
+        return List.copyOf(guards);
+    }
+
+    private boolean violatesAssumptions(Map<String, RuntimeValue> assignment, List<AssumptionGuard> guards) {
+        for (AssumptionGuard guard : guards) {
+            RuntimeValue value = assignment.get(guard.nonZeroSymbol());
+            if (value != null && value.kind() == RuntimeValue.Kind.SCALAR && Math.abs(value.scalar()) <= EPS) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String trimDouble(double value) {
@@ -312,6 +347,9 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         static Evaluation undefined(Set<String> zeroDenominatorSymbols) {
             return new Evaluation(RuntimeValue.scalar(Double.NaN), false, Set.copyOf(zeroDenominatorSymbols));
         }
+    }
+
+    private record AssumptionGuard(String nonZeroSymbol) {
     }
 
     private record RuntimeValue(Kind kind, double scalar, Matrix matrix) {

@@ -14,10 +14,10 @@ import java.util.Optional;
  */
 public class InMemoryHypothesisRepository implements HypothesisRepository {
 
-    private final Map<String, RuleCandidate> store = new LinkedHashMap<>();
+    private final Map<String, HypothesisCandidate> store = new LinkedHashMap<>();
 
     @Override
-    public void save(String hypothesisId, RuleCandidate hypothesis) {
+    public void save(String hypothesisId, HypothesisCandidate hypothesis) {
         if (hypothesisId == null || hypothesisId.isBlank()) {
             throw new IllegalArgumentException("hypothesisId must not be blank");
         }
@@ -25,12 +25,12 @@ public class InMemoryHypothesisRepository implements HypothesisRepository {
     }
 
     @Override
-    public Optional<RuleCandidate> findById(String hypothesisId) {
+    public Optional<HypothesisCandidate> findById(String hypothesisId) {
         return Optional.ofNullable(store.get(hypothesisId));
     }
 
     @Override
-    public List<RuleCandidate> findAll() {
+    public List<HypothesisCandidate> findAll() {
         return List.copyOf(store.values());
     }
 
