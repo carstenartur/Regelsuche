@@ -123,6 +123,32 @@ public final class PersistenceContext implements AutoCloseable {
                 }
                 return new PersistenceContext(GraphPersistenceMode.REMOTE_NEO4J, graph, inventory, table);
             }
+            case POSTGRESQL, POSTGRESQL_WITH_JSON_FALLBACK -> {
+                if (!config.hasPostgresCredentials()) {
+                    if (log != null) {
+                        log.println("Persistence: " + config.mode() + " requested but POSTGRES_URL/POSTGRES_USER/"
+                            + "POSTGRES_PASSWORD not all set; falling back to JSON_FILE at "
+                            + config.storagePath().toAbsolutePath());
+                    }
+                    return from(
+                        new PersistenceConfig(
+                            GraphPersistenceMode.JSON_FILE,
+                            config.storagePath(),
+                            null, null, null
+                        ),
+                        log
+                    );
+                }
+                JsonFileExpressionGraphStore graph = new JsonFileExpressionGraphStore(config.storagePath());
+                JsonFileRuleInventoryRepository inventory = new JsonFileRuleInventoryRepository(config.storagePath());
+                JsonFileTranspositionTable table = new JsonFileTranspositionTable(config.storagePath());
+                if (log != null) {
+                    log.println("Persistence: " + config.mode() + " relational metadata at "
+                        + config.postgresUrl() + "; mathematical graph artifacts use JSON_FILE at "
+                        + graph.filePath().toAbsolutePath());
+                }
+                return new PersistenceContext(config.mode(), graph, inventory, table);
+            }
             default -> throw new IllegalStateException("Unhandled mode: " + config.mode());
         }
     }
