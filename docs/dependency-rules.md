@@ -99,7 +99,8 @@ Workbench starten, bleiben im app-spezifischen Router.
 ## Experiments-Regel
 
 `:regelsuche-experiments` enthält den benchmarkfähigen Experiment-Kern
-(`SearchBenchmark`, Result-DTOs, Report-Renderer, `DiscoveryExperimentRunner`).
+(`SearchBenchmark`, Result-DTOs, Report-Renderer, `DiscoveryExperimentRunner`)
+und den portablen Seed-Corpus-Generator `AlgebraicExampleGenerator`.
 App-spezifische Demo-Szenarien und Web-/CLI-Ausgabe bleiben in `:app`.
 
 ## Interface-first für große Erweiterungen

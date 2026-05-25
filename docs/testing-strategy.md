@@ -11,7 +11,7 @@ schnell und deterministisch.
 | Validation-Tests | Äquivalenz-/Rewrite-Validierung inklusive Adapter-Fallbacks | JVM, optionale technische Adapter | `./gradlew :regelsuche-validation:test` |
 | Persistence-Tests | Persistenz-Konfiguration und Search-Checkpoint-Repositories | lokale Temp-Dateien, keine Container/Datenbanktreiber | `./gradlew :regelsuche-persistence:test` |
 | Learning-Tests | Rule-Candidate-Mining, Pattern-/Anti-Unification-Primitiven, Hypothesis-Ports | keine Container, kein Browser, keine App-Orchestrierung | `./gradlew :regelsuche-learning:test` |
-| Experiment-Tests | Benchmark-Kern, Report-Rendering, Experiment-Ports | keine Container, kein Browser, keine Persistenzadapter | `./gradlew :regelsuche-experiments:test` |
+| Experiment-Tests | Benchmark-Kern, Seed-Corpus, Report-Rendering, Experiment-Ports | keine Container, kein Browser, keine Persistenzadapter | `./gradlew :regelsuche-experiments:test` |
 | CLI-Kern-Tests | Command-Registry, Optionsparser und andere CLI-neutrale Primitiven | keine Container, kein Browser, keine App-Orchestrierung | `./gradlew :regelsuche-cli:test` |
 | Discovery-Kern-Tests | portable Discovery-Pfad-DTOs und Grenzregeln | keine Container, kein Browser, keine Graph-/Export-Orchestrierung | `./gradlew :regelsuche-discovery:test` |
 | App-/Integrationstests | Runtime-Wiring, Persistence, Search/Learning/Discovery, Web-APIs | JVM + optionale externe Systeme je Testklasse | `./gradlew :app:test` |

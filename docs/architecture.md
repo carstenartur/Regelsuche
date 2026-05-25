@@ -9,13 +9,52 @@ sind dort gezogen, wo der aktuelle Code bereits azyklisch und stabil genug ist:
 - `regelsuche-validation` hängt vom Core ab und kapselt die aktuellen Validierungs-/Äquivalenzadapter sowie den gemeinsamen `CandidateProofStatus`.
 - `regelsuche-persistence` enthält persistence-nahe Konfiguration und checkpointfähige JSON-/In-Memory-Ports ohne Datenbanktreiber.
 - `regelsuche-learning` enthält portable Mining-/Anti-Unification-Primitiven und Learning-Ports ohne Web-, CLI- oder Graph-Orchestrierung.
-- `regelsuche-experiments` enthält Benchmark-/Experiment-Primitiven ohne Web-, CLI- oder Persistenzadapter.
+- `regelsuche-experiments` enthält Benchmark-/Experiment-Primitiven und den Seed-Corpus-Generator ohne Web-, CLI- oder Persistenzadapter.
 - `regelsuche-cli` enthält CLI-neutrale Command-/Options-Primitiven ohne App- oder Web-Wiring.
 - `regelsuche-discovery` enthält portable Discovery-Pfad-DTOs ohne Graph-/Export-/App-Orchestrierung.
 - `app` bleibt die Laufzeit-Hülle für CLI, Web, Persistence, Learning/Discovery und die noch zyklisch gekoppelten oberen Schichten.
 
 Damit ist Issue #41 nicht mehr nur dokumentiert: Gradle erzwingt die wichtigsten
 Grenzen bereits beim Kompilieren.
+
+## Architekturdiagramm
+
+```mermaid
+flowchart BT
+    app[":app\nRuntime-Wiring, Web/CLI, Adapter"]
+    cli[":regelsuche-cli\nCLI-neutrale Primitiven"]
+    discovery[":regelsuche-discovery\nDiscovery-Pfad-DTOs"]
+    experiments[":regelsuche-experiments\nBenchmarks & Seed-Corpus"]
+    learning[":regelsuche-learning\nMining-Primitiven"]
+    persistence[":regelsuche-persistence\nCheckpoint/Persistenz-Ports"]
+    validation[":regelsuche-validation\nEquivalence/Validation"]
+    search[":regelsuche-search\nSearch/Scoring/Memory"]
+    egraph[":regelsuche-egraph\nE-Graph"]
+    core[":regelsuche-core\nAST/Parser/Rewrite/Core"]
+
+    app --> cli
+    app --> discovery
+    app --> experiments
+    app --> learning
+    app --> persistence
+    app --> validation
+    app --> search
+    app --> egraph
+    app --> core
+    discovery --> validation
+    discovery --> search
+    discovery --> core
+    experiments --> validation
+    experiments --> search
+    learning --> validation
+    learning --> search
+    learning --> core
+    persistence --> core
+    validation --> core
+    search --> egraph
+    search --> core
+    egraph --> core
+```
 
 ## Architektur-Leitplanken
 

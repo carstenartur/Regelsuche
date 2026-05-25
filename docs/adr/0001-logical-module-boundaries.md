@@ -50,7 +50,7 @@ verdrahtet bleiben.
 - Core-Logik bleibt isoliert und schneller testbar.
 - Persistence-Konfiguration und checkpointfähige Repositories können ohne Web-/CLI-/Datenbank-Wiring getestet werden.
 - Mining-/Anti-Unification-Primitiven können ohne Web-/CLI-/Discovery-Wiring getestet werden.
-- Benchmark-/Experiment-Primitiven können ohne Web-/CLI-/Persistenz-Wiring getestet werden.
+- Benchmark-/Experiment-Primitiven und Seed-Corpus-Generatoren können ohne Web-/CLI-/Persistenz-Wiring getestet werden.
 - CLI-neutrale Command-/Options-Primitiven können ohne App-/Web-Wiring getestet werden.
 - Discovery-Pfad-DTOs können ohne Graph-/Export-/Web-Wiring getestet werden.
 - Die obere SCC kann gezielt über Ports aufgelöst werden, ohne die grüne Build-
