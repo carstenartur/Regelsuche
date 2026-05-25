@@ -1,4 +1,4 @@
-# ADR 0001: Physical core/egraph/search/validation/persistence/learning/experiments/cli modules first
+# ADR 0001: Physical core/egraph/search/validation/persistence/learning/experiments/cli/discovery modules first
 
 - Status: Accepted
 - Date: 2026-05-25
@@ -10,7 +10,7 @@ Bei direkter Weiterentwicklung ohne zusätzliche Abstraktionsebenen steigt die
 kognitive Last und es drohen Architekturdrift, God-Classes und langsame Tests.
 
 Der aktuelle Code enthält noch Import-Zyklen in den oberen Schichten
-(`api`, `discovery`, `export`, `graph`, `inventory`, `mining`, orchestration-nahe `search`, …).
+(`api`, `export`, `graph`, `inventory`, `mining`, orchestration-nahe `search`, …).
 Ein vollständiger Big-Bang-Split in alle Zielmodule würde deshalb zyklische
 Gradle-Projektabhängigkeiten erzeugen.
 
@@ -25,6 +25,8 @@ Wir ziehen die bereits azyklischen Grenzen physisch als Gradle-Subprojekte:
 - `:regelsuche-persistence`
 - `:regelsuche-learning`
 - `:regelsuche-experiments`
+- `:regelsuche-cli`
+- `:regelsuche-discovery`
 
 Die oberen, noch zyklischen Schichten bleiben in `:app` und werden über die
 Teil-0-Ports entkoppelt, bevor sie in eigene Projekte extrahiert werden.
@@ -43,12 +45,13 @@ verdrahtet bleiben.
 
 ## Consequences
 
-- Core-, E-Graph-, Search-, Validation-, Persistence-, Learning-, Experiment- und CLI-Code sind nicht mehr nur logisch, sondern auch
+- Core-, E-Graph-, Search-, Validation-, Persistence-, Learning-, Experiment-, CLI- und Discovery-Code sind nicht mehr nur logisch, sondern auch
   durch Gradle getrennt.
 - Core-Logik bleibt isoliert und schneller testbar.
 - Persistence-Konfiguration und checkpointfähige Repositories können ohne Web-/CLI-/Datenbank-Wiring getestet werden.
 - Mining-/Anti-Unification-Primitiven können ohne Web-/CLI-/Discovery-Wiring getestet werden.
 - Benchmark-/Experiment-Primitiven können ohne Web-/CLI-/Persistenz-Wiring getestet werden.
 - CLI-neutrale Command-/Options-Primitiven können ohne App-/Web-Wiring getestet werden.
+- Discovery-Pfad-DTOs können ohne Graph-/Export-/Web-Wiring getestet werden.
 - Die obere SCC kann gezielt über Ports aufgelöst werden, ohne die grüne Build-
   Linie zu verlieren.

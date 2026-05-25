@@ -11,6 +11,7 @@ sind dort gezogen, wo der aktuelle Code bereits azyklisch und stabil genug ist:
 - `regelsuche-learning` enthält portable Mining-/Anti-Unification-Primitiven und Learning-Ports ohne Web-, CLI- oder Graph-Orchestrierung.
 - `regelsuche-experiments` enthält Benchmark-/Experiment-Primitiven ohne Web-, CLI- oder Persistenzadapter.
 - `regelsuche-cli` enthält CLI-neutrale Command-/Options-Primitiven ohne App- oder Web-Wiring.
+- `regelsuche-discovery` enthält portable Discovery-Pfad-DTOs ohne Graph-/Export-/App-Orchestrierung.
 - `app` bleibt die Laufzeit-Hülle für CLI, Web, Persistence, Learning/Discovery und die noch zyklisch gekoppelten oberen Schichten.
 
 Damit ist Issue #41 nicht mehr nur dokumentiert: Gradle erzwingt die wichtigsten
@@ -19,7 +20,7 @@ Grenzen bereits beim Kompilieren.
 ## Architektur-Leitplanken
 
 - mathematischer Kern bleibt technologie-agnostisch,
-- E-Graph, Search, Validation, Persistence, Learning und Experiments benutzen Core-/Search-Typen über explizite Projektabhängigkeiten; CLI bleibt projektabhängigkeitsfrei,
+- E-Graph, Search, Validation, Persistence, Learning, Experiments und Discovery benutzen Core-/Search-Typen über explizite Projektabhängigkeiten; CLI bleibt projektabhängigkeitsfrei,
 - Infrastruktur bleibt in `app` bzw. in Adapter-Modulen,
 - neue große Komponenten bekommen zuerst stabile Interfaces,
 - Tests sind nach Modul und Laufzeit/Kosten geschichtet.

@@ -13,6 +13,7 @@ schnell und deterministisch.
 | Learning-Tests | Rule-Candidate-Mining, Pattern-/Anti-Unification-Primitiven, Hypothesis-Ports | keine Container, kein Browser, keine App-Orchestrierung | `./gradlew :regelsuche-learning:test` |
 | Experiment-Tests | Benchmark-Kern, Report-Rendering, Experiment-Ports | keine Container, kein Browser, keine Persistenzadapter | `./gradlew :regelsuche-experiments:test` |
 | CLI-Kern-Tests | Command-Registry, Optionsparser und andere CLI-neutrale Primitiven | keine Container, kein Browser, keine App-Orchestrierung | `./gradlew :regelsuche-cli:test` |
+| Discovery-Kern-Tests | portable Discovery-Pfad-DTOs und Grenzregeln | keine Container, kein Browser, keine Graph-/Export-Orchestrierung | `./gradlew :regelsuche-discovery:test` |
 | App-/Integrationstests | Runtime-Wiring, Persistence, Search/Learning/Discovery, Web-APIs | JVM + optionale externe Systeme je Testklasse | `./gradlew :app:test` |
 | Browser-E2E | echte Nutzerflüsse, Replay/Reports/UI | Playwright + in-process `WebWorkbenchServer` | `./gradlew :app:e2eTest` |
 | Container-E2E | Docker-Image- und Asset-Serving-Absicherung | Testcontainers + Docker | `./gradlew :app:dockerE2eTest` |
@@ -20,7 +21,7 @@ schnell und deterministisch.
 ## Regeln
 
 1. Core-Tests müssen ohne Container und ohne technische Adapter reproduzierbar bleiben.
-2. E-Graph, Search, Validation, Persistence, Learning, Experiments und CLI testen ihre Modulgrenzen über Projektabhängigkeiten.
+2. E-Graph, Search, Validation, Persistence, Learning, Experiments, CLI und Discovery testen ihre Modulgrenzen über Projektabhängigkeiten.
 3. Integrations-/Persistenztests dürfen Infrastruktur verwenden, aber klar von
    Core-Tests getrennt.
 4. Browser-E2E testet End-to-End-Flows inkl. Replay/Report-Pfade.
