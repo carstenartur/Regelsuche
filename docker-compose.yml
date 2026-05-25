@@ -10,16 +10,18 @@
 # services required.
 #
 # This Compose file is the OPTIONAL Full Mode for persistent, larger
-# analyses backed by a real Neo4j server. Start with:
+# analyses backed by PostgreSQL plus an optional Neo4j server. Start with:
 #
 #     docker compose up --build
 #
-# and open http://localhost:8080. Neo4j is reachable on bolt://localhost:7687
-# (browser UI on http://localhost:7474).
+# and open http://localhost:8080. PostgreSQL is reachable on localhost:5432.
+# Optional services:
+#     docker compose --profile neo4j up --build
+#     docker compose --profile proof-worker up --build
 #
-# To stop and keep the Neo4j volume:
+# To stop and keep the database volumes:
 #     docker compose down
-# To wipe Neo4j data:
+# To wipe PostgreSQL/Neo4j data:
 #     docker compose down -v
 
 services:
@@ -29,18 +31,38 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Switch the app's persistence layer from JSON_FILE (default Docker
-      # mode) to the remote Neo4j shipped with this compose file.
-      REGELSUCHE_PERSISTENCE_MODE: REMOTE_NEO4J
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: regelsuche-demo
+      # Full Mode: compact Discovery metadata in PostgreSQL, mathematical
+      # provenance graph optionally in Neo4j, and JSON files as demo fallback.
+      REGELSUCHE_PERSISTENCE_MODE: POSTGRESQL_WITH_JSON_FALLBACK
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/regelsuche
+      POSTGRES_USER: regelsuche
+      POSTGRES_PASSWORD: regelsuche-demo
+      # Optional Neo4j graph provenance can be enabled by running the neo4j
+      # profile and setting NEO4J_URI/NEO4J_USER/NEO4J_PASSWORD here.
     depends_on:
-      neo4j:
+      postgres:
         condition: service_healthy
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: regelsuche
+      POSTGRES_USER: regelsuche
+      POSTGRES_PASSWORD: regelsuche-demo
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U regelsuche -d regelsuche"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   neo4j:
+    profiles: ["neo4j"]
     image: neo4j:5-community
     ports:
       - "7474:7474"
@@ -58,6 +80,20 @@ services:
       retries: 12
     restart: unless-stopped
 
+  proof-worker:
+    profiles: ["proof-worker"]
+    build:
+      context: .
+      dockerfile: Dockerfile.proof
+    image: regelsuche-proof-worker
+    environment:
+      REGELSUCHE_PROOF_ARTIFACT_PATH: /opt/regelsuche/proof-artifacts
+    volumes:
+      - proof-artifacts:/opt/regelsuche/proof-artifacts
+    restart: unless-stopped
+
 volumes:
+  postgres-data:
   neo4j-data:
   neo4j-logs:
+  proof-artifacts:

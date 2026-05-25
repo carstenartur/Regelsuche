@@ -20,11 +20,13 @@ import java.util.Optional;
  *       Defaults to {@code ./data/regelsuche}.</li>
  * </ul>
  *
- * <p>The optional Full Mode reads the standard Neo4j environment variables:
- * {@code NEO4J_URI}, {@code NEO4J_USER}, {@code NEO4J_PASSWORD}. If any of
- * them is set <em>and</em> the mode hasn't been chosen explicitly, the
- * configuration automatically resolves to {@link
- * GraphPersistenceMode#REMOTE_NEO4J}.</p>
+ * <p>The optional Full Mode reads the standard PostgreSQL and Neo4j environment
+ * variables: {@code POSTGRES_URL}, {@code POSTGRES_USER}, {@code
+ * POSTGRES_PASSWORD}, {@code NEO4J_URI}, {@code NEO4J_USER}, {@code
+ * NEO4J_PASSWORD}. If the PostgreSQL triplet is set <em>and</em> the mode
+ * hasn't been chosen explicitly, the configuration resolves to {@link
+ * GraphPersistenceMode#POSTGRESQL_WITH_JSON_FALLBACK}; if only the Neo4j
+ * triplet is present it resolves to {@link GraphPersistenceMode#REMOTE_NEO4J}.</p>
  *
  * <p>This class is intentionally a plain immutable record + a static factory
  * so it can be exercised from tests without touching real environment
@@ -35,7 +37,10 @@ public record PersistenceConfig(
     Path storagePath,
     String neo4jUri,
     String neo4jUser,
-    String neo4jPassword
+    String neo4jPassword,
+    String postgresUrl,
+    String postgresUser,
+    String postgresPassword
 ) {
 
     public static final String ENV_MODE = "REGELSUCHE_PERSISTENCE_MODE";
@@ -43,9 +48,25 @@ public record PersistenceConfig(
     public static final String ENV_NEO4J_URI = "NEO4J_URI";
     public static final String ENV_NEO4J_USER = "NEO4J_USER";
     public static final String ENV_NEO4J_PASSWORD = "NEO4J_PASSWORD";
+    public static final String ENV_POSTGRES_URL = "POSTGRES_URL";
+    public static final String ENV_POSTGRES_USER = "POSTGRES_USER";
+    public static final String ENV_POSTGRES_PASSWORD = "POSTGRES_PASSWORD";
     public static final String PROP_MODE = "regelsuche.persistence.mode";
     public static final String PROP_PATH = "regelsuche.persistence.path";
+    public static final String PROP_POSTGRES_URL = "regelsuche.postgres.url";
+    public static final String PROP_POSTGRES_USER = "regelsuche.postgres.user";
+    public static final String PROP_POSTGRES_PASSWORD = "regelsuche.postgres.password";
     public static final String DEFAULT_PATH = "./data/regelsuche";
+
+    public PersistenceConfig(
+        GraphPersistenceMode mode,
+        Path storagePath,
+        String neo4jUri,
+        String neo4jUser,
+        String neo4jPassword
+    ) {
+        this(mode, storagePath, neo4jUri, neo4jUser, neo4jPassword, null, null, null);
+    }
 
     public PersistenceConfig {
         if (mode == null) {
@@ -61,7 +82,7 @@ public record PersistenceConfig(
         return new PersistenceConfig(
             GraphPersistenceMode.IN_MEMORY,
             Paths.get(DEFAULT_PATH),
-            null, null, null
+            null, null, null, null, null, null
         );
     }
 
@@ -70,7 +91,22 @@ public record PersistenceConfig(
         return new PersistenceConfig(
             GraphPersistenceMode.JSON_FILE,
             path,
-            null, null, null
+            null, null, null, null, null, null
+        );
+    }
+
+    /** PostgreSQL-backed Discovery metadata with JSON fallback for graph-shaped artifacts. */
+    public static PersistenceConfig postgresqlWithJsonFallback(
+        Path path,
+        String postgresUrl,
+        String postgresUser,
+        String postgresPassword
+    ) {
+        return new PersistenceConfig(
+            GraphPersistenceMode.POSTGRESQL_WITH_JSON_FALLBACK,
+            path,
+            null, null, null,
+            postgresUrl, postgresUser, postgresPassword
         );
     }
 
@@ -98,10 +134,16 @@ public record PersistenceConfig(
         String uri = firstNonBlank(env.get(ENV_NEO4J_URI), System.getProperty("regelsuche.neo4j.uri"));
         String user = firstNonBlank(env.get(ENV_NEO4J_USER), System.getProperty("regelsuche.neo4j.user"));
         String password = firstNonBlank(env.get(ENV_NEO4J_PASSWORD), System.getProperty("regelsuche.neo4j.password"));
+        String postgresUrl = firstNonBlank(env.get(ENV_POSTGRES_URL), System.getProperty(PROP_POSTGRES_URL));
+        String postgresUser = firstNonBlank(env.get(ENV_POSTGRES_USER), System.getProperty(PROP_POSTGRES_USER));
+        String postgresPassword = firstNonBlank(env.get(ENV_POSTGRES_PASSWORD), System.getProperty(PROP_POSTGRES_PASSWORD));
 
         GraphPersistenceMode mode;
         if (rawMode != null) {
             mode = parseMode(rawMode);
+        } else if (postgresUrl != null && postgresUser != null && postgresPassword != null) {
+            // Auto-detect relational Full Mode when the PostgreSQL env vars are all present.
+            mode = GraphPersistenceMode.POSTGRESQL_WITH_JSON_FALLBACK;
         } else if (uri != null && user != null && password != null) {
             // Auto-detect Full Mode when the Neo4j env vars are all present.
             mode = GraphPersistenceMode.REMOTE_NEO4J;
@@ -110,7 +152,7 @@ public record PersistenceConfig(
         }
 
         Path path = Paths.get(rawPath == null ? DEFAULT_PATH : rawPath);
-        return new PersistenceConfig(mode, path, uri, user, password);
+        return new PersistenceConfig(mode, path, uri, user, password, postgresUrl, postgresUser, postgresPassword);
     }
 
     /** Convenience: read from the JVM's real environment. */
@@ -142,6 +184,11 @@ public record PersistenceConfig(
     /** Convenience: whether all Neo4j credentials are set. */
     public boolean hasNeo4jCredentials() {
         return neo4jUri != null && neo4jUser != null && neo4jPassword != null;
+    }
+
+    /** Convenience: whether all PostgreSQL connection settings are set. */
+    public boolean hasPostgresCredentials() {
+        return postgresUrl != null && postgresUser != null && postgresPassword != null;
     }
 
     public Optional<String> neo4jUriOptional() {

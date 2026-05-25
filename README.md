@@ -38,20 +38,22 @@ Eine kuratierte Übersicht **mit echten, aus den Tests generierten
 Screenshots** zu jeder Demo:
 👉 **[docs/demo-gallery.md](docs/demo-gallery.md)**.
 
-## Optional: Full Mode mit Neo4j
+## Optional: Full Mode mit PostgreSQL/Hibernate
 
-Für persistente, größere Analysen mit externem Neo4j-Server gibt es eine
-optionale `docker-compose.yml` — sie ist **nur optionaler
+Für persistente, größere Analysen mit PostgreSQL, Hibernate ORM und Hibernate
+Search gibt es eine optionale `docker-compose.yml` — sie ist **nur optionaler
 Persistenz-/Full-Mode** und nicht Voraussetzung für die Quickstart-Demo:
 
 ```bash
 docker compose up --build
 ```
 
-Das startet App + Neo4j 5 Community + persistentes Volume und setzt
-`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` automatisch. Details in
+Das startet App + PostgreSQL + persistentes Volume und setzt `POSTGRES_URL`,
+`POSTGRES_USER`, `POSTGRES_PASSWORD` automatisch. Neo4j bleibt optional für
+mathematische Graph-Provenance (`docker compose --profile neo4j up --build`).
+Details in
 [`docs/getting-started.md`](docs/getting-started.md) und
-[`docs/architecture.md`](docs/architecture.md).
+[`docs/persistence.md`](docs/persistence.md).
 
 ## 5-Minuten-Tour
 
@@ -104,8 +106,9 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
   `REGELSUCHE_PROOF_CACHE` konfiguriert. Für echte Prover gibt es
   `Dockerfile.proof` (Z3 + cvc5 vorinstalliert, Lean optional via
   `--build-arg INSTALL_LEAN=true`).
-* **Persistenz** als einzelner JSON-File (Killer-Demo-Modus) oder echtes
-  Neo4j 5 (Full Mode via `docker compose up`).
+* **Persistenz** als leichter JSON-Demo-Modus, PostgreSQL/Hibernate-Metadaten
+  im Full Mode, Hibernate Search für Text/Facetten und optionales Neo4j für
+  mathematische Graph-Provenance.
 * **Export-Bundle** mit Markdown, LaTeX, JSON, Mermaid, GraphML und dem
   Rule-Inventory in einer einzigen ZIP.
 

@@ -24,6 +24,12 @@ dependencies {
     implementation project(':regelsuche-discovery')
     implementation 'org.neo4j.driver:neo4j-java-driver:6.1.0'
     implementation 'org.graalvm.polyglot:polyglot:24.2.1'
+    implementation libs.hibernate.core
+    implementation libs.hibernate.search.mapper.orm
+    implementation libs.hibernate.search.backend.lucene
+    implementation libs.hibernate.validator
+    implementation libs.yasson
+    implementation libs.postgresql
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

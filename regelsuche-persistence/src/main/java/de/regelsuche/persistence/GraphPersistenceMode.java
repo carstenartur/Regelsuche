@@ -6,8 +6,9 @@ package de.regelsuche.persistence;
  * <p>The killer-demo's standard mode (single Docker image, one
  * {@code docker run}) must run without external infrastructure. The
  * {@link #IN_MEMORY} and {@link #JSON_FILE} backends satisfy that
- * requirement; {@link #REMOTE_NEO4J} is reserved for the optional Full Mode
- * shipped via {@code docker compose}.</p>
+ * requirement; {@link #POSTGRESQL} / {@link #POSTGRESQL_WITH_JSON_FALLBACK}
+ * cover relational Discovery persistence for the optional Full Mode, and
+ * {@link #REMOTE_NEO4J} remains the optional mathematical graph backend.</p>
  *
  * <p>{@link #EMBEDDED_NEO4J} is declared so the configuration surface stays
  * stable, but the current distribution does not bundle the embedded Neo4j
@@ -38,5 +39,18 @@ public enum GraphPersistenceMode {
      * Remote Neo4j server reached via {@code bolt://}. Used by the optional
      * Full Mode (see {@code docker-compose.yml}).
      */
-    REMOTE_NEO4J
+    REMOTE_NEO4J,
+
+    /**
+     * Relational Discovery/product data is stored in PostgreSQL. Mathematical
+     * provenance that is still graph-shaped remains separate from PostgreSQL.
+     */
+    POSTGRESQL,
+
+    /**
+     * Hybrid mode: PostgreSQL carries compact Discovery metadata while the
+     * JSON backend remains available for lightweight demo artifacts and as a
+     * fallback if the relational service is not configured.
+     */
+    POSTGRESQL_WITH_JSON_FALLBACK
 }

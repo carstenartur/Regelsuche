@@ -45,4 +45,28 @@ class PersistenceConfigTest {
         assertEquals(GraphPersistenceMode.IN_MEMORY, config.mode());
         assertFalse(config.hasNeo4jCredentials());
     }
+
+    @Test
+    void persistenceConfigAutoSelectsHybridPostgresWhenAllCredentialsPresent() {
+        PersistenceConfig config = PersistenceConfig.fromEnvironment(Map.of(
+            PersistenceConfig.ENV_POSTGRES_URL, "jdbc:postgresql://localhost:5432/regelsuche",
+            PersistenceConfig.ENV_POSTGRES_USER, "regelsuche",
+            PersistenceConfig.ENV_POSTGRES_PASSWORD, "secret"
+        ));
+        assertEquals(GraphPersistenceMode.POSTGRESQL_WITH_JSON_FALLBACK, config.mode());
+        assertTrue(config.hasPostgresCredentials());
+        assertFalse(config.hasNeo4jCredentials());
+    }
+
+    @Test
+    void explicitPostgresModeWinsOverNeo4jAutoDetection() {
+        PersistenceConfig config = PersistenceConfig.fromEnvironment(Map.of(
+            PersistenceConfig.ENV_MODE, "POSTGRESQL",
+            PersistenceConfig.ENV_NEO4J_URI, "bolt://example:7687",
+            PersistenceConfig.ENV_NEO4J_USER, "neo4j",
+            PersistenceConfig.ENV_NEO4J_PASSWORD, "secret"
+        ));
+        assertEquals(GraphPersistenceMode.POSTGRESQL, config.mode());
+        assertFalse(config.hasPostgresCredentials());
+    }
 }
