@@ -8,6 +8,7 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.LoadState;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import java.io.IOException;
 import java.util.List;
 import org.junit.jupiter.api.AfterAll;
@@ -132,9 +133,9 @@ class DemoSummaryAsciiHygieneTest {
 
     /**
      * The headline banner must use the KaTeX rendering pipeline, not raw
-     * ASCII. Asserts there is at least one {@code .math} (or KaTeX-rendered
-     * {@code .katex}) element inside {@code .demo-banner} for every demo
-     * whose summary builds a banner.
+     * ASCII or un-typeset {@code .math} placeholders. This is intentionally
+     * stricter than "a math span exists": it waits for the rendered
+     * {@code .katex} subtree and rejects visible fallback blocks.
      */
     @ParameterizedTest(name = "demo {0}: banner contains a KaTeX-typeset math span")
     @ValueSource(strings = {
@@ -154,11 +155,46 @@ class DemoSummaryAsciiHygieneTest {
             "() => document.querySelector('#demoSummary') "
                 + "&& document.querySelector('#demoSummary').innerHTML.length > 50",
             null, new Page.WaitForFunctionOptions().setTimeout(60_000));
+        page.waitForSelector("#demoSummary .demo-banner .katex",
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
         int mathNodes = ((Number) page.evaluate(
-            "() => document.querySelectorAll('#demoSummary .demo-banner .math, "
-                + "#demoSummary .demo-banner .katex').length")).intValue();
+            "() => document.querySelectorAll('#demoSummary .demo-banner .katex').length")).intValue();
         assertTrue(mathNodes > 0,
             "demo " + demoId + ": banner must contain at least one KaTeX-typeset "
                 + "math span (found " + mathNodes + ")");
+        int visibleFallbacks = ((Number) page.evaluate(
+            "() => Array.from(document.querySelectorAll('#demoSummary .demo-banner .math-fallback'))"
+                + ".filter((el) => el.offsetParent !== null).length")).intValue();
+        assertTrue(visibleFallbacks == 0,
+            "demo " + demoId + ": banner must not show math fallback blocks when KaTeX is available");
+    }
+
+    @DisplayName("Search graph overlay renders node math through KaTeX")
+    @org.junit.jupiter.api.Test
+    void graphOverlayUsesKatexNodeLabels() {
+        page.locator(".demo-button[data-demo='binomial']").click();
+        page.waitForFunction(
+            "() => document.querySelector('#demoSummary') "
+                + "&& document.querySelector('#demoSummary').innerHTML.length > 50",
+            null, new Page.WaitForFunctionOptions().setTimeout(60_000));
+        page.waitForFunction(
+            "() => typeof window.cytoscape === 'function' || window.__cytoscapeFailed === true",
+            null, new Page.WaitForFunctionOptions().setTimeout(15_000));
+        Boolean cytoscapeFailed = (Boolean) page.evaluate("() => window.__cytoscapeFailed === true");
+        assertTrue(!cytoscapeFailed, "vendored Cytoscape must load for graph-overlay rendering");
+        page.locator(".tab[data-tab='graph']").click();
+        page.locator("#graphInteractive").check();
+        page.locator("#reloadGraph").click();
+        page.waitForSelector("#graphCanvas .graph-overlay-layer .graph-node-math .katex",
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+        int overlayKatexNodes = ((Number) page.evaluate(
+            "() => document.querySelectorAll('#graphCanvas .graph-overlay-layer "
+                + ".graph-node-math .katex').length")).intValue();
+        assertTrue(overlayKatexNodes > 0,
+            "graph overlay must render mathematical node labels as KaTeX");
     }
 }
