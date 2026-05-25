@@ -18,14 +18,92 @@ import java.util.Optional;
 public interface CounterexampleSearchService {
 
     /**
-     * Try to find a counterexample to {@code leftExpression == rightExpression}.
-     *
-     * @return a counterexample assignment if one was found, or
-     *     {@link Optional#empty()} if the search exhausted its budget without
-     *     finding one. Returning {@link Optional#empty()} is <em>not</em> a
-     *     proof of equivalence.
+     * Try to find a counterexample for a full hypothesis under a bounded budget.
      */
-    Optional<Counterexample> search(String leftExpression, String rightExpression);
+    CounterexampleSearchResult search(HypothesisInput hypothesis, CounterexampleBudget budget);
+
+    /**
+     * Backwards-compatible convenience API for callers that only have two expressions.
+     */
+    default Optional<Counterexample> search(String leftExpression, String rightExpression) {
+        HypothesisInput hypothesis = new HypothesisInput(
+            "",
+            leftExpression,
+            rightExpression,
+            List.of()
+        );
+        return search(hypothesis, CounterexampleBudget.defaultBudget()).counterexample();
+    }
+
+    /**
+     * Lightweight hypothesis payload consumed by counterexample search backends.
+     */
+    record HypothesisInput(
+        String id,
+        String leftExpression,
+        String rightExpression,
+        List<String> assumptions
+    ) {
+        public HypothesisInput {
+            id = id == null ? "" : id;
+            if (leftExpression == null || leftExpression.isBlank()) {
+                throw new IllegalArgumentException("leftExpression must not be blank");
+            }
+            if (rightExpression == null || rightExpression.isBlank()) {
+                throw new IllegalArgumentException("rightExpression must not be blank");
+            }
+            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
+        }
+    }
+
+    /**
+     * Search budget. Keeps randomness deterministic by carrying the seed explicitly.
+     */
+    record CounterexampleBudget(
+        int numericRandomSamples,
+        boolean includeEdgeCases,
+        boolean includeMatrixAssignments,
+        long randomSeed,
+        boolean includeComplexAssignments
+    ) {
+        public CounterexampleBudget {
+            if (numericRandomSamples < 0) {
+                throw new IllegalArgumentException("numericRandomSamples must be >= 0");
+            }
+        }
+
+        public CounterexampleBudget(
+            int numericRandomSamples,
+            boolean includeEdgeCases,
+            boolean includeMatrixAssignments,
+            long randomSeed
+        ) {
+            this(numericRandomSamples, includeEdgeCases, includeMatrixAssignments, randomSeed, false);
+        }
+
+        public static CounterexampleBudget defaultBudget() {
+            return new CounterexampleBudget(16, true, true, 1L, false);
+        }
+    }
+
+    /**
+     * Full result of a counterexample search.
+     */
+    record CounterexampleSearchResult(
+        Optional<Counterexample> counterexample,
+        List<String> inferredAssumptions,
+        List<String> attemptedSources
+    ) {
+        public CounterexampleSearchResult {
+            counterexample = counterexample == null ? Optional.empty() : counterexample;
+            inferredAssumptions = inferredAssumptions == null ? List.of() : List.copyOf(inferredAssumptions);
+            attemptedSources = attemptedSources == null ? List.of() : List.copyOf(attemptedSources);
+        }
+
+        public static CounterexampleSearchResult noCounterexample() {
+            return new CounterexampleSearchResult(Optional.empty(), List.of(), List.of());
+        }
+    }
 
     /**
      * A concrete counterexample: a variable assignment plus the resulting

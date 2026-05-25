@@ -2,6 +2,7 @@ package de.regelsuche.canonical;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.AssumptionContext;
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -81,12 +82,7 @@ public class ExpressionCanonicalizer {
         if (context == null || context.isEmpty()) {
             return "";
         }
-        List<String> expressions = new ArrayList<>();
-        for (Assumption assumption : context.snapshot()) {
-            expressions.add(assumption.kind() + "|" + assumption.expression());
-        }
-        java.util.Collections.sort(expressions);
-        return String.join(";", expressions);
+        return AssumptionSignature.ofAssumptions(context.snapshot()).fingerprint();
     }
 
     public int astNodeCount(String expression) {

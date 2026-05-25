@@ -65,6 +65,19 @@ class ProofCacheTest {
     }
 
     @Test
+    void semanticallyEquivalentNonZeroAssumptionsProduceSameKey() {
+        ProofCacheKey left = ProofCacheKey.of("x", "x",
+            List.of(new Assumption(Assumption.Kind.NON_ZERO, "b != 0", List.of("b"))), "lean4");
+        ProofCacheKey swapped = ProofCacheKey.of("x", "x",
+            List.of(new Assumption(Assumption.Kind.NON_ZERO, "0 != b", List.of("b"))), "lean4");
+        ProofCacheKey unicode = ProofCacheKey.of("x", "x",
+            List.of(new Assumption(Assumption.Kind.NON_ZERO, "b≠0", List.of("b"))), "lean4");
+
+        assertEquals(left, swapped);
+        assertEquals(left, unicode);
+    }
+
+    @Test
     void differentAssumptionsProduceDifferentKeys() {
         ProofCacheKey withAssumption = ProofCacheKey.of("x/y", "x/y",
             List.of(Assumption.nonZero("y")), "lean4");

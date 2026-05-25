@@ -1,5 +1,6 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.validation.CandidateProofStatus;
 
 import java.time.Instant;
@@ -67,7 +68,7 @@ public record HypothesisCandidate(
         }
         supportingPaths = supportingPaths == null ? List.of() : List.copyOf(supportingPaths);
         supportingExpressions = supportingExpressions == null ? List.of() : List.copyOf(supportingExpressions);
-        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
+        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();
         if (noveltyScore < 0.0 || noveltyScore > 1.0) {
             noveltyScore = Math.max(0.0, Math.min(1.0, noveltyScore));
         }
@@ -96,6 +97,14 @@ public record HypothesisCandidate(
         return new HypothesisCandidate(id, leftPattern, rightPattern,
             supportingPaths, supportingExpressions, assumptions,
             noveltyScore, proofStatus, found,
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
+
+    /** Returns a copy with normalized assumptions. */
+    public HypothesisCandidate withAssumptions(List<String> newAssumptions) {
+        return new HypothesisCandidate(id, leftPattern, rightPattern,
+            supportingPaths, supportingExpressions, newAssumptions,
+            noveltyScore, proofStatus, counterexampleStatus,
             parameterRelations, expressionPlaceholders, createdAt);
     }
 

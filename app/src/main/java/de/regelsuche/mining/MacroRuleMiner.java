@@ -92,7 +92,10 @@ public final class MacroRuleMiner {
                     bucket.addExample(
                         transformation.id(),
                         steps.get(start).beforeExpression(),
-                        steps.get(start + length - 1).afterExpression()
+                        steps.get(start + length - 1).afterExpression(),
+                        steps.subList(start, start + length).stream()
+                            .flatMap(step -> step.assumptions().stream())
+                            .toList()
                     );
                 }
             }
@@ -114,7 +117,8 @@ public final class MacroRuleMiner {
                 bucket.firstRightPattern,
                 (double) bucket.sequence.size(),
                 CandidateProofStatus.OBSERVED,
-                List.copyOf(bucket.supportingIds)
+                List.copyOf(bucket.supportingIds),
+                List.copyOf(bucket.assumptions)
             ));
         }
         return result;
@@ -126,15 +130,22 @@ public final class MacroRuleMiner {
         String firstLeftPattern = "";
         String firstRightPattern = "";
         final List<String> supportingIds = new ArrayList<>();
+        final List<String> assumptions = new ArrayList<>();
 
         Bucket(List<String> sequence) {
             this.sequence = sequence;
         }
 
-        void addExample(String pathId, String left, String right) {
+        void addExample(String pathId, String left, String right, List<String> exampleAssumptions) {
             if (firstLeftPattern.isEmpty()) {
                 firstLeftPattern = left;
                 firstRightPattern = right;
+            }
+            for (String assumption : de.regelsuche.assumption.AssumptionSignature
+                .ofExpressions(exampleAssumptions).normalizedAssumptions()) {
+                if (!assumptions.contains(assumption)) {
+                    assumptions.add(assumption);
+                }
             }
             if (pathId != null && !pathId.isBlank() && !supportingIds.contains(pathId)) {
                 supportingIds.add(pathId);

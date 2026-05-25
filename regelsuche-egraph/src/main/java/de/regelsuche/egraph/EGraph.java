@@ -1,5 +1,6 @@
 package de.regelsuche.egraph;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
@@ -56,6 +57,8 @@ public final class EGraph {
     private final UnionFind unionFind = new UnionFind();
     /** Map id → e-class. Stale ids (post-union) point to the merged class. */
     private final Map<EClassId, EClass> classes = new HashMap<>();
+    /** Assumption signature associated with each canonical e-class. */
+    private final Map<EClassId, AssumptionSignature> assumptionsByClass = new HashMap<>();
     /** Hash-cons of canonical e-nodes to their owning class. */
     private final Map<ENode, EClassId> hashCons = new HashMap<>();
     /** Signature index: symbol/arity → candidate e-classes containing such nodes. */
@@ -100,6 +103,33 @@ public final class EGraph {
      * returned id is the e-class for the whole expression.
      */
     public EClassId addExpression(Expr expression) {
+        return addExpression(expression, List.of());
+    }
+
+    /**
+     * Walk {@code expression} bottom-up under an explicit assumption context.
+     *
+     * <p>Throws {@link IllegalArgumentException} if the same top-level e-class
+     * already carries a <em>different</em> non-empty assumption fingerprint —
+     * re-adding an expression under a conflicting context would silently collapse
+     * distinct assumption-gated identities.</p>
+     */
+    public EClassId addExpression(Expr expression, List<String> assumptions) {
+        EClassId id = addExpressionInternal(expression);
+        EClassId canonical = unionFind.find(id);
+        AssumptionSignature newSig = AssumptionSignature.ofExpressions(assumptions);
+        AssumptionSignature existing = assumptionsByClass.get(canonical);
+        if (existing != null && !existing.fingerprint().isEmpty()
+                && !existing.fingerprint().equals(newSig.fingerprint())) {
+            throw new IllegalArgumentException(
+                "Cannot add expression under a different assumption context: "
+                    + existing.fingerprint() + " vs " + newSig.fingerprint());
+        }
+        assumptionsByClass.put(canonical, newSig);
+        return id;
+    }
+
+    private EClassId addExpressionInternal(Expr expression) {
         if (expression instanceof NumberExpr number) {
             return add(ENode.leaf("num:" + format(number.value())));
         }
@@ -107,14 +137,14 @@ public final class EGraph {
             return add(ENode.leaf("var:" + variable.name()));
         }
         if (expression instanceof BinaryExpr binary) {
-            EClassId left = addExpression(binary.left());
-            EClassId right = addExpression(binary.right());
+            EClassId left = addExpressionInternal(binary.left());
+            EClassId right = addExpressionInternal(binary.right());
             return add(new ENode("op:" + binary.operator().name(), List.of(left, right)));
         }
         if (expression instanceof FunctionExpr function) {
             List<EClassId> arguments = new ArrayList<>(function.arguments().size());
             for (Expr argument : function.arguments()) {
-                arguments.add(addExpression(argument));
+                arguments.add(addExpressionInternal(argument));
             }
             return add(new ENode("fn:" + function.name(), arguments));
         }
@@ -142,9 +172,21 @@ public final class EGraph {
         if (rootA.equals(rootB)) {
             return rootA;
         }
+        AssumptionSignature assumptionsA = assumptionsFor(rootA);
+        AssumptionSignature assumptionsB = assumptionsFor(rootB);
+        if (!assumptionsA.fingerprint().equals(assumptionsB.fingerprint())) {
+            throw new IllegalArgumentException("Cannot merge e-classes with incompatible assumptions: "
+                + assumptionsA.fingerprint() + " vs " + assumptionsB.fingerprint());
+        }
         EClassId survivor = mergeClasses(rootA, rootB);
+        assumptionsByClass.put(survivor, assumptionsA);
         worklist.add(survivor);
         return survivor;
+    }
+
+    /** Assumptions attached to the canonical e-class for {@code id}. */
+    public AssumptionSignature assumptionsFor(EClassId id) {
+        return assumptionsByClass.getOrDefault(unionFind.find(id), new AssumptionSignature(List.of(), ""));
     }
 
     /**
@@ -409,6 +451,16 @@ public final class EGraph {
         if (rootLeft.equals(rootRight)) {
             return rootLeft;
         }
+        // Read assumptions BEFORE the union-find merge; after unionFind.union() the
+        // "merged" id resolves to the survivor via find(), so a post-merge read would
+        // always return the survivor's assumptions and the check would be vacuous.
+        AssumptionSignature leftAssumptions = assumptionsFor(rootLeft);
+        AssumptionSignature rightAssumptions = assumptionsFor(rootRight);
+        if (!leftAssumptions.fingerprint().equals(rightAssumptions.fingerprint())) {
+            throw new IllegalStateException(
+                "Congruence closure attempted to merge e-classes with incompatible assumptions: "
+                    + leftAssumptions.fingerprint() + " vs " + rightAssumptions.fingerprint());
+        }
         EClassId survivor = unionFind.union(rootLeft, rootRight);
         EClassId merged = survivor.equals(rootLeft) ? rootRight : rootLeft;
         EClass survivorClass = classes.get(survivor);
@@ -420,6 +472,9 @@ public final class EGraph {
             survivorClass.absorb(mergedClass);
         }
         classes.put(merged, survivorClass);
+        AssumptionSignature survivorAssumptions = survivor.equals(rootLeft) ? leftAssumptions : rightAssumptions;
+        assumptionsByClass.put(survivor, survivorAssumptions);
+        assumptionsByClass.put(merged, survivorAssumptions);
         canonicalClassCount--;
         markDirty(survivor);
         markDirty(merged);

@@ -25,9 +25,9 @@ import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.DeterministicCounterexampleSearchService;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,7 +43,8 @@ import org.junit.jupiter.api.Test;
  */
 class DiscoveryIntegrationTest {
 
-    private static final CounterexampleSearchService NO_CEX = (l, r) -> Optional.empty();
+    private static final CounterexampleSearchService NO_CEX =
+        (hypothesis, budget) -> CounterexampleSearchService.CounterexampleSearchResult.noCounterexample();
 
     // ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -225,5 +226,55 @@ class DiscoveryIntegrationTest {
             .anyMatch(relation -> relation.contains("S_(n+1)")));
         assertTrue(hypothesis.assumptions().stream()
             .anyMatch(assumption -> assumption.contains("closed form not derived yet")));
+    }
+
+    @Test
+    void falseSimplificationIsRefutedByCounterexampleSearch() {
+        DeterministicCounterexampleSearchService service = new DeterministicCounterexampleSearchService();
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput(
+                "h-false-rational",
+                "(a + b) / b",
+                "a",
+                List.of()
+            ),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+        );
+        assertTrue(result.counterexample().isPresent(),
+            "false simplification (a+b)/b -> a must be refuted");
+    }
+
+    @Test
+    void missingAssumptionIsInferredForRationalCancellation() {
+        DeterministicCounterexampleSearchService service = new DeterministicCounterexampleSearchService();
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput(
+                "h-rational-cancel",
+                "(a * b) / b",
+                "a",
+                List.of()
+            ),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+        );
+        assertFalse(result.counterexample().isPresent(),
+            "rational cancellation should survive finite tests without concrete mismatch");
+        assertTrue(result.inferredAssumptions().stream().anyMatch(assumption -> assumption.equals("b != 0")),
+            "service must infer missing assumption b != 0");
+    }
+
+    @Test
+    void matrixCommutativityClaimIsRefuted() {
+        DeterministicCounterexampleSearchService service = new DeterministicCounterexampleSearchService();
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput(
+                "h-matrix-commutativity",
+                "A * B",
+                "B * A",
+                List.of()
+            ),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+        );
+        assertTrue(result.counterexample().isPresent(),
+            "A*B = B*A must be refuted for non-commutative matrices");
     }
 }

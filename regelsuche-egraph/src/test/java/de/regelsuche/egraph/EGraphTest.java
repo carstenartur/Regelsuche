@@ -14,6 +14,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class EGraphTest {
@@ -165,6 +166,68 @@ class EGraphTest {
         Expr extracted = eGraph.extract(id, node -> 1);
         assertEquals(new BinaryExpr(new NumberExpr(3), BinaryOperator.MUL, new VariableExpr("x")),
             extracted);
+    }
+
+    @Test
+    void eGraphKeepsAssumptionContextsDistinct() {
+        EGraph eGraph = new EGraph();
+        EClassId xDivXWithoutAssumption = eGraph.addExpression(parse("x / x"));
+        EClassId oneWithAssumption = eGraph.addExpression(parse("1"), List.of("x != 0"));
+
+        try {
+            eGraph.union(xDivXWithoutAssumption, oneWithAssumption);
+            org.junit.jupiter.api.Assertions.fail("incompatible assumptions must prevent unsafe merge");
+        } catch (IllegalArgumentException expected) {
+            assertFalse(eGraph.areEquivalent(xDivXWithoutAssumption, oneWithAssumption));
+        }
+    }
+
+    @Test
+    void eGraphAllowsConditionalIdentityUnderSameAssumptions() {
+        EGraph eGraph = new EGraph();
+        EClassId xDivX = eGraph.addExpression(parse("x / x"), List.of("0 != x"));
+        EClassId one = eGraph.addExpression(parse("1"), List.of("x != 0"));
+
+        eGraph.union(xDivX, one);
+        eGraph.rebuild();
+
+        assertTrue(eGraph.areEquivalent(xDivX, one));
+        assertEquals("x != 0", eGraph.assumptionsFor(xDivX).fingerprint());
+    }
+
+    @Test
+    void addingExpressionWithDifferentAssumptionContextThrows() {
+        EGraph eGraph = new EGraph();
+        eGraph.addExpression(parse("x + 1"), List.of("x != 0"));
+        try {
+            eGraph.addExpression(parse("x + 1"), List.of("x > 0"));
+            org.junit.jupiter.api.Assertions.fail("re-adding with a different assumption must throw");
+        } catch (IllegalArgumentException expected) {
+            // x + 1 still carries its original assumption context
+            EClassId id = eGraph.addExpression(parse("x + 1"), List.of("x != 0"));
+            assertEquals("x != 0", eGraph.assumptionsFor(id).fingerprint());
+        }
+    }
+
+    @Test
+    void congruenceClosureThrowsWhenMergingIncompatibleAssumptions() {
+        // f(a) carries assumption "A", f(b) carries assumption "B"; declaring a≡b
+        // must not silently fuse the two distinct assumption contexts via rebuild().
+        EGraph eGraph = new EGraph();
+        EClassId a = eGraph.addExpression(new VariableExpr("a"));
+        EClassId b = eGraph.addExpression(new VariableExpr("b"));
+        eGraph.addExpression(parse("a + 1"), List.of("a != 0"));
+        eGraph.addExpression(parse("b + 1"), List.of("b != 0"));
+        // a and b themselves have no assumptions, so union(a,b) is fine.
+        eGraph.union(a, b);
+        try {
+            eGraph.rebuild();
+            org.junit.jupiter.api.Assertions.fail(
+                "rebuild() must throw when congruence would merge classes with incompatible assumptions");
+        } catch (IllegalStateException expected) {
+            // The e-classes for (a+1) and (b+1) have different assumptions and
+            // must not be silently merged.
+        }
     }
 
     private static Expr parse(String input) {

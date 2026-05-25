@@ -7,11 +7,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.search.strategy.TranspositionGate;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class TranspositionTableIntegrationTest {
 
     private static SearchState state(String hash, int depth, int score, List<String> rules, String parent) {
+        return state(hash, depth, score, rules, parent, List.of());
+    }
+
+    private static SearchState state(
+        String hash,
+        int depth,
+        int score,
+        List<String> rules,
+        String parent,
+        List<String> assumptions
+    ) {
         de.regelsuche.scoring.ExpressionScore s =
             new de.regelsuche.scoring.ExpressionScore(score, 0, 0, 0, 0);
         return new SearchState(
@@ -22,7 +34,7 @@ class TranspositionTableIntegrationTest {
             0, hash, parent, rules.isEmpty() ? null : rules.get(0),
             de.regelsuche.transform.RewriteKind.NORMALIZE,
             false, 0, true, 0
-        );
+        ).withAssumptions(assumptions);
     }
 
     @Test
@@ -77,5 +89,19 @@ class TranspositionTableIntegrationTest {
         PruningDecision decision = memory.decisions().get(memory.decisions().size() - 1);
         assertEquals(PruningReason.KEPT_NEW_RULE_COMBO, decision.reason());
         assertNotNull(decision.explanation());
+    }
+
+    @Test
+    void assumptionsArePartOfTranspositionIdentity() {
+        SearchMemory memory = new SearchMemory();
+        SearchState withoutAssumption = state("hash-x-div-x", 1, 5, List.of("r"), "root");
+        SearchState withAssumption = state("hash-x-div-x", 1, 5, List.of("r"), "root", List.of("x != 0"));
+
+        assertEquals(TranspositionGate.Verdict.KEEP,
+            TranspositionGate.evaluate(memory, withoutAssumption, "p1"));
+        assertEquals(TranspositionGate.Verdict.KEEP,
+            TranspositionGate.evaluate(memory, withAssumption, "p2"));
+        assertEquals(2, memory.table().size(),
+            "same canonical expression under different assumptions must not collide");
     }
 }

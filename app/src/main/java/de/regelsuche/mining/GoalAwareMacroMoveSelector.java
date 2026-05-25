@@ -1,5 +1,6 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.inventory.RuleInventoryRepository;
 
@@ -70,7 +71,7 @@ public class GoalAwareMacroMoveSelector {
      * @return candidate macro rules that may reduce cost for this expression
      */
     public List<ReusableRule> selectFor(String currentExpression) {
-        return selectFor(currentExpression, null);
+        return selectFor(currentExpression, null, List.of());
     }
 
     /**
@@ -79,9 +80,25 @@ public class GoalAwareMacroMoveSelector {
      * (or expose tokens that may enable additional rules).
      */
     public List<ReusableRule> selectFor(String currentExpression, String goalExpression) {
+        return selectFor(currentExpression, goalExpression, List.of());
+    }
+
+    /**
+     * Returns eligible macro rules under the current assumption context.
+     * Rules with assumptions are selected only if all of them are already
+     * satisfied by the caller-supplied context.
+     */
+    public List<ReusableRule> selectFor(
+        String currentExpression,
+        String goalExpression,
+        List<String> carriedAssumptions
+    ) {
         if (currentExpression == null || currentExpression.isBlank()) {
             return List.of();
         }
+        Set<String> normalizedCarried = new LinkedHashSet<>(
+            AssumptionSignature.ofExpressions(carriedAssumptions).normalizedAssumptions()
+        );
         List<ScoredMacroMove> selected = new ArrayList<>();
         for (ReusableRule rule : inventory.findAll()) {
             if (!inventory.isEnabled(rule.id())) {
@@ -94,6 +111,9 @@ public class GoalAwareMacroMoveSelector {
                 continue;
             }
             if (rule.occurrenceCount() < minOccurrences) {
+                continue;
+            }
+            if (!normalizedCarried.containsAll(rule.assumptions())) {
                 continue;
             }
             double score = score(rule, currentExpression, goalExpression);

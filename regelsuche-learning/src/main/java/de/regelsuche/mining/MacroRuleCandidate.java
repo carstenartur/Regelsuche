@@ -1,5 +1,6 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.validation.CandidateProofStatus;
 
 import java.util.List;
@@ -26,7 +27,8 @@ public record MacroRuleCandidate(
     String rightPattern,
     double compressionRatio,
     CandidateProofStatus proofStatus,
-    List<String> supportingTransformationIds
+    List<String> supportingTransformationIds,
+    List<String> assumptions
 ) {
     public MacroRuleCandidate {
         if (id == null || id.isBlank()) {
@@ -39,5 +41,20 @@ public record MacroRuleCandidate(
         supportingTransformationIds = supportingTransformationIds == null
             ? List.of()
             : List.copyOf(supportingTransformationIds);
+        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();
+    }
+
+    public MacroRuleCandidate(
+        String id,
+        List<String> ruleIdSequence,
+        int occurrences,
+        String leftPattern,
+        String rightPattern,
+        double compressionRatio,
+        CandidateProofStatus proofStatus,
+        List<String> supportingTransformationIds
+    ) {
+        this(id, ruleIdSequence, occurrences, leftPattern, rightPattern, compressionRatio,
+            proofStatus, supportingTransformationIds, List.of());
     }
 }

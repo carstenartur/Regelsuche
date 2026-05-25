@@ -45,6 +45,15 @@ class DiscoveryRecordsTest {
             () -> new TransformationStep(0, null, "x", "add-zero", RewriteKind.SIMPLIFY, 5, 1, true, null));
     }
 
+    @Test
+    void stepNormalizesAssumptions() {
+        TransformationStep step = new TransformationStep(
+            0, "(a*b)/b", "a", "cancel", RewriteKind.SIMPLIFY, 5, 1, true,
+            "cancel denominator", List.of("0 != b", "b≠0"));
+
+        assertEquals(List.of("b != 0"), step.assumptions());
+    }
+
     private static TransformationStep step() {
         return new TransformationStep(
             0, "x + 0", "x", "add-zero", RewriteKind.SIMPLIFY, 5, 1, true, "neutral element");

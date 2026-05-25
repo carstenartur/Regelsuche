@@ -13,19 +13,20 @@ import java.util.Optional;
  * wired against any backend (in-memory, JSON file, PostgreSQL, …) without
  * leaking persistence into the mathematical core.
  *
- * <p>The payload type is the existing {@link RuleCandidate} record so the
- * port can be adopted incrementally by current mining code.
+ * <p>The payload type is {@link HypothesisCandidate}, so validation metadata
+ * such as inferred assumptions and counterexample/proof status is not lost
+ * between mining and later review or promotion.
  */
 public interface HypothesisRepository {
 
     /** Persist a hypothesis under {@code hypothesisId}. */
-    void save(String hypothesisId, RuleCandidate hypothesis);
+    void save(String hypothesisId, HypothesisCandidate hypothesis);
 
     /** @return the hypothesis with the given id, if known. */
-    Optional<RuleCandidate> findById(String hypothesisId);
+    Optional<HypothesisCandidate> findById(String hypothesisId);
 
     /** @return all stored hypotheses (insertion order is not guaranteed). */
-    List<RuleCandidate> findAll();
+    List<HypothesisCandidate> findAll();
 
     /** Remove a hypothesis, e.g. after promotion to a reusable rule. */
     void delete(String hypothesisId);

@@ -11,10 +11,9 @@ import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.Map;
 
 /**
  * Orchestrates the full hypothesis promotion pipeline:
@@ -83,7 +82,10 @@ public class HypothesisPromotionPipeline {
         List<ReusableRule> promotedRules = new ArrayList<>();
         // Collect supporting paths of non-rejected candidates for the promotion step,
         // so rejected rules cannot be re-mined by learningService.learn().
-        Set<String> validatedSupportingIds = new LinkedHashSet<>();
+        // Track assumptions per path-id so each path only receives the assumptions
+        // inferred from the specific candidate(s) it supports — not assumptions from
+        // unrelated candidates that the path never contributed to.
+        Map<String, List<String>> pathAssumptions = new LinkedHashMap<>();
         boolean anyValidatedForPromotion = false;
 
         for (RuleCandidate candidate : candidates) {
@@ -93,38 +95,46 @@ public class HypothesisPromotionPipeline {
             HypothesisCandidate hypothesis = HypothesisCandidate.from(candidate, novelty, paths);
 
             // Step 3: Counterexample search.
-            Optional<CounterexampleSearchService.Counterexample> counterexample =
-                counterexampleService.search(candidate.leftPattern(), candidate.rightPattern());
+            CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =
+                counterexampleService.search(
+                    new CounterexampleSearchService.HypothesisInput(
+                        hypothesis.id(),
+                        candidate.leftPattern(),
+                        candidate.rightPattern(),
+                        hypothesis.assumptions()
+                    ),
+                    CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+                );
 
-            if (counterexample.isPresent()) {
+            if (counterexampleResult.counterexample().isPresent()) {
                 hypothesis = hypothesis
                     .withCounterexampleStatus(true)
                     .withProofStatus(CandidateProofStatus.REJECTED);
                 // Persist with REJECTED status so downstream readers see the correct state.
-                RuleCandidate rejectedCandidate = new RuleCandidate(
-                    candidate.leftPattern(), candidate.rightPattern(),
-                    candidate.examplesCount(), candidate.averageScoreImprovement(),
-                    candidate.maximumScoreImprovement(), candidate.equivalenceVerified(),
-                    candidate.generalizationPlausible(), candidate.containsFreeParameters(),
-                    candidate.parameterRelations(), candidate.status(),
-                    CandidateProofStatus.REJECTED, candidate.canonicalHash(),
-                    candidate.supportingTransformationIds()
-                );
-                hypothesisRepository.save(hypothesis.id(), rejectedCandidate);
+                hypothesisRepository.save(hypothesis.id(), hypothesis);
                 newHypotheses.add(hypothesis);
                 continue;
             }
 
             hypothesis = hypothesis.withCounterexampleStatus(false);
+            if (!counterexampleResult.inferredAssumptions().isEmpty()) {
+                List<String> mergedAssumptions = new ArrayList<>(hypothesis.assumptions());
+                mergedAssumptions.addAll(counterexampleResult.inferredAssumptions());
+                hypothesis = hypothesis.withAssumptions(mergedAssumptions);
+            }
 
             // Store as a pending hypothesis.
-            hypothesisRepository.save(hypothesis.id(), candidate);
+            hypothesisRepository.save(hypothesis.id(), hypothesis);
             newHypotheses.add(hypothesis);
 
             // Track which paths back this validated candidate for the promotion step.
             if (autoPromote && candidate.proofStatus().ordinal()
                 >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {
-                validatedSupportingIds.addAll(candidate.supportingTransformationIds());
+                List<String> candidateAssumptions = hypothesis.assumptions();
+                for (String pathId : candidate.supportingTransformationIds()) {
+                    pathAssumptions.computeIfAbsent(pathId, k -> new ArrayList<>())
+                        .addAll(candidateAssumptions);
+                }
                 anyValidatedForPromotion = true;
             }
         }
@@ -134,7 +144,8 @@ public class HypothesisPromotionPipeline {
         // rejected rules cannot be inadvertently re-mined and activated.
         if (anyValidatedForPromotion) {
             List<SuccessfulTransformationPath> validatedPaths = paths.stream()
-                .filter(p -> validatedSupportingIds.contains(p.id()))
+                .filter(p -> pathAssumptions.containsKey(p.id()))
+                .map(p -> p.withAssumptions(pathAssumptions.get(p.id())))
                 .toList();
             if (!validatedPaths.isEmpty()) {
                 MacroLearningResult result = learningService.learn(validatedPaths);

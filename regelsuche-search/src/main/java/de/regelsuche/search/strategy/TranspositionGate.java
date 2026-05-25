@@ -51,12 +51,13 @@ public final class TranspositionGate {
         if (memory == null) {
             return Verdict.KEEP;
         }
-        Optional<TranspositionEntry> existingOpt = memory.table().lookup(state.canonicalHash());
+        String identityHash = identityHash(state);
+        Optional<TranspositionEntry> existingOpt = memory.table().lookup(identityHash);
         Set<String> ruleIds = new LinkedHashSet<>(state.appliedRuleIds());
         int score = state.score().weightedTotal();
         Instant now = Instant.now();
         TranspositionEntry candidate = new TranspositionEntry(
-            state.canonicalHash(),
+            identityHash,
             state.expression(),
             score,
             state.depth(),
@@ -76,7 +77,7 @@ public final class TranspositionGate {
         if (score < existing.bestScore()) {
             memory.table().record(candidate);
             memory.recordDecision(new PruningDecision(
-                state.expression(), state.canonicalHash(),
+                state.expression(), identityHash,
                 PruningReason.REPLACED_WORSE_PATH));
             return Verdict.KEEP;
         }
@@ -84,7 +85,7 @@ public final class TranspositionGate {
         if (score == existing.bestScore() && state.depth() < existing.minDepthSeen()) {
             memory.table().record(candidate);
             memory.recordDecision(new PruningDecision(
-                state.expression(), state.canonicalHash(),
+                state.expression(), identityHash,
                 PruningReason.KEPT_LOWER_DEPTH));
             return Verdict.KEEP;
         }
@@ -93,7 +94,7 @@ public final class TranspositionGate {
         if (hasNewRules) {
             memory.table().record(candidate);
             memory.recordDecision(new PruningDecision(
-                state.expression(), state.canonicalHash(),
+                state.expression(), identityHash,
                 PruningReason.KEPT_NEW_RULE_COMBO));
             return Verdict.KEEP;
         }
@@ -103,7 +104,15 @@ public final class TranspositionGate {
             ? PruningReason.ALREADY_KNOWN_BETTER
             : PruningReason.ALREADY_KNOWN_EQUAL;
         memory.recordDecision(new PruningDecision(
-            state.expression(), state.canonicalHash(), reason));
+            state.expression(), identityHash, reason));
         return Verdict.PRUNE;
+    }
+
+    private static String identityHash(SearchState state) {
+        String assumptions = state.assumptionFingerprint();
+        if (assumptions.isBlank()) {
+            return state.canonicalHash();
+        }
+        return state.canonicalHash() + "\u0001assumptions:" + assumptions;
     }
 }
