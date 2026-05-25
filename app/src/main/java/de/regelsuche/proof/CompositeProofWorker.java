@@ -1,7 +1,7 @@
 package de.regelsuche.proof;
 
 import de.regelsuche.assumption.Assumption;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import java.util.List;
 import java.util.stream.Collectors;

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.api.searchgraph.SearchExpression;
+import de.regelsuche.benchmark.BenchmarkScenarioResult;
 import de.regelsuche.benchmark.BenchmarkSuite;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.export.MatrixLatexRenderer;
@@ -17,7 +18,7 @@ import de.regelsuche.inequality.Inequality;
 import de.regelsuche.inequality.InequalityTransformationRuleAdapter;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.ReusableRule;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.MacroRuleMiner;
 import de.regelsuche.parse.ExpressionParser;
 import java.io.IOException;
@@ -206,9 +207,9 @@ class MathDomainProductIntegrationTest {
     @Test
     void mathDomainBenchmarkContainsAllCategories() {
         BenchmarkSuite suite = new BenchmarkSuite();
-        List<BenchmarkSuite.BenchmarkSuiteResult> results = suite.runAll();
+        List<BenchmarkScenarioResult> results = suite.runAll();
         Set<String> names = results.stream()
-            .map(BenchmarkSuite.BenchmarkSuiteResult::name)
+            .map(BenchmarkScenarioResult::name)
             .collect(java.util.stream.Collectors.toSet());
         assertTrue(names.contains("equations"), "expected category 'equations' in: " + names);
         assertTrue(names.contains("inequalities"), "expected category 'inequalities' in: " + names);
@@ -216,7 +217,7 @@ class MathDomainProductIntegrationTest {
         assertTrue(names.contains("linear-algebra"), "expected category 'linear-algebra' in: " + names);
 
         // Each math-domain row exposes the required metrics:
-        for (BenchmarkSuite.BenchmarkSuiteResult r : results) {
+        for (BenchmarkScenarioResult r : results) {
             if (!Set.of("equations", "inequalities", "calculus", "linear-algebra")
                 .contains(r.name())) {
                 continue;

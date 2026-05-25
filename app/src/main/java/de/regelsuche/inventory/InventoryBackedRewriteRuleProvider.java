@@ -1,6 +1,6 @@
 package de.regelsuche.inventory;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.PatternBinary;
 import de.regelsuche.mining.PatternFunction;
 import de.regelsuche.mining.PatternNumber;

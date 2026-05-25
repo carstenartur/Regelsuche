@@ -1,5 +1,7 @@
 package de.regelsuche.cli;
 
+import de.regelsuche.cli.core.CliCommandRegistry;
+import de.regelsuche.cli.core.CliOptions;
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.example.AlgebraicExampleGenerator;
@@ -30,13 +32,10 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Dispatches CLI subcommands ({@code discover}, {@code transform},
@@ -44,8 +43,6 @@ import java.util.Set;
  * {@link de.regelsuche.App} entry point.
  */
 public class CliRouter {
-    private static final Set<String> SUBCOMMANDS = Set.of("discover", "transform", "inventory", "path", "benchmark", "serve", "explain");
-
     private final PrintStream out;
     private final ExportFileService exportFileService;
     private final TransformationExportService exportService;
@@ -79,7 +76,7 @@ public class CliRouter {
     }
 
     public static boolean isSubcommand(String token) {
-        return SUBCOMMANDS.contains(token.toLowerCase(Locale.ROOT));
+        return CliCommandRegistry.defaults().contains(token);
     }
 
     public int run(String[] args) {
@@ -108,10 +105,10 @@ public class CliRouter {
     }
 
     private int runDiscover(String[] args) {
-        Map<String, String> options = parseOptions(args);
+        CliOptions options = CliOptions.parse(args);
         int min = Integer.parseInt(options.getOrDefault("min", "1"));
         int max = Integer.parseInt(options.getOrDefault("max", "3"));
-        List<String> formats = splitCsv(options.getOrDefault("export", ""));
+        List<String> formats = options.csv("export");
         String directory = options.getOrDefault("dir", ExportFileService.DEFAULT_DIRECTORY);
 
         RuleDiscoveryService discovery = new RuleDiscoveryService(
@@ -259,7 +256,7 @@ public class CliRouter {
                 }
             }
             case "export" -> {
-                Map<String, String> options = parseOptions(rest);
+                CliOptions options = CliOptions.parse(rest);
                 String format = options.getOrDefault("format", "json");
                 if (!"json".equalsIgnoreCase(format)) {
                     out.println("Only json format is supported for inventory export");
@@ -289,10 +286,10 @@ public class CliRouter {
     }
 
     private int runBenchmark(String[] args) {
-        Map<String, String> options = parseOptions(args);
+        CliOptions options = CliOptions.parse(args);
         de.regelsuche.benchmark.BenchmarkSuite suite = new de.regelsuche.benchmark.BenchmarkSuite();
-        java.util.List<de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult> results = suite.runAll();
-        for (de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult result : results) {
+        java.util.List<de.regelsuche.benchmark.BenchmarkScenarioResult> results = suite.runAll();
+        for (de.regelsuche.benchmark.BenchmarkScenarioResult result : results) {
             out.println("# " + result.name());
             result.results().forEach(row -> out.println("  " + row));
             if (!options.containsKey("quiet")) {
@@ -327,7 +324,7 @@ public class CliRouter {
     }
 
     private int runServe(String[] args) {
-        Map<String, String> options = parseOptions(args);
+        CliOptions options = CliOptions.parse(args);
         int port = Integer.parseInt(options.getOrDefault("port", "8080"));
         String host = options.getOrDefault("host", "127.0.0.1");
         de.regelsuche.web.WebSecurityConfig.Builder configBuilder = de.regelsuche.web.WebSecurityConfig.builder();
@@ -450,7 +447,7 @@ public class CliRouter {
             return 1;
         }
         String pathId = args[0];
-        Map<String, String> options = parseOptions(Arrays.copyOfRange(args, 1, args.length));
+        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
         String formName = options.getOrDefault("form", "school").toUpperCase(Locale.ROOT);
         de.regelsuche.explain.ExplanationService.Form form;
         try {
@@ -476,7 +473,7 @@ public class CliRouter {
             return 1;
         }
         String pathId = args[1];
-        Map<String, String> options = parseOptions(Arrays.copyOfRange(args, 2, args.length));
+        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 2, args.length));
         String format = options.getOrDefault("format", "markdown");
         Optional<DiscoveredTransformation> match = graphStore.discoveredTransformations().stream()
             .filter(transformation -> transformation.id().equals(pathId))
@@ -497,53 +494,6 @@ public class CliRouter {
             }
         }
         return 0;
-    }
-
-    private Map<String, String> parseOptions(String[] args) {
-        Map<String, String> options = new java.util.LinkedHashMap<>();
-        int index = 0;
-        while (index < args.length) {
-            String current = args[index];
-            if (current.startsWith("--")) {
-                String body = current.substring(2);
-                String key;
-                String value;
-                int eq = body.indexOf('=');
-                if (eq >= 0) {
-                    // Support --key=value as well, which is more friendly for
-                    // Gradle-generated argument lists (no whitespace round-trip).
-                    key = body.substring(0, eq);
-                    value = body.substring(eq + 1);
-                    index++;
-                } else if (index + 1 < args.length && !args[index + 1].startsWith("--")) {
-                    key = body;
-                    value = args[index + 1];
-                    index += 2;
-                } else {
-                    key = body;
-                    value = "true";
-                    index++;
-                }
-                options.put(key, value);
-            } else {
-                index++;
-            }
-        }
-        return options;
-    }
-
-    private List<String> splitCsv(String value) {
-        if (value == null || value.isBlank()) {
-            return List.of();
-        }
-        List<String> values = new ArrayList<>();
-        for (String token : value.split(",")) {
-            String trimmed = token.trim();
-            if (!trimmed.isEmpty()) {
-                values.add(trimmed);
-            }
-        }
-        return values;
     }
 
     private void close(AutoCloseable resource) {

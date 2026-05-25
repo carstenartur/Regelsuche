@@ -12,7 +12,7 @@ import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.GraphSnapshot;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inequality.Comparator;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.proof.ProofBridge;

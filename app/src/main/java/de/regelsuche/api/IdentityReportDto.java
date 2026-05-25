@@ -1,6 +1,6 @@
 package de.regelsuche.api;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.MacroRuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import java.util.List;

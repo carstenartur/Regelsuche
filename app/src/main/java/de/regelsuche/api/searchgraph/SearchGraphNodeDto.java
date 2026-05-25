@@ -1,6 +1,6 @@
 package de.regelsuche.api.searchgraph;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 
 /**
  * Node DTO for the Visual Search Graph.

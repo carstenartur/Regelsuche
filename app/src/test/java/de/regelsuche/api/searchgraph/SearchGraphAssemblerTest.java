@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.GraphSnapshot;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.search.SimplificationSuccess;
 import de.regelsuche.transform.RewriteKind;
 import java.time.Instant;

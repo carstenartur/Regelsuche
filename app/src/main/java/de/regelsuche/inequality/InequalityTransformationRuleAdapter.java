@@ -3,7 +3,7 @@ package de.regelsuche.inequality;
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.graph.GraphEdge;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.transform.RewriteKind;
 import java.util.ArrayList;

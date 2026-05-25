@@ -1,6 +1,6 @@
 package de.regelsuche.paths;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import java.util.List;
 
 /**

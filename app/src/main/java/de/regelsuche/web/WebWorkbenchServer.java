@@ -1,5 +1,7 @@
 package de.regelsuche.web;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import com.sun.net.httpserver.BasicAuthenticator;
 import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpExchange;
@@ -1763,7 +1765,7 @@ public class WebWorkbenchServer {
             left, right, 1, 1.0, 1, true, true, false,
             List.of(),
             de.regelsuche.mining.RuleStatus.NEW,
-            de.regelsuche.mining.CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+            de.regelsuche.validation.CandidateProofStatus.SYMBOLICALLY_VERIFIED,
             Integer.toHexString((left + "->" + right).hashCode()),
             List.of()
         );
@@ -2024,7 +2026,7 @@ public class WebWorkbenchServer {
         }
         long started = System.nanoTime();
         var suite = new de.regelsuche.benchmark.BenchmarkSuite();
-        List<de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult> results = suite.runAll();
+        List<de.regelsuche.benchmark.BenchmarkScenarioResult> results = suite.runAll();
         long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
         JsonWriter writer = new JsonWriter();
         writer.beginObject();

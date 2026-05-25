@@ -12,7 +12,7 @@ import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.RuleStatus;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.web.WebWorkbenchServer;

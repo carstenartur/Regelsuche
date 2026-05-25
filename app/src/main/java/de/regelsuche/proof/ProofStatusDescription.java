@@ -1,6 +1,6 @@
 package de.regelsuche.proof;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;

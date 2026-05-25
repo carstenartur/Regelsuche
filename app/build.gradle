@@ -13,6 +13,15 @@ def vendorKatexDir = vendorWebRoot.dir('katex')
 def vendorCytoscapeDir = vendorWebRoot.dir('cytoscape')
 
 dependencies {
+    implementation project(':regelsuche-core')
+    implementation project(':regelsuche-egraph')
+    implementation project(':regelsuche-search')
+    implementation project(':regelsuche-validation')
+    implementation project(':regelsuche-persistence')
+    implementation project(':regelsuche-learning')
+    implementation project(':regelsuche-experiments')
+    implementation project(':regelsuche-cli')
+    implementation project(':regelsuche-discovery')
     implementation 'org.neo4j.driver:neo4j-java-driver:6.1.0'
     implementation 'org.graalvm.polyglot:polyglot:24.2.1'
 
@@ -82,14 +91,14 @@ sourceSets {
     e2eTest {
         java.srcDir 'src/e2eTest/java'
         resources.srcDir 'src/e2eTest/resources'
-        compileClasspath += sourceSets.main.output + sourceSets.test.output
-        runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+        compileClasspath += sourceSets.main.output + sourceSets.test.output + configurations.testRuntimeClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output + configurations.testRuntimeClasspath
     }
     dockerE2eTest {
         java.srcDir 'src/dockerE2eTest/java'
         resources.srcDir 'src/dockerE2eTest/resources'
-        compileClasspath += sourceSets.main.output
-        runtimeClasspath += sourceSets.main.output
+        compileClasspath += sourceSets.main.output + configurations.runtimeClasspath
+        runtimeClasspath += sourceSets.main.output + configurations.runtimeClasspath
     }
 }
 

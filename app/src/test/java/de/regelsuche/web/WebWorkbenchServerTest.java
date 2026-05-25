@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.proof.ProofBridge;
 import de.regelsuche.proof.ProofBridgeService;
 import de.regelsuche.proof.ProverExecutor;

@@ -1,14 +1,13 @@
 package de.regelsuche.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.inventory.ReusableRule;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.search.memory.TranspositionEntry;
@@ -18,48 +17,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class PersistenceContextTest {
-
-    @Test
-    void persistenceConfigFromEnvDefaultsToInMemory() {
-        PersistenceConfig config = PersistenceConfig.fromEnvironment(Map.of());
-        assertEquals(GraphPersistenceMode.IN_MEMORY, config.mode());
-    }
-
-    @Test
-    void persistenceConfigPicksUpExplicitJsonFileMode() {
-        PersistenceConfig config = PersistenceConfig.fromEnvironment(Map.of(
-            PersistenceConfig.ENV_MODE, "JSON_FILE",
-            PersistenceConfig.ENV_PATH, "/tmp/regelsuche-test"
-        ));
-        assertEquals(GraphPersistenceMode.JSON_FILE, config.mode());
-        assertEquals(Path.of("/tmp/regelsuche-test"), config.storagePath());
-    }
-
-    @Test
-    void persistenceConfigAutoSelectsRemoteNeo4jWhenAllCredentialsPresent() {
-        PersistenceConfig config = PersistenceConfig.fromEnvironment(Map.of(
-            PersistenceConfig.ENV_NEO4J_URI, "bolt://example:7687",
-            PersistenceConfig.ENV_NEO4J_USER, "neo4j",
-            PersistenceConfig.ENV_NEO4J_PASSWORD, "secret"
-        ));
-        assertEquals(GraphPersistenceMode.REMOTE_NEO4J, config.mode());
-        assertTrue(config.hasNeo4jCredentials());
-    }
-
-    @Test
-    void persistenceConfigDoesNotPickRemoteIfCredentialsIncomplete() {
-        PersistenceConfig config = PersistenceConfig.fromEnvironment(Map.of(
-            PersistenceConfig.ENV_NEO4J_URI, "bolt://example:7687"
-        ));
-        assertEquals(GraphPersistenceMode.IN_MEMORY, config.mode());
-        assertFalse(config.hasNeo4jCredentials());
-    }
 
     @Test
     void jsonFileStoreSurvivesRestart(@TempDir Path tmp) {

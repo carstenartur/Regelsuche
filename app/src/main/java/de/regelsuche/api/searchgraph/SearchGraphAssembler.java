@@ -4,7 +4,7 @@ import de.regelsuche.export.LaTeXMathRenderer;
 import de.regelsuche.export.MathRenderer;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.GraphSnapshot;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.search.SimplificationSuccess;
 import java.util.ArrayList;

@@ -113,7 +113,9 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
 
 * [Getting Started](docs/getting-started.md) — Docker, lokaler Gradle-Lauf,
   wichtige Endpunkte, optionaler Neo4j-Mode.
-* [Architektur](docs/architecture.md) — Module, Datenflüsse, Persistenz.
+* [Architektur](docs/architecture.md) — Leitplanken und Überblick.
+* [Modulstruktur](docs/module-structure.md) — Gradle-Module inkl. Search/Persistence/Learning/Experiments (inkl. Seed-Corpus)/CLI/Discovery, verbleibende logische Module und Paketmapping.
+* [Dependency-Regeln](docs/dependency-rules.md) — erlaubte Abhängigkeitsrichtungen.
 * [Nutzer-Workflows](docs/user-workflows.md) — Lehrer/Schüler,
   Forscher, CAS-Vergleich, Proof-Workflow.
 * [Such-Intelligenz](docs/search-intelligence.md) und
@@ -124,7 +126,8 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
 * [Proof-Workbench](docs/proof-workbench.md) — persistente Jobs, REST,
   Artefakt-Bundle, Dockerfile.proof.
 * [Macro-Rules](docs/macro-rules.md) — wie das System eigene Regeln lernt.
-* [Testing](docs/testing.md) — Unit-, Browser-E2E- und Doc-Asset-Pipelines.
+* [Testing](docs/testing.md) — Task-Referenz der Testpipelines.
+* [Testing-Strategie](docs/testing-strategy.md) — Schichtung nach Core/Integration/E2E.
 * [Developer Guide](docs/developer-guide.md) — Repo-Layout, Build-Kommandos,
   Konventionen, neue Endpunkte hinzufügen.
 

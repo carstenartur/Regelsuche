@@ -1,7 +1,7 @@
 package de.regelsuche.paths;
 
 import de.regelsuche.discovery.DiscoveredTransformation;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.search.TeachingPathScorer;
 import java.util.Comparator;
 import java.util.List;

@@ -1,6 +1,6 @@
 package de.regelsuche.graph;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.transform.RewriteKind;
 
 public record GraphEdge(

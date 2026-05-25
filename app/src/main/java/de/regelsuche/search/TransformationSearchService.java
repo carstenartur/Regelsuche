@@ -7,7 +7,7 @@ import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.GraphSnapshot;
 import de.regelsuche.input.InputRequest;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.notify.SimplificationNotifier;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
