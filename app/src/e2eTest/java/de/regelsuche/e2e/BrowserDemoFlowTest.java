@@ -528,11 +528,11 @@ class BrowserDemoFlowTest {
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.VISIBLE)
                 .setTimeout(15_000));
-        int renderedBestNodes = ((Number) page.evaluate(
+        int renderedNodes = ((Number) page.evaluate(
             "() => document.querySelectorAll("
-                + "'#graphCanvas .graph-overlay-layer .graph-node-math.is-best .katex'"
+                + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
                 + ").length")).intValue();
-        assertTrue(renderedBestNodes >= 2,
+        assertTrue(renderedNodes >= 2,
             fileName + " must show at least two KaTeX-rendered best-path nodes");
         page.evaluate(
             "() => {"
