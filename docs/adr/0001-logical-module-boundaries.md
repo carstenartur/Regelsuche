@@ -1,4 +1,4 @@
-# ADR 0001: Physical core/egraph/validation modules first
+# ADR 0001: Physical core/egraph/search/validation modules first
 
 - Status: Accepted
 - Date: 2026-05-25
@@ -10,7 +10,7 @@ Bei direkter Weiterentwicklung ohne zusätzliche Abstraktionsebenen steigt die
 kognitive Last und es drohen Architekturdrift, God-Classes und langsame Tests.
 
 Der aktuelle Code enthält noch Import-Zyklen in den oberen Schichten
-(`api`, `discovery`, `export`, `graph`, `inventory`, `mining`, `search`, …).
+(`api`, `discovery`, `export`, `graph`, `inventory`, `mining`, orchestration-nahe `search`, …).
 Ein vollständiger Big-Bang-Split in alle Zielmodule würde deshalb zyklische
 Gradle-Projektabhängigkeiten erzeugen.
 
@@ -20,6 +20,7 @@ Wir ziehen die bereits azyklischen Grenzen physisch als Gradle-Subprojekte:
 
 - `:regelsuche-core`
 - `:regelsuche-egraph`
+- `:regelsuche-search`
 - `:regelsuche-validation`
 
 Die oberen, noch zyklischen Schichten bleiben in `:app` und werden über die
@@ -39,7 +40,7 @@ verdrahtet bleiben.
 
 ## Consequences
 
-- Core-, E-Graph- und Validation-Code sind nicht mehr nur logisch, sondern auch
+- Core-, E-Graph-, Search- und Validation-Code sind nicht mehr nur logisch, sondern auch
   durch Gradle getrennt.
 - Core-Logik bleibt isoliert und schneller testbar.
 - Die obere SCC kann gezielt über Ports aufgelöst werden, ohne die grüne Build-

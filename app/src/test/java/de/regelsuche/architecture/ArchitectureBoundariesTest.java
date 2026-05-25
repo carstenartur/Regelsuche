@@ -35,7 +35,8 @@ class ArchitectureBoundariesTest {
     @Test
     void physicalArchitectureModulesAreIncluded() throws IOException {
         String settings = Files.readString(REPO_ROOT.resolve("settings.gradle"));
-        for (String module : List.of("regelsuche-core", "regelsuche-egraph", "regelsuche-validation", "app")) {
+        for (String module : List.of("regelsuche-core", "regelsuche-egraph",
+            "regelsuche-search", "regelsuche-validation", "app")) {
             assertTrue(settings.contains("'" + module + "'"),
                 () -> "settings.gradle must include :" + module);
             assertTrue(Files.exists(REPO_ROOT.resolve(module).resolve("build.gradle")),
@@ -48,8 +49,9 @@ class ArchitectureBoundariesTest {
         Map<String, List<String>> expectedProjectDependencies = Map.of(
             "regelsuche-core", List.of(),
             "regelsuche-egraph", List.of(":regelsuche-core"),
+            "regelsuche-search", List.of(":regelsuche-core", ":regelsuche-egraph"),
             "regelsuche-validation", List.of(":regelsuche-core"),
-            "app", List.of(":regelsuche-core", ":regelsuche-egraph", ":regelsuche-validation")
+            "app", List.of(":regelsuche-core", ":regelsuche-egraph", ":regelsuche-search", ":regelsuche-validation")
         );
         for (Map.Entry<String, List<String>> entry : expectedProjectDependencies.entrySet()) {
             String build = Files.readString(REPO_ROOT.resolve(entry.getKey()).resolve("build.gradle"));
@@ -93,6 +95,26 @@ class ArchitectureBoundariesTest {
                 .forEach(path -> assertFileHasNoForbiddenToken(path, forbiddenTokens));
         }
         assertFileHasNoForbiddenToken(REPO_ROOT.resolve("regelsuche-core/build.gradle"), forbiddenTokens);
+    }
+
+    @Test
+    void searchKernelHasNoPersistenceInfrastructureImports() throws IOException {
+        List<String> forbiddenTokens = List.of(
+            "org.neo4j",
+            "org.hibernate",
+            "jakarta.persistence",
+            "javax.persistence",
+            "testcontainers",
+            "docker",
+            "org.graalvm"
+        );
+        Path mainJavaRoot = REPO_ROOT.resolve("regelsuche-search/src/main/java");
+
+        try (Stream<Path> files = Files.walk(mainJavaRoot)) {
+            files.filter(path -> path.toString().endsWith(".java"))
+                .forEach(path -> assertFileHasNoForbiddenToken(path, forbiddenTokens));
+        }
+        assertFileHasNoForbiddenToken(REPO_ROOT.resolve("regelsuche-search/build.gradle"), forbiddenTokens);
     }
 
     private static List<String> projectDependencyTokens(String buildFileContent) {

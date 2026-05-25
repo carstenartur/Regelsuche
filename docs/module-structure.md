@@ -8,18 +8,19 @@ Import-Zyklen über die eingeführten Ports aufgelöst sind.
 | --- | --- | --- | --- |
 | `:regelsuche-core` | `de.regelsuche.ast`, `parse`, `canonical`, `rules`, `transform` (ohne `SymPyTransformationEngine`), `assumption`, `input`, `algebra`, `calculus`, `linalg`, `json`, `notify`, `util` | AST, Parser, kanonische Form, Rewrite-Regeln/Pattern-Ausdrücke, deterministische Mathematik-Helfer | keine Projektabhängigkeiten, keine Infrastruktur-Libraries |
 | `:regelsuche-egraph` | `de.regelsuche.egraph` | E-Graph, Equality Saturation, Pattern-Matching | `:regelsuche-core` |
+| `:regelsuche-search` | `de.regelsuche.search` (ohne `TransformationSearchService`, `TeachingPathScorer`), `search.strategy`, `search.memory` (ohne JSON/Neo4j-Adapter), `scoring`, `scoring.cost`, didaktische CostModel-Primitiven | Suchprofile, Strategien, CostModels, SearchMemory und TranspositionTable-Port/InMemory-Implementierung | `:regelsuche-core`, `:regelsuche-egraph` |
 | `:regelsuche-validation` | `de.regelsuche.equivalence`, `validation` | Äquivalenzchecks, Gegenbeispiel-/Validierungsports und aktuelle SymPy-Validierung | `:regelsuche-core` |
-| `:app` | `de.regelsuche.App`, `cli`, `web`, `api`, `search`, `mining`, `discovery`, `inventory`, `graph`, `persistence`, `export`, `didactic`, `proof`, `demo`, `equation`, `inequality`, `paths`, `jobs`, `benchmark`, plus `transform.SymPyTransformationEngine` | Runtime-Wiring, Web/CLI, Persistence, Search/Learning/Discovery und noch zyklische obere Schichten | `:regelsuche-core`, `:regelsuche-egraph`, `:regelsuche-validation`, Neo4j/GraalVM/WebAssets |
+| `:app` | `de.regelsuche.App`, `cli`, `web`, `api`, orchestration-nahe `search`, `mining`, `discovery`, `inventory`, `graph`, `persistence`, `export`, restliches `didactic`, `proof`, `demo`, `equation`, `inequality`, `paths`, `jobs`, `benchmark`, plus `transform.SymPyTransformationEngine` | Runtime-Wiring, Web/CLI, Persistence, Learning/Discovery und noch zyklische obere Schichten | `:regelsuche-core`, `:regelsuche-egraph`, `:regelsuche-search`, `:regelsuche-validation`, Neo4j/GraalVM/WebAssets |
 
 ## Noch nicht physisch getrennte Zielmodule
 
-Die Zielmodule `regelsuche-search`, `regelsuche-learning`,
-`regelsuche-persistence`, `regelsuche-experiments`, `regelsuche-web` und
-`regelsuche-cli` sind fachlich beschrieben, bleiben aber vorerst in `app`, weil
-der aktuelle Code noch eine obere SCC enthält:
+Die Zielmodule `regelsuche-learning`, `regelsuche-persistence`,
+`regelsuche-experiments`, `regelsuche-web` und `regelsuche-cli` sind fachlich
+beschrieben, bleiben aber vorerst in `app`, weil der aktuelle Code noch eine
+obere SCC enthält:
 
 ```text
-api, discovery, explain, export, graph, inventory, mining, search
+api, discovery, explain, export, graph, inventory, mining, orchestration-nahe search
 ```
 
 Diese Pakete werden über die Teil-0-Ports (`RuleIndex`, `SearchTraceStore`,

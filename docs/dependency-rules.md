@@ -8,13 +8,16 @@ den noch logischen Zielmodulen.
 ```text
 regelsuche-core
   <- regelsuche-egraph
+  <- regelsuche-search
   <- regelsuche-validation
   <- app
+regelsuche-egraph <- regelsuche-search
 ```
 
 - `:regelsuche-core` darf keine Projektabhängigkeiten und keine technischen
   Infrastruktur-Libraries deklarieren.
 - `:regelsuche-egraph` darf nur vom Core abhängen.
+- `:regelsuche-search` darf vom Core und vom E-Graph-Modul abhängen; JSON-/Neo4j-TranspositionTable-Adapter bleiben außerhalb.
 - `:regelsuche-validation` darf vom Core abhängen; konkrete Validierungsadapter
   dürfen hier zusätzliche technische Libraries kapseln.
 - `:app` ist die Composition Root und darf die Module verdrahten.
@@ -41,6 +44,12 @@ Der mathematische Kern (`:regelsuche-core`) bleibt frei von Infrastruktur-Detail
 
 `SymPyTransformationEngine` bleibt deshalb als Adapter in `:app`, während die
 reinen `TransformationEngine`-/Rewrite-Typen in `:regelsuche-core` liegen.
+
+## Search-Regel
+
+`:regelsuche-search` enthält Strategien, Profile, CostModels und die
+`TranspositionTable`-Abstraktion. Technische Speicheradapter (`JsonFileTranspositionTable`,
+`Neo4jTranspositionTable`) bleiben in `:app` bzw. später in `:regelsuche-persistence`.
 
 ## Interface-first für große Erweiterungen
 

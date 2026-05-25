@@ -114,7 +114,7 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
 * [Getting Started](docs/getting-started.md) — Docker, lokaler Gradle-Lauf,
   wichtige Endpunkte, optionaler Neo4j-Mode.
 * [Architektur](docs/architecture.md) — Leitplanken und Überblick.
-* [Modulstruktur](docs/module-structure.md) — logische Module und Paketmapping.
+* [Modulstruktur](docs/module-structure.md) — Gradle-Module, verbleibende logische Module und Paketmapping.
 * [Dependency-Regeln](docs/dependency-rules.md) — erlaubte Abhängigkeitsrichtungen.
 * [Nutzer-Workflows](docs/user-workflows.md) — Lehrer/Schüler,
   Forscher, CAS-Vergleich, Proof-Workflow.

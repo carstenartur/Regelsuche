@@ -7,6 +7,7 @@ schnell und deterministisch.
 | --- | --- | --- | --- |
 | Core-Tests | reine Logik, deterministisch, schnell | keine Container, kein Browser, keine technischen Adapter | `./gradlew :regelsuche-core:test` |
 | E-Graph-Tests | Equality-Saturation-/E-Graph-Logik gegen Core-Typen | keine Container, kein Browser | `./gradlew :regelsuche-egraph:test` |
+| Search-Tests | Suchstrategien, CostModels und TranspositionTable-Abstraktion | keine Container, kein Browser, keine Persistenzadapter | `./gradlew :regelsuche-search:test` |
 | Validation-Tests | Äquivalenz-/Rewrite-Validierung inklusive Adapter-Fallbacks | JVM, optionale technische Adapter | `./gradlew :regelsuche-validation:test` |
 | App-/Integrationstests | Runtime-Wiring, Persistence, Search/Learning/Discovery, Web-APIs | JVM + optionale externe Systeme je Testklasse | `./gradlew :app:test` |
 | Browser-E2E | echte Nutzerflüsse, Replay/Reports/UI | Playwright + in-process `WebWorkbenchServer` | `./gradlew :app:e2eTest` |
@@ -15,7 +16,7 @@ schnell und deterministisch.
 ## Regeln
 
 1. Core-Tests müssen ohne Container und ohne technische Adapter reproduzierbar bleiben.
-2. E-Graph und Validation testen ihre Modulgrenzen über Projektabhängigkeiten.
+2. E-Graph, Search und Validation testen ihre Modulgrenzen über Projektabhängigkeiten.
 3. Integrations-/Persistenztests dürfen Infrastruktur verwenden, aber klar von
    Core-Tests getrennt.
 4. Browser-E2E testet End-to-End-Flows inkl. Replay/Report-Pfade.

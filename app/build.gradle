@@ -15,6 +15,7 @@ def vendorCytoscapeDir = vendorWebRoot.dir('cytoscape')
 dependencies {
     implementation project(':regelsuche-core')
     implementation project(':regelsuche-egraph')
+    implementation project(':regelsuche-search')
     implementation project(':regelsuche-validation')
     implementation 'org.neo4j.driver:neo4j-java-driver:6.1.0'
     implementation 'org.graalvm.polyglot:polyglot:24.2.1'
