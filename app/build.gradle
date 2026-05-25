@@ -91,8 +91,8 @@ sourceSets {
     e2eTest {
         java.srcDir 'src/e2eTest/java'
         resources.srcDir 'src/e2eTest/resources'
-        compileClasspath += sourceSets.main.output + sourceSets.test.output + configurations.testRuntimeClasspath
-        runtimeClasspath += sourceSets.main.output + sourceSets.test.output + configurations.testRuntimeClasspath
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
     }
     dockerE2eTest {
         java.srcDir 'src/dockerE2eTest/java'
@@ -103,10 +103,10 @@ sourceSets {
 }
 
 configurations {
-    e2eTestImplementation.extendsFrom testImplementation
-    e2eTestRuntimeOnly.extendsFrom testRuntimeOnly
-    dockerE2eTestImplementation.extendsFrom testImplementation
-    dockerE2eTestRuntimeOnly.extendsFrom testRuntimeOnly
+    e2eTestImplementation.extendsFrom implementation
+    e2eTestRuntimeOnly.extendsFrom    runtimeOnly
+    dockerE2eTestImplementation.extendsFrom implementation
+    dockerE2eTestRuntimeOnly.extendsFrom    runtimeOnly
     webAssets
 }
 
@@ -168,11 +168,13 @@ tasks.named('processE2eTestResources') {
 }
 
 dependencies {
+    e2eTestImplementation libs.junit.jupiter
+    e2eTestRuntimeOnly    'org.junit.platform:junit-platform-launcher'
     e2eTestImplementation 'com.microsoft.playwright:playwright:1.60.0'
-    e2eTestImplementation 'org.testcontainers:testcontainers:2.0.5'
-    e2eTestImplementation 'org.testcontainers:junit-jupiter:2.0.5'
-    dockerE2eTestImplementation 'org.testcontainers:testcontainers:2.0.5'
-    dockerE2eTestImplementation 'org.testcontainers:junit-jupiter:2.0.5'
+    e2eTestImplementation libs.testcontainers.core
+    e2eTestImplementation libs.testcontainers.junit
+    dockerE2eTestImplementation libs.testcontainers.core
+    dockerE2eTestImplementation libs.testcontainers.junit
     dockerE2eTestImplementation 'com.microsoft.playwright:playwright:1.60.0'
     dockerE2eTestImplementation libs.junit.jupiter
     dockerE2eTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
