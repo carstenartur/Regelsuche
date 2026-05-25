@@ -58,7 +58,7 @@ class DiscoveryIntegrationTest {
             inventory, miner, knownRules, 3, 0.0
         );
         return new HypothesisPromotionPipeline(
-            miner, hypothesisRepo, NO_CEX, inventory, learningService, true
+            miner, hypothesisRepo, NO_CEX, learningService, true
         );
     }
 

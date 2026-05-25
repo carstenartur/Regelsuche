@@ -4,6 +4,7 @@ import de.regelsuche.validation.CandidateProofStatus;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * A mined hypothesis waiting to be validated, refuted, or promoted to a
@@ -73,7 +74,11 @@ public record HypothesisCandidate(
         parameterRelations = parameterRelations == null ? List.of() : List.copyOf(parameterRelations);
         expressionPlaceholders = expressionPlaceholders == null
             ? java.util.Map.of()
-            : java.util.Map.copyOf(expressionPlaceholders);
+            : expressionPlaceholders.entrySet().stream()
+                .collect(Collectors.toUnmodifiableMap(
+                    java.util.Map.Entry::getKey,
+                    e -> List.copyOf(e.getValue())
+                ));
         createdAt = createdAt == null ? Instant.now() : createdAt;
     }
 

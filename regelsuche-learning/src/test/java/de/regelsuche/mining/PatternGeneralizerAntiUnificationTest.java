@@ -19,12 +19,11 @@ import org.junit.jupiter.api.Test;
  *   <li>Mixed integer + expression placeholders</li>
  * </ul>
  *
- * <p>Note: Variable-name differences are not separately tested here because
- * {@link AstNormalizer} always canonicalises variable names to "x", "v1", etc.
- * by first-occurrence order, so structurally equivalent expressions with
- * different variable names produce identical normalised forms.  The
- * expression-placeholder mechanism for different-shape subtrees covers the
- * practically relevant generalisation cases.</p>
+ * <p>Also covers variable-name collisions at the same AST position: because
+ * {@link AstNormalizer} canonicalises variable names by first-occurrence order
+ * ("x", "v1", …), two paths that share the same first variable but differ in a
+ * second variable produce structurally different leaves at that position, which
+ * triggers the expression-placeholder path.</p>
  */
 class PatternGeneralizerAntiUnificationTest {
 

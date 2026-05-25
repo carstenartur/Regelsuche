@@ -1,7 +1,6 @@
 package de.regelsuche.learning;
 
 import de.regelsuche.inventory.ReusableRule;
-import de.regelsuche.inventory.RuleInventoryRepository;
 import de.regelsuche.mining.HypothesisCandidate;
 import de.regelsuche.mining.HypothesisRepository;
 import de.regelsuche.mining.RuleCandidate;
@@ -12,8 +11,10 @@ import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Orchestrates the full hypothesis promotion pipeline:
@@ -36,7 +37,6 @@ public class HypothesisPromotionPipeline {
     private final RuleCandidateMiner miner;
     private final HypothesisRepository hypothesisRepository;
     private final CounterexampleSearchService counterexampleService;
-    private final RuleInventoryRepository inventoryRepository;
     private final MacroRuleLearningService learningService;
     private final boolean autoPromote;
 
@@ -46,7 +46,6 @@ public class HypothesisPromotionPipeline {
      * @param miner                  mines rule candidates from transformation paths
      * @param hypothesisRepository   stores candidates as pending hypotheses
      * @param counterexampleService  searches for counterexamples; may be a no-op
-     * @param inventoryRepository    target inventory for promoted rules
      * @param learningService        handles confidence accumulation and inventory updates
      * @param autoPromote            if {@code true}, confirmed hypotheses are automatically
      *                               promoted to the inventory; otherwise they stay as
@@ -56,14 +55,12 @@ public class HypothesisPromotionPipeline {
         RuleCandidateMiner miner,
         HypothesisRepository hypothesisRepository,
         CounterexampleSearchService counterexampleService,
-        RuleInventoryRepository inventoryRepository,
         MacroRuleLearningService learningService,
         boolean autoPromote
     ) {
         this.miner = miner;
         this.hypothesisRepository = hypothesisRepository;
         this.counterexampleService = counterexampleService;
-        this.inventoryRepository = inventoryRepository;
         this.learningService = learningService;
         this.autoPromote = autoPromote;
     }
@@ -84,6 +81,10 @@ public class HypothesisPromotionPipeline {
 
         List<HypothesisCandidate> newHypotheses = new ArrayList<>();
         List<ReusableRule> promotedRules = new ArrayList<>();
+        // Collect supporting paths of non-rejected candidates for the promotion step,
+        // so rejected rules cannot be re-mined by learningService.learn().
+        Set<String> validatedSupportingIds = new LinkedHashSet<>();
+        boolean anyValidatedForPromotion = false;
 
         for (RuleCandidate candidate : candidates) {
             // Step 2: Compute novelty score (simple heuristic: NEW rules score 1.0,
@@ -99,7 +100,17 @@ public class HypothesisPromotionPipeline {
                 hypothesis = hypothesis
                     .withCounterexampleStatus(true)
                     .withProofStatus(CandidateProofStatus.REJECTED);
-                hypothesisRepository.save(hypothesis.id(), candidate);
+                // Persist with REJECTED status so downstream readers see the correct state.
+                RuleCandidate rejectedCandidate = new RuleCandidate(
+                    candidate.leftPattern(), candidate.rightPattern(),
+                    candidate.examplesCount(), candidate.averageScoreImprovement(),
+                    candidate.maximumScoreImprovement(), candidate.equivalenceVerified(),
+                    candidate.generalizationPlausible(), candidate.containsFreeParameters(),
+                    candidate.parameterRelations(), candidate.status(),
+                    CandidateProofStatus.REJECTED, candidate.canonicalHash(),
+                    candidate.supportingTransformationIds()
+                );
+                hypothesisRepository.save(hypothesis.id(), rejectedCandidate);
                 newHypotheses.add(hypothesis);
                 continue;
             }
@@ -110,10 +121,23 @@ public class HypothesisPromotionPipeline {
             hypothesisRepository.save(hypothesis.id(), candidate);
             newHypotheses.add(hypothesis);
 
-            // Step 4: Auto-promote validated hypotheses.
+            // Track which paths back this validated candidate for the promotion step.
             if (autoPromote && candidate.proofStatus().ordinal()
                 >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {
-                MacroLearningResult result = learningService.learn(paths);
+                validatedSupportingIds.addAll(candidate.supportingTransformationIds());
+                anyValidatedForPromotion = true;
+            }
+        }
+
+        // Step 4: Auto-promote validated hypotheses — called once, using only the
+        // supporting paths of candidates that passed the counterexample check, so
+        // rejected rules cannot be inadvertently re-mined and activated.
+        if (anyValidatedForPromotion) {
+            List<SuccessfulTransformationPath> validatedPaths = paths.stream()
+                .filter(p -> validatedSupportingIds.contains(p.id()))
+                .toList();
+            if (!validatedPaths.isEmpty()) {
+                MacroLearningResult result = learningService.learn(validatedPaths);
                 promotedRules.addAll(result.newlyActivated());
             }
         }

@@ -53,7 +53,7 @@ class HypothesisPromotionPipelineTest {
             inventory, miner, knownRules, 3, 0.0
         );
         return new HypothesisPromotionPipeline(
-            miner, hypothesisRepo, cex, inventory, learningService, autoPromote
+            miner, hypothesisRepo, cex, learningService, autoPromote
         );
     }
 
