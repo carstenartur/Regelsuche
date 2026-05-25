@@ -21,6 +21,7 @@ class ArchitectureBoundariesTest {
         List<String> ports = List.of(
             "de.regelsuche.inventory.RuleIndex",
             "de.regelsuche.search.SearchTraceStore",
+            "de.regelsuche.search.index.TermRuleIndex",
             "de.regelsuche.validation.CounterexampleSearchService",
             "de.regelsuche.equivalence.PolynomialEquivalenceService",
             "de.regelsuche.validation.CompletionService",

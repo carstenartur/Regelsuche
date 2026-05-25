@@ -121,6 +121,7 @@ Abhängigkeit genutzt werden (statt konkrete Backends direkt zu importieren):
 | --- | --- | --- |
 | `RuleIndex` | `de.regelsuche.inventory` | Schneller Lookup-Index über das Regelinventar (id/tag/pattern-key). |
 | `SearchTraceStore` | `de.regelsuche.search` | Persistenz von Search-Traces für Replay und Reports. |
+| `TermRuleIndex` | `de.regelsuche.search.index` | Suchkern-Port für atomare Regeln und gelernte Makrozüge mit indexseitigem Filtering. |
 | `CounterexampleSearchService` | `de.regelsuche.validation` | Suche nach Gegenbeispielen zu Kandidaten-Äquivalenzen. |
 | `PolynomialEquivalenceService` | `de.regelsuche.equivalence` | Spezialisierte Äquivalenzprüfung für Polynome. |
 | `CompletionService` | `de.regelsuche.validation` | Knuth-Bendix-Completion-/Konfluenzberichte als Port. |

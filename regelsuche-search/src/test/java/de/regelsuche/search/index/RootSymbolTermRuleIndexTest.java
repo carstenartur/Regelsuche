@@ -1,14 +1,10 @@
-package de.regelsuche.index;
+package de.regelsuche.search.index;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.regelsuche.inventory.ReusableRule;
-import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
-import de.regelsuche.validation.CandidateProofStatus;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -19,14 +15,14 @@ class RootSymbolTermRuleIndexTest {
         RewriteRule plusRule = stubRule("plus-zero");
         index.addAtomicRule("^", plusRule);
         index.addMacroMove(rule("macro_algebra_square", "(x + A) ^ 2", "x ^ 2 + 2 * A * x + A ^ 2",
-            CandidateProofStatus.VALIDATED_BY_EXAMPLES));
+            TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "algebra"));
         index.addMacroMove(rule("macro_trig_identity", "sin(x) ^ 2 + cos(x) ^ 2", "1",
-            CandidateProofStatus.OBSERVED));
+            TermRuleIndex.ProofStatusRank.OBSERVED, "trig"));
 
         TermRuleIndex.QueryResult result = index.query(
             "(x + 3) ^ 2",
             new TermRuleIndex.Query("x ^ 2 + 2 * 3 * x + 3 ^ 2",
-                CandidateProofStatus.VALIDATED_BY_EXAMPLES, "algebra", true, true)
+                TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "algebra", true, true)
         );
 
         assertEquals(List.of(plusRule), result.atomicRules());
@@ -36,9 +32,14 @@ class RootSymbolTermRuleIndexTest {
         assertEquals(2, result.metrics().rulesMatched());
     }
 
-    private static ReusableRule rule(String id, String left, String right, CandidateProofStatus status) {
-        return new ReusableRule(id, left, right, List.of(), status, RuleStatus.NEW, 2, 5.0,
-            Instant.now(), "hash-" + id, null, 0, 2, List.of("p1"), 0.9);
+    private static TermRuleIndex.IndexedMacroMove rule(
+        String id,
+        String left,
+        String right,
+        TermRuleIndex.ProofStatusRank status,
+        String domain
+    ) {
+        return new TermRuleIndex.IndexedMacroMove(id, left, right, status, domain);
     }
 
     private static RewriteRule stubRule(String id) {

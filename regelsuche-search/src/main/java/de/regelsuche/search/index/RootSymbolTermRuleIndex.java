@@ -1,8 +1,6 @@
-package de.regelsuche.index;
+package de.regelsuche.search.index;
 
-import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.transform.RewriteRule;
-import de.regelsuche.validation.CandidateProofStatus;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,9 +8,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /** Root-symbol implementation with extension points for richer feature-vector/discrimination-tree indexes. */
-public final class RootSymbolTermRuleIndex implements TermRuleIndex {
+public class RootSymbolTermRuleIndex implements TermRuleIndex {
     private final Map<String, List<RewriteRule>> atomicByRoot = new LinkedHashMap<>();
-    private final Map<String, List<ReusableRule>> macroByRoot = new LinkedHashMap<>();
+    private final Map<String, List<IndexedMacroMove>> macroByRoot = new LinkedHashMap<>();
 
     @Override
     public void addAtomicRule(String rootSymbol, RewriteRule rule) {
@@ -20,7 +18,7 @@ public final class RootSymbolTermRuleIndex implements TermRuleIndex {
     }
 
     @Override
-    public void addMacroMove(ReusableRule rule) {
+    public void addMacroMove(IndexedMacroMove rule) {
         macroByRoot.computeIfAbsent(rootSymbol(rule.leftPattern()), ignored -> new ArrayList<>()).add(rule);
     }
 
@@ -31,12 +29,12 @@ public final class RootSymbolTermRuleIndex implements TermRuleIndex {
         List<RewriteRule> atomicCandidates = effectiveQuery.includeAtomicRules()
             ? atomicByRoot.getOrDefault(root, List.of())
             : List.of();
-        List<ReusableRule> macroCandidates = effectiveQuery.includeMacroMoves()
+        List<IndexedMacroMove> macroCandidates = effectiveQuery.includeMacroMoves()
             ? macroByRoot.getOrDefault(root, List.of())
             : List.of();
         int considered = atomicByRoot.values().stream().mapToInt(List::size).sum()
             + macroByRoot.values().stream().mapToInt(List::size).sum();
-        List<ReusableRule> macros = macroCandidates.stream()
+        List<IndexedMacroMove> macros = macroCandidates.stream()
             .filter(rule -> rule.proofStatus().ordinal() >= effectiveQuery.minimumProofStatus().ordinal())
             .filter(rule -> effectiveQuery.domain().isBlank() || domainMatches(rule, effectiveQuery.domain()))
             .filter(rule -> effectiveQuery.goalExpression().isBlank() || goalAware(rule, effectiveQuery.goalExpression()))
@@ -90,12 +88,13 @@ public final class RootSymbolTermRuleIndex implements TermRuleIndex {
         return normalizeRoot(trimmed.replaceAll("[^A-Za-z0-9_].*$", ""));
     }
 
-    private static boolean domainMatches(ReusableRule rule, String domain) {
-        String haystack = (rule.id() + " " + rule.leftPattern() + " " + rule.rightPattern()).toLowerCase(Locale.ROOT);
+    private static boolean domainMatches(IndexedMacroMove rule, String domain) {
+        String haystack = (rule.domain() + " " + rule.id() + " " + rule.leftPattern() + " " + rule.rightPattern())
+            .toLowerCase(Locale.ROOT);
         return haystack.contains(domain.toLowerCase(Locale.ROOT));
     }
 
-    private static boolean goalAware(ReusableRule rule, String goalExpression) {
+    private static boolean goalAware(IndexedMacroMove rule, String goalExpression) {
         String root = rootSymbol(goalExpression);
         return root.isBlank() || root.equals(rootSymbol(rule.rightPattern())) || goalExpression.contains(rule.rightPattern());
     }
