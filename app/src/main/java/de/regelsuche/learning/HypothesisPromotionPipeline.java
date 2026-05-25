@@ -11,9 +11,9 @@ import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 /**
  * Orchestrates the full hypothesis promotion pipeline:
@@ -82,8 +82,10 @@ public class HypothesisPromotionPipeline {
         List<ReusableRule> promotedRules = new ArrayList<>();
         // Collect supporting paths of non-rejected candidates for the promotion step,
         // so rejected rules cannot be re-mined by learningService.learn().
-        Set<String> validatedSupportingIds = new LinkedHashSet<>();
-        List<String> promotionAssumptions = new ArrayList<>();
+        // Track assumptions per path-id so each path only receives the assumptions
+        // inferred from the specific candidate(s) it supports — not assumptions from
+        // unrelated candidates that the path never contributed to.
+        Map<String, List<String>> pathAssumptions = new LinkedHashMap<>();
         boolean anyValidatedForPromotion = false;
 
         for (RuleCandidate candidate : candidates) {
@@ -128,8 +130,11 @@ public class HypothesisPromotionPipeline {
             // Track which paths back this validated candidate for the promotion step.
             if (autoPromote && candidate.proofStatus().ordinal()
                 >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {
-                validatedSupportingIds.addAll(candidate.supportingTransformationIds());
-                promotionAssumptions.addAll(hypothesis.assumptions());
+                List<String> candidateAssumptions = hypothesis.assumptions();
+                for (String pathId : candidate.supportingTransformationIds()) {
+                    pathAssumptions.computeIfAbsent(pathId, k -> new ArrayList<>())
+                        .addAll(candidateAssumptions);
+                }
                 anyValidatedForPromotion = true;
             }
         }
@@ -139,8 +144,8 @@ public class HypothesisPromotionPipeline {
         // rejected rules cannot be inadvertently re-mined and activated.
         if (anyValidatedForPromotion) {
             List<SuccessfulTransformationPath> validatedPaths = paths.stream()
-                .filter(p -> validatedSupportingIds.contains(p.id()))
-                .map(p -> p.withAssumptions(promotionAssumptions))
+                .filter(p -> pathAssumptions.containsKey(p.id()))
+                .map(p -> p.withAssumptions(pathAssumptions.get(p.id())))
                 .toList();
             if (!validatedPaths.isEmpty()) {
                 MacroLearningResult result = learningService.learn(validatedPaths);

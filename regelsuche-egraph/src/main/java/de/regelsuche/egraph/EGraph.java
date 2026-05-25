@@ -108,10 +108,24 @@ public final class EGraph {
 
     /**
      * Walk {@code expression} bottom-up under an explicit assumption context.
+     *
+     * <p>Throws {@link IllegalArgumentException} if the same top-level e-class
+     * already carries a <em>different</em> non-empty assumption fingerprint —
+     * re-adding an expression under a conflicting context would silently collapse
+     * distinct assumption-gated identities.</p>
      */
     public EClassId addExpression(Expr expression, List<String> assumptions) {
         EClassId id = addExpressionInternal(expression);
-        assumptionsByClass.put(unionFind.find(id), AssumptionSignature.ofExpressions(assumptions));
+        EClassId canonical = unionFind.find(id);
+        AssumptionSignature newSig = AssumptionSignature.ofExpressions(assumptions);
+        AssumptionSignature existing = assumptionsByClass.get(canonical);
+        if (existing != null && !existing.fingerprint().isEmpty()
+                && !existing.fingerprint().equals(newSig.fingerprint())) {
+            throw new IllegalArgumentException(
+                "Cannot add expression under a different assumption context: "
+                    + existing.fingerprint() + " vs " + newSig.fingerprint());
+        }
+        assumptionsByClass.put(canonical, newSig);
         return id;
     }
 
@@ -437,6 +451,16 @@ public final class EGraph {
         if (rootLeft.equals(rootRight)) {
             return rootLeft;
         }
+        // Read assumptions BEFORE the union-find merge; after unionFind.union() the
+        // "merged" id resolves to the survivor via find(), so a post-merge read would
+        // always return the survivor's assumptions and the check would be vacuous.
+        AssumptionSignature leftAssumptions = assumptionsFor(rootLeft);
+        AssumptionSignature rightAssumptions = assumptionsFor(rootRight);
+        if (!leftAssumptions.fingerprint().equals(rightAssumptions.fingerprint())) {
+            throw new IllegalStateException(
+                "Congruence closure attempted to merge e-classes with incompatible assumptions: "
+                    + leftAssumptions.fingerprint() + " vs " + rightAssumptions.fingerprint());
+        }
         EClassId survivor = unionFind.union(rootLeft, rootRight);
         EClassId merged = survivor.equals(rootLeft) ? rootRight : rootLeft;
         EClass survivorClass = classes.get(survivor);
@@ -448,11 +472,7 @@ public final class EGraph {
             survivorClass.absorb(mergedClass);
         }
         classes.put(merged, survivorClass);
-        AssumptionSignature survivorAssumptions = assumptionsFor(survivor);
-        AssumptionSignature mergedAssumptions = assumptionsFor(merged);
-        if (!survivorAssumptions.fingerprint().equals(mergedAssumptions.fingerprint())) {
-            survivorAssumptions = AssumptionSignature.merge(survivorAssumptions, mergedAssumptions);
-        }
+        AssumptionSignature survivorAssumptions = survivor.equals(rootLeft) ? leftAssumptions : rightAssumptions;
         assumptionsByClass.put(survivor, survivorAssumptions);
         assumptionsByClass.put(merged, survivorAssumptions);
         canonicalClassCount--;

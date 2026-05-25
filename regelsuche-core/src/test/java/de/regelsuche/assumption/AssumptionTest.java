@@ -35,4 +35,16 @@ class AssumptionTest {
         assertEquals(java.util.List.of("b != 0", "x > 0"), signature.normalizedAssumptions());
         assertEquals("b != 0;x > 0", signature.fingerprint());
     }
+
+    @Test
+    void normalizationPreservesCompoundOperators() {
+        // >  must not match inside >=, and < must not match inside <=.
+        // Without a negative-lookahead guard, "x >= 0" would become "x > = 0".
+        AssumptionSignature sig = AssumptionSignature.ofExpressions(
+            java.util.List.of("x >= 0", "y<=1", "a>b", "c < d")
+        );
+        assertEquals(java.util.List.of("a > b", "c < d", "x >= 0", "y <= 1"),
+            sig.normalizedAssumptions());
+        assertEquals("a > b;c < d;x >= 0;y <= 1", sig.fingerprint());
+    }
 }

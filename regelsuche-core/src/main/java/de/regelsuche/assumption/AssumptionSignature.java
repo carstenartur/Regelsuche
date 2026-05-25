@@ -73,8 +73,8 @@ public record AssumptionSignature(List<String> normalizedAssumptions, String fin
             .replaceAll("\\s*!=\\s*", " != ")
             .replaceAll("\\s*>=\\s*", " >= ")
             .replaceAll("\\s*<=\\s*", " <= ")
-            .replaceAll("\\s*>\\s*", " > ")
-            .replaceAll("\\s*<\\s*", " < ")
+            .replaceAll("\\s*>(?!=)\\s*", " > ")
+            .replaceAll("\\s*<(?!=)\\s*", " < ")
             .trim();
         int notEquals = canonical.indexOf(" != ");
         if (notEquals >= 0) {
