@@ -1,4 +1,4 @@
-# ADR 0001: Physical core/egraph/search/validation/persistence/learning/experiments modules first
+# ADR 0001: Physical core/egraph/search/validation/persistence/learning/experiments/cli modules first
 
 - Status: Accepted
 - Date: 2026-05-25
@@ -43,11 +43,12 @@ verdrahtet bleiben.
 
 ## Consequences
 
-- Core-, E-Graph-, Search-, Validation-, Persistence-, Learning- und Experiment-Code sind nicht mehr nur logisch, sondern auch
+- Core-, E-Graph-, Search-, Validation-, Persistence-, Learning-, Experiment- und CLI-Code sind nicht mehr nur logisch, sondern auch
   durch Gradle getrennt.
 - Core-Logik bleibt isoliert und schneller testbar.
 - Persistence-Konfiguration und checkpointfähige Repositories können ohne Web-/CLI-/Datenbank-Wiring getestet werden.
 - Mining-/Anti-Unification-Primitiven können ohne Web-/CLI-/Discovery-Wiring getestet werden.
 - Benchmark-/Experiment-Primitiven können ohne Web-/CLI-/Persistenz-Wiring getestet werden.
+- CLI-neutrale Command-/Options-Primitiven können ohne App-/Web-Wiring getestet werden.
 - Die obere SCC kann gezielt über Ports aufgelöst werden, ohne die grüne Build-
   Linie zu verlieren.

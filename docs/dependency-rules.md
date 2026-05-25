@@ -19,6 +19,7 @@ regelsuche-search <- regelsuche-experiments
 regelsuche-validation <- regelsuche-learning
 regelsuche-search <- regelsuche-learning
 regelsuche-validation <- regelsuche-experiments
+regelsuche-cli <- app
 ```
 
 - `:regelsuche-core` darf keine Projektabhängigkeiten und keine technischen
@@ -30,6 +31,7 @@ regelsuche-validation <- regelsuche-experiments
 - `:regelsuche-persistence` darf vom Core abhängen und enthält nur einfache Datei-/In-Memory-Ports sowie Konfiguration; Datenbanktreiber bleiben vorerst in `:app`.
 - `:regelsuche-learning` darf von Core, Search und Validation abhängen; Discovery-/Graph-/Inventory-Orchestrierung bleibt außerhalb.
 - `:regelsuche-experiments` darf von Search und Validation abhängen; Web-/CLI-/Persistenzadapter bleiben außerhalb.
+- `:regelsuche-cli` bleibt projektabhängigkeitsfrei; app-spezifisches Routing und Serverstart-Wiring bleiben in `:app`.
 - `:app` ist die Composition Root und darf die Module verdrahten.
 
 ## Zielrichtung für die noch nicht extrahierten Schichten
@@ -76,6 +78,12 @@ Pattern-/Anti-Unification-Typen, `HypothesisRepository`, `RuleCandidateMiner`
 und `SuccessfulTransformationPath`. App-spezifische Discovery-Orchestrierung,
 Graph-Speicherung und Inventory-Promotion bleiben in `:app`, solange die oberen
 SCCs bestehen.
+
+## CLI-Regel
+
+`:regelsuche-cli` enthält nur CLI-neutrale Bausteine wie Command-Registry und
+Optionsparser. Subcommands, die Discovery, Webserver, Persistence oder Proof
+Workbench starten, bleiben im app-spezifischen Router.
 
 ## Experiments-Regel
 

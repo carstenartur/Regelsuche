@@ -13,15 +13,17 @@ Import-Zyklen über die eingeführten Ports aufgelöst sind.
 | `:regelsuche-persistence` | `de.regelsuche.persistence.PersistenceConfig`, `GraphPersistenceMode`; `de.regelsuche.checkpoint` | Persistenz-Konfiguration, checkpointfähige Suchjob-Snapshots und In-Memory-/JSON-Datei-Repositories ohne Datenbanktreiber | `:regelsuche-core` |
 | `:regelsuche-learning` | portable Teile von `de.regelsuche.mining` (`RuleCandidate`, Pattern-/Anti-Unification-Bausteine, `HypothesisRepository`, `RuleCandidateMiner`, `SuccessfulTransformationPath`) | Hypothesis-/Rule-Candidate-Mining und Anti-Unification-Primitiven ohne App-Orchestrierung | `:regelsuche-core`, `:regelsuche-search`, `:regelsuche-validation` |
 | `:regelsuche-experiments` | `de.regelsuche.benchmark` (Benchmark-Kern, Result-DTOs, Report-Renderer, `DiscoveryExperimentRunner`) | Experiment-/Benchmark-Primitiven, Seed-Corpus-Runner-Port und Report-Artefakte ohne App-Orchestrierung | `:regelsuche-search`, `:regelsuche-validation` |
-| `:app` | `de.regelsuche.App`, `cli`, `web`, `api`, orchestration-nahe `search`, app-spezifisches `mining` (`RuleDiscoveryService`, `MacroRuleMiner`), `discovery`, `inventory`, `graph`, app-spezifische `persistence`, `export`, restliches `didactic`, `proof`, `demo`, `equation`, `inequality`, `paths`, `jobs`, app-spezifische `benchmark.BenchmarkSuite`, plus `transform.SymPyTransformationEngine` | Runtime-Wiring, Web/CLI, datenbankgebundene Persistence, Learning/Discovery-Orchestrierung und noch zyklische obere Schichten | `:regelsuche-core`, `:regelsuche-egraph`, `:regelsuche-search`, `:regelsuche-validation`, `:regelsuche-persistence`, `:regelsuche-learning`, `:regelsuche-experiments`, Neo4j/GraalVM/WebAssets |
+| `:regelsuche-cli` | `de.regelsuche.cli.core` | CLI-neutrale Command-Registry und Optionsparser-Primitiven ohne App-/Web-Wiring | keine Projektabhängigkeiten |
+| `:app` | `de.regelsuche.App`, app-spezifisches `cli.CliRouter`, `web`, `api`, orchestration-nahe `search`, app-spezifisches `mining` (`RuleDiscoveryService`, `MacroRuleMiner`), `discovery`, `inventory`, `graph`, app-spezifische `persistence`, `export`, restliches `didactic`, `proof`, `demo`, `equation`, `inequality`, `paths`, `jobs`, app-spezifische `benchmark.BenchmarkSuite`, plus `transform.SymPyTransformationEngine` | Runtime-Wiring, Web/CLI, datenbankgebundene Persistence, Learning/Discovery-Orchestrierung und noch zyklische obere Schichten | `:regelsuche-core`, `:regelsuche-egraph`, `:regelsuche-search`, `:regelsuche-validation`, `:regelsuche-persistence`, `:regelsuche-learning`, `:regelsuche-experiments`, `:regelsuche-cli`, Neo4j/GraalVM/WebAssets |
 
 ## Noch nicht physisch getrennte Zielmodule
 
-Die Zielmodule `regelsuche-web` und `regelsuche-cli` bleiben vorerst in
-`app`, weil der aktuelle Code noch eine obere SCC enthält. `regelsuche-learning`
-existiert bereits für portable Mining-Primitiven; Discovery-Orchestrierung
-(`RuleDiscoveryService`, `MacroRuleMiner`) bleibt bis zur weiteren Entkopplung
-in `app`. `regelsuche-persistence` existiert bereits für Konfiguration und
+Das Zielmodul `regelsuche-web` bleibt vorerst in `app`, weil der aktuelle
+Code noch eine obere SCC enthält. `regelsuche-cli` existiert bereits für
+CLI-neutrale Primitiven; der app-spezifische `CliRouter` bleibt bis zur weiteren
+Entkopplung in `app`. `regelsuche-learning` existiert bereits für portable
+Mining-Primitiven; Discovery-Orchestrierung (`RuleDiscoveryService`,
+`MacroRuleMiner`) bleibt bis zur weiteren Entkopplung in `app`. `regelsuche-persistence` existiert bereits für Konfiguration und
 checkpointfähige Ports; datenbankgebundene App-Adapter bleiben bis zur weiteren
 Entkopplung in `app`:
 
