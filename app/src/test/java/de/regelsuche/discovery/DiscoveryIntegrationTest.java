@@ -1,5 +1,6 @@
 package de.regelsuche.discovery;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,9 +12,18 @@ import de.regelsuche.learning.MacroRuleLearningService;
 import de.regelsuche.mining.HypothesisCandidate;
 import de.regelsuche.mining.InMemoryHypothesisRepository;
 import de.regelsuche.mining.KnownRuleRepository;
+import de.regelsuche.mining.DiscoveryDemos;
+import de.regelsuche.mining.GoalAwareMacroMoveSelector;
 import de.regelsuche.mining.RuleCandidateMiner;
+import de.regelsuche.mining.MacroMoveTransformationEngine;
 import de.regelsuche.mining.SuccessfulTransformationPath;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.List;
 import java.util.Map;
@@ -156,5 +166,64 @@ class DiscoveryIntegrationTest {
             "learning service must produce at least one touched rule");
         assertTrue(result.touchedRules().getFirst().occurrenceCount() >= 3,
             "occurrence count must accumulate all 3 supporting paths");
+    }
+
+    @Test
+    void rationalSimplificationDemoPromotesMacroRule() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        MacroLearningResult result = DiscoveryDemos.promoteRationalSimplification(inventory);
+
+        assertFalse(result.touchedRules().isEmpty(),
+            "rational simplification demo must mine/promote a reusable rule");
+        assertFalse(inventory.findAll().isEmpty(),
+            "promoted rational rule must be present in the inventory");
+    }
+
+    @Test
+    void promotedRationalRuleShortensLaterSearchPath() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        DiscoveryDemos.promoteRationalSimplification(inventory);
+
+        String root = "(x * x) / x";
+        ExpressionScorer scorer = new ExpressionScorer();
+        ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+        SearchProblem atomicOnly = new SearchProblem(
+            root,
+            new AstRewriteTransformationEngine(),
+            scorer,
+            canonicalizer,
+            new SearchHeuristic(1, 80, 1, 4, 80, 20)
+        );
+        boolean atomicFindsXAtDepthOne = new BestFirstSearchStrategy().search(atomicOnly).stream()
+            .anyMatch(state -> state.expression().equals("x"));
+        assertFalse(atomicFindsXAtDepthOne, "atomic-only search should not cancel in one edge");
+
+        MacroMoveTransformationEngine macroEngine = new MacroMoveTransformationEngine(
+            new AstRewriteTransformationEngine(),
+            new GoalAwareMacroMoveSelector(inventory)
+        );
+        SearchProblem withMacro = new SearchProblem(
+            root,
+            macroEngine,
+            scorer,
+            canonicalizer,
+            new SearchHeuristic(1, 80, 1, 4, 80, 20)
+        );
+        assertTrue(new BestFirstSearchStrategy().search(withMacro).stream()
+            .anyMatch(state -> state.expression().equals("x") && state.depth() == 1),
+            "promoted rational macro should shorten later search to one edge");
+    }
+
+    @Test
+    void geometricSeriesDemoCreatesStructuralHypothesisWithWitnesses() {
+        HypothesisCandidate hypothesis = DiscoveryDemos.geometricSeriesHypothesis();
+
+        assertEquals("hyp-geometric-series-structural-recurrence", hypothesis.id());
+        assertEquals(3, hypothesis.supportingPaths().size());
+        assertEquals(3, hypothesis.supportingExpressions().size());
+        assertTrue(hypothesis.parameterRelations().stream()
+            .anyMatch(relation -> relation.contains("S_(n+1)")));
+        assertTrue(hypothesis.assumptions().stream()
+            .anyMatch(assumption -> assumption.contains("closed form not derived yet")));
     }
 }

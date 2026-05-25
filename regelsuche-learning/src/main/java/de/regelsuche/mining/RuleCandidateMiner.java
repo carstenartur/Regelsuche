@@ -35,6 +35,9 @@ public class RuleCandidateMiner {
         Map<String, List<SuccessfulTransformationPath>> clusters = new LinkedHashMap<>();
         for (SuccessfulTransformationPath path : paths) {
             clusters.computeIfAbsent(patternGeneralizer.skeleton(path), key -> new ArrayList<>()).add(path);
+            if (path.rules() != null && !path.rules().isEmpty()) {
+                clusters.computeIfAbsent("rules:" + String.join(">", path.rules()), key -> new ArrayList<>()).add(path);
+            }
         }
 
         Map<String, CandidateBucket> buckets = new LinkedHashMap<>();

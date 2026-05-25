@@ -90,7 +90,7 @@ public class HypothesisPromotionPipeline {
             // Step 2: Compute novelty score (simple heuristic: NEW rules score 1.0,
             // known rules score 0.2).
             double novelty = candidate.status() == RuleStatus.NEW ? 1.0 : 0.2;
-            HypothesisCandidate hypothesis = HypothesisCandidate.from(candidate, novelty);
+            HypothesisCandidate hypothesis = HypothesisCandidate.from(candidate, novelty, paths);
 
             // Step 3: Counterexample search.
             Optional<CounterexampleSearchService.Counterexample> counterexample =

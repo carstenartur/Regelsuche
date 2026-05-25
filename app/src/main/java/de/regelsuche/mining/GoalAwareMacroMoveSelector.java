@@ -4,7 +4,10 @@ import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.inventory.RuleInventoryRepository;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Selects which macro moves from the inventory are appropriate for the
@@ -67,10 +70,19 @@ public class GoalAwareMacroMoveSelector {
      * @return candidate macro rules that may reduce cost for this expression
      */
     public List<ReusableRule> selectFor(String currentExpression) {
+        return selectFor(currentExpression, null);
+    }
+
+    /**
+     * Returns eligible macro rules sorted by score. If {@code goalExpression}
+     * is provided, candidates must also overlap structurally with that target
+     * (or expose tokens that may enable additional rules).
+     */
+    public List<ReusableRule> selectFor(String currentExpression, String goalExpression) {
         if (currentExpression == null || currentExpression.isBlank()) {
             return List.of();
         }
-        List<ReusableRule> selected = new ArrayList<>();
+        List<ScoredMacroMove> selected = new ArrayList<>();
         for (ReusableRule rule : inventory.findAll()) {
             if (!inventory.isEnabled(rule.id())) {
                 continue;
@@ -84,11 +96,47 @@ public class GoalAwareMacroMoveSelector {
             if (rule.occurrenceCount() < minOccurrences) {
                 continue;
             }
-            if (isGoalAligned(rule, currentExpression)) {
-                selected.add(rule);
+            double score = score(rule, currentExpression, goalExpression);
+            if (score > 0.0) {
+                selected.add(new ScoredMacroMove(rule, score));
             }
         }
-        return List.copyOf(selected);
+        selected.sort(Comparator.comparingDouble(ScoredMacroMove::score).reversed());
+        return selected.stream().map(ScoredMacroMove::rule).toList();
+    }
+
+    /** Returns a numeric score for diagnostics and tests; 0 means rejected. */
+    public double score(ReusableRule rule, String currentExpression, String goalExpression) {
+        if (rule == null || currentExpression == null || currentExpression.isBlank()) {
+            return 0.0;
+        }
+        int currentOverlap = structuralOverlap(rule.leftPattern(), currentExpression);
+        if (currentOverlap <= 0) {
+            return 0.0;
+        }
+        int goalOverlap = goalExpression == null || goalExpression.isBlank()
+            ? 0
+            : Math.max(
+                structuralOverlap(rule.rightPattern(), goalExpression),
+                structuralOverlap(rule.leftPattern(), goalExpression)
+            );
+        int namedGoalOverlap = goalExpression == null || goalExpression.isBlank()
+            ? 0
+            : Math.max(
+                namedStructuralOverlap(rule.rightPattern(), goalExpression),
+                namedStructuralOverlap(rule.leftPattern(), goalExpression)
+            );
+        boolean exposesNewApplicableRules = exposesNewApplicableRules(rule, currentExpression);
+        if (goalExpression != null && !goalExpression.isBlank() && namedGoalOverlap <= 0 && !exposesNewApplicableRules) {
+            return 0.0;
+        }
+        double exposureBonus = exposesNewApplicableRules ? 1.0 : 0.0;
+        return (rule.confidenceScore() * 10.0)
+            + Math.max(0.0, rule.averageImprovement())
+            + Math.log1p(rule.occurrenceCount())
+            + currentOverlap
+            + (2.0 * goalOverlap)
+            + exposureBonus;
     }
 
     /**
@@ -100,13 +148,50 @@ public class GoalAwareMacroMoveSelector {
      * spurious matches (every expression "contains" the number 1 or 2).</p>
      */
     private boolean isGoalAligned(ReusableRule rule, String currentExpression) {
-        String pattern = rule.leftPattern();
-        if (pattern == null || pattern.isBlank()) {
-            return false;
+        return structuralOverlap(rule.leftPattern(), currentExpression) > 0;
+    }
+
+    private int structuralOverlap(String pattern, String expression) {
+        if (pattern == null || pattern.isBlank() || expression == null || expression.isBlank()) {
+            return 0;
+        }
+        Set<String> expressionTokens = tokens(expression);
+        int matches = 0;
+        for (String token : tokens(pattern)) {
+            if (expressionTokens.contains(token)) {
+                matches++;
+            }
+        }
+        return matches;
+    }
+
+    private int namedStructuralOverlap(String pattern, String expression) {
+        Set<String> expressionTokens = tokens(expression);
+        int matches = 0;
+        for (String token : tokens(pattern)) {
+            if (!token.startsWith("op:") && expressionTokens.contains(token)) {
+                matches++;
+            }
+        }
+        return matches;
+    }
+
+    private boolean exposesNewApplicableRules(ReusableRule rule, String currentExpression) {
+        Set<String> current = tokens(currentExpression);
+        Set<String> produced = tokens(rule.rightPattern());
+        produced.removeAll(current);
+        return !produced.isEmpty();
+    }
+
+    private Set<String> tokens(String expression) {
+        Set<String> result = new LinkedHashSet<>();
+        for (String operator : List.of("+", "-", "*", "/", "^")) {
+            if (expression.contains(operator)) {
+                result.add("op:" + operator);
+            }
         }
         // Extract significant tokens from pattern (operators and named identifiers only).
-        String[] tokens = pattern.split("[\\s()^+\\-*/,]+");
-        int matches = 0;
+        String[] tokens = expression.split("[\\s()^+\\-*/,]+");
         for (String token : tokens) {
             if (token.isEmpty()) {
                 continue;
@@ -120,10 +205,11 @@ public class GoalAwareMacroMoveSelector {
             if (token.matches("-?\\d+")) {
                 continue;
             }
-            if (currentExpression.contains(token)) {
-                matches++;
-            }
+            result.add(token);
         }
-        return matches > 0;
+        return result;
+    }
+
+    public record ScoredMacroMove(ReusableRule rule, double score) {
     }
 }

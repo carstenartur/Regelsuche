@@ -1,6 +1,7 @@
 package de.regelsuche.api.searchgraph;
 
 import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.mining.MacroMoveExpansion;
 import java.util.List;
 
 /**
@@ -19,7 +20,8 @@ public record SearchGraphEdgeDto(
     int scoreDelta,
     List<String> assumptions,
     List<String> pathIds,
-    boolean equivalencePreserving
+    boolean equivalencePreserving,
+    MacroMoveExpansion macroMoveExpansion
 ) {
     public SearchGraphEdgeDto {
         if (from == null || to == null) {
@@ -30,6 +32,20 @@ public record SearchGraphEdgeDto(
         ruleKind = ruleKind == null ? RewriteKind.NORMALIZE : ruleKind;
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         pathIds = pathIds == null ? List.of() : List.copyOf(pathIds);
+    }
+
+    public SearchGraphEdgeDto(
+        String from,
+        String to,
+        String ruleId,
+        String ruleLatex,
+        RewriteKind ruleKind,
+        int scoreDelta,
+        List<String> assumptions,
+        List<String> pathIds,
+        boolean equivalencePreserving
+    ) {
+        this(from, to, ruleId, ruleLatex, ruleKind, scoreDelta, assumptions, pathIds, equivalencePreserving, null);
     }
 
     /**
@@ -50,7 +66,23 @@ public record SearchGraphEdgeDto(
     ) {
         this(from, to, ruleId,
             de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(ruleId),
-            ruleKind, scoreDelta, assumptions, pathIds, equivalencePreserving);
+            ruleKind, scoreDelta, assumptions, pathIds, equivalencePreserving, null);
+    }
+
+    public SearchGraphEdgeDto(
+        String from,
+        String to,
+        String ruleId,
+        RewriteKind ruleKind,
+        int scoreDelta,
+        List<String> assumptions,
+        List<String> pathIds,
+        boolean equivalencePreserving,
+        MacroMoveExpansion macroMoveExpansion
+    ) {
+        this(from, to, ruleId,
+            de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(ruleId),
+            ruleKind, scoreDelta, assumptions, pathIds, equivalencePreserving, macroMoveExpansion);
     }
 
     /**

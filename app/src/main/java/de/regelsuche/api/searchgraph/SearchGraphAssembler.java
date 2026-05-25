@@ -163,7 +163,8 @@ public final class SearchGraphAssembler {
                 edge.scoreAfter() - edge.scoreBefore(),
                 List.of(),
                 edgePathIds.getOrDefault(key, List.of(edge.pathId() == null ? "" : edge.pathId())),
-                edge.equivalencePreservingByConstruction()
+                edge.equivalencePreservingByConstruction(),
+                edge.macroMoveExpansion()
             ));
         }
 

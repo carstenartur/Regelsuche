@@ -19,6 +19,7 @@ import java.util.List;
  * @param fromExpression    the expression before applying the macro
  * @param toExpression      the expression after applying the macro
  * @param atomicSteps       the original atomic steps compressed by this macro
+ * @param supportingPathIds reconstruction references for the supporting mined paths
  * @param compressionRatio  ratio of atomic steps replaced (≥ 1.0)
  * @param expanded          whether the UI should initially show the expanded view
  */
@@ -27,6 +28,7 @@ public record MacroMoveExpansion(
     String fromExpression,
     String toExpression,
     List<TransformationStep> atomicSteps,
+    List<String> supportingPathIds,
     double compressionRatio,
     boolean expanded
 ) {
@@ -35,16 +37,28 @@ public record MacroMoveExpansion(
             throw new IllegalArgumentException("macroRuleId must not be blank");
         }
         atomicSteps = atomicSteps == null ? List.of() : List.copyOf(atomicSteps);
+        supportingPathIds = supportingPathIds == null ? List.of() : List.copyOf(supportingPathIds);
         if (compressionRatio < 1.0) {
             compressionRatio = 1.0;
         }
+    }
+
+    public MacroMoveExpansion(
+        String macroRuleId,
+        String fromExpression,
+        String toExpression,
+        List<TransformationStep> atomicSteps,
+        double compressionRatio,
+        boolean expanded
+    ) {
+        this(macroRuleId, fromExpression, toExpression, atomicSteps, List.of(), compressionRatio, expanded);
     }
 
     /** Returns a copy with the expanded flag toggled. */
     public MacroMoveExpansion withExpanded(boolean newExpanded) {
         return new MacroMoveExpansion(
             macroRuleId, fromExpression, toExpression,
-            atomicSteps, compressionRatio, newExpanded
+            atomicSteps, supportingPathIds, compressionRatio, newExpanded
         );
     }
 
@@ -74,6 +88,7 @@ public record MacroMoveExpansion(
             from,
             to,
             atomicSteps,
+            candidate.supportingTransformationIds(),
             candidate.compressionRatio(),
             false
         );

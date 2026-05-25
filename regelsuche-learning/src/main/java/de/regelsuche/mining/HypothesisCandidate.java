@@ -4,6 +4,7 @@ import de.regelsuche.validation.CandidateProofStatus;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -100,7 +101,22 @@ public record HypothesisCandidate(
 
     /** Creates a {@link HypothesisCandidate} from a {@link RuleCandidate}. */
     public static HypothesisCandidate from(RuleCandidate candidate, double noveltyScore) {
-        List<ExpressionPair> witnesses = List.of(); // concrete witnesses tracked by id only
+        return from(candidate, noveltyScore, List.of());
+    }
+
+    /** Creates a {@link HypothesisCandidate} and populates concrete witnesses from mined paths. */
+    public static HypothesisCandidate from(
+        RuleCandidate candidate,
+        double noveltyScore,
+        List<SuccessfulTransformationPath> paths
+    ) {
+        Set<String> supportingIds = Set.copyOf(candidate.supportingTransformationIds());
+        List<ExpressionPair> witnesses = paths == null
+            ? List.of()
+            : paths.stream()
+                .filter(path -> supportingIds.contains(path.id()))
+                .map(path -> new ExpressionPair(path.originalExpression(), path.targetExpression()))
+                .toList();
         return new HypothesisCandidate(
             candidate.canonicalHash(),
             candidate.leftPattern(),

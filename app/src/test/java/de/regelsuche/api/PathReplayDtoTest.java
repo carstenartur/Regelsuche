@@ -8,11 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.explain.ExplanationService;
+import de.regelsuche.mining.MacroMoveExpansion;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.transform.RewriteKind;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -108,5 +110,39 @@ class PathReplayDtoTest {
         assertTrue(step.comparatorFlipped());
         assertNotNull(step.changedToSpans());
         assertFalse(step.changedToSpans().isEmpty());
+    }
+
+    @Test
+    void replayStepCarriesCollapsedMacroExpansionWithAtomicSteps() {
+        List<TransformationStep> atomic = List.of(
+            new TransformationStep(0, "A", "mid", "atomic-1", RewriteKind.NORMALIZE, 5, 4, true, ""),
+            new TransformationStep(1, "mid", "B", "atomic-2", RewriteKind.NORMALIZE, 4, 2, true, "")
+        );
+        TransformationStep macroStep = new TransformationStep(
+            0, "A", "B", "macro_demo", RewriteKind.NORMALIZE, 5, 2, true, "macro"
+        );
+        DiscoveredTransformation path = new DiscoveredTransformation(
+            "macro-path",
+            "A",
+            "B",
+            List.of(macroStep),
+            new ExpressionScore(5, 0, 0, 0, 0),
+            new ExpressionScore(2, 0, 0, 0, 0),
+            3,
+            CandidateProofStatus.OBSERVED,
+            Instant.now(),
+            "hash"
+        );
+
+        MacroMoveExpansion expansion = new MacroMoveExpansion(
+            "macro_demo", "A", "B", atomic, List.of("supporting-path"), 2.0, false
+        );
+        PathReplayDto replay = PathReplayDto.from(path, new ExplanationService(), Map.of(0, expansion));
+
+        assertEquals(1, replay.steps().size());
+        PathReplayDto.ReplayStep step = replay.steps().getFirst();
+        assertNotNull(step.macroMoveExpansion());
+        assertFalse(step.macroMoveExpansion().expanded(), "macro replay should be collapsed by default");
+        assertEquals(2, step.macroMoveExpansion().atomicSteps().size());
     }
 }

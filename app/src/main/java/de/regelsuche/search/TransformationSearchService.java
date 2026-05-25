@@ -18,6 +18,8 @@ import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.search.strategy.SearchStrategy;
+import de.regelsuche.mining.MacroMoveExpansion;
+import de.regelsuche.mining.MacroMoveTransformationEngine;
 import de.regelsuche.transform.TransformationEngine;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -125,6 +127,13 @@ public class TransformationSearchService {
             }
             graphStore.saveNode(state.expression(), state.score().weightedTotal());
             if (state.parentExpression() != null && state.appliedRuleId() != null) {
+                MacroMoveExpansion macroExpansion = engine instanceof MacroMoveTransformationEngine macroEngine
+                    ? macroEngine.expansionFor(
+                        state.parentExpression(),
+                        state.expression(),
+                        state.appliedRuleId()
+                    ).orElse(null)
+                    : null;
                 graphStore.saveEdge(new GraphEdge(
                     state.parentExpression(),
                     state.expression(),
@@ -139,7 +148,8 @@ public class TransformationSearchService {
                     state.mayIncreaseComplexity(),
                     state.estimatedCostDelta(),
                     state.equivalencePreservingByConstruction(),
-                    CandidateProofStatus.OBSERVED
+                    CandidateProofStatus.OBSERVED,
+                    macroExpansion
                 ));
             }
             if (state.improvement() > 0) {

@@ -1,5 +1,6 @@
 package de.regelsuche.learning;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -81,6 +82,10 @@ class HypothesisPromotionPipelineTest {
         HypothesisCandidate hyp = result.newHypotheses().getFirst();
         assertNotNull(hyp.id());
         assertFalse(hyp.leftPattern().isBlank());
+        assertEquals(3, hyp.supportingExpressions().size(),
+            "candidate must contain all three concrete binomial witnesses");
+        assertTrue(hyp.supportingExpressions().stream()
+            .anyMatch(pair -> pair.left().equals("(x + 1) ^ 2") && pair.right().equals("1 + 2 * x + x ^ 2")));
     }
 
     @Test
