@@ -169,10 +169,12 @@ tasks.named('processE2eTestResources') {
 
 dependencies {
     e2eTestImplementation 'com.microsoft.playwright:playwright:1.60.0'
-    e2eTestImplementation 'org.testcontainers:testcontainers:2.0.5'
-    e2eTestImplementation 'org.testcontainers:junit-jupiter:2.0.5'
-    dockerE2eTestImplementation 'org.testcontainers:testcontainers:2.0.5'
-    dockerE2eTestImplementation 'org.testcontainers:junit-jupiter:2.0.5'
+    e2eTestImplementation platform(libs.testcontainers.bom)
+    e2eTestImplementation libs.testcontainers.core
+    e2eTestImplementation libs.testcontainers.junit
+    dockerE2eTestImplementation platform(libs.testcontainers.bom)
+    dockerE2eTestImplementation libs.testcontainers.core
+    dockerE2eTestImplementation libs.testcontainers.junit
     dockerE2eTestImplementation 'com.microsoft.playwright:playwright:1.60.0'
     dockerE2eTestImplementation libs.junit.jupiter
     dockerE2eTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'

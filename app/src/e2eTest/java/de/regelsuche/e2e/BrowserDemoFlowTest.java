@@ -479,11 +479,19 @@ class BrowserDemoFlowTest {
         // Force a fresh render so the overlay reflects the latest demo.
         page.locator("#reloadGraph").click();
         boolean interactive = false;
-        try {
-            page.waitForSelector("#graphCanvas .graph-overlay-layer .graph-node-math",
-                new Page.WaitForSelectorOptions().setTimeout(15_000));
+        page.waitForFunction(
+            "() => typeof window.cytoscape === 'function' || window.__cytoscapeFailed === true",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(15_000));
+        Boolean cytoscapeAvailable = (Boolean) page.evaluate(
+            "() => typeof window.cytoscape === 'function' && window.__cytoscapeFailed !== true");
+        if (Boolean.TRUE.equals(cytoscapeAvailable)) {
+            page.waitForSelector("#graphCanvas .graph-overlay-layer .graph-node-math .katex",
+                new Page.WaitForSelectorOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(15_000));
             interactive = true;
-        } catch (RuntimeException ignored) {
+        } else {
             // Cytoscape may be unavailable in restricted sandboxes; we still
             // emit a full-page screenshot so the docs gallery has *some*
             // recording for this demo.
