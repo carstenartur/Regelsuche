@@ -23,7 +23,15 @@ public record SaturationStats(
     Map<String, Integer> appliedRules,
     String extractedBest,
     boolean saturated,
-    Reason stopReason
+    Reason stopReason,
+    long classesScanned,
+    long nodesScanned,
+    long candidateClassesSkipped,
+    long matchesFound,
+    long matcherCacheHits,
+    long matcherCacheMisses,
+    int saturationIterations,
+    int rulesFired
 ) {
 
     /** Why saturation stopped. */
@@ -38,6 +46,36 @@ public record SaturationStats(
 
     public SaturationStats {
         appliedRules = appliedRules == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(appliedRules));
+    }
+
+    public SaturationStats(
+        int eclasses,
+        int enodes,
+        int merges,
+        int iterations,
+        Map<String, Integer> appliedRules,
+        String extractedBest,
+        boolean saturated,
+        Reason stopReason
+    ) {
+        this(
+            eclasses,
+            enodes,
+            merges,
+            iterations,
+            appliedRules,
+            extractedBest,
+            saturated,
+            stopReason,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            iterations,
+            appliedRules == null ? 0 : appliedRules.values().stream().mapToInt(Integer::intValue).sum()
+        );
     }
 
     /** Total number of rule applications across all iterations. */

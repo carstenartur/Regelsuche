@@ -32,6 +32,14 @@ class BenchmarkReportRendererTest {
                 /* eGraphClasses */ 10,
                 /* eGraphNodes */ 20,
                 /* saturationSavings */ 0.5,
+                /* classesScanned */ 30,
+                /* nodesScanned */ 40,
+                /* candidateClassesSkipped */ 15,
+                /* matchesFound */ 7,
+                /* matcherCacheHits */ 5,
+                /* matcherCacheMisses */ 2,
+                /* saturationIterations */ 3,
+                /* rulesFired */ 8,
                 /* learnedRuleUsed */ true,
                 /* exportBundleValid */ true
             ))
@@ -62,7 +70,9 @@ class BenchmarkReportRendererTest {
                 "beam", "x + 0",
                 3, 1, 1, 1, 1, 7L,
                 de.regelsuche.validation.CandidateProofStatus.VALIDATED_BY_EXAMPLES,
-                Boolean.FALSE, 0, 0, 0, 0.0, false, false
+                Boolean.FALSE, 0, 0, 0, 0.0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                false, false
             ))
         );
         String json = new BenchmarkReportRenderer().renderJsonSummary(List.of(scenario));
@@ -78,6 +88,14 @@ class BenchmarkReportRendererTest {
             "summary must include e-graph metrics");
         assertTrue(json.contains("\"saturationSavings\""),
             "summary must include saturationSavings");
+        assertTrue(json.contains("\"classesScanned\"") && json.contains("\"nodesScanned\""),
+            "summary must include scan metrics");
+        assertTrue(json.contains("\"candidateClassesSkipped\"") && json.contains("\"matchesFound\""),
+            "summary must include candidate/match metrics");
+        assertTrue(json.contains("\"matcherCacheHits\"") && json.contains("\"matcherCacheMisses\""),
+            "summary must include matcher cache metrics");
+        assertTrue(json.contains("\"saturationIterations\"") && json.contains("\"rulesFired\""),
+            "summary must include saturation iteration/rule metrics");
         assertTrue(json.contains("\"learnedRuleUsed\""),
             "summary must include learnedRuleUsed");
         assertTrue(json.contains("\"exportBundleValid\""),

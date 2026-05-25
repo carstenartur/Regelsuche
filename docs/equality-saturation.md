@@ -39,6 +39,45 @@ Stats from the most recent saturation are available via
 `EqualitySaturationStrategy.lastStats()` and surfaced in the benchmark
 report.
 
+## Matcher-Indizes & Skalierung
+
+Die Engine nutzt jetzt drei Kernmechanismen, um große E-Graphs nicht
+mehr blind zu scannen:
+
+- direkter `EClassId -> EClass` Lookup (`EGraph.classOrThrow(...)`),
+- `ENodeSignature(symbol, arity)`-Index über Root-Kandidaten
+  (`EGraph.classesWith(...)`, plus Prefix-Lookup für Kategorien wie
+  `num:*`),
+- Worklist/Dirty-EClass-Saturation statt Vollscan pro Iteration.
+
+`EGraphPatternMatcher` memoisiert zusätzlich Matches pro
+`(patternId, eclassId, egraphVersion)`.
+Bei jeder strukturellen E-Graph-Änderung wird die Version erhöht und der
+Matcher-Cache dadurch korrekt invalidiert.
+
+Der Symbol-/Arity-Index verursacht bei sehr kleinen Add/Rebuild-
+Mikrobenchmarks zusätzlichen Buchhaltungsaufwand. Dieser Overhead ist
+bewusst zugunsten größerer Discovery-Läufe akzeptiert: neue JMH-
+Vergleichspunkte (`egraphPatternMatchFullScanLarge` vs.
+`egraphPatternMatchIndexedLarge`) messen den Crossover explizit, indem
+sie denselben großen In-Memory-EGraph einmal per Vollscan und einmal per
+Signaturindex matchen. Die Add/Rebuild-Kurven bleiben durch
+`egraphRebuildSmall`, `egraphAddAndRebuildMedium` und
+`egraphAddAndRebuildLarge` separat sichtbar.
+
+### Verfügbare Metriken
+
+Neben den bisherigen Feldern enthält `SaturationStats` jetzt:
+
+- `classesScanned`
+- `nodesScanned`
+- `candidateClassesSkipped`
+- `matchesFound`
+- `matcherCacheHits`
+- `matcherCacheMisses`
+- `saturationIterations`
+- `rulesFired`
+
 ## When to pick this profile
 
 - Many equivalent rewrites compete; you want to see them all before
@@ -55,10 +94,16 @@ report.
   conditional rewrites yet. See [`limits.md`](limits.md).
 - Memory grows with the number of distinct rewrites; saturate small to
   medium expressions, not 200-term ones.
+- For tiny e-graphs, maintaining matcher indices can be slower than the
+  previous no-index bookkeeping. The intended win is reduced matching
+  work once the graph has many unrelated root symbols/classes; benchmark
+  reports should therefore compare both Add/Rebuild and large matcher
+  scan metrics.
 
 ## Related code & tests
 
-- `app/src/main/java/de/regelsuche/egraph/EGraph.java`
-- `app/src/main/java/de/regelsuche/egraph/EqualitySaturation.java`
-- `app/src/main/java/de/regelsuche/search/strategy/EqualitySaturationStrategy.java`
-- `app/src/test/java/de/regelsuche/egraph/EGraphTest.java`
+- `regelsuche-egraph/src/main/java/de/regelsuche/egraph/EGraph.java`
+- `regelsuche-egraph/src/main/java/de/regelsuche/egraph/EGraphPatternMatcher.java`
+- `regelsuche-egraph/src/main/java/de/regelsuche/egraph/EqualitySaturation.java`
+- `regelsuche-search/src/main/java/de/regelsuche/search/strategy/EqualitySaturationStrategy.java`
+- `regelsuche-egraph/src/test/java/de/regelsuche/egraph/EqualitySaturationScalabilityTest.java`

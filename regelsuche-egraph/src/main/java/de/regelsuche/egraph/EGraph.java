@@ -58,8 +58,16 @@ public final class EGraph {
     private final Map<EClassId, EClass> classes = new HashMap<>();
     /** Hash-cons of canonical e-nodes to their owning class. */
     private final Map<ENode, EClassId> hashCons = new HashMap<>();
+    /** Signature index: symbol/arity → candidate e-classes containing such nodes. */
+    private final Map<ENodeSignature, LinkedHashSet<EClassId>> signatureIndex = new HashMap<>();
     /** Pending unions waiting for the next {@link #rebuild()} call. */
     private final Deque<EClassId> worklist = new ArrayDeque<>();
+    /** E-classes touched by add/union/rebuild, consumed by worklist saturation. */
+    private final LinkedHashSet<EClassId> dirtyClasses = new LinkedHashSet<>();
+    /** Version increments whenever the graph structure changes. */
+    private long version = 0L;
+    /** Number of currently canonical e-classes. */
+    private int canonicalClassCount = 0;
 
     /**
      * Add an e-node. Children must already be present in the graph (use
@@ -76,11 +84,14 @@ public final class EGraph {
         EClassId id = unionFind.makeSet();
         EClass eclass = new EClass(id, canonical);
         classes.put(id, eclass);
-        hashCons.put(canonical, id);
+        canonicalClassCount++;
+        putHashCons(canonical, id);
         // record this node as a parent of each child class.
         for (EClassId child : canonical.children()) {
             classOf(child).addParent(canonical);
         }
+        markDirty(id);
+        bumpVersion();
         return id;
     }
 
@@ -131,14 +142,7 @@ public final class EGraph {
         if (rootA.equals(rootB)) {
             return rootA;
         }
-        EClassId survivor = unionFind.union(rootA, rootB);
-        EClassId merged = survivor.equals(rootA) ? rootB : rootA;
-        // absorb merged's nodes and parents into survivor immediately so
-        // the e-graph stays observable; rebuild() will then re-canonicalize.
-        EClass survivorClass = classes.get(survivor);
-        EClass mergedClass = classes.get(merged);
-        survivorClass.absorb(mergedClass);
-        classes.put(merged, survivorClass);
+        EClassId survivor = mergeClasses(rootA, rootB);
         worklist.add(survivor);
         return survivor;
     }
@@ -175,9 +179,49 @@ public final class EGraph {
         return Collections.unmodifiableList(result);
     }
 
+    /** Direct O(1) lookup of the canonical e-class for {@code id}. */
+    public EClass classOrThrow(EClassId id) {
+        return classOf(id);
+    }
+
+    /** E-graph change counter used to invalidate matcher memoization. */
+    public long version() {
+        return version;
+    }
+
+    /** Signature index lookup for candidate selection in pattern matching. */
+    public Collection<EClassId> classesWith(ENodeSignature signature) {
+        Objects.requireNonNull(signature, "signature");
+        LinkedHashSet<EClassId> indexed = signatureIndex.get(signature);
+        if (indexed == null || indexed.isEmpty()) {
+            return List.of();
+        }
+        return dedupeCanonical(indexed);
+    }
+
+    /** Prefix lookup (e.g. {@code num:*}) for pattern candidate selection. */
+    public Collection<EClassId> classesWithSymbolPrefix(String symbolPrefix, int arity) {
+        Objects.requireNonNull(symbolPrefix, "symbolPrefix");
+        LinkedHashSet<EClassId> hits = new LinkedHashSet<>();
+        for (Map.Entry<ENodeSignature, LinkedHashSet<EClassId>> entry : signatureIndex.entrySet()) {
+            ENodeSignature signature = entry.getKey();
+            if (signature.arity() == arity && signature.symbol().startsWith(symbolPrefix)) {
+                hits.addAll(entry.getValue());
+            }
+        }
+        return dedupeCanonical(hits);
+    }
+
+    /** Consume and clear the set of classes changed since the last call. */
+    public Collection<EClassId> consumeDirtyClasses() {
+        Collection<EClassId> snapshot = dedupeCanonical(dirtyClasses);
+        dirtyClasses.clear();
+        return snapshot;
+    }
+
     /** Number of distinct e-classes (after rebuild). */
     public int classCount() {
-        return classes().size();
+        return canonicalClassCount;
     }
 
     /** Number of distinct e-nodes currently hash-consed. */
@@ -268,9 +312,10 @@ public final class EGraph {
         Map<ENode, EClassId> newParents = new HashMap<>();
         for (ENode parent : new ArrayList<>(eclass.parents())) {
             ENode parentCanonical = parent.canonicalize(unionFind);
-            EClassId hit = hashCons.remove(parent);
+            EClassId hit = removeHashCons(parent);
             if (hit != null) {
-                hashCons.put(parentCanonical, unionFind.find(hit));
+                putHashCons(parentCanonical, unionFind.find(hit));
+                markDirty(hit);
             }
             EClassId alreadyOwned = newParents.get(parentCanonical);
             if (alreadyOwned != null) {
@@ -279,10 +324,7 @@ public final class EGraph {
                 EClassId here = unionFind.find(hit == null ? alreadyOwned : hit);
                 EClassId there = unionFind.find(alreadyOwned);
                 if (!here.equals(there)) {
-                    EClassId survivor = unionFind.union(here, there);
-                    EClassId other = survivor.equals(here) ? there : here;
-                    classes.get(survivor).absorb(classes.get(other));
-                    classes.put(other, classes.get(survivor));
+                    EClassId survivor = mergeClasses(here, there);
                     worklist.add(survivor);
                 }
                 newParents.put(parentCanonical, unionFind.find(here));
@@ -302,14 +344,15 @@ public final class EGraph {
             dedup.add(canonical);
             EClassId owner = hashCons.get(canonical);
             if (owner == null) {
-                hashCons.put(canonical, eclass.id());
+                putHashCons(canonical, eclass.id());
             } else if (!unionFind.find(owner).equals(eclass.id())) {
                 // Two classes claim the same canonical node → congruence.
-                EClassId survivor = unionFind.union(eclass.id(), owner);
+                EClassId survivor = mergeClasses(eclass.id(), owner);
                 worklist.add(survivor);
             }
         }
         eclass.replaceNodes(dedup);
+        markDirty(eclass.id());
     }
 
     private Expr buildExpression(EClassId canonical, Map<EClassId, ENode> bestNode) {
@@ -358,5 +401,82 @@ public final class EGraph {
             builder.append("\n  ").append(eclass);
         }
         return builder.toString();
+    }
+
+    private EClassId mergeClasses(EClassId left, EClassId right) {
+        EClassId rootLeft = unionFind.find(left);
+        EClassId rootRight = unionFind.find(right);
+        if (rootLeft.equals(rootRight)) {
+            return rootLeft;
+        }
+        EClassId survivor = unionFind.union(rootLeft, rootRight);
+        EClassId merged = survivor.equals(rootLeft) ? rootRight : rootLeft;
+        EClass survivorClass = classes.get(survivor);
+        EClass mergedClass = classes.get(merged);
+        if (survivorClass == null || mergedClass == null) {
+            throw new IllegalStateException("Unknown merge classes: " + survivor + " / " + merged);
+        }
+        if (survivorClass != mergedClass) {
+            survivorClass.absorb(mergedClass);
+        }
+        classes.put(merged, survivorClass);
+        canonicalClassCount--;
+        markDirty(survivor);
+        markDirty(merged);
+        bumpVersion();
+        return survivor;
+    }
+
+    private EClassId removeHashCons(ENode node) {
+        EClassId owner = hashCons.remove(node);
+        if (owner != null) {
+            removeSignatureMembership(node, owner);
+        }
+        return owner;
+    }
+
+    private void putHashCons(ENode node, EClassId owner) {
+        EClassId previous = hashCons.put(node, owner);
+        if (previous != null) {
+            removeSignatureMembership(node, previous);
+        }
+        addSignatureMembership(node, owner);
+    }
+
+    private void addSignatureMembership(ENode node, EClassId owner) {
+        ENodeSignature signature = ENodeSignature.of(node);
+        signatureIndex.computeIfAbsent(signature, ignored -> new LinkedHashSet<>())
+            .add(unionFind.find(owner));
+    }
+
+    private void removeSignatureMembership(ENode node, EClassId owner) {
+        ENodeSignature signature = ENodeSignature.of(node);
+        LinkedHashSet<EClassId> owners = signatureIndex.get(signature);
+        if (owners == null) {
+            return;
+        }
+        owners.remove(unionFind.find(owner));
+        owners.remove(owner);
+        if (owners.isEmpty()) {
+            signatureIndex.remove(signature);
+        }
+    }
+
+    private Collection<EClassId> dedupeCanonical(Collection<EClassId> ids) {
+        LinkedHashSet<EClassId> canonical = new LinkedHashSet<>();
+        for (EClassId id : ids) {
+            canonical.add(unionFind.find(id));
+        }
+        List<EClassId> sorted = new ArrayList<>(canonical);
+        Collections.sort(sorted);
+        return Collections.unmodifiableList(sorted);
+    }
+
+    private void markDirty(EClassId id) {
+        dirtyClasses.add(unionFind.find(id));
+    }
+
+    private void bumpVersion() {
+        version++;
     }
 }
