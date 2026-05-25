@@ -41,13 +41,26 @@ public class PatternGeneralizer {
         if (leftPattern.isEmpty() || rightPattern.isEmpty()) {
             return Optional.empty();
         }
-        ParameterRelationMiner.RelationResult relations = relationMiner.mine(state.values);
-        if (relations.isEmpty()) {
+        // Mine integer relations if any integer placeholders exist.
+        ParameterRelationMiner.RelationResult relations = state.values.isEmpty()
+            ? ParameterRelationMiner.RelationResult.empty()
+            : relationMiner.mine(state.values);
+        // Require at least one kind of abstraction: integer relations or expression placeholders.
+        boolean hasIntegerRelation = !relations.isEmpty();
+        boolean hasExpressionPlaceholders = !state.expressionValues.isEmpty();
+        if (!hasIntegerRelation && !hasExpressionPlaceholders) {
             return Optional.empty();
         }
         String left = relations.apply(leftPattern.orElseThrow()).canonicalString();
         String right = relations.apply(rightPattern.orElseThrow()).canonicalString();
-        return Optional.of(new GeneralizedPattern(left, right, state.values, relations.descriptions()));
+        // Build combined descriptions: integer relations + expression placeholder notes.
+        List<String> descriptions = new ArrayList<>(relations.descriptions());
+        for (Map.Entry<String, List<String>> entry : state.expressionValues.entrySet()) {
+            descriptions.add(entry.getKey() + " \u2208 {" + String.join(", ", entry.getValue()) + "}");
+        }
+        return Optional.of(new GeneralizedPattern(
+            left, right, state.values, descriptions, state.expressionValues
+        ));
     }
 
     private Optional<NormalizedNode> generalizeNodes(List<NormalizedNode> nodes, PlaceholderState state) {
@@ -62,8 +75,26 @@ public class PatternGeneralizer {
             state.values.put(placeholder, nodes.stream().map(NormalizedNode::number).toList());
             return Optional.of(NormalizedNode.placeholder(placeholder));
         }
+        // Anti-unification over variables: different variable names become expression placeholders.
+        boolean allVariables = nodes.stream().allMatch(node -> node.kind() == NormalizedNode.Kind.VARIABLE);
+        if (allVariables) {
+            boolean allSameName = nodes.stream().allMatch(n -> first.name().equals(n.name()));
+            if (!allSameName) {
+                String placeholder = state.nextExpressionPlaceholder();
+                state.expressionValues.put(placeholder,
+                    nodes.stream().map(NormalizedNode::canonicalString).distinct().toList());
+                return Optional.of(NormalizedNode.placeholder(placeholder));
+            }
+        }
         boolean sameShape = nodes.stream().allMatch(first::sameShape);
-        if (!sameShape || first.kind() == NormalizedNode.Kind.NUMBER || first.kind() == NormalizedNode.Kind.VARIABLE) {
+        if (!sameShape) {
+            // Anti-unification over subtrees: structurally different subtrees become expression placeholders.
+            String placeholder = state.nextExpressionPlaceholder();
+            state.expressionValues.put(placeholder,
+                nodes.stream().map(NormalizedNode::canonicalString).distinct().toList());
+            return Optional.of(NormalizedNode.placeholder(placeholder));
+        }
+        if (first.kind() == NormalizedNode.Kind.NUMBER || first.kind() == NormalizedNode.Kind.VARIABLE) {
             return Optional.empty();
         }
         List<NormalizedNode> generalizedChildren = new ArrayList<>();
@@ -89,12 +120,21 @@ public class PatternGeneralizer {
     }
 
     private static final class PlaceholderState {
-        private int index;
+        private int integerIndex;
+        private int expressionIndex;
         private final Map<String, List<Integer>> values = new LinkedHashMap<>();
+        private final Map<String, List<String>> expressionValues = new LinkedHashMap<>();
 
         private String nextPlaceholder() {
-            index++;
-            return "N" + index;
+            integerIndex++;
+            return "N" + integerIndex;
+        }
+
+        private String nextExpressionPlaceholder() {
+            // Use single uppercase letters (B, C, D, ...) for expression-level placeholders.
+            // We skip 'A' since ParameterRelationMiner uses 'A' as its canonical parameter name.
+            expressionIndex++;
+            return String.valueOf((char) ('A' + expressionIndex)); // 1→B, 2→C, ...
         }
     }
 }

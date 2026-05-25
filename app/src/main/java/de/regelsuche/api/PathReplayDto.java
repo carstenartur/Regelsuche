@@ -5,8 +5,10 @@ import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.explain.ExplanationService;
 import de.regelsuche.export.MathDiff;
 import de.regelsuche.export.MathPresentation;
+import de.regelsuche.mining.MacroMoveExpansion;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Step-wise replay representation of a {@link DiscoveredTransformation}.
@@ -96,13 +98,45 @@ public record PathReplayDto(
         boolean equivalencePreserving,
         boolean comparatorFlipped,
         List<int[]> changedFromSpans,
-        List<int[]> changedToSpans
+        List<int[]> changedToSpans,
+        MacroMoveExpansion macroMoveExpansion
     ) {
         public ReplayStep {
             changedFromSpans = changedFromSpans == null
                 ? List.of() : List.copyOf(changedFromSpans);
             changedToSpans = changedToSpans == null
                 ? List.of() : List.copyOf(changedToSpans);
+        }
+
+        public ReplayStep(
+            int stepIndex,
+            String fromExpression,
+            String fromLatex,
+            String toExpression,
+            String toLatex,
+            String ruleId,
+            String ruleExplanation,
+            int scoreDelta,
+            boolean equivalencePreserving,
+            boolean comparatorFlipped,
+            List<int[]> changedFromSpans,
+            List<int[]> changedToSpans
+        ) {
+            this(
+                stepIndex,
+                fromExpression,
+                fromLatex,
+                toExpression,
+                toLatex,
+                ruleId,
+                ruleExplanation,
+                scoreDelta,
+                equivalencePreserving,
+                comparatorFlipped,
+                changedFromSpans,
+                changedToSpans,
+                null
+            );
         }
 
         /**
@@ -134,7 +168,8 @@ public record PathReplayDto(
                 equivalencePreserving,
                 MathPresentation.detectComparatorFlip(ruleId, fromExpression, toExpression),
                 MathDiff.diffSpans(fromLatex, toLatex).fromSpans(),
-                MathDiff.diffSpans(fromLatex, toLatex).toSpans()
+                MathDiff.diffSpans(fromLatex, toLatex).toSpans(),
+                null
             );
         }
 
@@ -155,6 +190,14 @@ public record PathReplayDto(
     }
 
     public static PathReplayDto from(DiscoveredTransformation path, ExplanationService explanationService) {
+        return from(path, explanationService, Map.of());
+    }
+
+    public static PathReplayDto from(
+        DiscoveredTransformation path,
+        ExplanationService explanationService,
+        Map<Integer, MacroMoveExpansion> macroExpansionsByStepIndex
+    ) {
         List<TransformationStep> steps = path.steps();
         List<ReplayStep> replaySteps = new ArrayList<>(steps.size());
         for (TransformationStep step : steps) {
@@ -175,7 +218,8 @@ public record PathReplayDto(
                 step.equivalencePreserving(),
                 flipped,
                 diff.fromSpans(),
-                diff.toSpans()
+                diff.toSpans(),
+                macroExpansionsByStepIndex == null ? null : macroExpansionsByStepIndex.get(step.index())
             ));
         }
         return new PathReplayDto(path.id(), replaySteps);

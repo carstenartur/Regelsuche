@@ -2,9 +2,11 @@ package de.regelsuche.api.searchgraph;
 
 import de.regelsuche.api.IdentityReportDto;
 import de.regelsuche.api.PathReplayDto;
+import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.export.layout.MathLayoutJsonWriter;
 import de.regelsuche.json.JsonReader;
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.MacroMoveExpansion;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.MacroRuleCandidate;
 import de.regelsuche.mining.RuleStatus;
@@ -72,6 +74,7 @@ public final class SearchGraphRecordCodec {
             inner.stringArray("assumptions", edge.assumptions());
             inner.stringArray("pathIds", edge.pathIds());
             inner.property("equivalencePreserving", edge.equivalencePreserving());
+            writeMacroExpansion(inner, edge.macroMoveExpansion());
         })));
         writer.array("clusters", w -> dto.clusters().forEach(cluster -> w.objectValue(inner -> {
             inner.property("id", cluster.id());
@@ -114,8 +117,39 @@ public final class SearchGraphRecordCodec {
             inner.property("comparatorFlipped", step.comparatorFlipped());
             writeSpanArray(inner, "changedFromSpans", step.changedFromSpans());
             writeSpanArray(inner, "changedToSpans", step.changedToSpans());
+            writeMacroExpansion(inner, step.macroMoveExpansion());
             MathLayoutJsonWriter.write(inner, "layout", step.layout());
         })));
+    }
+
+    private static void writeMacroExpansion(JsonWriter writer, MacroMoveExpansion expansion) {
+        if (expansion == null) {
+            writer.nullProperty("macroMoveExpansion");
+            return;
+        }
+        writer.object("macroMoveExpansion", macro -> {
+            macro.property("macroRuleId", expansion.macroRuleId());
+            macro.property("fromExpression", expansion.fromExpression());
+            macro.property("toExpression", expansion.toExpression());
+            macro.stringArray("supportingPathIds", expansion.supportingPathIds());
+            macro.property("compressionRatio", expansion.compressionRatio());
+            macro.property("expanded", expansion.expanded());
+            macro.array("atomicSteps", steps -> expansion.atomicSteps().forEach(step -> steps.objectValue(s -> {
+                writeTransformationStep(s, step);
+            })));
+        });
+    }
+
+    private static void writeTransformationStep(JsonWriter writer, TransformationStep step) {
+        writer.property("index", step.index());
+        writer.property("beforeExpression", step.beforeExpression());
+        writer.property("afterExpression", step.afterExpression());
+        writer.property("ruleId", step.ruleId());
+        writer.property("ruleKind", step.ruleKind().name());
+        writer.property("scoreBefore", step.scoreBefore());
+        writer.property("scoreAfter", step.scoreAfter());
+        writer.property("equivalencePreserving", step.equivalencePreserving());
+        writer.property("explanation", step.explanation());
     }
 
     /**
