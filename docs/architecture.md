@@ -7,6 +7,7 @@ sind dort gezogen, wo der aktuelle Code bereits azyklisch und stabil genug ist:
 - `regelsuche-egraph` hängt nur vom Core ab.
 - `regelsuche-search` enthält Suchprofile, Strategien, CostModels und die TranspositionTable-Abstraktion ohne JSON-/Neo4j-Persistenzadapter.
 - `regelsuche-validation` hängt vom Core ab und kapselt die aktuellen Validierungs-/Äquivalenzadapter sowie den gemeinsamen `CandidateProofStatus`.
+- `regelsuche-persistence` enthält persistence-nahe Konfiguration und checkpointfähige JSON-/In-Memory-Ports ohne Datenbanktreiber.
 - `regelsuche-experiments` enthält Benchmark-/Experiment-Primitiven ohne Web-, CLI- oder Persistenzadapter.
 - `app` bleibt die Laufzeit-Hülle für CLI, Web, Persistence, Learning/Discovery und die noch zyklisch gekoppelten oberen Schichten.
 
@@ -16,7 +17,7 @@ Grenzen bereits beim Kompilieren.
 ## Architektur-Leitplanken
 
 - mathematischer Kern bleibt technologie-agnostisch,
-- E-Graph, Search, Validation und Experiments benutzen Core-/Search-Typen über explizite Projektabhängigkeiten,
+- E-Graph, Search, Validation, Persistence und Experiments benutzen Core-/Search-Typen über explizite Projektabhängigkeiten,
 - Infrastruktur bleibt in `app` bzw. in Adapter-Modulen,
 - neue große Komponenten bekommen zuerst stabile Interfaces,
 - Tests sind nach Modul und Laufzeit/Kosten geschichtet.

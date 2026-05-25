@@ -1,4 +1,4 @@
-# ADR 0001: Physical core/egraph/search/validation/experiments modules first
+# ADR 0001: Physical core/egraph/search/validation/persistence/experiments modules first
 
 - Status: Accepted
 - Date: 2026-05-25
@@ -22,6 +22,7 @@ Wir ziehen die bereits azyklischen Grenzen physisch als Gradle-Subprojekte:
 - `:regelsuche-egraph`
 - `:regelsuche-search`
 - `:regelsuche-validation`
+- `:regelsuche-persistence`
 - `:regelsuche-experiments`
 
 Die oberen, noch zyklischen Schichten bleiben in `:app` und werden über die
@@ -41,9 +42,10 @@ verdrahtet bleiben.
 
 ## Consequences
 
-- Core-, E-Graph-, Search-, Validation- und Experiment-Code sind nicht mehr nur logisch, sondern auch
+- Core-, E-Graph-, Search-, Validation-, Persistence- und Experiment-Code sind nicht mehr nur logisch, sondern auch
   durch Gradle getrennt.
 - Core-Logik bleibt isoliert und schneller testbar.
+- Persistence-Konfiguration und checkpointfähige Repositories können ohne Web-/CLI-/Datenbank-Wiring getestet werden.
 - Benchmark-/Experiment-Primitiven können ohne Web-/CLI-/Persistenz-Wiring getestet werden.
 - Die obere SCC kann gezielt über Ports aufgelöst werden, ohne die grüne Build-
   Linie zu verlieren.

@@ -10,6 +10,7 @@ regelsuche-core
   <- regelsuche-egraph
   <- regelsuche-search
   <- regelsuche-validation
+  <- regelsuche-persistence
   <- regelsuche-experiments
   <- app
 regelsuche-egraph <- regelsuche-search
@@ -23,6 +24,7 @@ regelsuche-validation <- regelsuche-experiments
 - `:regelsuche-search` darf vom Core und vom E-Graph-Modul abhängen; JSON-/Neo4j-TranspositionTable-Adapter bleiben außerhalb.
 - `:regelsuche-validation` darf vom Core abhängen; konkrete Validierungsadapter
   dürfen hier zusätzliche technische Libraries kapseln.
+- `:regelsuche-persistence` darf vom Core abhängen und enthält nur einfache Datei-/In-Memory-Ports sowie Konfiguration; Datenbanktreiber bleiben vorerst in `:app`.
 - `:regelsuche-experiments` darf von Search und Validation abhängen; Web-/CLI-/Persistenzadapter bleiben außerhalb.
 - `:app` ist die Composition Root und darf die Module verdrahten.
 
@@ -54,6 +56,14 @@ reinen `TransformationEngine`-/Rewrite-Typen in `:regelsuche-core` liegen.
 `:regelsuche-search` enthält Strategien, Profile, CostModels und die
 `TranspositionTable`-Abstraktion. Technische Speicheradapter (`JsonFileTranspositionTable`,
 `Neo4jTranspositionTable`) bleiben in `:app` bzw. später in `:regelsuche-persistence`.
+
+## Persistence-Regel
+
+`:regelsuche-persistence` enthält persistenznahe, aber leichtgewichtige Bausteine
+(`PersistenceConfig`, `GraphPersistenceMode`, Search-Checkpoint-Port und
+In-Memory-/JSON-Datei-Repository). App-spezifische Composition (`PersistenceContext`)
+und Neo4j-/Graph-/Inventory-Adapter bleiben in `:app`, bis die oberen SCCs
+entkoppelt sind.
 
 ## Experiments-Regel
 

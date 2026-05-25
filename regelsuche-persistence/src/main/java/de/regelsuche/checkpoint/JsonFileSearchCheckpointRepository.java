@@ -1,5 +1,6 @@
 package de.regelsuche.checkpoint;
 
+import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -96,7 +97,7 @@ public class JsonFileSearchCheckpointRepository implements SearchCheckpointRepos
             if (file.getParent() != null) {
                 Files.createDirectories(file.getParent());
             }
-            Files.writeString(file, render(), StandardCharsets.UTF_8);
+            AtomicJsonFile.writeUtf8(file, render());
         } catch (IOException ex) {
             throw new UncheckedIOException("Failed to write checkpoint file " + file, ex);
         }
