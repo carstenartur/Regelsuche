@@ -12,6 +12,24 @@ import org.junit.jupiter.api.Test;
 
 class ArchitectureBoundariesTest {
 
+    @Test
+    void teil0PortInterfacesExist() throws ClassNotFoundException {
+        List<String> ports = List.of(
+            "de.regelsuche.inventory.RuleIndex",
+            "de.regelsuche.search.SearchTraceStore",
+            "de.regelsuche.validation.CounterexampleSearchService",
+            "de.regelsuche.equivalence.PolynomialEquivalenceService",
+            "de.regelsuche.mining.HypothesisRepository",
+            "de.regelsuche.benchmark.DiscoveryExperimentRunner"
+        );
+        for (String fqcn : ports) {
+            Class<?> type = Class.forName(fqcn);
+            assertTrue(type.isInterface(),
+                () -> fqcn + " must be declared as an interface (Teil-0 \"Interfaces zuerst\")");
+        }
+    }
+
+
     private static final Path REPO_ROOT = locateRepoRoot();
 
     @Test
