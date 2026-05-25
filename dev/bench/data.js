@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779697578179,
+  "lastUpdate": 1779701615941,
   "repoUrl": "https://github.com/carstenartur/Regelsuche",
   "entries": {
     "Regelsuche JMH Benchmarks": [
@@ -598,6 +598,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
             "value": 164.2276851946212,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "Copilot",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a0b22a6bda700c1abc55cf77cdb030aff2535ff1",
+          "message": "Improve demo gallery screenshot quality and E2E readiness waits (#46)\n\n* test: target demo gallery screenshots\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/f71c6ddb-0767-441e-8cc4-7436db553174\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n* docs: align demo gallery screenshots\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/f71c6ddb-0767-441e-8cc4-7436db553174\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n* test: relax best path graph node check\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/f71c6ddb-0767-441e-8cc4-7436db553174\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n* test: add e2e ready signal waits\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/f71c6ddb-0767-441e-8cc4-7436db553174\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n---------\n\nCo-authored-by: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>",
+          "timestamp": "2026-05-25T11:32:23+02:00",
+          "tree_id": "26062389f5f5f53c954e8541e9be47ab8f7f5440",
+          "url": "https://github.com/carstenartur/Regelsuche/commit/a0b22a6bda700c1abc55cf77cdb030aff2535ff1"
+        },
+        "date": 1779701614699,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+            "value": 1.1571224672555267,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+            "value": 2.9986815927447594,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+            "value": 4.999093830210249,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+            "value": 1.6449726372534041,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+            "value": 82.38123485062455,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+            "value": 150.98926759466758,
             "unit": "us/op",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
