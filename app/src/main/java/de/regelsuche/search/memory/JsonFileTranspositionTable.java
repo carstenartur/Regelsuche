@@ -1,6 +1,6 @@
 package de.regelsuche.search.memory;
 
-import de.regelsuche.inventory.MiniJson;
+import de.regelsuche.json.MiniJson;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

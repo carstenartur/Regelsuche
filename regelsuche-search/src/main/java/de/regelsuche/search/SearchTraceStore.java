@@ -1,41 +1,29 @@
 package de.regelsuche.search;
 
-import java.util.List;
-import java.util.Optional;
+import de.regelsuche.assumption.AssumptionSignature;
 
 /**
- * Stable port for persisting and retrieving search traces.
+ * Compact port for persisting large search traces.
  *
- * <p>Introduced as part of Teil 0 of the Discovery Epic (issue #41,
- * "Interfaces zuerst"): replay, reporting and experiment-runner features
- * must depend on this abstraction so they can be wired against any
- * concrete backend (in-memory, JSON file, PostgreSQL, Neo4j, …) without
- * leaking infrastructure into the mathematical core.
- *
- * <p>The trace payload is intentionally typed as a free-form record so the
- * port stays infrastructure-agnostic. Concrete trace shapes will be
- * introduced together with the search-trace feature and are not required
- * for Teil 0.
+ * <p>Discovery runs with millions of edges must avoid duplicating expression
+ * strings or rule IDs in every path step. Therefore this store exposes
+ * interning and id-based edge/path APIs that can be backed by compact
+ * encodings.
  */
 public interface SearchTraceStore {
 
-    /** Persist a search trace and return the assigned id. */
-    String store(SearchTraceRecord trace);
+    /** Intern a canonical expression and return a stable numeric id. */
+    long internExpression(String canonicalHash, String canonicalForm);
 
-    /** @return a previously stored trace, if known. */
-    Optional<SearchTraceRecord> findById(String traceId);
+    /** Intern a rule id and return a stable numeric id. */
+    long internRule(String ruleId);
 
-    /** @return all stored traces (typically used for reports/dashboards). */
-    List<SearchTraceRecord> findAll();
+    /** Intern an assumption signature and return a stable numeric id. */
+    long internAssumptions(AssumptionSignature assumptions);
 
-    /**
-     * Minimal envelope for a stored search trace.
-     *
-     * @param id stable identifier assigned by the store
-     * @param description human-readable label
-     * @param payload serialised trace body (JSON, NDJSON, …) — opaque to
-     *     the store
-     */
-    record SearchTraceRecord(String id, String description, String payload) {
-    }
+    /** Add one directed edge in the trace graph and return its id. */
+    long addEdge(long fromExprId, long toExprId, int ruleId, long assumptionsId);
+
+    /** Add one path represented as edge-id sequence and return its id. */
+    long addPath(long[] edgeIds);
 }

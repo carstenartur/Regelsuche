@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -35,10 +36,7 @@ class ArchitectureBoundariesTest {
     @Test
     void physicalArchitectureModulesAreIncluded() throws IOException {
         String settings = Files.readString(REPO_ROOT.resolve("settings.gradle"));
-        for (String module : List.of("regelsuche-core", "regelsuche-egraph",
-            "regelsuche-search", "regelsuche-validation", "regelsuche-persistence",
-            "regelsuche-learning", "regelsuche-experiments", "regelsuche-cli",
-            "regelsuche-discovery", "app")) {
+        for (String module : settingsGradleModules(settings)) {
             assertTrue(settings.contains("'" + module + "'"),
                 () -> "settings.gradle must include :" + module);
             assertTrue(Files.exists(REPO_ROOT.resolve(module).resolve("build.gradle")),
@@ -47,23 +45,36 @@ class ArchitectureBoundariesTest {
     }
 
     @Test
+    void dockerfileCopiesEveryGradleModule() throws IOException {
+        String settings = Files.readString(REPO_ROOT.resolve("settings.gradle"));
+        String dockerfile = Files.readString(REPO_ROOT.resolve("Dockerfile"));
+        for (String module : settingsGradleModules(settings)) {
+            assertTrue(dockerfile.contains("COPY " + module + "/build.gradle ./" + module + "/build.gradle"),
+                () -> "Dockerfile must copy build.gradle for :" + module);
+            assertTrue(dockerfile.contains("COPY " + module + " ./" + module),
+                () -> "Dockerfile must copy sources for :" + module);
+        }
+    }
+
+    @Test
     void physicalModuleDependenciesFollowTeil0Direction() throws IOException {
-        Map<String, List<String>> expectedProjectDependencies = Map.of(
-            "regelsuche-core", List.of(),
-            "regelsuche-egraph", List.of(":regelsuche-core"),
-            "regelsuche-search", List.of(":regelsuche-core", ":regelsuche-egraph"),
-            "regelsuche-validation", List.of(":regelsuche-core"),
-            "regelsuche-persistence", List.of(":regelsuche-core"),
-            "regelsuche-learning", List.of(":regelsuche-core", ":regelsuche-search",
-                ":regelsuche-validation"),
-            "regelsuche-experiments", List.of(":regelsuche-search", ":regelsuche-validation"),
-            "regelsuche-cli", List.of(),
-            "regelsuche-discovery", List.of(":regelsuche-core", ":regelsuche-search",
-                ":regelsuche-validation"),
-            "app", List.of(":regelsuche-core", ":regelsuche-egraph", ":regelsuche-search",
-                ":regelsuche-validation", ":regelsuche-persistence", ":regelsuche-learning",
-                ":regelsuche-experiments", ":regelsuche-cli", ":regelsuche-discovery")
-        );
+        Map<String, List<String>> expectedProjectDependencies = new LinkedHashMap<>();
+        expectedProjectDependencies.put("regelsuche-core", List.of());
+        expectedProjectDependencies.put("regelsuche-egraph", List.of(":regelsuche-core"));
+        expectedProjectDependencies.put("regelsuche-search", List.of(":regelsuche-core", ":regelsuche-egraph"));
+        expectedProjectDependencies.put("regelsuche-validation", List.of(":regelsuche-core"));
+        expectedProjectDependencies.put("regelsuche-persistence", List.of(":regelsuche-core"));
+        expectedProjectDependencies.put("regelsuche-learning", List.of(":regelsuche-core", ":regelsuche-search",
+            ":regelsuche-validation"));
+        expectedProjectDependencies.put("regelsuche-persistence-hibernate", List.of(":regelsuche-persistence",
+            ":regelsuche-learning", ":regelsuche-validation", ":regelsuche-core"));
+        expectedProjectDependencies.put("regelsuche-experiments", List.of(":regelsuche-search", ":regelsuche-validation"));
+        expectedProjectDependencies.put("regelsuche-cli", List.of());
+        expectedProjectDependencies.put("regelsuche-discovery", List.of(":regelsuche-core", ":regelsuche-search",
+            ":regelsuche-validation"));
+        expectedProjectDependencies.put("app", List.of(":regelsuche-core", ":regelsuche-egraph", ":regelsuche-search",
+            ":regelsuche-validation", ":regelsuche-persistence", ":regelsuche-persistence-hibernate",
+            ":regelsuche-learning", ":regelsuche-experiments", ":regelsuche-cli", ":regelsuche-discovery"));
         for (Map.Entry<String, List<String>> entry : expectedProjectDependencies.entrySet()) {
             String build = Files.readString(REPO_ROOT.resolve(entry.getKey()).resolve("build.gradle"));
             List<String> declared = projectDependencyTokens(build);
@@ -167,6 +178,21 @@ class ArchitectureBoundariesTest {
     }
 
     @Test
+    void hibernateInfrastructureLivesOnlyInHibernatePersistenceAdapter() throws IOException {
+        String adapterBuild = Files.readString(REPO_ROOT.resolve("regelsuche-persistence-hibernate/build.gradle"));
+        assertTrue(adapterBuild.contains("libs.hibernate.core"),
+            "regelsuche-persistence-hibernate must own Hibernate dependencies");
+
+        Path adapterRoot = REPO_ROOT.resolve("regelsuche-persistence-hibernate/src/main/java");
+        try (Stream<Path> files = Files.walk(adapterRoot)) {
+            assertTrue(files.filter(path -> path.toString().endsWith(".java"))
+                    .map(path -> readFile(path).contains("org.hibernate") || readFile(path).contains("jakarta.persistence"))
+                    .reduce(false, Boolean::logicalOr),
+                "Hibernate adapter module should contain Hibernate/JPA integration code");
+        }
+    }
+
+    @Test
     void learningKernelHasNoInfrastructureImports() throws IOException {
         List<String> forbiddenTokens = List.of(
             "org.neo4j",
@@ -234,16 +260,30 @@ class ArchitectureBoundariesTest {
             .toList();
     }
 
+    private static List<String> settingsGradleModules(String settingsFileContent) {
+        int includeStart = settingsFileContent.indexOf("include(");
+        int includeEnd = settingsFileContent.indexOf(')', includeStart);
+        assertTrue(includeStart >= 0 && includeEnd > includeStart, "settings.gradle must contain include(...)");
+        return settingsFileContent.substring(includeStart, includeEnd).lines()
+            .map(String::trim)
+            .filter(line -> line.startsWith("'"))
+            .map(line -> line.substring(1, line.indexOf("'", 1)))
+            .toList();
+    }
+
     private static void assertFileHasNoForbiddenToken(Path file, List<String> forbiddenTokens) {
-        String content;
-        try {
-            content = Files.readString(file);
-        } catch (IOException exception) {
-            throw new RuntimeException("Could not read " + file, exception);
-        }
+        String content = readFile(file);
         for (String forbidden : forbiddenTokens) {
             assertFalse(content.contains(forbidden),
                 () -> "Core file must not reference infrastructure token '" + forbidden + "': " + file);
+        }
+    }
+
+    private static String readFile(Path file) {
+        try {
+            return Files.readString(file);
+        } catch (IOException exception) {
+            throw new RuntimeException("Could not read " + file, exception);
         }
     }
 

@@ -1,0 +1,52 @@
+plugins {
+    id 'java-library'
+    id 'jacoco'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    api project(':regelsuche-persistence')
+    api project(':regelsuche-learning')
+    api project(':regelsuche-validation')
+    implementation project(':regelsuche-core')
+    implementation libs.hibernate.core
+    implementation libs.hibernate.search.mapper.orm
+    implementation libs.hibernate.search.backend.lucene
+    implementation libs.hibernate.validator
+    implementation libs.yasson
+    implementation libs.postgresql
+
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestReport')
+}

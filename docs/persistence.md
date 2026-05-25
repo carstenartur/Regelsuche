@@ -6,8 +6,8 @@ Regelsuche separates short-lived search state, compact metadata, text search and
 RAM / EGraph / TranspositionTable
 → active search run only
 
-JSON SearchTraceStore / graph artifacts
-→ large raw traces and lightweight demo exports
+Compact SearchTraceStore / graph artifacts
+→ large raw traces for replay/reporting (id-interned + compact paths)
 
 PostgreSQL + Hibernate ORM
 → experiments, search runs, hypotheses, counterexamples, benchmarks, seeds, reports, proof-job metadata
@@ -71,7 +71,7 @@ docker compose --profile proof-worker up --build
 
 ## Migrations
 
-Versioned SQL migrations live in `app/src/main/resources/db/migration` and are applied by `DatabaseMigrationRunner` before Hibernate ORM starts. The runner records applied versions in `regelsuche_schema_history` and skips already-applied migrations, so repeated startup is safe.
+Versioned SQL migrations live in `regelsuche-persistence-hibernate/src/main/resources/db/migration` and are applied by `DatabaseMigrationRunner` before Hibernate ORM starts. The runner records applied versions in `regelsuche_schema_history` and skips already-applied migrations, so repeated startup is safe.
 
 The migrations create relational tables and JSONB columns for compact metadata. Hibernate Search with the Lucene backend is the primary full-text/facet mechanism; the PostgreSQL `search_vector` migration remains a conservative fallback for direct SQL diagnostics.
 
@@ -98,3 +98,16 @@ Heavy PostgreSQL/Hibernate integration coverage is isolated in Docker E2E tests:
 ```bash
 ./gradlew :app:dockerE2eTest --tests de.regelsuche.dockere2e.HibernateFullModePersistenceTest
 ```
+
+## Compact SearchTraceStore strategy (Discovery Epic Teil 5)
+
+Search traces for large discovery runs are persisted in a dedicated compact store:
+
+- **Hash-consing:** expressions, rule ids and assumption signatures are interned once.
+- **Edges:** store only numeric references (`fromExprId`, `toExprId`, `ruleId`, `assumptionsId`).
+- **Paths:** top-k hot paths may stay as raw edge-id arrays; remaining paths use
+  **delta + varint encoding**.
+- **Replay:** compressed paths are decoded back to edge-id sequences and then expanded via intern tables.
+
+This removes JSON-only duplication as the limiting factor for large discovery spaces
+and keeps replay/report generation reconstructable.

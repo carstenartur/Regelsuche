@@ -1,7 +1,7 @@
 package de.regelsuche.proof;
 
 import de.regelsuche.assumption.Assumption;
-import de.regelsuche.inventory.MiniJson;
+import de.regelsuche.json.MiniJson;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
