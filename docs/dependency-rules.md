@@ -121,6 +121,10 @@ Abhängigkeit genutzt werden (statt konkrete Backends direkt zu importieren):
 | `SearchTraceStore` | `de.regelsuche.search` | Persistenz von Search-Traces für Replay und Reports. |
 | `CounterexampleSearchService` | `de.regelsuche.validation` | Suche nach Gegenbeispielen zu Kandidaten-Äquivalenzen. |
 | `PolynomialEquivalenceService` | `de.regelsuche.equivalence` | Spezialisierte Äquivalenzprüfung für Polynome. |
+| `CompletionService` | `de.regelsuche.validation` | Knuth-Bendix-Completion-/Konfluenzberichte als Port. |
+| `CriticalPairService` | `de.regelsuche.validation` | Kritische-Paar-Analyse als separater Port. |
+| `NumericRelationService` | `de.regelsuche.validation` | PSLQ-/numerische Relationshypothesen als Port (kein Beweis). |
+| `MathematicalAlgorithmRegistry` | `de.regelsuche.validation` | Konfigurations-/Budget-Registry für einzeln aktivierbare Mathe-Algorithmen. |
 | `HypothesisRepository` | `de.regelsuche.mining` | Persistenz gemeinter Hypothesen vor Promotion zu reusable rules. |
 | `DiscoveryExperimentRunner` | `de.regelsuche.benchmark` | Reproduzierbare Discovery-Experimente über ein Seed-Corpus. |
 

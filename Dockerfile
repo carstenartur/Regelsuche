@@ -13,6 +13,8 @@ COPY regelsuche-core/build.gradle ./regelsuche-core/build.gradle
 COPY regelsuche-egraph/build.gradle ./regelsuche-egraph/build.gradle
 COPY regelsuche-search/build.gradle ./regelsuche-search/build.gradle
 COPY regelsuche-validation/build.gradle ./regelsuche-validation/build.gradle
+COPY regelsuche-math-algorithms/build.gradle ./regelsuche-math-algorithms/build.gradle
+COPY regelsuche-math-jas/build.gradle ./regelsuche-math-jas/build.gradle
 COPY regelsuche-persistence/build.gradle ./regelsuche-persistence/build.gradle
 COPY regelsuche-persistence-hibernate/build.gradle ./regelsuche-persistence-hibernate/build.gradle
 COPY regelsuche-learning/build.gradle ./regelsuche-learning/build.gradle
@@ -32,6 +34,8 @@ COPY regelsuche-core ./regelsuche-core
 COPY regelsuche-egraph ./regelsuche-egraph
 COPY regelsuche-search ./regelsuche-search
 COPY regelsuche-validation ./regelsuche-validation
+COPY regelsuche-math-algorithms ./regelsuche-math-algorithms
+COPY regelsuche-math-jas ./regelsuche-math-jas
 COPY regelsuche-persistence ./regelsuche-persistence
 COPY regelsuche-persistence-hibernate ./regelsuche-persistence-hibernate
 COPY regelsuche-learning ./regelsuche-learning

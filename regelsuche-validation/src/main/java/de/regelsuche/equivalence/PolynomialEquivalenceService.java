@@ -5,7 +5,7 @@ package de.regelsuche.equivalence;
  *
  * <p>Introduced as part of Teil 0 of the Discovery Epic (issue #41,
  * "Interfaces zuerst"): polynomial-specific equivalence checks (canonical
- * expansion, Gröbner-basis style reduction, etc.) require a dedicated
+ * expansion, Gröbner-basis ideal reduction, etc.) require a dedicated
  * interface so search, validation and discovery features can depend on
  * the port without pulling in a concrete CAS implementation.
  *
