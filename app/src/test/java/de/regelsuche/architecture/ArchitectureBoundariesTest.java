@@ -36,14 +36,23 @@ class ArchitectureBoundariesTest {
     @Test
     void physicalArchitectureModulesAreIncluded() throws IOException {
         String settings = Files.readString(REPO_ROOT.resolve("settings.gradle"));
-        for (String module : List.of("regelsuche-core", "regelsuche-egraph",
-            "regelsuche-search", "regelsuche-validation", "regelsuche-persistence",
-            "regelsuche-persistence-hibernate", "regelsuche-learning", "regelsuche-experiments",
-            "regelsuche-cli", "regelsuche-discovery", "app")) {
+        for (String module : settingsGradleModules(settings)) {
             assertTrue(settings.contains("'" + module + "'"),
                 () -> "settings.gradle must include :" + module);
             assertTrue(Files.exists(REPO_ROOT.resolve(module).resolve("build.gradle")),
                 () -> "Expected Gradle build file for :" + module);
+        }
+    }
+
+    @Test
+    void dockerfileCopiesEveryGradleModule() throws IOException {
+        String settings = Files.readString(REPO_ROOT.resolve("settings.gradle"));
+        String dockerfile = Files.readString(REPO_ROOT.resolve("Dockerfile"));
+        for (String module : settingsGradleModules(settings)) {
+            assertTrue(dockerfile.contains("COPY " + module + "/build.gradle ./" + module + "/build.gradle"),
+                () -> "Dockerfile must copy build.gradle for :" + module);
+            assertTrue(dockerfile.contains("COPY " + module + " ./" + module),
+                () -> "Dockerfile must copy sources for :" + module);
         }
     }
 
@@ -248,6 +257,17 @@ class ArchitectureBoundariesTest {
             .filter(line -> line.contains("project(':"))
             .map(line -> line.substring(line.indexOf("project(':") + "project('".length()))
             .map(token -> token.substring(0, token.indexOf("')")))
+            .toList();
+    }
+
+    private static List<String> settingsGradleModules(String settingsFileContent) {
+        int includeStart = settingsFileContent.indexOf("include(");
+        int includeEnd = settingsFileContent.indexOf(')', includeStart);
+        assertTrue(includeStart >= 0 && includeEnd > includeStart, "settings.gradle must contain include(...)");
+        return settingsFileContent.substring(includeStart, includeEnd).lines()
+            .map(String::trim)
+            .filter(line -> line.startsWith("'"))
+            .map(line -> line.substring(1, line.indexOf("'", 1)))
             .toList();
     }
 
