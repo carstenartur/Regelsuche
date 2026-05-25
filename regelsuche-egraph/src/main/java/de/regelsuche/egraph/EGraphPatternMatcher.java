@@ -2,6 +2,7 @@ package de.regelsuche.egraph;
 
 import de.regelsuche.transform.PatternExpr;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -29,6 +30,19 @@ import java.util.Set;
  */
 public final class EGraphPatternMatcher {
 
+    private record MatchCacheKey(String patternId, EClassId root, long version) {
+    }
+
+    public record MatcherStats(
+        long classesScanned,
+        long nodesScanned,
+        long candidateClassesSkipped,
+        long matchesFound,
+        long matcherCacheHits,
+        long matcherCacheMisses
+    ) {
+    }
+
     /**
      * One successful match: the e-class the pattern root anchored on,
      * plus the placeholder bindings — each placeholder maps to the
@@ -41,6 +55,14 @@ public final class EGraphPatternMatcher {
     }
 
     private final EGraph eGraph;
+    private final Map<MatchCacheKey, List<Map<String, EClassId>>> matchCache = new HashMap<>();
+    private long cacheVersion = -1L;
+    private long classesScanned = 0L;
+    private long nodesScanned = 0L;
+    private long candidateClassesSkipped = 0L;
+    private long matchesFound = 0L;
+    private long matcherCacheHits = 0L;
+    private long matcherCacheMisses = 0L;
 
     public EGraphPatternMatcher(EGraph eGraph) {
         this.eGraph = eGraph;
@@ -48,16 +70,24 @@ public final class EGraphPatternMatcher {
 
     /** Every {@link Match} of {@code pattern} anywhere in the graph. */
     public List<Match> matchAll(PatternExpr pattern) {
+        return matchAll(pattern.toString(), pattern, null);
+    }
+
+    /** Every {@link Match} of {@code pattern} on the given candidate roots. */
+    public List<Match> matchAll(String patternId, PatternExpr pattern, Collection<EClassId> candidates) {
+        clearCacheIfVersionChanged();
         List<Match> results = new ArrayList<>();
         // De-duplicate matches sharing the same root + bindings — multiple
         // e-nodes inside the same class can produce the same logical match.
         Set<String> seen = new LinkedHashSet<>();
-        for (EClass eclass : eGraph.classes()) {
-            EClassId rootId = eclass.id();
-            for (Map<String, EClassId> bindings : matchInClass(pattern, rootId)) {
+        Collection<EClassId> roots = selectCandidateRoots(pattern, candidates);
+        classesScanned += roots.size();
+        for (EClassId rootId : roots) {
+            for (Map<String, EClassId> bindings : matchInClassMemoized(patternId, pattern, rootId)) {
                 String key = rootId + "|" + canonicalBindingsKey(bindings);
                 if (seen.add(key)) {
                     results.add(new Match(rootId, bindings));
+                    matchesFound++;
                 }
             }
         }
@@ -94,8 +124,9 @@ public final class EGraphPatternMatcher {
         }
         if (pattern instanceof PatternExpr.LiteralNumber literal) {
             String symbol = "num:" + formatNumber(literal.value());
-            EClass eclass = classOrThrow(canonical);
+            EClass eclass = eGraph.classOrThrow(canonical);
             for (ENode node : eclass.nodes()) {
+                nodesScanned++;
                 if (node.isLeaf() && node.symbol().equals(symbol)) {
                     return List.of(bindings);
                 }
@@ -119,9 +150,10 @@ public final class EGraphPatternMatcher {
         List<PatternExpr> argumentPatterns,
         Map<String, EClassId> bindings
     ) {
-        EClass eclass = classOrThrow(targetClass);
+        EClass eclass = eGraph.classOrThrow(targetClass);
         List<Map<String, EClassId>> results = new ArrayList<>();
         for (ENode node : eclass.nodes()) {
+            nodesScanned++;
             if (!node.symbol().equals(expectedSymbol) || node.children().size() != argumentPatterns.size()) {
                 continue;
             }
@@ -142,13 +174,103 @@ public final class EGraphPatternMatcher {
         return results;
     }
 
-    private EClass classOrThrow(EClassId id) {
-        for (EClass eclass : eGraph.classes()) {
-            if (eclass.id().equals(id)) {
-                return eclass;
+    private List<Map<String, EClassId>> matchInClassMemoized(String patternId, PatternExpr pattern, EClassId rootId) {
+        MatchCacheKey key = new MatchCacheKey(patternId, eGraph.find(rootId), eGraph.version());
+        List<Map<String, EClassId>> hit = matchCache.get(key);
+        if (hit != null) {
+            matcherCacheHits++;
+            return hit;
+        }
+        matcherCacheMisses++;
+        List<Map<String, EClassId>> computed = List.copyOf(matchInClass(pattern, rootId));
+        matchCache.put(key, computed);
+        return computed;
+    }
+
+    private Collection<EClassId> selectCandidateRoots(PatternExpr pattern, Collection<EClassId> candidates) {
+        Collection<EClassId> base;
+        if (candidates == null || candidates.isEmpty()) {
+            List<EClassId> all = new ArrayList<>();
+            for (EClass eClass : eGraph.classes()) {
+                all.add(eClass.id());
+            }
+            base = all;
+        } else {
+            base = candidates;
+        }
+        Collection<EClassId> signatureCandidates = candidatesForPatternRoot(pattern);
+        if (signatureCandidates == null) {
+            return canonicalize(base);
+        }
+        Set<EClassId> bySignature = new LinkedHashSet<>(canonicalize(signatureCandidates));
+        List<EClassId> filtered = new ArrayList<>();
+        for (EClassId root : canonicalize(base)) {
+            if (bySignature.contains(root)) {
+                filtered.add(root);
+            } else {
+                candidateClassesSkipped++;
             }
         }
-        throw new IllegalStateException("Unknown e-class " + id);
+        return filtered;
+    }
+
+    private Collection<EClassId> candidatesForPatternRoot(PatternExpr pattern) {
+        if (pattern instanceof PatternExpr.Placeholder) {
+            return null;
+        }
+        if (pattern instanceof PatternExpr.Operation operation) {
+            return eGraph.classesWith(new ENodeSignature("op:" + operation.operator().name(), 2));
+        }
+        if (pattern instanceof PatternExpr.Function function) {
+            return eGraph.classesWith(new ENodeSignature("fn:" + function.name(), function.arguments().size()));
+        }
+        if (pattern instanceof PatternExpr.LiteralNumber literal) {
+            String symbol = "num:" + formatNumber(literal.value());
+            Collection<EClassId> exact = eGraph.classesWith(new ENodeSignature(symbol, 0));
+            if (!exact.isEmpty()) {
+                return exact;
+            }
+            return eGraph.classesWithSymbolPrefix("num:", 0);
+        }
+        return null;
+    }
+
+    private List<EClassId> canonicalize(Collection<EClassId> classes) {
+        LinkedHashSet<EClassId> canonical = new LinkedHashSet<>();
+        for (EClassId id : classes) {
+            canonical.add(eGraph.find(id));
+        }
+        List<EClassId> sorted = new ArrayList<>(canonical);
+        Collections.sort(sorted);
+        return sorted;
+    }
+
+    public MatcherStats stats() {
+        return new MatcherStats(
+            classesScanned,
+            nodesScanned,
+            candidateClassesSkipped,
+            matchesFound,
+            matcherCacheHits,
+            matcherCacheMisses
+        );
+    }
+
+    public void resetStats() {
+        classesScanned = 0L;
+        nodesScanned = 0L;
+        candidateClassesSkipped = 0L;
+        matchesFound = 0L;
+        matcherCacheHits = 0L;
+        matcherCacheMisses = 0L;
+    }
+
+    private void clearCacheIfVersionChanged() {
+        long currentVersion = eGraph.version();
+        if (cacheVersion != currentVersion) {
+            matchCache.clear();
+            cacheVersion = currentVersion;
+        }
     }
 
     private String canonicalBindingsKey(Map<String, EClassId> bindings) {

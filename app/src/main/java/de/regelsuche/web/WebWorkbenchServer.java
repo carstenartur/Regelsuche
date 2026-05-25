@@ -2056,6 +2056,14 @@ public class WebWorkbenchServer {
                         r.property("prunedStates", row.prunedStates());
                         r.property("eGraphClasses", row.eGraphClasses());
                         r.property("eGraphNodes", row.eGraphNodes());
+                        r.property("classesScanned", row.classesScanned());
+                        r.property("nodesScanned", row.nodesScanned());
+                        r.property("candidateClassesSkipped", row.candidateClassesSkipped());
+                        r.property("matchesFound", row.matchesFound());
+                        r.property("matcherCacheHits", row.matcherCacheHits());
+                        r.property("matcherCacheMisses", row.matcherCacheMisses());
+                        r.property("saturationIterations", row.saturationIterations());
+                        r.property("rulesFired", row.rulesFired());
                         r.property("saturationSavings", row.saturationSavings());
                         r.property("learnedRuleUsed", row.learnedRuleUsed());
                         r.property("exportBundleValid", row.exportBundleValid());

@@ -39,6 +39,35 @@ Stats from the most recent saturation are available via
 `EqualitySaturationStrategy.lastStats()` and surfaced in the benchmark
 report.
 
+## Matcher-Indizes & Skalierung
+
+Die Engine nutzt jetzt drei Kernmechanismen, um große E-Graphs nicht
+mehr blind zu scannen:
+
+- direkter `EClassId -> EClass` Lookup (`EGraph.classOrThrow(...)`),
+- `ENodeSignature(symbol, arity)`-Index über Root-Kandidaten
+  (`EGraph.classesWith(...)`, plus Prefix-Lookup für Kategorien wie
+  `num:*`),
+- Worklist/Dirty-EClass-Saturation statt Vollscan pro Iteration.
+
+`EGraphPatternMatcher` memoisiert zusätzlich Matches pro
+`(patternId, eclassId, egraphVersion)`.
+Bei jeder strukturellen E-Graph-Änderung wird die Version erhöht und der
+Matcher-Cache dadurch korrekt invalidiert.
+
+### Verfügbare Metriken
+
+Neben den bisherigen Feldern enthält `SaturationStats` jetzt:
+
+- `classesScanned`
+- `nodesScanned`
+- `candidateClassesSkipped`
+- `matchesFound`
+- `matcherCacheHits`
+- `matcherCacheMisses`
+- `saturationIterations`
+- `rulesFired`
+
 ## When to pick this profile
 
 - Many equivalent rewrites compete; you want to see them all before
@@ -58,7 +87,8 @@ report.
 
 ## Related code & tests
 
-- `app/src/main/java/de/regelsuche/egraph/EGraph.java`
-- `app/src/main/java/de/regelsuche/egraph/EqualitySaturation.java`
-- `app/src/main/java/de/regelsuche/search/strategy/EqualitySaturationStrategy.java`
-- `app/src/test/java/de/regelsuche/egraph/EGraphTest.java`
+- `regelsuche-egraph/src/main/java/de/regelsuche/egraph/EGraph.java`
+- `regelsuche-egraph/src/main/java/de/regelsuche/egraph/EGraphPatternMatcher.java`
+- `regelsuche-egraph/src/main/java/de/regelsuche/egraph/EqualitySaturation.java`
+- `regelsuche-search/src/main/java/de/regelsuche/search/strategy/EqualitySaturationStrategy.java`
+- `regelsuche-egraph/src/test/java/de/regelsuche/egraph/EqualitySaturationScalabilityTest.java`

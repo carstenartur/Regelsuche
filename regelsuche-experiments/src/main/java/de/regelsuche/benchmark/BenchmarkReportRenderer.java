@@ -28,13 +28,14 @@ public final class BenchmarkReportRenderer {
         out.append("Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt ")
             .append("neben den klassischen Suchmetriken auch Qualitätsmetriken: ob das erwartete ")
             .append("Ergebnis getroffen wurde, wie viele Zustände geprunet wurden, e-Graph-Größe, ")
-            .append("Saturation-Einsparungen, ob eine gelernte Makroregel beteiligt war und ob das ")
+            .append("Matcher-Scan-/Cache-Metriken, Saturation-Einsparungen, ob eine gelernte ")
+            .append("Makroregel beteiligt war und ob das ")
             .append("Export-Bundle für diese Zeile gültig ist.\n\n");
         out.append("**Ampel:** ✅ OK · ⚠️ WARN · ❌ FAIL\n\n");
         for (BenchmarkScenarioResult scenario : scenarios) {
             out.append("## ").append(scenario.name()).append("\n\n");
-            out.append("| Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Sat-Sparung | Lernregel | Proof | Export |\n");
-            out.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+            out.append("| Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |\n");
+            out.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
             for (SearchBenchmarkResult row : scenario.results()) {
                 out.append("| ").append(escape(row.strategyName()))
                     .append(" | ").append(escape(row.expression()))
@@ -46,6 +47,14 @@ public final class BenchmarkReportRenderer {
                     .append(" | ").append(row.prunedStates())
                     .append(" | ").append(row.eGraphClasses())
                     .append(" | ").append(row.eGraphNodes())
+                    .append(" | ").append(row.classesScanned())
+                    .append(" | ").append(row.nodesScanned())
+                    .append(" | ").append(row.candidateClassesSkipped())
+                    .append(" | ").append(row.matchesFound())
+                    .append(" | ").append(row.matcherCacheHits())
+                    .append(" | ").append(row.matcherCacheMisses())
+                    .append(" | ").append(row.saturationIterations())
+                    .append(" | ").append(row.rulesFired())
                     .append(" | ").append(String.format(Locale.ROOT, "%.2f", row.saturationSavings()))
                     .append(" | ").append(row.learnedRuleUsed() ? "✓" : "–")
                     .append(" | ").append(row.proofStatus().name())
@@ -79,6 +88,14 @@ public final class BenchmarkReportRenderer {
                         r.property("prunedStates", row.prunedStates());
                         r.property("eGraphClasses", row.eGraphClasses());
                         r.property("eGraphNodes", row.eGraphNodes());
+                        r.property("classesScanned", row.classesScanned());
+                        r.property("nodesScanned", row.nodesScanned());
+                        r.property("candidateClassesSkipped", row.candidateClassesSkipped());
+                        r.property("matchesFound", row.matchesFound());
+                        r.property("matcherCacheHits", row.matcherCacheHits());
+                        r.property("matcherCacheMisses", row.matcherCacheMisses());
+                        r.property("saturationIterations", row.saturationIterations());
+                        r.property("rulesFired", row.rulesFired());
                         r.property("saturationSavings", row.saturationSavings());
                         r.property("learnedRuleUsed", row.learnedRuleUsed());
                         r.property("proofStatus", row.proofStatus().name());

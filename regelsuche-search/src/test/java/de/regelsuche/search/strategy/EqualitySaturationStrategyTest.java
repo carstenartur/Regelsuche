@@ -114,6 +114,14 @@ class EqualitySaturationStrategyTest {
         assertTrue(stats.iterations() >= 1, "stats.iterations() must be populated");
         assertNotNull(stats.appliedRules(), "stats.appliedRules() must be populated");
         assertNotNull(stats.extractedBest(), "stats.extractedBest() must be populated");
+        assertTrue(stats.classesScanned() >= 0, "stats.classesScanned() must be populated");
+        assertTrue(stats.nodesScanned() >= 0, "stats.nodesScanned() must be populated");
+        assertTrue(stats.matcherCacheHits() >= 0, "stats.matcherCacheHits() must be populated");
+        assertTrue(stats.matcherCacheMisses() >= 0, "stats.matcherCacheMisses() must be populated");
+        assertEquals(stats.iterations(), stats.saturationIterations(),
+            "legacy and explicit saturation iteration counters must agree");
+        assertEquals(stats.totalApplications(), stats.rulesFired(),
+            "rulesFired must mirror appliedRules totals");
         // Aggregated stats must be self-consistent.
         assertEquals(stats.totalApplications(),
             stats.appliedRules().values().stream().mapToInt(Integer::intValue).sum());

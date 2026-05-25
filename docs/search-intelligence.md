@@ -67,3 +67,16 @@ see [`macro-rules.md`](macro-rules.md) for how they're promoted.
 - [`equality-saturation.md`](equality-saturation.md) — the EGraph layer.
 - [`didactic-ranking.md`](didactic-ranking.md) — how `TEACHING_FRIENDLY`
   ranks alternative paths.
+
+## Equality-Saturation Runtime-Metriken
+
+Für `EQUALITY_SATURATION` werden zusätzlich zu den klassischen
+Suchmetriken auch Matching-/Saturation-Metriken reportet:
+
+- `classesScanned`, `nodesScanned`, `candidateClassesSkipped`
+- `matchesFound`
+- `matcherCacheHits`, `matcherCacheMisses`
+- `saturationIterations`, `rulesFired`
+
+Diese Felder sind in `SaturationStats` sowie in den Benchmark-JSON/MD
+Artefakten enthalten.

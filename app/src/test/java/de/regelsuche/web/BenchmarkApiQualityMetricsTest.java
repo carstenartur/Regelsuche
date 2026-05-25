@@ -54,6 +54,14 @@ class BenchmarkApiQualityMetricsTest {
             "benchmark JSON must include prunedStates");
         assertTrue(body.contains("\"eGraphClasses\"") && body.contains("\"eGraphNodes\""),
             "benchmark JSON must include e-graph size");
+        assertTrue(body.contains("\"classesScanned\"") && body.contains("\"nodesScanned\""),
+            "benchmark JSON must include matcher scan metrics");
+        assertTrue(body.contains("\"candidateClassesSkipped\"") && body.contains("\"matchesFound\""),
+            "benchmark JSON must include matcher candidate/match metrics");
+        assertTrue(body.contains("\"matcherCacheHits\"") && body.contains("\"matcherCacheMisses\""),
+            "benchmark JSON must include matcher cache metrics");
+        assertTrue(body.contains("\"saturationIterations\"") && body.contains("\"rulesFired\""),
+            "benchmark JSON must include saturation iteration/rule metrics");
         assertTrue(body.contains("\"saturationSavings\""),
             "benchmark JSON must include saturationSavings");
         assertTrue(body.contains("\"learnedRuleUsed\""),

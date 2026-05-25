@@ -77,6 +77,14 @@ public class SearchBenchmark {
                 int eGraphClasses = 0;
                 int eGraphNodes = 0;
                 double saturationSavings = 0.0;
+                long classesScanned = 0L;
+                long nodesScanned = 0L;
+                long candidateClassesSkipped = 0L;
+                long matchesFound = 0L;
+                long matcherCacheHits = 0L;
+                long matcherCacheMisses = 0L;
+                int saturationIterations = 0;
+                int rulesFired = 0;
                 if (strategy.strategy() instanceof de.regelsuche.search.strategy.EqualitySaturationStrategy es
                         && es.lastStats() != null) {
                     var stats = es.lastStats();
@@ -86,6 +94,14 @@ public class SearchBenchmark {
                     saturationSavings = applications == 0
                         ? 0.0
                         : stats.merges() / (double) applications;
+                    classesScanned = stats.classesScanned();
+                    nodesScanned = stats.nodesScanned();
+                    candidateClassesSkipped = stats.candidateClassesSkipped();
+                    matchesFound = stats.matchesFound();
+                    matcherCacheHits = stats.matcherCacheHits();
+                    matcherCacheMisses = stats.matcherCacheMisses();
+                    saturationIterations = stats.saturationIterations();
+                    rulesFired = stats.rulesFired();
                 }
                 String expected = EXPECTED_RESULTS.get(expression);
                 Boolean expectedResultMatched = expected == null || bestState == null
@@ -112,6 +128,14 @@ public class SearchBenchmark {
                     eGraphClasses,
                     eGraphNodes,
                     saturationSavings,
+                    classesScanned,
+                    nodesScanned,
+                    candidateClassesSkipped,
+                    matchesFound,
+                    matcherCacheHits,
+                    matcherCacheMisses,
+                    saturationIterations,
+                    rulesFired,
                     learnedRuleUsed,
                     /* exportBundleValid     */ true
                 ));

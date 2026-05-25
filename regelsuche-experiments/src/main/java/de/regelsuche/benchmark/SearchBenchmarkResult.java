@@ -42,6 +42,14 @@ public record SearchBenchmarkResult(
     int eGraphClasses,
     int eGraphNodes,
     double saturationSavings,
+    long classesScanned,
+    long nodesScanned,
+    long candidateClassesSkipped,
+    long matchesFound,
+    long matcherCacheHits,
+    long matcherCacheMisses,
+    int saturationIterations,
+    int rulesFired,
     boolean learnedRuleUsed,
     boolean exportBundleValid
 ) {
@@ -74,6 +82,14 @@ public record SearchBenchmarkResult(
             /* eGraphClasses         */ 0,
             /* eGraphNodes           */ 0,
             /* saturationSavings     */ 0.0,
+            /* classesScanned        */ 0L,
+            /* nodesScanned          */ 0L,
+            /* candidateClassesSkipped */ 0L,
+            /* matchesFound          */ 0L,
+            /* matcherCacheHits      */ 0L,
+            /* matcherCacheMisses    */ 0L,
+            /* saturationIterations  */ 0,
+            /* rulesFired            */ 0,
             /* learnedRuleUsed       */ false,
             /* exportBundleValid     */ true);
     }
@@ -120,4 +136,3 @@ public record SearchBenchmarkResult(
         return "OK";
     }
 }
-

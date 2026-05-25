@@ -1,6 +1,6 @@
 # Regelsuche – Benchmark-Qualitätsdashboard
 
-Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben den klassischen Suchmetriken auch Qualitätsmetriken: ob das erwartete Ergebnis getroffen wurde, wie viele Zustände geprunet wurden, e-Graph-Größe, Saturation-Einsparungen, ob eine gelernte Makroregel beteiligt war und ob das Export-Bundle für diese Zeile gültig ist.
+Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben den klassischen Suchmetriken auch Qualitätsmetriken: ob das erwartete Ergebnis getroffen wurde, wie viele Zustände geprunet wurden, e-Graph-Größe, Matcher-Scan-/Cache-Felder (`classesScanned`, `nodesScanned`, `candidateClassesSkipped`, `matchesFound`, `matcherCacheHits`, `matcherCacheMisses`), Saturation-Iterations-/Regelmetriken (`saturationIterations`, `rulesFired`), Saturation-Einsparungen, ob eine gelernte Makroregel beteiligt war und ob das Export-Bundle für diese Zeile gültig ist.
 
 **Ampel:** ✅ OK · ⚠️ WARN · ❌ FAIL
 
@@ -119,4 +119,3 @@ Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben de
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | math-domain | A * (B + C) | ✅ | ✓ | — | 0 | 2 | 0 | 0 | 0 | 0.00 | – | SYMBOLICALLY_VERIFIED | ✓ |
-

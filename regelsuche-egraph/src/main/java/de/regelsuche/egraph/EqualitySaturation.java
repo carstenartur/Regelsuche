@@ -49,7 +49,7 @@ import java.util.function.ToIntFunction;
 public final class EqualitySaturation {
 
     /** Configuration tuning saturation behaviour. */
-    public record Config(int maxIterations, int maxNodes) {
+    public record Config(int maxIterations, int maxNodes, boolean useDirtyWorklist) {
         public Config {
             if (maxIterations <= 0) {
                 throw new IllegalArgumentException("maxIterations must be > 0");
@@ -59,9 +59,13 @@ public final class EqualitySaturation {
             }
         }
 
+        public Config(int maxIterations, int maxNodes) {
+            this(maxIterations, maxNodes, true);
+        }
+
         /** Default configuration: 12 iterations, ~10 000 node guard. */
         public static Config defaults() {
-            return new Config(12, 10_000);
+            return new Config(12, 10_000, true);
         }
     }
 
@@ -97,12 +101,21 @@ public final class EqualitySaturation {
         Objects.requireNonNull(costOfNode, "costOfNode");
         EGraphPatternMatcher matcher = new EGraphPatternMatcher(eGraph);
         EGraphPatternApplier applier = new EGraphPatternApplier(eGraph);
+        matcher.resetStats();
 
         Map<String, Integer> appliedRules = new LinkedHashMap<>();
         int merges = 0;
         int iterations = 0;
         SaturationStats.Reason stopReason = SaturationStats.Reason.FIX_POINT;
         boolean saturated = false;
+        Collection<EClassId> dirtyClasses = eGraph.consumeDirtyClasses();
+        if (dirtyClasses.isEmpty()) {
+            List<EClassId> allClasses = new ArrayList<>();
+            for (EClass eclass : eGraph.classes()) {
+                allClasses.add(eclass.id());
+            }
+            dirtyClasses = allClasses;
+        }
 
         for (int i = 0; i < config.maxIterations(); i++) {
             iterations = i + 1;
@@ -114,8 +127,12 @@ public final class EqualitySaturation {
             int classesBefore = eGraph.classCount();
             int nodesBefore = eGraph.nodeCount();
 
-            int fired = applyAllRules(eGraph, matcher, applier, costOfNode, appliedRules);
+            Collection<EClassId> classesToScan = config.useDirtyWorklist()
+                ? dirtyClasses
+                : allClasses(eGraph);
+            int fired = applyAllRules(eGraph, matcher, applier, costOfNode, appliedRules, classesToScan);
             eGraph.rebuild();
+            dirtyClasses = eGraph.consumeDirtyClasses();
             int classesAfter = eGraph.classCount();
             merges += Math.max(0, (classesBefore + (eGraph.nodeCount() - nodesBefore)) - classesAfter);
 
@@ -130,6 +147,7 @@ public final class EqualitySaturation {
         }
 
         Expr best = eGraph.extract(root, costOfNode);
+        EGraphPatternMatcher.MatcherStats matcherStats = matcher.stats();
         SaturationStats stats = new SaturationStats(
             eGraph.classCount(),
             eGraph.nodeCount(),
@@ -138,7 +156,15 @@ public final class EqualitySaturation {
             appliedRules,
             de.regelsuche.parse.ExpressionFormatter.format(best),
             saturated,
-            stopReason
+            stopReason,
+            matcherStats.classesScanned(),
+            matcherStats.nodesScanned(),
+            matcherStats.candidateClassesSkipped(),
+            matcherStats.matchesFound(),
+            matcherStats.matcherCacheHits(),
+            matcherStats.matcherCacheMisses(),
+            iterations,
+            appliedRules.values().stream().mapToInt(Integer::intValue).sum()
         );
         return new Result(best, stats);
     }
@@ -155,19 +181,15 @@ public final class EqualitySaturation {
         EGraphPatternMatcher matcher,
         EGraphPatternApplier applier,
         ToIntFunction<ENode> costOfNode,
-        Map<String, Integer> appliedRules
+        Map<String, Integer> appliedRules,
+        Collection<EClassId> classSnapshot
     ) {
         int fired = 0;
-        // Snapshot classes — applying rules may add more, but we don't
-        // want a single iteration to spiral into a nested loop.
-        List<EClassId> classSnapshot = new ArrayList<>();
-        for (EClass eclass : eGraph.classes()) {
-            classSnapshot.add(eclass.id());
-        }
+        List<EClassId> deterministicSnapshot = canonicalSorted(eGraph, classSnapshot);
 
         for (RewriteRule rule : rules) {
             if (rule instanceof PatternRewriteRule pattern) {
-                List<EGraphPatternMatcher.Match> matches = matcher.matchAll(pattern.source());
+                List<EGraphPatternMatcher.Match> matches = matcher.matchAll(rule.id(), pattern.source(), deterministicSnapshot);
                 for (EGraphPatternMatcher.Match match : matches) {
                     EClassId rhs = applier.instantiate(pattern.target(), match.bindings());
                     EClassId lhs = eGraph.find(match.root());
@@ -179,7 +201,7 @@ public final class EqualitySaturation {
                 }
             } else {
                 Set<EClassId> seen = new LinkedHashSet<>();
-                for (EClassId raw : classSnapshot) {
+                for (EClassId raw : deterministicSnapshot) {
                     EClassId canonical = eGraph.find(raw);
                     if (!seen.add(canonical)) {
                         continue;
@@ -212,6 +234,24 @@ public final class EqualitySaturation {
             }
         }
         return fired;
+    }
+
+    private static Collection<EClassId> allClasses(EGraph eGraph) {
+        List<EClassId> classes = new ArrayList<>();
+        for (EClass eclass : eGraph.classes()) {
+            classes.add(eclass.id());
+        }
+        return classes;
+    }
+
+    private static List<EClassId> canonicalSorted(EGraph eGraph, Collection<EClassId> ids) {
+        LinkedHashSet<EClassId> canonical = new LinkedHashSet<>();
+        for (EClassId id : ids) {
+            canonical.add(eGraph.find(id));
+        }
+        List<EClassId> sorted = new ArrayList<>(canonical);
+        sorted.sort(EClassId::compareTo);
+        return sorted;
     }
 
     /** Result of a saturation run: the extracted best AST plus statistics. */
