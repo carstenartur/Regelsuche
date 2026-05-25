@@ -6,6 +6,8 @@ import de.regelsuche.egraph.EClassId;
 import de.regelsuche.egraph.EGraph;
 import de.regelsuche.egraph.EGraphPatternMatcher;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.index.RootSymbolTermRuleIndex;
+import de.regelsuche.search.index.TermRuleIndex;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.TransformationEngine;
@@ -48,6 +50,7 @@ public class CoreBenchmarks {
     private List<String> largeEGraphExpressions;
     private EGraph largeMatcherGraph;
     private PatternExpr addPattern;
+    private RootSymbolTermRuleIndex growingRuleIndex;
 
     @Setup
     public void setup() {
@@ -61,6 +64,16 @@ public class CoreBenchmarks {
         largeMatcherGraph = new EGraph();
         for (String expr : largeEGraphExpressions) {
             largeMatcherGraph.addExpression(parser.parseTerm(expr));
+        }
+        growingRuleIndex = new RootSymbolTermRuleIndex();
+        for (int i = 0; i < 2_000; i++) {
+            growingRuleIndex.addMacroMove(new TermRuleIndex.IndexedMacroMove(
+                "macro_algebra_" + i,
+                "(x + A" + i + ") ^ 2",
+                "x ^ 2 + 2 * A" + i + " * x + A" + i + " ^ 2",
+                TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES,
+                "algebra"
+            ));
         }
     }
 
@@ -142,6 +155,15 @@ public class CoreBenchmarks {
     public int egraphPatternMatchIndexedLarge() {
         EGraphPatternMatcher matcher = new EGraphPatternMatcher(largeMatcherGraph);
         return matcher.matchAll("jmh-add-pattern", addPattern, null).size();
+    }
+
+    @Benchmark
+    public int termRuleIndexGrowingInventory() {
+        return growingRuleIndex.query(
+            "(x + 7) ^ 2",
+            new TermRuleIndex.Query("x ^ 2 + 14 * x + 49",
+                TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "algebra", false, true)
+        ).metrics().rulesMatched();
     }
 
     private static List<String> buildLargeEGraphExpressions() {

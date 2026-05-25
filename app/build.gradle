@@ -214,7 +214,11 @@ tasks.register('e2eTest', Test) {
     description = 'Browser-driven end-to-end demo flows (Playwright). Use ' +
         '-Pregelsuche.recordDocs=true to refresh docs/assets/{screenshots,videos}.'
     group = 'verification'
-    dependsOn tasks.named('installPlaywrightBrowsers')
+    if (!providers.gradleProperty('regelsuche.skipPlaywrightInstall')
+        .map { it.toBoolean() }
+        .getOrElse(false)) {
+        dependsOn tasks.named('installPlaywrightBrowsers')
+    }
     testClassesDirs = sourceSets.e2eTest.output.classesDirs
     classpath = sourceSets.e2eTest.runtimeClasspath
     useJUnitPlatform()

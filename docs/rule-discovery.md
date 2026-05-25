@@ -154,8 +154,9 @@ Der portable Experiment-Kern liegt in `:regelsuche-experiments`:
   PostgreSQL-Hybrid-Modus und führt den kompletten Pfad
   **Seed → Discovery/Search/Validation → Replay → Persistenz → Report** aus.
 - `DiscoveryReplayArtifactWriter` schreibt CI-taugliche Replay-Artefakte:
-  `discovery-report.json`, `discovery-report.html`, `discovery-summary.png`
-  und ein mehrstufiges `discovery-replay.gif`.
+  `discovery-report.json`, `discovery-report.html`, `discovery-report.md`,
+  `discovery-replay.json`, `discovery-summary.png` und ein mehrstufiges
+  `discovery-replay.gif`.
 
 Lokale Befehle:
 

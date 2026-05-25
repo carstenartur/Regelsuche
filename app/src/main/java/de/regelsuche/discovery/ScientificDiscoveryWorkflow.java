@@ -249,6 +249,8 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             "Seed → Discovery → Replay → Persistence → Report", "SUCCEEDED", runIds, FIXED_INSTANT, FIXED_INSTANT));
         saveArtifact(adapters, experimentId, "json", artifacts.jsonReport(), report, runIds);
         saveArtifact(adapters, experimentId, "html", artifacts.htmlReport(), report, runIds);
+        saveArtifact(adapters, experimentId, "md", artifacts.markdownReport(), report, runIds);
+        saveArtifact(adapters, experimentId, "replay-json", artifacts.replayJson(), report, runIds);
         saveArtifact(adapters, experimentId, "png", artifacts.screenshotPng(), report, runIds);
         saveArtifact(adapters, experimentId, "gif", artifacts.replayGif(), report, runIds);
     }

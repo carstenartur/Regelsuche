@@ -73,6 +73,32 @@ class MacroMoveTransformationEngineTest {
         assertTrue(macroEngine.expansionFor(root, target, reachedByMacro.appliedRuleId()).isPresent(),
             "macro edge must retain replay expansion metadata");
         assertEquals(3, macroEngine.expansionFor(root, target, reachedByMacro.appliedRuleId()).orElseThrow().atomicSteps().size());
+        MacroMoveStatistics stats = macroEngine.expansionFor(root, target, reachedByMacro.appliedRuleId()).orElseThrow().stats();
+        assertEquals(1, stats.timesConsidered());
+        assertTrue(stats.timesApplied() >= 1);
+        assertTrue(stats.averageCostReduction() > 0.0);
+    }
+
+    @Test
+    void macroMovesCanBeDisabledWhileAtomicSearchStillRuns() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        ReusableRule macro = macroRule("binomial_square", "(x + A) ^ 2", "x ^ 2 + 2 * A * x + A ^ 2");
+        inventory.save(macro);
+        inventory.setEnabled(macro.id(), true);
+
+        MacroMoveTransformationEngine disabled = new MacroMoveTransformationEngine(
+            new AstRewriteTransformationEngine(),
+            new GoalAwareMacroMoveSelector(inventory),
+            "x ^ 2 + 2 * 3 * x + 3 ^ 2",
+            Map.of(macro.id(), atomicSteps()),
+            List.of(),
+            false
+        );
+
+        List<de.regelsuche.transform.Transformation> transformations = disabled.transform("(x + 3) ^ 2");
+        assertTrue(transformations.stream().noneMatch(t -> t.rule().startsWith("macro_")));
+        assertTrue(transformations.stream().anyMatch(t -> !t.rule().startsWith("macro_")),
+            "atomic search must be preserved when macro moves are disabled");
     }
 
     @Test

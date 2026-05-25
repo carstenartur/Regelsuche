@@ -31,13 +31,15 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
     private final String goalExpression;
     private final List<String> carriedAssumptions;
     private final Map<String, List<TransformationStep>> atomicStepsByRuleId;
+    private final boolean macroMovesEnabled;
     private final Map<String, MacroMoveExpansion> expansionsByEdge = new HashMap<>();
+    private final Map<String, MacroMoveStatistics> statisticsByRuleId = new HashMap<>();
 
     public MacroMoveTransformationEngine(
         TransformationEngine baseEngine,
         GoalAwareMacroMoveSelector selector
     ) {
-        this(baseEngine, selector, null, Map.of(), List.of());
+        this(baseEngine, selector, null, Map.of(), List.of(), true);
     }
 
     public MacroMoveTransformationEngine(
@@ -46,7 +48,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         String goalExpression,
         Map<String, List<TransformationStep>> atomicStepsByRuleId
     ) {
-        this(baseEngine, selector, goalExpression, atomicStepsByRuleId, List.of());
+        this(baseEngine, selector, goalExpression, atomicStepsByRuleId, List.of(), true);
     }
 
     public MacroMoveTransformationEngine(
@@ -56,6 +58,17 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         Map<String, List<TransformationStep>> atomicStepsByRuleId,
         List<String> carriedAssumptions
     ) {
+        this(baseEngine, selector, goalExpression, atomicStepsByRuleId, carriedAssumptions, true);
+    }
+
+    public MacroMoveTransformationEngine(
+        TransformationEngine baseEngine,
+        GoalAwareMacroMoveSelector selector,
+        String goalExpression,
+        Map<String, List<TransformationStep>> atomicStepsByRuleId,
+        List<String> carriedAssumptions,
+        boolean macroMovesEnabled
+    ) {
         if (baseEngine == null || selector == null) {
             throw new IllegalArgumentException("baseEngine and selector are required");
         }
@@ -64,11 +77,15 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         this.goalExpression = goalExpression;
         this.carriedAssumptions = carriedAssumptions == null ? List.of() : List.copyOf(carriedAssumptions);
         this.atomicStepsByRuleId = atomicStepsByRuleId == null ? Map.of() : Map.copyOf(atomicStepsByRuleId);
+        this.macroMovesEnabled = macroMovesEnabled;
     }
 
     @Override
     public List<Transformation> transform(String expression) {
         List<Transformation> result = new ArrayList<>(baseEngine.transform(expression));
+        if (!macroMovesEnabled) {
+            return result;
+        }
         for (ReusableRule rule : selector.selectFor(expression, goalExpression, carriedAssumptions)) {
             result.addAll(applyMacro(expression, rule));
         }
@@ -77,6 +94,10 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
 
     public Optional<MacroMoveExpansion> expansionFor(String fromExpression, String toExpression, String ruleId) {
         return Optional.ofNullable(expansionsByEdge.get(edgeKey(fromExpression, toExpression, ruleId)));
+    }
+
+    public Map<String, MacroMoveStatistics> statisticsByRuleId() {
+        return Map.copyOf(statisticsByRuleId);
     }
 
     private List<Transformation> applyMacro(String expression, ReusableRule rule) {
@@ -90,7 +111,20 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
             true
         );
         AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(List.of(rewriteRule));
+        MacroMoveStatistics before = statisticsByRuleId.getOrDefault(rule.id(), MacroMoveStatistics.empty());
         List<Transformation> transformations = macroEngine.transform(expression);
+        int improved = (int) transformations.stream().filter(t -> t.estimatedCostDelta() < 0).count();
+        double averageReduction = transformations.isEmpty()
+            ? before.averageCostReduction()
+            : transformations.stream().mapToInt(t -> Math.max(0, -t.estimatedCostDelta())).average().orElse(0.0);
+        MacroMoveStatistics stats = new MacroMoveStatistics(
+            before.timesConsidered() + 1,
+            before.timesApplied() + transformations.size(),
+            before.timesImprovedScore() + improved,
+            averageReduction,
+            goalExpression == null || goalExpression.isBlank() ? before.usefulForGoals() : List.of(goalExpression)
+        );
+        statisticsByRuleId.put(rule.id(), stats);
         for (Transformation transformation : transformations) {
             MacroMoveExpansion expansion = new MacroMoveExpansion(
                 transformation.rule(),
@@ -99,7 +133,8 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
                 atomicStepsByRuleId.getOrDefault(rule.id(), List.of()),
                 rule.supportingPathIds(),
                 Math.max(1.0, rule.supportingPathIds().isEmpty() ? 1.0 : rule.supportingPathIds().size()),
-                false
+                false,
+                stats
             );
             expansionsByEdge.put(edgeKey(expression, transformation.transformedExpression(), transformation.rule()), expansion);
         }

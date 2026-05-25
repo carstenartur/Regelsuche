@@ -4,6 +4,7 @@ import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.GraphSnapshot;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.search.SimplificationSuccess;
+import de.regelsuche.validation.CandidateProofStatus;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -49,12 +50,28 @@ public final class SearchGraphStatsService {
         Map<String, Integer> ruleImprovement = new HashMap<>();
         Map<String, Integer> outDegree = new HashMap<>();
         Set<String> hasImprovingOutgoing = new HashSet<>();
+        int macroConsidered = 0;
+        int macroApplied = 0;
+        int macroImproved = 0;
+        int macroCostReduction = 0;
+        Set<String> macroGoals = new HashSet<>();
         for (GraphEdge edge : edges) {
             ruleUsage.merge(edge.transformationRule(), 1, Integer::sum);
             ruleImprovement.merge(edge.transformationRule(), edge.improvement(), Integer::sum);
             outDegree.merge(edge.fromExpression(), 1, Integer::sum);
             if (edge.improvement() > 0) {
                 hasImprovingOutgoing.add(edge.fromExpression());
+            }
+            if (edge.macroMoveExpansion() != null || edge.transformationRule().startsWith("macro")) {
+                macroConsidered++;
+                macroApplied++;
+                if (edge.improvement() > 0 || edge.scoreAfter() < edge.scoreBefore()) {
+                    macroImproved++;
+                }
+                macroCostReduction += Math.max(0, edge.scoreBefore() - edge.scoreAfter());
+                if (edge.toExpression() != null && !edge.toExpression().isBlank()) {
+                    macroGoals.add(edge.toExpression());
+                }
             }
         }
         Map<String, Integer> ruleUsageFrequency = new LinkedHashMap<>();
@@ -87,6 +104,18 @@ public final class SearchGraphStatsService {
             }
         }
 
+        Map<String, Integer> matchStats = new LinkedHashMap<>();
+        matchStats.put("successes", successes.size());
+        matchStats.put("candidates", candidates.size());
+        matchStats.put("rulesMatched", ruleUsage.values().stream().mapToInt(Integer::intValue).sum());
+        int proofEligible = candidates.size();
+        long proofSuccesses = candidates.stream()
+            .filter(candidate -> candidate.proofStatus() != null
+                && candidate.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal())
+            .count();
+        long counterexamples = candidates.stream()
+            .filter(candidate -> candidate.proofStatus() == CandidateProofStatus.REJECTED)
+            .count();
         return new SearchGraphStatsDto(
             nodesVisited,
             edgesGenerated,
@@ -97,7 +126,20 @@ public final class SearchGraphStatsService {
             ruleUsageFrequency,
             mostUsefulRules,
             candidates.size(),
-            macroRuleCount
+            macroRuleCount,
+            nodesVisited + edgesGenerated,
+            matchStats,
+            new SearchGraphStatsDto.MacroMoveUsage(
+                macroConsidered,
+                macroApplied,
+                macroImproved,
+                macroApplied == 0 ? 0.0 : (double) macroCostReduction / (double) macroApplied,
+                macroGoals.stream().sorted().limit(10).toList()
+            ),
+            Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory(),
+            new SearchGraphStatsDto.CounterexampleStats(proofEligible, (int) counterexamples),
+            proofEligible == 0 ? 0.0 : (double) proofSuccesses / (double) proofEligible,
+            Map.of()
         );
     }
 }

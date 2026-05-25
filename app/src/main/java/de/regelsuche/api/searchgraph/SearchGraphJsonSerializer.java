@@ -70,6 +70,22 @@ public final class SearchGraphJsonSerializer {
             stats.stringArray("mostUsefulRules", statsDto.mostUsefulRules());
             stats.property("candidateCount", statsDto.candidateCount());
             stats.property("macroRuleCount", statsDto.macroRuleCount());
+            stats.property("searchSpaceSize", statsDto.searchSpaceSize());
+            stats.object("matchStats", match -> statsDto.matchStats().forEach(match::property));
+            stats.object("macroMoveUsage", macro -> {
+                macro.property("timesConsidered", statsDto.macroMoveUsage().timesConsidered());
+                macro.property("timesApplied", statsDto.macroMoveUsage().timesApplied());
+                macro.property("timesImprovedScore", statsDto.macroMoveUsage().timesImprovedScore());
+                macro.property("averageCostReduction", statsDto.macroMoveUsage().averageCostReduction());
+                macro.stringArray("usefulForGoals", statsDto.macroMoveUsage().usefulForGoals());
+            });
+            stats.property("memoryUsage", statsDto.memoryUsage());
+            stats.object("counterexampleStats", counterexamples -> {
+                counterexamples.property("checked", statsDto.counterexampleStats().checked());
+                counterexamples.property("found", statsDto.counterexampleStats().found());
+            });
+            stats.property("proofSuccessRate", statsDto.proofSuccessRate());
+            stats.object("artifactCounts", artifacts -> statsDto.artifactCounts().forEach(artifacts::property));
         });
         writer.endObject();
         return writer.toString();

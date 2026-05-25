@@ -427,7 +427,11 @@ public class WebWorkbenchServer {
                 sendStatus(exchange, 404, "path not found");
                 return;
             }
-            sendJson(exchange, 200, replayJson(de.regelsuche.api.PathReplayDto.from(match.get(), explanationService)));
+            sendJson(exchange, 200, replayJson(de.regelsuche.api.PathReplayDto.from(
+                match.get(),
+                explanationService,
+                macroExpansionsFor(match.get())
+            )));
             return;
         }
         final String singleId = suffix;
@@ -622,10 +626,177 @@ public class WebWorkbenchServer {
                 inner.property("comparatorFlipped", step.comparatorFlipped());
                 writeReplaySpanArray(inner, "changedFromSpans", step.changedFromSpans());
                 writeReplaySpanArray(inner, "changedToSpans", step.changedToSpans());
+                writeReplayMacroExpansion(inner, step.macroMoveExpansion());
                 MathLayoutJsonWriter.write(inner, "layout", step.layout());
             })));
         writer.endObject();
         return writer.toString();
+    }
+
+    private static void writeReplayMacroExpansion(
+        JsonWriter writer,
+        de.regelsuche.mining.MacroMoveExpansion expansion
+    ) {
+        if (expansion == null) {
+            writer.nullProperty("macroMoveExpansion");
+            return;
+        }
+        writer.object("macroMoveExpansion", macro -> {
+            macro.property("macroRuleId", expansion.macroRuleId());
+            macro.property("fromExpression", expansion.fromExpression());
+            macro.property("toExpression", expansion.toExpression());
+            macro.property("compressionRatio", expansion.compressionRatio());
+            macro.property("expanded", expansion.expanded());
+            macro.stringArray("supportingPathIds", expansion.supportingPathIds());
+            macro.object("stats", stats -> {
+                stats.property("timesConsidered", expansion.stats().timesConsidered());
+                stats.property("timesApplied", expansion.stats().timesApplied());
+                stats.property("timesImprovedScore", expansion.stats().timesImprovedScore());
+                stats.property("averageCostReduction", expansion.stats().averageCostReduction());
+                stats.stringArray("usefulForGoals", expansion.stats().usefulForGoals());
+            });
+            macro.array("atomicSteps", steps -> expansion.atomicSteps().forEach(step ->
+                steps.objectValue(inner -> {
+                    inner.property("index", step.index());
+                    inner.property("beforeExpression", step.beforeExpression());
+                    inner.property("afterExpression", step.afterExpression());
+                    inner.property("ruleId", step.ruleId());
+                    inner.property("ruleKind", step.ruleKind().name());
+                    inner.property("scoreBefore", step.scoreBefore());
+                    inner.property("scoreAfter", step.scoreAfter());
+                    inner.property("equivalencePreserving", step.equivalencePreserving());
+                    inner.property("explanation", step.explanation());
+                })));
+        });
+    }
+
+    private java.util.Map<Integer, de.regelsuche.mining.MacroMoveExpansion> macroExpansionsFor(
+        de.regelsuche.discovery.DiscoveredTransformation path
+    ) {
+        MacroExpansionIndex index = macroExpansionIndex();
+        java.util.Map<Integer, de.regelsuche.mining.MacroMoveExpansion> byStep = new java.util.LinkedHashMap<>();
+        for (de.regelsuche.discovery.TransformationStep step : path.steps()) {
+            de.regelsuche.mining.MacroMoveExpansion expansion = index.find(path.id(), step);
+            if (expansion != null) {
+                byStep.put(step.index(), expansion);
+            }
+        }
+        return byStep;
+    }
+
+    private MacroExpansionIndex macroExpansionIndex() {
+        java.util.Map<ReplayMacroExpansionKey, java.util.List<de.regelsuche.mining.MacroMoveExpansion>> byPathAndDepth =
+            new java.util.HashMap<>();
+        java.util.Map<ReplayMacroExpansionKey, java.util.List<de.regelsuche.mining.MacroMoveExpansion>> byPath =
+            new java.util.HashMap<>();
+        java.util.Map<ReplayMacroExpansionKey, java.util.List<de.regelsuche.mining.MacroMoveExpansion>> relaxed =
+            new java.util.HashMap<>();
+        for (de.regelsuche.graph.GraphEdge edge : graphStore.snapshot().edges()) {
+            de.regelsuche.mining.MacroMoveExpansion expansion = edge.macroMoveExpansion();
+            if (expansion == null) {
+                continue;
+            }
+            byPathAndDepth.computeIfAbsent(
+                ReplayMacroExpansionKey.of(edge, edge.pathId(), edge.depth()),
+                key -> new java.util.ArrayList<>()
+            ).add(expansion);
+            byPath.computeIfAbsent(
+                ReplayMacroExpansionKey.of(edge, edge.pathId(), null),
+                key -> new java.util.ArrayList<>()
+            ).add(expansion);
+            relaxed.computeIfAbsent(
+                ReplayMacroExpansionKey.of(edge, "", null),
+                key -> new java.util.ArrayList<>()
+            ).add(expansion);
+        }
+        return new MacroExpansionIndex(byPathAndDepth, byPath, relaxed);
+    }
+
+    private static de.regelsuche.mining.MacroMoveExpansion uniqueOrNull(
+        java.util.Map<ReplayMacroExpansionKey, java.util.List<de.regelsuche.mining.MacroMoveExpansion>> index,
+        ReplayMacroExpansionKey key
+    ) {
+        java.util.List<de.regelsuche.mining.MacroMoveExpansion> matches = index.get(key);
+        return matches != null && matches.size() == 1 ? matches.getFirst() : null;
+    }
+
+    private record MacroExpansionIndex(
+        java.util.Map<ReplayMacroExpansionKey, java.util.List<de.regelsuche.mining.MacroMoveExpansion>> byPathAndDepth,
+        java.util.Map<ReplayMacroExpansionKey, java.util.List<de.regelsuche.mining.MacroMoveExpansion>> byPath,
+        java.util.Map<ReplayMacroExpansionKey, java.util.List<de.regelsuche.mining.MacroMoveExpansion>> relaxed
+    ) {
+        private de.regelsuche.mining.MacroMoveExpansion find(
+            String pathId,
+            de.regelsuche.discovery.TransformationStep step
+        ) {
+            de.regelsuche.mining.MacroMoveExpansion exact = uniqueOrNull(
+                byPathAndDepth,
+                ReplayMacroExpansionKey.of(step, pathId + "#" + step.index(), step.index())
+            );
+            if (exact != null) {
+                return exact;
+            }
+            de.regelsuche.mining.MacroMoveExpansion pathOnly = uniqueOrNull(
+                byPath,
+                ReplayMacroExpansionKey.of(step, pathId + "#" + step.index(), null)
+            );
+            if (pathOnly != null) {
+                return pathOnly;
+            }
+            de.regelsuche.mining.MacroMoveExpansion rootPathExact = uniqueOrNull(
+                byPathAndDepth,
+                ReplayMacroExpansionKey.of(step, pathId, step.index())
+            );
+            if (rootPathExact != null) {
+                return rootPathExact;
+            }
+            de.regelsuche.mining.MacroMoveExpansion rootPathOnly = uniqueOrNull(
+                byPath,
+                ReplayMacroExpansionKey.of(step, pathId, null)
+            );
+            if (rootPathOnly != null) {
+                return rootPathOnly;
+            }
+            return uniqueOrNull(relaxed, ReplayMacroExpansionKey.of(step, "", null));
+        }
+    }
+
+    private record ReplayMacroExpansionKey(
+        String fromExpression,
+        String toExpression,
+        String ruleId,
+        int scoreBefore,
+        int scoreAfter,
+        String pathId,
+        Integer depth
+    ) {
+        private static ReplayMacroExpansionKey of(de.regelsuche.graph.GraphEdge edge, String pathId, Integer depth) {
+            return new ReplayMacroExpansionKey(
+                edge.fromExpression(),
+                edge.toExpression(),
+                edge.transformationRule(),
+                edge.scoreBefore(),
+                edge.scoreAfter(),
+                pathId == null ? "" : pathId,
+                depth
+            );
+        }
+
+        private static ReplayMacroExpansionKey of(
+            de.regelsuche.discovery.TransformationStep step,
+            String pathId,
+            Integer depth
+        ) {
+            return new ReplayMacroExpansionKey(
+                step.beforeExpression(),
+                step.afterExpression(),
+                step.ruleId(),
+                step.scoreBefore(),
+                step.scoreAfter(),
+                pathId == null ? "" : pathId,
+                depth
+            );
+        }
     }
 
     private static void writeReplaySpanArray(JsonWriter writer, String key, java.util.List<int[]> spans) {

@@ -1,6 +1,7 @@
 package de.regelsuche.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -10,6 +11,7 @@ import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.mining.MacroMoveExpansion;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.transform.RewriteKind;
@@ -56,6 +58,13 @@ class SearchGraphEndpointsTest {
         assertTrue(body.contains("\"nodes\""));
         assertTrue(body.contains("\"edges\""));
         assertTrue(body.contains("\"stats\""));
+        assertTrue(body.contains("\"searchSpaceSize\""));
+        assertTrue(body.contains("\"matchStats\""));
+        assertTrue(body.contains("\"macroMoveUsage\""));
+        assertTrue(body.contains("\"memoryUsage\""));
+        assertTrue(body.contains("\"counterexampleStats\""));
+        assertTrue(body.contains("\"proofSuccessRate\""));
+        assertTrue(body.contains("\"artifactCounts\""));
         assertTrue(body.contains("\"layout\":{\"kind\""),
             "/api/search-graph must expose layout JSON for math-bearing nodes/edges");
     }
@@ -72,6 +81,25 @@ class SearchGraphEndpointsTest {
             "/api/paths/{id}/replay must expose the structured derivation layout");
         assertTrue(body.contains("\"layout\":{\"kind\""),
             "/api/paths/{id}/replay must expose structured step layouts");
+    }
+
+    @Test
+    void replayEndpointIncludesMacroMoveExpansionWhenGraphEdgeCarriesIt() throws IOException {
+        seedMacroTransformation();
+        String body = get("/api/paths/macro-path/replay");
+        assertTrue(body.contains("\"macroMoveExpansion\":{"), body);
+        assertTrue(body.contains("\"macroRuleId\":\"macro_demo\""), body);
+        assertTrue(body.contains("\"supportingPathIds\":[\"supporting-path\"]"), body);
+        assertTrue(body.contains("\"atomicSteps\":"), body);
+    }
+
+    @Test
+    void replayEndpointDisambiguatesMacroExpansionByScoreAndPathMetadata() throws IOException {
+        seedMacroTransformationWithAmbiguousEdgeTriples();
+        String body = get("/api/paths/macro-disambiguated-path/replay");
+        assertTrue(body.contains("\"macroMoveExpansion\":{"), body);
+        assertTrue(body.contains("\"macroRuleId\":\"macro_correct\""), body);
+        assertFalse(body.contains("\"macroRuleId\":\"macro_wrong\""), body);
     }
 
     @Test
@@ -168,6 +196,62 @@ class SearchGraphEndpointsTest {
             new ExpressionScore(6, 6, 1, 1, 0),
             new ExpressionScore(1, 1, 0, 0, 0),
             3, CandidateProofStatus.OBSERVED, Instant.now(), "h-p2"));
+    }
+
+    private void seedMacroTransformation() {
+        List<TransformationStep> atomic = List.of(
+            new TransformationStep(0, "A", "A + 0", "expand_zero", RewriteKind.NORMALIZE, 5, 4, true, ""),
+            new TransformationStep(1, "A + 0", "B", "normalize_macro", RewriteKind.NORMALIZE, 4, 2, true, "")
+        );
+        MacroMoveExpansion expansion = new MacroMoveExpansion(
+            "macro_demo", "A", "B", atomic, List.of("supporting-path"), 2.0, false
+        );
+        TransformationStep step = new TransformationStep(
+            0, "A", "B", "macro_demo", RewriteKind.NORMALIZE, 5, 2, true, ""
+        );
+        graphStore.saveNode("A", 5);
+        graphStore.saveNode("B", 2);
+        graphStore.saveEdge(new GraphEdge(
+            "A", "B", "macro_demo", 0, 3, "macro-path#0", "macro-hash", 5, 2,
+            RewriteKind.NORMALIZE, false, -3, true, CandidateProofStatus.OBSERVED, expansion
+        ));
+        graphStore.saveDiscoveredTransformation(new DiscoveredTransformation(
+            "macro-path", "A", "B", List.of(step),
+            new ExpressionScore(5, 0, 0, 0, 0),
+            new ExpressionScore(2, 0, 0, 0, 0),
+            3, CandidateProofStatus.OBSERVED, Instant.now(), "macro-hash"
+        ));
+    }
+
+    private void seedMacroTransformationWithAmbiguousEdgeTriples() {
+        List<TransformationStep> stepAtomic = List.of(
+            new TransformationStep(0, "C", "C + 0", "expand_zero", RewriteKind.NORMALIZE, 9, 8, true, "")
+        );
+        MacroMoveExpansion wrongExpansion = new MacroMoveExpansion(
+            "macro_wrong", "C", "D", stepAtomic, List.of("wrong-path"), 1.0, false
+        );
+        MacroMoveExpansion correctExpansion = new MacroMoveExpansion(
+            "macro_correct", "C", "D", stepAtomic, List.of("correct-path"), 1.0, false
+        );
+        TransformationStep step = new TransformationStep(
+            0, "C", "D", "macro_demo", RewriteKind.NORMALIZE, 7, 3, true, ""
+        );
+        graphStore.saveNode("C", 7);
+        graphStore.saveNode("D", 3);
+        graphStore.saveEdge(new GraphEdge(
+            "C", "D", "macro_demo", 0, 1, "other-path#0", "other-hash", 9, 8,
+            RewriteKind.NORMALIZE, false, -1, true, CandidateProofStatus.OBSERVED, wrongExpansion
+        ));
+        graphStore.saveEdge(new GraphEdge(
+            "C", "D", "macro_demo", 0, 4, "macro-disambiguated-path#0", "disambiguated-hash", 7, 3,
+            RewriteKind.NORMALIZE, false, -4, true, CandidateProofStatus.OBSERVED, correctExpansion
+        ));
+        graphStore.saveDiscoveredTransformation(new DiscoveredTransformation(
+            "macro-disambiguated-path", "C", "D", List.of(step),
+            new ExpressionScore(7, 0, 0, 0, 0),
+            new ExpressionScore(3, 0, 0, 0, 0),
+            4, CandidateProofStatus.OBSERVED, Instant.now(), "disambiguated-hash"
+        ));
     }
 
     private String get(String path) throws IOException {

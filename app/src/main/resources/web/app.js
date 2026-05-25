@@ -1085,7 +1085,17 @@
             const response = await fetch('/api/search-graph');
             const data = await response.json();
             const stats = data.stats || {};
+            const macroUsage = stats.macroMoveUsage || {};
+            const counterexamples = stats.counterexampleStats || {};
+            const artifacts = stats.artifactCounts || {};
             const tileData = [
+                ['Suchraumgröße', stats.searchSpaceSize],
+                ['Match-Statistik', formatMap(stats.matchStats)],
+                ['MacroMove-Nutzung', (macroUsage.timesApplied || 0) + ' / ' + (macroUsage.timesConsidered || 0)],
+                ['Speicherverbrauch', formatBytes(stats.memoryUsage || 0)],
+                ['Counterexamples', (counterexamples.found || 0) + ' / ' + (counterexamples.checked || 0)],
+                ['Proof-Erfolgsrate', formatPercent(stats.proofSuccessRate || 0)],
+                ['Artefakte', Object.values(artifacts).reduce((sum, value) => sum + Number(value || 0), 0)],
                 ['Knoten', stats.nodesVisited],
                 ['Kanten', stats.edgesGenerated],
                 ['Sackgassen', stats.deadEnds],
@@ -1110,6 +1120,22 @@
         } catch (ex) {
             tiles.innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
         }
+    }
+
+    function formatMap(value) {
+        const entries = Object.entries(value || {});
+        return entries.length ? entries.map(([k, v]) => k + ':' + v).join(' · ') : '–';
+    }
+
+    function formatPercent(value) {
+        return (Number(value || 0) * 100).toFixed(0) + '%';
+    }
+
+    function formatBytes(value) {
+        const bytes = Number(value || 0);
+        if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MiB';
+        if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KiB';
+        return bytes + ' B';
     }
 
     /* ─── Benchmark tab ─── */
@@ -1297,8 +1323,10 @@
             replayState.derivationLayout,
             replayState.alignedDerivationLatex,
             replayState.index);
+        const replayMetrics = renderReplayMetrics();
         const fromInline = '$' + (step.fromLatex || '') + '$';
         canvas.innerHTML = derivationBlock
+            + replayMetrics
             + '<div class="replay-step">'
             + '<div class="replay-step-index">Schritt ' + (step.stepIndex + 1)
             + ' / ' + replayState.steps.length + '</div>'
@@ -1327,6 +1355,17 @@
         }
         window.renderMath(canvas);
         window.__regelsucheReplayReady = true;
+    }
+
+    function renderReplayMetrics() {
+        const macroSteps = replayState.steps.filter((s) => s.macroMoveExpansion).length;
+        const counterexampleSteps = replayState.steps.filter((s) =>
+            String(s.ruleExplanation || '').toLowerCase().includes('counterexample')).length;
+        return '<div class="replay-dashboard-metrics">'
+            + '<span><strong>searchSpaceSize</strong>: ' + replayState.steps.length + '</span>'
+            + '<span><strong>macroMoveUsage</strong>: ' + macroSteps + '</span>'
+            + '<span><strong>counterexampleStats</strong>: ' + counterexampleSteps + '</span>'
+            + '</div>';
     }
 
     /**
@@ -1390,7 +1429,41 @@
                 + escapeHtml(after) + '$</div>'
                 + '</div>');
         }
+        const macro = step.macroMoveExpansion;
+        if (macro && Array.isArray(macro.atomicSteps) && macro.atomicSteps.length) {
+            const supportingPaths = (macro.supportingPathIds || []).length
+                ? '<div class="hint">Discovery-Branches: '
+                    + (macro.supportingPathIds || []).map((id) =>
+                        '<code>' + escapeHtml(id) + '</code>').join(', ')
+                    + '</div>'
+                : '';
+            const atomicSteps = macro.atomicSteps.map((atomicStep) =>
+                '<li><code>' + escapeHtml(atomicStep.ruleId || '') + '</code>: '
+                    + '<code>' + escapeHtml(atomicStep.beforeExpression || '') + ' → '
+                    + escapeHtml(atomicStep.afterExpression || '') + '</code></li>').join('');
+            out.push('<div class="replay-rule-card replay-macro-card">'
+                + '<strong>Makrozug: ' + escapeHtml(macro.macroRuleId || '') + '</strong>'
+                + '<div class="rule-card-body">Kompression: '
+                + escapeHtml(Number(macro.compressionRatio || 1).toFixed(2))
+                + ' · atomare Schritte: ' + macro.atomicSteps.length + '</div>'
+                + renderMacroStats(macro.stats)
+                + supportingPaths
+                + '<details' + (macro.expanded ? ' open' : '') + '>'
+                + '<summary>Atomare Replay-Schritte anzeigen</summary>'
+                + '<ol class="replay-macro-steps">' + atomicSteps + '</ol>'
+                + '</details>'
+                + '</div>');
+        }
         return out.join('');
+    }
+
+    function renderMacroStats(stats) {
+        if (!stats) return '';
+        return '<div class="hint">Stats: considered=' + escapeHtml(stats.timesConsidered || 0)
+            + ' · applied=' + escapeHtml(stats.timesApplied || 0)
+            + ' · improved=' + escapeHtml(stats.timesImprovedScore || 0)
+            + ' · avgCostReduction=' + escapeHtml(Number(stats.averageCostReduction || 0).toFixed(2))
+            + '</div>';
     }
 
     function derivativeRuleLabel(ruleId) {

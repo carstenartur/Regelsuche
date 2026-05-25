@@ -60,6 +60,8 @@ class ScientificDiscoveryPostgresE2ETest {
             assertFalse(run.context().graphStore().discoveredTransformations().isEmpty());
             assertTrue(Files.exists(run.artifacts().jsonReport()));
             assertTrue(Files.exists(run.artifacts().htmlReport()));
+            assertTrue(Files.exists(artifactRoot.resolve("discovery-report.md")));
+            assertTrue(Files.exists(artifactRoot.resolve("discovery-replay.json")));
             assertTrue(Files.exists(run.artifacts().screenshotPng()));
             assertTrue(Files.exists(run.artifacts().replayGif()));
             assertTrue(Files.readString(run.artifacts().htmlReport()).contains("Regelsuche Discovery Report"));
