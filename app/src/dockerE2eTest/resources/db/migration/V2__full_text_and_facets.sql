@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS search_index_documents (
+    document_id TEXT,
     type TEXT NOT NULL,
     entity_id TEXT NOT NULL,
     title TEXT NOT NULL DEFAULT '',

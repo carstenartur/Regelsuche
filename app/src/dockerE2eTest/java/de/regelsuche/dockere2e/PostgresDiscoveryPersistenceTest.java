@@ -34,8 +34,8 @@ class PostgresDiscoveryPersistenceTest {
             new DatabaseMigrationRunner().migrate(connection);
 
             try (PreparedStatement insert = connection.prepareStatement("""
-                INSERT INTO search_index_documents(type, entity_id, title, body, facets)
-                VALUES ('RULE', 'rule-1', 'Quadratic expansion', 'Expand polynomial squares', '{"domain":"polynomial"}'::jsonb)
+                INSERT INTO search_index_documents(document_id, type, entity_id, title, body, facets)
+                VALUES ('RULE:rule-1', 'RULE', 'rule-1', 'Quadratic expansion', 'Expand polynomial squares', '{"domain":"polynomial"}'::jsonb)
                 ON CONFLICT (type, entity_id) DO NOTHING
                 """)) {
                 assertEquals(1, insert.executeUpdate());

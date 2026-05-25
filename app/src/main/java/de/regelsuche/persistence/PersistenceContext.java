@@ -6,11 +6,14 @@ import de.regelsuche.graph.Neo4jExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.Neo4jRuleInventoryRepository;
 import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.persistence.relational.PersistenceAdapterFactory;
+import de.regelsuche.persistence.relational.RelationalPersistenceAdapters;
 import de.regelsuche.search.memory.InMemoryTranspositionTable;
 import de.regelsuche.search.memory.JsonFileTranspositionTable;
 import de.regelsuche.search.memory.Neo4jTranspositionTable;
 import de.regelsuche.search.memory.TranspositionTable;
 import java.io.PrintStream;
+import java.util.Optional;
 
 /**
  * Resolved persistence wiring: an {@link ExpressionGraphStore} + a
@@ -26,6 +29,7 @@ public final class PersistenceContext implements AutoCloseable {
     private final ExpressionGraphStore graphStore;
     private final RuleInventoryRepository inventoryRepository;
     private final TranspositionTable transpositionTable;
+    private final RelationalPersistenceAdapters relationalAdapters;
 
     private PersistenceContext(
         GraphPersistenceMode effectiveMode,
@@ -33,10 +37,21 @@ public final class PersistenceContext implements AutoCloseable {
         RuleInventoryRepository inventoryRepository,
         TranspositionTable transpositionTable
     ) {
+        this(effectiveMode, graphStore, inventoryRepository, transpositionTable, null);
+    }
+
+    private PersistenceContext(
+        GraphPersistenceMode effectiveMode,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TranspositionTable transpositionTable,
+        RelationalPersistenceAdapters relationalAdapters
+    ) {
         this.effectiveMode = effectiveMode;
         this.graphStore = graphStore;
         this.inventoryRepository = inventoryRepository;
         this.transpositionTable = transpositionTable;
+        this.relationalAdapters = relationalAdapters;
     }
 
     public GraphPersistenceMode effectiveMode() {
@@ -53,6 +68,10 @@ public final class PersistenceContext implements AutoCloseable {
 
     public TranspositionTable transpositionTable() {
         return transpositionTable;
+    }
+
+    public Optional<RelationalPersistenceAdapters> relationalAdapters() {
+        return Optional.ofNullable(relationalAdapters);
     }
 
     /**
@@ -124,30 +143,27 @@ public final class PersistenceContext implements AutoCloseable {
                 return new PersistenceContext(GraphPersistenceMode.REMOTE_NEO4J, graph, inventory, table);
             }
             case POSTGRESQL, POSTGRESQL_WITH_JSON_FALLBACK -> {
-                if (!config.hasPostgresCredentials()) {
-                    if (log != null) {
-                        log.println("Persistence: " + config.mode() + " requested but POSTGRES_URL/POSTGRES_USER/"
-                            + "POSTGRES_PASSWORD not all set; falling back to JSON_FILE at "
-                            + config.storagePath().toAbsolutePath());
-                    }
-                    return from(
-                        new PersistenceConfig(
-                            GraphPersistenceMode.JSON_FILE,
-                            config.storagePath(),
-                            null, null, null
-                        ),
-                        log
-                    );
-                }
+                Optional<RelationalPersistenceAdapters> adapters = PersistenceAdapterFactory.create(config, log);
                 JsonFileExpressionGraphStore graph = new JsonFileExpressionGraphStore(config.storagePath());
                 JsonFileRuleInventoryRepository inventory = new JsonFileRuleInventoryRepository(config.storagePath());
                 JsonFileTranspositionTable table = new JsonFileTranspositionTable(config.storagePath());
                 if (log != null) {
-                    log.println("Persistence: " + config.mode() + " relational metadata at "
-                        + config.postgresUrl() + "; mathematical graph artifacts use JSON_FILE at "
-                        + graph.filePath().toAbsolutePath());
+                    if (adapters.isPresent()) {
+                        log.println("Persistence: " + config.mode() + " relational metadata at "
+                            + config.postgresUrl() + "; mathematical graph artifacts use JSON_FILE at "
+                            + graph.filePath().toAbsolutePath());
+                    } else {
+                        log.println("Persistence: POSTGRESQL_WITH_JSON_FALLBACK running JSON-only at "
+                            + graph.filePath().toAbsolutePath());
+                    }
                 }
-                return new PersistenceContext(config.mode(), graph, inventory, table);
+                return new PersistenceContext(
+                    adapters.isPresent() ? config.mode() : GraphPersistenceMode.JSON_FILE,
+                    graph,
+                    inventory,
+                    table,
+                    adapters.orElse(null)
+                );
             }
             default -> throw new IllegalStateException("Unhandled mode: " + config.mode());
         }
@@ -160,6 +176,7 @@ public final class PersistenceContext implements AutoCloseable {
         if (transpositionTable instanceof AutoCloseable closable) {
             closeQuietly(closable);
         }
+        closeQuietly(relationalAdapters);
     }
 
     private static void closeQuietly(AutoCloseable resource) {

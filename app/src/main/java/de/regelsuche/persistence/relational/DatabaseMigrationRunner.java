@@ -14,7 +14,8 @@ import java.util.List;
 public final class DatabaseMigrationRunner {
     public static final List<DatabaseMigration> DEFAULT_MIGRATIONS = List.of(
         new DatabaseMigration(1, "discovery_persistence", "db/migration/V1__discovery_persistence.sql"),
-        new DatabaseMigration(2, "full_text_and_facets", "db/migration/V2__full_text_and_facets.sql")
+        new DatabaseMigration(2, "full_text_and_facets", "db/migration/V2__full_text_and_facets.sql"),
+        new DatabaseMigration(3, "hibernate_search_fields", "db/migration/V3__hibernate_search_fields.sql")
     );
 
     private final List<DatabaseMigration> migrations;

@@ -6,6 +6,10 @@ guava = "33.5.0-jre"
 junit-jupiter = "6.1.0"
 testcontainers = "2.0.5"
 postgresql = "42.7.11"
+hibernate-orm = "6.6.51.Final"
+hibernate-search = "7.2.6.Final"
+hibernate-validator = "8.0.3.Final"
+yasson = "3.0.4"
 
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
@@ -14,3 +18,8 @@ testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version
 testcontainers-core = { module = "org.testcontainers:testcontainers" }
 testcontainers-junit = { module = "org.testcontainers:testcontainers-junit-jupiter" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+hibernate-core = { module = "org.hibernate.orm:hibernate-core", version.ref = "hibernate-orm" }
+hibernate-search-mapper-orm = { module = "org.hibernate.search:hibernate-search-mapper-orm", version.ref = "hibernate-search" }
+hibernate-search-backend-lucene = { module = "org.hibernate.search:hibernate-search-backend-lucene", version.ref = "hibernate-search" }
+hibernate-validator = { module = "org.hibernate.validator:hibernate-validator", version.ref = "hibernate-validator" }
+yasson = { module = "org.eclipse:yasson", version.ref = "yasson" }

@@ -12,7 +12,7 @@ class DatabaseMigrationRunnerTest {
     void defaultMigrationsAreVersionedAndPackaged() {
         List<DatabaseMigration> migrations = DatabaseMigrationRunner.DEFAULT_MIGRATIONS;
 
-        assertEquals(List.of(1, 2), migrations.stream().map(DatabaseMigration::version).toList());
+        assertEquals(List.of(1, 2, 3), migrations.stream().map(DatabaseMigration::version).toList());
         for (DatabaseMigration migration : migrations) {
             assertNotNull(DatabaseMigrationRunner.class.getClassLoader().getResource(migration.resourcePath()),
                 () -> "missing " + migration.resourcePath());

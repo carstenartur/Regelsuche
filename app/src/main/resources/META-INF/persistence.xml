@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence" version="3.1">
+  <persistence-unit name="regelsuche-postgresql" transaction-type="RESOURCE_LOCAL">
+    <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+    <class>de.regelsuche.persistence.relational.SearchRunEntity</class>
+    <class>de.regelsuche.persistence.relational.DiscoveryExperimentEntity</class>
+    <class>de.regelsuche.persistence.relational.HypothesisCandidateEntity</class>
+    <class>de.regelsuche.persistence.relational.CounterexampleEntity</class>
+    <class>de.regelsuche.persistence.relational.BenchmarkResultEntity</class>
+    <class>de.regelsuche.persistence.relational.SeedExpressionEntity</class>
+    <class>de.regelsuche.persistence.relational.ExportReportEntity</class>
+    <class>de.regelsuche.persistence.relational.ProofJobMetadataEntity</class>
+    <class>de.regelsuche.persistence.relational.SearchIndexDocument</class>
+    <properties>
+      <property name="jakarta.persistence.jdbc.driver" value="org.postgresql.Driver"/>
+      <property name="hibernate.hbm2ddl.auto" value="none"/>
+      <property name="hibernate.show_sql" value="false"/>
+      <property name="hibernate.format_sql" value="false"/>
+      <property name="hibernate.search.backend.type" value="lucene"/>
+      <property name="hibernate.search.backend.directory.type" value="local-filesystem"/>
+      <property name="hibernate.search.schema_management.strategy" value="drop-and-create"/>
+      <property name="hibernate.search.indexing.plan.synchronization.strategy" value="sync"/>
+    </properties>
+  </persistence-unit>
+</persistence>
