@@ -1,5 +1,7 @@
 package de.regelsuche.proof;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.mining.RuleCandidate;
 import java.nio.file.Path;
@@ -12,7 +14,7 @@ import java.util.Objects;
  *
  * <p>Without an executor the worker behaves identically to the old
  * {@link SmtProofBridge}: it generates a {@code .smt2} script and reports
- * {@link de.regelsuche.mining.CandidateProofStatus#FORMALLY_PROVABLE}.</p>
+ * {@link de.regelsuche.validation.CandidateProofStatus#FORMALLY_PROVABLE}.</p>
  */
 public final class SmtProofWorker implements ProofWorker {
 

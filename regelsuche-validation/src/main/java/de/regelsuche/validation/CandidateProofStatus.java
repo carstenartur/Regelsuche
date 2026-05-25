@@ -1,10 +1,10 @@
-package de.regelsuche.mining;
+package de.regelsuche.validation;
 
 /**
- * Lifecycle of a {@link RuleCandidate} or {@link de.regelsuche.inventory.ReusableRule}.
+ * Lifecycle of a mined rule candidate or reusable inventory rule.
  *
- * <p>Ordering is used by {@link RuleInventoryConfiguration#minProofStatus()} and
- * similar threshold checks; {@code REJECTED} is intentionally placed
+ * <p>Ordering is used by inventory, discovery and proof threshold checks;
+ * {@code REJECTED} is intentionally placed
  * <strong>before</strong> {@code OBSERVED} so candidates explicitly excluded
  * from the inventory never satisfy any positive minimum.</p>
  */

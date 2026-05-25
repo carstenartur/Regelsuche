@@ -4,7 +4,7 @@ import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.Equation;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.graph.GraphEdge;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.transform.RewriteKind;

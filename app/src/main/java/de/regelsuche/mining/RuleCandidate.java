@@ -1,5 +1,7 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import java.util.List;
 
 public record RuleCandidate(

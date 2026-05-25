@@ -10,7 +10,7 @@ import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.transform.RewriteKind;
 import java.io.IOException;

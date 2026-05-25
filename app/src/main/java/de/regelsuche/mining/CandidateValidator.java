@@ -1,5 +1,7 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import de.regelsuche.ast.Expr;
 import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.parse.ExpressionFormatter;

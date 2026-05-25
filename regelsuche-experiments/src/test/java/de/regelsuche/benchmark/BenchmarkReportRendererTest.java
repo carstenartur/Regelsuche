@@ -1,5 +1,7 @@
 package de.regelsuche.benchmark;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,7 +16,7 @@ class BenchmarkReportRendererTest {
 
     @Test
     void benchmarkReportContainsQualityMetrics() {
-        BenchmarkSuite.BenchmarkSuiteResult scenario = new BenchmarkSuite.BenchmarkSuiteResult(
+        BenchmarkScenarioResult scenario = new BenchmarkScenarioResult(
             "test-scenario",
             List.of(new SearchBenchmarkResult(
                 "best-first", "x + 0",
@@ -24,7 +26,7 @@ class BenchmarkReportRendererTest {
                 /* expandedSteps */ 1,
                 /* distinctRules */ 1,
                 /* elapsedMillis */ 5L,
-                de.regelsuche.mining.CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+                de.regelsuche.validation.CandidateProofStatus.VALIDATED_BY_EXAMPLES,
                 /* expectedResultMatched */ Boolean.TRUE,
                 /* prunedStates */ 2,
                 /* eGraphClasses */ 10,
@@ -54,12 +56,12 @@ class BenchmarkReportRendererTest {
 
     @Test
     void benchmarkSummaryJsonIsGenerated() {
-        BenchmarkSuite.BenchmarkSuiteResult scenario = new BenchmarkSuite.BenchmarkSuiteResult(
+        BenchmarkScenarioResult scenario = new BenchmarkScenarioResult(
             "test-scenario",
             List.of(new SearchBenchmarkResult(
                 "beam", "x + 0",
                 3, 1, 1, 1, 1, 7L,
-                de.regelsuche.mining.CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+                de.regelsuche.validation.CandidateProofStatus.VALIDATED_BY_EXAMPLES,
                 Boolean.FALSE, 0, 0, 0, 0.0, false, false
             ))
         );

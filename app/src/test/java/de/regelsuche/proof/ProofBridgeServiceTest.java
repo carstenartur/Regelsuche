@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import java.io.IOException;

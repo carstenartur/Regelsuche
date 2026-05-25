@@ -21,7 +21,7 @@ import de.regelsuche.inventory.InventoryBackedRewriteRuleProvider;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.inventory.RuleActivationDecision;
 import de.regelsuche.inventory.RuleInventoryConfiguration;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.DiscoverySettings;
 import de.regelsuche.mining.KnownRuleRepository;
 import de.regelsuche.mining.RuleCandidate;

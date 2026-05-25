@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.inventory.ReusableRule;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.search.memory.TranspositionEntry;

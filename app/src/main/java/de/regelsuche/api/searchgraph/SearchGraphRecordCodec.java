@@ -5,7 +5,7 @@ import de.regelsuche.api.PathReplayDto;
 import de.regelsuche.export.layout.MathLayoutJsonWriter;
 import de.regelsuche.json.JsonReader;
 import de.regelsuche.json.JsonWriter;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.MacroRuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.transform.RewriteKind;

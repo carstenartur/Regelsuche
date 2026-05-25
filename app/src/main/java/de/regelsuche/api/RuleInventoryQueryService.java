@@ -2,7 +2,7 @@ package de.regelsuche.api;
 
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.inventory.RuleInventoryRepository;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import java.util.List;
 

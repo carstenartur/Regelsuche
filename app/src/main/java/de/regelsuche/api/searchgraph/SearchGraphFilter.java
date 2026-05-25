@@ -1,6 +1,6 @@
 package de.regelsuche.api.searchgraph;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.transform.RewriteKind;
 import java.util.ArrayList;
 import java.util.HashSet;

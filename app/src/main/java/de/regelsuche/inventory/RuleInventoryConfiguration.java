@@ -1,6 +1,6 @@
 package de.regelsuche.inventory;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import java.util.List;
 import java.util.Set;
 

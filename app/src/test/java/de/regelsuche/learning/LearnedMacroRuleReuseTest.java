@@ -10,7 +10,7 @@ import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.InventoryBackedRewriteRuleProvider;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.inventory.RuleInventoryConfiguration;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;

@@ -1,5 +1,7 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;

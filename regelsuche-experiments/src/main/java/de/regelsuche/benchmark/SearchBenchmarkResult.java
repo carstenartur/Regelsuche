@@ -1,6 +1,6 @@
 package de.regelsuche.benchmark;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 
 /**
  * Per-row result of a single benchmark scenario.

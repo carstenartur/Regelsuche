@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.api.IdentityReportDto;
 import de.regelsuche.api.PathReplayDto;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.transform.RewriteKind;
 import java.nio.file.Files;

@@ -10,8 +10,11 @@ regelsuche-core
   <- regelsuche-egraph
   <- regelsuche-search
   <- regelsuche-validation
+  <- regelsuche-experiments
   <- app
 regelsuche-egraph <- regelsuche-search
+regelsuche-search <- regelsuche-experiments
+regelsuche-validation <- regelsuche-experiments
 ```
 
 - `:regelsuche-core` darf keine Projektabhängigkeiten und keine technischen
@@ -20,6 +23,7 @@ regelsuche-egraph <- regelsuche-search
 - `:regelsuche-search` darf vom Core und vom E-Graph-Modul abhängen; JSON-/Neo4j-TranspositionTable-Adapter bleiben außerhalb.
 - `:regelsuche-validation` darf vom Core abhängen; konkrete Validierungsadapter
   dürfen hier zusätzliche technische Libraries kapseln.
+- `:regelsuche-experiments` darf von Search und Validation abhängen; Web-/CLI-/Persistenzadapter bleiben außerhalb.
 - `:app` ist die Composition Root und darf die Module verdrahten.
 
 ## Zielrichtung für die noch nicht extrahierten Schichten
@@ -50,6 +54,12 @@ reinen `TransformationEngine`-/Rewrite-Typen in `:regelsuche-core` liegen.
 `:regelsuche-search` enthält Strategien, Profile, CostModels und die
 `TranspositionTable`-Abstraktion. Technische Speicheradapter (`JsonFileTranspositionTable`,
 `Neo4jTranspositionTable`) bleiben in `:app` bzw. später in `:regelsuche-persistence`.
+
+## Experiments-Regel
+
+`:regelsuche-experiments` enthält den benchmarkfähigen Experiment-Kern
+(`SearchBenchmark`, Result-DTOs, Report-Renderer, `DiscoveryExperimentRunner`).
+App-spezifische Demo-Szenarien und Web-/CLI-Ausgabe bleiben in `:app`.
 
 ## Interface-first für große Erweiterungen
 

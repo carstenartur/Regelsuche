@@ -16,7 +16,7 @@ import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inequality.Comparator;
 import de.regelsuche.inequality.Inequality;
 import de.regelsuche.inequality.InequalityTransformationRuleAdapter;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.parse.ExpressionFormatter;

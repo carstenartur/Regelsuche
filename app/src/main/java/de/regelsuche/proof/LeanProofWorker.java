@@ -1,5 +1,7 @@
 package de.regelsuche.proof;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.mining.RuleCandidate;
 import java.nio.file.Path;
@@ -13,7 +15,7 @@ import java.util.Objects;
  * <p>Constructed without an artifact directory or executor the worker behaves
  * identically to the old skeleton-only {@link LeanProofBridge}: it produces a
  * {@code .lean} file in memory and reports
- * {@link de.regelsuche.mining.CandidateProofStatus#FORMALLY_PROVABLE}.  Pass
+ * {@link de.regelsuche.validation.CandidateProofStatus#FORMALLY_PROVABLE}.  Pass
  * a real {@link ProverExecutor#lean()} to upgrade to full proof execution.</p>
  */
 public final class LeanProofWorker implements ProofWorker {

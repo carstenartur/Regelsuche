@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.transform.RewriteKind;
 import java.time.Instant;

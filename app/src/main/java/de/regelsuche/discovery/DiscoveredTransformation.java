@@ -1,6 +1,6 @@
 package de.regelsuche.discovery;
 
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import java.time.Instant;
 import java.util.List;

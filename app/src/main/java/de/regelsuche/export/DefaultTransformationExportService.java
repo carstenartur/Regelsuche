@@ -1,5 +1,7 @@
 package de.regelsuche.export;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.inventory.ReusableRule;
@@ -95,7 +97,7 @@ public class DefaultTransformationExportService implements TransformationExportS
         return builder.toString();
     }
 
-    private String mermaidStatusClass(de.regelsuche.mining.CandidateProofStatus status) {
+    private String mermaidStatusClass(de.regelsuche.validation.CandidateProofStatus status) {
         return switch (status) {
             case FORMALLY_PROVED, FORMALLY_PROVABLE -> "formal";
             case SYMBOLICALLY_VERIFIED -> "symbolic";

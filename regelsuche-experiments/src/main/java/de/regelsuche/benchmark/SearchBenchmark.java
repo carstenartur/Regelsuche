@@ -1,5 +1,7 @@
 package de.regelsuche.benchmark;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
@@ -64,9 +66,9 @@ public class SearchBenchmark {
                 // The bare benchmark only runs the search; it does not validate
                 // identities formally. An improving path corresponds to a
                 // concrete equivalent expression -> VALIDATED_BY_EXAMPLES.
-                de.regelsuche.mining.CandidateProofStatus proofStatus = bestImprovement > 0
-                    ? de.regelsuche.mining.CandidateProofStatus.VALIDATED_BY_EXAMPLES
-                    : de.regelsuche.mining.CandidateProofStatus.OBSERVED;
+                de.regelsuche.validation.CandidateProofStatus proofStatus = bestImprovement > 0
+                    ? de.regelsuche.validation.CandidateProofStatus.VALIDATED_BY_EXAMPLES
+                    : de.regelsuche.validation.CandidateProofStatus.OBSERVED;
                 // Quality metrics — derived from the same `states` traversal
                 // so adding them carries no extra search cost.
                 boolean learnedRuleUsed = states.stream()

@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Renders {@link BenchmarkSuite.BenchmarkSuiteResult}s into the two artefacts
+ * Renders {@link BenchmarkScenarioResult}s into the two artefacts
  * that the docs site ships:
  *
  * <ul>
@@ -22,7 +22,7 @@ import java.util.Locale;
  */
 public final class BenchmarkReportRenderer {
 
-    public String renderMarkdown(List<BenchmarkSuite.BenchmarkSuiteResult> scenarios) {
+    public String renderMarkdown(List<BenchmarkScenarioResult> scenarios) {
         StringBuilder out = new StringBuilder();
         out.append("# Regelsuche – Benchmark-Qualitätsdashboard\n\n");
         out.append("Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt ")
@@ -31,7 +31,7 @@ public final class BenchmarkReportRenderer {
             .append("Saturation-Einsparungen, ob eine gelernte Makroregel beteiligt war und ob das ")
             .append("Export-Bundle für diese Zeile gültig ist.\n\n");
         out.append("**Ampel:** ✅ OK · ⚠️ WARN · ❌ FAIL\n\n");
-        for (BenchmarkSuite.BenchmarkSuiteResult scenario : scenarios) {
+        for (BenchmarkScenarioResult scenario : scenarios) {
             out.append("## ").append(scenario.name()).append("\n\n");
             out.append("| Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Sat-Sparung | Lernregel | Proof | Export |\n");
             out.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
@@ -57,7 +57,7 @@ public final class BenchmarkReportRenderer {
         return out.toString();
     }
 
-    public String renderJsonSummary(List<BenchmarkSuite.BenchmarkSuiteResult> scenarios) {
+    public String renderJsonSummary(List<BenchmarkScenarioResult> scenarios) {
         JsonWriter w = new JsonWriter();
         w.beginObject();
         w.property("schema", "regelsuche.benchmark-summary/v1");

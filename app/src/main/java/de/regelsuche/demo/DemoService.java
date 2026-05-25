@@ -6,7 +6,7 @@ import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.GraphEdge;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.strategy.SearchProblem;

@@ -2,7 +2,7 @@ package de.regelsuche.learning;
 
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.inventory.RuleInventoryRepository;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.DiscoverySettings;
 import de.regelsuche.mining.KnownRuleRepository;
 import de.regelsuche.mining.RuleCandidate;

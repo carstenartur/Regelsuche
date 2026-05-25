@@ -3,7 +3,7 @@ package de.regelsuche.proof;
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.inventory.RuleInventoryRepository;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import java.time.Duration;

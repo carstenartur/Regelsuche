@@ -1,5 +1,7 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 /**
  * Configures how the discovery loop collects search paths for rule mining.
  *

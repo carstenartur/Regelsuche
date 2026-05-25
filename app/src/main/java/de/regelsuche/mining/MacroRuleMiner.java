@@ -1,5 +1,7 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.validation.CandidateProofStatus;
+
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
 import java.util.ArrayList;

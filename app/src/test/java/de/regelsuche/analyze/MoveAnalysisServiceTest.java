@@ -9,7 +9,7 @@ import de.regelsuche.api.searchgraph.SearchGraphDto;
 import de.regelsuche.api.searchgraph.SearchGraphEdgeDto;
 import de.regelsuche.api.searchgraph.SearchGraphNodeDto;
 import de.regelsuche.api.searchgraph.SearchGraphStatsDto;
-import de.regelsuche.mining.CandidateProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.transform.RewriteKind;
 import java.util.List;
 import java.util.Map;

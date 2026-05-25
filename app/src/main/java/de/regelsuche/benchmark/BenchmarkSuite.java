@@ -22,8 +22,8 @@ import java.util.List;
  */
 public final class BenchmarkSuite {
 
-    public List<BenchmarkSuiteResult> runAll() {
-        List<BenchmarkSuiteResult> all = new ArrayList<>();
+    public List<BenchmarkScenarioResult> runAll() {
+        List<BenchmarkScenarioResult> all = new ArrayList<>();
         all.add(run("known-identities", List.of(
             "x + 0",
             "x * 1",
@@ -61,7 +61,7 @@ public final class BenchmarkSuite {
         return all;
     }
 
-    private BenchmarkSuiteResult runMathDomain(
+    private BenchmarkScenarioResult runMathDomain(
         String name,
         java.util.function.Function<de.regelsuche.demo.UnifiedMathDomainWorkbench,
             de.regelsuche.demo.UnifiedMathDomainWorkbench.DemoExecution> runner
@@ -82,13 +82,13 @@ public final class BenchmarkSuite {
                 .map(de.regelsuche.discovery.TransformationStep::ruleId).distinct().count(),
             /* elapsedMillis    */ elapsedMillis,
             /* proofStatus      */ exec.proofStatus() == null
-                ? de.regelsuche.mining.CandidateProofStatus.SYMBOLICALLY_VERIFIED
+                ? de.regelsuche.validation.CandidateProofStatus.SYMBOLICALLY_VERIFIED
                 : exec.proofStatus()
         );
-        return new BenchmarkSuiteResult(name, List.of(row));
+        return new BenchmarkScenarioResult(name, List.of(row));
     }
 
-    public BenchmarkSuiteResult run(String name, List<String> expressions, SearchHeuristic heuristic) {
+    public BenchmarkScenarioResult run(String name, List<String> expressions, SearchHeuristic heuristic) {
         SearchBenchmark benchmark = new SearchBenchmark(new AstRewriteTransformationEngine(), heuristic);
         List<SearchBenchmark.NamedSearchStrategy> strategies = List.of(
             new SearchBenchmark.NamedSearchStrategy("best-first", new BestFirstSearchStrategy()),
@@ -98,12 +98,6 @@ public final class BenchmarkSuite {
             new SearchBenchmark.NamedSearchStrategy("mcts", new MonteCarloTreeSearchStrategy(7L)),
             new SearchBenchmark.NamedSearchStrategy("hybrid", new HybridSearchStrategy())
         );
-        return new BenchmarkSuiteResult(name, benchmark.run(expressions, strategies));
-    }
-
-    public record BenchmarkSuiteResult(String name, List<SearchBenchmarkResult> results) {
-        public BenchmarkSuiteResult {
-            results = List.copyOf(results);
-        }
+        return new BenchmarkScenarioResult(name, benchmark.run(expressions, strategies));
     }
 }

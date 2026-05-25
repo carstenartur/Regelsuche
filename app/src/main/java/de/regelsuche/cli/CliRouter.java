@@ -291,8 +291,8 @@ public class CliRouter {
     private int runBenchmark(String[] args) {
         Map<String, String> options = parseOptions(args);
         de.regelsuche.benchmark.BenchmarkSuite suite = new de.regelsuche.benchmark.BenchmarkSuite();
-        java.util.List<de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult> results = suite.runAll();
-        for (de.regelsuche.benchmark.BenchmarkSuite.BenchmarkSuiteResult result : results) {
+        java.util.List<de.regelsuche.benchmark.BenchmarkScenarioResult> results = suite.runAll();
+        for (de.regelsuche.benchmark.BenchmarkScenarioResult result : results) {
             out.println("# " + result.name());
             result.results().forEach(row -> out.println("  " + row));
             if (!options.containsKey("quiet")) {
