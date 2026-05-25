@@ -1,6 +1,7 @@
 package de.regelsuche.egraph;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.Expr;
@@ -12,6 +13,7 @@ import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.PatternExpr;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class EqualitySaturationScalabilityTest {
@@ -98,6 +100,40 @@ class EqualitySaturationScalabilityTest {
         assertTrue(hitsAfterSecond > 0);
         assertEquals(missesAfterFirst, missesAfterSecond);
         assertTrue(missesAfterMutation > missesAfterSecond);
+    }
+
+    @Test
+    void memoizationDoesNotAliasDifferentPatternsWithSameId() {
+        EGraph eGraph = new EGraph();
+        eGraph.addExpression(parse("a + b"));
+        eGraph.addExpression(parse("sin(x)"));
+        EGraphPatternMatcher matcher = new EGraphPatternMatcher(eGraph);
+        String reusedId = "shared-pattern-id";
+        PatternExpr addPattern = PatternExpr.op(BinaryOperator.ADD, PatternExpr.var("L"), PatternExpr.var("R"));
+        PatternExpr sinPattern = PatternExpr.fn("sin", PatternExpr.var("X"));
+
+        List<EGraphPatternMatcher.Match> addMatches = matcher.matchAll(reusedId, addPattern, null);
+        List<EGraphPatternMatcher.Match> sinMatches = matcher.matchAll(reusedId, sinPattern, null);
+
+        assertEquals(1, addMatches.size());
+        assertEquals(1, sinMatches.size());
+        assertTrue(!addMatches.getFirst().root().equals(sinMatches.getFirst().root()));
+    }
+
+    @Test
+    void matchBindingsAreImmutableForPublicAndMemoizedResults() {
+        EGraph eGraph = new EGraph();
+        EClassId root = eGraph.addExpression(parse("a + b"));
+        EGraphPatternMatcher matcher = new EGraphPatternMatcher(eGraph);
+        PatternExpr addPattern = PatternExpr.op(BinaryOperator.ADD, PatternExpr.var("L"), PatternExpr.var("R"));
+
+        List<Map<String, EClassId>> directMatches = matcher.matchInClass(addPattern, root);
+        Map<String, EClassId> directBinding = directMatches.getFirst();
+        assertThrows(UnsupportedOperationException.class, () -> directBinding.put("NEW", root));
+
+        List<EGraphPatternMatcher.Match> memoizedMatches = matcher.matchAll("immutable", addPattern, List.of(root));
+        Map<String, EClassId> memoizedBinding = memoizedMatches.getFirst().bindings();
+        assertThrows(UnsupportedOperationException.class, () -> memoizedBinding.put("NEW", root));
     }
 
     @Test

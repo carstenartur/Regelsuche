@@ -30,7 +30,7 @@ import java.util.Set;
  */
 public final class EGraphPatternMatcher {
 
-    private record MatchCacheKey(String patternId, EClassId root, long version) {
+    private record MatchCacheKey(String patternId, String patternFingerprint, EClassId root, long version) {
     }
 
     public record MatcherStats(
@@ -113,7 +113,7 @@ public final class EGraphPatternMatcher {
      */
     public List<Map<String, EClassId>> matchInClass(PatternExpr pattern, EClassId targetClass) {
         EClassId canonical = eGraph.find(targetClass);
-        return matchAgainst(pattern, canonical, Collections.emptyMap());
+        return immutableBindings(matchAgainst(pattern, canonical, Collections.emptyMap()));
     }
 
     private List<Map<String, EClassId>> matchAgainst(
@@ -187,16 +187,24 @@ public final class EGraphPatternMatcher {
     }
 
     private List<Map<String, EClassId>> matchInClassMemoized(String patternId, PatternExpr pattern, EClassId rootId) {
-        MatchCacheKey key = new MatchCacheKey(patternId, eGraph.find(rootId), eGraph.version());
+        MatchCacheKey key = new MatchCacheKey(patternId, pattern.toString(), eGraph.find(rootId), eGraph.version());
         List<Map<String, EClassId>> hit = matchCache.get(key);
         if (hit != null) {
             matcherCacheHits++;
             return hit;
         }
         matcherCacheMisses++;
-        List<Map<String, EClassId>> computed = List.copyOf(matchInClass(pattern, rootId));
+        List<Map<String, EClassId>> computed = matchInClass(pattern, rootId);
         matchCache.put(key, computed);
         return computed;
+    }
+
+    private List<Map<String, EClassId>> immutableBindings(List<Map<String, EClassId>> bindings) {
+        List<Map<String, EClassId>> immutable = new ArrayList<>(bindings.size());
+        for (Map<String, EClassId> binding : bindings) {
+            immutable.add(Map.copyOf(binding));
+        }
+        return List.copyOf(immutable);
     }
 
     private Collection<EClassId> selectCandidateRoots(PatternExpr pattern, Collection<EClassId> candidates) {

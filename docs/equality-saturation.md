@@ -62,7 +62,8 @@ Vergleichspunkte (`egraphPatternMatchFullScanLarge` vs.
 `egraphPatternMatchIndexedLarge`) messen den Crossover explizit, indem
 sie denselben großen In-Memory-EGraph einmal per Vollscan und einmal per
 Signaturindex matchen. Die Add/Rebuild-Kurven bleiben durch
-`egraphAddAndRebuildSmall/Medium/Large` separat sichtbar.
+`egraphRebuildSmall`, `egraphAddAndRebuildMedium` und
+`egraphAddAndRebuildLarge` separat sichtbar.
 
 ### Verfügbare Metriken
 
