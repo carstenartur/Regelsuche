@@ -38,10 +38,14 @@ class ScientificSeedCorporaTest {
             [
               {
                 "id": "json-1",
-                "expression": "x + 0",
+                "expression": "f(\\"x\\") + 0",
                 "source": "local-json",
                 "category": "identity",
-                "tags": ["simple"]
+                "tags": ["simple", "quoted"],
+                "assumptions": ["x != \\"\\""],
+                "metadata": {
+                  "kind": "demo"
+                }
               }
             ]
             """);
@@ -56,7 +60,11 @@ class ScientificSeedCorporaTest {
         List<SeedExpression> seeds = ScientificSeedCorpora.fromCatalogs(List.of(yaml, json));
 
         assertEquals(2, seeds.size());
-        assertTrue(seeds.stream().anyMatch(seed -> seed.id().equals("json-1") && seed.source().equals("local-json")));
+        assertTrue(seeds.stream().anyMatch(seed ->
+            seed.id().equals("json-1")
+                && seed.source().equals("local-json")
+                && seed.expression().equals("f(\"x\") + 0")
+                && seed.assumptions().equals(List.of("x != \"\""))));
         assertTrue(seeds.stream().anyMatch(seed -> seed.id().equals("yaml-1") && seed.source().equals("local-yaml")));
     }
 }

@@ -1,5 +1,6 @@
 package de.regelsuche.example;
 
+import de.regelsuche.json.JsonReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,8 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /** Curated + file-backed scientific seed corpus helpers. */
 public final class ScientificSeedCorpora {
@@ -58,20 +57,21 @@ public final class ScientificSeedCorpora {
     }
 
     private static List<SeedExpression> parseJson(String content) {
-        Pattern objectPattern = Pattern.compile("\\{([^{}]*)\\}");
-        Matcher objectMatcher = objectPattern.matcher(content == null ? "" : content);
+        List<Object> values = new JsonReader(content == null ? "[]" : content).readArray();
         List<SeedExpression> seeds = new ArrayList<>();
-        while (objectMatcher.find()) {
-            String object = objectMatcher.group(1);
-            String id = fieldValue(object, "id");
-            String expression = fieldValue(object, "expression");
+        for (Object value : values) {
+            if (!(value instanceof Map<?, ?> object)) {
+                continue;
+            }
+            String id = stringValue(object, "id");
+            String expression = stringValue(object, "expression");
             if (expression.isBlank()) {
                 continue;
             }
-            String source = fieldValue(object, "source");
-            String category = fieldValue(object, "category");
-            List<String> tags = arrayValue(object, "tags");
-            List<String> assumptions = arrayValue(object, "assumptions");
+            String source = stringValue(object, "source");
+            String category = stringValue(object, "category");
+            List<String> tags = stringList(object.get("tags"));
+            List<String> assumptions = stringList(object.get("assumptions"));
             seeds.add(new SeedExpression(id, expression, source, category, tags, assumptions));
         }
         return normalize(seeds);
@@ -138,30 +138,22 @@ public final class ScientificSeedCorpora {
         return normalize(seeds);
     }
 
-    private static String fieldValue(String object, String key) {
-        Pattern p = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*\"([^\"]*)\"");
-        Matcher m = p.matcher(object == null ? "" : object);
-        return m.find() ? m.group(1).trim() : "";
+    private static String stringValue(Map<?, ?> object, String key) {
+        Object value = object.get(key);
+        if (value instanceof String text) {
+            return text.trim();
+        }
+        return "";
     }
 
-    private static List<String> arrayValue(String object, String key) {
-        Pattern p = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*\\[([^\\]]*)\\]");
-        Matcher m = p.matcher(object == null ? "" : object);
-        if (!m.find()) {
-            return List.of();
-        }
-        String values = m.group(1).trim();
-        if (values.isEmpty()) {
+    private static List<String> stringList(Object value) {
+        if (!(value instanceof List<?> values)) {
             return List.of();
         }
         List<String> result = new ArrayList<>();
-        for (String token : values.split(",")) {
-            String stripped = token.trim();
-            if (stripped.startsWith("\"") && stripped.endsWith("\"") && stripped.length() >= 2) {
-                stripped = stripped.substring(1, stripped.length() - 1);
-            }
-            if (!stripped.isBlank()) {
-                result.add(stripped);
+        for (Object element : values) {
+            if (element instanceof String text && !text.isBlank()) {
+                result.add(text);
             }
         }
         return List.copyOf(result);

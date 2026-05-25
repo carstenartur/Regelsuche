@@ -36,15 +36,33 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
         List<SeedExpression> seeds = (seedExpressions == null ? List.<String>of() : seedExpressions).stream()
             .map(expression -> new SeedExpression(expression, expression, "inline", "general", List.of(), List.of()))
             .toList();
-        return runDetailed(seeds).rows().stream()
+        return execute(seeds, false).stream()
             .map(row -> new ExperimentResult(row.seed().expression(), row.success(), row.summary()))
             .toList();
     }
 
     public DiscoveryReport runDetailed(List<SeedExpression> seedExpressions) {
         long started = System.nanoTime();
-        List<SeedExpression> normalized = normalize(seedExpressions);
-        List<SeedExpression> budgeted = normalized.stream().limit(globalBudget).toList();
+        List<SeedRunReport> rows = execute(seedExpressions, true);
+        long runtimeMillis = (System.nanoTime() - started) / 1_000_000L;
+        long successful = rows.stream().filter(SeedRunReport::success).count();
+        long hypotheses = rows.stream().mapToLong(row -> row.hypotheses().size()).sum();
+        long counterexamples = rows.stream().mapToLong(row -> row.counterexamples().size()).sum();
+        long rowRuntime = rows.stream().mapToLong(SeedRunReport::elapsedMillis).sum();
+        long rowMemory = rows.stream().mapToLong(SeedRunReport::memoryBytes).sum();
+        return new DiscoveryReport(
+            rows,
+            new DiscoveryMetrics(rows.size(), (int) successful, (int) hypotheses, (int) counterexamples, rowRuntime, rowMemory),
+            runtimeMillis
+        );
+    }
+
+    private List<SeedRunReport> execute(List<SeedExpression> seedExpressions, boolean stableOrder) {
+        List<SeedExpression> candidates = usable(seedExpressions);
+        if (stableOrder) {
+            candidates = candidates.stream().sorted(Comparator.comparing(SeedExpression::stableKey)).toList();
+        }
+        List<SeedExpression> budgeted = candidates.stream().limit(globalBudget).toList();
         ExecutorService pool = Executors.newFixedThreadPool(parallelism);
         try {
             List<Callable<IndexedResult>> tasks = new ArrayList<>();
@@ -69,18 +87,10 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                     outcome.memoryBytes()
                 ));
             }
-            rows = rows.stream().sorted(Comparator.comparing(row -> row.seed().stableKey())).toList();
-            long runtimeMillis = (System.nanoTime() - started) / 1_000_000L;
-            long successful = rows.stream().filter(SeedRunReport::success).count();
-            long hypotheses = rows.stream().mapToLong(row -> row.hypotheses().size()).sum();
-            long counterexamples = rows.stream().mapToLong(row -> row.counterexamples().size()).sum();
-            long rowRuntime = rows.stream().mapToLong(SeedRunReport::elapsedMillis).sum();
-            long rowMemory = rows.stream().mapToLong(SeedRunReport::memoryBytes).sum();
-            return new DiscoveryReport(
-                rows,
-                new DiscoveryMetrics(rows.size(), (int) successful, (int) hypotheses, (int) counterexamples, rowRuntime, rowMemory),
-                runtimeMillis
-            );
+            if (!stableOrder) {
+                return List.copyOf(rows);
+            }
+            return rows.stream().sorted(Comparator.comparing(row -> row.seed().stableKey())).toList();
         } catch (Exception exception) {
             throw new IllegalStateException("Experiment run failed", exception);
         } finally {
@@ -88,10 +98,9 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
         }
     }
 
-    private static List<SeedExpression> normalize(List<SeedExpression> input) {
+    private static List<SeedExpression> usable(List<SeedExpression> input) {
         return (input == null ? List.<SeedExpression>of() : input).stream()
             .filter(seed -> seed != null && !seed.expression().isBlank())
-            .sorted(Comparator.comparing(SeedExpression::stableKey))
             .toList();
     }
 

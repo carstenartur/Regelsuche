@@ -45,11 +45,11 @@ class DeterministicDiscoveryExperimentRunnerTest {
     @Test
     void plainRunnerInterfaceRemainsBackwardsCompatible() {
         DeterministicDiscoveryExperimentRunner runner = new DeterministicDiscoveryExperimentRunner(
-            5,
+            2,
             2,
             seed -> new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
                 seed.expression().contains("+ 0"),
-                "summary",
+                "summary for " + seed.expression(),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -58,9 +58,12 @@ class DeterministicDiscoveryExperimentRunnerTest {
             )
         );
 
-        List<DiscoveryExperimentRunner.ExperimentResult> results = runner.run(List.of("x + 0", "x * 1"));
+        List<DiscoveryExperimentRunner.ExperimentResult> results = runner.run(List.of("x * 1", "x + 0", "z + 0"));
 
         assertEquals(2, results.size());
-        assertTrue(results.stream().anyMatch(DiscoveryExperimentRunner.ExperimentResult::success));
+        assertEquals("x * 1", results.get(0).seedExpression());
+        assertEquals("summary for x * 1", results.get(0).summary());
+        assertEquals("x + 0", results.get(1).seedExpression());
+        assertTrue(results.get(1).success());
     }
 }
