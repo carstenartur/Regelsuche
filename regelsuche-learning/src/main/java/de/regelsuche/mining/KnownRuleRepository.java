@@ -3,6 +3,7 @@ package de.regelsuche.mining;
 import java.util.List;
 
 public class KnownRuleRepository {
+    private final KnownRuleSimilarityService similarityService = new KnownRuleSimilarityService();
     private final List<KnownRule> rules = List.of(
         new KnownRule("erste binomische Formel", "a^2 + 2*a*b + b^2", "(a + b)^2"),
         new KnownRule("erste binomische Formel", "x^2 + 2*a*x + a^2", "(x + a)^2"),
@@ -22,6 +23,10 @@ public class KnownRuleRepository {
             }
         }
         return RuleStatus.NEW;
+    }
+
+    public double similarityToKnownRules(String leftPattern, String rightPattern) {
+        return similarityService.similarityToKnownRules(leftPattern, rightPattern, rules);
     }
 
     public List<KnownRule> all() {
