@@ -21,4 +21,25 @@ class RuleIndexBenchmarkTest {
         assertTrue(multiStage.rulesSkippedByIndex() > root.rulesSkippedByIndex());
         assertEquals(multiStage.candidateSetSize(), (int) multiStage.averageCandidateSetSize());
     }
+
+    @Test
+    void comparesMacroHeavyDiscoveryCandidateRetrievalWithBudget() {
+        List<RuleIndexBenchmark.Result> results = new RuleIndexBenchmark().macroHeavyDiscovery(100, 5);
+
+        assertEquals(List.of("naive-scan", "root-symbol", "multi-stage"),
+            results.stream().map(RuleIndexBenchmark.Result::strategy).toList());
+        assertTrue(results.stream().allMatch(result -> result.candidateSetSize() <= 5));
+        assertTrue(results.get(2).rulesSkippedByIndex() >= results.get(1).rulesSkippedByIndex());
+    }
+
+    @Test
+    void tracksGrowingEGraphMatcherMetrics() {
+        RuleIndexBenchmark.Result result = new RuleIndexBenchmark().growingEGraph(32);
+
+        assertEquals("growing-egraph-indexed", result.strategy());
+        assertEquals(32, result.candidateSetSize());
+        assertTrue(result.rulesSkippedByIndex() > 0);
+        assertTrue(result.nodesScanned() > 0);
+        assertTrue(result.matcherCacheHits() >= 32);
+    }
 }

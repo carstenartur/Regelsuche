@@ -17,8 +17,10 @@ Zentrale Bausteine:
   Verengung aus Root-Symbol, Operator-Signatur, Feature-Vektor,
   Discrimination-Tree-Key und Goal-Ranking aus.
 - `RuleIndexBenchmark` vergleicht naive Scans, Root-Symbol-Index und
-  Multi-Stage-Index über wachsende Makroregel-Inventare und exportiert u. a.
-  `rulesSkippedByIndex` und durchschnittliche Kandidatenmengen.
+  Multi-Stage-Index über wachsende Makroregel-Inventare, makrolastige
+  Discovery-Szenarien und wachsende E-Graph-Matcher-Indizes. Exportierte
+  Metriken sind u. a. `rulesSkippedByIndex`, `nodesScanned`,
+  `matcherCacheHits` und durchschnittliche Kandidatenmengen.
 
 Wichtige Einstiegspunkte:
 
