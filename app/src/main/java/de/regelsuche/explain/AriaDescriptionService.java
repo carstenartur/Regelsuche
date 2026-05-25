@@ -52,9 +52,7 @@ public class AriaDescriptionService {
         boolean german = isGerman(locale);
         String fromAria = AstAriaRenderer.ariaLabel(step.beforeExpression(), locale);
         String toAria   = AstAriaRenderer.ariaLabel(step.afterExpression(), locale);
-        String ruleName = explanationService.renderStep(step, ExplanationService.Form.SCHOOL, locale);
-        // Extract just the first line of the SCHOOL rendering (e.g. "Regel: …" / "Rule: …")
-        String ruleLabel = firstLine(ruleName);
+        String ruleLabel = explanationService.ruleTitle(step.ruleId(), locale);
 
         String equivalenceNote;
         if (step.equivalencePreserving()) {
@@ -147,11 +145,4 @@ public class AriaDescriptionService {
         return "de".equalsIgnoreCase(locale.getLanguage());
     }
 
-    private static String firstLine(String text) {
-        if (text == null || text.isEmpty()) {
-            return "";
-        }
-        int nl = text.indexOf('\n');
-        return nl < 0 ? text : text.substring(0, nl);
-    }
 }

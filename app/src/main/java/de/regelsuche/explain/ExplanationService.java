@@ -16,11 +16,10 @@ import java.util.Map;
  * <p>Supported {@link Form forms}: {@code SHORT}, {@code SCHOOL},
  * {@code EXPERT}, {@code LATEX}, {@code JSON}.</p>
  *
- * <p>All text-producing forms ({@code SHORT}, {@code SCHOOL},
- * {@code EXPERT}) are locale-aware. The overloads without a
- * {@link Locale} parameter default to {@link Locale#GERMAN} for
- * backward compatibility. Pass {@link Locale#ENGLISH} (or any other
- * locale, which falls back to English) to obtain English output.</p>
+ * <p>{@code SCHOOL} output and path headings are locale-aware. The overloads
+ * without a {@link Locale} parameter default to {@link Locale#GERMAN} for
+ * backward compatibility. Pass {@link Locale#ENGLISH} (or any other locale,
+ * which falls back to English) to obtain English output.</p>
  */
 public class ExplanationService {
 
@@ -112,6 +111,19 @@ public class ExplanationService {
             }
         }
         return builder.toString();
+    }
+
+    /**
+     * Returns the localized, human-readable title for a rewrite rule without
+     * any surrounding {@code Regel:}/{@code Rule:} label.
+     *
+     * @param ruleId the transformation rule id
+     * @param locale target locale; German is used for {@code de}, all other
+     *               locales fall back to English
+     * @return localized rule title
+     */
+    public String ruleTitle(String ruleId, Locale locale) {
+        return humanRuleName(ruleId, locale);
     }
 
     // ── Private rendering helpers ────────────────────────────────────────────

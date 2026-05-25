@@ -164,6 +164,8 @@ class LocalizedExplanationTest {
         String narration = aria.stepNarration(step, 0, Locale.GERMAN);
         assertTrue(narration.contains("Schritt 1"), "German narration must start with 'Schritt 1'");
         assertTrue(narration.contains("Distributivgesetz"), "German narration must name the rule");
+        assertFalse(narration.contains("Schritt 1: Regel:"),
+            "German narration must not duplicate the step/rule label");
         assertTrue(narration.contains("Vorher:"), "German narration must describe before expression");
         assertTrue(narration.contains("Nachher:"), "German narration must describe after expression");
     }
@@ -176,6 +178,8 @@ class LocalizedExplanationTest {
         String narration = aria.stepNarration(step, 0, Locale.ENGLISH);
         assertTrue(narration.contains("Step 1"), "English narration must start with 'Step 1'");
         assertTrue(narration.contains("Distributive law"), "English narration must name the rule");
+        assertFalse(narration.contains("Step 1: Rule:"),
+            "English narration must not duplicate the step/rule label");
         assertTrue(narration.contains("Before:"), "English narration must describe before expression");
         assertTrue(narration.contains("After:"), "English narration must describe after expression");
     }
