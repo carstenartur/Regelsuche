@@ -31,7 +31,16 @@ Discovery-Pfad-DTOs; Graph-/Export-/Web-Orchestrierung bleibt in `app`.
 Mining-Primitiven; Discovery-Orchestrierung (`RuleDiscoveryService`,
 `MacroRuleMiner`) bleibt bis zur weiteren Entkopplung in `app`. `regelsuche-persistence` existiert für Konfiguration und
 checkpointfähige Ports; der datenbankgebundene Hibernate-Adapter ist jetzt in
-`:regelsuche-persistence-hibernate` ausgelagert:
+`:regelsuche-persistence-hibernate` ausgelagert.
+
+Für die nächste Architekturwelle sind die Zielmodule `regelsuche-search-index`,
+`regelsuche-discovery-ranking`, `regelsuche-provenance`,
+`regelsuche-symbolic-regression`, `regelsuche-cas`, `regelsuche-cas-jas`,
+`regelsuche-cas-singular` und `regelsuche-dashboard` vorbereitet, aber noch
+nicht physisch eingeschaltet. Der erste stabile Port dieser Welle ist
+`RuleCandidateIndex` im bestehenden `:regelsuche-search`; er kapselt die neue
+mehrstufige Kandidatenverengung, bis der spätere `regelsuche-search-index`-
+Extraktionsschritt ohne Import-Zyklen möglich ist:
 
 ```text
 api, explain, export, graph, inventory, app-spezifisches mining, orchestration-nahe search

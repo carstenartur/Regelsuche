@@ -10,11 +10,15 @@ Zentrale Bausteine:
 - `DeterministicDiscoveryExperimentRunner` wertet Seeds deterministisch, budgetiert und optional parallel aus.
 - `DiscoveryReplayArtifactWriter` erzeugt `discovery-report.{json,html,md}`, `discovery-replay.json`, `discovery-summary.png` und `discovery-replay.gif`.
 - `PathReplayDto` und die Web-Workbench liefern das interaktive Schritt-für-Schritt-Replay inklusive Makrozügen, Domänenkarten und Proof-Status.
-- `de.regelsuche.search.index.TermRuleIndex` und `RootSymbolTermRuleIndex`
-  liegen im Search-Modul und bilden den ersten Index-Layer für atomare Regeln
-  und gelernte Makrozüge; `app` konsumiert sie nur für Wiring/Benchmarks.
-  Feature-Vektor- und Discrimination-Tree-Varianten sind als Erweiterungspunkte
-  angelegt.
+- `de.regelsuche.search.index.RuleCandidateIndex` erweitert den bisherigen
+  `TermRuleIndex`-Pfad um `CandidateSet`, `SearchContext`, `CandidateBudget`
+  und detaillierte `IndexMetrics`. `RootSymbolTermRuleIndex` bleibt die
+  rückwärtskompatible Implementierung, führt aber optional eine mehrstufige
+  Verengung aus Root-Symbol, Operator-Signatur, Feature-Vektor,
+  Discrimination-Tree-Key und Goal-Ranking aus.
+- `RuleIndexBenchmark` vergleicht naive Scans, Root-Symbol-Index und
+  Multi-Stage-Index über wachsende Makroregel-Inventare und exportiert u. a.
+  `rulesSkippedByIndex` und durchschnittliche Kandidatenmengen.
 
 Wichtige Einstiegspunkte:
 
