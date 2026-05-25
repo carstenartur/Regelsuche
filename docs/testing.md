@@ -29,6 +29,9 @@ Treibt den Web-Workbench mit echten Browser-Flows an. Jeder Test:
 Vor dem ersten Lauf zieht der Sub-Task `installPlaywrightBrowsers`
 Chromium ins lokale `~/.cache/ms-playwright/`. Dieser Schritt ist
 idempotent.
+CI trennt Installation und Testausführung: erst `./gradlew installPlaywrightBrowsers`,
+dann `./gradlew e2eTest -Pregelsuche.skipPlaywrightInstall=true`, damit während
+der eigentlichen Browser-Tests keine externen Downloads stattfinden.
 
 Die Browser-Tests verwenden bewusst eine in-Process-Server-Variante statt
 Testcontainers für schnelle Feedback-Loops — ein In-Process-Start ist eine
@@ -80,7 +83,8 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
 `.github/workflows/ci-cd.yml` fährt sechs voneinander unabhängige Jobs:
 
 * `unit-test` — `./gradlew test`
-* `browser-e2e` — installiert Chromium und ruft `./gradlew e2eTest` auf
+* `browser-e2e` — installiert Chromium und ruft
+  `./gradlew e2eTest -Pregelsuche.skipPlaywrightInstall=true` auf
   (deckt u. a. die landing-page-spezifischen Flows `landingPageShowsSimplePrimaryFlow`,
   `tabsHiddenBeforeFirstSearch`, `tabsVisibleAfterSearch`,
   `goalSelectionIsSubmittedWithSearch` aus

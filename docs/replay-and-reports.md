@@ -13,6 +13,8 @@ Das Replay zeigt pro Pfad:
 - Regelbegründung und Diff-Hervorhebung
 - Domänenhinweise (z. B. Vergleichszeichen-Flip, Matrixkarte)
 - Makrozüge inklusive atomarer Expansion und unterstützender Pfad-IDs
+- kompakte Dashboard-Metriken (`searchSpaceSize`, `macroMoveUsage`,
+  `counterexampleStats`) direkt im Replay-Panel
 
 ## Reports
 
@@ -24,6 +26,16 @@ Automatisch erzeugte Artefakte:
 - `discovery-replay.json`
 - `discovery-summary.png`
 - `discovery-replay.gif`
+
+Die HTML-/Markdown-/Replay-JSON-Reports enthalten zusätzlich:
+
+- `searchSpaceSize`
+- `matchStats`
+- `macroMoveUsage`
+- `memoryUsage`
+- `counterexampleStats`
+- `proofSuccessRate`
+- `artifactCounts`
 
 Browser-E2E und Doku-Assets:
 

@@ -6,9 +6,14 @@ import de.regelsuche.egraph.EClassId;
 import de.regelsuche.egraph.EGraph;
 import de.regelsuche.egraph.EGraphPatternMatcher;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.index.RootSymbolTermRuleIndex;
+import de.regelsuche.index.TermRuleIndex;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.validation.CandidateProofStatus;
 
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -19,6 +24,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 
 import java.util.List;
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -48,6 +54,7 @@ public class CoreBenchmarks {
     private List<String> largeEGraphExpressions;
     private EGraph largeMatcherGraph;
     private PatternExpr addPattern;
+    private RootSymbolTermRuleIndex growingRuleIndex;
 
     @Setup
     public void setup() {
@@ -61,6 +68,26 @@ public class CoreBenchmarks {
         largeMatcherGraph = new EGraph();
         for (String expr : largeEGraphExpressions) {
             largeMatcherGraph.addExpression(parser.parseTerm(expr));
+        }
+        growingRuleIndex = new RootSymbolTermRuleIndex();
+        for (int i = 0; i < 2_000; i++) {
+            growingRuleIndex.addMacroMove(new ReusableRule(
+                "macro_algebra_" + i,
+                "(x + A" + i + ") ^ 2",
+                "x ^ 2 + 2 * A" + i + " * x + A" + i + " ^ 2",
+                List.of(),
+                CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+                RuleStatus.NEW,
+                2,
+                5.0,
+                Instant.EPOCH,
+                "hash-" + i,
+                null,
+                0,
+                2,
+                List.of("path-" + i),
+                0.9
+            ));
         }
     }
 
@@ -142,6 +169,15 @@ public class CoreBenchmarks {
     public int egraphPatternMatchIndexedLarge() {
         EGraphPatternMatcher matcher = new EGraphPatternMatcher(largeMatcherGraph);
         return matcher.matchAll("jmh-add-pattern", addPattern, null).size();
+    }
+
+    @Benchmark
+    public int termRuleIndexGrowingInventory() {
+        return growingRuleIndex.query(
+            "(x + 7) ^ 2",
+            new TermRuleIndex.Query("x ^ 2 + 14 * x + 49",
+                CandidateProofStatus.VALIDATED_BY_EXAMPLES, "algebra", false, true)
+        ).metrics().rulesMatched();
     }
 
     private static List<String> buildLargeEGraphExpressions() {

@@ -30,7 +30,8 @@ public record MacroMoveExpansion(
     List<TransformationStep> atomicSteps,
     List<String> supportingPathIds,
     double compressionRatio,
-    boolean expanded
+    boolean expanded,
+    MacroMoveStatistics stats
 ) {
     public MacroMoveExpansion {
         if (macroRuleId == null || macroRuleId.isBlank()) {
@@ -41,6 +42,20 @@ public record MacroMoveExpansion(
         if (compressionRatio < 1.0) {
             compressionRatio = 1.0;
         }
+        stats = stats == null ? MacroMoveStatistics.empty() : stats;
+    }
+
+    public MacroMoveExpansion(
+        String macroRuleId,
+        String fromExpression,
+        String toExpression,
+        List<TransformationStep> atomicSteps,
+        List<String> supportingPathIds,
+        double compressionRatio,
+        boolean expanded
+    ) {
+        this(macroRuleId, fromExpression, toExpression, atomicSteps, supportingPathIds,
+            compressionRatio, expanded, MacroMoveStatistics.empty());
     }
 
     public MacroMoveExpansion(
@@ -51,14 +66,15 @@ public record MacroMoveExpansion(
         double compressionRatio,
         boolean expanded
     ) {
-        this(macroRuleId, fromExpression, toExpression, atomicSteps, List.of(), compressionRatio, expanded);
+        this(macroRuleId, fromExpression, toExpression, atomicSteps, List.of(), compressionRatio, expanded,
+            MacroMoveStatistics.empty());
     }
 
     /** Returns a copy with the expanded flag toggled. */
     public MacroMoveExpansion withExpanded(boolean newExpanded) {
         return new MacroMoveExpansion(
             macroRuleId, fromExpression, toExpression,
-            atomicSteps, supportingPathIds, compressionRatio, newExpanded
+            atomicSteps, supportingPathIds, compressionRatio, newExpanded, stats
         );
     }
 
@@ -90,7 +106,8 @@ public record MacroMoveExpansion(
             atomicSteps,
             candidate.supportingTransformationIds(),
             candidate.compressionRatio(),
-            false
+            false,
+            MacroMoveStatistics.empty()
         );
     }
 }

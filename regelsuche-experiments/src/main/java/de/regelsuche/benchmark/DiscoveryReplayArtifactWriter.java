@@ -7,6 +7,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
@@ -56,7 +57,15 @@ public final class DiscoveryReplayArtifactWriter {
             .append("</style>");
         out.append("</head><body><h1>Regelsuche Discovery Report</h1>");
         out.append("<p class=\"muted\">Deterministischer Replay-/Discovery-Bericht für wissenschaftliche Reproduktionsläufe.</p>");
+        DiscoveryDashboardMetrics dashboard = dashboardMetrics(report);
         out.append("<div class=\"cards\">")
+            .append(metricCard("searchSpaceSize", String.valueOf(dashboard.searchSpaceSize())))
+            .append(metricCard("matchStats", dashboard.matchStats().matched() + " / " + dashboard.matchStats().unmatched()))
+            .append(metricCard("macroMoveUsage", dashboard.macroMoveUsage().applied() + " applied"))
+            .append(metricCard("memoryUsage", dashboard.memoryUsage() + " B"))
+            .append(metricCard("counterexampleStats", dashboard.counterexampleStats().found() + " / " + dashboard.counterexampleStats().checked()))
+            .append(metricCard("proofSuccessRate", String.format(java.util.Locale.ROOT, "%.2f", dashboard.proofSuccessRate())))
+            .append(metricCard("artifactCounts", String.valueOf(dashboard.artifactCounts().values().stream().mapToInt(Integer::intValue).sum())))
             .append(metricCard("Seeds", String.valueOf(report.metrics().processedSeeds())))
             .append(metricCard("Erfolgreich", String.valueOf(report.metrics().successfulSeeds())))
             .append(metricCard("Hypothesen", String.valueOf(report.metrics().hypotheses())))
@@ -99,6 +108,17 @@ public final class DiscoveryReplayArtifactWriter {
         out.append("- Gegenbeispiele: ").append(report.metrics().counterexamples()).append('\n');
         out.append("- Laufzeit Σ: ").append(report.metrics().accumulatedRuntimeMillis()).append(" ms\n");
         out.append("- Speicher Σ: ").append(report.metrics().accumulatedMemoryBytes()).append(" B\n\n");
+        DiscoveryDashboardMetrics dashboard = dashboardMetrics(report);
+        out.append("## Dashboard Metrics\n\n");
+        out.append("- searchSpaceSize: ").append(dashboard.searchSpaceSize()).append('\n');
+        out.append("- matchStats: ").append(dashboard.matchStats().matched()).append(" matched / ")
+            .append(dashboard.matchStats().unmatched()).append(" unmatched\n");
+        out.append("- macroMoveUsage: ").append(dashboard.macroMoveUsage().applied()).append(" applied\n");
+        out.append("- memoryUsage: ").append(dashboard.memoryUsage()).append(" B\n");
+        out.append("- counterexampleStats: ").append(dashboard.counterexampleStats().found()).append(" / ")
+            .append(dashboard.counterexampleStats().checked()).append('\n');
+        out.append("- proofSuccessRate: ").append(String.format(java.util.Locale.ROOT, "%.2f", dashboard.proofSuccessRate())).append('\n');
+        out.append("- artifactCounts: ").append(dashboard.artifactCounts()).append("\n\n");
         for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
             out.append("## ").append(row.seed().stableKey()).append("\n\n");
             out.append("- Status: ").append(row.success() ? "OK" : "FAIL").append('\n');
@@ -126,6 +146,26 @@ public final class DiscoveryReplayArtifactWriter {
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("schema", "regelsuche.discovery-replay/v1");
+        DiscoveryDashboardMetrics dashboard = dashboardMetrics(report);
+        writer.object("dashboardMetrics", metrics -> {
+            metrics.property("searchSpaceSize", dashboard.searchSpaceSize());
+            metrics.object("matchStats", match -> {
+                match.property("matched", dashboard.matchStats().matched());
+                match.property("unmatched", dashboard.matchStats().unmatched());
+            });
+            metrics.object("macroMoveUsage", macro -> {
+                macro.property("considered", dashboard.macroMoveUsage().considered());
+                macro.property("applied", dashboard.macroMoveUsage().applied());
+                macro.property("averageCostReduction", dashboard.macroMoveUsage().averageCostReduction());
+            });
+            metrics.property("memoryUsage", dashboard.memoryUsage());
+            metrics.object("counterexampleStats", counterexamples -> {
+                counterexamples.property("checked", dashboard.counterexampleStats().checked());
+                counterexamples.property("found", dashboard.counterexampleStats().found());
+            });
+            metrics.property("proofSuccessRate", dashboard.proofSuccessRate());
+            metrics.object("artifactCounts", artifacts -> dashboard.artifactCounts().forEach(artifacts::property));
+        });
         writer.array("replays", arr -> report.rows().forEach(row -> arr.objectValue(object -> {
             object.property("seedId", row.seed().id());
             object.property("seedStableKey", row.seed().stableKey());
@@ -233,6 +273,17 @@ public final class DiscoveryReplayArtifactWriter {
 
     private String joinOrDash(java.util.List<String> values) {
         return values == null || values.isEmpty() ? "–" : String.join(", ", values);
+    }
+
+    private DiscoveryDashboardMetrics dashboardMetrics(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        return DiscoveryDashboardMetrics.from(report, Map.of(
+            "json", 1,
+            "html", 1,
+            "markdown", 1,
+            "replayJson", 1,
+            "screenshotPng", 1,
+            "replayGif", 1
+        ));
     }
 
     public record ArtifactBundle(

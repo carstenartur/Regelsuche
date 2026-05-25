@@ -434,6 +434,13 @@ table.compare thead th { background: #eff6ff; }
 .replay-macro-card      { border-color: #1d4ed8; background: #eff6ff; }
 .replay-macro-steps     { margin: 8px 0 0 20px; }
 .replay-macro-steps li  { margin: 4px 0; }
+.replay-dashboard-metrics {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px;
+}
+.replay-dashboard-metrics span {
+  background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 999px;
+  padding: 4px 10px; font-size: 0.82rem;
+}
 .benchmark-group { margin: 20px 0; }
 .benchmark-group-title {
   margin: 8px 0; padding-bottom: 4px; border-bottom: 2px solid #cbd5e1;

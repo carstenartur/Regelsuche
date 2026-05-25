@@ -84,6 +84,24 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
    starten — enthält Markdown/LaTeX/JSON/Mermaid/GraphML und das aktuelle
    Rule-Inventory.
 
+## Scientific Discovery Walkthrough
+
+Für reproduzierbare Discovery-Läufe ohne UI:
+
+```bash
+./gradlew :app:test --tests de.regelsuche.discovery.ScientificDiscoveryReproductionTest
+```
+
+Der Lauf speist kuratierte `SeedExpression`s in die produktive
+`ScientificDiscoveryWorkflow`-Komposition ein und erzeugt Replay-/Report-
+Artefakte: `discovery-report.json`, `discovery-report.html`,
+`discovery-report.md`, `discovery-replay.json`, `discovery-summary.png` und
+`discovery-replay.gif`. Für PostgreSQL-/Hibernate-Metadaten plus Artefakte:
+
+```bash
+./gradlew :app:dockerE2eTest --tests de.regelsuche.dockere2e.ScientificDiscoveryPostgresE2ETest
+```
+
 ## Was kann Regelsuche?
 
 * **Atomare Rewrite-Regeln** statt vorgefertigter Formeln — Schulbuchidentitäten
@@ -118,6 +136,8 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
 
 * [Getting Started](docs/getting-started.md) — Docker, lokaler Gradle-Lauf,
   wichtige Endpunkte, optionaler Neo4j-Mode.
+* [Docker-/Compose-Setup](docker-compose.yml) — PostgreSQL-Full-Mode und
+  optionales Neo4j-Profil.
 * [Architektur](docs/architecture.md) — Leitplanken und Überblick.
 * [Modulstruktur](docs/module-structure.md) — Gradle-Module inkl. Search/Persistence/Learning/Experiments (inkl. Seed-Corpus)/CLI/Discovery, verbleibende logische Module und Paketmapping.
 * [Dependency-Regeln](docs/dependency-rules.md) — erlaubte Abhängigkeitsrichtungen.
@@ -137,10 +157,15 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
   Artefakte, Browser-Screenshots/GIFs.
 * [Storage Architecture](docs/storage-architecture.md) — In-Memory, JSON,
   PostgreSQL/Hibernate und Artefakt-Ablage.
+* [Persistenz](docs/persistence.md) — Betriebsmodi und Adapterdetails.
 * [Mathematical Algorithms](docs/mathematical-algorithms.md) — Registry,
   Validierungs-Backends und aktuelle Toggles.
 * [Scientific Reproducibility](docs/scientific-reproducibility.md) —
   reproduzierbare Discovery-Läufe, Seeds und CI-Artefakte.
+* [Benchmarks](docs/benchmark-report.md) — aktuelle Benchmark-Beispiele und
+  Qualitätsdashboard.
+* [Bekannte Grenzen](docs/limits.md) — bewusst begrenzte Semantik und
+  Follow-up-Entscheidungen.
 * [Proof-Bridge](docs/proof-bridge.md) — vom Pfad zum formalen Beweis.
 * [Proof-Workbench](docs/proof-workbench.md) — persistente Jobs, REST,
   Artefakt-Bundle, Dockerfile.proof.

@@ -10,6 +10,9 @@ Zentrale Bausteine:
 - `DeterministicDiscoveryExperimentRunner` wertet Seeds deterministisch, budgetiert und optional parallel aus.
 - `DiscoveryReplayArtifactWriter` erzeugt `discovery-report.{json,html,md}`, `discovery-replay.json`, `discovery-summary.png` und `discovery-replay.gif`.
 - `PathReplayDto` und die Web-Workbench liefern das interaktive Schritt-für-Schritt-Replay inklusive Makrozügen, Domänenkarten und Proof-Status.
+- `TermRuleIndex`/`RootSymbolTermRuleIndex` bilden den ersten Index-Layer für
+  atomare Regeln und gelernte Makrozüge; Feature-Vektor- und
+  Discrimination-Tree-Varianten sind als Erweiterungspunkte angelegt.
 
 Wichtige Einstiegspunkte:
 

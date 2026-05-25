@@ -35,9 +35,12 @@ class DiscoveryReplayArtifactWriterTest {
 
         assertTrue(Files.readString(bundle.jsonReport()).contains("regelsuche.discovery-report/v1"));
         assertTrue(Files.readString(bundle.htmlReport()).contains("Regelsuche Discovery Report"));
+        assertTrue(Files.readString(bundle.htmlReport()).contains("searchSpaceSize"));
+        assertTrue(Files.readString(bundle.htmlReport()).contains("artifactCounts"));
         assertTrue(Files.readString(bundle.htmlReport()).contains("Hypothesen"));
-        assertTrue(Files.readString(bundle.markdownReport()).contains("# Regelsuche Discovery Report"));
+        assertTrue(Files.readString(bundle.markdownReport()).contains("## Dashboard Metrics"));
         assertTrue(Files.readString(bundle.replayJson()).contains("regelsuche.discovery-replay/v1"));
+        assertTrue(Files.readString(bundle.replayJson()).contains("\"dashboardMetrics\""));
         assertTrue(Files.size(bundle.screenshotPng()) > 0, "PNG screenshot artifact must be written");
         assertTrue(Files.size(bundle.replayGif()) > 0, "GIF replay artifact must be written");
     }

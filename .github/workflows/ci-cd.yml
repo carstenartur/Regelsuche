@@ -215,16 +215,26 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-v1
+      - name: Install Playwright browsers
+        run: ./gradlew installPlaywrightBrowsers
       - name: Run browser E2E flows
-        run: ./gradlew e2eTest
+        run: ./gradlew e2eTest -Pregelsuche.skipPlaywrightInstall=true
       - name: Upload E2E reports
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-test-reports
           path: |
             app/build/reports/tests/e2eTest/**
             app/build/test-results/e2eTest/**
+      - name: Upload replay/report artifacts from E2E
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-replay-report-artifacts
+          path: |
+            app/build/reports/e2eTest/**
+            app/build/discovery-artifacts/**
 
   docs-assets:
     name: Refresh docs/assets screenshots & videos

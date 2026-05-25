@@ -58,6 +58,13 @@ class SearchGraphEndpointsTest {
         assertTrue(body.contains("\"nodes\""));
         assertTrue(body.contains("\"edges\""));
         assertTrue(body.contains("\"stats\""));
+        assertTrue(body.contains("\"searchSpaceSize\""));
+        assertTrue(body.contains("\"matchStats\""));
+        assertTrue(body.contains("\"macroMoveUsage\""));
+        assertTrue(body.contains("\"memoryUsage\""));
+        assertTrue(body.contains("\"counterexampleStats\""));
+        assertTrue(body.contains("\"proofSuccessRate\""));
+        assertTrue(body.contains("\"artifactCounts\""));
         assertTrue(body.contains("\"layout\":{\"kind\""),
             "/api/search-graph must expose layout JSON for math-bearing nodes/edges");
     }

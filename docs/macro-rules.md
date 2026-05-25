@@ -76,6 +76,17 @@ ursprünglichen Pfad zum Aufklappen.
 - `PathReplayDto.ReplayStep.macroMoveExpansion`
 - `SearchGraphRecordCodec` exportiert `macroMoveExpansion.atomicSteps`
 
+Makrozüge tragen außerdem Nutzungsstatistiken:
+
+- `timesConsidered`
+- `timesApplied`
+- `timesImprovedScore`
+- `averageCostReduction`
+- `usefulForGoals`
+
+`MacroMoveTransformationEngine` kann mit deaktivierten Makrozügen betrieben
+werden; die atomare Suche bleibt dabei unverändert aktiv.
+
 Exportformat (gekürzt):
 
 ```json

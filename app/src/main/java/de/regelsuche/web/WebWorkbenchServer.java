@@ -648,6 +648,13 @@ public class WebWorkbenchServer {
             macro.property("compressionRatio", expansion.compressionRatio());
             macro.property("expanded", expansion.expanded());
             macro.stringArray("supportingPathIds", expansion.supportingPathIds());
+            macro.object("stats", stats -> {
+                stats.property("timesConsidered", expansion.stats().timesConsidered());
+                stats.property("timesApplied", expansion.stats().timesApplied());
+                stats.property("timesImprovedScore", expansion.stats().timesImprovedScore());
+                stats.property("averageCostReduction", expansion.stats().averageCostReduction());
+                stats.stringArray("usefulForGoals", expansion.stats().usefulForGoals());
+            });
             macro.array("atomicSteps", steps -> expansion.atomicSteps().forEach(step ->
                 steps.objectValue(inner -> {
                     inner.property("index", step.index());

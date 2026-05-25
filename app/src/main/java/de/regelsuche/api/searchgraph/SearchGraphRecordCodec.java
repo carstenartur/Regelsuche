@@ -96,6 +96,22 @@ public final class SearchGraphRecordCodec {
             stats.stringArray("mostUsefulRules", s.mostUsefulRules());
             stats.property("candidateCount", s.candidateCount());
             stats.property("macroRuleCount", s.macroRuleCount());
+            stats.property("searchSpaceSize", s.searchSpaceSize());
+            stats.object("matchStats", match -> s.matchStats().forEach(match::property));
+            stats.object("macroMoveUsage", macro -> {
+                macro.property("timesConsidered", s.macroMoveUsage().timesConsidered());
+                macro.property("timesApplied", s.macroMoveUsage().timesApplied());
+                macro.property("timesImprovedScore", s.macroMoveUsage().timesImprovedScore());
+                macro.property("averageCostReduction", s.macroMoveUsage().averageCostReduction());
+                macro.stringArray("usefulForGoals", s.macroMoveUsage().usefulForGoals());
+            });
+            stats.property("memoryUsage", s.memoryUsage());
+            stats.object("counterexampleStats", counterexamples -> {
+                counterexamples.property("checked", s.counterexampleStats().checked());
+                counterexamples.property("found", s.counterexampleStats().found());
+            });
+            stats.property("proofSuccessRate", s.proofSuccessRate());
+            stats.object("artifactCounts", artifacts -> s.artifactCounts().forEach(artifacts::property));
         });
     }
 
@@ -134,6 +150,13 @@ public final class SearchGraphRecordCodec {
             macro.stringArray("supportingPathIds", expansion.supportingPathIds());
             macro.property("compressionRatio", expansion.compressionRatio());
             macro.property("expanded", expansion.expanded());
+            macro.object("stats", stats -> {
+                stats.property("timesConsidered", expansion.stats().timesConsidered());
+                stats.property("timesApplied", expansion.stats().timesApplied());
+                stats.property("timesImprovedScore", expansion.stats().timesImprovedScore());
+                stats.property("averageCostReduction", expansion.stats().averageCostReduction());
+                stats.stringArray("usefulForGoals", expansion.stats().usefulForGoals());
+            });
             macro.array("atomicSteps", steps -> expansion.atomicSteps().forEach(step -> steps.objectValue(s -> {
                 writeTransformationStep(s, step);
             })));
@@ -282,6 +305,16 @@ public final class SearchGraphRecordCodec {
         for (Map.Entry<String, Object> entry : asMap(stats.get("ruleUsageFrequency")).entrySet()) {
             ruleUsage.put(entry.getKey(), intValue(entry.getValue(), 0));
         }
+        Map<String, Integer> matchStats = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : asMap(stats.get("matchStats")).entrySet()) {
+            matchStats.put(entry.getKey(), intValue(entry.getValue(), 0));
+        }
+        Map<String, Integer> artifactCounts = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : asMap(stats.get("artifactCounts")).entrySet()) {
+            artifactCounts.put(entry.getKey(), intValue(entry.getValue(), 0));
+        }
+        Map<String, Object> macroMoveUsage = asMap(stats.get("macroMoveUsage"));
+        Map<String, Object> counterexampleStats = asMap(stats.get("counterexampleStats"));
         SearchGraphStatsDto statsDto = new SearchGraphStatsDto(
             intValue(stats.get("nodesVisited"), 0),
             intValue(stats.get("edgesGenerated"), 0),
@@ -292,7 +325,23 @@ public final class SearchGraphRecordCodec {
             ruleUsage,
             stringList(stats.get("mostUsefulRules")),
             intValue(stats.get("candidateCount"), 0),
-            intValue(stats.get("macroRuleCount"), 0)
+            intValue(stats.get("macroRuleCount"), 0),
+            intValue(stats.get("searchSpaceSize"), 0),
+            matchStats,
+            new SearchGraphStatsDto.MacroMoveUsage(
+                intValue(macroMoveUsage.get("timesConsidered"), 0),
+                intValue(macroMoveUsage.get("timesApplied"), 0),
+                intValue(macroMoveUsage.get("timesImprovedScore"), 0),
+                doubleValue(macroMoveUsage.get("averageCostReduction"), 0.0),
+                stringList(macroMoveUsage.get("usefulForGoals"))
+            ),
+            longValue(stats.get("memoryUsage"), 0L),
+            new SearchGraphStatsDto.CounterexampleStats(
+                intValue(counterexampleStats.get("checked"), 0),
+                intValue(counterexampleStats.get("found"), 0)
+            ),
+            doubleValue(stats.get("proofSuccessRate"), 0.0),
+            artifactCounts
         );
         return new SearchGraphDto(nodes, edges, clusters, statsDto);
     }
@@ -428,6 +477,20 @@ public final class SearchGraphRecordCodec {
         }
         try {
             return Integer.parseInt(String.valueOf(raw));
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private static long longValue(Object raw, long fallback) {
+        if (raw == null) {
+            return fallback;
+        }
+        if (raw instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(String.valueOf(raw));
         } catch (NumberFormatException ex) {
             return fallback;
         }
