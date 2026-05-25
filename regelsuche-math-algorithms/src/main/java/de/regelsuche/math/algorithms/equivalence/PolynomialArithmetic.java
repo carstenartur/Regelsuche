@@ -5,12 +5,9 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
-import de.regelsuche.equivalence.PolynomialEquivalenceService;
 import de.regelsuche.parse.ExpressionParser;
-import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.math.BigDecimal;
 import java.math.MathContext;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -18,109 +15,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 
-public class GroebnerPolynomialEquivalenceService implements PolynomialEquivalenceService {
-    private static final MathContext MC = MathContext.DECIMAL128;
+final class PolynomialArithmetic {
+    static final MathContext MC = MathContext.DECIMAL128;
 
     private final ExpressionParser parser = new ExpressionParser();
-    private final MathematicalAlgorithmRegistry registry;
-    private MathematicalAlgorithmRegistry.AlgorithmExecutionResult lastResult =
-        MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown("not executed");
 
-    public GroebnerPolynomialEquivalenceService(MathematicalAlgorithmRegistry registry) {
-        this.registry = registry;
-    }
-
-    public MathematicalAlgorithmRegistry.AlgorithmExecutionResult lastResult() {
-        return lastResult;
-    }
-
-    @Override
-    public boolean arePolynomiallyEquivalent(String leftPolynomial, String rightPolynomial) {
-        if (!isEnabled()) {
-            lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.disabled(
-                "polynomialEquivalence and groebnerBasis must both be enabled");
-            return false;
-        }
-
-        Optional<Polynomial> left = parsePolynomial(leftPolynomial);
-        Optional<Polynomial> right = parsePolynomial(rightPolynomial);
-        if (left.isEmpty() || right.isEmpty()) {
-            lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(
-                "unsupported non-polynomial expression domain");
-            return false;
-        }
-
-        boolean equal = left.orElseThrow().equals(right.orElseThrow());
-        lastResult = new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
-            MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS,
-            equal ? MathematicalAlgorithmRegistry.ResultType.PROOF : MathematicalAlgorithmRegistry.ResultType.REFUTATION,
-            equal ? "matching Gröbner-style polynomial normal form" : "normal forms differ",
-            Map.of(
-                "leftNormalForm", left.orElseThrow().toCanonicalString(),
-                "rightNormalForm", right.orElseThrow().toCanonicalString()
-            )
-        );
-        return equal;
-    }
-
-    @Override
-    public String evidence(String leftExpression, String rightExpression) {
-        arePolynomiallyEquivalent(leftExpression, rightExpression);
-        return lastResult.detail();
-    }
-
-    public Optional<String> normalForm(String polynomialExpression) {
-        if (!isEnabled()) {
-            return Optional.empty();
-        }
-        return parsePolynomial(polynomialExpression).map(Polynomial::toCanonicalString);
-    }
-
-    public List<String> eliminateLinearVariable(List<String> equationsEqualZero, String variable) {
-        if (!isEnabled() || equationsEqualZero == null || equationsEqualZero.isEmpty() || variable == null || variable.isBlank()) {
-            return List.of();
-        }
-        List<Polynomial> parsed = new ArrayList<>();
-        for (String equation : equationsEqualZero) {
-            Optional<Polynomial> polynomial = parsePolynomial(equation);
-            if (polynomial.isEmpty()) {
-                return List.of();
-            }
-            parsed.add(polynomial.orElseThrow());
-        }
-
-        Optional<LinearEquation> pivot = parsed.stream()
-            .map(polynomial -> polynomial.isolateLinear(variable))
-            .filter(Optional::isPresent)
-            .map(Optional::orElseThrow)
-            .findFirst();
-        if (pivot.isEmpty()) {
-            return List.of();
-        }
-        LinearEquation pivotEquation = pivot.orElseThrow();
-
-        List<String> result = new ArrayList<>();
-        for (Polynomial equation : parsed) {
-            Optional<LinearEquation> linear = equation.isolateLinear(variable);
-            Polynomial eliminated;
-            if (linear.isPresent()) {
-                LinearEquation current = linear.orElseThrow();
-                eliminated = current.rest().multiply(pivotEquation.coefficient())
-                    .subtract(pivotEquation.rest().multiply(current.coefficient()));
-            } else {
-                eliminated = equation;
-            }
-            result.add(eliminated.toCanonicalString());
-        }
-        return result;
-    }
-
-    private boolean isEnabled() {
-        return registry.isEnabled(MathematicalAlgorithmRegistry.POLYNOMIAL_EQUIVALENCE)
-            && registry.isEnabled(MathematicalAlgorithmRegistry.GROEBNER_BASIS);
-    }
-
-    private Optional<Polynomial> parsePolynomial(String expression) {
+    Optional<Polynomial> parse(String expression) {
         try {
             Expr expr = parser.parseTerm(expression);
             return asPolynomial(expr);
@@ -166,11 +66,14 @@ public class GroebnerPolynomialEquivalenceService implements PolynomialEquivalen
         return Optional.of(exponent);
     }
 
-    private record LinearEquation(BigDecimal coefficient, Polynomial rest) {
+    record LinearEquation(BigDecimal coefficient, Polynomial rest) {
     }
 
-    private record Monomial(Map<String, Integer> powers) {
-        private Monomial {
+    record Term(Monomial monomial, BigDecimal coefficient) {
+    }
+
+    record Monomial(Map<String, Integer> powers) {
+        Monomial {
             powers = Map.copyOf(powers);
         }
 
@@ -188,6 +91,26 @@ public class GroebnerPolynomialEquivalenceService implements PolynomialEquivalen
                 merged.merge(entry.getKey(), entry.getValue(), Integer::sum);
             }
             merged.entrySet().removeIf(entry -> entry.getValue() == 0);
+            return new Monomial(merged);
+        }
+
+        boolean divides(Monomial other) {
+            return powers.entrySet().stream()
+                .allMatch(entry -> other.powers.getOrDefault(entry.getKey(), 0) >= entry.getValue());
+        }
+
+        Monomial divideBy(Monomial divisor) {
+            Map<String, Integer> quotient = new HashMap<>(powers);
+            divisor.powers.forEach((variable, exponent) ->
+                quotient.compute(variable, (ignored, current) -> current == null ? -exponent : current - exponent));
+            quotient.entrySet().removeIf(entry -> entry.getValue() == 0);
+            return new Monomial(quotient);
+        }
+
+        Monomial lcm(Monomial other) {
+            Map<String, Integer> merged = new HashMap<>(powers);
+            other.powers.forEach((variable, exponent) ->
+                merged.merge(variable, exponent, Math::max));
             return new Monomial(merged);
         }
 
@@ -224,7 +147,7 @@ public class GroebnerPolynomialEquivalenceService implements PolynomialEquivalen
         }
     }
 
-    private static final class Polynomial {
+    static final class Polynomial {
         private static final Comparator<Monomial> MONOMIAL_ORDER = Comparator
             .comparingInt(Monomial::totalDegree)
             .reversed()
@@ -245,6 +168,21 @@ public class GroebnerPolynomialEquivalenceService implements PolynomialEquivalen
             return new Polynomial(Map.of(Monomial.variable(variable), BigDecimal.ONE));
         }
 
+        static Polynomial term(Monomial monomial, BigDecimal coefficient) {
+            return new Polynomial(Map.of(monomial, coefficient));
+        }
+
+        boolean isZero() {
+            return terms.isEmpty();
+        }
+
+        Optional<Term> leadingTerm() {
+            return terms.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(MONOMIAL_ORDER))
+                .findFirst()
+                .map(entry -> new Term(entry.getKey(), entry.getValue()));
+        }
+
         Polynomial add(Polynomial other) {
             Map<Monomial, BigDecimal> merged = new HashMap<>(terms);
             other.terms.forEach((monomial, coefficient) -> merged.merge(monomial, coefficient, BigDecimal::add));
@@ -259,6 +197,10 @@ public class GroebnerPolynomialEquivalenceService implements PolynomialEquivalen
             Map<Monomial, BigDecimal> scaled = new HashMap<>();
             terms.forEach((monomial, coefficient) -> scaled.put(monomial, coefficient.multiply(scalar, MC)));
             return new Polynomial(scaled);
+        }
+
+        Polynomial multiply(Monomial monomial, BigDecimal coefficient) {
+            return multiply(term(monomial, coefficient));
         }
 
         Polynomial multiply(Polynomial other) {

@@ -28,12 +28,22 @@ public class DefaultMathematicalAlgorithmRegistry implements MathematicalAlgorit
         ));
         defaults.put(GROEBNER_BASIS, descriptor(
             GROEBNER_BASIS,
-            "Gröbner-basis style reduction for polynomial identities",
+            "Gröbner-basis reduction for polynomial ideals/systems",
             false,
             AlgorithmBudget.bounded(200, 2_000, 0, 0.0),
             ProofSemantics.PROOF_FOR_SUPPORTED_DOMAIN,
             ResultType.PROOF,
             ResultType.REFUTATION
+        ));
+        defaults.put(JAS_BACKEND, descriptor(
+            JAS_BACKEND,
+            "Optional JAS backend adapter for Gröbner-basis computation",
+            false,
+            AlgorithmBudget.bounded(500, 5_000, 0, 0.0),
+            ProofSemantics.PROOF_FOR_SUPPORTED_DOMAIN,
+            ResultType.PROOF,
+            ResultType.REFUTATION,
+            ResultType.DIAGNOSTIC
         ));
         defaults.put(SINGULAR_BACKEND, descriptor(
             SINGULAR_BACKEND,

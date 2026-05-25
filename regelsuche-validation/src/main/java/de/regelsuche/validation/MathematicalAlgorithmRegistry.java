@@ -8,6 +8,7 @@ import java.util.Optional;
 public interface MathematicalAlgorithmRegistry {
     String POLYNOMIAL_EQUIVALENCE = "polynomialEquivalence";
     String GROEBNER_BASIS = "groebnerBasis";
+    String JAS_BACKEND = "jasBackend";
     String SINGULAR_BACKEND = "singularBackend";
     String KNUTH_BENDIX = "knuthBendix";
     String CRITICAL_PAIRS = "criticalPairs";
@@ -70,6 +71,7 @@ public interface MathematicalAlgorithmRegistry {
     enum ExecutionStatus {
         SUCCESS,
         UNKNOWN,
+        UNAVAILABLE,
         DISABLED,
         BUDGET_EXHAUSTED
     }
@@ -86,6 +88,10 @@ public interface MathematicalAlgorithmRegistry {
 
         public static AlgorithmExecutionResult unknown(String detail) {
             return new AlgorithmExecutionResult(ExecutionStatus.UNKNOWN, ResultType.DIAGNOSTIC, detail, Map.of());
+        }
+
+        public static AlgorithmExecutionResult unavailable(String detail) {
+            return new AlgorithmExecutionResult(ExecutionStatus.UNAVAILABLE, ResultType.DIAGNOSTIC, detail, Map.of());
         }
     }
 }
