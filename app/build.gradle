@@ -251,6 +251,8 @@ tasks.register('dockerE2eTest', Test) {
     shouldRunAfter tasks.named('test')
     // Pass the project root so ImageFromDockerfile can find the Dockerfile.
     systemProperty 'regelsuche.projectRoot', rootProject.projectDir.absolutePath
+    systemProperty 'regelsuche.discoveryArtifactsDir',
+        layout.buildDirectory.dir('discovery-artifacts').get().asFile.absolutePath
     testLogging {
         events 'passed', 'skipped', 'failed'
         showStandardStreams = true

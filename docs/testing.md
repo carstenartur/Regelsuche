@@ -90,7 +90,29 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
 * `docker-image-e2e` — baut das Standard-Dockerfile, fährt den Container via
   Testcontainers hoch und verifiziert via HTTP-Client + Playwright das
   Asset-Serving und KaTeX-Rendering (schützt vor dem `/vendor/`-Bug und
-  ähnlichen Regressions).
+  ähnlichen Regressions). Zusätzlich laufen PostgreSQL-basierte
+  Discovery-Full-Mode-Tests wie `ScientificDiscoveryPostgresE2ETest`, die
+  wissenschaftliche Seeds reproduzierbar ausführen, Replay-Artefakte erzeugen
+  und Seeds/Search-Runs/Hypothesen/Gegenbeispiele/Reports/Proof-Worker-
+  Metadaten persistieren. Die erzeugten Dateien liegen lokal unter
+  `app/build/discovery-artifacts/scientific-postgres-e2e/` und werden im CI als
+  Artifact `scientific-discovery-artifacts` hochgeladen:
+
+  ```bash
+  ./gradlew :app:dockerE2eTest --tests de.regelsuche.dockere2e.ScientificDiscoveryPostgresE2ETest
+  ```
+
+  Für den schnellen nicht-containerisierten Determinismus-/Budget-Check:
+
+  ```bash
+  ./gradlew :app:test --tests de.regelsuche.discovery.ScientificDiscoveryReproductionTest
+  ```
+
+  Artefakte: `discovery-report.json` (byte-stabil; volatile Laufzeitfelder sind
+  markiert und stabilisiert), `discovery-report.html` (vollständige
+  Replay-Schritte), `discovery-summary.png` (synthetischer Report-Screenshot)
+  und `discovery-replay.gif` (mehrere Replay-Frames). Echte UI-Screenshots
+  bleiben Aufgabe der Playwright-Flows.
 * `docs-assets` — nur auf `main`: `./gradlew e2eTest -Pregelsuche.recordDocs=true`
   und lädt die frischen Screenshots/Videos als CI-Artifact hoch.
 * `benchmark-report` — `./gradlew benchmarkReport` rendert die aktuelle
