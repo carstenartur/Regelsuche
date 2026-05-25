@@ -388,3 +388,9 @@ jobs:
           path: |
             app/build/reports/tests/dockerE2eTest/**
             app/build/test-results/dockerE2eTest/**
+      - name: Upload scientific discovery artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-discovery-artifacts
+          path: app/build/discovery-artifacts/**

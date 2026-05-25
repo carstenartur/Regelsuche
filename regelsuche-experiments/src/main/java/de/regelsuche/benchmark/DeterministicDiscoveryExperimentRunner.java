@@ -154,14 +154,21 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
             JsonWriter writer = new JsonWriter();
             writer.beginObject();
             writer.property("schema", "regelsuche.discovery-report/v1");
-            writer.property("wallClockRuntimeMillis", wallClockRuntimeMillis);
+            writer.array("volatileFields", volatileFields -> {
+                volatileFields.value("wallClockRuntimeMillis");
+                volatileFields.value("rows[].elapsedMillis");
+                volatileFields.value("rows[].memoryBytes");
+                volatileFields.value("metrics.accumulatedRuntimeMillis");
+                volatileFields.value("metrics.accumulatedMemoryBytes");
+            });
+            writer.property("wallClockRuntimeMillis", 0L);
             writer.object("metrics", metricsObject -> {
                 metricsObject.property("processedSeeds", metrics.processedSeeds());
                 metricsObject.property("successfulSeeds", metrics.successfulSeeds());
                 metricsObject.property("hypotheses", metrics.hypotheses());
                 metricsObject.property("counterexamples", metrics.counterexamples());
-                metricsObject.property("accumulatedRuntimeMillis", metrics.accumulatedRuntimeMillis());
-                metricsObject.property("accumulatedMemoryBytes", metrics.accumulatedMemoryBytes());
+                metricsObject.property("accumulatedRuntimeMillis", 0L);
+                metricsObject.property("accumulatedMemoryBytes", 0L);
             });
             writer.array("rows", rowsArray -> rows.forEach(row -> rowsArray.objectValue(object -> {
                 object.property("seedId", row.seed().id());
@@ -171,8 +178,8 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                 object.array("hypotheses", h -> row.hypotheses().forEach(h::value));
                 object.array("counterexamples", c -> row.counterexamples().forEach(c::value));
                 object.array("replayPath", r -> row.replayPath().forEach(r::value));
-                object.property("elapsedMillis", row.elapsedMillis());
-                object.property("memoryBytes", row.memoryBytes());
+                object.property("elapsedMillis", 0L);
+                object.property("memoryBytes", 0L);
             })));
             writer.endObject();
             return writer.toString();

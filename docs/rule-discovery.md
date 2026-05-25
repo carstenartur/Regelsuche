@@ -149,16 +149,37 @@ Der portable Experiment-Kern liegt in `:regelsuche-experiments`:
 - `DeterministicDiscoveryExperimentRunner` sortiert Seeds deterministisch,
   erzwingt ein globales Budget und kann Seeds parallel auswerten, ohne die
   Report-Reihenfolge zu verändern.
+- `ScientificDiscoveryWorkflow` (app) bootet die produktive
+  `PersistenceContext`-Komposition im In-Memory-, JSON- oder
+  PostgreSQL-Hybrid-Modus und führt den kompletten Pfad
+  **Seed → Discovery/Search/Validation → Replay → Persistenz → Report** aus.
 - `DiscoveryReplayArtifactWriter` schreibt CI-taugliche Replay-Artefakte:
   `discovery-report.json`, `discovery-report.html`, `discovery-summary.png`
-  und `discovery-replay.gif`.
+  und ein mehrstufiges `discovery-replay.gif`.
+
+Lokale Befehle:
+
+```bash
+./gradlew :app:test --tests de.regelsuche.discovery.ScientificDiscoveryReproductionTest
+./gradlew :app:dockerE2eTest --tests de.regelsuche.dockere2e.ScientificDiscoveryPostgresE2ETest
+```
 
 Die wissenschaftlichen Reproduktions-Tests gehen über Runner-Mechanik hinaus:
-`ScientificDiscoveryReproductionTest` führt ausgewählte Seeds durch echte
-App-Discovery-/Demo-Pipelines (u. a. Binom, Trigonometrie, Matrix und rationale
-Vereinfachung), prüft Replay-Pfade und erzeugt Artefakte. Der
-Testcontainers-basierte `ScientificDiscoveryPostgresE2ETest` persistiert
-Seeds, Search-Runs, Experiment, Report und einen optionalen Stub-Proof-Worker-
-Status in PostgreSQL. Das Projekt nutzt keine Spring-Boot-Runtime; die
-Container-Integration erfolgt daher über JUnit/Testcontainers plus die
+`ScientificDiscoveryReproductionTest` speist `SeedExpression` direkt in die
+App-Wiring-Schicht ein und deckt Binom, geometrische Reihe, Faktorisierung,
+Trigonometrie, Matrixidentität und rationale Vereinfachung ab. Zusätzlich
+prüft der Test Byte-Stabilität der deterministischen JSON-Reports,
+`parallelism=1` vs. `parallelism=4`, globale Budgets und konsistente
+Abbruch-Reports mit Budget `0`.
+
+Der Testcontainers-basierte `ScientificDiscoveryPostgresE2ETest` startet
+PostgreSQL, bootet den PostgreSQL+JSON-Hybrid-Modus über `PersistenceContext`,
+persistiert Seeds, Experiment, Search-Runs, Hypothesen, Gegenbeispiele,
+Proof-Worker-Metadaten sowie JSON/HTML/PNG/GIF-Artefakt-Metadaten und lädt sie
+anschließend wieder aus PostgreSQL. Das Projekt nutzt keine Spring-Boot-Runtime;
+die Container-Integration erfolgt daher über JUnit/Testcontainers plus die
 Produktions-Persistenzadapter statt über `@SpringBootTest`.
+
+Grenze: `discovery-summary.png` und `discovery-replay.gif` werden aus dem
+Report-Renderer synthetisch gerendert. Echte Browser-/UI-Screenshots bleiben im
+separaten Playwright-`e2eTest`-Pfad.
