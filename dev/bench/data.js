@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779689421889,
+  "lastUpdate": 1779697578179,
   "repoUrl": "https://github.com/carstenartur/Regelsuche",
   "entries": {
     "Regelsuche JMH Benchmarks": [
@@ -538,6 +538,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
             "value": 120.5233809232575,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "Copilot",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8f3e6fa84431abc138b2ba06ae53abe67bf525b4",
+          "message": "feat: Internationalise ARIA descriptions and replay explanations (DE/EN) (#44)\n\n* Initial plan\n\n* feat: add locale-aware ARIA descriptions and internationalised replay explanations\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/6f87bde6-9a6b-4045-8845-3eab4eeb7840\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n* test: require KaTeX demo and graph rendering\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/710b74ac-ebc8-40ee-80bf-099b404a277f\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n* build: use Testcontainers BOM for e2e dependencies\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/76db4ebb-eafb-457d-8491-61e90fc8be98\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n* fix: copy Gradle modules into Docker build\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/7dcea1e0-25ff-42c9-8aff-e1e440b4c123\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n* fix: address explanation review feedback\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/7dcea1e0-25ff-42c9-8aff-e1e440b4c123\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n* docs: refresh demo screenshots\n\nAgent-Logs-Url: https://github.com/carstenartur/Regelsuche/sessions/e5ed29d8-4c10-435a-9a22-63ba047acdd5\n\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>\n\n---------\n\nCo-authored-by: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>\nCo-authored-by: carstenartur <3164220+carstenartur@users.noreply.github.com>",
+          "timestamp": "2026-05-25T10:25:05+02:00",
+          "tree_id": "ca46f2c7bc0d3bb24f659de8a6d5460dd7d0dde6",
+          "url": "https://github.com/carstenartur/Regelsuche/commit/8f3e6fa84431abc138b2ba06ae53abe67bf525b4"
+        },
+        "date": 1779697576726,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+            "value": 1.246062416659145,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+            "value": 3.1317856933583847,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+            "value": 5.05191016843731,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+            "value": 1.703395230132692,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+            "value": 88.85918135298719,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+            "value": 164.2276851946212,
             "unit": "us/op",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
