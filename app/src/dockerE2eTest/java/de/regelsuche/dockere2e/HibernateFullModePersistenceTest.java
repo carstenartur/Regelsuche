@@ -1,6 +1,7 @@
 package de.regelsuche.dockere2e;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.mining.HypothesisCandidate;
@@ -8,6 +9,7 @@ import de.regelsuche.persistence.GraphPersistenceMode;
 import de.regelsuche.persistence.PersistenceConfig;
 import de.regelsuche.persistence.PersistenceContext;
 import de.regelsuche.persistence.relational.DatabaseMigrationRunner;
+import de.regelsuche.persistence.relational.CounterexampleEntity;
 import de.regelsuche.persistence.relational.PersistenceAdapterFactory;
 import de.regelsuche.persistence.relational.RelationalPersistenceAdapters;
 import de.regelsuche.persistence.relational.SearchEntityType;
@@ -49,7 +51,7 @@ class HibernateFullModePersistenceTest {
             try (ResultSet resultSet = connection.createStatement()
                 .executeQuery("SELECT count(*) FROM regelsuche_schema_history")) {
                 assertTrue(resultSet.next());
-                assertEquals(3, resultSet.getInt(1));
+                assertEquals(4, resultSet.getInt(1));
             }
         }
     }
@@ -63,13 +65,13 @@ class HibernateFullModePersistenceTest {
                 "A + 0",
                 "A",
                 List.of("path-1"),
-                List.of(),
+                List.of(new HypothesisCandidate.ExpressionPair("a + 0", "a")),
                 List.of("A is real"),
                 0.72,
                 CandidateProofStatus.VALIDATED_BY_EXAMPLES,
                 false,
                 List.of("neutral element"),
-                java.util.Map.of(),
+                java.util.Map.of("B", List.of("x + y")),
                 Instant.parse("2026-05-25T00:00:00Z")
             );
 
@@ -77,8 +79,71 @@ class HibernateFullModePersistenceTest {
             HypothesisCandidate reloaded = adapters.hypotheses().orElseThrow().findById(hypothesis.id()).orElseThrow();
 
             assertEquals(List.of("A is real"), reloaded.assumptions());
+            assertEquals(List.of("path-1"), reloaded.supportingPaths());
+            assertEquals(List.of(new HypothesisCandidate.ExpressionPair("a + 0", "a")), reloaded.supportingExpressions());
+            assertEquals(List.of("neutral element"), reloaded.parameterRelations());
+            assertEquals(java.util.Map.of("B", List.of("x + y")), reloaded.expressionPlaceholders());
             assertEquals(CandidateProofStatus.VALIDATED_BY_EXAMPLES, reloaded.proofStatus());
             assertEquals(false, reloaded.counterexampleStatus());
+        }
+    }
+
+    @Test
+    void hibernateHypothesisRepositoryRejectsMismatchedSaveId() {
+        PersistenceConfig config = postgresConfig();
+        try (RelationalPersistenceAdapters adapters = PersistenceAdapterFactory.create(config, null).orElseThrow()) {
+            HypothesisCandidate hypothesis = new HypothesisCandidate(
+                "hyp-actual-id",
+                "A + 0",
+                "A",
+                List.of(),
+                List.of(),
+                List.of(),
+                0.1,
+                CandidateProofStatus.OBSERVED,
+                null,
+                List.of(),
+                java.util.Map.of(),
+                Instant.parse("2026-05-25T00:00:00Z")
+            );
+            assertThrows(IllegalArgumentException.class,
+                () -> adapters.hypotheses().orElseThrow().save("different-id", hypothesis));
+        }
+    }
+
+    @Test
+    void hibernateCounterexampleRepositoryPersistsHypothesisForeignKeyFromScalarId() {
+        PersistenceConfig config = postgresConfig();
+        try (RelationalPersistenceAdapters adapters = PersistenceAdapterFactory.create(config, null).orElseThrow()) {
+            HypothesisCandidate hypothesis = new HypothesisCandidate(
+                "hyp-for-counterexample",
+                "A + 0",
+                "A",
+                List.of(),
+                List.of(),
+                List.of(),
+                0.5,
+                CandidateProofStatus.OBSERVED,
+                null,
+                List.of(),
+                java.util.Map.of(),
+                Instant.parse("2026-05-25T00:00:00Z")
+            );
+            adapters.hypotheses().orElseThrow().save(hypothesis.id(), hypothesis);
+
+            CounterexampleEntity counterexample = new CounterexampleEntity(
+                "ce-1",
+                hypothesis.id(),
+                "1 + 0",
+                "1",
+                "1",
+                List.of(),
+                Instant.parse("2026-05-25T00:00:00Z")
+            );
+            adapters.counterexamples().save(counterexample);
+
+            CounterexampleEntity reloaded = adapters.counterexamples().findById("ce-1").orElseThrow();
+            assertEquals("hyp-for-counterexample", reloaded.hypothesisId());
         }
     }
 
@@ -119,6 +184,40 @@ class HibernateFullModePersistenceTest {
             )).stream().map(result -> result.document().entityId()).toList();
 
             assertEquals(List.of("hyp-search", "report-search"), ids);
+        }
+    }
+
+    @Test
+    void hibernateSearchCollectsEnoughHitsAfterApplyingTypeFilter() {
+        PersistenceConfig config = postgresConfig();
+        try (RelationalPersistenceAdapters adapters = PersistenceAdapterFactory.create(config, null).orElseThrow()) {
+            for (int i = 0; i < 40; i++) {
+                adapters.searchIndex().index(new SearchIndexDocument(
+                    SearchEntityType.REPORT,
+                    "report-filter-" + i,
+                    "expansion expansion expansion",
+                    "expansion coverage report " + i,
+                    List.of(new SearchFacet("domain", "polynomial")),
+                    Instant.now()
+                ));
+            }
+            adapters.searchIndex().index(new SearchIndexDocument(
+                SearchEntityType.HYPOTHESIS,
+                "hyp-filter-target",
+                "Hypothesis candidate",
+                "expansion",
+                List.of(new SearchFacet("domain", "polynomial")),
+                Instant.now()
+            ));
+
+            List<String> ids = adapters.searchIndex().search(new SearchQuery(
+                "expansion",
+                List.of(new SearchFacet("domain", "polynomial")),
+                List.of(SearchEntityType.HYPOTHESIS),
+                1
+            )).stream().map(result -> result.document().entityId()).toList();
+
+            assertEquals(List.of("hyp-filter-target"), ids);
         }
     }
 

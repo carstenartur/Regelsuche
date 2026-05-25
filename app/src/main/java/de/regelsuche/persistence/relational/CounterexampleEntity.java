@@ -18,10 +18,10 @@ import org.hibernate.type.SqlTypes;
 public class CounterexampleEntity {
     @Id
     private String id;
-    @Column(name = "hypothesis_id", nullable = false, insertable = false, updatable = false)
+    @Column(name = "hypothesis_id", nullable = false)
     private String hypothesisId;
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hypothesis_id", nullable = false)
+    @JoinColumn(name = "hypothesis_id", nullable = false, insertable = false, updatable = false)
     private HypothesisCandidateEntity hypothesis;
     @Column(name = "input_expression", nullable = false, columnDefinition = "text")
     private String inputExpression;

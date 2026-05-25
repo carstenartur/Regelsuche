@@ -18,6 +18,12 @@ public final class HibernateHypothesisRepository implements HypothesisRepository
         if (hypothesisId == null || hypothesisId.isBlank()) {
             throw new IllegalArgumentException("hypothesisId must not be blank");
         }
+        if (hypothesis == null) {
+            throw new IllegalArgumentException("hypothesis must not be null");
+        }
+        if (!hypothesisId.equals(hypothesis.id())) {
+            throw new IllegalArgumentException("hypothesisId must match hypothesis.id()");
+        }
         entities.save(HypothesisCandidateEntity.from(hypothesis));
     }
 

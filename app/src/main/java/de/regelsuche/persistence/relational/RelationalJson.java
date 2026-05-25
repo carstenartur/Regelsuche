@@ -1,6 +1,8 @@
 package de.regelsuche.persistence.relational;
 
 import de.regelsuche.inventory.MiniJson;
+import de.regelsuche.mining.HypothesisCandidate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -49,6 +51,51 @@ final class RelationalJson {
         return facets == null ? "" : facets.stream()
             .map(facet -> facet.key() + ":" + facet.value())
             .collect(Collectors.joining(" "));
+    }
+
+    static String expressionPairs(List<HypothesisCandidate.ExpressionPair> pairs) {
+        List<HypothesisCandidate.ExpressionPair> safe = pairs == null ? List.of() : pairs;
+        return safe.stream()
+            .map(pair -> "{"
+                + quote("left") + ":" + quote(pair.left() == null ? "" : pair.left()) + ","
+                + quote("right") + ":" + quote(pair.right() == null ? "" : pair.right())
+                + "}")
+            .collect(Collectors.joining(",", "[", "]"));
+    }
+
+    static List<HypothesisCandidate.ExpressionPair> expressionPairsValues(String json) {
+        String safeJson = json == null || json.isBlank() ? "[]" : json;
+        List<Map<String, String>> objects = MiniJson.parseObjectArray("{\"pairs\":" + safeJson + "}", "pairs");
+        return objects.stream()
+            .map(object -> new HypothesisCandidate.ExpressionPair(
+                object.getOrDefault("left", ""),
+                object.getOrDefault("right", "")))
+            .toList();
+    }
+
+    static String placeholderEntries(Map<String, List<String>> values) {
+        Map<String, List<String>> safe = values == null ? Map.of() : values;
+        return safe.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(entry -> "{"
+                + quote("key") + ":" + quote(entry.getKey()) + ","
+                + quote("values") + ":" + array(entry.getValue())
+                + "}")
+            .collect(Collectors.joining(",", "[", "]"));
+    }
+
+    static Map<String, List<String>> placeholderEntriesValues(String json) {
+        String safeJson = json == null || json.isBlank() ? "[]" : json;
+        List<Map<String, String>> objects = MiniJson.parseObjectArray("{\"entries\":" + safeJson + "}", "entries");
+        Map<String, List<String>> values = new LinkedHashMap<>();
+        for (Map<String, String> object : objects) {
+            String key = object.get("key");
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            values.put(key, arrayValues(object.get("values")));
+        }
+        return Map.copyOf(values);
     }
 
     static String quote(String value) {

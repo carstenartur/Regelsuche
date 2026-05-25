@@ -13,7 +13,7 @@ public final class InMemoryFacetedSearchIndex implements FacetedSearchIndex {
 
     @Override
     public void index(SearchIndexDocument document) {
-        documents.put(document.type() + ":" + document.entityId(), document);
+        documents.put(document.documentId(), document);
     }
 
     @Override

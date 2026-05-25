@@ -42,6 +42,18 @@ public class HypothesisCandidateEntity {
     @FullTextField(name = "assumptions")
     @Column(name = "assumptions_text", nullable = false, columnDefinition = "text")
     private String assumptionsText;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "supporting_paths", nullable = false, columnDefinition = "jsonb")
+    private String supportingPathsJson;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "supporting_expressions", nullable = false, columnDefinition = "jsonb")
+    private String supportingExpressionsJson;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "parameter_relations", nullable = false, columnDefinition = "jsonb")
+    private String parameterRelationsJson;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "expression_placeholders", nullable = false, columnDefinition = "jsonb")
+    private String expressionPlaceholdersJson;
     @KeywordField
     @Column(name = "proof_status", nullable = false)
     private String proofStatus;
@@ -59,7 +71,10 @@ public class HypothesisCandidateEntity {
     }
 
     public HypothesisCandidateEntity(String id, String experimentId, String leftPattern, String rightPattern,
-        List<String> assumptions, String proofStatus, Boolean counterexampleFound, double noveltyScore, Instant createdAt) {
+        List<String> assumptions, List<String> supportingPaths,
+        List<HypothesisCandidate.ExpressionPair> supportingExpressions, List<String> parameterRelations,
+        java.util.Map<String, List<String>> expressionPlaceholders, String proofStatus,
+        Boolean counterexampleFound, double noveltyScore, Instant createdAt) {
         this.id = SearchRunEntity.requireId(id, "id");
         this.experimentId = experimentId == null || experimentId.isBlank() ? null : experimentId;
         if (leftPattern == null || rightPattern == null) {
@@ -69,6 +84,10 @@ public class HypothesisCandidateEntity {
         this.rightPattern = rightPattern;
         this.assumptionsJson = RelationalJson.array(assumptions);
         this.assumptionsText = RelationalJson.join(assumptions);
+        this.supportingPathsJson = RelationalJson.array(supportingPaths);
+        this.supportingExpressionsJson = RelationalJson.expressionPairs(supportingExpressions);
+        this.parameterRelationsJson = RelationalJson.array(parameterRelations);
+        this.expressionPlaceholdersJson = RelationalJson.placeholderEntries(expressionPlaceholders);
         this.proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED.name() : proofStatus;
         this.counterexampleFound = counterexampleFound;
         this.noveltyScore = Math.max(0.0, Math.min(1.0, noveltyScore));
@@ -77,13 +96,15 @@ public class HypothesisCandidateEntity {
 
     public static HypothesisCandidateEntity from(HypothesisCandidate candidate) {
         return new HypothesisCandidateEntity(candidate.id(), "", candidate.leftPattern(), candidate.rightPattern(),
-            candidate.assumptions(), candidate.proofStatus().name(), candidate.counterexampleStatus(),
-            candidate.noveltyScore(), candidate.createdAt());
+            candidate.assumptions(), candidate.supportingPaths(), candidate.supportingExpressions(),
+            candidate.parameterRelations(), candidate.expressionPlaceholders(),
+            candidate.proofStatus().name(), candidate.counterexampleStatus(), candidate.noveltyScore(), candidate.createdAt());
     }
 
     public HypothesisCandidate toHypothesisCandidate() {
-        return new HypothesisCandidate(id, leftPattern, rightPattern, List.of(), List.of(), assumptions(),
-            noveltyScore, CandidateProofStatus.valueOf(proofStatus), counterexampleFound, List.of(), java.util.Map.of(), createdAt);
+        return new HypothesisCandidate(id, leftPattern, rightPattern, supportingPaths(), supportingExpressions(), assumptions(),
+            noveltyScore, CandidateProofStatus.valueOf(proofStatus), counterexampleFound,
+            parameterRelations(), expressionPlaceholders(), createdAt);
     }
 
     public String id() { return id; }
@@ -91,6 +112,14 @@ public class HypothesisCandidateEntity {
     public String leftPattern() { return leftPattern; }
     public String rightPattern() { return rightPattern; }
     public List<String> assumptions() { return RelationalJson.arrayValues(assumptionsJson); }
+    public List<String> supportingPaths() { return RelationalJson.arrayValues(supportingPathsJson); }
+    public List<HypothesisCandidate.ExpressionPair> supportingExpressions() {
+        return RelationalJson.expressionPairsValues(supportingExpressionsJson);
+    }
+    public List<String> parameterRelations() { return RelationalJson.arrayValues(parameterRelationsJson); }
+    public java.util.Map<String, List<String>> expressionPlaceholders() {
+        return RelationalJson.placeholderEntriesValues(expressionPlaceholdersJson);
+    }
     public String proofStatus() { return proofStatus; }
     public Boolean counterexampleFound() { return counterexampleFound; }
     public double noveltyScore() { return noveltyScore; }

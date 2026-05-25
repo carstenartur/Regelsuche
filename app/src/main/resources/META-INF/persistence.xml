@@ -18,7 +18,7 @@
       <property name="hibernate.format_sql" value="false"/>
       <property name="hibernate.search.backend.type" value="lucene"/>
       <property name="hibernate.search.backend.directory.type" value="local-filesystem"/>
-      <property name="hibernate.search.schema_management.strategy" value="drop-and-create"/>
+      <property name="hibernate.search.schema_management.strategy" value="create-or-validate"/>
       <property name="hibernate.search.indexing.plan.synchronization.strategy" value="sync"/>
     </properties>
   </persistence-unit>
