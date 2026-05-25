@@ -1,5 +1,10 @@
 package de.regelsuche.api.searchgraph;
 
+import de.regelsuche.provenance.ProvenanceEdge;
+import de.regelsuche.provenance.ProvenanceGraph;
+import de.regelsuche.provenance.ProvenanceGraphAssembler;
+import de.regelsuche.provenance.ProvenanceNode;
+import de.regelsuche.provenance.ProvenanceNodeType;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -69,7 +74,12 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
                     + "DETACH DELETE x",
                 Map.of("id", record.id())
             );
+            session.run(
+                "MATCH (r:SearchRun {id: $id})-[:HAS_PROVENANCE]->(x) DETACH DELETE x",
+                Map.of("id", record.id())
+            );
             persistGraph(session, record);
+            persistProvenanceGraph(session, record);
         }
     }
 
@@ -209,6 +219,40 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
         }
     }
 
+    private void persistProvenanceGraph(Session session, SearchGraphRecord record) {
+        ProvenanceGraph graph = new ProvenanceGraphAssembler().assemble(record);
+        for (ProvenanceNode node : graph.nodes()) {
+            Map<String, Object> p = new HashMap<>();
+            p.put("runId", record.id());
+            p.put("id", node.id());
+            p.put("type", node.type().name());
+            p.put("label", node.label());
+            p.put("properties", node.properties().toString());
+            session.run(
+                "MATCH (r:SearchRun {id: $runId}) "
+                    + "MERGE (p:ProvenanceEntity:" + labelFor(node.type()) + " {runId: $runId, id: $id}) "
+                    + "SET p.type = $type, p.label = $label, p.properties = $properties "
+                    + "MERGE (r)-[:HAS_PROVENANCE]->(p)",
+                p
+            );
+        }
+        for (ProvenanceEdge edge : graph.edges()) {
+            Map<String, Object> p = new HashMap<>();
+            p.put("runId", record.id());
+            p.put("fromId", edge.fromId());
+            p.put("toId", edge.toId());
+            p.put("edgeType", edge.type().name());
+            p.put("properties", edge.properties().toString());
+            session.run(
+                "MATCH (from:ProvenanceEntity {runId: $runId, id: $fromId}) "
+                    + "MATCH (to:ProvenanceEntity {runId: $runId, id: $toId}) "
+                    + "MERGE (from)-[e:" + edge.type().name() + "]->(to) "
+                    + "SET e.type = $edgeType, e.properties = $properties",
+                p
+            );
+        }
+    }
+
     @Override
     public Optional<SearchGraphRecord> findById(String id) {
         try (Session session = driver.session()) {
@@ -248,7 +292,7 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
         try (Session session = driver.session()) {
             // Delete all related structured nodes first, then the SearchRun itself.
             session.run(
-                "MATCH (r:SearchRun {id: $id})-[:HAS_NODE|HAS_PATH|HAS_MACRO|HAS_IDENTITY]->(x) "
+                "MATCH (r:SearchRun {id: $id})-[:HAS_NODE|HAS_PATH|HAS_MACRO|HAS_IDENTITY|HAS_PROVENANCE]->(x) "
                     + "DETACH DELETE x",
                 Map.of("id", id)
             );
@@ -265,5 +309,19 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
     @SuppressWarnings("unused")
     private static Instant nowOr(Instant supplied) {
         return supplied == null ? Instant.now() : supplied;
+    }
+
+    private static String labelFor(ProvenanceNodeType type) {
+        return switch (type) {
+            case HYPOTHESIS -> "Hypothesis";
+            case COUNTEREXAMPLE -> "Counterexample";
+            case PROOF_ATTEMPT -> "ProofAttempt";
+            case SEARCH_RUN -> "ProvenanceSearchRun";
+            case MACRO_MOVE -> "MacroMove";
+            case SEED_EXPRESSION -> "SeedExpression";
+            case ASSUMPTION_SIGNATURE -> "AssumptionSignature";
+            case BENCHMARK_RUN -> "BenchmarkRun";
+            case TRANSFORMATION_PATH -> "TransformationPath";
+        };
     }
 }

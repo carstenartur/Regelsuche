@@ -49,6 +49,16 @@ NEO4J_USER=neo4j
 NEO4J_PASSWORD=regelsuche-demo
 ```
 
+When `Neo4jSearchGraphRepository` stores a `SearchGraphRecord`, it now writes
+both the round-trippable JSON snapshot and a typed provenance graph. The
+provenance model contains `Hypothesis`, `Counterexample`, `ProofAttempt`,
+`SearchRun`, `MacroMove`, `SeedExpression`, `AssumptionSignature`,
+`BenchmarkRun` and `TransformationPath` entities plus typed relationships such
+as `SUPPORTED_BY`, `REFUTED_BY`, `GENERALIZES`, `DERIVED_FROM`, `USEFUL_FOR`,
+`REPLAY_OF` and `GENERATED_BY`. In-memory provenance queries are available via
+`ProvenanceGraphQueries` for strongest hypotheses, complex-domain refutations,
+most reused macro rules and derivation lineage.
+
 ## Docker Compose
 
 Start the standard Full Mode:
