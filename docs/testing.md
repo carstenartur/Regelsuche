@@ -109,10 +109,11 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
   ```
 
   Artefakte: `discovery-report.json` (byte-stabil; volatile Laufzeitfelder sind
-  markiert und stabilisiert), `discovery-report.html` (vollständige
-  Replay-Schritte), `discovery-summary.png` (synthetischer Report-Screenshot)
-  und `discovery-replay.gif` (mehrere Replay-Frames). Echte UI-Screenshots
-  bleiben Aufgabe der Playwright-Flows.
+  markiert und stabilisiert), `discovery-report.html`,
+  `discovery-report.md`, `discovery-replay.json`,
+  `discovery-summary.png` (synthetischer Report-Screenshot) und
+  `discovery-replay.gif` (mehrere Replay-Frames). Echte UI-Screenshots bleiben
+  Aufgabe der Playwright-Flows.
 * `docs-assets` — nur auf `main`: `./gradlew e2eTest -Pregelsuche.recordDocs=true`
   und lädt die frischen Screenshots/Videos als CI-Artifact hoch.
 * `benchmark-report` — `./gradlew benchmarkReport` rendert die aktuelle

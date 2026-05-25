@@ -127,6 +127,20 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
   [Equality-Saturation](docs/equality-saturation.md).
 * [Math-Domains](docs/math-domains.md) — semantische Domänen, Replay-Karten,
   Discovery-Tags.
+* [Discovery Engine](docs/discovery-engine.md) — End-to-End-Pipeline von Seed
+  über Replay bis Persistenz/Reports.
+* [Hypothesis Mining](docs/hypothesis-mining.md) — Kandidaten, Annahmen,
+  Counterexamples, Promotion.
+* [Experiment Runner](docs/experiment-runner.md) — deterministische
+  Seed-Auswertung, Budgets, Parallelität.
+* [Replay & Reports](docs/replay-and-reports.md) — Replay-UX, Discovery-Report-
+  Artefakte, Browser-Screenshots/GIFs.
+* [Storage Architecture](docs/storage-architecture.md) — In-Memory, JSON,
+  PostgreSQL/Hibernate und Artefakt-Ablage.
+* [Mathematical Algorithms](docs/mathematical-algorithms.md) — Registry,
+  Validierungs-Backends und aktuelle Toggles.
+* [Scientific Reproducibility](docs/scientific-reproducibility.md) —
+  reproduzierbare Discovery-Läufe, Seeds und CI-Artefakte.
 * [Proof-Bridge](docs/proof-bridge.md) — vom Pfad zum formalen Beweis.
 * [Proof-Workbench](docs/proof-workbench.md) — persistente Jobs, REST,
   Artefakt-Bundle, Dockerfile.proof.

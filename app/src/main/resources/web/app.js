@@ -1390,6 +1390,30 @@
                 + escapeHtml(after) + '$</div>'
                 + '</div>');
         }
+        const macro = step.macroMoveExpansion;
+        if (macro && Array.isArray(macro.atomicSteps) && macro.atomicSteps.length) {
+            const supportingPaths = (macro.supportingPathIds || []).length
+                ? '<div class="hint">Discovery-Branches: '
+                    + (macro.supportingPathIds || []).map((id) =>
+                        '<code>' + escapeHtml(id) + '</code>').join(', ')
+                    + '</div>'
+                : '';
+            const atomicSteps = macro.atomicSteps.map((atomicStep) =>
+                '<li><code>' + escapeHtml(atomicStep.ruleId || '') + '</code>: '
+                    + '<code>' + escapeHtml(atomicStep.beforeExpression || '') + ' → '
+                    + escapeHtml(atomicStep.afterExpression || '') + '</code></li>').join('');
+            out.push('<div class="replay-rule-card replay-macro-card">'
+                + '<strong>Makrozug: ' + escapeHtml(macro.macroRuleId || '') + '</strong>'
+                + '<div class="rule-card-body">Kompression: '
+                + escapeHtml(Number(macro.compressionRatio || 1).toFixed(2))
+                + ' · atomare Schritte: ' + macro.atomicSteps.length + '</div>'
+                + supportingPaths
+                + '<details' + (macro.expanded ? ' open' : '') + '>'
+                + '<summary>Atomare Replay-Schritte anzeigen</summary>'
+                + '<ol class="replay-macro-steps">' + atomicSteps + '</ol>'
+                + '</details>'
+                + '</div>');
+        }
         return out.join('');
     }
 

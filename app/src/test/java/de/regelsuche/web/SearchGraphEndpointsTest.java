@@ -10,6 +10,7 @@ import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.mining.MacroMoveExpansion;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.transform.RewriteKind;
@@ -72,6 +73,16 @@ class SearchGraphEndpointsTest {
             "/api/paths/{id}/replay must expose the structured derivation layout");
         assertTrue(body.contains("\"layout\":{\"kind\""),
             "/api/paths/{id}/replay must expose structured step layouts");
+    }
+
+    @Test
+    void replayEndpointIncludesMacroMoveExpansionWhenGraphEdgeCarriesIt() throws IOException {
+        seedMacroTransformation();
+        String body = get("/api/paths/macro-path/replay");
+        assertTrue(body.contains("\"macroMoveExpansion\":{"), body);
+        assertTrue(body.contains("\"macroRuleId\":\"macro_demo\""), body);
+        assertTrue(body.contains("\"supportingPathIds\":[\"supporting-path\"]"), body);
+        assertTrue(body.contains("\"atomicSteps\":"), body);
     }
 
     @Test
@@ -168,6 +179,31 @@ class SearchGraphEndpointsTest {
             new ExpressionScore(6, 6, 1, 1, 0),
             new ExpressionScore(1, 1, 0, 0, 0),
             3, CandidateProofStatus.OBSERVED, Instant.now(), "h-p2"));
+    }
+
+    private void seedMacroTransformation() {
+        List<TransformationStep> atomic = List.of(
+            new TransformationStep(0, "A", "A + 0", "expand_zero", RewriteKind.NORMALIZE, 5, 4, true, ""),
+            new TransformationStep(1, "A + 0", "B", "normalize_macro", RewriteKind.NORMALIZE, 4, 2, true, "")
+        );
+        MacroMoveExpansion expansion = new MacroMoveExpansion(
+            "macro_demo", "A", "B", atomic, List.of("supporting-path"), 2.0, false
+        );
+        TransformationStep step = new TransformationStep(
+            0, "A", "B", "macro_demo", RewriteKind.NORMALIZE, 5, 2, true, ""
+        );
+        graphStore.saveNode("A", 5);
+        graphStore.saveNode("B", 2);
+        graphStore.saveEdge(new GraphEdge(
+            "A", "B", "macro_demo", 0, 3, "macro-path#0", "macro-hash", 5, 2,
+            RewriteKind.NORMALIZE, false, -3, true, CandidateProofStatus.OBSERVED, expansion
+        ));
+        graphStore.saveDiscoveredTransformation(new DiscoveredTransformation(
+            "macro-path", "A", "B", List.of(step),
+            new ExpressionScore(5, 0, 0, 0, 0),
+            new ExpressionScore(2, 0, 0, 0, 0),
+            3, CandidateProofStatus.OBSERVED, Instant.now(), "macro-hash"
+        ));
     }
 
     private String get(String path) throws IOException {

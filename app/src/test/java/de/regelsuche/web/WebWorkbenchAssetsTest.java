@@ -50,6 +50,7 @@ class WebWorkbenchAssetsTest {
         assertTrue(css.contains(".dashboard-grid"));
         assertTrue(css.contains(".identity-card"));
         assertTrue(css.contains(".replay-canvas"));
+        assertTrue(css.contains(".replay-macro-card"));
 
         String app = resourceAsString("/web/app.js");
         assertTrue(app.contains("/api/search"));
@@ -61,5 +62,6 @@ class WebWorkbenchAssetsTest {
         assertTrue(app.contains("/api/identities"));
         assertTrue(app.contains("/api/search-graph"));
         assertTrue(app.contains("replay"));
+        assertTrue(app.contains("macroMoveExpansion"));
     }
 }

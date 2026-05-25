@@ -427,7 +427,11 @@ public class WebWorkbenchServer {
                 sendStatus(exchange, 404, "path not found");
                 return;
             }
-            sendJson(exchange, 200, replayJson(de.regelsuche.api.PathReplayDto.from(match.get(), explanationService)));
+            sendJson(exchange, 200, replayJson(de.regelsuche.api.PathReplayDto.from(
+                match.get(),
+                explanationService,
+                macroExpansionsFor(match.get())
+            )));
             return;
         }
         final String singleId = suffix;
@@ -622,10 +626,71 @@ public class WebWorkbenchServer {
                 inner.property("comparatorFlipped", step.comparatorFlipped());
                 writeReplaySpanArray(inner, "changedFromSpans", step.changedFromSpans());
                 writeReplaySpanArray(inner, "changedToSpans", step.changedToSpans());
+                writeReplayMacroExpansion(inner, step.macroMoveExpansion());
                 MathLayoutJsonWriter.write(inner, "layout", step.layout());
             })));
         writer.endObject();
         return writer.toString();
+    }
+
+    private static void writeReplayMacroExpansion(
+        JsonWriter writer,
+        de.regelsuche.mining.MacroMoveExpansion expansion
+    ) {
+        if (expansion == null) {
+            writer.nullProperty("macroMoveExpansion");
+            return;
+        }
+        writer.object("macroMoveExpansion", macro -> {
+            macro.property("macroRuleId", expansion.macroRuleId());
+            macro.property("fromExpression", expansion.fromExpression());
+            macro.property("toExpression", expansion.toExpression());
+            macro.property("compressionRatio", expansion.compressionRatio());
+            macro.property("expanded", expansion.expanded());
+            macro.stringArray("supportingPathIds", expansion.supportingPathIds());
+            macro.array("atomicSteps", steps -> expansion.atomicSteps().forEach(step ->
+                steps.objectValue(inner -> {
+                    inner.property("index", step.index());
+                    inner.property("beforeExpression", step.beforeExpression());
+                    inner.property("afterExpression", step.afterExpression());
+                    inner.property("ruleId", step.ruleId());
+                    inner.property("ruleKind", step.ruleKind().name());
+                    inner.property("scoreBefore", step.scoreBefore());
+                    inner.property("scoreAfter", step.scoreAfter());
+                    inner.property("equivalencePreserving", step.equivalencePreserving());
+                    inner.property("explanation", step.explanation());
+                })));
+        });
+    }
+
+    private java.util.Map<Integer, de.regelsuche.mining.MacroMoveExpansion> macroExpansionsFor(
+        de.regelsuche.discovery.DiscoveredTransformation path
+    ) {
+        java.util.Map<Integer, de.regelsuche.mining.MacroMoveExpansion> byStep = new java.util.LinkedHashMap<>();
+        java.util.List<de.regelsuche.graph.GraphEdge> edges = graphStore.snapshot().edges();
+        java.util.Set<Integer> usedEdgeIndexes = new java.util.HashSet<>();
+        for (de.regelsuche.discovery.TransformationStep step : path.steps()) {
+            for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
+                if (!usedEdgeIndexes.add(edgeIndex)) {
+                    continue;
+                }
+                de.regelsuche.graph.GraphEdge edge = edges.get(edgeIndex);
+                if (edge.macroMoveExpansion() == null) {
+                    usedEdgeIndexes.remove(edgeIndex);
+                    continue;
+                }
+                boolean matches = java.util.Objects.equals(edge.fromExpression(), step.beforeExpression())
+                    && java.util.Objects.equals(edge.toExpression(), step.afterExpression())
+                    && java.util.Objects.equals(edge.transformationRule(), step.ruleId());
+                if (!matches) {
+                    usedEdgeIndexes.remove(edgeIndex);
+                    continue;
+                }
+                byStep.put(step.index(), edge.macroMoveExpansion());
+                break;
+            }
+        }
+        return byStep;
     }
 
     private static void writeReplaySpanArray(JsonWriter writer, String key, java.util.List<int[]> spans) {
