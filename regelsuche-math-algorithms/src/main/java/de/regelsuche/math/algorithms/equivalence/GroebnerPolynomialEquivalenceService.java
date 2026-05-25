@@ -212,7 +212,7 @@ public class GroebnerPolynomialEquivalenceService implements PolynomialEquivalen
             TreeMap<String, Integer> ordered = new TreeMap<>(powers);
             StringBuilder builder = new StringBuilder();
             ordered.forEach((name, exponent) -> {
-                if (!builder.isEmpty()) {
+                if (builder.length() > 0) {
                     builder.append('*');
                 }
                 builder.append(name);
@@ -329,7 +329,7 @@ public class GroebnerPolynomialEquivalenceService implements PolynomialEquivalen
                 BigDecimal absolute = coefficient.abs();
                 String monomialKey = monomial.key();
 
-                if (!builder.isEmpty()) {
+                if (builder.length() > 0) {
                     builder.append(negative ? " - " : " + ");
                 } else if (negative) {
                     builder.append('-');

@@ -11,7 +11,7 @@ import de.regelsuche.equivalence.PolynomialEquivalenceService;
 public class JasPolynomialEquivalenceAdapter implements PolynomialEquivalenceService {
     @Override
     public boolean arePolynomiallyEquivalent(String leftPolynomial, String rightPolynomial) {
-        return false;
+        throw new IllegalStateException("JAS backend not configured");
     }
 
     @Override
