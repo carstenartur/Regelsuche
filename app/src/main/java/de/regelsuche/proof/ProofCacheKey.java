@@ -1,8 +1,8 @@
 package de.regelsuche.proof;
 
 import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionSignature;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Immutable key that uniquely identifies a proof obligation for caching.
@@ -39,11 +39,7 @@ public record ProofCacheKey(
      */
     public static ProofCacheKey of(String left, String right,
                                    List<Assumption> assumptions, String proverVersion) {
-        String sorted = assumptions == null ? ""
-            : assumptions.stream()
-                .map(Assumption::expression)
-                .sorted()
-                .collect(Collectors.joining(";"));
+        String sorted = AssumptionSignature.ofAssumptions(assumptions).fingerprint();
         return new ProofCacheKey(left, right, sorted, proverVersion);
     }
 }

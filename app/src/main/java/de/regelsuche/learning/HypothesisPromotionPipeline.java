@@ -13,7 +13,6 @@ import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -93,10 +92,18 @@ public class HypothesisPromotionPipeline {
             HypothesisCandidate hypothesis = HypothesisCandidate.from(candidate, novelty, paths);
 
             // Step 3: Counterexample search.
-            Optional<CounterexampleSearchService.Counterexample> counterexample =
-                counterexampleService.search(candidate.leftPattern(), candidate.rightPattern());
+            CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =
+                counterexampleService.search(
+                    new CounterexampleSearchService.HypothesisInput(
+                        hypothesis.id(),
+                        candidate.leftPattern(),
+                        candidate.rightPattern(),
+                        hypothesis.assumptions()
+                    ),
+                    CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+                );
 
-            if (counterexample.isPresent()) {
+            if (counterexampleResult.counterexample().isPresent()) {
                 hypothesis = hypothesis
                     .withCounterexampleStatus(true)
                     .withProofStatus(CandidateProofStatus.REJECTED);
@@ -116,6 +123,11 @@ public class HypothesisPromotionPipeline {
             }
 
             hypothesis = hypothesis.withCounterexampleStatus(false);
+            if (!counterexampleResult.inferredAssumptions().isEmpty()) {
+                List<String> mergedAssumptions = new ArrayList<>(hypothesis.assumptions());
+                mergedAssumptions.addAll(counterexampleResult.inferredAssumptions());
+                hypothesis = hypothesis.withAssumptions(mergedAssumptions);
+            }
 
             // Store as a pending hypothesis.
             hypothesisRepository.save(hypothesis.id(), candidate);

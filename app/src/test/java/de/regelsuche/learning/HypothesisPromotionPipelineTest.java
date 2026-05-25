@@ -22,13 +22,18 @@ import org.junit.jupiter.api.Test;
 class HypothesisPromotionPipelineTest {
 
     private static final CounterexampleSearchService NO_COUNTEREXAMPLE =
-        (left, right) -> Optional.empty();
+        (hypothesis, budget) -> CounterexampleSearchService.CounterexampleSearchResult.noCounterexample();
 
     private static final CounterexampleSearchService ALWAYS_COUNTEREXAMPLE =
-        (left, right) -> Optional.of(
-            new CounterexampleSearchService.Counterexample(
-                List.of("x=1"), "2", "3"
+        (hypothesis, budget) -> new CounterexampleSearchService.CounterexampleSearchResult(
+            Optional.of(
+                new CounterexampleSearchService.Counterexample(
+                    List.of("x=1"), "2", "3"
+                )
             )
+            ,
+            List.of(),
+            List.of("test")
         );
 
     private static SuccessfulTransformationPath path(String id, String left, String right) {
@@ -123,4 +128,5 @@ class HypothesisPromotionPipelineTest {
         assertNotNull(result.newHypotheses());
         assertNotNull(result.promotedRules());
     }
+
 }
