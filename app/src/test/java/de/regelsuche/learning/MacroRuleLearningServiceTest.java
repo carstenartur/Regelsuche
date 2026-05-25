@@ -63,4 +63,28 @@ class MacroRuleLearningServiceTest {
         assertFalse(inventory.findAll().isEmpty(),
             "inventory must remember the learned rule");
     }
+
+    @Test
+    void learnedMacroRuleCarriesPathAssumptions() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        MacroRuleLearningService service = new MacroRuleLearningService(
+            inventory,
+            new RuleCandidateMiner(new KnownRuleRepository()),
+            new KnownRuleRepository(),
+            3,
+            0.0
+        );
+        List<SuccessfulTransformationPath> paths = List.of(
+            path("p1", "(x + 1) ^ 2", "1 + 2 * x + x ^ 2", 6).withAssumptions(List.of("b != 0")),
+            path("p2", "(x + 2) ^ 2", "4 + 4 * x + x ^ 2", 8).withAssumptions(List.of("0 != b")),
+            path("p3", "(x + 3) ^ 2", "9 + 6 * x + x ^ 2", 8).withAssumptions(List.of("b≠0"))
+        );
+
+        MacroLearningResult result = service.learn(paths);
+
+        assertFalse(result.touchedRules().isEmpty());
+        ReusableRule learned = result.touchedRules().get(0);
+        assertTrue(learned.assumptions().stream().anyMatch(a -> a.endsWith(" != 0")),
+            "macro rules must carry normalized assumptions from supporting paths");
+    }
 }

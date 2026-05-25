@@ -63,7 +63,8 @@ public interface CounterexampleSearchService {
         int numericRandomSamples,
         boolean includeEdgeCases,
         boolean includeMatrixAssignments,
-        long randomSeed
+        long randomSeed,
+        boolean includeComplexAssignments
     ) {
         public CounterexampleBudget {
             if (numericRandomSamples < 0) {
@@ -71,8 +72,17 @@ public interface CounterexampleSearchService {
             }
         }
 
+        public CounterexampleBudget(
+            int numericRandomSamples,
+            boolean includeEdgeCases,
+            boolean includeMatrixAssignments,
+            long randomSeed
+        ) {
+            this(numericRandomSamples, includeEdgeCases, includeMatrixAssignments, randomSeed, false);
+        }
+
         public static CounterexampleBudget defaultBudget() {
-            return new CounterexampleBudget(16, true, true, 1L);
+            return new CounterexampleBudget(16, true, true, 1L, false);
         }
     }
 

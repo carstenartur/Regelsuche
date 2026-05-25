@@ -14,6 +14,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class EGraphTest {
@@ -165,6 +166,33 @@ class EGraphTest {
         Expr extracted = eGraph.extract(id, node -> 1);
         assertEquals(new BinaryExpr(new NumberExpr(3), BinaryOperator.MUL, new VariableExpr("x")),
             extracted);
+    }
+
+    @Test
+    void eGraphKeepsAssumptionContextsDistinct() {
+        EGraph eGraph = new EGraph();
+        EClassId xDivXWithoutAssumption = eGraph.addExpression(parse("x / x"));
+        EClassId oneWithAssumption = eGraph.addExpression(parse("1"), List.of("x != 0"));
+
+        try {
+            eGraph.union(xDivXWithoutAssumption, oneWithAssumption);
+            org.junit.jupiter.api.Assertions.fail("incompatible assumptions must prevent unsafe merge");
+        } catch (IllegalArgumentException expected) {
+            assertFalse(eGraph.areEquivalent(xDivXWithoutAssumption, oneWithAssumption));
+        }
+    }
+
+    @Test
+    void eGraphAllowsConditionalIdentityUnderSameAssumptions() {
+        EGraph eGraph = new EGraph();
+        EClassId xDivX = eGraph.addExpression(parse("x / x"), List.of("0 != x"));
+        EClassId one = eGraph.addExpression(parse("1"), List.of("x != 0"));
+
+        eGraph.union(xDivX, one);
+        eGraph.rebuild();
+
+        assertTrue(eGraph.areEquivalent(xDivX, one));
+        assertEquals("x != 0", eGraph.assumptionsFor(xDivX).fingerprint());
     }
 
     private static Expr parse(String input) {

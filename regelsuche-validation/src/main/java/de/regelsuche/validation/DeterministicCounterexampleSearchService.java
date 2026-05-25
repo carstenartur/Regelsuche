@@ -97,6 +97,19 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             }
         }
 
+        if (budget.includeComplexAssignments()) {
+            Optional<Counterexample> complexCounterexample = tryComplexCounterexample(
+                left, right, orderedVariables, attemptedSources, assumptionGuards
+            );
+            if (complexCounterexample.isPresent()) {
+                return new CounterexampleSearchResult(
+                    complexCounterexample,
+                    List.copyOf(inferredAssumptions),
+                    attemptedSources
+                );
+            }
+        }
+
         return new CounterexampleSearchResult(Optional.empty(), List.copyOf(inferredAssumptions), attemptedSources);
     }
 
@@ -141,6 +154,51 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 continue;
             }
             if (!leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {
+                return Optional.of(new Counterexample(
+                    assignmentText,
+                    leftEvaluation.value().asText(),
+                    rightEvaluation.value().asText()
+                ));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Counterexample> tryComplexCounterexample(
+        Expr left,
+        Expr right,
+        List<String> orderedVariables,
+        List<String> attemptedSources,
+        List<AssumptionGuard> assumptionGuards
+    ) {
+        if (orderedVariables.isEmpty()) {
+            return Optional.empty();
+        }
+        attemptedSources.add("complex-samples");
+        List<Complex> values = List.of(
+            new Complex(0.0, 1.0),
+            new Complex(0.0, -1.0),
+            new Complex(-1.0, 1.0),
+            new Complex(1.0, -1.0)
+        );
+        for (int i = 0; i < Math.max(values.size(), orderedVariables.size()); i++) {
+            Map<String, RuntimeValue> assignment = new HashMap<>();
+            List<String> assignmentText = new ArrayList<>();
+            int j = 0;
+            for (String variable : orderedVariables) {
+                Complex value = values.get((i + j) % values.size());
+                assignment.put(variable, RuntimeValue.complex(value));
+                assignmentText.add(variable + "=" + value.asText());
+                j++;
+            }
+            if (violatesAssumptions(assignment, assumptionGuards)) {
+                continue;
+            }
+            Evaluation leftEvaluation = evaluate(left, assignment);
+            Evaluation rightEvaluation = evaluate(right, assignment);
+            if (leftEvaluation.defined()
+                && rightEvaluation.defined()
+                && !leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {
                 return Optional.of(new Counterexample(
                     assignmentText,
                     leftEvaluation.value().asText(),
@@ -215,7 +273,18 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 return Evaluation.undefined(Set.of());
             }
             Evaluation argument = evaluate(functionExpr.arguments().getFirst(), variables);
-            if (!argument.defined() || argument.value().kind() != RuntimeValue.Kind.SCALAR) {
+            if (!argument.defined()) {
+                return Evaluation.undefined(argument.zeroDenominatorSymbols());
+            }
+            if (argument.value().kind() == RuntimeValue.Kind.COMPLEX) {
+                Complex z = argument.value().complex();
+                return switch (functionExpr.name()) {
+                    case "sqrt" -> Evaluation.defined(RuntimeValue.complex(z.sqrt()));
+                    case "abs" -> Evaluation.defined(RuntimeValue.scalar(z.abs()));
+                    default -> Evaluation.undefined(Set.of());
+                };
+            }
+            if (argument.value().kind() != RuntimeValue.Kind.SCALAR) {
                 return Evaluation.undefined(argument.zeroDenominatorSymbols());
             }
             double x = argument.value().scalar();
@@ -254,12 +323,18 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         if (left.kind() == RuntimeValue.Kind.SCALAR && right.kind() == RuntimeValue.Kind.SCALAR) {
             return Evaluation.defined(RuntimeValue.scalar(left.scalar() + right.scalar()));
         }
+        if (left.isNumeric() && right.isNumeric()) {
+            return Evaluation.defined(RuntimeValue.complex(left.asComplex().add(right.asComplex())));
+        }
         return Evaluation.undefined(Set.of());
     }
 
     private Evaluation subtract(RuntimeValue left, RuntimeValue right) {
         if (left.kind() == RuntimeValue.Kind.SCALAR && right.kind() == RuntimeValue.Kind.SCALAR) {
             return Evaluation.defined(RuntimeValue.scalar(left.scalar() - right.scalar()));
+        }
+        if (left.isNumeric() && right.isNumeric()) {
+            return Evaluation.defined(RuntimeValue.complex(left.asComplex().subtract(right.asComplex())));
         }
         return Evaluation.undefined(Set.of());
     }
@@ -268,6 +343,9 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         if (left.kind() == RuntimeValue.Kind.SCALAR && right.kind() == RuntimeValue.Kind.SCALAR) {
             return Evaluation.defined(RuntimeValue.scalar(left.scalar() * right.scalar()));
         }
+        if (left.isNumeric() && right.isNumeric()) {
+            return Evaluation.defined(RuntimeValue.complex(left.asComplex().multiply(right.asComplex())));
+        }
         if (left.kind() == RuntimeValue.Kind.MATRIX && right.kind() == RuntimeValue.Kind.MATRIX) {
             return Evaluation.defined(RuntimeValue.matrix(left.matrix().multiply(right.matrix())));
         }
@@ -275,20 +353,26 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
     }
 
     private Evaluation divide(RuntimeValue left, RuntimeValue right, Expr denominatorExpr) {
-        if (left.kind() != RuntimeValue.Kind.SCALAR || right.kind() != RuntimeValue.Kind.SCALAR) {
+        if (!left.isNumeric() || !right.isNumeric()) {
             return Evaluation.undefined(Set.of());
         }
-        if (Math.abs(right.scalar()) <= EPS) {
+        if (right.asComplex().abs() <= EPS) {
             Set<String> denominatorVariables = new LinkedHashSet<>();
             collectVariables(denominatorExpr, denominatorVariables);
             return Evaluation.undefined(denominatorVariables);
         }
-        return Evaluation.defined(RuntimeValue.scalar(left.scalar() / right.scalar()));
+        if (left.kind() == RuntimeValue.Kind.SCALAR && right.kind() == RuntimeValue.Kind.SCALAR) {
+            return Evaluation.defined(RuntimeValue.scalar(left.scalar() / right.scalar()));
+        }
+        return Evaluation.defined(RuntimeValue.complex(left.asComplex().divide(right.asComplex())));
     }
 
     private Evaluation pow(RuntimeValue left, RuntimeValue right) {
-        if (left.kind() != RuntimeValue.Kind.SCALAR || right.kind() != RuntimeValue.Kind.SCALAR) {
+        if (!left.isNumeric() || right.kind() != RuntimeValue.Kind.SCALAR) {
             return Evaluation.undefined(Set.of());
+        }
+        if (left.kind() == RuntimeValue.Kind.COMPLEX && right.scalar() == Math.rint(right.scalar())) {
+            return Evaluation.defined(RuntimeValue.complex(left.complex().pow((int) right.scalar())));
         }
         double value = Math.pow(left.scalar(), right.scalar());
         if (!Double.isFinite(value)) {
@@ -325,7 +409,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
     private boolean violatesAssumptions(Map<String, RuntimeValue> assignment, List<AssumptionGuard> guards) {
         for (AssumptionGuard guard : guards) {
             RuntimeValue value = assignment.get(guard.nonZeroSymbol());
-            if (value != null && value.kind() == RuntimeValue.Kind.SCALAR && Math.abs(value.scalar()) <= EPS) {
+            if (value != null && value.isNumeric() && value.asComplex().abs() <= EPS) {
                 return true;
             }
         }
@@ -352,18 +436,31 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
     private record AssumptionGuard(String nonZeroSymbol) {
     }
 
-    private record RuntimeValue(Kind kind, double scalar, Matrix matrix) {
+    private record RuntimeValue(Kind kind, double scalar, Matrix matrix, Complex complex) {
         enum Kind {
             SCALAR,
-            MATRIX
+            MATRIX,
+            COMPLEX
         }
 
         static RuntimeValue scalar(double value) {
-            return new RuntimeValue(Kind.SCALAR, value, null);
+            return new RuntimeValue(Kind.SCALAR, value, null, null);
         }
 
         static RuntimeValue matrix(Matrix value) {
-            return new RuntimeValue(Kind.MATRIX, 0.0, value);
+            return new RuntimeValue(Kind.MATRIX, 0.0, value, null);
+        }
+
+        static RuntimeValue complex(Complex value) {
+            return new RuntimeValue(Kind.COMPLEX, 0.0, null, value);
+        }
+
+        boolean isNumeric() {
+            return kind == Kind.SCALAR || kind == Kind.COMPLEX;
+        }
+
+        Complex asComplex() {
+            return kind == Kind.COMPLEX ? complex : new Complex(scalar, 0.0);
         }
 
         boolean approximatelyEquals(RuntimeValue other) {
@@ -376,12 +473,18 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 }
                 return Math.abs(scalar - other.scalar) <= EPS;
             }
+            if (kind == Kind.COMPLEX) {
+                return complex.subtract(other.complex).abs() <= EPS;
+            }
             return matrix.equals(other.matrix);
         }
 
         String asText() {
             if (kind == Kind.SCALAR) {
                 return trimDouble(scalar);
+            }
+            if (kind == Kind.COMPLEX) {
+                return complex.asText();
             }
             StringBuilder builder = new StringBuilder("[");
             for (int i = 0; i < matrix.rows(); i++) {
@@ -396,6 +499,64 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 }
             }
             return builder.append("]").toString();
+        }
+    }
+
+    private record Complex(double real, double imaginary) {
+        Complex add(Complex other) {
+            return new Complex(real + other.real, imaginary + other.imaginary);
+        }
+
+        Complex subtract(Complex other) {
+            return new Complex(real - other.real, imaginary - other.imaginary);
+        }
+
+        Complex multiply(Complex other) {
+            return new Complex(
+                real * other.real - imaginary * other.imaginary,
+                real * other.imaginary + imaginary * other.real
+            );
+        }
+
+        Complex divide(Complex other) {
+            double denominator = other.real * other.real + other.imaginary * other.imaginary;
+            return new Complex(
+                (real * other.real + imaginary * other.imaginary) / denominator,
+                (imaginary * other.real - real * other.imaginary) / denominator
+            );
+        }
+
+        Complex pow(int exponent) {
+            if (exponent == 0) {
+                return new Complex(1.0, 0.0);
+            }
+            Complex result = new Complex(1.0, 0.0);
+            int count = Math.abs(exponent);
+            for (int i = 0; i < count; i++) {
+                result = result.multiply(this);
+            }
+            return exponent < 0 ? new Complex(1.0, 0.0).divide(result) : result;
+        }
+
+        Complex sqrt() {
+            double magnitude = abs();
+            double realPart = Math.sqrt((magnitude + real) / 2.0);
+            double imaginaryPart = Math.copySign(Math.sqrt((magnitude - real) / 2.0), imaginary);
+            return new Complex(realPart, imaginaryPart);
+        }
+
+        double abs() {
+            return Math.hypot(real, imaginary);
+        }
+
+        String asText() {
+            if (Math.abs(imaginary) <= EPS) {
+                return trimDouble(real);
+            }
+            if (Math.abs(real) <= EPS) {
+                return trimDouble(imaginary) + "i";
+            }
+            return trimDouble(real) + (imaginary < 0 ? "" : "+") + trimDouble(imaginary) + "i";
         }
     }
 }

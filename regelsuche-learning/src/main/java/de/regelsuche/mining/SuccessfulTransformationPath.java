@@ -1,5 +1,6 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.scoring.ExpressionScore;
 import java.util.List;
 import java.util.Map;
@@ -14,13 +15,42 @@ public record SuccessfulTransformationPath(
     ExpressionScore scoreAfter,
     boolean equivalenceVerified,
     String equivalenceEvidence,
-    Map<String, String> variableStructure
+    Map<String, String> variableStructure,
+    List<String> assumptions
 ) {
     public SuccessfulTransformationPath {
         id = id == null || id.isBlank() ? deterministicId(originalExpression, targetExpression, expressionPath, rules) : id;
         expressionPath = List.copyOf(expressionPath);
         rules = List.copyOf(rules);
         variableStructure = Map.copyOf(variableStructure);
+        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();
+    }
+
+    public SuccessfulTransformationPath(
+        String id,
+        String originalExpression,
+        String targetExpression,
+        List<String> expressionPath,
+        List<String> rules,
+        ExpressionScore scoreBefore,
+        ExpressionScore scoreAfter,
+        boolean equivalenceVerified,
+        String equivalenceEvidence,
+        Map<String, String> variableStructure
+    ) {
+        this(
+            id,
+            originalExpression,
+            targetExpression,
+            expressionPath,
+            rules,
+            scoreBefore,
+            scoreAfter,
+            equivalenceVerified,
+            equivalenceEvidence,
+            variableStructure,
+            List.of()
+        );
     }
 
     private static String deterministicId(
@@ -67,7 +97,8 @@ public record SuccessfulTransformationPath(
             scoreAfter,
             equivalenceVerified,
             equivalenceEvidence,
-            variableStructure
+            variableStructure,
+            List.of()
         );
     }
 
@@ -97,5 +128,21 @@ public record SuccessfulTransformationPath(
 
     public int scoreImprovement() {
         return scoreBefore.improvementTo(scoreAfter);
+    }
+
+    public String assumptionFingerprint() {
+        return AssumptionSignature.ofExpressions(assumptions).fingerprint();
+    }
+
+    public SuccessfulTransformationPath withAssumptions(List<String> additionalAssumptions) {
+        AssumptionSignature merged = AssumptionSignature.merge(
+            AssumptionSignature.ofExpressions(assumptions),
+            AssumptionSignature.ofExpressions(additionalAssumptions)
+        );
+        return new SuccessfulTransformationPath(
+            id, originalExpression, targetExpression, expressionPath, rules,
+            scoreBefore, scoreAfter, equivalenceVerified, equivalenceEvidence,
+            variableStructure, merged.normalizedAssumptions()
+        );
     }
 }

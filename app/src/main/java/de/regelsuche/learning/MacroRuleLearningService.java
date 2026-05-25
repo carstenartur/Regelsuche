@@ -2,6 +2,7 @@ package de.regelsuche.learning;
 
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.DiscoverySettings;
 import de.regelsuche.mining.KnownRuleRepository;
@@ -90,8 +91,10 @@ public class MacroRuleLearningService {
         // each candidate and tag the resulting reusable rule with its domain
         // (equations / inequalities / calculus / linear-algebra / algebra).
         java.util.Map<String, List<String>> rulesByPathId = new java.util.HashMap<>();
+        java.util.Map<String, List<String>> assumptionsByPathId = new java.util.HashMap<>();
         for (SuccessfulTransformationPath p : paths) {
             rulesByPathId.put(p.id(), p.rules());
+            assumptionsByPathId.put(p.id(), p.assumptions());
         }
         de.regelsuche.mining.MacroDomainInferrer inferrer =
             new de.regelsuche.mining.MacroDomainInferrer();
@@ -100,7 +103,7 @@ public class MacroRuleLearningService {
         for (RuleCandidate candidate : candidates) {
             ReusableRule ruleBefore = findById(candidate.canonicalHash())
                 .orElse(null);
-            ReusableRule rule = buildOrUpdate(candidate, ruleBefore);
+            ReusableRule rule = buildOrUpdate(candidate, ruleBefore, assumptionsFor(candidate, assumptionsByPathId));
             inventory.save(rule);
             boolean shouldEnable = rule.occurrenceCount() >= minOccurrences
                 && rule.confidenceScore() >= minConfidence;
@@ -140,7 +143,18 @@ public class MacroRuleLearningService {
         return Optional.empty();
     }
 
-    private ReusableRule buildOrUpdate(RuleCandidate candidate, ReusableRule existing) {
+    private List<String> assumptionsFor(
+        RuleCandidate candidate,
+        java.util.Map<String, List<String>> assumptionsByPathId
+    ) {
+        List<String> merged = new ArrayList<>();
+        for (String supportingId : candidate.supportingTransformationIds()) {
+            merged.addAll(assumptionsByPathId.getOrDefault(supportingId, List.of()));
+        }
+        return AssumptionSignature.ofExpressions(merged).normalizedAssumptions();
+    }
+
+    private ReusableRule buildOrUpdate(RuleCandidate candidate, ReusableRule existing, List<String> assumptions) {
         Set<String> supportingPathIds = new LinkedHashSet<>();
         if (existing != null) {
             supportingPathIds.addAll(existing.supportingPathIds());
@@ -176,7 +190,8 @@ public class MacroRuleLearningService {
             usageCount,
             occurrenceCount,
             new ArrayList<>(supportingPathIds),
-            confidence
+            confidence,
+            assumptions
         );
     }
 }

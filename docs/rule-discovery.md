@@ -56,6 +56,47 @@ Orchestriert den vollständigen Pipeline-Durchlauf:
 4. Speicherung als `HypothesisCandidate`
 5. Auto-Promotion via `MacroRuleLearningService` (wenn aktiviert)
 
+### Annahmen als mathematische Identität (Issue #35)
+
+Annahmen sind nicht nur Kommentartext an einer Hypothese. Sie gehören zur
+Identität einer mathematischen Aussage:
+
+- `TransformationStep` und `SuccessfulTransformationPath` tragen normalisierte
+  Annahmen, damit Pfade wie `(a*b)/b → a` die Voraussetzung `b != 0`
+  weiterreichen.
+- `HypothesisRepository` speichert `HypothesisCandidate`, sodass inferred
+  assumptions sowie Proof-/Counterexample-Status erhalten bleiben.
+- `ReusableRule` und `MacroRuleCandidate` enthalten normalisierte Annahmen.
+  Macro-Moves dürfen nur ausgewählt werden, wenn ihre Annahmen bereits im
+  Suchkontext erfüllt sind oder explizit weitergetragen werden.
+- E-Graph-Merges und Transposition-Table-Identitäten berücksichtigen den
+  `AssumptionSignature`-Fingerprint. Dieselbe Expression unter verschiedenen
+  Annahmen darf nicht als derselbe Zustand behandelt werden.
+
+`AssumptionSignature` normalisiert derzeit einfache textuelle Varianten wie
+`b≠0`, `b != 0`, `0 != b`, doppelte Leerzeichen und Klammerformen wie
+`(b) != 0` auf denselben Fingerprint.
+
+### Counterexample Search ist kein Beweis
+
+Die deterministische Gegenbeispielsuche ist endlich budgetiert. Ein leerer
+Fund bedeutet daher nur: Unter den aktivierten Quellen wurde kein
+Gegenbeispiel gefunden. Das ist kein mathematischer Beweis.
+
+Aktuell unterstützte Quellen:
+
+- numerische Edge-Cases und deterministische Random-Samples,
+- optionale nicht-kommutative Matrix-Samples für uppercase Variablen,
+- optionale einfache komplexe Samples für `+`, `-`, `*`, `/`, sichere
+  Integer-Potenzen und `sqrt`/`abs`,
+- optionaler externer Solver-Port (`ExternalSolverCounterexampleBackend`),
+  standardmäßig deaktiviert/no-op, bis Z3/cvc5 lokal verfügbar ist.
+
+Nicht vollständig unterstützt sind u. a. allgemeine Quantoren, vollständige
+Inequality-Semantik über komplexen Zahlen, vollständige Transzendenten im
+Komplexen und formale Beweise. SMT/Z3/cvc5-Setup und tiefere komplexe
+Domänenmodellierung bleiben Follow-up-Scope.
+
 ### Aktuelle No-DB-Grenze
 
 Issue #34 ist bewusst ohne Datenbank-Persistenz umgesetzt. `HypothesisCandidate`

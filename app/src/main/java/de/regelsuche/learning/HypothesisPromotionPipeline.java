@@ -83,6 +83,7 @@ public class HypothesisPromotionPipeline {
         // Collect supporting paths of non-rejected candidates for the promotion step,
         // so rejected rules cannot be re-mined by learningService.learn().
         Set<String> validatedSupportingIds = new LinkedHashSet<>();
+        List<String> promotionAssumptions = new ArrayList<>();
         boolean anyValidatedForPromotion = false;
 
         for (RuleCandidate candidate : candidates) {
@@ -128,6 +129,7 @@ public class HypothesisPromotionPipeline {
             if (autoPromote && candidate.proofStatus().ordinal()
                 >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {
                 validatedSupportingIds.addAll(candidate.supportingTransformationIds());
+                promotionAssumptions.addAll(hypothesis.assumptions());
                 anyValidatedForPromotion = true;
             }
         }
@@ -138,6 +140,7 @@ public class HypothesisPromotionPipeline {
         if (anyValidatedForPromotion) {
             List<SuccessfulTransformationPath> validatedPaths = paths.stream()
                 .filter(p -> validatedSupportingIds.contains(p.id()))
+                .map(p -> p.withAssumptions(promotionAssumptions))
                 .toList();
             if (!validatedPaths.isEmpty()) {
                 MacroLearningResult result = learningService.learn(validatedPaths);

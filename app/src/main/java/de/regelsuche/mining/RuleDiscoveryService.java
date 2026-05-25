@@ -169,7 +169,8 @@ public class RuleDiscoveryService {
                     state.score(),
                     equivalent,
                     equivalenceService.evidence(root, state.expression()),
-                    Map.of("variable", "x")
+                    Map.of("variable", "x"),
+                    state.assumptions()
                 ));
                 graphStore.saveDiscoveredTransformation(toDiscovered(pathId, root, state, before));
             }
@@ -242,7 +243,8 @@ public class RuleDiscoveryService {
                 scoreBefore,
                 scoreAfter,
                 equivalencePreserving,
-                ruleIds.get(i)
+                ruleIds.get(i),
+                state.assumptions()
             ));
         }
         return steps;

@@ -77,4 +77,34 @@ class DeterministicCounterexampleSearchServiceTest {
         assertEquals(first, second);
         assertNotEquals(first, different);
     }
+
+    @Test
+    void matrixBudgetControlsNonCommutativeRefutation() {
+        CounterexampleSearchService.HypothesisInput hypothesis =
+            new CounterexampleSearchService.HypothesisInput("h", "A * B", "B * A", List.of());
+
+        CounterexampleSearchService.CounterexampleSearchResult matrixDisabled = service.search(
+            hypothesis,
+            new CounterexampleSearchService.CounterexampleBudget(0, false, false, 1L)
+        );
+        CounterexampleSearchService.CounterexampleSearchResult matrixEnabled = service.search(
+            hypothesis,
+            new CounterexampleSearchService.CounterexampleBudget(0, false, true, 1L)
+        );
+
+        assertFalse(matrixDisabled.counterexample().isPresent());
+        assertTrue(matrixEnabled.counterexample().isPresent());
+        assertEquals(List.of("matrix-non-commutative"), matrixEnabled.attemptedSources());
+    }
+
+    @Test
+    void complexSamplingRefutesPrincipalSqrtIdentity() {
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput("h", "sqrt(x^2)", "x", List.of()),
+            new CounterexampleSearchService.CounterexampleBudget(0, false, false, 1L, true)
+        );
+
+        assertTrue(result.counterexample().isPresent());
+        assertEquals(List.of("complex-samples"), result.attemptedSources());
+    }
 }

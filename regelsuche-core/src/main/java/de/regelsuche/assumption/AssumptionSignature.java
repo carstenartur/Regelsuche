@@ -69,6 +69,7 @@ public record AssumptionSignature(List<String> normalizedAssumptions, String fin
         String canonical = expression.trim()
             .replace("≠", "!=")
             .replaceAll("\\s+", " ")
+            .replaceAll("^not\\((.*)=0\\)$", "$1 != 0")
             .replaceAll("\\s*!=\\s*", " != ")
             .replaceAll("\\s*>=\\s*", " >= ")
             .replaceAll("\\s*<=\\s*", " <= ")
@@ -79,6 +80,8 @@ public record AssumptionSignature(List<String> normalizedAssumptions, String fin
         if (notEquals >= 0) {
             String left = canonical.substring(0, notEquals).trim();
             String right = canonical.substring(notEquals + 4).trim();
+            left = stripOuterParens(left);
+            right = stripOuterParens(right);
             if (isZero(left) && !right.isBlank()) {
                 return right + " != 0";
             }
@@ -91,5 +94,13 @@ public record AssumptionSignature(List<String> normalizedAssumptions, String fin
 
     private static boolean isZero(String value) {
         return value.equals("0") || value.equals("0.0");
+    }
+
+    private static String stripOuterParens(String value) {
+        String result = value;
+        while (result.startsWith("(") && result.endsWith(")") && result.length() > 1) {
+            result = result.substring(1, result.length() - 1).trim();
+        }
+        return result;
     }
 }

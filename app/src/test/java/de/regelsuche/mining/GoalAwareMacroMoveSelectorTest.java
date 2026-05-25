@@ -124,4 +124,20 @@ class GoalAwareMacroMoveSelectorTest {
         assertTrue(selector.selectFor("").isEmpty());
         assertTrue(selector.selectFor(null).isEmpty());
     }
+
+    @Test
+    void macroWithAssumptionsRequiresMatchingCarriedContext() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        ReusableRule rationalCancel = rule("cancel", "(a * b) / b", "a", 0.9, 5.0, 3)
+            .withAssumptions(List.of("b != 0"));
+        inventory.save(rationalCancel);
+        inventory.setEnabled("cancel", true);
+
+        GoalAwareMacroMoveSelector selector = new GoalAwareMacroMoveSelector(inventory);
+
+        assertTrue(selector.selectFor("(a * b) / b").isEmpty(),
+            "macro must not apply when its assumption context is absent");
+        assertEquals(1, selector.selectFor("(a * b) / b", null, List.of("0 != b")).size(),
+            "normalized carried assumption should satisfy the macro precondition");
+    }
 }

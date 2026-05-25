@@ -29,6 +29,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
     private final TransformationEngine baseEngine;
     private final GoalAwareMacroMoveSelector selector;
     private final String goalExpression;
+    private final List<String> carriedAssumptions;
     private final Map<String, List<TransformationStep>> atomicStepsByRuleId;
     private final Map<String, MacroMoveExpansion> expansionsByEdge = new HashMap<>();
 
@@ -36,7 +37,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         TransformationEngine baseEngine,
         GoalAwareMacroMoveSelector selector
     ) {
-        this(baseEngine, selector, null, Map.of());
+        this(baseEngine, selector, null, Map.of(), List.of());
     }
 
     public MacroMoveTransformationEngine(
@@ -45,19 +46,30 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         String goalExpression,
         Map<String, List<TransformationStep>> atomicStepsByRuleId
     ) {
+        this(baseEngine, selector, goalExpression, atomicStepsByRuleId, List.of());
+    }
+
+    public MacroMoveTransformationEngine(
+        TransformationEngine baseEngine,
+        GoalAwareMacroMoveSelector selector,
+        String goalExpression,
+        Map<String, List<TransformationStep>> atomicStepsByRuleId,
+        List<String> carriedAssumptions
+    ) {
         if (baseEngine == null || selector == null) {
             throw new IllegalArgumentException("baseEngine and selector are required");
         }
         this.baseEngine = baseEngine;
         this.selector = selector;
         this.goalExpression = goalExpression;
+        this.carriedAssumptions = carriedAssumptions == null ? List.of() : List.copyOf(carriedAssumptions);
         this.atomicStepsByRuleId = atomicStepsByRuleId == null ? Map.of() : Map.copyOf(atomicStepsByRuleId);
     }
 
     @Override
     public List<Transformation> transform(String expression) {
         List<Transformation> result = new ArrayList<>(baseEngine.transform(expression));
-        for (ReusableRule rule : selector.selectFor(expression, goalExpression)) {
+        for (ReusableRule rule : selector.selectFor(expression, goalExpression, carriedAssumptions)) {
             result.addAll(applyMacro(expression, rule));
         }
         return result;
