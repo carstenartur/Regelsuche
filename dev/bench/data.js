@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779701615941,
+  "lastUpdate": 1779707148981,
   "repoUrl": "https://github.com/carstenartur/Regelsuche",
   "entries": {
     "Regelsuche JMH Benchmarks": [
@@ -658,6 +658,84 @@ window.BENCHMARK_DATA = {
           {
             "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
             "value": 150.98926759466758,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "Copilot",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cda489c0388029a0c35af333b033fc3cc25516b9",
+          "message": "Scale E-Graph matching with canonical lookup, signature indexing, memoized matching, and dirty-class saturation (#47)",
+          "timestamp": "2026-05-25T13:04:18+02:00",
+          "tree_id": "ac45e18ded9634ebb97310a1de99104d78606d95",
+          "url": "https://github.com/carstenartur/Regelsuche/commit/cda489c0388029a0c35af333b033fc3cc25516b9"
+        },
+        "date": 1779707148155,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+            "value": 1.241865961615242,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+            "value": 3.2446360988804757,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge",
+            "value": 4133.588296635769,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+            "value": 6.222669956140248,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge",
+            "value": 1781.8143206384236,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge",
+            "value": 476.7711873878358,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+            "value": 2.0538897053569074,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+            "value": 84.71232777181888,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+            "value": 163.5511280877889,
             "unit": "us/op",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
