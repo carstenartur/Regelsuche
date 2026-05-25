@@ -11,6 +11,7 @@ import com.microsoft.playwright.Download;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.ScreenshotType;
 import com.microsoft.playwright.options.WaitForSelectorState;
@@ -104,7 +105,7 @@ class BrowserDemoFlowTest {
             }
         });
         page.navigate(app.baseUrl());
-        page.waitForLoadState(LoadState.NETWORKIDLE);
+        page.waitForLoadState(LoadState.DOMCONTENTLOADED);
     }
 
     @AfterEach
@@ -187,8 +188,10 @@ class BrowserDemoFlowTest {
         clickDemoButton("macro-learning");
         // Macro-learning uses its own summary renderer; wait for the
         // characteristic block to appear instead of selectedPath structure.
+        waitForDemoFinished("macro-learning");
+        waitForMathRendered("#demoSummary");
         page.waitForSelector("#demoSummary >> text=/Makro|Iteration|reusable/i",
-            new Page.WaitForSelectorOptions().setTimeout(60_000));
+            new Page.WaitForSelectorOptions().setTimeout(10_000));
         assertTrue(page.locator("#demoSummary").innerText().length() > 50);
         screenshotDemoSummaryCard("macro-learning-summary.png",
             "#demoSummary table", false);
@@ -214,7 +217,7 @@ class BrowserDemoFlowTest {
         waitForDemoSummary("math-inequality");
         // The flip warning must be visible right in the summary panel.
         page.waitForSelector(".math-inequality-panel",
-            new Page.WaitForSelectorOptions().setTimeout(15_000));
+            new Page.WaitForSelectorOptions().setTimeout(10_000));
         assertTrue(page.locator(".math-inequality-panel").innerText()
             .toLowerCase().contains("vergleichszeichen"),
             "inequality summary must contain the flip warning");
@@ -294,8 +297,7 @@ class BrowserDemoFlowTest {
                     + " s.dispatchEvent(new Event('change', { bubbles: true })); }",
                 sel);
             page.locator("#replayLoad").click();
-            page.waitForSelector(".replay-step",
-                new Page.WaitForSelectorOptions().setTimeout(10_000));
+            waitForReplayReady();
             for (int step = 0; step < 30 && !foundMatrixCard; step++) {
                 if (page.locator(".replay-matrix-card").count() > 0) {
                     foundMatrixCard = true;
@@ -321,10 +323,8 @@ class BrowserDemoFlowTest {
         clickDemoButton("math-equation");
         waitForDemoSummary("math-equation");
         page.waitForSelector("#proofBridgeRun",
-            new Page.WaitForSelectorOptions().setTimeout(15_000));
-        page.locator("#proofBridgeRun").click();
-        page.waitForSelector("#proofBridgeResult .proof-bridge-summary",
-            new Page.WaitForSelectorOptions().setTimeout(30_000));
+            new Page.WaitForSelectorOptions().setTimeout(10_000));
+        waitForProofResult(() -> page.locator("#proofBridgeRun").click());
         String result = page.locator("#proofBridgeResult").innerText();
         assertTrue(result.contains("Proof-Status"),
             "proof-bridge result must show Proof-Status");
@@ -352,6 +352,7 @@ class BrowserDemoFlowTest {
         page.locator(".tab[data-tab='exports']").click();
         page.waitForSelector("#tab-exports.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
+        waitForDownloadReady();
         Download download = page.waitForDownload(() ->
             page.locator("a[href='/api/exports/bundle.zip']").first().click());
         Path saved = Files.createTempFile("regelsuche-bundle-", ".zip");
@@ -393,42 +394,97 @@ class BrowserDemoFlowTest {
         assertTrue(summary.contains("Proof-Status")
                 || page.locator(".proof-badge").count() > 0,
             "demo " + demoId + " must surface a Proof-Status row or badge");
-        // Graph tab must render something (either the cytoscape canvas
-        // becomes visible or the mermaid fallback fills #graphOutput).
+        // Graph tab must render the interactive Cytoscape/KaTeX view.
         page.locator(".tab[data-tab='graph']").click();
         page.waitForSelector("#tab-graph.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
         page.locator("#reloadGraph").click();
-        page.waitForFunction(
-            "() => {"
-                + " var c = document.querySelector('#graphCanvas');"
-                + " var o = document.querySelector('#graphOutput');"
-                + " return (c && c.style.display !== 'none' && c.innerHTML.length > 50)"
-                + "     || (o && o.textContent.length > 50);"
-                + "}",
-            null, new Page.WaitForFunctionOptions().setTimeout(20_000));
+        waitForGraphRendered();
         // Replay tab must show selectable paths.
         openReplayForLatestPath();
-        page.waitForSelector(".replay-step",
-            new Page.WaitForSelectorOptions().setTimeout(15_000));
+        waitForReplayReady();
     }
 
     private void clickDemoButton(String demoId) {
-        page.locator(".demo-button[data-demo='" + demoId + "']").click();
-        // The status field flips to a non-empty message immediately after the
-        // POST returns; the demo-summary then renders in the same tick.
+        page.waitForResponse(
+            response -> response.url().contains("/api/demo/" + demoId)
+                && response.status() == 200,
+            () -> page.locator(".demo-button[data-demo='" + demoId + "']").click());
+        waitForDemoFinished(demoId);
+    }
+
+    private void waitForDemoFinished(String demoId) {
         page.waitForFunction(
-            "() => document.querySelector('#demoStatus') "
-                + "&& document.querySelector('#demoStatus').innerText.length > 0",
-            null, new Page.WaitForFunctionOptions().setTimeout(60_000));
+            "(id) => window.__regelsucheDemoReady === true "
+                + "&& document.querySelector('#demoSummary') "
+                + "&& document.querySelector('#demoSummary').innerHTML.length > 50",
+            demoId,
+            new Page.WaitForFunctionOptions().setTimeout(15_000));
     }
 
     private void waitForDemoSummary(String expectedDemoId) {
+        waitForDemoFinished(expectedDemoId);
+        waitForMathRendered("#demoSummary");
+    }
+
+    private void waitForMathRendered(String containerSelector) {
         page.waitForFunction(
-            "(id) => document.querySelector('#demoSummary') "
-                + "&& document.querySelector('#demoSummary').innerHTML.length > 50",
-            expectedDemoId,
-            new Page.WaitForFunctionOptions().setTimeout(60_000));
+            "(selector) => window.__regelsucheMathRendered === true "
+                + "&& document.querySelector(selector)",
+            containerSelector,
+            new Page.WaitForFunctionOptions().setTimeout(10_000));
+    }
+
+    private void waitForGraphRendered() {
+        page.waitForFunction(
+            "() => window.__regelsucheGraphRendered === true "
+                + "&& document.querySelectorAll("
+                + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
+                + ").length > 0",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(10_000));
+    }
+
+    private void waitForReplayReady() {
+        page.waitForFunction(
+            "() => window.__regelsucheReplayReady === true "
+                + "&& document.querySelector('.replay-step')",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(10_000));
+    }
+
+    private void waitForProofResult(Runnable action) {
+        page.waitForResponse(
+            response -> response.url().contains("/api/proof-bridge")
+                && response.status() == 200,
+            action);
+        page.waitForSelector("#proofBridgeResult .proof-bridge-summary",
+            new Page.WaitForSelectorOptions().setTimeout(10_000));
+    }
+
+    private void waitForDownloadReady() {
+        page.waitForSelector("#tab-exports .export-grid a[href='/api/exports/bundle.zip']",
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(5_000));
+    }
+
+    private void waitForStableElement(String selector) {
+        page.waitForFunction(
+            "(selector) => new Promise((resolve) => {"
+                + " const el = document.querySelector(selector);"
+                + " if (!el) { resolve(false); return; }"
+                + " const first = el.getBoundingClientRect();"
+                + " requestAnimationFrame(() => requestAnimationFrame(() => {"
+                + "   const second = el.getBoundingClientRect();"
+                + "   resolve(Math.abs(first.x - second.x) < 1"
+                + "     && Math.abs(first.y - second.y) < 1"
+                + "     && Math.abs(first.width - second.width) < 1"
+                + "     && Math.abs(first.height - second.height) < 1);"
+                + " }));"
+                + "})",
+            selector,
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
     }
 
     private void openReplayForLatestPath() {
@@ -453,10 +509,7 @@ class BrowserDemoFlowTest {
                 + " s.dispatchEvent(new Event('change', { bubbles: true }));"
                 + "}");
         page.locator("#replayLoad").click();
-        page.waitForSelector(".replay-step",
-            new Page.WaitForSelectorOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(15_000));
+        waitForReplayReady();
     }
 
     private void screenshotDemoSummaryCard(
@@ -482,18 +535,18 @@ class BrowserDemoFlowTest {
         page.waitForSelector(containerSelector,
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(15_000));
+                .setTimeout(10_000));
         page.waitForSelector(requiredSelector,
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(15_000));
+                .setTimeout(10_000));
         Locator container = page.locator(containerSelector).first();
         if (requireKatex) {
             assertTrue(container.locator(".katex").count() > 0,
                 fileName + " must include at least one rendered KaTeX element");
         }
         container.scrollIntoViewIfNeeded();
-        page.waitForTimeout(200);
+        waitForStableElement(containerSelector);
         Path target = SCREENSHOT_DIR.resolve(fileName);
         createParentDirectory(target);
         container.screenshot(new Locator.ScreenshotOptions()
@@ -517,17 +570,14 @@ class BrowserDemoFlowTest {
         page.waitForFunction(
             "() => typeof window.cytoscape === 'function' || window.__cytoscapeFailed === true",
             null,
-            new Page.WaitForFunctionOptions().setTimeout(15_000));
+            new Page.WaitForFunctionOptions().setTimeout(10_000));
         Boolean cytoscapeAvailable = (Boolean) page.evaluate(
             "() => typeof window.cytoscape === 'function' && window.__cytoscapeFailed !== true");
         if (!Boolean.TRUE.equals(cytoscapeAvailable)) {
             throw new TestAbortedException(
                 "Cytoscape unavailable; refusing to replace docs graph screenshot with fallback");
         }
-        page.waitForSelector("#graphCanvas .graph-overlay-layer .graph-node-math.is-best .katex",
-            new Page.WaitForSelectorOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(15_000));
+        waitForGraphRendered();
         int renderedNodes = ((Number) page.evaluate(
             "() => document.querySelectorAll("
                 + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
@@ -545,7 +595,7 @@ class BrowserDemoFlowTest {
         Path target = SCREENSHOT_DIR.resolve(fileName);
         createParentDirectory(target);
         page.locator("#graphCanvas").scrollIntoViewIfNeeded();
-        page.waitForTimeout(400);
+        waitForStableElement("#graphCanvas");
         page.locator("#graphCanvas").screenshot(new Locator.ScreenshotOptions()
             .setPath(target)
             .setType(ScreenshotType.PNG));

@@ -13,6 +13,10 @@
  * UI is still usable when an endpoint is missing.
  */
 (() => {
+    window.__regelsucheDemoReady = false;
+    window.__regelsucheMathRendered = false;
+    window.__regelsucheGraphRendered = false;
+    window.__regelsucheReplayReady = false;
     // Optional script loader for the interactive Cytoscape graph view.
     // KaTeX is loaded statically from index.html so cold page loads can
     // typeset math before the UI starts mutating the DOM.
@@ -54,6 +58,7 @@
      */
     window.renderMath = function renderMath(root) {
         if (!root) { return; }
+        window.__regelsucheMathRendered = false;
         const nodes = mathTargets(root);
         if (typeof window.renderMathInElement === 'function') {
             try {
@@ -68,6 +73,7 @@
                     strict: 'ignore',
                     throwOnError: false
                 });
+                window.__regelsucheMathRendered = true;
                 return;
             } catch (_) {
                 // fall through to plain fallback below
@@ -84,6 +90,7 @@
             node.appendChild(code);
             node.classList.add('math-fallback');
         });
+        window.__regelsucheMathRendered = true;
     };
 
     /**
@@ -211,6 +218,9 @@
     }
 
     async function runDemo(demoId, btn) {
+        window.__regelsucheDemoReady = false;
+        window.__regelsucheGraphRendered = false;
+        window.__regelsucheReplayReady = false;
         markSearchStarted();
         const status = $('demoStatus');
         const summary = $('demoSummary');
@@ -232,6 +242,7 @@
             status.textContent = 'Demo "' + data.title + '" abgeschlossen in '
                 + (data.metrics && data.metrics.elapsedMillis) + ' ms.';
             renderDemoSummary(data);
+            window.__regelsucheDemoReady = true;
             // Refresh the existing panels so users see graph/replay immediately.
             if (typeof loadPaths === 'function') { loadPaths().catch(() => {}); }
             if (typeof loadIdentities === 'function') { loadIdentities().catch(() => {}); }
@@ -240,6 +251,7 @@
         } catch (ex) {
             status.className = 'status error';
             status.textContent = 'Netzwerkfehler: ' + ex;
+            window.__regelsucheDemoReady = false;
         } finally {
             buttons.forEach((b) => (b.disabled = false));
         }
@@ -733,6 +745,7 @@
 
     /* ─── Graph tab ─── */
     $('reloadGraph').addEventListener('click', async () => {
+        window.__regelsucheGraphRendered = false;
         const out = $('graphOutput');
         const canvas = $('graphCanvas');
         const inspector = $('graphInspector');
@@ -758,6 +771,7 @@
             out.textContent = await response.text();
         } catch (ex) {
             out.textContent = 'Fehler: ' + ex;
+            window.__regelsucheGraphRendered = false;
         }
     });
 
@@ -800,6 +814,7 @@
         // so the math nodes track the underlying Cytoscape positions
         // smoothly via CSS transitions.
         graphMathOverlay.install(cy, canvas);
+        window.__regelsucheGraphRendered = true;
         if (inspector) {
             inspector.style.display = 'block';
             inspector.innerHTML = '<em>Klicke auf einen Knoten oder eine Kante, um Details anzuzeigen.</em>';
@@ -1248,6 +1263,7 @@
         }
     }
     async function loadReplay() {
+        window.__regelsucheReplayReady = false;
         const select = $('replayPathSelect');
         const pathId = select && select.value;
         if (!pathId) { return; }
@@ -1263,6 +1279,7 @@
             renderReplayStep();
         } catch (ex) {
             $('replayCanvas').innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
+            window.__regelsucheReplayReady = false;
         }
     }
     function renderReplayStep() {
@@ -1309,6 +1326,7 @@
             window.renderMathLayout(step.layout, toHost);
         }
         window.renderMath(canvas);
+        window.__regelsucheReplayReady = true;
     }
 
     /**
