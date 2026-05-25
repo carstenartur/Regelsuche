@@ -15,7 +15,7 @@ class DiscoveryReplayArtifactWriterTest {
     Path tempDir;
 
     @Test
-    void writesJsonHtmlScreenshotAndReplayGifArtifacts() throws Exception {
+    void writesJsonHtmlMarkdownReplayScreenshotAndGifArtifacts() throws Exception {
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report = new DeterministicDiscoveryExperimentRunner.DiscoveryReport(
             List.of(new DeterministicDiscoveryExperimentRunner.SeedRunReport(
                 new SeedExpression("identity-binomial-1", "(x + 1)^2", "known-identity", "binomial", List.of("scientific"), List.of()),
@@ -36,8 +36,8 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(Files.readString(bundle.jsonReport()).contains("regelsuche.discovery-report/v1"));
         assertTrue(Files.readString(bundle.htmlReport()).contains("Regelsuche Discovery Report"));
         assertTrue(Files.readString(bundle.htmlReport()).contains("Hypothesen"));
-        assertTrue(Files.readString(tempDir.resolve("discovery-report.md")).contains("# Regelsuche Discovery Report"));
-        assertTrue(Files.readString(tempDir.resolve("discovery-replay.json")).contains("regelsuche.discovery-replay/v1"));
+        assertTrue(Files.readString(bundle.markdownReport()).contains("# Regelsuche Discovery Report"));
+        assertTrue(Files.readString(bundle.replayJson()).contains("regelsuche.discovery-replay/v1"));
         assertTrue(Files.size(bundle.screenshotPng()) > 0, "PNG screenshot artifact must be written");
         assertTrue(Files.size(bundle.replayGif()) > 0, "GIF replay artifact must be written");
     }

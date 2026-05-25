@@ -1,6 +1,7 @@
 package de.regelsuche.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -83,6 +84,15 @@ class SearchGraphEndpointsTest {
         assertTrue(body.contains("\"macroRuleId\":\"macro_demo\""), body);
         assertTrue(body.contains("\"supportingPathIds\":[\"supporting-path\"]"), body);
         assertTrue(body.contains("\"atomicSteps\":"), body);
+    }
+
+    @Test
+    void replayEndpointDisambiguatesMacroExpansionByScoreAndPathMetadata() throws IOException {
+        seedMacroTransformationWithAmbiguousEdgeTriples();
+        String body = get("/api/paths/macro-disambiguated-path/replay");
+        assertTrue(body.contains("\"macroMoveExpansion\":{"), body);
+        assertTrue(body.contains("\"macroRuleId\":\"macro_correct\""), body);
+        assertFalse(body.contains("\"macroRuleId\":\"macro_wrong\""), body);
     }
 
     @Test
@@ -203,6 +213,37 @@ class SearchGraphEndpointsTest {
             new ExpressionScore(5, 0, 0, 0, 0),
             new ExpressionScore(2, 0, 0, 0, 0),
             3, CandidateProofStatus.OBSERVED, Instant.now(), "macro-hash"
+        ));
+    }
+
+    private void seedMacroTransformationWithAmbiguousEdgeTriples() {
+        List<TransformationStep> stepAtomic = List.of(
+            new TransformationStep(0, "C", "C + 0", "expand_zero", RewriteKind.NORMALIZE, 9, 8, true, "")
+        );
+        MacroMoveExpansion wrongExpansion = new MacroMoveExpansion(
+            "macro_wrong", "C", "D", stepAtomic, List.of("wrong-path"), 1.0, false
+        );
+        MacroMoveExpansion correctExpansion = new MacroMoveExpansion(
+            "macro_correct", "C", "D", stepAtomic, List.of("correct-path"), 1.0, false
+        );
+        TransformationStep step = new TransformationStep(
+            0, "C", "D", "macro_demo", RewriteKind.NORMALIZE, 7, 3, true, ""
+        );
+        graphStore.saveNode("C", 7);
+        graphStore.saveNode("D", 3);
+        graphStore.saveEdge(new GraphEdge(
+            "C", "D", "macro_demo", 0, 1, "other-path#0", "other-hash", 9, 8,
+            RewriteKind.NORMALIZE, false, -1, true, CandidateProofStatus.OBSERVED, wrongExpansion
+        ));
+        graphStore.saveEdge(new GraphEdge(
+            "C", "D", "macro_demo", 0, 4, "macro-disambiguated-path#0", "disambiguated-hash", 7, 3,
+            RewriteKind.NORMALIZE, false, -4, true, CandidateProofStatus.OBSERVED, correctExpansion
+        ));
+        graphStore.saveDiscoveredTransformation(new DiscoveredTransformation(
+            "macro-disambiguated-path", "C", "D", List.of(step),
+            new ExpressionScore(7, 0, 0, 0, 0),
+            new ExpressionScore(3, 0, 0, 0, 0),
+            4, CandidateProofStatus.OBSERVED, Instant.now(), "disambiguated-hash"
         ));
     }
 

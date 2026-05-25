@@ -33,7 +33,7 @@ public final class DiscoveryReplayArtifactWriter {
             Files.writeString(replayExport, renderReplayExport(report));
             writeScreenshot(screenshot, report);
             writeReplayGif(gif, report);
-            return new ArtifactBundle(json, html, screenshot, gif);
+            return new ArtifactBundle(json, html, markdown, replayExport, screenshot, gif);
         } catch (IOException exception) {
             throw new IllegalStateException("Could not write discovery replay artefacts to " + outputDirectory, exception);
         }
@@ -235,6 +235,13 @@ public final class DiscoveryReplayArtifactWriter {
         return values == null || values.isEmpty() ? "–" : String.join(", ", values);
     }
 
-    public record ArtifactBundle(Path jsonReport, Path htmlReport, Path screenshotPng, Path replayGif) {
+    public record ArtifactBundle(
+        Path jsonReport,
+        Path htmlReport,
+        Path markdownReport,
+        Path replayJson,
+        Path screenshotPng,
+        Path replayGif
+    ) {
     }
 }
