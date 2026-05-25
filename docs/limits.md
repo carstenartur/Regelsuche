@@ -7,6 +7,8 @@
 - **Inventar-Persistenz.** `InMemoryRuleInventoryRepository.persistTo(file)` / `loadFrom(file)` schreibt/liest enabled/tags plus alle Rule-Felder als JSON. Das `Neo4jRuleInventoryRepository` speichert enabled/tags zusätzlich als Knoten-Properties.
 - **Symbolische Nebenbedingungen.** `Assumption` + `AssumptionContext` modellieren Vorbedingungen; `RewriteRule.assumptions(subtree)` ist ein Erweiterungspunkt. `RationalRules`, `LogarithmicRules`, `RadicalRules`, `TrigonometricRules` und `CalculusBasicRules` emittieren konkrete `NON_ZERO`/`POSITIVE`/`NON_NEGATIVE`-Assumptions. Siehe [`docs/assumptions.md`](assumptions.md).
 - **Jobsteuerung.** `SearchJobManager` mit `submit/pause/resume/cancel/checkpoint/restore` für persistente, abbrechbare Suchläufe. Siehe [`docs/job-control.md`](job-control.md).
+- **Modulare mathematische Algorithmen.** `MathematicalAlgorithmRegistry` schaltet Verfahren einzeln (`polynomialEquivalence`, `groebnerBasis`, `singularBackend`, `knuthBendix`, `criticalPairs`, `pslq`, `numericRelationSearch`) und enthält Budgets/Semantik pro Verfahren.
+- **Proof-vs-Hypothesis strikt getrennt.** Polynomial-/Gröbner-Normalformen dürfen im unterstützten Polynom-Domain `PROOF` liefern, PSLQ und numerische Relationssuche liefern ausschließlich `HYPOTHESIS`, begrenzte erfolglose Suchen bleiben `UNKNOWN`.
 
 ## Was bewusst (noch) nicht geht
 

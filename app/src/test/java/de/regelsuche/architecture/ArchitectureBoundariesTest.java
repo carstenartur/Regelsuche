@@ -23,6 +23,10 @@ class ArchitectureBoundariesTest {
             "de.regelsuche.search.SearchTraceStore",
             "de.regelsuche.validation.CounterexampleSearchService",
             "de.regelsuche.equivalence.PolynomialEquivalenceService",
+            "de.regelsuche.validation.CompletionService",
+            "de.regelsuche.validation.CriticalPairService",
+            "de.regelsuche.validation.NumericRelationService",
+            "de.regelsuche.validation.MathematicalAlgorithmRegistry",
             "de.regelsuche.mining.HypothesisRepository",
             "de.regelsuche.benchmark.DiscoveryExperimentRunner"
         );
@@ -63,6 +67,8 @@ class ArchitectureBoundariesTest {
         expectedProjectDependencies.put("regelsuche-egraph", List.of(":regelsuche-core"));
         expectedProjectDependencies.put("regelsuche-search", List.of(":regelsuche-core", ":regelsuche-egraph"));
         expectedProjectDependencies.put("regelsuche-validation", List.of(":regelsuche-core"));
+        expectedProjectDependencies.put("regelsuche-math-algorithms", List.of(":regelsuche-core", ":regelsuche-validation"));
+        expectedProjectDependencies.put("regelsuche-math-jas", List.of(":regelsuche-validation"));
         expectedProjectDependencies.put("regelsuche-persistence", List.of(":regelsuche-core"));
         expectedProjectDependencies.put("regelsuche-learning", List.of(":regelsuche-core", ":regelsuche-search",
             ":regelsuche-validation"));
@@ -73,7 +79,7 @@ class ArchitectureBoundariesTest {
         expectedProjectDependencies.put("regelsuche-discovery", List.of(":regelsuche-core", ":regelsuche-search",
             ":regelsuche-validation"));
         expectedProjectDependencies.put("app", List.of(":regelsuche-core", ":regelsuche-egraph", ":regelsuche-search",
-            ":regelsuche-validation", ":regelsuche-persistence", ":regelsuche-persistence-hibernate",
+            ":regelsuche-validation", ":regelsuche-math-algorithms", ":regelsuche-persistence", ":regelsuche-persistence-hibernate",
             ":regelsuche-learning", ":regelsuche-experiments", ":regelsuche-cli", ":regelsuche-discovery"));
         for (Map.Entry<String, List<String>> entry : expectedProjectDependencies.entrySet()) {
             String build = Files.readString(REPO_ROOT.resolve(entry.getKey()).resolve("build.gradle"));
