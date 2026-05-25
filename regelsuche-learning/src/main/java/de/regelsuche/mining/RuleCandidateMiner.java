@@ -93,7 +93,13 @@ public class RuleCandidateMiner {
         }
 
         private void addAll(List<SuccessfulTransformationPath> paths) {
-            this.paths.addAll(paths);
+            for (SuccessfulTransformationPath path : paths) {
+                boolean alreadyPresent = this.paths.stream()
+                    .anyMatch(existing -> existing.id() != null && existing.id().equals(path.id()));
+                if (!alreadyPresent) {
+                    this.paths.add(path);
+                }
+            }
         }
 
         private RuleCandidate toCandidate(KnownRuleRepository knownRules) {

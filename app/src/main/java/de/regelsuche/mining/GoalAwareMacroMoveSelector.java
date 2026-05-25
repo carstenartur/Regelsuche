@@ -114,6 +114,10 @@ public class GoalAwareMacroMoveSelector {
         if (currentOverlap <= 0) {
             return 0.0;
         }
+        int currentNamedOverlap = namedStructuralOverlap(rule.leftPattern(), currentExpression);
+        if (currentNamedOverlap <= 0 && hasNamedTokens(rule.leftPattern())) {
+            return 0.0;
+        }
         int goalOverlap = goalExpression == null || goalExpression.isBlank()
             ? 0
             : Math.max(
@@ -181,6 +185,10 @@ public class GoalAwareMacroMoveSelector {
         Set<String> produced = tokens(rule.rightPattern());
         produced.removeAll(current);
         return !produced.isEmpty();
+    }
+
+    private boolean hasNamedTokens(String expression) {
+        return tokens(expression).stream().anyMatch(token -> !token.startsWith("op:"));
     }
 
     private Set<String> tokens(String expression) {

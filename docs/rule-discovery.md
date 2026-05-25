@@ -56,6 +56,20 @@ Orchestriert den vollständigen Pipeline-Durchlauf:
 4. Speicherung als `HypothesisCandidate`
 5. Auto-Promotion via `MacroRuleLearningService` (wenn aktiviert)
 
+### Aktuelle No-DB-Grenze
+
+Issue #34 ist bewusst ohne Datenbank-Persistenz umgesetzt. `HypothesisCandidate`
+und die Demo-Regeln laufen über `InMemoryHypothesisRepository` bzw.
+`InMemoryRuleInventoryRepository`. Persistente PostgreSQL-/Neo4j-Ablage bleibt
+außerhalb dieses Scopes.
+
+### Evidenz
+
+`HypothesisCandidate.supportingExpressions` wird jetzt aus den geminten
+`SuccessfulTransformationPath`s befüllt. Jede Hypothese enthält damit neben den
+`supportingPaths` auch konkrete Vorher/Nachher-Zeugen, z. B. alle drei
+binomischen Beispiele `(x+1)^2`, `(x+2)^2`, `(x+3)^2`.
+
 ## Anti-Unifikation (Discovery Epic Teil 2)
 
 `PatternGeneralizer` unterstützt jetzt robuste Anti-Unifikation über:
@@ -65,3 +79,18 @@ Orchestriert den vollständigen Pipeline-Durchlauf:
 - **Verschiedene Variable-Namen** (neu): wenn Variablen an strukturell gleicher Position verschiedene Namen haben, entstehen Ausdruck-Platzhalter.
 
 Ausdruck-Platzhalter werden in `GeneralizedPattern.expressionPlaceholderValues()` gespeichert und in den `parameterRelations` als Mengenzugehörigkeit dokumentiert (z. B. `B ∈ {x, x + 1, x + 2}`).
+
+## Demos ohne DB
+
+`DiscoveryDemos` enthält reproduzierbare In-Memory-Szenarien:
+
+- **Rationalvereinfachung**: Beispiele wie `(x*x)/x → x`, `(a*b)/a → b`,
+  `(x+1)/(x+1) → 1` sowie zusätzliche gleichförmige Stützbeispiele. Daraus wird
+  eine wiederverwendbare Makroregel zur Kürzung gemeinsamer Faktoren in das
+  Inventar promoted. Wenn der derzeitige Miner wegen Nebenbedingungen
+  (`A != 0`) keine validierte Regel emittiert, nutzt die Demo einen explizit
+  annotierten Fallback mit derselben Evidenzbasis.
+- **Geometrische Reihe**: `1+x`, `1+x+x^2`, `1+x+x^2+x^3` erzeugen aktuell eine
+  strukturelle `HypothesisCandidate` mit der Relation
+  `S_(n+1) = S_n + x^n`. Die geschlossene Form `(1-x^n)/(1-x)` wird noch nicht
+  automatisch hergeleitet oder bewiesen.
