@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -186,9 +187,10 @@ public final class ProvenanceGraphQueries {
         double threshold = Math.max(0.0, maxResidual);
         return graph.nodes().stream()
             .filter(node -> node.type() == ProvenanceNodeType.NUMERIC_RELATION_CANDIDATE)
-            .filter(node -> parseDouble(node.properties().get("residual")) <= threshold)
+            .filter(node -> parseResidualForQuality(node).isPresent())
+            .filter(node -> parseResidualForQuality(node).orElseThrow() <= threshold)
             .sorted(Comparator
-                .comparingDouble((ProvenanceNode node) -> parseDouble(node.properties().get("residual")))
+                .comparingDouble((ProvenanceNode node) -> parseResidualForQuality(node).orElseThrow())
                 .thenComparing(ProvenanceNode::id))
             .limit(Math.max(0, limit))
             .toList();
@@ -329,6 +331,21 @@ public final class ProvenanceGraphQueries {
 
     private static double supportCountProperty(ProvenanceNode node) {
         return parseDouble(node.properties().get("supportCount"));
+    }
+
+    private static OptionalDouble parseResidualForQuality(ProvenanceNode node) {
+        if (node == null) {
+            return OptionalDouble.empty();
+        }
+        String value = node.properties().get("residual");
+        if (value == null || value.isBlank()) {
+            return OptionalDouble.empty();
+        }
+        try {
+            return OptionalDouble.of(Double.parseDouble(value));
+        } catch (NumberFormatException ignored) {
+            return OptionalDouble.empty();
+        }
     }
 
     private static double parseDouble(String value) {

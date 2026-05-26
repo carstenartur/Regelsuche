@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Builds a typed mathematical discovery provenance graph from a persisted search run. */
 public final class ProvenanceGraphAssembler {
@@ -154,32 +155,31 @@ public final class ProvenanceGraphAssembler {
         }
         if (isNumericRelation(identity)) {
             String relationId = "numeric-relation:" + record.id() + ":" + identity.id();
+            Map<String, String> relationProperties = new LinkedHashMap<>();
+            relationProperties.put("leftPattern", identity.leftPattern());
+            relationProperties.put("rightPattern", identity.rightPattern());
+            relationProperties.put("coefficients", String.join(",", numericCoefficientTokens(identity)));
+            parseResidual(identity).ifPresent(value -> relationProperties.put("residual", value));
+            relationProperties.put("resultType", "HYPOTHESIS");
+            relationProperties.put("proofStatus", identity.proofStatus().name());
+            relationProperties.put("status", "SUCCESS");
             put(nodes, new ProvenanceNode(relationId, ProvenanceNodeType.NUMERIC_RELATION_CANDIDATE,
-                identity.id(), Map.of(
-                    "leftPattern", identity.leftPattern(),
-                    "rightPattern", identity.rightPattern(),
-                    "coefficients", String.join(",", identity.ruleIdSequence()),
-                    "residual", "0.0",
-                    "resultType", "HYPOTHESIS",
-                    "proofStatus", identity.proofStatus().name(),
-                    "status", "SUCCESS"
-                )));
+                identity.id(), relationProperties));
             edges.add(new ProvenanceEdge(hypothesisId, relationId, ProvenanceEdgeType.SUPPORTED_BY,
                 Map.of("kind", "numeric-relation")));
         }
-        if (identity.proofStatus().isPositive()) {
+        if (identity.proofStatus().atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED)) {
             String casId = "cas:" + record.id() + ":" + identity.id();
-            boolean verified = identity.proofStatus().atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED);
             put(nodes, new ProvenanceNode(casId, ProvenanceNodeType.CAS_VALIDATION_ATTEMPT,
                 "CAS " + identity.id(), Map.of(
                     "backend", "domain-aware-cas-router",
-                    "status", verified ? "SUCCESS" : "UNKNOWN",
-                    "resultType", verified ? "PROOF" : "DIAGNOSTIC",
+                    "status", "SUCCESS",
+                    "resultType", "PROOF",
                     "proofStatus", identity.proofStatus().name(),
                     "domains", String.join(",", record.domains())
                 )));
             edges.add(new ProvenanceEdge(hypothesisId, casId,
-                verified ? ProvenanceEdgeType.VALIDATED_BY_CAS : ProvenanceEdgeType.FAILED_CAS_VALIDATION,
+                ProvenanceEdgeType.VALIDATED_BY_CAS,
                 Map.of()));
         }
     }
@@ -251,5 +251,25 @@ public final class ProvenanceGraphAssembler {
             .map(value -> value.substring("template:".length()))
             .findFirst()
             .orElse("");
+    }
+
+    private static List<String> numericCoefficientTokens(IdentityReportDto identity) {
+        return identity.ruleIdSequence().stream()
+            .map(String::trim)
+            .filter(ProvenanceGraphAssembler::isNumericToken)
+            .toList();
+    }
+
+    private static Optional<String> parseResidual(IdentityReportDto identity) {
+        return identity.ruleIdSequence().stream()
+            .map(String::trim)
+            .filter(value -> value.startsWith("residual:") || value.startsWith("residual="))
+            .map(value -> value.substring(value.indexOf(':') >= 0 ? value.indexOf(':') + 1 : value.indexOf('=') + 1).trim())
+            .filter(ProvenanceGraphAssembler::isNumericToken)
+            .findFirst();
+    }
+
+    private static boolean isNumericToken(String value) {
+        return value.matches("[-+]?\\d+(?:\\.\\d+)?");
     }
 }

@@ -69,6 +69,21 @@ class GroebnerBasisEquivalenceServiceTest {
     }
 
     @Test
+    void payloadReportsRequestedAndActualBackend() {
+        GroebnerBasisEquivalenceService service = new GroebnerBasisEquivalenceService(
+            new DefaultMathematicalAlgorithmRegistry(Map.of(
+                MathematicalAlgorithmRegistry.GROEBNER_BASIS, true,
+                MathematicalAlgorithmRegistry.JAS_BACKEND, true
+            ), Map.of()),
+            true
+        );
+
+        assertTrue(service.reducesToZeroModuloIdeal("x^2 - 1", List.of("x - 1")));
+        assertEquals("jas", service.lastResult().payload().get("requestedBackend"));
+        assertEquals("pureJavaSmallGroebner", service.lastResult().payload().get("backend"));
+    }
+
+    @Test
     void nonMemberHasSeparateGroebnerRefutationMetadata() {
         GroebnerBasisEquivalenceService service = enabledService();
 

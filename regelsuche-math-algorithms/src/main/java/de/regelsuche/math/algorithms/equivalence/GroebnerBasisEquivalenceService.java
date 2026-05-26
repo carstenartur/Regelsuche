@@ -193,7 +193,9 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
     private Map<String, Object> basePayload(String unsupportedReason) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("capability", MathematicalAlgorithmRegistry.GROEBNER_BASIS);
-        payload.put("backend", registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND) ? "jas" : "pureJavaSmallGroebner");
+        boolean jasRequested = registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND);
+        payload.put("requestedBackend", jasRequested ? "jas" : "pureJavaSmallGroebner");
+        payload.put("backend", "pureJavaSmallGroebner");
         MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)
             .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)
             .orElse(SAFE_DEFAULT_BUDGET);

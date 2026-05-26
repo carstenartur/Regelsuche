@@ -1,6 +1,7 @@
 package de.regelsuche.provenance;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.api.IdentityReportDto;
@@ -100,11 +101,18 @@ class ProvenanceGraphAssemblerTest {
             .stream()
             .map(ProvenanceNode::id)
             .toList());
+        ProvenanceNode numericNode = graph.nodeIndex().get("numeric-relation:run-1:pslq-demo");
+        assertEquals("2,-1", numericNode.properties().get("coefficients"));
+        assertEquals("0.0", numericNode.properties().get("residual"));
         assertEquals(List.of("cas:run-1:hyp-strong"), queries
             .casValidationAttempts(graph, "hypothesis:run-1:hyp-strong")
             .stream()
             .map(ProvenanceNode::id)
             .toList());
+        assertTrue(queries.casValidationAttempts(graph, "hypothesis:run-1:template-symreg-demo").isEmpty());
+        assertFalse(graph.edges().stream().anyMatch(edge ->
+            edge.fromId().equals("hypothesis:run-1:template-symreg-demo")
+                && edge.type() == ProvenanceEdgeType.FAILED_CAS_VALIDATION));
         assertTrue(queries.hypothesesValidatedByCas(graph, 10).stream()
             .map(ProvenanceNode::id)
             .toList()
@@ -202,7 +210,7 @@ class ProvenanceGraphAssemblerTest {
         );
         IdentityReportDto numericRelation = new IdentityReportDto(
             "pslq-demo", "sqrt(2),sqrt(8)", "2*a-b=0",
-            List.of("2", "-1", "pslq"), 2, 1.0,
+            List.of("2", "-1", "pslq", "residual:0.0"), 2, 1.0,
             CandidateProofStatus.VALIDATED_BY_EXAMPLES, RuleStatus.NEW, List.of("path-1")
         );
         return new SearchGraphRecord(
