@@ -11,12 +11,22 @@ public final class CrossDomainScore implements InterestingnessScoringModule {
 
     @Override
     public double score(InterestingnessScoringContext context) {
-        long domains = context.candidate().supportingPaths().stream()
-            .map(CrossDomainScore::domainPrefix)
+        long domains = explicitDomains(context) > 0
+            ? explicitDomains(context)
+            : context.candidate().supportingPaths().stream()
+                .map(CrossDomainScore::domainPrefix)
+                .filter(domain -> !domain.isBlank())
+                .distinct()
+                .count();
+        return domains <= 1 ? domains : 1.0 + Math.log(domains);
+    }
+
+    private static long explicitDomains(InterestingnessScoringContext context) {
+        return context.domainTags().stream()
+            .map(domain -> domain == null ? "" : domain.trim().toLowerCase(Locale.ROOT))
             .filter(domain -> !domain.isBlank())
             .distinct()
             .count();
-        return domains <= 1 ? domains : 1.0 + Math.log(domains);
     }
 
     private static String domainPrefix(String path) {
