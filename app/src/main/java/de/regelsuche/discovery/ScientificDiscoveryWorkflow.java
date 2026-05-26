@@ -7,6 +7,7 @@ import de.regelsuche.demo.DemoRuleSet;
 import de.regelsuche.example.SeedExpression;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.cas.DomainAwareCasRouter;
 import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
 import de.regelsuche.mining.DiscoveryDemos;
 import de.regelsuche.mining.HypothesisCandidate;
@@ -53,6 +54,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     private final DeterministicCounterexampleSearchService counterexamples = new DeterministicCounterexampleSearchService();
     private final PolynomialNormalFormEquivalenceService polynomialEquivalence =
         new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
+    private final DomainAwareCasRouter casRouter = new DomainAwareCasRouter(new DefaultMathematicalAlgorithmRegistry());
 
     private ScientificDiscoveryWorkflow(PersistenceContext context) {
         this.context = context;
@@ -118,7 +120,8 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
 
     private DeterministicDiscoveryExperimentRunner.SeedRunOutcome factorization(SeedExpression seed) {
         String target = "(x + a) * (x - a)";
-        boolean equivalent = polynomialEquivalence.arePolynomiallyEquivalent(seed.expression(), target);
+        boolean equivalent = casRouter.provePolynomialIdentity(seed.expression(), target).resultType()
+            == de.regelsuche.validation.MathematicalAlgorithmRegistry.ResultType.PROOF;
         Optional<Transformation> sympy = new SymPyTransformationEngine().transform(seed.expression()).stream()
             .filter(transformation -> polynomialEquivalence.arePolynomiallyEquivalent(transformation.transformedExpression(), target))
             .findFirst();
