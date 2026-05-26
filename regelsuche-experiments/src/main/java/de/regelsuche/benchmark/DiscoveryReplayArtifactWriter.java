@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Arrays;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
@@ -213,10 +214,29 @@ public final class DiscoveryReplayArtifactWriter {
             toolchain.property("javaVersion", System.getProperty("java.version", ""));
             toolchain.property("javaVendor", System.getProperty("java.vendor", ""));
             toolchain.property("osName", System.getProperty("os.name", ""));
+            toolchain.property("gradleVersion", System.getProperty("gradle.version", ""));
+            toolchain.property("userLanguage", System.getProperty("user.language", ""));
         });
+        writer.array("dependencies", dependencies -> classpathEntries().forEach(entry -> dependencies.objectValue(object -> {
+            object.property("file", entry.getFileName().toString());
+            object.property("sha256", Files.isRegularFile(entry) ? checksum(entry) : "");
+        })));
         writer.object("command", command -> {
             command.property("main", "DiscoveryReplayArtifactWriter");
             command.property("processedSeeds", report.metrics().processedSeeds());
+        });
+        writer.object("discoveryState", state -> {
+            state.array("seedCategories", categories -> report.rows().stream()
+                .map(row -> row.seed().category())
+                .distinct()
+                .sorted()
+                .forEach(categories::value));
+            state.array("activeAlgorithmIds", active -> (algorithmSnapshot == null ? List
+                .<MathematicalAlgorithmRegistry.AlgorithmDescriptor>of() : algorithmSnapshot.stream()
+                .filter(MathematicalAlgorithmRegistry.AlgorithmDescriptor::enabled)
+                .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id))
+                .toList())
+                .forEach(descriptor -> active.value(descriptor.id())));
         });
         writer.array("algorithmRegistry", algorithms -> (algorithmSnapshot == null ? List
             .<MathematicalAlgorithmRegistry.AlgorithmDescriptor>of() : algorithmSnapshot.stream()
@@ -227,7 +247,22 @@ public final class DiscoveryReplayArtifactWriter {
                 object.property("proofSemantics", descriptor.proofSemantics().name());
                 object.property("maxSteps", descriptor.budget().maxSteps());
                 object.property("maxStates", descriptor.budget().maxStates());
+                object.property("maxCoefficient", descriptor.budget().maxCoefficient());
+                object.property("tolerance", descriptor.budget().tolerance());
             })));
+        writer.array("proofHistory", history -> report.rows().forEach(row -> history.objectValue(object -> {
+            object.property("seedId", row.seed().id());
+            object.property("success", row.success());
+            object.array("hypotheses", hypotheses -> row.hypotheses().forEach(hypotheses::value));
+            object.array("counterexamples", counterexamples -> row.counterexamples().forEach(counterexamples::value));
+            object.property("summary", row.summary());
+        })));
+        writer.object("docker", docker -> {
+            Path dockerfile = Path.of("Dockerfile");
+            docker.property("dockerfile", dockerfile.toString());
+            docker.property("dockerfileSha256", Files.isRegularFile(dockerfile) ? checksum(dockerfile) : "");
+            docker.property("image", System.getenv().getOrDefault("REGELSUCHE_DOCKER_IMAGE", ""));
+        });
         writer.array("artifacts", arr -> (artifacts == null ? List.<Path>of() : artifacts).stream()
             .sorted(Comparator.comparing(path -> path.getFileName().toString()))
             .forEach(path -> arr.objectValue(object -> {
@@ -236,6 +271,19 @@ public final class DiscoveryReplayArtifactWriter {
             })));
         writer.endObject();
         return writer.toString();
+    }
+
+    private static List<Path> classpathEntries() {
+        String classpath = System.getProperty("java.class.path", "");
+        if (classpath.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(classpath.split(java.io.File.pathSeparator))
+            .map(Path::of)
+            .filter(path -> Files.isRegularFile(path) && path.getFileName() != null)
+            .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+            .limit(200)
+            .toList();
     }
 
     private void writeScreenshot(Path path, DeterministicDiscoveryExperimentRunner.DiscoveryReport report) throws IOException {

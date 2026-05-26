@@ -2,7 +2,9 @@ package de.regelsuche.learning;
 
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.HypothesisCandidate;
+import de.regelsuche.mining.HypothesisRankingStrategy;
 import de.regelsuche.mining.InterestingnessScore;
+import de.regelsuche.mining.InterestingnessRankingStrategy;
 import de.regelsuche.mining.HypothesisRepository;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleCandidateMiner;
@@ -13,7 +15,6 @@ import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,7 @@ public class HypothesisPromotionPipeline {
     private final MacroRuleLearningService learningService;
     private final boolean autoPromote;
     private final List<SymbolicRegressionHypothesisSource> symbolicRegressionSources;
+    private final HypothesisRankingStrategy rankingStrategy;
 
     /**
      * Full-featured constructor.
@@ -74,6 +76,19 @@ public class HypothesisPromotionPipeline {
         boolean autoPromote,
         List<SymbolicRegressionHypothesisSource> symbolicRegressionSources
     ) {
+        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,
+            symbolicRegressionSources, new InterestingnessRankingStrategy());
+    }
+
+    public HypothesisPromotionPipeline(
+        RuleCandidateMiner miner,
+        HypothesisRepository hypothesisRepository,
+        CounterexampleSearchService counterexampleService,
+        MacroRuleLearningService learningService,
+        boolean autoPromote,
+        List<SymbolicRegressionHypothesisSource> symbolicRegressionSources,
+        HypothesisRankingStrategy rankingStrategy
+    ) {
         this.miner = miner;
         this.hypothesisRepository = hypothesisRepository;
         this.counterexampleService = counterexampleService;
@@ -82,6 +97,7 @@ public class HypothesisPromotionPipeline {
         this.symbolicRegressionSources = symbolicRegressionSources == null
             ? List.of()
             : List.copyOf(symbolicRegressionSources);
+        this.rankingStrategy = rankingStrategy == null ? new InterestingnessRankingStrategy() : rankingStrategy;
     }
 
     /**
@@ -109,10 +125,7 @@ public class HypothesisPromotionPipeline {
         boolean anyValidatedForPromotion = false;
 
         Map<String, Set<String>> domainsByPath = domainsByPath(paths);
-        List<ScoredCandidate> prioritizedCandidates = candidates.stream()
-            .map(candidate -> score(candidate, paths, domainsByPath))
-            .sorted(Comparator.comparing(ScoredCandidate::score))
-            .toList();
+        List<ScoredCandidate> prioritizedCandidates = score(candidates, paths, domainsByPath);
 
         for (ScoredCandidate scoredCandidate : prioritizedCandidates) {
             RuleCandidate candidate = scoredCandidate.candidate();
@@ -226,15 +239,29 @@ public class HypothesisPromotionPipeline {
         }
     }
 
-    private ScoredCandidate score(
-        RuleCandidate candidate,
+    private List<ScoredCandidate> score(
+        List<RuleCandidate> candidates,
         List<SuccessfulTransformationPath> paths,
         Map<String, Set<String>> domainsByPath
     ) {
-        double knownSimilarity = candidate.status() == RuleStatus.NEW ? 0.0 : 1.0;
-        HypothesisCandidate base = HypothesisCandidate.from(candidate, 0.0, paths);
-        InterestingnessScore score = InterestingnessScore.from(base, knownSimilarity, domainsFor(base, domainsByPath));
-        return new ScoredCandidate(candidate, base.withNoveltyScore(normalized(score.total())), score);
+        Map<String, RuleCandidate> candidatesByHypothesisId = new LinkedHashMap<>();
+        Map<String, Double> similarities = new LinkedHashMap<>();
+        Map<String, Set<String>> domains = new LinkedHashMap<>();
+        List<HypothesisCandidate> hypotheses = new ArrayList<>();
+        for (RuleCandidate candidate : candidates) {
+            HypothesisCandidate base = HypothesisCandidate.from(candidate, 0.0, paths);
+            candidatesByHypothesisId.put(base.id(), candidate);
+            similarities.put(base.id(), candidate.status() == RuleStatus.NEW ? 0.0 : 1.0);
+            domains.put(base.id(), domainsFor(base, domainsByPath));
+            hypotheses.add(base);
+        }
+        return rankingStrategy.rank(hypotheses, similarities, domains).stream()
+            .map(ranked -> new ScoredCandidate(
+                candidatesByHypothesisId.get(ranked.hypothesis().id()),
+                ranked.hypothesis().withNoveltyScore(normalized(ranked.score().total())),
+                ranked.score()
+            ))
+            .toList();
     }
 
     private static double normalized(double score) {

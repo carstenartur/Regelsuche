@@ -40,4 +40,44 @@ class DomainAwareCasRouterTest {
 
         assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.UNAVAILABLE, singular.status());
     }
+
+    @Test
+    void fallsBackToGroebnerWhenSingularIsUnavailableAndGroebnerIsEnabled() {
+        DomainAwareCasRouter router = new DomainAwareCasRouter(
+            new DefaultMathematicalAlgorithmRegistry(Map.of(
+                MathematicalAlgorithmRegistry.SINGULAR_BACKEND, true,
+                MathematicalAlgorithmRegistry.GROEBNER_BASIS, true
+            ), Map.of()),
+            new de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService(
+                new DefaultMathematicalAlgorithmRegistry()),
+            new de.regelsuche.math.algorithms.equivalence.GroebnerBasisEquivalenceService(
+                new DefaultMathematicalAlgorithmRegistry(Map.of(MathematicalAlgorithmRegistry.GROEBNER_BASIS, true), Map.of())),
+            (polynomialExpression, generatorExpressions, timeout) ->
+                MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unavailable("singular unavailable")
+        );
+
+        MathematicalAlgorithmRegistry.AlgorithmExecutionResult result =
+            router.proveIdealMembership("x^2 - 1", List.of("x - 1"));
+
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS, result.status());
+        assertEquals(MathematicalAlgorithmRegistry.ResultType.PROOF, result.resultType());
+    }
+
+    @Test
+    void routesNumericRelationDiscoveryToPslqBackend() {
+        DomainAwareCasRouter router = new DomainAwareCasRouter(new DefaultMathematicalAlgorithmRegistry(
+            Map.of(
+                MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH, true,
+                MathematicalAlgorithmRegistry.PSLQ, true
+            ),
+            Map.of()
+        ));
+
+        MathematicalAlgorithmRegistry.AlgorithmExecutionResult result =
+            router.discoverNumericRelation(List.of(Math.sqrt(2), Math.sqrt(8)));
+
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS, result.status());
+        assertEquals(MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS, result.resultType());
+        assertEquals(List.of(2, -1), result.payload().get("coefficients"));
+    }
 }
