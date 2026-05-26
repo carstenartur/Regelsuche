@@ -3,9 +3,12 @@ package de.regelsuche.math.algorithms.equivalence;
 import de.regelsuche.equivalence.PolynomialEquivalenceService;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Gröbner-basis service for small polynomial ideals/systems over exact rational coefficients.
@@ -16,6 +19,9 @@ import java.util.Optional;
  * {@code UNAVAILABLE} instead of falling back to normal-form equivalence.
  */
 public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceService {
+    private static final int DEFAULT_MAX_TERMS = 256;
+    private static final int DEFAULT_MAX_DEGREE = 20;
+    private static final int DEFAULT_MAX_VARIABLES = 8;
     private final PolynomialArithmetic arithmetic = new PolynomialArithmetic();
     private final MathematicalAlgorithmRegistry registry;
     private final boolean jasBackendAvailable;
@@ -75,15 +81,13 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
             return Optional.empty();
         }
         if (generatorExpressions == null || generatorExpressions.isEmpty()) {
-            lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(
-                "ideal reduction requires at least one generator");
+            lastResult = unsupported("ideal reduction requires at least one generator", "missing-generators");
             return Optional.empty();
         }
 
         Optional<Polynomial> polynomial = arithmetic.parse(polynomialExpression);
         if (polynomial.isEmpty()) {
-            lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(
-                "unsupported polynomial expression");
+            lastResult = unsupported("unsupported polynomial expression", "unsupported-polynomial-syntax");
             return Optional.empty();
         }
 
@@ -91,8 +95,7 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         for (String generatorExpression : generatorExpressions) {
             Optional<Polynomial> generator = arithmetic.parse(generatorExpression);
             if (generator.isEmpty()) {
-                lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(
-                    "unsupported ideal generator");
+                lastResult = unsupported("unsupported ideal generator", "unsupported-generator-syntax");
                 return Optional.empty();
             }
             if (!generator.orElseThrow().isZero()) {
@@ -100,14 +103,18 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
             }
         }
         if (generators.isEmpty()) {
-            lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(
-                "ideal generators reduce to zero");
+            lastResult = unsupported("ideal generators reduce to zero", "zero-generators");
             return Optional.empty();
         }
 
         MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)
             .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)
             .orElse(MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(200, 1_000, 0, 0.0));
+        Optional<String> unsupportedReason = unsupportedByHardLimits(polynomial.orElseThrow(), generators, budget);
+        if (unsupportedReason.isPresent()) {
+            lastResult = unsupported("polynomial outside configured Gröbner limits", unsupportedReason.orElseThrow());
+            return Optional.empty();
+        }
         GroebnerBasisEngine engine = new GroebnerBasisEngine(monomialOrder);
         GroebnerBasisEngine.EngineResult result = engine.normalFormModuloIdeal(
             polynomial.orElseThrow(),
@@ -136,14 +143,67 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
     }
 
     private Map<String, Object> resultPayload(GroebnerBasisEngine.EngineResult result) {
-        return Map.of(
-            "capability", MathematicalAlgorithmRegistry.GROEBNER_BASIS,
-            "backend", registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND) ? "jas" : "pureJavaSmallGroebner",
-            "basis", result.basis().stream().map(polynomial -> polynomial.toCanonicalString(monomialOrder)).toList(),
-            "remainder", result.remainder().toCanonicalString(monomialOrder),
-            "monomialOrder", result.monomialOrder(),
-            "steps", result.steps(),
-            "budgetStatus", result.budgetStatus()
+        Map<String, Object> payload = basePayload("");
+        payload.put("basis", result.basis().stream().map(polynomial -> polynomial.toCanonicalString(monomialOrder)).toList());
+        payload.put("reducedBasis", result.reducedBasis().stream()
+            .map(polynomial -> polynomial.toCanonicalString(monomialOrder))
+            .toList());
+        payload.put("remainder", result.remainder().toCanonicalString(monomialOrder));
+        payload.put("monomialOrder", result.monomialOrder());
+        payload.put("steps", result.steps());
+        payload.put("budgetStatus", result.budgetStatus());
+        return Map.copyOf(payload);
+    }
+
+    private Optional<String> unsupportedByHardLimits(
+        Polynomial polynomial,
+        List<Polynomial> generators,
+        MathematicalAlgorithmRegistry.AlgorithmBudget budget
+    ) {
+        List<Polynomial> all = new ArrayList<>();
+        all.add(polynomial);
+        all.addAll(generators);
+        int termCount = all.stream().mapToInt(Polynomial::termCount).sum();
+        if (termCount > DEFAULT_MAX_TERMS) {
+            return Optional.of("maxTerms");
+        }
+        int degree = all.stream().mapToInt(Polynomial::totalDegree).max().orElse(0);
+        if (degree > DEFAULT_MAX_DEGREE) {
+            return Optional.of("maxDegree");
+        }
+        Set<String> variables = new TreeSet<>();
+        all.forEach(value -> variables.addAll(value.variables()));
+        if (variables.size() > DEFAULT_MAX_VARIABLES) {
+            return Optional.of("maxVariables");
+        }
+        if (budget.maxCoefficient() > 0 && all.stream().anyMatch(value -> value.coefficientMagnitudeExceeds(budget.maxCoefficient()))) {
+            return Optional.of("maxCoefficient");
+        }
+        return Optional.empty();
+    }
+
+    private MathematicalAlgorithmRegistry.AlgorithmExecutionResult unsupported(String detail, String reason) {
+        return new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
+            MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN,
+            MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC,
+            detail,
+            basePayload(reason)
         );
+    }
+
+    private Map<String, Object> basePayload(String unsupportedReason) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("capability", MathematicalAlgorithmRegistry.GROEBNER_BASIS);
+        payload.put("backend", registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND) ? "jas" : "pureJavaSmallGroebner");
+        payload.put("maxTerms", DEFAULT_MAX_TERMS);
+        payload.put("maxDegree", DEFAULT_MAX_DEGREE);
+        payload.put("maxVariables", DEFAULT_MAX_VARIABLES);
+        payload.put("maxPairs", registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)
+            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)
+            .map(MathematicalAlgorithmRegistry.AlgorithmBudget::maxStates)
+            .orElse(1_000));
+        payload.put("timeoutMillis", 0);
+        payload.put("unsupportedReason", unsupportedReason == null ? "" : unsupportedReason);
+        return payload;
     }
 }

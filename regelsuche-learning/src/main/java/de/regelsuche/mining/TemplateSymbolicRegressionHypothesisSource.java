@@ -61,8 +61,18 @@ public final class TemplateSymbolicRegressionHypothesisSource implements Symboli
             0.0,
             CandidateProofStatus.OBSERVED,
             null,
-            List.of("fitted-by-template-library", "sample-count=" + fitted.supportingSamples().size()),
-            Map.of("symbolicRegression", List.of("internal-template", "evidence-only")),
+            List.of(
+                "fitted-by-template-library",
+                "sample-count=" + fitted.supportingSamples().size(),
+                "max-residual=" + DefaultTemplateSymbolicRegressionBackend.format(fitted.maxResidual()),
+                "confidence=" + DefaultTemplateSymbolicRegressionBackend.format(fitted.confidence())
+            ),
+            Map.of("symbolicRegression", List.of(
+                "internal-template",
+                "evidence-only",
+                "template=" + fitted.templateName(),
+                "confidence=" + DefaultTemplateSymbolicRegressionBackend.format(fitted.confidence())
+            )),
             Instant.EPOCH
         );
     }

@@ -43,16 +43,44 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(Files.readString(bundle.markdownReport()).contains("## Dashboard Metrics"));
         assertTrue(Files.readString(bundle.replayJson()).contains("regelsuche.discovery-replay/v1"));
         assertTrue(Files.readString(bundle.replayJson()).contains("\"dashboardMetrics\""));
+        assertTrue(Files.readString(bundle.hypothesesJson()).contains("regelsuche.hypotheses/v1"));
+        assertTrue(Files.readString(bundle.macroRulesJson()).contains("regelsuche.macro-rules/v1"));
+        assertTrue(Files.readString(bundle.counterexamplesJson()).contains("regelsuche.counterexamples/v1"));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("regelsuche.provenance-graph/v1"));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"DERIVED_FROM\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("regelsuche.reproducibility-pack/v1"));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"sha256\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"dependencies\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"discoveryState\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"gitCommit\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"enabledBackends\""));
+        assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"hypotheses.json\""));
+        assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"provenance.graph.json\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"proofHistory\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"docker\""));
         assertTrue(Files.size(bundle.screenshotPng()) > 0, "PNG screenshot artifact must be written");
         assertTrue(Files.size(bundle.replayGif()) > 0, "GIF replay artifact must be written");
+    }
+
+    @Test
+    void discoveryCampaignRendersBudgetsBackendsAndArtifacts() {
+        DiscoveryCampaign campaign = DiscoveryCampaign.fromReport(
+            "campaign-polynomial-pack",
+            sampleReport(),
+            5,
+            2,
+            List.of("groebnerBasis", "pslq"),
+            "JSON_FILE"
+        );
+
+        String json = campaign.renderJson();
+
+        assertTrue(json.contains("regelsuche.discovery-campaign/v1"));
+        assertTrue(json.contains("\"globalBudget\":5"));
+        assertTrue(json.contains("\"parallelism\":2"));
+        assertTrue(json.contains("\"groebnerBasis\""));
+        assertTrue(json.contains("\"hypotheses.json\""));
+        assertTrue(json.contains("\"provenance.graph.json\""));
     }
 
     @Test

@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 public final class Polynomial {
     private static final MonomialOrder DEFAULT_ORDER = new GradedReverseLexOrder();
@@ -36,6 +38,30 @@ public final class Polynomial {
 
     public Map<Monomial, Rational> terms() {
         return Map.copyOf(terms);
+    }
+
+    public int termCount() {
+        return terms.size();
+    }
+
+    public int totalDegree() {
+        return terms.keySet().stream().mapToInt(Monomial::totalDegree).max().orElse(0);
+    }
+
+    public Set<String> variables() {
+        TreeSet<String> variables = new TreeSet<>();
+        terms.keySet().forEach(monomial -> variables.addAll(monomial.powers().keySet()));
+        return Set.copyOf(variables);
+    }
+
+    public boolean coefficientMagnitudeExceeds(int maxCoefficient) {
+        if (maxCoefficient <= 0) {
+            return false;
+        }
+        java.math.BigInteger bound = java.math.BigInteger.valueOf(maxCoefficient);
+        return terms.values().stream().anyMatch(coefficient ->
+            coefficient.numerator().abs().compareTo(bound) > 0
+                || coefficient.denominator().abs().compareTo(bound) > 0);
     }
 
     public Optional<Term> leadingTerm(MonomialOrder order) {

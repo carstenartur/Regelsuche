@@ -52,15 +52,25 @@ public final class DiscoveryReplayArtifactWriter {
             Path screenshot = outputDirectory.resolve("discovery-summary.png");
             Path gif = outputDirectory.resolve("discovery-replay.gif");
             Path reproPack = outputDirectory.resolve("reproducibility-pack.json");
+            Path hypotheses = outputDirectory.resolve("hypotheses.json");
+            Path macroRules = outputDirectory.resolve("macro-rules.json");
+            Path counterexamples = outputDirectory.resolve("counterexamples.json");
+            Path provenanceGraph = outputDirectory.resolve("provenance.graph.json");
             Files.writeString(json, report.renderDeterministicJson());
             Files.writeString(html, renderHtml(report));
             Files.writeString(markdown, renderMarkdown(report));
             Files.writeString(replayExport, renderReplayExport(report));
+            Files.writeString(hypotheses, renderHypothesesExport(report));
+            Files.writeString(macroRules, renderMacroRulesExport(report));
+            Files.writeString(counterexamples, renderCounterexamplesExport(report));
+            Files.writeString(provenanceGraph, renderProvenanceGraphExport(report));
             writeScreenshot(screenshot, report);
             writeReplayGif(gif, report);
             Files.writeString(reproPack, renderReproducibilityPack(report,
-                List.of(json, html, markdown, replayExport, screenshot, gif), algorithmSnapshot));
-            return new ArtifactBundle(json, html, markdown, replayExport, screenshot, gif, reproPack);
+                List.of(json, html, markdown, replayExport, screenshot, gif, hypotheses, macroRules, counterexamples, provenanceGraph),
+                algorithmSnapshot));
+            return new ArtifactBundle(json, html, markdown, replayExport, screenshot, gif, reproPack,
+                hypotheses, macroRules, counterexamples, provenanceGraph);
         } catch (IOException exception) {
             throw new IllegalStateException("Could not write discovery replay artefacts to " + outputDirectory, exception);
         }
@@ -201,6 +211,120 @@ public final class DiscoveryReplayArtifactWriter {
             object.array("counterexamples", counterexamples -> row.counterexamples().forEach(counterexamples::value));
             object.array("replayPath", replay -> row.replayPath().forEach(replay::value));
         })));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    public String renderHypothesesExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.hypotheses/v1");
+        writer.array("hypotheses", arr -> report.rows().forEach(row -> row.hypotheses().forEach(hypothesis ->
+            arr.objectValue(object -> {
+                object.property("id", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                object.property("seedId", row.seed().id());
+                object.property("expression", hypothesis);
+                object.property("evidenceCount", row.replayPath().size());
+                object.array("assumptions", assumptions -> row.seed().assumptions().forEach(assumptions::value));
+                object.array("interestingnessReasons", reasons -> {
+                    reasons.value("supported-by-replay-path");
+                    if (!row.counterexamples().isEmpty()) {
+                        reasons.value("counterexample-search-performed");
+                    }
+                    if (row.summary().toLowerCase(java.util.Locale.ROOT).contains("proof")) {
+                        reasons.value("proof-mentioned-in-summary");
+                    }
+                });
+            }))));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    public String renderMacroRulesExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.macro-rules/v1");
+        writer.array("macroRules", arr -> report.rows().forEach(row -> {
+            for (String step : row.replayPath()) {
+                if (step.toLowerCase(java.util.Locale.ROOT).contains("macro")) {
+                    arr.objectValue(object -> {
+                        object.property("id", stableArtifactId("macro", row.seed().id(), step));
+                        object.property("seedId", row.seed().id());
+                        object.property("sourceStep", step);
+                        object.property("usefulness", "observed-in-replay");
+                    });
+                }
+            }
+        }));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    public String renderCounterexamplesExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.counterexamples/v1");
+        writer.array("counterexamples", arr -> report.rows().forEach(row -> row.counterexamples().forEach(counterexample ->
+            arr.objectValue(object -> {
+                object.property("id", stableArtifactId("counterexample", row.seed().id(), counterexample));
+                object.property("seedId", row.seed().id());
+                object.property("description", counterexample);
+                object.property("refutesHypothesis", row.hypotheses().isEmpty() ? "" : row.hypotheses().getFirst());
+            }))));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    public String renderProvenanceGraphExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.provenance-graph/v1");
+        writer.array("nodes", nodes -> report.rows().forEach(row -> {
+            nodes.objectValue(node -> {
+                node.property("id", "seed:" + row.seed().id());
+                node.property("type", "SeedExpression");
+                node.property("label", row.seed().stableKey());
+            });
+            row.hypotheses().forEach(hypothesis -> nodes.objectValue(node -> {
+                node.property("id", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                node.property("type", "Hypothesis");
+                node.property("label", hypothesis);
+            }));
+            row.counterexamples().forEach(counterexample -> nodes.objectValue(node -> {
+                node.property("id", stableArtifactId("counterexample", row.seed().id(), counterexample));
+                node.property("type", "Counterexample");
+                node.property("label", counterexample);
+            }));
+            for (int i = 0; i < row.replayPath().size(); i++) {
+                int index = i;
+                nodes.objectValue(node -> {
+                    node.property("id", "replay:" + row.seed().id() + ":" + index);
+                    node.property("type", "TransformationPath");
+                    node.property("label", row.replayPath().get(index));
+                });
+            }
+        }));
+        writer.array("edges", edges -> report.rows().forEach(row -> {
+            row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                edge.property("from", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                edge.property("to", "seed:" + row.seed().id());
+                edge.property("type", "DERIVED_FROM");
+            }));
+            row.counterexamples().forEach(counterexample -> edges.objectValue(edge -> {
+                edge.property("from", stableArtifactId("counterexample", row.seed().id(), counterexample));
+                edge.property("to", row.hypotheses().isEmpty() ? "seed:" + row.seed().id()
+                    : stableArtifactId("hypothesis", row.seed().id(), row.hypotheses().getFirst()));
+                edge.property("type", row.hypotheses().isEmpty() ? "GENERATED_BY" : "REFUTED_BY");
+            }));
+            for (int i = 0; i < row.replayPath().size(); i++) {
+                int index = i;
+                edges.objectValue(edge -> {
+                    edge.property("from", "replay:" + row.seed().id() + ":" + index);
+                    edge.property("to", "seed:" + row.seed().id());
+                    edge.property("type", "REPLAY_OF");
+                });
+            }
+        }));
         writer.endObject();
         return writer.toString();
     }
@@ -431,14 +555,18 @@ public final class DiscoveryReplayArtifactWriter {
     }
 
     private DiscoveryDashboardMetrics dashboardMetrics(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
-        return DiscoveryDashboardMetrics.from(report, Map.of(
-            "json", 1,
-            "html", 1,
-            "markdown", 1,
-            "replayJson", 1,
-            "screenshotPng", 1,
-            "replayGif", 1,
-            "reproducibilityPack", 1
+        return DiscoveryDashboardMetrics.from(report, Map.ofEntries(
+            Map.entry("json", 1),
+            Map.entry("html", 1),
+            Map.entry("markdown", 1),
+            Map.entry("replayJson", 1),
+            Map.entry("screenshotPng", 1),
+            Map.entry("replayGif", 1),
+            Map.entry("reproducibilityPack", 1),
+            Map.entry("hypotheses", 1),
+            Map.entry("macroRules", 1),
+            Map.entry("counterexamples", 1),
+            Map.entry("provenanceGraph", 1)
         ));
     }
 
@@ -449,8 +577,16 @@ public final class DiscoveryReplayArtifactWriter {
         Path replayJson,
         Path screenshotPng,
         Path replayGif,
-        Path reproducibilityPack
+        Path reproducibilityPack,
+        Path hypothesesJson,
+        Path macroRulesJson,
+        Path counterexamplesJson,
+        Path provenanceGraphJson
     ) {
+    }
+
+    private static String stableArtifactId(String type, String seedId, String value) {
+        return type + ":" + sha256Utf8Lines(List.of(seedId == null ? "" : seedId, value == null ? "" : value)).substring(0, 16);
     }
 
     private static String checksum(Path path) {

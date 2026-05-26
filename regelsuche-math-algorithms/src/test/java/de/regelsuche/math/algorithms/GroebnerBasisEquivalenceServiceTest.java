@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.math.algorithms.equivalence.GroebnerBasisEquivalenceService;
+import de.regelsuche.math.algorithms.equivalence.PolynomialDiscoveryPack;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
@@ -151,6 +152,57 @@ class GroebnerBasisEquivalenceServiceTest {
         assertEquals(first.lastResult().payload().get("basis"), second.lastResult().payload().get("basis"));
         assertEquals(first.lastResult().payload().get("remainder"), second.lastResult().payload().get("remainder"));
         assertEquals(first.lastResult().payload().get("steps"), second.lastResult().payload().get("steps"));
+    }
+
+    @Test
+    void standardizedPayloadIncludesReducedBasisLimitsAndUnsupportedReason() {
+        GroebnerBasisEquivalenceService service = enabledService();
+
+        assertTrue(service.reducesToZeroModuloIdeal("x^2 - 1", List.of("x - 1")));
+
+        assertTrue(service.lastResult().payload().containsKey("reducedBasis"));
+        assertEquals("", service.lastResult().payload().get("unsupportedReason"));
+        assertEquals(256, service.lastResult().payload().get("maxTerms"));
+        assertEquals(20, service.lastResult().payload().get("maxDegree"));
+        assertEquals(8, service.lastResult().payload().get("maxVariables"));
+        assertEquals(2_000, service.lastResult().payload().get("maxPairs"));
+        assertEquals(0, service.lastResult().payload().get("timeoutMillis"));
+    }
+
+    @Test
+    void unsupportedExpressionsCarryMachineReadableReason() {
+        GroebnerBasisEquivalenceService service = enabledService();
+
+        assertFalse(service.reducesToZeroModuloIdeal("sin(x)", List.of("x")));
+
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN, service.lastResult().status());
+        assertEquals("unsupported-polynomial-syntax", service.lastResult().payload().get("unsupportedReason"));
+    }
+
+    @Test
+    void hardLimitsRejectOversizedPolynomialDomains() {
+        GroebnerBasisEquivalenceService service = enabledService();
+
+        assertFalse(service.reducesToZeroModuloIdeal("a + b + c + d + e + f + g + h + i", List.of("a")));
+
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN, service.lastResult().status());
+        assertEquals("maxVariables", service.lastResult().payload().get("unsupportedReason"));
+    }
+
+    @Test
+    void polynomialDiscoveryPackExercisesProofsAndCounterexampleTraps() {
+        GroebnerBasisEquivalenceService service = enabledService();
+
+        for (PolynomialDiscoveryPack.Example example : PolynomialDiscoveryPack.examples()) {
+            assertEquals(
+                example.expectedMember(),
+                service.reducesToZeroModuloIdeal(example.polynomial(), example.generators()),
+                example.id()
+            );
+            assertEquals("pureJavaSmallGroebner", service.lastResult().payload().get("backend"));
+            assertTrue(service.lastResult().payload().containsKey("basis"), example.id());
+            assertTrue(service.lastResult().payload().containsKey("remainder"), example.id());
+        }
     }
 
     @Test
