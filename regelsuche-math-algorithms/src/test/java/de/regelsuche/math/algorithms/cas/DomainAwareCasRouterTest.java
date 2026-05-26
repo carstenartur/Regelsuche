@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class DomainAwareCasRouterTest {
@@ -61,6 +63,32 @@ class DomainAwareCasRouterTest {
 
         assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS, result.status());
         assertEquals(MathematicalAlgorithmRegistry.ResultType.PROOF, result.resultType());
+    }
+
+    @Test
+    void singularTimeoutUsesExplicitSecondScaleBudgetMapping() {
+        AtomicReference<Duration> timeout = new AtomicReference<>();
+        DomainAwareCasRouter router = new DomainAwareCasRouter(
+            new DefaultMathematicalAlgorithmRegistry(
+                Map.of(MathematicalAlgorithmRegistry.SINGULAR_BACKEND, true),
+                Map.of(
+                    MathematicalAlgorithmRegistry.SINGULAR_BACKEND,
+                    MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(2, 5_000, 0, 0.0)
+                )
+            ),
+            new de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService(
+                new DefaultMathematicalAlgorithmRegistry()),
+            new de.regelsuche.math.algorithms.equivalence.GroebnerBasisEquivalenceService(
+                new DefaultMathematicalAlgorithmRegistry()),
+            (polynomialExpression, generatorExpressions, workerTimeout) -> {
+                timeout.set(workerTimeout);
+                return MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unavailable("singular unavailable");
+            }
+        );
+
+        router.proveIdealMembership("x", List.of("x"));
+
+        assertEquals(Duration.ofSeconds(2), timeout.get());
     }
 
     @Test

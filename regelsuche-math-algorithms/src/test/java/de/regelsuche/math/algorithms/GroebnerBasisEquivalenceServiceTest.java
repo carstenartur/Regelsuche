@@ -91,6 +91,21 @@ class GroebnerBasisEquivalenceServiceTest {
     }
 
     @Test
+    void budgetAlsoAppliesToFinalReductionAfterBasisConstruction() {
+        GroebnerBasisEquivalenceService service = new GroebnerBasisEquivalenceService(
+            new DefaultMathematicalAlgorithmRegistry(
+                Map.of(MathematicalAlgorithmRegistry.GROEBNER_BASIS, true),
+                Map.of(MathematicalAlgorithmRegistry.GROEBNER_BASIS,
+                    MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(3, 10, 0, 0.0))
+            )
+        );
+
+        assertFalse(service.reducesToZeroModuloIdeal("x + y", List.of("x + y", "x - y")));
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED, service.lastResult().status());
+        assertEquals("BUDGET_EXHAUSTED", service.lastResult().payload().get("budgetStatus"));
+    }
+
+    @Test
     void unsupportedPolynomialDomainStaysUnknown() {
         GroebnerBasisEquivalenceService service = enabledService();
 

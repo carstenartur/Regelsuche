@@ -16,14 +16,16 @@ public final class GroebnerBasisEngine {
         if (basis.budgetExhausted()) {
             return new EngineResult(basis.basis(), Polynomial.zero(), order.name(), basis.steps(), basis.budgetStatus(), true);
         }
-        PolynomialReducer.ReductionResult reduction = reducer.reduce(polynomial, basis.basis(), order, maxSteps);
-        boolean budgetExhausted = reduction.budgetExhausted();
+        int remainingSteps = Math.max(0, maxSteps - basis.steps());
+        PolynomialReducer.ReductionResult reduction = reducer.reduce(polynomial, basis.basis(), order, remainingSteps);
+        int totalSteps = basis.steps() + reduction.steps();
+        boolean budgetExhausted = reduction.budgetExhausted() || totalSteps > maxSteps;
         String budgetStatus = budgetExhausted ? "BUDGET_EXHAUSTED" : "OK";
         return new EngineResult(
             basis.basis(),
             reduction.remainder(),
             order.name(),
-            basis.steps() + reduction.steps(),
+            totalSteps,
             budgetStatus,
             budgetExhausted
         );

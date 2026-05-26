@@ -62,7 +62,7 @@ public final class DomainAwareCasRouter {
                 .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)
                 .orElse(MathematicalAlgorithmRegistry.AlgorithmBudget.unbounded());
             MathematicalAlgorithmRegistry.AlgorithmExecutionResult singular = singularWorker.reduceModuloIdeal(polynomialExpression, generatorExpressions,
-                Duration.ofMillis(Math.max(1, budget.maxSteps())));
+                singularTimeout(budget));
             if (singular.status() == MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS
                 || !registry.isEnabled(MathematicalAlgorithmRegistry.GROEBNER_BASIS)) {
                 return singular;
@@ -84,5 +84,10 @@ public final class DomainAwareCasRouter {
             result.result().detail(),
             payload
         );
+    }
+
+    private static Duration singularTimeout(MathematicalAlgorithmRegistry.AlgorithmBudget budget) {
+        long timeoutSeconds = Math.max(1L, budget.maxSteps());
+        return Duration.ofSeconds(timeoutSeconds);
     }
 }

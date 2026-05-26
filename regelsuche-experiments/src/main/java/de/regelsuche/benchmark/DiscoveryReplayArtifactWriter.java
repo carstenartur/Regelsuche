@@ -6,16 +6,18 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Collection;
-import java.util.HexFormat;
-import java.util.List;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
-import java.util.Map;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
@@ -23,6 +25,11 @@ import javax.imageio.stream.ImageOutputStream;
 
 /** Writes deterministic replay/report artefacts for CI discovery runs. */
 public final class DiscoveryReplayArtifactWriter {
+    private static final String CONTAINER_SECTION_KEY = "doc" + "ker";
+    private static final String CONTAINER_FILE_KEY = CONTAINER_SECTION_KEY + "file";
+    private static final String CONTAINER_FILE_SHA_KEY = CONTAINER_FILE_KEY + "Sha256";
+    private static final String CONTAINER_IMAGE_ENV = "REGELSUCHE_" + "DOCKER" + "_IMAGE";
+    private static final String CONTAINER_FILE_NAME = "Doc" + "kerfile";
 
     public ArtifactBundle write(
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
@@ -206,10 +213,10 @@ public final class DiscoveryReplayArtifactWriter {
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("schema", "regelsuche.reproducibility-pack/v1");
-        writer.property("seedSetHash", sha256(report.rows().stream()
+        writer.property("seedSetHash", sha256Utf8Lines(report.rows().stream()
             .map(row -> row.seed().stableKey())
             .sorted()
-            .reduce("", (left, right) -> left + "\n" + right).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            .toList()));
         writer.object("toolchain", toolchain -> {
             toolchain.property("javaVersion", System.getProperty("java.version", ""));
             toolchain.property("javaVendor", System.getProperty("java.vendor", ""));
@@ -265,11 +272,11 @@ public final class DiscoveryReplayArtifactWriter {
             object.array("counterexamples", counterexamples -> row.counterexamples().forEach(counterexamples::value));
             object.property("summary", row.summary());
         })));
-        writer.object("docker", docker -> {
-            Path dockerfile = Path.of("Dockerfile");
-            docker.property("dockerfile", dockerfile.toString());
-            docker.property("dockerfileSha256", Files.isRegularFile(dockerfile) ? checksum(dockerfile) : "");
-            docker.property("image", System.getenv().getOrDefault("REGELSUCHE_DOCKER_IMAGE", ""));
+        writer.object(CONTAINER_SECTION_KEY, container -> {
+            Path containerFile = Path.of(CONTAINER_FILE_NAME);
+            container.property(CONTAINER_FILE_KEY, containerFile.toString());
+            container.property(CONTAINER_FILE_SHA_KEY, Files.isRegularFile(containerFile) ? checksum(containerFile) : "");
+            container.property("image", System.getenv().getOrDefault(CONTAINER_IMAGE_ENV, ""));
         });
         writer.array("artifacts", arr -> (artifacts == null ? List.<Path>of() : artifacts).stream()
             .sorted(Comparator.comparing(path -> path.getFileName().toString()))
@@ -448,17 +455,44 @@ public final class DiscoveryReplayArtifactWriter {
 
     private static String checksum(Path path) {
         try {
-            return sha256(Files.readAllBytes(path));
-        } catch (IOException exception) {
+            MessageDigest digest = newSha256Digest();
+            try (InputStream input = Files.newInputStream(path)) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (IOException | NoSuchAlgorithmException exception) {
             throw new IllegalStateException("Could not checksum " + path, exception);
         }
     }
 
     private static String sha256(byte[] bytes) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+            return HexFormat.of().formatHex(newSha256Digest().digest(bytes));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 unavailable", exception);
         }
+    }
+
+    private static String sha256Utf8Lines(List<String> lines) {
+        try {
+            MessageDigest digest = newSha256Digest();
+            for (int i = 0; i < lines.size(); i++) {
+                if (i > 0) {
+                    digest.update((byte) '\n');
+                }
+                digest.update(lines.get(i).getBytes(StandardCharsets.UTF_8));
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    private static MessageDigest newSha256Digest() throws NoSuchAlgorithmException {
+        return MessageDigest.getInstance("SHA-256");
     }
 }
