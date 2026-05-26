@@ -54,6 +54,7 @@ class TemplateSymbolicRegressionHypothesisSourceTest {
         assertTrue(quadratic.stream().anyMatch(hypothesis ->
             hypothesis.assumptions().contains("template:polynomial-degree-2")
                 && hypothesis.rightPattern().equals("x^2 + 2 * x + 1")));
+        assertObservedOnly(quadratic);
 
         List<HypothesisCandidate> cubic = source.propose(List.of(
             path("c1", "0", "0"),
@@ -64,6 +65,7 @@ class TemplateSymbolicRegressionHypothesisSourceTest {
         assertTrue(cubic.stream().anyMatch(hypothesis ->
             hypothesis.assumptions().contains("template:polynomial-degree-3")
                 && hypothesis.rightPattern().equals("x^3")));
+        assertObservedOnly(cubic);
 
         List<HypothesisCandidate> rational = source.propose(List.of(
             path("r1", "1", "3"),
@@ -74,6 +76,7 @@ class TemplateSymbolicRegressionHypothesisSourceTest {
         assertTrue(rational.stream().anyMatch(hypothesis ->
             hypothesis.assumptions().contains("template:rational-reciprocal-shift")
                 && hypothesis.rightPattern().equals("6 / (x + 1)")));
+        assertObservedOnly(rational);
 
         List<HypothesisCandidate> geometric = source.propose(List.of(
             path("g1", "0", "2"),
@@ -84,6 +87,22 @@ class TemplateSymbolicRegressionHypothesisSourceTest {
         assertTrue(geometric.stream().anyMatch(hypothesis ->
             hypothesis.assumptions().contains("template:geometric-sequence")
                 && hypothesis.rightPattern().equals("2 * 3^x")));
+        assertObservedOnly(geometric);
+    }
+
+    @Test
+    void rejectsNoisySamplesBelowMinimumSupport() {
+        TemplateSymbolicRegressionHypothesisSource source = new TemplateSymbolicRegressionHypothesisSource(true, 5);
+
+        List<HypothesisCandidate> hypotheses = source.propose(List.of(
+            path("n1", "0", "1.01"),
+            path("n2", "1", "4.02"),
+            path("n3", "2", "8.99"),
+            path("n4", "3", "16.03"),
+            path("n5", "4", "25.04")
+        ));
+
+        assertEquals(List.of(), hypotheses);
     }
 
     @Test
@@ -118,5 +137,12 @@ class TemplateSymbolicRegressionHypothesisSourceTest {
             Map.of(),
             List.of()
         );
+    }
+
+    private static void assertObservedOnly(List<HypothesisCandidate> hypotheses) {
+        assertTrue(hypotheses.stream().allMatch(hypothesis -> hypothesis.proofStatus() == CandidateProofStatus.OBSERVED));
+        assertTrue(hypotheses.stream().allMatch(hypothesis -> hypothesis.assumptions().contains("symbolic-regression-evidence-only")));
+        assertTrue(hypotheses.stream().noneMatch(hypothesis ->
+            hypothesis.proofStatus().atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED)));
     }
 }

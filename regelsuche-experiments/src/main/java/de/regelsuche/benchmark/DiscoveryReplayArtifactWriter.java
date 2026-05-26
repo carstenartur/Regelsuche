@@ -56,6 +56,7 @@ public final class DiscoveryReplayArtifactWriter {
             Path macroRules = outputDirectory.resolve("macro-rules.json");
             Path counterexamples = outputDirectory.resolve("counterexamples.json");
             Path provenanceGraph = outputDirectory.resolve("provenance.graph.json");
+            Path campaign = outputDirectory.resolve("discovery-campaign.json");
             Files.writeString(json, report.renderDeterministicJson());
             Files.writeString(html, renderHtml(report));
             Files.writeString(markdown, renderMarkdown(report));
@@ -64,13 +65,21 @@ public final class DiscoveryReplayArtifactWriter {
             Files.writeString(macroRules, renderMacroRulesExport(report));
             Files.writeString(counterexamples, renderCounterexamplesExport(report));
             Files.writeString(provenanceGraph, renderProvenanceGraphExport(report));
+            Files.writeString(campaign, DiscoveryCampaign.fromReport(
+                "campaign-" + sha256Utf8Lines(report.rows().stream().map(row -> row.seed().id()).sorted().toList()).substring(0, 12),
+                report,
+                report.metrics().processedSeeds(),
+                1,
+                enabledBackends(algorithmSnapshot),
+                "JSON_FILE"
+            ).renderJson());
             writeScreenshot(screenshot, report);
             writeReplayGif(gif, report);
             Files.writeString(reproPack, renderReproducibilityPack(report,
-                List.of(json, html, markdown, replayExport, screenshot, gif, hypotheses, macroRules, counterexamples, provenanceGraph),
+                List.of(json, html, markdown, replayExport, screenshot, gif, hypotheses, macroRules, counterexamples, provenanceGraph, campaign),
                 algorithmSnapshot));
             return new ArtifactBundle(json, html, markdown, replayExport, screenshot, gif, reproPack,
-                hypotheses, macroRules, counterexamples, provenanceGraph);
+                hypotheses, macroRules, counterexamples, provenanceGraph, campaign);
         } catch (IOException exception) {
             throw new IllegalStateException("Could not write discovery replay artefacts to " + outputDirectory, exception);
         }
@@ -282,13 +291,28 @@ public final class DiscoveryReplayArtifactWriter {
         writer.array("nodes", nodes -> report.rows().forEach(row -> {
             nodes.objectValue(node -> {
                 node.property("id", "seed:" + row.seed().id());
-                node.property("type", "SeedExpression");
+                node.property("type", "Seed");
                 node.property("label", row.seed().stableKey());
+            });
+            nodes.objectValue(node -> {
+                node.property("id", "search-run:" + row.seed().id());
+                node.property("type", "SearchRun");
+                node.property("label", row.summary());
             });
             row.hypotheses().forEach(hypothesis -> nodes.objectValue(node -> {
                 node.property("id", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
                 node.property("type", "Hypothesis");
                 node.property("label", hypothesis);
+            }));
+            row.hypotheses().forEach(hypothesis -> nodes.objectValue(node -> {
+                node.property("id", stableArtifactId("symreg", row.seed().id(), hypothesis));
+                node.property("type", "SymbolicRegressionProposal");
+                node.property("label", hypothesis);
+            }));
+            row.hypotheses().forEach(hypothesis -> nodes.objectValue(node -> {
+                node.property("id", stableArtifactId("cas-attempt", row.seed().id(), hypothesis));
+                node.property("type", "CASAttempt");
+                node.property("label", "CAS verification attempt for " + hypothesis);
             }));
             row.counterexamples().forEach(counterexample -> nodes.objectValue(node -> {
                 node.property("id", stableArtifactId("counterexample", row.seed().id(), counterexample));
@@ -299,30 +323,50 @@ public final class DiscoveryReplayArtifactWriter {
                 int index = i;
                 nodes.objectValue(node -> {
                     node.property("id", "replay:" + row.seed().id() + ":" + index);
-                    node.property("type", "TransformationPath");
+                    node.property("type", "SupportingPath");
                     node.property("label", row.replayPath().get(index));
                 });
             }
         }));
         writer.array("edges", edges -> report.rows().forEach(row -> {
+            edges.objectValue(edge -> {
+                edge.property("from", "seed:" + row.seed().id());
+                edge.property("to", "search-run:" + row.seed().id());
+                edge.property("type", "SEEDED");
+            });
             row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
                 edge.property("from", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
                 edge.property("to", "seed:" + row.seed().id());
                 edge.property("type", "DERIVED_FROM");
             }));
+            row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                edge.property("from", stableArtifactId("symreg", row.seed().id(), hypothesis));
+                edge.property("to", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                edge.property("type", "PROPOSES");
+            }));
+            row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                edge.property("from", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                edge.property("to", stableArtifactId("cas-attempt", row.seed().id(), hypothesis));
+                edge.property("type", "CHECKED_BY");
+            }));
             row.counterexamples().forEach(counterexample -> edges.objectValue(edge -> {
-                edge.property("from", stableArtifactId("counterexample", row.seed().id(), counterexample));
-                edge.property("to", row.hypotheses().isEmpty() ? "seed:" + row.seed().id()
+                edge.property("from", row.hypotheses().isEmpty() ? "search-run:" + row.seed().id()
                     : stableArtifactId("hypothesis", row.seed().id(), row.hypotheses().getFirst()));
-                edge.property("type", row.hypotheses().isEmpty() ? "GENERATED_BY" : "REFUTED_BY");
+                edge.property("to", stableArtifactId("counterexample", row.seed().id(), counterexample));
+                edge.property("type", row.hypotheses().isEmpty() ? "GENERATED" : "HAS_COUNTEREXAMPLE");
             }));
             for (int i = 0; i < row.replayPath().size(); i++) {
                 int index = i;
                 edges.objectValue(edge -> {
-                    edge.property("from", "replay:" + row.seed().id() + ":" + index);
-                    edge.property("to", "seed:" + row.seed().id());
-                    edge.property("type", "REPLAY_OF");
+                    edge.property("from", "search-run:" + row.seed().id());
+                    edge.property("to", "replay:" + row.seed().id() + ":" + index);
+                    edge.property("type", "FOUND_PATH");
                 });
+                row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                    edge.property("from", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                    edge.property("to", "replay:" + row.seed().id() + ":" + index);
+                    edge.property("type", "SUPPORTED_BY");
+                }));
             }
         }));
         writer.endObject();
@@ -388,6 +432,9 @@ public final class DiscoveryReplayArtifactWriter {
                 object.property("maxStates", descriptor.budget().maxStates());
                 object.property("maxCoefficient", descriptor.budget().maxCoefficient());
                 object.property("tolerance", descriptor.budget().tolerance());
+                object.property("maxTerms", descriptor.budget().maxTerms());
+                object.property("maxDegree", descriptor.budget().maxDegree());
+                object.property("maxVariables", descriptor.budget().maxVariables());
             })));
         writer.array("proofHistory", history -> report.rows().forEach(row -> history.objectValue(object -> {
             object.property("seedId", row.seed().id());
@@ -429,6 +476,17 @@ public final class DiscoveryReplayArtifactWriter {
         return descriptor.id().endsWith("Backend")
             || MathematicalAlgorithmRegistry.PSLQ.equals(descriptor.id())
             || MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH.equals(descriptor.id());
+    }
+
+    private static List<String> enabledBackends(Collection<MathematicalAlgorithmRegistry.AlgorithmDescriptor> algorithmSnapshot) {
+        return (algorithmSnapshot == null ? List.<MathematicalAlgorithmRegistry.AlgorithmDescriptor>of() : algorithmSnapshot.stream()
+            .filter(MathematicalAlgorithmRegistry.AlgorithmDescriptor::enabled)
+            .filter(DiscoveryReplayArtifactWriter::isBackend)
+            .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id))
+            .toList())
+            .stream()
+            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id)
+            .toList();
     }
 
     private static String gitCommit() {
@@ -566,7 +624,8 @@ public final class DiscoveryReplayArtifactWriter {
             Map.entry("hypotheses", 1),
             Map.entry("macroRules", 1),
             Map.entry("counterexamples", 1),
-            Map.entry("provenanceGraph", 1)
+            Map.entry("provenanceGraph", 1),
+            Map.entry("campaign", 1)
         ));
     }
 
@@ -581,7 +640,8 @@ public final class DiscoveryReplayArtifactWriter {
         Path hypothesesJson,
         Path macroRulesJson,
         Path counterexamplesJson,
-        Path provenanceGraphJson
+        Path provenanceGraphJson,
+        Path campaignJson
     ) {
     }
 

@@ -1,5 +1,7 @@
 package de.regelsuche.math.algorithms.equivalence;
 
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.util.List;
 
 /** Curated polynomial examples used to exercise exact algebraic discovery and reporting. */
@@ -24,6 +26,13 @@ public final class PolynomialDiscoveryPack {
                 true
             ),
             new Example(
+                "cubic-factorization",
+                "x^3 - 1",
+                List.of("x - 1", "x^2 + x + 1"),
+                Kind.FACTORIZATION,
+                true
+            ),
+            new Example(
                 "elimination-consequence",
                 "2*y - 1",
                 List.of("x + y - 1", "x - y"),
@@ -38,13 +47,63 @@ public final class PolynomialDiscoveryPack {
                 false
             ),
             new Example(
+                "non-member-ideal",
+                "x",
+                List.of("x^2"),
+                Kind.IDEAL_MEMBERSHIP,
+                false
+            ),
+            new Example(
                 "rational-coefficients",
                 "0.5*x + 0.5*x - 1",
                 List.of("x - 1"),
                 Kind.RATIONAL_SIMPLIFICATION,
                 true
+            ),
+            new Example(
+                "rational-coefficient-ideal",
+                "0.5*x - 0.5",
+                List.of("x - 1"),
+                Kind.RATIONAL_SIMPLIFICATION,
+                true
+            ),
+            new Example(
+                "unsupported-trig-radical-division",
+                "sin(x) + sqrt(y) + x / y",
+                List.of("x"),
+                Kind.UNSUPPORTED_DOMAIN,
+                false,
+                MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN,
+                null
+            ),
+            new Example(
+                "budget-limit",
+                "x*y",
+                List.of("x", "y"),
+                Kind.BUDGET_LIMIT,
+                false,
+                MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED,
+                MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(0, 1, 0, 0.0, 256, 20, 8)
             )
         );
+    }
+
+    public static String renderReportJson(List<EvaluationResult> results) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.polynomial-discovery-pack-report/v1");
+        writer.array("cases", cases -> (results == null ? List.<EvaluationResult>of() : results).forEach(result ->
+            cases.objectValue(object -> {
+                object.property("id", result.example().id());
+                object.property("kind", result.example().kind().name());
+                object.property("expectedMember", result.example().expectedMember());
+                object.property("actualMember", result.actualMember());
+                object.property("actualResult", result.actualResult());
+                object.property("status", result.status().name());
+            })
+        ));
+        writer.endObject();
+        return writer.toString();
     }
 
     public enum Kind {
@@ -53,7 +112,9 @@ public final class PolynomialDiscoveryPack {
         ELIMINATION,
         IDEAL_MEMBERSHIP,
         RATIONAL_SIMPLIFICATION,
-        COUNTEREXAMPLE_TRAP
+        COUNTEREXAMPLE_TRAP,
+        UNSUPPORTED_DOMAIN,
+        BUDGET_LIMIT
     }
 
     public record Example(
@@ -61,8 +122,14 @@ public final class PolynomialDiscoveryPack {
         String polynomial,
         List<String> generators,
         Kind kind,
-        boolean expectedMember
+        boolean expectedMember,
+        MathematicalAlgorithmRegistry.ExecutionStatus expectedStatus,
+        MathematicalAlgorithmRegistry.AlgorithmBudget budget
     ) {
+        public Example(String id, String polynomial, List<String> generators, Kind kind, boolean expectedMember) {
+            this(id, polynomial, generators, kind, expectedMember, MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS, null);
+        }
+
         public Example {
             if (id == null || id.isBlank()) {
                 throw new IllegalArgumentException("id must not be blank");
@@ -72,6 +139,22 @@ public final class PolynomialDiscoveryPack {
             }
             generators = generators == null ? List.of() : List.copyOf(generators);
             kind = kind == null ? Kind.IDENTITY : kind;
+            expectedStatus = expectedStatus == null ? MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS : expectedStatus;
+        }
+    }
+
+    public record EvaluationResult(
+        Example example,
+        boolean actualMember,
+        String actualResult,
+        MathematicalAlgorithmRegistry.ExecutionStatus status
+    ) {
+        public EvaluationResult {
+            if (example == null) {
+                throw new IllegalArgumentException("example must not be null");
+            }
+            actualResult = actualResult == null ? "" : actualResult;
+            status = status == null ? MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN : status;
         }
     }
 }

@@ -19,9 +19,8 @@ import java.util.TreeSet;
  * {@code UNAVAILABLE} instead of falling back to normal-form equivalence.
  */
 public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceService {
-    private static final int DEFAULT_MAX_TERMS = 256;
-    private static final int DEFAULT_MAX_DEGREE = 20;
-    private static final int DEFAULT_MAX_VARIABLES = 8;
+    private static final MathematicalAlgorithmRegistry.AlgorithmBudget SAFE_DEFAULT_BUDGET =
+        MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(200, 1_000, 0, 0.0, 256, 20, 8);
     private final PolynomialArithmetic arithmetic = new PolynomialArithmetic();
     private final MathematicalAlgorithmRegistry registry;
     private final boolean jasBackendAvailable;
@@ -109,7 +108,7 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
 
         MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)
             .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)
-            .orElse(MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(200, 1_000, 0, 0.0));
+            .orElse(SAFE_DEFAULT_BUDGET);
         Optional<String> unsupportedReason = unsupportedByHardLimits(polynomial.orElseThrow(), generators, budget);
         if (unsupportedReason.isPresent()) {
             lastResult = unsupported("polynomial outside configured Gröbner limits", unsupportedReason.orElseThrow());
@@ -164,16 +163,16 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         all.add(polynomial);
         all.addAll(generators);
         int termCount = all.stream().mapToInt(Polynomial::termCount).sum();
-        if (termCount > DEFAULT_MAX_TERMS) {
+        if (termCount > budget.maxTerms()) {
             return Optional.of("maxTerms");
         }
         int degree = all.stream().mapToInt(Polynomial::totalDegree).max().orElse(0);
-        if (degree > DEFAULT_MAX_DEGREE) {
+        if (degree > budget.maxDegree()) {
             return Optional.of("maxDegree");
         }
         Set<String> variables = new TreeSet<>();
         all.forEach(value -> variables.addAll(value.variables()));
-        if (variables.size() > DEFAULT_MAX_VARIABLES) {
+        if (variables.size() > budget.maxVariables()) {
             return Optional.of("maxVariables");
         }
         if (budget.maxCoefficient() > 0 && all.stream().anyMatch(value -> value.coefficientMagnitudeExceeds(budget.maxCoefficient()))) {
@@ -195,13 +194,16 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("capability", MathematicalAlgorithmRegistry.GROEBNER_BASIS);
         payload.put("backend", registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND) ? "jas" : "pureJavaSmallGroebner");
-        payload.put("maxTerms", DEFAULT_MAX_TERMS);
-        payload.put("maxDegree", DEFAULT_MAX_DEGREE);
-        payload.put("maxVariables", DEFAULT_MAX_VARIABLES);
+        MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)
+            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)
+            .orElse(SAFE_DEFAULT_BUDGET);
+        payload.put("maxTerms", budget.maxTerms());
+        payload.put("maxDegree", budget.maxDegree());
+        payload.put("maxVariables", budget.maxVariables());
         payload.put("maxPairs", registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)
             .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)
             .map(MathematicalAlgorithmRegistry.AlgorithmBudget::maxStates)
-            .orElse(1_000));
+            .orElse(SAFE_DEFAULT_BUDGET.maxStates()));
         payload.put("timeoutMillis", 0);
         payload.put("unsupportedReason", unsupportedReason == null ? "" : unsupportedReason);
         return payload;

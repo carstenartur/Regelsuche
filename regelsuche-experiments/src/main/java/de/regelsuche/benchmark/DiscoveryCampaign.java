@@ -3,7 +3,7 @@ package de.regelsuche.benchmark;
 import de.regelsuche.json.JsonWriter;
 import java.util.List;
 
-/** Product-level campaign descriptor for replayable multi-seed discovery runs. */
+/** Product-level campaign descriptor for replayable multi-seed discovery runs; execution is handled by runners. */
 public record DiscoveryCampaign(
     String id,
     List<String> seedIds,
@@ -45,6 +45,7 @@ public record DiscoveryCampaign(
                 "discovery-report.html",
                 "discovery-report.md",
                 "discovery-replay.json",
+                "discovery-campaign.json",
                 "hypotheses.json",
                 "macro-rules.json",
                 "counterexamples.json",
@@ -58,6 +59,7 @@ public record DiscoveryCampaign(
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("schema", "regelsuche.discovery-campaign/v1");
+        writer.property("kind", "descriptor");
         writer.property("id", id);
         writer.array("seedIds", seeds -> seedIds.forEach(seeds::value));
         writer.object("budgets", budgets -> {

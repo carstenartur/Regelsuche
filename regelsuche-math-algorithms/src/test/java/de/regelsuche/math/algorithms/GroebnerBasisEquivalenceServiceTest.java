@@ -10,6 +10,7 @@ import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -181,7 +182,8 @@ class GroebnerBasisEquivalenceServiceTest {
 
     @Test
     void hardLimitsRejectOversizedPolynomialDomains() {
-        GroebnerBasisEquivalenceService service = enabledService();
+        GroebnerBasisEquivalenceService service = enabledService(
+            MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(200, 2_000, 0, 0.0, 256, 20, 8));
 
         assertFalse(service.reducesToZeroModuloIdeal("a + b + c + d + e + f + g + h + i", List.of("a")));
 
@@ -190,19 +192,50 @@ class GroebnerBasisEquivalenceServiceTest {
     }
 
     @Test
+    void configuredGroebnerLimitsAreEnforcedAndVisibleInPayload() {
+        GroebnerBasisEquivalenceService service = enabledService(
+            MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(200, 2_000, 0, 0.0, 4, 2, 3));
+
+        assertFalse(service.reducesToZeroModuloIdeal("x^3", List.of("x")));
+
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN, service.lastResult().status());
+        assertEquals("maxDegree", service.lastResult().payload().get("unsupportedReason"));
+        assertEquals(4, service.lastResult().payload().get("maxTerms"));
+        assertEquals(2, service.lastResult().payload().get("maxDegree"));
+        assertEquals(3, service.lastResult().payload().get("maxVariables"));
+    }
+
+    @Test
     void polynomialDiscoveryPackExercisesProofsAndCounterexampleTraps() {
-        GroebnerBasisEquivalenceService service = enabledService();
+        List<PolynomialDiscoveryPack.EvaluationResult> results = new ArrayList<>();
 
         for (PolynomialDiscoveryPack.Example example : PolynomialDiscoveryPack.examples()) {
+            GroebnerBasisEquivalenceService service = example.budget() == null ? enabledService() : enabledService(example.budget());
+            boolean actualMember = service.reducesToZeroModuloIdeal(example.polynomial(), example.generators());
             assertEquals(
                 example.expectedMember(),
-                service.reducesToZeroModuloIdeal(example.polynomial(), example.generators()),
+                actualMember,
                 example.id()
             );
-            assertEquals("pureJavaSmallGroebner", service.lastResult().payload().get("backend"));
-            assertTrue(service.lastResult().payload().containsKey("basis"), example.id());
-            assertTrue(service.lastResult().payload().containsKey("remainder"), example.id());
+            assertEquals(example.expectedStatus(), service.lastResult().status(), example.id());
+            results.add(new PolynomialDiscoveryPack.EvaluationResult(
+                example,
+                actualMember,
+                service.lastResult().detail(),
+                service.lastResult().status()
+            ));
+            if (service.lastResult().status() == MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS) {
+                assertEquals("pureJavaSmallGroebner", service.lastResult().payload().get("backend"));
+                assertTrue(service.lastResult().payload().containsKey("basis"), example.id());
+                assertTrue(service.lastResult().payload().containsKey("remainder"), example.id());
+            }
         }
+
+        String report = PolynomialDiscoveryPack.renderReportJson(results);
+        assertTrue(report.contains("\"expectedMember\""));
+        assertTrue(report.contains("\"actualResult\""));
+        assertTrue(report.contains("\"cubic-factorization\""));
+        assertTrue(report.contains("\"budget-limit\""));
     }
 
     @Test
@@ -229,10 +262,14 @@ class GroebnerBasisEquivalenceServiceTest {
     }
 
     private GroebnerBasisEquivalenceService enabledService() {
+        return enabledService(null);
+    }
+
+    private GroebnerBasisEquivalenceService enabledService(MathematicalAlgorithmRegistry.AlgorithmBudget budget) {
         return new GroebnerBasisEquivalenceService(
             new DefaultMathematicalAlgorithmRegistry(Map.of(
                 MathematicalAlgorithmRegistry.GROEBNER_BASIS, true
-            ), Map.of())
+            ), budget == null ? Map.of() : Map.of(MathematicalAlgorithmRegistry.GROEBNER_BASIS, budget))
         );
     }
 }

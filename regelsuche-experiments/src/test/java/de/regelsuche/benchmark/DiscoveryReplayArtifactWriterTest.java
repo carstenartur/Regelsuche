@@ -24,12 +24,12 @@ class DiscoveryReplayArtifactWriterTest {
                 true,
                 "binomial reproduced",
                 List.of("hyp-binomial"),
-                List.of(),
+                List.of("x=0 breaks extrapolated template"),
                 List.of("(x + 1)^2", "(x + 1) * (x + 1)", "x^2 + 2*x + 1"),
                 12L,
                 1024L
             )),
-            new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, 1, 1, 0, 12L, 1024L),
+            new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, 1, 1, 1, 12L, 1024L),
             13L
         );
 
@@ -48,6 +48,19 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(Files.readString(bundle.counterexamplesJson()).contains("regelsuche.counterexamples/v1"));
         assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("regelsuche.provenance-graph/v1"));
         assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"DERIVED_FROM\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"Seed\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"SearchRun\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"SupportingPath\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"Counterexample\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"CASAttempt\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"SymbolicRegressionProposal\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"SEEDED\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"SUPPORTED_BY\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"HAS_COUNTEREXAMPLE\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"CHECKED_BY\""));
+        assertTrue(Files.readString(bundle.provenanceGraphJson()).contains("\"PROPOSES\""));
+        assertTrue(Files.readString(bundle.campaignJson()).contains("regelsuche.discovery-campaign/v1"));
+        assertTrue(Files.readString(bundle.campaignJson()).contains("\"kind\":\"descriptor\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("regelsuche.reproducibility-pack/v1"));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"sha256\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"dependencies\""));
@@ -56,6 +69,7 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"enabledBackends\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"hypotheses.json\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"provenance.graph.json\""));
+        assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"discovery-campaign.json\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"proofHistory\""));
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"docker\""));
         assertTrue(Files.size(bundle.screenshotPng()) > 0, "PNG screenshot artifact must be written");
@@ -76,6 +90,7 @@ class DiscoveryReplayArtifactWriterTest {
         String json = campaign.renderJson();
 
         assertTrue(json.contains("regelsuche.discovery-campaign/v1"));
+        assertTrue(json.contains("\"kind\":\"descriptor\""));
         assertTrue(json.contains("\"globalBudget\":5"));
         assertTrue(json.contains("\"parallelism\":2"));
         assertTrue(json.contains("\"groebnerBasis\""));
@@ -115,12 +130,12 @@ class DiscoveryReplayArtifactWriterTest {
                 true,
                 "binomial reproduced",
                 List.of("hyp-binomial"),
-                List.of(),
+                List.of("x=0 breaks extrapolated template"),
                 List.of("(x + 1)^2", "(x + 1) * (x + 1)", "x^2 + 2*x + 1"),
                 12L,
                 1024L
             )),
-            new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, 1, 1, 0, 12L, 1024L),
+            new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, 1, 1, 1, 12L, 1024L),
             13L
         );
     }

@@ -30,7 +30,7 @@ public class DefaultMathematicalAlgorithmRegistry implements MathematicalAlgorit
             GROEBNER_BASIS,
             "Gröbner-basis reduction for polynomial ideals/systems",
             false,
-            AlgorithmBudget.bounded(200, 2_000, 0, 0.0),
+            AlgorithmBudget.bounded(200, 2_000, 0, 0.0, 256, 20, 8),
             ProofSemantics.PROOF_FOR_SUPPORTED_DOMAIN,
             ResultType.PROOF,
             ResultType.REFUTATION
