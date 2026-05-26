@@ -45,6 +45,10 @@ class ScientificDiscoveryReproductionTest {
             assertFalse(run.context().graphStore().discoveredTransformations().isEmpty(),
                 "workflow must write discovered transformations through app wiring");
             assertTrue(Files.readString(run.artifacts().htmlReport()).contains("replay-step"));
+            String markdown = Files.readString(run.artifacts().markdownReport());
+            assertTrue(markdown.contains("Renderer: SemanticSearchGraphAssembler"));
+            assertTrue(markdown.contains("Raw graph nodes:"));
+            assertTrue(Files.readString(run.artifacts().replayJson()).contains("\"renderer\":\"SemanticSearchGraphAssembler\""));
             assertTrue(Files.exists(tempDir.resolve("artifacts").resolve("discovery-report.md")));
             assertTrue(Files.exists(tempDir.resolve("artifacts").resolve("discovery-replay.json")));
             assertTrue(Files.size(run.artifacts().screenshotPng()) > 0);

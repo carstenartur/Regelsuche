@@ -36,7 +36,7 @@ public final class DiscoveryReplayArtifactWriter {
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
         Path outputDirectory
     ) {
-        return write(report, outputDirectory, List.of());
+        return write(report, outputDirectory, List.of(), null);
     }
 
     public ArtifactBundle write(
@@ -44,7 +44,19 @@ public final class DiscoveryReplayArtifactWriter {
         Path outputDirectory,
         Collection<MathematicalAlgorithmRegistry.AlgorithmDescriptor> algorithmSnapshot
     ) {
+        return write(report, outputDirectory, algorithmSnapshot, null);
+    }
+
+    public ArtifactBundle write(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        Path outputDirectory,
+        Collection<MathematicalAlgorithmRegistry.AlgorithmDescriptor> algorithmSnapshot,
+        DiscoverySemanticReportView semanticView
+    ) {
         try {
+            DiscoverySemanticReportView effectiveSemanticView = semanticView == null
+                ? DiscoverySemanticReportView.fromReplayPaths(report)
+                : semanticView;
             Files.createDirectories(outputDirectory);
             Path json = outputDirectory.resolve("discovery-report.json");
             Path html = outputDirectory.resolve("discovery-report.html");
@@ -60,8 +72,8 @@ public final class DiscoveryReplayArtifactWriter {
             Path campaign = outputDirectory.resolve("discovery-campaign.json");
             Files.writeString(json, report.renderDeterministicJson());
             Files.writeString(html, renderHtml(report));
-            Files.writeString(markdown, renderMarkdown(report));
-            Files.writeString(replayExport, renderReplayExport(report));
+            Files.writeString(markdown, renderMarkdown(report, effectiveSemanticView));
+            Files.writeString(replayExport, renderReplayExport(report, effectiveSemanticView));
             Files.writeString(hypotheses, renderHypothesesExport(report));
             Files.writeString(macroRules, renderMacroRulesExport(report));
             Files.writeString(counterexamples, renderCounterexamplesExport(report));
@@ -74,8 +86,8 @@ public final class DiscoveryReplayArtifactWriter {
                 enabledBackends(algorithmSnapshot),
                 "JSON_FILE"
             ).renderJson());
-            writeScreenshot(screenshot, report);
-            writeReplayGif(gif, report);
+            writeScreenshot(screenshot, report, effectiveSemanticView);
+            writeReplayGif(gif, report, effectiveSemanticView);
             Files.writeString(reproPack, renderReproducibilityPack(report,
                 List.of(json, html, markdown, replayExport, screenshot, gif, hypotheses, macroRules, counterexamples, provenanceGraph, campaign),
                 algorithmSnapshot));
@@ -146,6 +158,13 @@ public final class DiscoveryReplayArtifactWriter {
     }
 
     public String renderMarkdown(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        return renderMarkdown(report, DiscoverySemanticReportView.fromReplayPaths(report));
+    }
+
+    public String renderMarkdown(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView
+    ) {
         StringBuilder out = new StringBuilder();
         out.append("# Regelsuche Discovery Report\n\n");
         out.append("- Seeds: ").append(report.metrics().processedSeeds()).append('\n');
@@ -166,10 +185,14 @@ public final class DiscoveryReplayArtifactWriter {
         out.append("- proofSuccessRate: ").append(String.format(java.util.Locale.ROOT, "%.2f", dashboard.proofSuccessRate())).append('\n');
         out.append("- artifactCounts: ").append(dashboard.artifactCounts()).append("\n\n");
         out.append("## Semantic Discovery View\n\n");
-        out.append("- Renderer: semantic-main-path\n");
-        out.append("- Main path nodes: ").append(semanticNodeCount(report)).append('\n');
-        out.append("- Collapsed low-signal steps: ").append(collapsedLowSignalStepCount(report)).append("\n\n");
-        out.append("```mermaid\n").append(renderSemanticMermaid(report)).append("```\n\n");
+        out.append("## Semantic Discovery View\n\n");
+        out.append("- Raw graph nodes: ").append(semanticView.rawNodeCount()).append('\n');
+        out.append("- Raw graph edges: ").append(semanticView.rawEdgeCount()).append('\n');
+        out.append("- Main path nodes: ").append(semanticView.semanticNodeCount()).append('\n');
+        out.append("- Semantic edges: ").append(semanticView.semanticEdgeCount()).append('\n');
+        out.append("- Collapsed variants: ").append(semanticView.collapsedVariantCount()).append('\n');
+        out.append("- Collapsed low-signal steps: ").append(semanticView.collapsedLowSignalCount()).append("\n\n");
+        out.append("```mermaid\n").append(renderSemanticMermaid(semanticView)).append("```\n\n");
         for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
             out.append("## ").append(row.seed().stableKey()).append("\n\n");
             out.append("- Status: ").append(row.success() ? "OK" : "FAIL").append('\n');
@@ -194,6 +217,13 @@ public final class DiscoveryReplayArtifactWriter {
     }
 
     public String renderReplayExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        return renderReplayExport(report, DiscoverySemanticReportView.fromReplayPaths(report));
+    }
+
+    public String renderReplayExport(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView
+    ) {
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("schema", "regelsuche.discovery-replay/v1");
@@ -226,6 +256,29 @@ public final class DiscoveryReplayArtifactWriter {
             object.array("counterexamples", counterexamples -> row.counterexamples().forEach(counterexamples::value));
             object.array("replayPath", replay -> row.replayPath().forEach(replay::value));
         })));
+        writer.object("semanticGraph", semantic -> {
+            semantic.property("renderer", semanticView.renderer());
+            semantic.property("rawNodeCount", semanticView.rawNodeCount());
+            semantic.property("rawEdgeCount", semanticView.rawEdgeCount());
+            semantic.property("semanticNodeCount", semanticView.semanticNodeCount());
+            semantic.property("semanticEdgeCount", semanticView.semanticEdgeCount());
+            semantic.property("collapsedVariantCount", semanticView.collapsedVariantCount());
+            semantic.property("collapsedLowSignalCount", semanticView.collapsedLowSignalCount());
+            semantic.array("paths", paths -> semanticView.paths().forEach(path -> paths.objectValue(pathObject -> {
+                pathObject.property("seedId", path.seedId());
+                pathObject.array("nodes", nodes -> path.nodes().forEach(node -> nodes.objectValue(nodeObject -> {
+                    nodeObject.property("id", node.id());
+                    nodeObject.property("label", node.label());
+                })));
+                pathObject.array("edges", edges -> path.edges().forEach(edge -> edges.objectValue(edgeObject -> {
+                    edgeObject.property("from", edge.from());
+                    edgeObject.property("to", edge.to());
+                    edgeObject.property("label", edge.label());
+                    edgeObject.property("kind", edge.kind());
+                    edgeObject.property("collapsedCount", edge.collapsedCount());
+                })));
+            })));
+        });
         writer.endObject();
         return writer.toString();
     }
@@ -522,13 +575,17 @@ public final class DiscoveryReplayArtifactWriter {
         return "unknown";
     }
 
-    private void writeScreenshot(Path path, DeterministicDiscoveryExperimentRunner.DiscoveryReport report) throws IOException {
-        if (!ImageIO.write(renderFrame(report, 0), "png", path.toFile())) {
+    private void writeScreenshot(Path path,
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView) throws IOException {
+        if (!ImageIO.write(renderFrame(report, semanticView, 0), "png", path.toFile())) {
             throw new IOException("No ImageIO writer for png");
         }
     }
 
-    private void writeReplayGif(Path path, DeterministicDiscoveryExperimentRunner.DiscoveryReport report) throws IOException {
+    private void writeReplayGif(Path path,
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView) throws IOException {
         ImageWriter writer = ImageIO.getImageWritersByFormatName("gif").hasNext()
             ? ImageIO.getImageWritersByFormatName("gif").next()
             : null;
@@ -539,9 +596,9 @@ public final class DiscoveryReplayArtifactWriter {
             writer.setOutput(output);
             ImageWriteParam params = writer.getDefaultWriteParam();
             writer.prepareWriteSequence(null);
-            int frames = Math.max(2, report.rows().stream().mapToInt(row -> Math.max(1, row.replayPath().size())).max().orElse(2));
+            int frames = Math.max(2, semanticView.paths().stream().mapToInt(pathView -> Math.max(1, pathView.nodes().size())).max().orElse(2));
             for (int i = 0; i < frames; i++) {
-                writer.writeToSequence(new javax.imageio.IIOImage(renderFrame(report, i), null, null), params);
+                writer.writeToSequence(new javax.imageio.IIOImage(renderFrame(report, semanticView, i), null, null), params);
             }
             writer.endWriteSequence();
         } finally {
@@ -549,7 +606,9 @@ public final class DiscoveryReplayArtifactWriter {
         }
     }
 
-    private BufferedImage renderFrame(DeterministicDiscoveryExperimentRunner.DiscoveryReport report, int frame) {
+    private BufferedImage renderFrame(DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView,
+        int frame) {
         int width = 480;
         int height = 180;
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -562,9 +621,9 @@ public final class DiscoveryReplayArtifactWriter {
             graphics.setColor(Color.WHITE);
             graphics.drawString("Regelsuche Semantic Discovery View", 20, 27);
             graphics.setColor(new Color(31, 41, 55));
-            graphics.drawString("Main path: " + semanticNodeCount(report) + " nodes", 20, 64);
-            graphics.drawString("Collapsed low-signal: " + collapsedLowSignalStepCount(report), 20, 82);
-            drawSemanticMainPath(graphics, report, frame);
+            graphics.drawString("Main path: " + semanticView.semanticNodeCount() + " nodes", 20, 64);
+            graphics.drawString("Collapsed low-signal: " + semanticView.collapsedLowSignalCount(), 20, 82);
+            drawSemanticMainPath(graphics, semanticView, frame);
         } finally {
             graphics.dispose();
         }
@@ -572,11 +631,11 @@ public final class DiscoveryReplayArtifactWriter {
     }
 
     private void drawSemanticMainPath(Graphics2D graphics,
-        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView,
         int frame) {
-        List<String> nodes = report.rows().stream()
+        List<DiscoverySemanticReportView.SemanticNode> nodes = semanticView.paths().stream()
             .findFirst()
-            .map(row -> semanticPath(row.replayPath()))
+            .map(DiscoverySemanticReportView.SemanticPath::nodes)
             .orElse(List.of());
         if (nodes.isEmpty()) {
             graphics.setColor(new Color(107, 114, 128));
@@ -602,69 +661,30 @@ public final class DiscoveryReplayArtifactWriter {
             graphics.setColor(Color.WHITE);
             graphics.drawString(String.valueOf(i + 1), x - 4, y + 5);
             graphics.setColor(new Color(31, 41, 55));
-            String label = nodes.get(i);
+            String label = nodes.get(i).label();
             graphics.drawString(label.substring(0, Math.min(16, label.length())), x - 24, y + 32);
         }
     }
 
-    private String renderSemanticMermaid(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+    private String renderSemanticMermaid(DiscoverySemanticReportView semanticView) {
         StringBuilder builder = new StringBuilder("graph TD\n");
-        for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
-            List<String> path = semanticPath(row.replayPath());
-            if (path.isEmpty()) {
-                String seedId = mermaidId("seed", row.seed().id());
-                builder.append("  ").append(seedId).append("[\"").append(escapeMermaid(row.seed().stableKey())).append("\"]\n");
+        for (DiscoverySemanticReportView.SemanticPath path : semanticView.paths()) {
+            if (path.nodes().isEmpty()) {
+                String seedId = mermaidId("seed", path.seedId());
+                builder.append("  ").append(seedId).append("[\"").append(escapeMermaid(path.seedId())).append("\"]\n");
                 continue;
             }
-            for (int i = 0; i < path.size(); i++) {
-                String id = mermaidId(row.seed().id(), String.valueOf(i));
-                builder.append("  ").append(id).append("[\"").append(escapeMermaid(path.get(i))).append("\"]\n");
-                if (i > 0) {
-                    builder.append("  ").append(mermaidId(row.seed().id(), String.valueOf(i - 1)))
-                        .append(" -->|semantic main step| ").append(id).append('\n');
-                }
+            for (DiscoverySemanticReportView.SemanticNode node : path.nodes()) {
+                builder.append("  ").append(mermaidId(path.seedId(), node.id()))
+                    .append("[\"").append(escapeMermaid(node.label())).append("\"]\n");
+            }
+            for (DiscoverySemanticReportView.SemanticEdge edge : path.edges()) {
+                builder.append("  ").append(mermaidId(path.seedId(), edge.from()))
+                    .append(" -->|").append(escapeMermaid(edge.label())).append("| ")
+                    .append(mermaidId(path.seedId(), edge.to())).append('\n');
             }
         }
         return builder.toString();
-    }
-
-    private int semanticNodeCount(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
-        return report.rows().stream().mapToInt(row -> semanticPath(row.replayPath()).size()).sum();
-    }
-
-    private int collapsedLowSignalStepCount(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
-        return report.rows().stream()
-            .mapToInt(row -> Math.max(0, row.replayPath().size() - semanticPath(row.replayPath()).size()))
-            .sum();
-    }
-
-    private List<String> semanticPath(List<String> replayPath) {
-        if (replayPath == null || replayPath.isEmpty()) {
-            return List.of();
-        }
-        java.util.ArrayList<String> semantic = new java.util.ArrayList<>();
-        String previousCanonical = "";
-        for (String step : replayPath) {
-            String canonical = canonicalSemanticExpression(step);
-            if (canonical.isBlank() || canonical.equals(previousCanonical)) {
-                continue;
-            }
-            semantic.add(step == null ? "" : step);
-            previousCanonical = canonical;
-        }
-        return semantic;
-    }
-
-    private String canonicalSemanticExpression(String expression) {
-        if (expression == null) {
-            return "";
-        }
-        return expression.replaceAll("\\s+", "")
-            .replace("+-", "-")
-            .replace("+0", "")
-            .replace("0+", "")
-            .replace("*1", "")
-            .replace("1*", "");
     }
 
     private String mermaidId(String prefix, String value) {

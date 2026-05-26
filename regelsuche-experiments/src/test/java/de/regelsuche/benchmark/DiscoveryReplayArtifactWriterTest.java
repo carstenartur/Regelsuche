@@ -47,8 +47,8 @@ class DiscoveryReplayArtifactWriterTest {
         String markdown = Files.readString(bundle.markdownReport());
         assertTrue(markdown.contains("## Dashboard Metrics"));
         assertTrue(markdown.contains("## Semantic Discovery View"));
-        assertTrue(markdown.contains("Renderer: semantic-main-path"));
-        assertTrue(markdown.contains("semantic main step"));
+        assertTrue(markdown.contains("Renderer: replay-main-path"));
+        assertTrue(markdown.contains("replay step"));
         assertTrue(Files.readString(bundle.replayJson()).contains("regelsuche.discovery-replay/v1"));
         assertTrue(Files.readString(bundle.replayJson()).contains("\"dashboardMetrics\""));
         assertTrue(Files.readString(bundle.hypothesesJson()).contains("regelsuche.hypotheses/v1"));
@@ -116,7 +116,8 @@ class DiscoveryReplayArtifactWriterTest {
     void denseReplayReportSemanticViewCollapsesNoisyCanonicalVariants() throws Exception {
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report = denseReplayReport();
 
-        DiscoveryReplayArtifactWriter.ArtifactBundle bundle = new DiscoveryReplayArtifactWriter().write(report, tempDir);
+        DiscoveryReplayArtifactWriter.ArtifactBundle bundle = new DiscoveryReplayArtifactWriter()
+            .write(report, tempDir, List.of(), denseSemanticView(report));
         String markdown = Files.readString(bundle.markdownReport());
 
         assertTrue(markdown.contains("- Main path nodes: 32"));
@@ -188,6 +189,40 @@ class DiscoveryReplayArtifactWriterTest {
             rows,
             new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(8, 8, 8, 0, 188L, 16412L),
             21L
+        );
+    }
+
+    private static DiscoverySemanticReportView denseSemanticView(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report
+    ) {
+        List<DiscoverySemanticReportView.SemanticPath> paths = report.rows().stream()
+            .map(row -> {
+                List<DiscoverySemanticReportView.SemanticNode> nodes = List.of(
+                    new DiscoverySemanticReportView.SemanticNode(row.seed().id() + "-0", "x"),
+                    new DiscoverySemanticReportView.SemanticNode(row.seed().id() + "-1", "x + 1"),
+                    new DiscoverySemanticReportView.SemanticNode(row.seed().id() + "-2", "(x + 1)^2"),
+                    new DiscoverySemanticReportView.SemanticNode(row.seed().id() + "-3", "x^2 + 2*x + 1")
+                );
+                List<DiscoverySemanticReportView.SemanticEdge> edges = List.of(
+                    new DiscoverySemanticReportView.SemanticEdge(nodes.get(0).id(), nodes.get(1).id(),
+                        "semantic main step", "MAIN_STEP", 0),
+                    new DiscoverySemanticReportView.SemanticEdge(nodes.get(1).id(), nodes.get(2).id(),
+                        "semantic main step", "MAIN_STEP", 0),
+                    new DiscoverySemanticReportView.SemanticEdge(nodes.get(2).id(), nodes.get(3).id(),
+                        "semantic main step", "MAIN_STEP", 0)
+                );
+                return new DiscoverySemanticReportView.SemanticPath(row.seed().id(), nodes, edges);
+            })
+            .toList();
+        return new DiscoverySemanticReportView(
+            "SemanticSearchGraphAssembler",
+            128,
+            120,
+            32,
+            24,
+            96,
+            96,
+            paths
         );
     }
 
