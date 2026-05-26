@@ -185,7 +185,7 @@ public final class DiscoveryReplayArtifactWriter {
         out.append("- proofSuccessRate: ").append(String.format(java.util.Locale.ROOT, "%.2f", dashboard.proofSuccessRate())).append('\n');
         out.append("- artifactCounts: ").append(dashboard.artifactCounts()).append("\n\n");
         out.append("## Semantic Discovery View\n\n");
-        out.append("## Semantic Discovery View\n\n");
+        out.append("- Renderer: ").append(semanticView.renderer()).append('\n');
         out.append("- Raw graph nodes: ").append(semanticView.rawNodeCount()).append('\n');
         out.append("- Raw graph edges: ").append(semanticView.rawEdgeCount()).append('\n');
         out.append("- Main path nodes: ").append(semanticView.semanticNodeCount()).append('\n');
