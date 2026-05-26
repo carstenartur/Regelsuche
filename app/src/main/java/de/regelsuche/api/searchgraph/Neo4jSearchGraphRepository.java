@@ -370,6 +370,9 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
             case ASSUMPTION_SIGNATURE -> "AssumptionSignature";
             case BENCHMARK_RUN -> "BenchmarkRun";
             case TRANSFORMATION_PATH -> "TransformationPath";
+            case SYMBOLIC_REGRESSION_PROPOSAL -> "SymbolicRegressionProposal";
+            case NUMERIC_RELATION_CANDIDATE -> "NumericRelationCandidate";
+            case CAS_VALIDATION_ATTEMPT -> "CasValidationAttempt";
         };
     }
 }

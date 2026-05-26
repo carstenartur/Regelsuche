@@ -10,6 +10,7 @@ import de.regelsuche.search.index.RootSymbolTermRuleIndex;
 import de.regelsuche.search.index.SearchContext;
 import de.regelsuche.search.index.TermRuleIndex;
 import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.json.JsonWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -161,5 +162,39 @@ public final class RuleIndexBenchmark {
         long matcherCacheHits,
         long elapsedNanos
     ) {
+        public String renderJson() {
+            JsonWriter writer = new JsonWriter();
+            writer.beginObject();
+            writer.property("schema", "regelsuche.rule-index-benchmark-result/v1");
+            writer.property("strategy", strategy);
+            writer.property("rulesConsidered", rulesConsidered);
+            writer.property("candidateSetSize", candidateSetSize);
+            writer.property("rulesSkippedByIndex", rulesSkippedByIndex);
+            writer.property("averageCandidateSetSize", averageCandidateSetSize);
+            writer.property("nodesScanned", nodesScanned);
+            writer.property("matcherCacheHits", matcherCacheHits);
+            writer.property("elapsedNanos", elapsedNanos);
+            writer.endObject();
+            return writer.toString();
+        }
+
+        public static String renderJsonArray(List<Result> results) {
+            JsonWriter writer = new JsonWriter();
+            writer.beginObject();
+            writer.property("schema", "regelsuche.rule-index-benchmark/v1");
+            writer.array("results", array -> (results == null ? List.<Result>of() : results)
+                .forEach(result -> array.objectValue(object -> {
+                    object.property("strategy", result.strategy());
+                    object.property("rulesConsidered", result.rulesConsidered());
+                    object.property("candidateSetSize", result.candidateSetSize());
+                    object.property("rulesSkippedByIndex", result.rulesSkippedByIndex());
+                    object.property("averageCandidateSetSize", result.averageCandidateSetSize());
+                    object.property("nodesScanned", result.nodesScanned());
+                    object.property("matcherCacheHits", result.matcherCacheHits());
+                    object.property("elapsedNanos", result.elapsedNanos());
+                })));
+            writer.endObject();
+            return writer.toString();
+        }
     }
 }

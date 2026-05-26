@@ -20,6 +20,8 @@ class RuleIndexBenchmarkTest {
         assertTrue(root.candidateSetSize() > multiStage.candidateSetSize());
         assertTrue(multiStage.rulesSkippedByIndex() > root.rulesSkippedByIndex());
         assertEquals(multiStage.candidateSetSize(), (int) multiStage.averageCandidateSetSize());
+        assertTrue(RuleIndexBenchmark.Result.renderJsonArray(results).contains("\"rulesSkippedByIndex\""));
+        assertTrue(multiStage.renderJson().contains("regelsuche.rule-index-benchmark-result/v1"));
     }
 
     @Test

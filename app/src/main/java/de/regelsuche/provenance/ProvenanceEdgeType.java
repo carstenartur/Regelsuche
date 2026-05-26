@@ -8,5 +8,8 @@ public enum ProvenanceEdgeType {
     DERIVED_FROM,
     USEFUL_FOR,
     REPLAY_OF,
-    GENERATED_BY
+    GENERATED_BY,
+    PROPOSAL_FROM,
+    VALIDATED_BY_CAS,
+    FAILED_CAS_VALIDATION
 }

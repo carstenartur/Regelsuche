@@ -74,14 +74,22 @@ public final class DomainAwareCasRouter {
 
     public MathematicalAlgorithmRegistry.AlgorithmExecutionResult discoverNumericRelation(List<Double> samples) {
         NumericRelationService.NumericRelationResult result = numericRelations.findIntegerRelation(samples);
+        MathematicalAlgorithmRegistry.ResultType resultType = result.result().resultType();
+        String detail = result.result().detail();
+        if (result.result().status() == MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS
+            && resultType != MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS) {
+            resultType = MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS;
+            detail = detail + " (downgraded to hypothesis-only numeric relation semantics)";
+        }
         Map<String, Object> payload = new java.util.LinkedHashMap<>(result.result().payload());
         payload.put("sampleCount", samples == null ? 0 : samples.size());
         payload.put("coefficients", result.coefficients());
         payload.put("residual", result.residual());
+        payload.put("proofSemantics", MathematicalAlgorithmRegistry.ProofSemantics.HYPOTHESIS_ONLY.name());
         return new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
             result.result().status(),
-            result.result().resultType(),
-            result.result().detail(),
+            resultType,
+            detail,
             payload
         );
     }

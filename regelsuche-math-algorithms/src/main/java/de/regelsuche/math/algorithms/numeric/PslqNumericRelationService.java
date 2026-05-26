@@ -25,6 +25,14 @@ public class PslqNumericRelationService implements NumericRelationService {
             return new NumericRelationResult(List.of(), Double.NaN,
                 MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown("at least two values are required"));
         }
+        if (values.stream().anyMatch(value -> value == null || !Double.isFinite(value))) {
+            return new NumericRelationResult(List.of(), Double.NaN,
+                MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown("finite numeric values are required"));
+        }
+        if (values.stream().allMatch(value -> Math.abs(value) <= 1e-15)) {
+            return new NumericRelationResult(List.of(), Double.NaN,
+                MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown("all-zero samples do not define a numeric relation"));
+        }
 
         MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.PSLQ)
             .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)
@@ -163,7 +171,7 @@ public class PslqNumericRelationService implements NumericRelationService {
 
         private int gcd(int a, int b) {
             if (b == 0) {
-                return a;
+                return Math.abs(a);
             }
             return gcd(b, a % b);
         }

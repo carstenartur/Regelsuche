@@ -52,15 +52,34 @@ public final class DiscoveryReplayArtifactWriter {
             Path screenshot = outputDirectory.resolve("discovery-summary.png");
             Path gif = outputDirectory.resolve("discovery-replay.gif");
             Path reproPack = outputDirectory.resolve("reproducibility-pack.json");
+            Path hypotheses = outputDirectory.resolve("hypotheses.json");
+            Path macroRules = outputDirectory.resolve("macro-rules.json");
+            Path counterexamples = outputDirectory.resolve("counterexamples.json");
+            Path provenanceGraph = outputDirectory.resolve("provenance.graph.json");
+            Path campaign = outputDirectory.resolve("discovery-campaign.json");
             Files.writeString(json, report.renderDeterministicJson());
             Files.writeString(html, renderHtml(report));
             Files.writeString(markdown, renderMarkdown(report));
             Files.writeString(replayExport, renderReplayExport(report));
+            Files.writeString(hypotheses, renderHypothesesExport(report));
+            Files.writeString(macroRules, renderMacroRulesExport(report));
+            Files.writeString(counterexamples, renderCounterexamplesExport(report));
+            Files.writeString(provenanceGraph, renderProvenanceGraphExport(report));
+            Files.writeString(campaign, DiscoveryCampaign.fromReport(
+                "campaign-" + sha256Utf8Lines(report.rows().stream().map(row -> row.seed().id()).sorted().toList()).substring(0, 12),
+                report,
+                report.metrics().processedSeeds(),
+                1,
+                enabledBackends(algorithmSnapshot),
+                "JSON_FILE"
+            ).renderJson());
             writeScreenshot(screenshot, report);
             writeReplayGif(gif, report);
             Files.writeString(reproPack, renderReproducibilityPack(report,
-                List.of(json, html, markdown, replayExport, screenshot, gif), algorithmSnapshot));
-            return new ArtifactBundle(json, html, markdown, replayExport, screenshot, gif, reproPack);
+                List.of(json, html, markdown, replayExport, screenshot, gif, hypotheses, macroRules, counterexamples, provenanceGraph, campaign),
+                algorithmSnapshot));
+            return new ArtifactBundle(json, html, markdown, replayExport, screenshot, gif, reproPack,
+                hypotheses, macroRules, counterexamples, provenanceGraph, campaign);
         } catch (IOException exception) {
             throw new IllegalStateException("Could not write discovery replay artefacts to " + outputDirectory, exception);
         }
@@ -205,6 +224,155 @@ public final class DiscoveryReplayArtifactWriter {
         return writer.toString();
     }
 
+    public String renderHypothesesExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.hypotheses/v1");
+        writer.array("hypotheses", arr -> report.rows().forEach(row -> row.hypotheses().forEach(hypothesis ->
+            arr.objectValue(object -> {
+                object.property("id", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                object.property("seedId", row.seed().id());
+                object.property("expression", hypothesis);
+                object.property("evidenceCount", row.replayPath().size());
+                object.array("assumptions", assumptions -> row.seed().assumptions().forEach(assumptions::value));
+                object.array("interestingnessReasons", reasons -> {
+                    reasons.value("supported-by-replay-path");
+                    if (!row.counterexamples().isEmpty()) {
+                        reasons.value("counterexample-search-performed");
+                    }
+                    if (row.summary().toLowerCase(java.util.Locale.ROOT).contains("proof")) {
+                        reasons.value("proof-mentioned-in-summary");
+                    }
+                });
+            }))));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    public String renderMacroRulesExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.macro-rules/v1");
+        writer.array("macroRules", arr -> report.rows().forEach(row -> {
+            for (String step : row.replayPath()) {
+                if (step.toLowerCase(java.util.Locale.ROOT).contains("macro")) {
+                    arr.objectValue(object -> {
+                        object.property("id", stableArtifactId("macro", row.seed().id(), step));
+                        object.property("seedId", row.seed().id());
+                        object.property("sourceStep", step);
+                        object.property("usefulness", "observed-in-replay");
+                    });
+                }
+            }
+        }));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    public String renderCounterexamplesExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.counterexamples/v1");
+        writer.array("counterexamples", arr -> report.rows().forEach(row -> row.counterexamples().forEach(counterexample ->
+            arr.objectValue(object -> {
+                object.property("id", stableArtifactId("counterexample", row.seed().id(), counterexample));
+                object.property("seedId", row.seed().id());
+                object.property("description", counterexample);
+                object.property("refutesHypothesis", row.hypotheses().isEmpty() ? "" : row.hypotheses().getFirst());
+            }))));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    public String renderProvenanceGraphExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.provenance-graph/v1");
+        writer.array("nodes", nodes -> report.rows().forEach(row -> {
+            nodes.objectValue(node -> {
+                node.property("id", "seed:" + row.seed().id());
+                node.property("type", "Seed");
+                node.property("label", row.seed().stableKey());
+            });
+            nodes.objectValue(node -> {
+                node.property("id", "search-run:" + row.seed().id());
+                node.property("type", "SearchRun");
+                node.property("label", row.summary());
+            });
+            row.hypotheses().forEach(hypothesis -> nodes.objectValue(node -> {
+                node.property("id", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                node.property("type", "Hypothesis");
+                node.property("label", hypothesis);
+            }));
+            row.hypotheses().forEach(hypothesis -> nodes.objectValue(node -> {
+                node.property("id", stableArtifactId("symreg", row.seed().id(), hypothesis));
+                node.property("type", "SymbolicRegressionProposal");
+                node.property("label", hypothesis);
+            }));
+            row.hypotheses().forEach(hypothesis -> nodes.objectValue(node -> {
+                node.property("id", stableArtifactId("cas-attempt", row.seed().id(), hypothesis));
+                node.property("type", "CASAttempt");
+                node.property("label", "CAS verification attempt for " + hypothesis);
+            }));
+            row.counterexamples().forEach(counterexample -> nodes.objectValue(node -> {
+                node.property("id", stableArtifactId("counterexample", row.seed().id(), counterexample));
+                node.property("type", "Counterexample");
+                node.property("label", counterexample);
+            }));
+            for (int i = 0; i < row.replayPath().size(); i++) {
+                int index = i;
+                nodes.objectValue(node -> {
+                    node.property("id", "replay:" + row.seed().id() + ":" + index);
+                    node.property("type", "SupportingPath");
+                    node.property("label", row.replayPath().get(index));
+                });
+            }
+        }));
+        writer.array("edges", edges -> report.rows().forEach(row -> {
+            edges.objectValue(edge -> {
+                edge.property("from", "seed:" + row.seed().id());
+                edge.property("to", "search-run:" + row.seed().id());
+                edge.property("type", "SEEDED");
+            });
+            row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                edge.property("from", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                edge.property("to", "seed:" + row.seed().id());
+                edge.property("type", "DERIVED_FROM");
+            }));
+            row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                edge.property("from", stableArtifactId("symreg", row.seed().id(), hypothesis));
+                edge.property("to", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                edge.property("type", "PROPOSES");
+            }));
+            row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                edge.property("from", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                edge.property("to", stableArtifactId("cas-attempt", row.seed().id(), hypothesis));
+                edge.property("type", "CHECKED_BY");
+            }));
+            row.counterexamples().forEach(counterexample -> edges.objectValue(edge -> {
+                edge.property("from", row.hypotheses().isEmpty() ? "search-run:" + row.seed().id()
+                    : stableArtifactId("hypothesis", row.seed().id(), row.hypotheses().getFirst()));
+                edge.property("to", stableArtifactId("counterexample", row.seed().id(), counterexample));
+                edge.property("type", row.hypotheses().isEmpty() ? "GENERATED" : "HAS_COUNTEREXAMPLE");
+            }));
+            for (int i = 0; i < row.replayPath().size(); i++) {
+                int index = i;
+                edges.objectValue(edge -> {
+                    edge.property("from", "search-run:" + row.seed().id());
+                    edge.property("to", "replay:" + row.seed().id() + ":" + index);
+                    edge.property("type", "FOUND_PATH");
+                });
+                row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                    edge.property("from", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                    edge.property("to", "replay:" + row.seed().id() + ":" + index);
+                    edge.property("type", "SUPPORTED_BY");
+                }));
+            }
+        }));
+        writer.endObject();
+        return writer.toString();
+    }
+
     public String renderReproducibilityPack(
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
         List<Path> artifacts,
@@ -264,6 +432,9 @@ public final class DiscoveryReplayArtifactWriter {
                 object.property("maxStates", descriptor.budget().maxStates());
                 object.property("maxCoefficient", descriptor.budget().maxCoefficient());
                 object.property("tolerance", descriptor.budget().tolerance());
+                object.property("maxTerms", descriptor.budget().maxTerms());
+                object.property("maxDegree", descriptor.budget().maxDegree());
+                object.property("maxVariables", descriptor.budget().maxVariables());
             })));
         writer.array("proofHistory", history -> report.rows().forEach(row -> history.objectValue(object -> {
             object.property("seedId", row.seed().id());
@@ -305,6 +476,17 @@ public final class DiscoveryReplayArtifactWriter {
         return descriptor.id().endsWith("Backend")
             || MathematicalAlgorithmRegistry.PSLQ.equals(descriptor.id())
             || MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH.equals(descriptor.id());
+    }
+
+    private static List<String> enabledBackends(Collection<MathematicalAlgorithmRegistry.AlgorithmDescriptor> algorithmSnapshot) {
+        return (algorithmSnapshot == null ? List.<MathematicalAlgorithmRegistry.AlgorithmDescriptor>of() : algorithmSnapshot.stream()
+            .filter(MathematicalAlgorithmRegistry.AlgorithmDescriptor::enabled)
+            .filter(DiscoveryReplayArtifactWriter::isBackend)
+            .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id))
+            .toList())
+            .stream()
+            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id)
+            .toList();
     }
 
     private static String gitCommit() {
@@ -431,14 +613,19 @@ public final class DiscoveryReplayArtifactWriter {
     }
 
     private DiscoveryDashboardMetrics dashboardMetrics(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
-        return DiscoveryDashboardMetrics.from(report, Map.of(
-            "json", 1,
-            "html", 1,
-            "markdown", 1,
-            "replayJson", 1,
-            "screenshotPng", 1,
-            "replayGif", 1,
-            "reproducibilityPack", 1
+        return DiscoveryDashboardMetrics.from(report, Map.ofEntries(
+            Map.entry("json", 1),
+            Map.entry("html", 1),
+            Map.entry("markdown", 1),
+            Map.entry("replayJson", 1),
+            Map.entry("screenshotPng", 1),
+            Map.entry("replayGif", 1),
+            Map.entry("reproducibilityPack", 1),
+            Map.entry("hypotheses", 1),
+            Map.entry("macroRules", 1),
+            Map.entry("counterexamples", 1),
+            Map.entry("provenanceGraph", 1),
+            Map.entry("campaign", 1)
         ));
     }
 
@@ -449,8 +636,17 @@ public final class DiscoveryReplayArtifactWriter {
         Path replayJson,
         Path screenshotPng,
         Path replayGif,
-        Path reproducibilityPack
+        Path reproducibilityPack,
+        Path hypothesesJson,
+        Path macroRulesJson,
+        Path counterexamplesJson,
+        Path provenanceGraphJson,
+        Path campaignJson
     ) {
+    }
+
+    private static String stableArtifactId(String type, String seedId, String value) {
+        return type + ":" + sha256Utf8Lines(List.of(seedId == null ? "" : seedId, value == null ? "" : value)).substring(0, 16);
     }
 
     private static String checksum(Path path) {

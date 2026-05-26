@@ -44,13 +44,45 @@ public interface MathematicalAlgorithmRegistry {
         }
     }
 
-    record AlgorithmBudget(int maxSteps, int maxStates, int maxCoefficient, double tolerance) {
+    record AlgorithmBudget(
+        int maxSteps,
+        int maxStates,
+        int maxCoefficient,
+        double tolerance,
+        int maxTerms,
+        int maxDegree,
+        int maxVariables
+    ) {
+        public AlgorithmBudget(int maxSteps, int maxStates, int maxCoefficient, double tolerance) {
+            this(maxSteps, maxStates, maxCoefficient, tolerance, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE);
+        }
+
         public static AlgorithmBudget unbounded() {
-            return new AlgorithmBudget(Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, 0.0);
+            return new AlgorithmBudget(
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE,
+                0.0,
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE
+            );
         }
 
         public static AlgorithmBudget bounded(int maxSteps, int maxStates, int maxCoefficient, double tolerance) {
             return new AlgorithmBudget(maxSteps, maxStates, maxCoefficient, tolerance);
+        }
+
+        public static AlgorithmBudget bounded(
+            int maxSteps,
+            int maxStates,
+            int maxCoefficient,
+            double tolerance,
+            int maxTerms,
+            int maxDegree,
+            int maxVariables
+        ) {
+            return new AlgorithmBudget(maxSteps, maxStates, maxCoefficient, tolerance, maxTerms, maxDegree, maxVariables);
         }
     }
 
