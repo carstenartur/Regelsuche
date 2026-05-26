@@ -182,56 +182,56 @@ public final class ProvenanceGraphQueries {
         if (domains == null || domain == null || domain.isBlank()) {
             return false;
         }
-
-        private static List<String> domains(String domains) {
-            if (domains == null || domains.isBlank()) {
-                return List.of("unknown");
-            }
-            return java.util.Arrays.stream(domains.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isBlank())
-                .toList();
-        }
-
-        private static String runId(String provenanceNodeId) {
-            String[] parts = provenanceNodeId.split(":", 3);
-            return parts.length >= 2 ? parts[1] : "";
-        }
-
-        private static String familyKey(ProvenanceNode node) {
-            return normalizePattern(node.properties().get("leftPattern"))
-                + " -> "
-                + normalizePattern(node.properties().get("rightPattern"));
-        }
-
-        private static String normalizePattern(String pattern) {
-            return pattern == null ? "" : pattern.replaceAll("\\s+", " ").trim();
-        }
-
-        private static double patternSimilarity(ProvenanceNode left, ProvenanceNode right) {
-            Set<String> leftTokens = tokens(familyKey(left));
-            Set<String> rightTokens = tokens(familyKey(right));
-            if (leftTokens.isEmpty() && rightTokens.isEmpty()) {
-                return 1.0;
-            }
-            Set<String> intersection = new HashSet<>(leftTokens);
-            intersection.retainAll(rightTokens);
-            Set<String> union = new HashSet<>(leftTokens);
-            union.addAll(rightTokens);
-            return union.isEmpty() ? 0.0 : (double) intersection.size() / union.size();
-        }
-
-        private static Set<String> tokens(String value) {
-            return java.util.Arrays.stream(value.split("[^A-Za-z0-9_]+"))
-                .filter(token -> !token.isBlank())
-                .collect(Collectors.toSet());
-        }
         for (String value : domains.split(",")) {
             if (value.trim().equalsIgnoreCase(domain.trim())) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static List<String> domains(String domains) {
+        if (domains == null || domains.isBlank()) {
+            return List.of("unknown");
+        }
+        return java.util.Arrays.stream(domains.split(","))
+            .map(String::trim)
+            .filter(value -> !value.isBlank())
+            .toList();
+    }
+
+    private static String runId(String provenanceNodeId) {
+        String[] parts = provenanceNodeId.split(":", 3);
+        return parts.length >= 2 ? parts[1] : "";
+    }
+
+    private static String familyKey(ProvenanceNode node) {
+        return normalizePattern(node.properties().get("leftPattern"))
+            + " -> "
+            + normalizePattern(node.properties().get("rightPattern"));
+    }
+
+    private static String normalizePattern(String pattern) {
+        return pattern == null ? "" : pattern.replaceAll("\\s+", " ").trim();
+    }
+
+    private static double patternSimilarity(ProvenanceNode left, ProvenanceNode right) {
+        Set<String> leftTokens = tokens(familyKey(left));
+        Set<String> rightTokens = tokens(familyKey(right));
+        if (leftTokens.isEmpty() && rightTokens.isEmpty()) {
+            return 1.0;
+        }
+        Set<String> intersection = new HashSet<>(leftTokens);
+        intersection.retainAll(rightTokens);
+        Set<String> union = new HashSet<>(leftTokens);
+        union.addAll(rightTokens);
+        return union.isEmpty() ? 0.0 : (double) intersection.size() / union.size();
+    }
+
+    private static Set<String> tokens(String value) {
+        return java.util.Arrays.stream(value.split("[^A-Za-z0-9_]+"))
+            .filter(token -> !token.isBlank())
+            .collect(Collectors.toSet());
     }
 
     private static int supportCount(ProvenanceGraph graph, String id) {
@@ -271,24 +271,24 @@ public final class ProvenanceGraphQueries {
         } catch (NumberFormatException ignored) {
             return 0.0;
         }
+    }
 
-        public record HypothesisFamily(
-            String patternKey,
-            List<ProvenanceNode> hypotheses,
-            Map<String, Long> proofStatusCounts
-        ) {
-        }
+    public record HypothesisFamily(
+        String patternKey,
+        List<ProvenanceNode> hypotheses,
+        Map<String, Long> proofStatusCounts
+    ) {
+    }
 
-        public record ErrorDistribution(
-            String domain,
-            long total,
-            Map<String, Long> failureModes
-        ) {
-            private ErrorDistribution merge(ErrorDistribution other) {
-                Map<String, Long> mergedModes = new LinkedHashMap<>(failureModes);
-                other.failureModes.forEach((mode, count) -> mergedModes.merge(mode, count, Long::sum));
-                return new ErrorDistribution(domain, total + other.total, mergedModes);
-            }
+    public record ErrorDistribution(
+        String domain,
+        long total,
+        Map<String, Long> failureModes
+    ) {
+        private ErrorDistribution merge(ErrorDistribution other) {
+            Map<String, Long> mergedModes = new LinkedHashMap<>(failureModes);
+            other.failureModes.forEach((mode, count) -> mergedModes.merge(mode, count, Long::sum));
+            return new ErrorDistribution(domain, total + other.total, mergedModes);
         }
     }
 }
