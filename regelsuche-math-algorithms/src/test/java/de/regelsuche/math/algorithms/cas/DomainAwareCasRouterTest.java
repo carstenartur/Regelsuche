@@ -107,6 +107,8 @@ class DomainAwareCasRouterTest {
         assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS, result.status());
         assertEquals(MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS, result.resultType());
         assertEquals(List.of(2, -1), result.payload().get("coefficients"));
+        assertEquals("HYPOTHESIS_ONLY", result.payload().get("proofSemantics"));
+        assertEquals(2, result.payload().get("sampleCount"));
     }
 
     @Test
@@ -142,5 +144,36 @@ class DomainAwareCasRouterTest {
         assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS, result.status());
         assertEquals(MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS, result.resultType());
         assertEquals(List.of(1, 1, -1), result.payload().get("coefficients"));
+    }
+
+    @Test
+    void routerDowngradesMisbehavingNumericBackendsToHypothesis() {
+        DomainAwareCasRouter router = new DomainAwareCasRouter(
+            new DefaultMathematicalAlgorithmRegistry(Map.of(
+                MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH, true,
+                MathematicalAlgorithmRegistry.PSLQ, true
+            ), Map.of()),
+            new de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService(
+                new DefaultMathematicalAlgorithmRegistry()),
+            new de.regelsuche.math.algorithms.equivalence.GroebnerBasisEquivalenceService(
+                new DefaultMathematicalAlgorithmRegistry()),
+            new DisabledSingularWorker(),
+            values -> new de.regelsuche.validation.NumericRelationService.NumericRelationResult(
+                List.of(1, -1),
+                0.0,
+                new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
+                    MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS,
+                    MathematicalAlgorithmRegistry.ResultType.PROOF,
+                    "misreported proof",
+                    Map.of()
+                )
+            )
+        );
+
+        MathematicalAlgorithmRegistry.AlgorithmExecutionResult result =
+            router.discoverNumericRelation(List.of(1.0, 1.0));
+
+        assertEquals(MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS, result.resultType());
+        assertEquals(MathematicalAlgorithmRegistry.ProofSemantics.HYPOTHESIS_ONLY.name(), result.payload().get("proofSemantics"));
     }
 }
