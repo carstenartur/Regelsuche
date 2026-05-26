@@ -24,6 +24,7 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertFalse(result.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND, result.status());
         assertTrue(result.inferredAssumptions().isEmpty(),
             "existing b != 0 assumption should filter b=0 samples instead of being re-inferred");
     }
@@ -41,6 +42,7 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertTrue(result.inferredAssumptions().contains("b != 0"));
+        assertEquals(CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND, result.status());
     }
 
     @Test
@@ -58,7 +60,9 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertFalse(exhausted.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.INCONCLUSIVE, exhausted.status());
         assertTrue(sampled.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, sampled.status());
     }
 
     @Test
@@ -93,7 +97,9 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertFalse(matrixDisabled.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.INCONCLUSIVE, matrixDisabled.status());
         assertTrue(matrixEnabled.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, matrixEnabled.status());
         assertEquals(List.of("matrix-non-commutative"), matrixEnabled.attemptedSources());
     }
 
@@ -105,6 +111,7 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertTrue(result.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, result.status());
         assertEquals(List.of("complex-samples"), result.attemptedSources());
     }
 }

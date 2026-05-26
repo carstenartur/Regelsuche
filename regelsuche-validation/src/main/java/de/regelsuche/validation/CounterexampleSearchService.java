@@ -90,19 +90,58 @@ public interface CounterexampleSearchService {
      * Full result of a counterexample search.
      */
     record CounterexampleSearchResult(
+        Status status,
         Optional<Counterexample> counterexample,
         List<String> inferredAssumptions,
         List<String> attemptedSources
     ) {
+        public CounterexampleSearchResult(Optional<Counterexample> counterexample, List<String> inferredAssumptions, List<String> attemptedSources) {
+            this(deriveStatus(counterexample, attemptedSources), counterexample, inferredAssumptions, attemptedSources);
+        }
+
         public CounterexampleSearchResult {
+            status = status == null ? deriveStatus(counterexample, attemptedSources) : status;
             counterexample = counterexample == null ? Optional.empty() : counterexample;
             inferredAssumptions = inferredAssumptions == null ? List.of() : List.copyOf(inferredAssumptions);
             attemptedSources = attemptedSources == null ? List.of() : List.copyOf(attemptedSources);
         }
 
         public static CounterexampleSearchResult noCounterexample() {
-            return new CounterexampleSearchResult(Optional.empty(), List.of(), List.of());
+            return new CounterexampleSearchResult(Status.NO_COUNTEREXAMPLE_FOUND, Optional.empty(), List.of(), List.of());
         }
+
+        public static CounterexampleSearchResult inconclusive() {
+            return new CounterexampleSearchResult(Status.INCONCLUSIVE, Optional.empty(), List.of(), List.of());
+        }
+
+        public static CounterexampleSearchResult counterexampleFound(
+            Counterexample counterexample,
+            List<String> inferredAssumptions,
+            List<String> attemptedSources
+        ) {
+            return new CounterexampleSearchResult(
+                Status.COUNTEREXAMPLE_FOUND,
+                Optional.of(counterexample),
+                inferredAssumptions,
+                attemptedSources
+            );
+        }
+
+        private static Status deriveStatus(Optional<Counterexample> counterexample, List<String> attemptedSources) {
+            if (counterexample != null && counterexample.isPresent()) {
+                return Status.COUNTEREXAMPLE_FOUND;
+            }
+            if (attemptedSources == null || attemptedSources.isEmpty()) {
+                return Status.INCONCLUSIVE;
+            }
+            return Status.NO_COUNTEREXAMPLE_FOUND;
+        }
+    }
+
+    enum Status {
+        NO_COUNTEREXAMPLE_FOUND,
+        COUNTEREXAMPLE_FOUND,
+        INCONCLUSIVE
     }
 
     /**

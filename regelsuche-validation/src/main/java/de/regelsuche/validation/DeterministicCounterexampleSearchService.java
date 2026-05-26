@@ -40,7 +40,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             left = parser.parse(new InputRequest(InputType.TERM, hypothesis.leftExpression())).terms().getFirst();
             right = parser.parse(new InputRequest(InputType.TERM, hypothesis.rightExpression())).terms().getFirst();
         } catch (RuntimeException ex) {
-            return CounterexampleSearchResult.noCounterexample();
+            return CounterexampleSearchResult.inconclusive();
         }
 
         List<String> attemptedSources = new ArrayList<>();
