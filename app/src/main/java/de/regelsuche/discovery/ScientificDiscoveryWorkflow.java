@@ -2,6 +2,7 @@ package de.regelsuche.discovery;
 
 import de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunner;
 import de.regelsuche.benchmark.DiscoveryReplayArtifactWriter;
+import de.regelsuche.benchmark.DiscoverySemanticReportView;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.demo.DemoRuleSet;
 import de.regelsuche.example.SeedExpression;
@@ -69,8 +70,9 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         DeterministicDiscoveryExperimentRunner runner = new DeterministicDiscoveryExperimentRunner(
             globalBudget, parallelism, this::evaluateSeed);
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report = runner.runDetailed(seeds);
+        DiscoverySemanticReportView semanticView = new SemanticDiscoveryReportViewAssembler().assemble(report, context.graphStore());
         DiscoveryReplayArtifactWriter.ArtifactBundle artifacts = new DiscoveryReplayArtifactWriter()
-            .write(report, artifactDirectory, algorithmRegistry.algorithms());
+            .write(report, artifactDirectory, algorithmRegistry.algorithms(), semanticView);
         context.relationalAdapters().ifPresent(adapters -> persist(experimentId, report, artifacts, adapters));
         return new RunResult(report, artifacts, context);
     }

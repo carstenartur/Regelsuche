@@ -751,22 +751,38 @@
         const inspector = $('graphInspector');
         const filter = $('graphFilter') && $('graphFilter').value || '';
         const interactive = $('graphInteractive') && $('graphInteractive').checked;
+        const mode = $('graphViewMode') && $('graphViewMode').value || 'semantic';
+        const showLowSignal = !!($('showLowSignal') && $('showLowSignal').checked);
+        const showAlternatives = !($('showAlternatives') && !$('showAlternatives').checked);
+        const showVariants = !!($('showVariants') && $('showVariants').checked);
         const filterQuery = filter ? ('?filter=' + encodeURIComponent(filter)) : '';
-        const source = $('graphSource') && $('graphSource').value || 'search-graph';
+        const semanticQuery = '?mode=' + encodeURIComponent(mode)
+            + '&showLowSignal=' + encodeURIComponent(String(showLowSignal))
+            + '&showAlternatives=' + encodeURIComponent(String(showAlternatives))
+            + '&showVariants=' + encodeURIComponent(String(showVariants));
         out.textContent = 'Lade …';
         if (canvas) canvas.style.display = 'none';
         if (inspector) { inspector.style.display = 'none'; inspector.innerHTML = ''; }
         try {
-            if (interactive && source === 'search-graph' && typeof cytoscape === 'function' && !window.__cytoscapeFailed) {
-                const response = await fetch('/api/search-graph' + filterQuery);
+            if (interactive && mode !== 'raw' && typeof cytoscape === 'function' && !window.__cytoscapeFailed) {
+                const response = await fetch('/api/search-graph/semantic' + semanticQuery);
                 const data = await response.json();
-                renderCytoscape(data);
-                out.textContent = '(Interaktive Cytoscape-Ansicht aktiv – Mermaid-Quelltext unten ist Fallback.)';
-                const mermaidResp = await fetch('/api/exports/search-graph.mmd' + filterQuery);
+                renderSemanticGraph(data);
+                const mermaidResp = await fetch('/api/exports/search-graph-semantic.mmd' + semanticQuery);
                 out.textContent = (await mermaidResp.text());
                 return;
             }
-            const url = source === 'search-graph' ? ('/api/exports/search-graph.mmd' + filterQuery) : '/api/graph';
+            if (interactive && mode === 'raw' && typeof cytoscape === 'function' && !window.__cytoscapeFailed) {
+                const response = await fetch('/api/search-graph' + filterQuery);
+                const data = await response.json();
+                renderCytoscape(data);
+                const mermaidResp = await fetch('/api/exports/search-graph.mmd' + filterQuery);
+                out.textContent = await mermaidResp.text();
+                return;
+            }
+            const url = mode === 'raw'
+                ? ('/api/exports/search-graph.mmd' + filterQuery)
+                : ('/api/exports/search-graph-semantic.mmd' + semanticQuery);
             const response = await fetch(url);
             out.textContent = await response.text();
         } catch (ex) {
@@ -774,6 +790,34 @@
             window.__regelsucheGraphRendered = false;
         }
     });
+
+    window.renderSemanticGraph = function renderSemanticGraph(graph, options) {
+        return renderCytoscape(graph, options);
+    };
+    window.expandSemanticNode = function expandSemanticNode(nodeId) {
+        const inspector = $('graphInspector');
+        if (inspector) {
+            inspector.style.display = 'block';
+            inspector.innerHTML = '<div><strong>expandSemanticNode:</strong> ' + escapeHtml(String(nodeId)) + '</div>';
+        }
+    };
+    window.expandSemanticEdge = function expandSemanticEdge(edgeId) {
+        const inspector = $('graphInspector');
+        if (inspector) {
+            inspector.style.display = 'block';
+            inspector.innerHTML = '<div><strong>expandSemanticEdge:</strong> ' + escapeHtml(String(edgeId)) + '</div>';
+        }
+    };
+    window.toggleLowSignal = function toggleLowSignal(show) {
+        if ($('showLowSignal')) {
+            $('showLowSignal').checked = !!show;
+        }
+    };
+    window.toggleAlternatives = function toggleAlternatives(show) {
+        if ($('showAlternatives')) {
+            $('showAlternatives').checked = !!show;
+        }
+    };
 
     function renderCytoscape(graph) {
         const canvas = $('graphCanvas');
@@ -784,9 +828,22 @@
         canvas.style.display = 'block';
         canvas.innerHTML = '';
         const elements = [];
-        (graph.nodes || []).forEach(n => elements.push({ data: { id: n.id, label: n.expression, payload: n } }));
+        (graph.nodes || []).forEach(n => elements.push({
+            data: {
+                id: n.id,
+                label: n.expression || n.representativeExpression || n.canonicalExpression || n.id,
+                payload: n
+            }
+        }));
         (graph.edges || []).forEach(e => elements.push({
-            data: { id: e.from + '->' + e.to + ':' + e.ruleId, source: e.from, target: e.to, label: e.ruleId, payload: e }
+            data: {
+                id: e.from + '->' + e.to + ':' + e.ruleId,
+                source: e.from,
+                target: e.to,
+                label: e.ruleId,
+                kind: e.kind || '',
+                payload: e
+            }
         }));
         const cy = cytoscape({
             container: canvas,
@@ -799,10 +856,14 @@
                 // overlay's aria-label.
                 { selector: 'node', style: { 'label': '', 'font-size': 10, 'background-color': '#3b82f6', 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center' } },
                 { selector: 'node[?payload.isBest]', style: { 'background-color': '#10b981' } },
+                { selector: 'node[?payload.onMainPath]', style: { 'background-color': '#10b981' } },
                 { selector: 'node[?payload.isDeadEnd]', style: { 'background-color': '#9ca3af' } },
-                { selector: 'edge', style: { 'label': 'data(label)', 'font-size': 8, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle' } }
+                { selector: 'edge', style: { 'label': 'data(label)', 'font-size': 8, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle' } },
+                { selector: 'edge[?payload.lowSignal]', style: { 'line-color': '#d1d5db', 'target-arrow-color': '#d1d5db', 'opacity': 0.6 } },
+                { selector: 'edge[kind = "MAIN_STEP"]', style: { 'line-color': '#0ea5e9', 'target-arrow-color': '#0ea5e9', 'width': 3 } },
+                { selector: 'edge[kind = "MACRO_MOVE"]', style: { 'line-color': '#8b5cf6', 'target-arrow-color': '#8b5cf6', 'width': 3 } }
             ],
-            layout: { name: 'breadthfirst', spacingFactor: 1.2 }
+            layout: computeGraphLayout(graph)
         });
         cy.on('tap', 'node', evt => showInspector(evt.target.data('payload')));
         cy.on('tap', 'edge', evt => showInspector(evt.target.data('payload')));
@@ -819,6 +880,21 @@
             inspector.style.display = 'block';
             inspector.innerHTML = '<em>Klicke auf einen Knoten oder eine Kante, um Details anzuzeigen.</em>';
         }
+    }
+
+    function computeGraphLayout(graph) {
+        const positions = graph && graph.view && graph.view.layout && graph.view.layout.positions;
+        if (positions && typeof positions === 'object' && Object.keys(positions).length > 0) {
+            return {
+                name: 'preset',
+                positions: (node) => {
+                    const p = positions[node.id()];
+                    if (!p) { return { x: 0, y: 0 }; }
+                    return { x: p.x, y: p.y };
+                }
+            };
+        }
+        return { name: 'breadthfirst', spacingFactor: 1.2 };
     }
 
     /**
@@ -874,7 +950,9 @@
                 let host = layer.querySelector('[data-node-id="' + cssEscape(id) + '"]');
                 const payload = node.data('payload') || {};
                 const latex = payload.expressionLatex
+                    || payload.representativeLatex
                     || payload.latex
+                    || payload.representativeExpression
                     || payload.expression
                     || id;
                 if (!host) {
@@ -888,7 +966,7 @@
                 }
                 host.setAttribute('data-math', '$' + latex + '$');
                 host.textContent = '$' + latex + '$';
-                if (payload.isBest) { host.classList.add('is-best'); } else { host.classList.remove('is-best'); }
+                if (payload.isBest || payload.onMainPath) { host.classList.add('is-best'); } else { host.classList.remove('is-best'); }
                 if (payload.isDeadEnd) { host.classList.add('is-dead-end'); } else { host.classList.remove('is-dead-end'); }
                 const box = projectNode(node);
                 // Use translate3d so the GPU compositor can animate the
@@ -952,7 +1030,10 @@
         const rows = Object.entries(payload || {}).map(([k, v]) =>
             `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : String(v))}</div>`);
         inspector.innerHTML = rows.join('');
-        const latex = payload && (payload.expressionLatex || payload.ruleLatex || payload.latex);
+        const latex = payload && (payload.expressionLatex
+            || payload.representativeLatex
+            || payload.ruleLatex
+            || payload.latex);
         if (latex) {
             inspector.innerHTML += '<div class="graph-inspector-math" data-math="$'
                 + escapeHtml(latex) + '$">$' + escapeHtml(latex) + '$</div>';

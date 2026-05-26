@@ -85,7 +85,34 @@ Erweiterung von `resources/web/index.html` und `app.js`:
   (`POST /api/identities/{id}/promote`).
 - **Dashboard** – Tile-Ansicht der `SearchGraphStatsDto`-Werte plus Top-Regeln.
 
-## Roadmap (vollständig umgesetzt in diesem PR)
+## Semantic Discovery Explanation Graph
+
+The raw visual search graph remains available for debugging, but the default
+user-facing graph is now a semantic explanation graph.
+
+New endpoint and exports:
+
+- `GET /api/search-graph/semantic`
+- `GET /api/exports/search-graph-semantic.json`
+- `GET /api/exports/search-graph-semantic.mmd`
+
+Semantic preparation pipeline (backend):
+
+1. canonicalization + equivalence clustering,
+2. low-signal rewrite suppression/collapse,
+3. main-path selection with weighted ranking,
+4. macro-move edge projection with expandable atomic metadata,
+5. semantic layout coordinates (`view.layout.positions`).
+
+The Graph tab defaults to **Semantische Erklärung** and supports progressive
+disclosure via:
+
+- `triviale Normalisierungen anzeigen`,
+- `alternative Pfade anzeigen`,
+- `Varianten in Clustern anzeigen`,
+- mode selector (`semantic`, `mainPath`, `complexity`, `raw`).
+
+## Roadmap (raw graph stack)
 
 1. ✅ **HTTP API** – `GET /api/search-graph`, `GET /api/paths?sort=…`, `GET /api/paths/{id}/replay`.
 2. ✅ **Macro-rule mining** & emergent-identity report (`POST /api/identities/{id}/promote`).

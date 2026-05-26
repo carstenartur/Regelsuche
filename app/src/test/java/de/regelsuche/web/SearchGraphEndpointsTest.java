@@ -70,6 +70,18 @@ class SearchGraphEndpointsTest {
     }
 
     @Test
+    void semanticSearchGraphEndpointReturnsJsonShape() throws IOException {
+        seedTransformations();
+        String body = get("/api/search-graph/semantic?mode=semantic&showLowSignal=false&showAlternatives=true&showVariants=false");
+        assertTrue(body.contains("\"nodes\""));
+        assertTrue(body.contains("\"edges\""));
+        assertTrue(body.contains("\"clusters\""));
+        assertTrue(body.contains("\"stats\""));
+        assertTrue(body.contains("\"view\""));
+        assertTrue(body.contains("\"canonicalExpression\""));
+    }
+
+    @Test
     void replaysTransformationPath() throws IOException {
         seedTransformations();
         String body = get("/api/paths/path-1/replay");
@@ -155,6 +167,11 @@ class SearchGraphEndpointsTest {
 
         String graphml = get("/api/exports/search-graph.graphml");
         assertTrue(graphml.contains("<graphml"));
+
+        String semanticJson = get("/api/exports/search-graph-semantic.json");
+        assertTrue(semanticJson.contains("\"canonicalExpression\""));
+        String semanticMermaid = get("/api/exports/search-graph-semantic.mmd");
+        assertTrue(semanticMermaid.startsWith("graph TD"));
 
         String bestPath = get("/api/exports/best-path.md");
         assertNotNull(bestPath);

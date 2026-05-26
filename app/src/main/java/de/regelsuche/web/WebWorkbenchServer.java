@@ -224,6 +224,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/paths", this::handlePaths));
         secure(server.createContext("/api/graph", this::handleGraph));
         secure(server.createContext("/api/search-graph", this::handleSearchGraph));
+        secure(server.createContext("/api/search-graph/semantic", this::handleSemanticSearchGraph));
         secure(server.createContext("/api/identities", this::handleIdentities));
         secure(server.createContext("/api/candidates", this::handleCandidates));
         secure(server.createContext("/api/inventory", this::handleInventory));
@@ -461,6 +462,26 @@ public class WebWorkbenchServer {
         sendJson(exchange, 200, de.regelsuche.api.searchgraph.SearchGraphJsonSerializer.toJson(graph));
     }
 
+    private void handleSemanticSearchGraph(HttpExchange exchange) throws IOException {
+        de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode mode =
+            de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.parse(
+                queryParam(exchange, "mode", "semantic"));
+        boolean showLowSignal = parseBooleanParam(queryParam(exchange, "showLowSignal", "false"));
+        boolean showAlternatives = parseBooleanParam(queryParam(exchange, "showAlternatives", "true"));
+        boolean showVariants = parseBooleanParam(queryParam(exchange, "showVariants", "false"));
+        int maxAlternatives = parseIntParam(queryParam(exchange, "maxAlternatives", "12"), 12);
+        int maxVariantsPerCluster = parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8);
+        var graph = buildSemanticSearchGraph(
+            mode,
+            showLowSignal,
+            showAlternatives,
+            showVariants,
+            maxAlternatives,
+            maxVariantsPerCluster
+        );
+        sendJson(exchange, 200, de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toJson(graph));
+    }
+
     private void handlePathComparison(HttpExchange exchange) throws IOException {
         String leftId = queryParam(exchange, "left", "");
         String rightId = queryParam(exchange, "right", "");
@@ -599,6 +620,10 @@ public class WebWorkbenchServer {
         } catch (NumberFormatException ex) {
             return fallback;
         }
+    }
+
+    private static boolean parseBooleanParam(String value) {
+        return "true".equalsIgnoreCase(value) || "1".equals(value) || "yes".equalsIgnoreCase(value);
     }
 
     private static String escapeJson(String value) {
@@ -957,6 +982,18 @@ public class WebWorkbenchServer {
                 }
                 sendJson(exchange, 200, exportService.exportSearchGraphJson(graph));
             }
+            case "search-graph-semantic", "search-graph-semantic.json" -> {
+                var graph = buildSemanticSearchGraph(
+                    de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.parse(
+                        queryParam(exchange, "mode", "semantic")),
+                    parseBooleanParam(queryParam(exchange, "showLowSignal", "false")),
+                    parseBooleanParam(queryParam(exchange, "showAlternatives", "true")),
+                    parseBooleanParam(queryParam(exchange, "showVariants", "false")),
+                    parseIntParam(queryParam(exchange, "maxAlternatives", "12"), 12),
+                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8)
+                );
+                sendJson(exchange, 200, de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toJson(graph));
+            }
             case "search-graph.mmd" -> {
                 var graph = buildSearchGraph();
                 String filterExpr = queryParam(exchange, "filter", "");
@@ -964,6 +1001,18 @@ public class WebWorkbenchServer {
                     graph = de.regelsuche.api.searchgraph.SearchGraphFilter.parse(filterExpr).apply(graph);
                 }
                 sendText(exchange, 200, exportService.exportSearchGraphMermaid(graph));
+            }
+            case "search-graph-semantic.mmd" -> {
+                var graph = buildSemanticSearchGraph(
+                    de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.parse(
+                        queryParam(exchange, "mode", "semantic")),
+                    parseBooleanParam(queryParam(exchange, "showLowSignal", "false")),
+                    parseBooleanParam(queryParam(exchange, "showAlternatives", "true")),
+                    parseBooleanParam(queryParam(exchange, "showVariants", "false")),
+                    parseIntParam(queryParam(exchange, "maxAlternatives", "12"), 12),
+                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8)
+                );
+                sendText(exchange, 200, de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toMermaid(graph));
             }
             case "search-graph.graphml" -> {
                 var graph = buildSearchGraph();
@@ -1051,6 +1100,30 @@ public class WebWorkbenchServer {
             graphStore.ruleCandidates(),
             macros.size(),
             transformations
+        );
+    }
+
+    private de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphDto buildSemanticSearchGraph(
+        de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode mode,
+        boolean showLowSignal,
+        boolean showAlternatives,
+        boolean showVariants,
+        int maxAlternatives,
+        int maxVariantsPerCluster
+    ) {
+        var transformations = graphStore.discoveredTransformations();
+        var rawGraph = buildSearchGraph();
+        var macroRules = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);
+        return new de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphAssembler().assemble(
+            rawGraph,
+            transformations,
+            macroRules,
+            mode,
+            showLowSignal,
+            showAlternatives,
+            showVariants,
+            maxAlternatives,
+            maxVariantsPerCluster
         );
     }
 
@@ -1806,6 +1879,7 @@ public class WebWorkbenchServer {
             })));
         writer.object("links", l -> {
             l.property("searchGraph", "/api/search-graph");
+            l.property("semanticSearchGraph", "/api/search-graph/semantic");
             l.property("paths", "/api/paths");
             l.property("identities", "/api/identities");
             l.property("candidates", "/api/candidates");
@@ -2250,6 +2324,14 @@ public class WebWorkbenchServer {
         var ctx = analysisReportContext();
         var transformations = graphStore.discoveredTransformations();
         var graph = buildSearchGraph();
+        var semanticGraph = buildSemanticSearchGraph(
+            de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.SEMANTIC,
+            false,
+            true,
+            false,
+            12,
+            8
+        );
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {
             putZipEntry(zip, "search-analysis-report.md", report.renderMarkdown(ctx));
@@ -2261,6 +2343,10 @@ public class WebWorkbenchServer {
             putZipEntry(zip, "search-graph.mmd", exportService.exportSearchGraphMermaid(graph));
             putZipEntry(zip, "search-graph.graphml", exportService.exportSearchGraphGraphMl(graph));
             putZipEntry(zip, "search-graph.json", exportService.exportSearchGraphJson(graph));
+            putZipEntry(zip, "search-graph-semantic.mmd",
+                de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toMermaid(semanticGraph));
+            putZipEntry(zip, "search-graph-semantic.json",
+                de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toJson(semanticGraph));
             putZipEntry(zip, "best-path.md", exportService.exportBestPathMarkdown(transformations));
             putZipEntry(zip, "rule-inventory.json",
                 exportService.exportJson(List.of(), List.of(), inventoryRepository.findAll()));

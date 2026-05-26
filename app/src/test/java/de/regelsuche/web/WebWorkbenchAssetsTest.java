@@ -39,6 +39,10 @@ class WebWorkbenchAssetsTest {
         assertTrue(html.contains("data-tab=\"identities\""));
         assertTrue(html.contains("data-tab=\"dashboard\""));
         assertTrue(html.contains("data-tab=\"replay\""));
+        assertTrue(html.contains("id=\"graphViewMode\""));
+        assertTrue(html.contains("id=\"showLowSignal\""));
+        assertTrue(html.contains("id=\"showAlternatives\""));
+        assertTrue(html.contains("id=\"showVariants\""));
         // New domain pickers introduced in the workbench overhaul.
         assertTrue(html.contains("trigonometric"));
         assertTrue(html.contains("logarithmic"));
@@ -62,6 +66,8 @@ class WebWorkbenchAssetsTest {
         // Visual-search-graph endpoints wired into the UI.
         assertTrue(app.contains("/api/identities"));
         assertTrue(app.contains("/api/search-graph"));
+        assertTrue(app.contains("/api/search-graph/semantic"));
+        assertTrue(app.contains("renderSemanticGraph"));
         assertTrue(app.contains("replay"));
         assertTrue(app.contains("macroMoveExpansion"));
         assertTrue(app.contains("searchSpaceSize"));

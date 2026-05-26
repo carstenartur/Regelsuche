@@ -195,15 +195,29 @@
             <div class="actions">
                 <button id="reloadGraph" class="primary">Graph laden</button>
                 <label class="field inline">
-                    <span>Quelle:</span>
-                    <select id="graphSource">
-                        <option value="search-graph">Suchgraph (Knoten + Kanten + bestPath + Sackgassen)</option>
-                        <option value="transformations">Pfade (klassische Mermaid-Ansicht)</option>
+                    <span>Ansicht:</span>
+                    <select id="graphViewMode">
+                        <option value="semantic" selected>Semantische Erklärung</option>
+                        <option value="mainPath">Nur Hauptpfad</option>
+                        <option value="complexity">Complexity Map</option>
+                        <option value="raw">Rohgraph</option>
                     </select>
                 </label>
                 <label class="field inline">
                     <span>Filter:</span>
                     <input type="text" id="graphFilter" placeholder="bestPath=true,hideDeadEnds=true,ruleKind=NORMALIZE">
+                </label>
+                <label class="field inline">
+                    <input type="checkbox" id="showLowSignal">
+                    <span>triviale Normalisierungen anzeigen</span>
+                </label>
+                <label class="field inline">
+                    <input type="checkbox" id="showAlternatives" checked>
+                    <span>alternative Pfade anzeigen</span>
+                </label>
+                <label class="field inline">
+                    <input type="checkbox" id="showVariants">
+                    <span>Varianten in Clustern anzeigen</span>
                 </label>
                 <label class="field inline">
                     <input type="checkbox" id="graphInteractive" checked>

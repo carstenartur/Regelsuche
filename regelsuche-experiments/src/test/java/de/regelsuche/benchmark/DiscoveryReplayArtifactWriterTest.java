@@ -5,9 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.example.SeedExpression;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,7 +44,11 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(Files.readString(bundle.htmlReport()).contains("searchSpaceSize"));
         assertTrue(Files.readString(bundle.htmlReport()).contains("artifactCounts"));
         assertTrue(Files.readString(bundle.htmlReport()).contains("Hypothesen"));
-        assertTrue(Files.readString(bundle.markdownReport()).contains("## Dashboard Metrics"));
+        String markdown = Files.readString(bundle.markdownReport());
+        assertTrue(markdown.contains("## Dashboard Metrics"));
+        assertTrue(markdown.contains("## Semantic Discovery View"));
+        assertTrue(markdown.contains("Renderer: replay-main-path"));
+        assertTrue(markdown.contains("replay step"));
         assertTrue(Files.readString(bundle.replayJson()).contains("regelsuche.discovery-replay/v1"));
         assertTrue(Files.readString(bundle.replayJson()).contains("\"dashboardMetrics\""));
         assertTrue(Files.readString(bundle.hypothesesJson()).contains("regelsuche.hypotheses/v1"));
@@ -74,6 +82,12 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"docker\""));
         assertTrue(Files.size(bundle.screenshotPng()) > 0, "PNG screenshot artifact must be written");
         assertTrue(Files.size(bundle.replayGif()) > 0, "GIF replay artifact must be written");
+        BufferedImage screenshot = ImageIO.read(bundle.screenshotPng().toFile());
+        assertEquals(new Color(22, 163, 74).getRGB(), screenshot.getRGB(220, 112),
+            "PNG must render the semantic main-path node");
+        BufferedImage replayFrame = ImageIO.read(bundle.replayGif().toFile());
+        assertEquals(new Color(22, 163, 74).getRGB(), replayFrame.getRGB(220, 112),
+            "GIF must render the semantic main-path node");
     }
 
     @Test
@@ -96,6 +110,23 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(json.contains("\"groebnerBasis\""));
         assertTrue(json.contains("\"hypotheses.json\""));
         assertTrue(json.contains("\"provenance.graph.json\""));
+    }
+
+    @Test
+    void denseReplayReportSemanticViewCollapsesNoisyCanonicalVariants() throws Exception {
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report = denseReplayReport();
+
+        DiscoveryReplayArtifactWriter.ArtifactBundle bundle = new DiscoveryReplayArtifactWriter()
+            .write(report, tempDir, List.of(), denseSemanticView(report));
+        String markdown = Files.readString(bundle.markdownReport());
+
+        assertTrue(markdown.contains("- Main path nodes: 32"));
+        assertTrue(markdown.contains("- Collapsed low-signal steps: 96"));
+        assertEquals(24, countOccurrences(markdown, "semantic main step"));
+        assertTrue(markdown.contains("0 + x"));
+        assertTrue(markdown.contains("x^2+2*x+1*1"));
+        assertTrue(Files.size(bundle.screenshotPng()) > 0);
+        assertTrue(Files.size(bundle.replayGif()) > 0);
     }
 
     @Test
@@ -138,6 +169,92 @@ class DiscoveryReplayArtifactWriterTest {
             new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, 1, 1, 1, 12L, 1024L),
             13L
         );
+    }
+
+    private static DeterministicDiscoveryExperimentRunner.DiscoveryReport denseReplayReport() {
+        List<DeterministicDiscoveryExperimentRunner.SeedRunReport> rows = new ArrayList<>();
+        for (int seed = 0; seed < 8; seed++) {
+            rows.add(new DeterministicDiscoveryExperimentRunner.SeedRunReport(
+                new SeedExpression("dense-seed-" + seed, "x + 0", "dense", "polynomial", List.of("dense"), List.of()),
+                true,
+                "dense replay collapsed",
+                List.of("hyp-dense-" + seed),
+                List.of(),
+                denseReplayPath(),
+                20L + seed,
+                2048L + seed
+            ));
+        }
+        return new DeterministicDiscoveryExperimentRunner.DiscoveryReport(
+            rows,
+            new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(8, 8, 8, 0, 188L, 16412L),
+            21L
+        );
+    }
+
+    private static DiscoverySemanticReportView denseSemanticView(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report
+    ) {
+        List<DiscoverySemanticReportView.SemanticPath> paths = report.rows().stream()
+            .map(row -> {
+                List<DiscoverySemanticReportView.SemanticNode> nodes = List.of(
+                    new DiscoverySemanticReportView.SemanticNode(row.seed().id() + "-0", "x"),
+                    new DiscoverySemanticReportView.SemanticNode(row.seed().id() + "-1", "x + 1"),
+                    new DiscoverySemanticReportView.SemanticNode(row.seed().id() + "-2", "(x + 1)^2"),
+                    new DiscoverySemanticReportView.SemanticNode(row.seed().id() + "-3", "x^2 + 2*x + 1")
+                );
+                List<DiscoverySemanticReportView.SemanticEdge> edges = List.of(
+                    new DiscoverySemanticReportView.SemanticEdge(nodes.get(0).id(), nodes.get(1).id(),
+                        "semantic main step", "MAIN_STEP", 0),
+                    new DiscoverySemanticReportView.SemanticEdge(nodes.get(1).id(), nodes.get(2).id(),
+                        "semantic main step", "MAIN_STEP", 0),
+                    new DiscoverySemanticReportView.SemanticEdge(nodes.get(2).id(), nodes.get(3).id(),
+                        "semantic main step", "MAIN_STEP", 0)
+                );
+                return new DiscoverySemanticReportView.SemanticPath(row.seed().id(), nodes, edges);
+            })
+            .toList();
+        return new DiscoverySemanticReportView(
+            "SemanticSearchGraphAssembler",
+            128,
+            120,
+            32,
+            24,
+            96,
+            96,
+            paths
+        );
+    }
+
+    private static List<String> denseReplayPath() {
+        return List.of(
+            "x + 0",
+            "0 + x",
+            "1*x",
+            "x*1",
+            "x",
+            "x + 1",
+            "x+1 + 0",
+            "0 + x + 1",
+            "(x + 1)^2",
+            "(x+1)^2 + 0",
+            "1*(x+1)^2",
+            "(x+1)^2*1",
+            "x^2 + 2*x + 1",
+            "x^2+2*x+1 + 0",
+            "1*x^2+2*x+1",
+            "x^2+2*x+1*1"
+        );
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int index = haystack.indexOf(needle);
+        while (index >= 0) {
+            count++;
+            index = haystack.indexOf(needle, index + needle.length());
+        }
+        return count;
     }
 
     private static MathematicalAlgorithmRegistry.AlgorithmDescriptor descriptor(String id, boolean enabled) {
