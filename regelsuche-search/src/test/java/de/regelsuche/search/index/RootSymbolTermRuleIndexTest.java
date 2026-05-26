@@ -3,6 +3,7 @@ package de.regelsuche.search.index;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import java.util.List;
@@ -30,6 +31,46 @@ class RootSymbolTermRuleIndexTest {
         assertEquals("macro_algebra_square", result.macroMoves().getFirst().id());
         assertTrue(result.metrics().rulesSkippedByIndex() >= 1);
         assertEquals(2, result.metrics().rulesMatched());
+    }
+
+    @Test
+    void multiStageIndexSkipsStructuralMismatchesWithinSameRoot() {
+        RootSymbolTermRuleIndex index = new RootSymbolTermRuleIndex();
+        index.addMacroMove(rule("square", "(x + A) ^ 2", "x ^ 2 + 2 * A * x + A ^ 2",
+            TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "algebra"));
+        index.addMacroMove(rule("power-of-sine", "sin(x) ^ 2", "1 - cos(x) ^ 2",
+            TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "trig"));
+        index.addMacroMove(rule("cube", "(x + A) ^ 3", "x ^ 3 + 3 * A * x ^ 2 + 3 * A ^ 2 * x + A ^ 3",
+            TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "algebra"));
+
+        CandidateSet candidates = index.candidatesFor(
+            new ExpressionParser().parseTerm("(x + 3) ^ 2"),
+            new SearchContext("", TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "", false, true, java.util.Set.of()),
+            CandidateBudget.unbounded()
+        );
+
+        assertEquals(List.of("square"), candidates.macroMoves().stream().map(TermRuleIndex.IndexedMacroMove::id).toList());
+        assertEquals(1, candidates.metrics().rulesSkippedByFeatureVector());
+        assertEquals(1, candidates.metrics().rulesSkippedByDiscriminationTree());
+        assertEquals(1, candidates.metrics().rulesMatched());
+    }
+
+    @Test
+    void candidateBudgetLimitsResultSetAndTracksBudgetSkips() {
+        RootSymbolTermRuleIndex index = new RootSymbolTermRuleIndex();
+        index.addMacroMove(rule("macro-a", "x + A", "A + x",
+            TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "algebra"));
+        index.addMacroMove(rule("macro-b", "x + B", "B + x",
+            TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "algebra"));
+
+        CandidateSet candidates = index.candidateSetForExpression(
+            "x + 1",
+            new SearchContext("", TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "", false, true, java.util.Set.of()),
+            new CandidateBudget(0, 1)
+        );
+
+        assertEquals(1, candidates.macroMoves().size());
+        assertEquals(1, candidates.metrics().rulesSkippedByBudget());
     }
 
     private static TermRuleIndex.IndexedMacroMove rule(

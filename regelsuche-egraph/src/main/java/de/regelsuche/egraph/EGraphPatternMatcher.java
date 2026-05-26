@@ -30,7 +30,7 @@ import java.util.Set;
  */
 public final class EGraphPatternMatcher {
 
-    private record MatchCacheKey(String patternId, String patternFingerprint, EClassId root, long version) {
+    private record MatchCacheKey(String patternId, String patternFingerprint, EClassId root) {
     }
 
     public record MatcherStats(
@@ -187,7 +187,7 @@ public final class EGraphPatternMatcher {
     }
 
     private List<Map<String, EClassId>> matchInClassMemoized(String patternId, PatternExpr pattern, EClassId rootId) {
-        MatchCacheKey key = new MatchCacheKey(patternId, pattern.toString(), eGraph.find(rootId), eGraph.version());
+        MatchCacheKey key = new MatchCacheKey(patternId, pattern.toString(), eGraph.find(rootId));
         List<Map<String, EClassId>> hit = matchCache.get(key);
         if (hit != null) {
             matcherCacheHits++;
@@ -301,7 +301,12 @@ public final class EGraphPatternMatcher {
     private void clearCacheIfVersionChanged() {
         long currentVersion = eGraph.version();
         if (cacheVersion != currentVersion) {
-            matchCache.clear();
+            if (cacheVersion < 0) {
+                matchCache.clear();
+            } else {
+                Set<EClassId> affectedRoots = new LinkedHashSet<>(eGraph.affectedClassesChangedAfter(cacheVersion));
+                matchCache.keySet().removeIf(key -> affectedRoots.contains(eGraph.find(key.root())));
+            }
             cacheVersion = currentVersion;
         }
     }

@@ -1,16 +1,29 @@
 package de.regelsuche.search.index;
 
+import de.regelsuche.ast.Expr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 /** Root-symbol implementation with extension points for richer feature-vector/discrimination-tree indexes. */
-public class RootSymbolTermRuleIndex implements TermRuleIndex {
+public class RootSymbolTermRuleIndex implements TermRuleIndex, RuleCandidateIndex {
     private final Map<String, List<RewriteRule>> atomicByRoot = new LinkedHashMap<>();
-    private final Map<String, List<IndexedMacroMove>> macroByRoot = new LinkedHashMap<>();
+    private final Map<String, List<MacroEntry>> macroByRoot = new LinkedHashMap<>();
+    private final boolean multiStageFiltersEnabled;
+
+    public RootSymbolTermRuleIndex() {
+        this(true);
+    }
+
+    public RootSymbolTermRuleIndex(boolean multiStageFiltersEnabled) {
+        this.multiStageFiltersEnabled = multiStageFiltersEnabled;
+    }
 
     @Override
     public void addAtomicRule(String rootSymbol, RewriteRule rule) {
@@ -19,31 +32,103 @@ public class RootSymbolTermRuleIndex implements TermRuleIndex {
 
     @Override
     public void addMacroMove(IndexedMacroMove rule) {
-        macroByRoot.computeIfAbsent(rootSymbol(rule.leftPattern()), ignored -> new ArrayList<>()).add(rule);
+        macroByRoot.computeIfAbsent(rootSymbol(rule.leftPattern()), ignored -> new ArrayList<>()).add(MacroEntry.from(rule));
     }
 
     @Override
     public QueryResult query(String expression, Query query) {
-        Query effectiveQuery = query == null ? Query.all() : query;
+        CandidateSet candidates = candidateSetForExpression(
+            expression,
+            SearchContext.from(query),
+            CandidateBudget.unbounded()
+        );
+        return new QueryResult(candidates.atomicRules(), candidates.macroMoves(), candidates.metrics().asTermRuleMetrics());
+    }
+
+    @Override
+    public CandidateSet candidatesFor(Expr subtree, SearchContext context, CandidateBudget budget) {
+        return candidateSetForExpression(
+            subtree == null ? "" : ExpressionFormatter.format(subtree),
+            context == null ? SearchContext.all() : context,
+            budget == null ? CandidateBudget.unbounded() : budget
+        );
+    }
+
+    public CandidateSet candidateSetForExpression(String expression, SearchContext context, CandidateBudget budget) {
+        SearchContext effectiveQuery = context == null ? SearchContext.all() : context;
+        CandidateBudget effectiveBudget = budget == null ? CandidateBudget.unbounded() : budget;
         String root = rootSymbol(expression);
         List<RewriteRule> atomicCandidates = effectiveQuery.includeAtomicRules()
             ? atomicByRoot.getOrDefault(root, List.of())
             : List.of();
-        List<IndexedMacroMove> macroCandidates = effectiveQuery.includeMacroMoves()
+        List<MacroEntry> macroCandidates = effectiveQuery.includeMacroMoves()
             ? macroByRoot.getOrDefault(root, List.of())
             : List.of();
-        int considered = atomicByRoot.values().stream().mapToInt(List::size).sum()
+        OperatorSignature querySignature = null;
+        ExpressionFeatureVector queryFeatures = null;
+        DiscriminationTreeKey queryDiscriminationKey = null;
+        if (multiStageFiltersEnabled && !macroCandidates.isEmpty()) {
+            querySignature = OperatorSignature.parse(expression);
+            queryFeatures = ExpressionFeatureVector.parse(expression);
+            queryDiscriminationKey = DiscriminationTreeKey.parse(expression);
+        }
+        int totalAtomic = atomicByRoot.values().stream().mapToInt(List::size).sum();
+        int totalMacros = macroByRoot.values().stream().mapToInt(List::size).sum();
+        int considered = totalAtomic
             + macroByRoot.values().stream().mapToInt(List::size).sum();
-        List<IndexedMacroMove> macros = macroCandidates.stream()
-            .filter(rule -> rule.proofStatus().ordinal() >= effectiveQuery.minimumProofStatus().ordinal())
-            .filter(rule -> effectiveQuery.domain().isBlank() || domainMatches(rule, effectiveQuery.domain()))
-            .filter(rule -> effectiveQuery.goalExpression().isBlank() || goalAware(rule, effectiveQuery.goalExpression()))
+        int skippedByRoot = Math.max(0, totalAtomic - atomicCandidates.size())
+            + Math.max(0, totalMacros - macroCandidates.size());
+        List<RewriteRule> budgetedAtomic = atomicCandidates.stream()
+            .limit(effectiveBudget.maxAtomicRules())
             .toList();
-        int matched = atomicCandidates.size() + macros.size();
-        return new QueryResult(
-            atomicCandidates,
-            macros,
-            new Metrics(considered, Math.max(0, considered - matched), matched)
+        int skippedByBudget = Math.max(0, atomicCandidates.size() - budgetedAtomic.size());
+        List<IndexedMacroMove> macros = new ArrayList<>();
+        int skippedByGoal = 0;
+        int skippedBySignature = 0;
+        int skippedByFeature = 0;
+        int skippedByDiscrimination = 0;
+        for (MacroEntry entry : macroCandidates) {
+            IndexedMacroMove rule = entry.rule();
+            if (rule.proofStatus().ordinal() < effectiveQuery.minimumProofStatus().ordinal()
+                    || (!effectiveQuery.domain().isBlank() && !domainMatches(rule, effectiveQuery.domain()))
+                    || (!effectiveQuery.goalExpression().isBlank() && !goalAware(rule, effectiveQuery.goalExpression()))) {
+                skippedByGoal++;
+                continue;
+            }
+            if (multiStageFiltersEnabled && !entry.signature().compatibleWith(querySignature)) {
+                skippedBySignature++;
+                continue;
+            }
+            if (multiStageFiltersEnabled && !entry.features().canMatch(queryFeatures)) {
+                skippedByFeature++;
+                continue;
+            }
+            if (multiStageFiltersEnabled && !entry.discriminationKey().compatibleWith(queryDiscriminationKey)) {
+                skippedByDiscrimination++;
+                continue;
+            }
+            macros.add(rule);
+        }
+        List<IndexedMacroMove> budgetedMacros = macros.stream()
+            .sorted(goalRanking(effectiveQuery.goalExpression()))
+            .limit(effectiveBudget.maxMacroMoves())
+            .toList();
+        skippedByBudget += Math.max(0, macros.size() - budgetedMacros.size());
+        int matched = budgetedAtomic.size() + budgetedMacros.size();
+        return new CandidateSet(
+            budgetedAtomic,
+            budgetedMacros,
+            new IndexMetrics(
+                considered,
+                skippedByRoot,
+                skippedBySignature,
+                skippedByFeature,
+                skippedByDiscrimination,
+                skippedByGoal,
+                skippedByBudget,
+                matched,
+                matched
+            )
         );
     }
 
@@ -54,7 +139,7 @@ public class RootSymbolTermRuleIndex implements TermRuleIndex {
 
     /** Extension point: discrimination-tree implementations can route by the normalized pattern tree. */
     protected String discriminationTreeKey(String expression) {
-        return rootSymbol(expression);
+        return DiscriminationTreeKey.parse(expression).requiredPaths().toString();
     }
 
     static String rootSymbol(String expression) {
@@ -99,6 +184,13 @@ public class RootSymbolTermRuleIndex implements TermRuleIndex {
         return root.isBlank() || root.equals(rootSymbol(rule.rightPattern())) || goalExpression.contains(rule.rightPattern());
     }
 
+    private static Comparator<IndexedMacroMove> goalRanking(String goalExpression) {
+        String goalRoot = rootSymbol(goalExpression);
+        return Comparator
+            .comparing((IndexedMacroMove rule) -> !goalRoot.isBlank() && goalRoot.equals(rootSymbol(rule.rightPattern())) ? 0 : 1)
+            .thenComparing(IndexedMacroMove::id);
+    }
+
     private static String normalizeRoot(String root) {
         return root == null ? "" : root.trim().toLowerCase(Locale.ROOT);
     }
@@ -121,5 +213,39 @@ public class RootSymbolTermRuleIndex implements TermRuleIndex {
             }
         }
         return depth == 0;
+    }
+
+    private record MacroEntry(
+        IndexedMacroMove rule,
+        OperatorSignature signature,
+        ExpressionFeatureVector features,
+        DiscriminationTreeKey discriminationKey
+    ) {
+        private static MacroEntry from(IndexedMacroMove rule) {
+            String left = rule.leftPattern();
+            Expr parsed = parse(left);
+            if (parsed != null) {
+                return new MacroEntry(
+                    rule,
+                    OperatorSignature.of(parsed),
+                    ExpressionFeatureVector.of(parsed),
+                    DiscriminationTreeKey.of(parsed)
+                );
+            }
+            return new MacroEntry(
+                rule,
+                OperatorSignature.parse(left),
+                ExpressionFeatureVector.parse(left),
+                DiscriminationTreeKey.parse(left)
+            );
+        }
+
+        private static Expr parse(String expression) {
+            try {
+                return new ExpressionParser().parseTerm(expression == null ? "" : expression);
+            } catch (RuntimeException ignored) {
+                return null;
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 package de.regelsuche.mining;
 
-import de.regelsuche.validation.CandidateProofStatus;
+import java.util.List;
 
 /** Composite ranking for deciding which hypotheses deserve report/inventory attention first. */
 public record InterestingnessScore(
@@ -15,25 +15,87 @@ public record InterestingnessScore(
     double minimalAssumptions,
     double total
 ) implements Comparable<InterestingnessScore> {
+    private static final CompressionScore COMPRESSION = new CompressionScore();
+    private static final GeneralizationScore GENERALIZATION = new GeneralizationScore();
+    private static final ReusabilityScore REUSABILITY = new ReusabilityScore();
+    private static final SurpriseScore SURPRISE = new SurpriseScore();
+    private static final CrossDomainScore CROSS_DOMAIN = new CrossDomainScore();
+    private static final AssumptionComplexityScore ASSUMPTIONS = new AssumptionComplexityScore();
+    private static final ProofConfidenceScore PROOF = new ProofConfidenceScore();
+    private static final CounterexampleRobustnessScore COUNTEREXAMPLES = new CounterexampleRobustnessScore();
+    private static final List<InterestingnessScoringModule> DEFAULT_MODULES = List.of(
+        COMPRESSION,
+        GENERALIZATION,
+        REUSABILITY,
+        SURPRISE,
+        CROSS_DOMAIN,
+        ASSUMPTIONS,
+        PROOF,
+        COUNTEREXAMPLES
+    );
+
     @Override
     public int compareTo(InterestingnessScore other) {
         return Double.compare(other.total, total);
     }
 
+    public static InterestingnessScore from(HypothesisCandidate candidate, KnownRuleRepository knownRules) {
+        double similarity = new KnownRuleSimilarityService()
+            .similarityToKnownRules(candidate.leftPattern(), candidate.rightPattern(), knownRules);
+        return from(candidate, similarity);
+    }
+
     public static InterestingnessScore from(HypothesisCandidate candidate, double similarityToKnownRules) {
+        InterestingnessScoringContext context = new InterestingnessScoringContext(candidate, similarityToKnownRules);
         double evidence = distinctEvidence(candidate);
-        double compression = Math.max(0.0, candidate.leftPattern().length() - candidate.rightPattern().length()) / 20.0;
-        double generality = candidate.expressionPlaceholders().size() + placeholderCount(candidate.leftPattern());
-        double reusability = Math.log1p(candidate.supportingPaths().size());
-        double proof = proofWeight(candidate.proofStatus());
-        double counterexample = Boolean.TRUE.equals(candidate.counterexampleStatus()) ? -2.0 : 1.0;
-        double crossDomain = candidate.supportingPaths().stream().map(path -> path.split("[:/#-]", 2)[0]).distinct().count();
-        double assumptions = 1.0 / (1.0 + candidate.assumptions().size());
+        double compression = COMPRESSION.score(context);
+        double generality = GENERALIZATION.score(context);
+        double reusability = REUSABILITY.score(context);
+        double proof = PROOF.score(context);
+        double counterexample = COUNTEREXAMPLES.score(context);
+        double crossDomain = CROSS_DOMAIN.score(context);
+        double assumptions = ASSUMPTIONS.score(context);
+        double surprise = SURPRISE.score(context);
         double knownPenalty = Math.max(0.0, Math.min(1.0, similarityToKnownRules));
-        double total = compression + generality + evidence + reusability + proof + counterexample
-            + crossDomain + assumptions - knownPenalty;
+        double total = weightedTotal(
+            compression,
+            generality,
+            evidence,
+            reusability,
+            surprise,
+            crossDomain,
+            assumptions,
+            proof,
+            counterexample
+        ) - knownPenalty;
         return new InterestingnessScore(compression, generality, evidence, reusability, proof,
             counterexample, knownPenalty, crossDomain, assumptions, total);
+    }
+
+    public static List<InterestingnessScoringModule> defaultModules() {
+        return DEFAULT_MODULES;
+    }
+
+    private static double weightedTotal(
+        double compression,
+        double generality,
+        double evidence,
+        double reusability,
+        double surprise,
+        double crossDomain,
+        double assumptions,
+        double proof,
+        double counterexample
+    ) {
+        return 1.25 * compression
+            + 1.10 * generality
+            + 0.75 * evidence
+            + 1.20 * reusability
+            + 1.00 * surprise
+            + 1.10 * crossDomain
+            + 0.80 * assumptions
+            + 1.00 * proof
+            + 1.50 * counterexample;
     }
 
     private static double distinctEvidence(HypothesisCandidate candidate) {
@@ -42,11 +104,4 @@ public record InterestingnessScore(
             : candidate.supportingExpressions().stream().distinct().count();
     }
 
-    private static double placeholderCount(String pattern) {
-        return pattern.chars().filter(Character::isUpperCase).distinct().count();
-    }
-
-    private static double proofWeight(CandidateProofStatus status) {
-        return status == null ? 0.0 : status.ordinal() / 2.0;
-    }
 }

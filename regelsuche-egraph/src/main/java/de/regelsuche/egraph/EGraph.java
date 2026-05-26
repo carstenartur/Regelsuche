@@ -67,6 +67,8 @@ public final class EGraph {
     private final Deque<EClassId> worklist = new ArrayDeque<>();
     /** E-classes touched by add/union/rebuild, consumed by worklist saturation. */
     private final LinkedHashSet<EClassId> dirtyClasses = new LinkedHashSet<>();
+    /** Last structural version that touched each canonical e-class. */
+    private final Map<EClassId, Long> classChangeVersions = new HashMap<>();
     /** Version increments whenever the graph structure changes. */
     private long version = 0L;
     /** Number of currently canonical e-classes. */
@@ -259,6 +261,40 @@ public final class EGraph {
         Collection<EClassId> snapshot = dedupeCanonical(dirtyClasses);
         dirtyClasses.clear();
         return snapshot;
+    }
+
+    /**
+     * Classes whose own nodes or dependent parents may have changed after {@code versionExclusive}.
+     *
+     * <p>This is intentionally independent of {@link #consumeDirtyClasses()} so matchers can do
+     * fine-grained cache invalidation without stealing the saturation worklist.</p>
+     */
+    public Collection<EClassId> affectedClassesChangedAfter(long versionExclusive) {
+        LinkedHashSet<EClassId> changed = new LinkedHashSet<>();
+        for (Map.Entry<EClassId, Long> entry : classChangeVersions.entrySet()) {
+            if (entry.getValue() > versionExclusive) {
+                changed.add(unionFind.find(entry.getKey()));
+            }
+        }
+        LinkedHashSet<EClassId> affected = new LinkedHashSet<>(dedupeCanonical(changed));
+        ArrayDeque<EClassId> queue = new ArrayDeque<>(affected);
+        while (!queue.isEmpty()) {
+            EClassId id = queue.removeFirst();
+            EClass eclass = classes.get(unionFind.find(id));
+            if (eclass == null) {
+                continue;
+            }
+            for (ENode parent : eclass.parents()) {
+                EClassId owner = hashCons.get(parent.canonicalize(unionFind));
+                if (owner != null) {
+                    EClassId canonicalOwner = unionFind.find(owner);
+                    if (affected.add(canonicalOwner)) {
+                        queue.addLast(canonicalOwner);
+                    }
+                }
+            }
+        }
+        return dedupeCanonical(affected);
     }
 
     /** Number of distinct e-classes (after rebuild). */
@@ -528,7 +564,9 @@ public final class EGraph {
     }
 
     private void markDirty(EClassId id) {
-        dirtyClasses.add(unionFind.find(id));
+        EClassId canonical = unionFind.find(id);
+        dirtyClasses.add(canonical);
+        classChangeVersions.put(canonical, version + 1);
     }
 
     private void bumpVersion() {
