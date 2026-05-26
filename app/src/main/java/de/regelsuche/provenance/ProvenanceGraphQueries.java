@@ -170,6 +170,71 @@ public final class ProvenanceGraphQueries {
         return result;
     }
 
+    public List<ProvenanceNode> regressionProposalsBySource(ProvenanceGraph graph, String source) {
+        String needle = source == null ? "" : source.trim().toLowerCase(java.util.Locale.ROOT);
+        return graph.nodes().stream()
+            .filter(node -> node.type() == ProvenanceNodeType.SYMBOLIC_REGRESSION_PROPOSAL)
+            .filter(node -> needle.isBlank()
+                || node.properties().getOrDefault("regressionSource", "").toLowerCase(java.util.Locale.ROOT).contains(needle))
+            .sorted(Comparator
+                .comparingDouble(ProvenanceGraphQueries::supportCountProperty).reversed()
+                .thenComparing(ProvenanceNode::id))
+            .toList();
+    }
+
+    public List<ProvenanceNode> numericRelationsByQuality(ProvenanceGraph graph, double maxResidual, int limit) {
+        double threshold = Math.max(0.0, maxResidual);
+        return graph.nodes().stream()
+            .filter(node -> node.type() == ProvenanceNodeType.NUMERIC_RELATION_CANDIDATE)
+            .filter(node -> parseDouble(node.properties().get("residual")) <= threshold)
+            .sorted(Comparator
+                .comparingDouble((ProvenanceNode node) -> parseDouble(node.properties().get("residual")))
+                .thenComparing(ProvenanceNode::id))
+            .limit(Math.max(0, limit))
+            .toList();
+    }
+
+    public List<ProvenanceNode> casValidationAttempts(ProvenanceGraph graph, String hypothesisId) {
+        Map<String, ProvenanceNode> nodes = graph.nodeIndex();
+        return graph.edges().stream()
+            .filter(edge -> edge.fromId().equals(hypothesisId))
+            .filter(edge -> edge.type() == ProvenanceEdgeType.VALIDATED_BY_CAS
+                || edge.type() == ProvenanceEdgeType.FAILED_CAS_VALIDATION)
+            .map(edge -> nodes.get(edge.toId()))
+            .filter(node -> node != null && node.type() == ProvenanceNodeType.CAS_VALIDATION_ATTEMPT)
+            .toList();
+    }
+
+    public List<ProvenanceNode> hypothesesValidatedByCas(ProvenanceGraph graph, int limit) {
+        Map<String, ProvenanceNode> nodes = graph.nodeIndex();
+        return graph.edges().stream()
+            .filter(edge -> edge.type() == ProvenanceEdgeType.VALIDATED_BY_CAS)
+            .map(edge -> nodes.get(edge.fromId()))
+            .filter(node -> node != null && node.type() == ProvenanceNodeType.HYPOTHESIS)
+            .distinct()
+            .limit(Math.max(0, limit))
+            .toList();
+    }
+
+    public Map<String, CasSuccessRate> casSuccessRateByDomain(ProvenanceGraph graph) {
+        Map<String, long[]> counts = new LinkedHashMap<>();
+        graph.nodes().stream()
+            .filter(node -> node.type() == ProvenanceNodeType.CAS_VALIDATION_ATTEMPT)
+            .forEach(node -> {
+                boolean success = "SUCCESS".equalsIgnoreCase(node.properties().get("status"));
+                for (String domain : domains(node.properties().get("domains"))) {
+                    long[] values = counts.computeIfAbsent(domain, ignored -> new long[2]);
+                    values[0]++;
+                    if (success) {
+                        values[1]++;
+                    }
+                }
+            });
+        Map<String, CasSuccessRate> result = new LinkedHashMap<>();
+        counts.forEach((domain, values) -> result.put(domain, new CasSuccessRate(domain, values[0], values[1])));
+        return result;
+    }
+
     private static boolean isLineageEdge(ProvenanceEdgeType type) {
         return type == ProvenanceEdgeType.DERIVED_FROM
             || type == ProvenanceEdgeType.GENERALIZES
@@ -262,6 +327,10 @@ public final class ProvenanceGraphQueries {
         return parseDouble(node.properties().get("occurrences"));
     }
 
+    private static double supportCountProperty(ProvenanceNode node) {
+        return parseDouble(node.properties().get("supportCount"));
+    }
+
     private static double parseDouble(String value) {
         if (value == null || value.isBlank()) {
             return 0.0;
@@ -289,6 +358,12 @@ public final class ProvenanceGraphQueries {
             Map<String, Long> mergedModes = new LinkedHashMap<>(failureModes);
             other.failureModes.forEach((mode, count) -> mergedModes.merge(mode, count, Long::sum));
             return new ErrorDistribution(domain, total + other.total, mergedModes);
+        }
+    }
+
+    public record CasSuccessRate(String domain, long total, long successes) {
+        public double rate() {
+            return total == 0 ? 0.0 : (double) successes / total;
         }
     }
 }

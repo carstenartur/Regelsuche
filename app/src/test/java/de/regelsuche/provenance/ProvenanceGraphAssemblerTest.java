@@ -32,6 +32,9 @@ class ProvenanceGraphAssemblerTest {
         assertTrue(graph.nodes().stream().anyMatch(node -> node.type() == ProvenanceNodeType.COUNTEREXAMPLE));
         assertTrue(graph.nodes().stream().anyMatch(node -> node.type() == ProvenanceNodeType.ASSUMPTION_SIGNATURE));
         assertTrue(graph.nodes().stream().anyMatch(node -> node.type() == ProvenanceNodeType.BENCHMARK_RUN));
+        assertTrue(graph.nodes().stream().anyMatch(node -> node.type() == ProvenanceNodeType.SYMBOLIC_REGRESSION_PROPOSAL));
+        assertTrue(graph.nodes().stream().anyMatch(node -> node.type() == ProvenanceNodeType.NUMERIC_RELATION_CANDIDATE));
+        assertTrue(graph.nodes().stream().anyMatch(node -> node.type() == ProvenanceNodeType.CAS_VALIDATION_ATTEMPT));
         assertTrue(graph.edges().stream().anyMatch(edge -> edge.type() == ProvenanceEdgeType.SUPPORTED_BY));
         assertTrue(graph.edges().stream().anyMatch(edge -> edge.type() == ProvenanceEdgeType.REFUTED_BY));
         assertTrue(graph.edges().stream().anyMatch(edge -> edge.type() == ProvenanceEdgeType.GENERALIZES));
@@ -39,6 +42,8 @@ class ProvenanceGraphAssemblerTest {
         assertTrue(graph.edges().stream().anyMatch(edge -> edge.type() == ProvenanceEdgeType.USEFUL_FOR));
         assertTrue(graph.edges().stream().anyMatch(edge -> edge.type() == ProvenanceEdgeType.REPLAY_OF));
         assertTrue(graph.edges().stream().anyMatch(edge -> edge.type() == ProvenanceEdgeType.GENERATED_BY));
+        assertTrue(graph.edges().stream().anyMatch(edge -> edge.type() == ProvenanceEdgeType.PROPOSAL_FROM));
+        assertTrue(graph.edges().stream().anyMatch(edge -> edge.type() == ProvenanceEdgeType.VALIDATED_BY_CAS));
     }
 
     @Test
@@ -84,6 +89,27 @@ class ProvenanceGraphAssemblerTest {
         Map<String, ProvenanceGraphQueries.ErrorDistribution> errors =
             queries.errorDistributionByDomain(graph, "run-1");
         assertEquals(1, errors.get("complex").total());
+
+        assertEquals(List.of("symreg:run-1:template-symreg-demo"), queries
+            .regressionProposalsBySource(graph, "symbolic-regression")
+            .stream()
+            .map(ProvenanceNode::id)
+            .toList());
+        assertEquals(List.of("numeric-relation:run-1:pslq-demo"), queries
+            .numericRelationsByQuality(graph, 1e-9, 1)
+            .stream()
+            .map(ProvenanceNode::id)
+            .toList());
+        assertEquals(List.of("cas:run-1:hyp-strong"), queries
+            .casValidationAttempts(graph, "hypothesis:run-1:hyp-strong")
+            .stream()
+            .map(ProvenanceNode::id)
+            .toList());
+        assertTrue(queries.hypothesesValidatedByCas(graph, 10).stream()
+            .map(ProvenanceNode::id)
+            .toList()
+            .contains("hypothesis:run-1:hyp-strong"));
+        assertTrue(queries.casSuccessRateByDomain(graph).get("complex").rate() > 0.0);
     }
 
     @Test
@@ -169,6 +195,16 @@ class ProvenanceGraphAssemblerTest {
             "hyp-rejected", "sqrt(A^2)", "A", List.of("r3"), 1, 1.0,
             CandidateProofStatus.REJECTED, RuleStatus.NEW, List.of("path-1")
         );
+        IdentityReportDto symbolicRegression = new IdentityReportDto(
+            "template-symreg-demo", "x", "2 * x",
+            List.of("symbolic-regression-evidence-only", "template:scale"), 3, 1.0,
+            CandidateProofStatus.OBSERVED, RuleStatus.NEW, List.of("path-1")
+        );
+        IdentityReportDto numericRelation = new IdentityReportDto(
+            "pslq-demo", "sqrt(2),sqrt(8)", "2*a-b=0",
+            List.of("2", "-1", "pslq"), 2, 1.0,
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES, RuleStatus.NEW, List.of("path-1")
+        );
         return new SearchGraphRecord(
             "run-1",
             Instant.parse("2026-05-25T00:00:00Z"),
@@ -177,7 +213,7 @@ class ProvenanceGraphAssemblerTest {
             graph,
             List.of(replay),
             List.of(macro),
-            List.of(rejected, strong),
+            List.of(rejected, strong, symbolicRegression, numericRelation),
             Map.of("markdown", "# run")
         );
     }

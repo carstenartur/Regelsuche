@@ -121,9 +121,67 @@ public final class ProvenanceGraphAssembler {
                     ProvenanceEdgeType.GENERALIZES, Map.of()));
             }
             addProofOrCounterexample(record, nodes, edges, identity, hypothesisId);
+            addSpecializedEvidence(record, nodes, edges, identity, hypothesisId);
         }
 
         return new ProvenanceGraph(List.copyOf(nodes.values()), edges);
+    }
+
+    private static void addSpecializedEvidence(
+        SearchGraphRecord record,
+        Map<String, ProvenanceNode> nodes,
+        List<ProvenanceEdge> edges,
+        IdentityReportDto identity,
+        String hypothesisId
+    ) {
+        if (isSymbolicRegression(identity)) {
+            String proposalId = "symreg:" + record.id() + ":" + identity.id();
+            put(nodes, new ProvenanceNode(proposalId, ProvenanceNodeType.SYMBOLIC_REGRESSION_PROPOSAL,
+                identity.id(), Map.of(
+                    "leftPattern", identity.leftPattern(),
+                    "rightPattern", identity.rightPattern(),
+                    "regressionSource", regressionSource(identity),
+                    "templateName", templateName(identity),
+                    "proofStatus", identity.proofStatus().name(),
+                    "supportCount", String.valueOf(identity.supportingTransformationIds().size())
+                )));
+            edges.add(new ProvenanceEdge(hypothesisId, proposalId, ProvenanceEdgeType.SUPPORTED_BY,
+                Map.of("kind", "symbolic-regression")));
+            for (String pathId : identity.supportingTransformationIds()) {
+                edges.add(new ProvenanceEdge(proposalId, pathNodeId(record.id(), pathId),
+                    ProvenanceEdgeType.PROPOSAL_FROM, Map.of()));
+            }
+        }
+        if (isNumericRelation(identity)) {
+            String relationId = "numeric-relation:" + record.id() + ":" + identity.id();
+            put(nodes, new ProvenanceNode(relationId, ProvenanceNodeType.NUMERIC_RELATION_CANDIDATE,
+                identity.id(), Map.of(
+                    "leftPattern", identity.leftPattern(),
+                    "rightPattern", identity.rightPattern(),
+                    "coefficients", String.join(",", identity.ruleIdSequence()),
+                    "residual", "0.0",
+                    "resultType", "HYPOTHESIS",
+                    "proofStatus", identity.proofStatus().name(),
+                    "status", "SUCCESS"
+                )));
+            edges.add(new ProvenanceEdge(hypothesisId, relationId, ProvenanceEdgeType.SUPPORTED_BY,
+                Map.of("kind", "numeric-relation")));
+        }
+        if (identity.proofStatus().isPositive()) {
+            String casId = "cas:" + record.id() + ":" + identity.id();
+            boolean verified = identity.proofStatus().atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+            put(nodes, new ProvenanceNode(casId, ProvenanceNodeType.CAS_VALIDATION_ATTEMPT,
+                "CAS " + identity.id(), Map.of(
+                    "backend", "domain-aware-cas-router",
+                    "status", verified ? "SUCCESS" : "UNKNOWN",
+                    "resultType", verified ? "PROOF" : "DIAGNOSTIC",
+                    "proofStatus", identity.proofStatus().name(),
+                    "domains", String.join(",", record.domains())
+                )));
+            edges.add(new ProvenanceEdge(hypothesisId, casId,
+                verified ? ProvenanceEdgeType.VALIDATED_BY_CAS : ProvenanceEdgeType.FAILED_CAS_VALIDATION,
+                Map.of()));
+        }
     }
 
     private static void addProofOrCounterexample(
@@ -165,5 +223,33 @@ public final class ProvenanceGraphAssembler {
 
     private static void put(Map<String, ProvenanceNode> nodes, ProvenanceNode node) {
         nodes.putIfAbsent(node.id(), node);
+    }
+
+    private static boolean isSymbolicRegression(IdentityReportDto identity) {
+        return identity.id().contains("symreg")
+            || identity.ruleIdSequence().stream().anyMatch(value -> value.contains("symbolic-regression")
+                || value.contains("template:"));
+    }
+
+    private static boolean isNumericRelation(IdentityReportDto identity) {
+        return identity.id().contains("pslq")
+            || identity.id().contains("numeric-relation")
+            || identity.ruleIdSequence().stream().anyMatch(value -> value.contains("pslq")
+                || value.contains("numeric-relation"));
+    }
+
+    private static String regressionSource(IdentityReportDto identity) {
+        return identity.ruleIdSequence().stream()
+            .filter(value -> value.contains("symbolic-regression"))
+            .findFirst()
+            .orElse("symbolic-regression");
+    }
+
+    private static String templateName(IdentityReportDto identity) {
+        return identity.ruleIdSequence().stream()
+            .filter(value -> value.startsWith("template:"))
+            .map(value -> value.substring("template:".length()))
+            .findFirst()
+            .orElse("");
     }
 }
