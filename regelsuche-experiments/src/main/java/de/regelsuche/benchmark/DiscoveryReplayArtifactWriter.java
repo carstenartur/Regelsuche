@@ -286,45 +286,45 @@ public final class DiscoveryReplayArtifactWriter {
         if (classpath.isBlank()) {
             return List.of();
         }
-
-        private static boolean isBackend(MathematicalAlgorithmRegistry.AlgorithmDescriptor descriptor) {
-            return descriptor.id().endsWith("Backend")
-                || MathematicalAlgorithmRegistry.PSLQ.equals(descriptor.id())
-                || MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH.equals(descriptor.id());
-        }
-
-        private static String gitCommit() {
-            String fromProperty = System.getProperty("regelsuche.git.commit", "");
-            if (!fromProperty.isBlank()) {
-                return fromProperty;
-            }
-            String fromEnvironment = System.getenv().getOrDefault("GITHUB_SHA", "");
-            if (!fromEnvironment.isBlank()) {
-                return fromEnvironment;
-            }
-            try {
-                Process process = new ProcessBuilder("git", "rev-parse", "HEAD")
-                    .redirectErrorStream(true)
-                    .start();
-                String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
-                    .trim();
-                if (process.waitFor() == 0 && !output.isBlank()) {
-                    return output;
-                }
-            } catch (IOException exception) {
-                return "unknown";
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                return "unknown";
-            }
-            return "unknown";
-        }
         return Arrays.stream(classpath.split(java.io.File.pathSeparator))
             .map(Path::of)
             .filter(path -> Files.isRegularFile(path) && path.getFileName() != null)
             .sorted(Comparator.comparing(path -> path.getFileName().toString()))
             .limit(200)
             .toList();
+    }
+
+    private static boolean isBackend(MathematicalAlgorithmRegistry.AlgorithmDescriptor descriptor) {
+        return descriptor.id().endsWith("Backend")
+            || MathematicalAlgorithmRegistry.PSLQ.equals(descriptor.id())
+            || MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH.equals(descriptor.id());
+    }
+
+    private static String gitCommit() {
+        String fromProperty = System.getProperty("regelsuche.git.commit", "");
+        if (!fromProperty.isBlank()) {
+            return fromProperty;
+        }
+        String fromEnvironment = System.getenv().getOrDefault("GITHUB_SHA", "");
+        if (!fromEnvironment.isBlank()) {
+            return fromEnvironment;
+        }
+        try {
+            Process process = new ProcessBuilder("git", "rev-parse", "HEAD")
+                .redirectErrorStream(true)
+                .start();
+            String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+                .trim();
+            if (process.waitFor() == 0 && !output.isBlank()) {
+                return output;
+            }
+        } catch (IOException exception) {
+            return "unknown";
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return "unknown";
+        }
+        return "unknown";
     }
 
     private void writeScreenshot(Path path, DeterministicDiscoveryExperimentRunner.DiscoveryReport report) throws IOException {

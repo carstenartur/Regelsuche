@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.example.SeedExpression;
-import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,19 +59,16 @@ class DiscoveryReplayArtifactWriterTest {
     void reproducibilityPackIsByteStableForSameInputs() throws Exception {
         System.setProperty("regelsuche.git.commit", "test-commit");
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report = sampleReport();
-        var registry = new DefaultMathematicalAlgorithmRegistry(
-            java.util.Map.of(
-                MathematicalAlgorithmRegistry.PSLQ, true,
-                MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH, true
-            ),
-            java.util.Map.of()
+        var algorithms = List.of(
+            descriptor(MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH, true),
+            descriptor(MathematicalAlgorithmRegistry.PSLQ, true)
         );
         Path artifact = tempDir.resolve("artifact.txt");
         Files.writeString(artifact, "stable");
         DiscoveryReplayArtifactWriter writer = new DiscoveryReplayArtifactWriter();
 
-        String first = writer.renderReproducibilityPack(report, List.of(artifact), registry.algorithms());
-        String second = writer.renderReproducibilityPack(report, List.of(artifact), registry.algorithms());
+        String first = writer.renderReproducibilityPack(report, List.of(artifact), algorithms);
+        String second = writer.renderReproducibilityPack(report, List.of(artifact), algorithms);
 
         assertEquals(first, second);
         assertTrue(first.contains("\"seedSetHash\""));
@@ -98,6 +94,17 @@ class DiscoveryReplayArtifactWriterTest {
             )),
             new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, 1, 1, 0, 12L, 1024L),
             13L
+        );
+    }
+
+    private static MathematicalAlgorithmRegistry.AlgorithmDescriptor descriptor(String id, boolean enabled) {
+        return new MathematicalAlgorithmRegistry.AlgorithmDescriptor(
+            id,
+            id,
+            enabled,
+            MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(1, 2, 3, 1e-8),
+            MathematicalAlgorithmRegistry.ProofSemantics.HYPOTHESIS_ONLY,
+            java.util.EnumSet.of(MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS)
         );
     }
 }
