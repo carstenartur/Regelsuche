@@ -9,6 +9,7 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
@@ -112,6 +113,22 @@ class DiscoveryReplayArtifactWriterTest {
     }
 
     @Test
+    void denseReplayReportSemanticViewCollapsesNoisyCanonicalVariants() throws Exception {
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report = denseReplayReport();
+
+        DiscoveryReplayArtifactWriter.ArtifactBundle bundle = new DiscoveryReplayArtifactWriter().write(report, tempDir);
+        String markdown = Files.readString(bundle.markdownReport());
+
+        assertTrue(markdown.contains("- Main path nodes: 32"));
+        assertTrue(markdown.contains("- Collapsed low-signal steps: 96"));
+        assertEquals(24, countOccurrences(markdown, "semantic main step"));
+        assertTrue(markdown.contains("0 + x"));
+        assertTrue(markdown.contains("x^2+2*x+1*1"));
+        assertTrue(Files.size(bundle.screenshotPng()) > 0);
+        assertTrue(Files.size(bundle.replayGif()) > 0);
+    }
+
+    @Test
     void reproducibilityPackIsByteStableForSameInputs() throws Exception {
         System.setProperty("regelsuche.git.commit", "test-commit");
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report = sampleReport();
@@ -151,6 +168,58 @@ class DiscoveryReplayArtifactWriterTest {
             new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, 1, 1, 1, 12L, 1024L),
             13L
         );
+    }
+
+    private static DeterministicDiscoveryExperimentRunner.DiscoveryReport denseReplayReport() {
+        List<DeterministicDiscoveryExperimentRunner.SeedRunReport> rows = new ArrayList<>();
+        for (int seed = 0; seed < 8; seed++) {
+            rows.add(new DeterministicDiscoveryExperimentRunner.SeedRunReport(
+                new SeedExpression("dense-seed-" + seed, "x + 0", "dense", "polynomial", List.of("dense"), List.of()),
+                true,
+                "dense replay collapsed",
+                List.of("hyp-dense-" + seed),
+                List.of(),
+                denseReplayPath(),
+                20L + seed,
+                2048L + seed
+            ));
+        }
+        return new DeterministicDiscoveryExperimentRunner.DiscoveryReport(
+            rows,
+            new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(8, 8, 8, 0, 188L, 16412L),
+            21L
+        );
+    }
+
+    private static List<String> denseReplayPath() {
+        return List.of(
+            "x + 0",
+            "0 + x",
+            "1*x",
+            "x*1",
+            "x",
+            "x + 1",
+            "x+1 + 0",
+            "0 + x + 1",
+            "(x + 1)^2",
+            "(x+1)^2 + 0",
+            "1*(x+1)^2",
+            "(x+1)^2*1",
+            "x^2 + 2*x + 1",
+            "x^2+2*x+1 + 0",
+            "1*x^2+2*x+1",
+            "x^2+2*x+1*1"
+        );
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int index = haystack.indexOf(needle);
+        while (index >= 0) {
+            count++;
+            index = haystack.indexOf(needle, index + needle.length());
+        }
+        return count;
     }
 
     private static MathematicalAlgorithmRegistry.AlgorithmDescriptor descriptor(String id, boolean enabled) {
