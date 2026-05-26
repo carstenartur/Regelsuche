@@ -52,9 +52,10 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     private final AstRewriteTransformationEngine searchEngine = new AstRewriteTransformationEngine(DemoRuleSet.rules());
     private final BestFirstSearchStrategy searchStrategy = new BestFirstSearchStrategy();
     private final DeterministicCounterexampleSearchService counterexamples = new DeterministicCounterexampleSearchService();
+    private final DefaultMathematicalAlgorithmRegistry algorithmRegistry = new DefaultMathematicalAlgorithmRegistry();
     private final PolynomialNormalFormEquivalenceService polynomialEquivalence =
-        new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
-    private final DomainAwareCasRouter casRouter = new DomainAwareCasRouter(new DefaultMathematicalAlgorithmRegistry());
+        new PolynomialNormalFormEquivalenceService(algorithmRegistry);
+    private final DomainAwareCasRouter casRouter = new DomainAwareCasRouter(algorithmRegistry);
 
     private ScientificDiscoveryWorkflow(PersistenceContext context) {
         this.context = context;
@@ -68,7 +69,8 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         DeterministicDiscoveryExperimentRunner runner = new DeterministicDiscoveryExperimentRunner(
             globalBudget, parallelism, this::evaluateSeed);
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report = runner.runDetailed(seeds);
-        DiscoveryReplayArtifactWriter.ArtifactBundle artifacts = new DiscoveryReplayArtifactWriter().write(report, artifactDirectory);
+        DiscoveryReplayArtifactWriter.ArtifactBundle artifacts = new DiscoveryReplayArtifactWriter()
+            .write(report, artifactDirectory, algorithmRegistry.algorithms());
         context.relationalAdapters().ifPresent(adapters -> persist(experimentId, report, artifacts, adapters));
         return new RunResult(report, artifacts, context);
     }

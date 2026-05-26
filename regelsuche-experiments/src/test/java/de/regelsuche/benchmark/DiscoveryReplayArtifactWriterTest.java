@@ -41,6 +41,8 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(Files.readString(bundle.markdownReport()).contains("## Dashboard Metrics"));
         assertTrue(Files.readString(bundle.replayJson()).contains("regelsuche.discovery-replay/v1"));
         assertTrue(Files.readString(bundle.replayJson()).contains("\"dashboardMetrics\""));
+        assertTrue(Files.readString(bundle.reproducibilityPack()).contains("regelsuche.reproducibility-pack/v1"));
+        assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"sha256\""));
         assertTrue(Files.size(bundle.screenshotPng()) > 0, "PNG screenshot artifact must be written");
         assertTrue(Files.size(bundle.replayGif()) > 0, "GIF replay artifact must be written");
     }

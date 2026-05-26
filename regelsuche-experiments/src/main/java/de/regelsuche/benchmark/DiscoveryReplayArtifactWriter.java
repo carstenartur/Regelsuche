@@ -1,12 +1,19 @@
 package de.regelsuche.benchmark;
 
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
+import java.util.HexFormat;
+import java.util.List;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -20,6 +27,14 @@ public final class DiscoveryReplayArtifactWriter {
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
         Path outputDirectory
     ) {
+        return write(report, outputDirectory, List.of());
+    }
+
+    public ArtifactBundle write(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        Path outputDirectory,
+        Collection<MathematicalAlgorithmRegistry.AlgorithmDescriptor> algorithmSnapshot
+    ) {
         try {
             Files.createDirectories(outputDirectory);
             Path json = outputDirectory.resolve("discovery-report.json");
@@ -28,13 +43,16 @@ public final class DiscoveryReplayArtifactWriter {
             Path replayExport = outputDirectory.resolve("discovery-replay.json");
             Path screenshot = outputDirectory.resolve("discovery-summary.png");
             Path gif = outputDirectory.resolve("discovery-replay.gif");
+            Path reproPack = outputDirectory.resolve("reproducibility-pack.json");
             Files.writeString(json, report.renderDeterministicJson());
             Files.writeString(html, renderHtml(report));
             Files.writeString(markdown, renderMarkdown(report));
             Files.writeString(replayExport, renderReplayExport(report));
             writeScreenshot(screenshot, report);
             writeReplayGif(gif, report);
-            return new ArtifactBundle(json, html, markdown, replayExport, screenshot, gif);
+            Files.writeString(reproPack, renderReproducibilityPack(report,
+                List.of(json, html, markdown, replayExport, screenshot, gif), algorithmSnapshot));
+            return new ArtifactBundle(json, html, markdown, replayExport, screenshot, gif, reproPack);
         } catch (IOException exception) {
             throw new IllegalStateException("Could not write discovery replay artefacts to " + outputDirectory, exception);
         }
@@ -179,6 +197,47 @@ public final class DiscoveryReplayArtifactWriter {
         return writer.toString();
     }
 
+    public String renderReproducibilityPack(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        List<Path> artifacts,
+        Collection<MathematicalAlgorithmRegistry.AlgorithmDescriptor> algorithmSnapshot
+    ) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("schema", "regelsuche.reproducibility-pack/v1");
+        writer.property("seedSetHash", sha256(report.rows().stream()
+            .map(row -> row.seed().stableKey())
+            .sorted()
+            .reduce("", (left, right) -> left + "\n" + right).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        writer.object("toolchain", toolchain -> {
+            toolchain.property("javaVersion", System.getProperty("java.version", ""));
+            toolchain.property("javaVendor", System.getProperty("java.vendor", ""));
+            toolchain.property("osName", System.getProperty("os.name", ""));
+        });
+        writer.object("command", command -> {
+            command.property("main", "DiscoveryReplayArtifactWriter");
+            command.property("processedSeeds", report.metrics().processedSeeds());
+        });
+        writer.array("algorithmRegistry", algorithms -> (algorithmSnapshot == null ? List
+            .<MathematicalAlgorithmRegistry.AlgorithmDescriptor>of() : algorithmSnapshot.stream()
+            .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id)).toList())
+            .forEach(descriptor -> algorithms.objectValue(object -> {
+                object.property("id", descriptor.id());
+                object.property("enabled", descriptor.enabled());
+                object.property("proofSemantics", descriptor.proofSemantics().name());
+                object.property("maxSteps", descriptor.budget().maxSteps());
+                object.property("maxStates", descriptor.budget().maxStates());
+            })));
+        writer.array("artifacts", arr -> (artifacts == null ? List.<Path>of() : artifacts).stream()
+            .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+            .forEach(path -> arr.objectValue(object -> {
+                object.property("file", path.getFileName().toString());
+                object.property("sha256", checksum(path));
+            })));
+        writer.endObject();
+        return writer.toString();
+    }
+
     private void writeScreenshot(Path path, DeterministicDiscoveryExperimentRunner.DiscoveryReport report) throws IOException {
         if (!ImageIO.write(renderFrame(report, 0), "png", path.toFile())) {
             throw new IOException("No ImageIO writer for png");
@@ -282,7 +341,8 @@ public final class DiscoveryReplayArtifactWriter {
             "markdown", 1,
             "replayJson", 1,
             "screenshotPng", 1,
-            "replayGif", 1
+            "replayGif", 1,
+            "reproducibilityPack", 1
         ));
     }
 
@@ -292,7 +352,24 @@ public final class DiscoveryReplayArtifactWriter {
         Path markdownReport,
         Path replayJson,
         Path screenshotPng,
-        Path replayGif
+        Path replayGif,
+        Path reproducibilityPack
     ) {
+    }
+
+    private static String checksum(Path path) {
+        try {
+            return sha256(Files.readAllBytes(path));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not checksum " + path, exception);
+        }
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
     }
 }
