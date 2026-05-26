@@ -217,6 +217,7 @@ public final class DiscoveryReplayArtifactWriter {
             toolchain.property("gradleVersion", System.getProperty("gradle.version", ""));
             toolchain.property("userLanguage", System.getProperty("user.language", ""));
         });
+        writer.property("gitCommit", gitCommit());
         writer.array("dependencies", dependencies -> classpathEntries().forEach(entry -> dependencies.objectValue(object -> {
             object.property("file", entry.getFileName().toString());
             object.property("sha256", Files.isRegularFile(entry) ? checksum(entry) : "");
@@ -234,6 +235,13 @@ public final class DiscoveryReplayArtifactWriter {
             state.array("activeAlgorithmIds", active -> (algorithmSnapshot == null ? List
                 .<MathematicalAlgorithmRegistry.AlgorithmDescriptor>of() : algorithmSnapshot.stream()
                 .filter(MathematicalAlgorithmRegistry.AlgorithmDescriptor::enabled)
+                .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id))
+                .toList())
+                .forEach(descriptor -> active.value(descriptor.id())));
+            state.array("enabledBackends", active -> (algorithmSnapshot == null ? List
+                .<MathematicalAlgorithmRegistry.AlgorithmDescriptor>of() : algorithmSnapshot.stream()
+                .filter(MathematicalAlgorithmRegistry.AlgorithmDescriptor::enabled)
+                .filter(DiscoveryReplayArtifactWriter::isBackend)
                 .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id))
                 .toList())
                 .forEach(descriptor -> active.value(descriptor.id())));
@@ -277,6 +285,39 @@ public final class DiscoveryReplayArtifactWriter {
         String classpath = System.getProperty("java.class.path", "");
         if (classpath.isBlank()) {
             return List.of();
+        }
+
+        private static boolean isBackend(MathematicalAlgorithmRegistry.AlgorithmDescriptor descriptor) {
+            return descriptor.id().endsWith("Backend")
+                || MathematicalAlgorithmRegistry.PSLQ.equals(descriptor.id())
+                || MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH.equals(descriptor.id());
+        }
+
+        private static String gitCommit() {
+            String fromProperty = System.getProperty("regelsuche.git.commit", "");
+            if (!fromProperty.isBlank()) {
+                return fromProperty;
+            }
+            String fromEnvironment = System.getenv().getOrDefault("GITHUB_SHA", "");
+            if (!fromEnvironment.isBlank()) {
+                return fromEnvironment;
+            }
+            try {
+                Process process = new ProcessBuilder("git", "rev-parse", "HEAD")
+                    .redirectErrorStream(true)
+                    .start();
+                String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+                    .trim();
+                if (process.waitFor() == 0 && !output.isBlank()) {
+                    return output;
+                }
+            } catch (IOException exception) {
+                return "unknown";
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return "unknown";
+            }
+            return "unknown";
         }
         return Arrays.stream(classpath.split(java.io.File.pathSeparator))
             .map(Path::of)

@@ -29,6 +29,20 @@ class GroebnerBasisEquivalenceServiceTest {
     }
 
     @Test
+    void provesIdealMembershipWithMultipleGenerators() {
+        GroebnerBasisEquivalenceService service = new GroebnerBasisEquivalenceService(
+            new DefaultMathematicalAlgorithmRegistry(Map.of(
+                MathematicalAlgorithmRegistry.GROEBNER_BASIS, true
+            ), Map.of())
+        );
+
+        assertTrue(service.reducesToZeroModuloIdeal("x*y + x", List.of("x", "y - 1")));
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS, service.lastResult().status());
+        assertEquals(MathematicalAlgorithmRegistry.ResultType.PROOF, service.lastResult().resultType());
+        assertEquals("pureJavaSmallGroebner", service.lastResult().payload().get("backend"));
+    }
+
+    @Test
     void groebnerDisabledPreventsIdealReduction() {
         GroebnerBasisEquivalenceService service = new GroebnerBasisEquivalenceService(
             new DefaultMathematicalAlgorithmRegistry(Map.of(
@@ -65,5 +79,32 @@ class GroebnerBasisEquivalenceServiceTest {
         assertFalse(service.reducesToZeroModuloIdeal("x", List.of("x^2")));
         assertEquals(MathematicalAlgorithmRegistry.ResultType.REFUTATION, service.lastResult().resultType());
         assertEquals(MathematicalAlgorithmRegistry.GROEBNER_BASIS, service.lastResult().payload().get("capability"));
+        assertEquals("x", service.lastResult().payload().get("remainder"));
+    }
+
+    @Test
+    void budgetExhaustedStopsBasisComputation() {
+        GroebnerBasisEquivalenceService service = new GroebnerBasisEquivalenceService(
+            new DefaultMathematicalAlgorithmRegistry(
+                Map.of(MathematicalAlgorithmRegistry.GROEBNER_BASIS, true),
+                Map.of(MathematicalAlgorithmRegistry.GROEBNER_BASIS,
+                    MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(0, 1, 0, 0.0))
+            )
+        );
+
+        assertFalse(service.reducesToZeroModuloIdeal("x*y", List.of("x", "y")));
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED, service.lastResult().status());
+    }
+
+    @Test
+    void unsupportedPolynomialDomainStaysUnknown() {
+        GroebnerBasisEquivalenceService service = new GroebnerBasisEquivalenceService(
+            new DefaultMathematicalAlgorithmRegistry(Map.of(
+                MathematicalAlgorithmRegistry.GROEBNER_BASIS, true
+            ), Map.of())
+        );
+
+        assertFalse(service.reducesToZeroModuloIdeal("sin(x)", List.of("x")));
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN, service.lastResult().status());
     }
 }

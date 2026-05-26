@@ -6,7 +6,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-/** Lightweight symbolic-regression backend that proposes repeated input/output shapes as hypotheses only. */
+/** Heuristic evidence-only source that proposes repeated input/output shapes as hypotheses only. */
 public final class HeuristicSymbolicRegressionHypothesisSource implements SymbolicRegressionHypothesisSource {
     private final boolean enabled;
     private final int minimumSupport;

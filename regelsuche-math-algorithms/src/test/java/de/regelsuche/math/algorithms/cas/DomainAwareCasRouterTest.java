@@ -80,4 +80,39 @@ class DomainAwareCasRouterTest {
         assertEquals(MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS, result.resultType());
         assertEquals(List.of(2, -1), result.payload().get("coefficients"));
     }
+
+    @Test
+    void numericRelationDiscoveryIsDisabledWhenPslqDisabled() {
+        DomainAwareCasRouter router = new DomainAwareCasRouter(new DefaultMathematicalAlgorithmRegistry(
+            Map.of(
+                MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH, true,
+                MathematicalAlgorithmRegistry.PSLQ, false
+            ),
+            Map.of()
+        ));
+
+        MathematicalAlgorithmRegistry.AlgorithmExecutionResult result =
+            router.discoverNumericRelation(List.of(Math.sqrt(2), Math.sqrt(8)));
+
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.DISABLED, result.status());
+        assertEquals(MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC, result.resultType());
+    }
+
+    @Test
+    void pslqEnabledReturnsHypothesisForSimpleIntegerRelation() {
+        DomainAwareCasRouter router = new DomainAwareCasRouter(new DefaultMathematicalAlgorithmRegistry(
+            Map.of(
+                MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH, true,
+                MathematicalAlgorithmRegistry.PSLQ, true
+            ),
+            Map.of()
+        ));
+
+        MathematicalAlgorithmRegistry.AlgorithmExecutionResult result =
+            router.discoverNumericRelation(List.of(1.0, 2.0, 3.0));
+
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS, result.status());
+        assertEquals(MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS, result.resultType());
+        assertEquals(List.of(1, 1, -1), result.payload().get("coefficients"));
+    }
 }
