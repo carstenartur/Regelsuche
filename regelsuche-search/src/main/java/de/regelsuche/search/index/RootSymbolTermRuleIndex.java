@@ -58,15 +58,20 @@ public class RootSymbolTermRuleIndex implements TermRuleIndex, RuleCandidateInde
         SearchContext effectiveQuery = context == null ? SearchContext.all() : context;
         CandidateBudget effectiveBudget = budget == null ? CandidateBudget.unbounded() : budget;
         String root = rootSymbol(expression);
-        OperatorSignature querySignature = OperatorSignature.parse(expression);
-        ExpressionFeatureVector queryFeatures = ExpressionFeatureVector.parse(expression);
-        DiscriminationTreeKey queryDiscriminationKey = DiscriminationTreeKey.parse(expression);
         List<RewriteRule> atomicCandidates = effectiveQuery.includeAtomicRules()
             ? atomicByRoot.getOrDefault(root, List.of())
             : List.of();
         List<MacroEntry> macroCandidates = effectiveQuery.includeMacroMoves()
             ? macroByRoot.getOrDefault(root, List.of())
             : List.of();
+        OperatorSignature querySignature = null;
+        ExpressionFeatureVector queryFeatures = null;
+        DiscriminationTreeKey queryDiscriminationKey = null;
+        if (multiStageFiltersEnabled && !macroCandidates.isEmpty()) {
+            querySignature = OperatorSignature.parse(expression);
+            queryFeatures = ExpressionFeatureVector.parse(expression);
+            queryDiscriminationKey = DiscriminationTreeKey.parse(expression);
+        }
         int totalAtomic = atomicByRoot.values().stream().mapToInt(List::size).sum();
         int totalMacros = macroByRoot.values().stream().mapToInt(List::size).sum();
         int considered = totalAtomic

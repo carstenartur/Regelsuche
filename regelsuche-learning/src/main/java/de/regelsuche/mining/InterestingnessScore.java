@@ -57,7 +57,17 @@ public record InterestingnessScore(
         double assumptions = ASSUMPTIONS.score(context);
         double surprise = SURPRISE.score(context);
         double knownPenalty = Math.max(0.0, Math.min(1.0, similarityToKnownRules));
-        double total = weightedTotal(context, evidence) - knownPenalty;
+        double total = weightedTotal(
+            compression,
+            generality,
+            evidence,
+            reusability,
+            surprise,
+            crossDomain,
+            assumptions,
+            proof,
+            counterexample
+        ) - knownPenalty;
         return new InterestingnessScore(compression, generality, evidence, reusability, proof,
             counterexample, knownPenalty, crossDomain, assumptions, total);
     }
@@ -66,16 +76,26 @@ public record InterestingnessScore(
         return DEFAULT_MODULES;
     }
 
-    private static double weightedTotal(InterestingnessScoringContext context, double evidence) {
-        return 1.25 * COMPRESSION.score(context)
-            + 1.10 * GENERALIZATION.score(context)
+    private static double weightedTotal(
+        double compression,
+        double generality,
+        double evidence,
+        double reusability,
+        double surprise,
+        double crossDomain,
+        double assumptions,
+        double proof,
+        double counterexample
+    ) {
+        return 1.25 * compression
+            + 1.10 * generality
             + 0.75 * evidence
-            + 1.20 * REUSABILITY.score(context)
-            + 1.00 * SURPRISE.score(context)
-            + 1.10 * CROSS_DOMAIN.score(context)
-            + 0.80 * ASSUMPTIONS.score(context)
-            + 1.00 * PROOF.score(context)
-            + 1.50 * COUNTEREXAMPLES.score(context);
+            + 1.20 * reusability
+            + 1.00 * surprise
+            + 1.10 * crossDomain
+            + 0.80 * assumptions
+            + 1.00 * proof
+            + 1.50 * counterexample;
     }
 
     private static double distinctEvidence(HypothesisCandidate candidate) {
