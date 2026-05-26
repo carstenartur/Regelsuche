@@ -19,9 +19,16 @@ Die Algorithmen werden über die Registry aktiviert/deaktiviert und von der Vali
 
 - `groebnerBasis` nutzt die interne `pureJavaSmallGroebner`-Reduktion für kleine Polynomideale mit mehreren Generatoren, Nicht-Null-Rest, Budget- und Unsupported-Domain-Status.
 - `jasBackend` wurde gegen Maven Central evaluiert: das verfügbare JAS-Artefakt (`edu.jas:jas`) steht unter GPL-3.0-or-later und wird deshalb nicht in die MIT-lizenzierte Standard-Distribution eingebunden. Wenn `jasBackend` aktiviert wird, aber kein kompatibler Adapter verfügbar ist, meldet die Gröbner-Schicht `UNAVAILABLE`.
-- `numericRelationSearch` routet bei aktiviertem `pslq` auf den internen `PslqNumericRelationService`; Ergebnisse sind Hypothesen, keine Beweise.
-- Symbolic Regression besteht aus zwei Evidence-only Quellen: `HeuristicSymbolicRegressionHypothesisSource` für Shape-Wiederholungen und `TemplateSymbolicRegressionHypothesisSource` für kleine numerische Template-Fits. Beide erzeugen `HypothesisCandidate`-Werte mit Beobachtungs-/Hypothesen-Semantik, nie Proof-Status.
-- Provenance wird als typed graph aufgebaut und kann über `ProvenanceRepository` identisch im Speicher oder im Neo4j-Adapter persistiert werden.
+- `numericRelationSearch` routet bei aktiviertem `pslq` über `DomainAwareCasRouter` auf den internen `PslqNumericRelationService`; Ergebnisse sind immer `HYPOTHESIS`, nie `PROOF`, und tragen Koeffizienten, Residual, Sample-Anzahl und Hypothesis-only-Semantik im Payload.
+- Symbolic Regression besteht aus zwei Evidence-only Quellen: `HeuristicSymbolicRegressionHypothesisSource` für Shape-Wiederholungen und `TemplateSymbolicRegressionHypothesisSource` für kleine numerische Template-Fits. Die Template-Quelle nutzt die stabile Backend-Schnittstelle `SymbolicRegressionBackend` mit `SymbolicRegressionSample`/`SymbolicRegressionFittedResult`, sodass spätere PySR-/Operon-/GP-Adapter ohne Proof-Semantik angeschlossen werden können.
+- Provenance wird als typed graph aufgebaut und kann über `ProvenanceRepository` identisch im Speicher oder im Neo4j-Adapter persistiert werden. Der Graph enthält eigene Knoten für Symbolic-Regression-Proposals, numerische Relationskandidaten und CAS-Validierungsversuche sowie Queries für Quelle, Qualität und CAS-Erfolgsraten.
+
+## Grenzen der High-End-Ausbaustufe
+
+- Der integrierte Gröbner-Kern ist für kleine Polynomideale über rationalen Koeffizienten gedacht.
+- Trigonometrie, Radikale, allgemeine Division und nichtkommutative Algebra werden nicht durch ein vollständiges CAS bewiesen.
+- Numerische Relationen und Symbolic-Regression-Ausgaben sind Discovery-Evidence. Sie müssen durch Counterexample-Suche und optional unterstützte symbolische Backends weiter geprüft werden.
+- Externe CAS-Schichten wie Singular bleiben optional und melden ohne Adapter/Installation sauber `UNAVAILABLE`.
 
 Weiterführende Dokumente:
 

@@ -10,6 +10,9 @@ Zentrale Bausteine:
 - `DeterministicDiscoveryExperimentRunner` wertet Seeds deterministisch, budgetiert und optional parallel aus.
 - `DiscoveryReplayArtifactWriter` erzeugt `discovery-report.{json,html,md}`, `discovery-replay.json`, `discovery-summary.png` und `discovery-replay.gif`.
 - `PathReplayDto` und die Web-Workbench liefern das interaktive Schritt-für-Schritt-Replay inklusive Makrozügen, Domänenkarten und Proof-Status.
+- `DomainAwareCasRouter` ist der produktive Einstieg für Polynomidentitäten, kleine Gröbner-Idealprüfungen und numerische Relationssuche; numerische Treffer werden in Reports/Provenance als Hypothesen mit Koeffizienten und Residual geführt.
+- Symbolic-Regression-Proposals laufen über Backend-Ports und bleiben im Discovery-Workflow Evidence-only: Sample-Fit → Hypothese → Counterexample-Suche → optionaler unterstützter Proof-Versuch.
+- Der Provenance-Graph unterscheidet Hypothesen, Regression-Proposals, numerische Relationskandidaten und CAS-Validierungsversuche, damit Reports und spätere UI-Queries Quelle und Beweissemantik getrennt darstellen können.
 - `de.regelsuche.search.index.RuleCandidateIndex` erweitert den bisherigen
   `TermRuleIndex`-Pfad um `CandidateSet`, `SearchContext`, `CandidateBudget`
   und detaillierte `IndexMetrics`. `RootSymbolTermRuleIndex` bleibt die
