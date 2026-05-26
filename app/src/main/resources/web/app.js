@@ -768,7 +768,6 @@
                 const response = await fetch('/api/search-graph/semantic' + semanticQuery);
                 const data = await response.json();
                 renderSemanticGraph(data);
-                out.textContent = '(Interaktive Cytoscape-Ansicht aktiv – Mermaid-Quelltext unten ist Fallback.)';
                 const mermaidResp = await fetch('/api/exports/search-graph-semantic.mmd' + semanticQuery);
                 out.textContent = (await mermaidResp.text());
                 return;

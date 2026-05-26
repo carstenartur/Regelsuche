@@ -222,9 +222,9 @@ public final class SemanticSearchGraphAssembler {
             String to = rawExpressionToClusterId.getOrDefault(edge.to(), edge.to());
             RewriteSignal signal = rewriteSignalClassifier.classify(edge);
             if (signal == RewriteSignal.LOW_SIGNAL) {
-                String key = from + "->" + to;
-                lowSignalByPair.computeIfAbsent(key, k -> new ArrayList<>()).add(edge);
                 if (!showLowSignal) {
+                    String key = from + "->" + to;
+                    lowSignalByPair.computeIfAbsent(key, k -> new ArrayList<>()).add(edge);
                     continue;
                 }
             }
