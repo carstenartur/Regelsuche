@@ -4,6 +4,7 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.BasicStroke;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -164,6 +165,11 @@ public final class DiscoveryReplayArtifactWriter {
             .append(dashboard.counterexampleStats().checked()).append('\n');
         out.append("- proofSuccessRate: ").append(String.format(java.util.Locale.ROOT, "%.2f", dashboard.proofSuccessRate())).append('\n');
         out.append("- artifactCounts: ").append(dashboard.artifactCounts()).append("\n\n");
+        out.append("## Semantic Discovery View\n\n");
+        out.append("- Renderer: semantic-main-path\n");
+        out.append("- Main path nodes: ").append(semanticNodeCount(report)).append('\n');
+        out.append("- Collapsed low-signal steps: ").append(collapsedLowSignalStepCount(report)).append("\n\n");
+        out.append("```mermaid\n").append(renderSemanticMermaid(report)).append("```\n\n");
         for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
             out.append("## ").append(row.seed().stableKey()).append("\n\n");
             out.append("- Status: ").append(row.success() ? "OK" : "FAIL").append('\n');
@@ -551,26 +557,122 @@ public final class DiscoveryReplayArtifactWriter {
         try {
             graphics.setColor(Color.WHITE);
             graphics.fillRect(0, 0, width, height);
-            graphics.setColor(new Color(26, 115, 232));
+            graphics.setColor(new Color(35, 78, 112));
             graphics.fillRect(0, 0, width, 42);
             graphics.setColor(Color.WHITE);
-            graphics.drawString("Regelsuche Discovery Replay", 20, 27);
-            graphics.setColor(Color.BLACK);
-            graphics.drawString("Seeds: " + report.metrics().processedSeeds(), 20, 72);
-            graphics.drawString("Successful: " + report.metrics().successfulSeeds(), 20, 96);
-            graphics.drawString("Hypotheses: " + report.metrics().hypotheses(), 20, 120);
-            graphics.drawString("Counterexamples: " + report.metrics().counterexamples(), 20, 144);
-            graphics.drawString("Replay frame: " + frame, 260, 72);
-            report.rows().stream().findFirst().ifPresent(row -> {
-                if (!row.replayPath().isEmpty()) {
-                    String step = row.replayPath().get(Math.min(frame, row.replayPath().size() - 1));
-                    graphics.drawString(step.substring(0, Math.min(52, step.length())), 260, 96);
-                }
-            });
+            graphics.drawString("Regelsuche Semantic Discovery View", 20, 27);
+            graphics.setColor(new Color(31, 41, 55));
+            graphics.drawString("Main path: " + semanticNodeCount(report) + " nodes", 20, 64);
+            graphics.drawString("Collapsed low-signal: " + collapsedLowSignalStepCount(report), 20, 82);
+            drawSemanticMainPath(graphics, report, frame);
         } finally {
             graphics.dispose();
         }
         return image;
+    }
+
+    private void drawSemanticMainPath(Graphics2D graphics,
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        int frame) {
+        List<String> nodes = report.rows().stream()
+            .findFirst()
+            .map(row -> semanticPath(row.replayPath()))
+            .orElse(List.of());
+        if (nodes.isEmpty()) {
+            graphics.setColor(new Color(107, 114, 128));
+            graphics.drawString("No semantic path available", 220, 106);
+            return;
+        }
+        int visible = Math.min(nodes.size(), Math.max(1, frame + 1));
+        int left = 220;
+        int right = 450;
+        int y = 112;
+        int spacing = visible == 1 ? 0 : (right - left) / (visible - 1);
+        graphics.setStroke(new BasicStroke(2.5f));
+        graphics.setColor(new Color(124, 58, 237));
+        for (int i = 0; i < visible - 1; i++) {
+            int x1 = left + i * spacing;
+            int x2 = left + (i + 1) * spacing;
+            graphics.drawLine(x1 + 12, y, x2 - 12, y);
+        }
+        for (int i = 0; i < visible; i++) {
+            int x = left + i * spacing;
+            graphics.setColor(i == visible - 1 ? new Color(22, 163, 74) : new Color(59, 130, 246));
+            graphics.fillOval(x - 12, y - 12, 24, 24);
+            graphics.setColor(Color.WHITE);
+            graphics.drawString(String.valueOf(i + 1), x - 4, y + 5);
+            graphics.setColor(new Color(31, 41, 55));
+            String label = nodes.get(i);
+            graphics.drawString(label.substring(0, Math.min(16, label.length())), x - 24, y + 32);
+        }
+    }
+
+    private String renderSemanticMermaid(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        StringBuilder builder = new StringBuilder("graph TD\n");
+        for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
+            List<String> path = semanticPath(row.replayPath());
+            if (path.isEmpty()) {
+                String seedId = mermaidId("seed", row.seed().id());
+                builder.append("  ").append(seedId).append("[\"").append(escapeMermaid(row.seed().stableKey())).append("\"]\n");
+                continue;
+            }
+            for (int i = 0; i < path.size(); i++) {
+                String id = mermaidId(row.seed().id(), String.valueOf(i));
+                builder.append("  ").append(id).append("[\"").append(escapeMermaid(path.get(i))).append("\"]\n");
+                if (i > 0) {
+                    builder.append("  ").append(mermaidId(row.seed().id(), String.valueOf(i - 1)))
+                        .append(" -->|semantic main step| ").append(id).append('\n');
+                }
+            }
+        }
+        return builder.toString();
+    }
+
+    private int semanticNodeCount(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        return report.rows().stream().mapToInt(row -> semanticPath(row.replayPath()).size()).sum();
+    }
+
+    private int collapsedLowSignalStepCount(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        return report.rows().stream()
+            .mapToInt(row -> Math.max(0, row.replayPath().size() - semanticPath(row.replayPath()).size()))
+            .sum();
+    }
+
+    private List<String> semanticPath(List<String> replayPath) {
+        if (replayPath == null || replayPath.isEmpty()) {
+            return List.of();
+        }
+        java.util.ArrayList<String> semantic = new java.util.ArrayList<>();
+        String previousCanonical = "";
+        for (String step : replayPath) {
+            String canonical = canonicalSemanticExpression(step);
+            if (canonical.isBlank() || canonical.equals(previousCanonical)) {
+                continue;
+            }
+            semantic.add(step == null ? "" : step);
+            previousCanonical = canonical;
+        }
+        return semantic;
+    }
+
+    private String canonicalSemanticExpression(String expression) {
+        if (expression == null) {
+            return "";
+        }
+        return expression.replaceAll("\\s+", "")
+            .replace("+-", "-")
+            .replace("+0", "")
+            .replace("0+", "")
+            .replace("*1", "")
+            .replace("1*", "");
+    }
+
+    private String mermaidId(String prefix, String value) {
+        return "semantic_" + sha256Utf8Lines(List.of(prefix == null ? "" : prefix, value == null ? "" : value)).substring(0, 12);
+    }
+
+    private String escapeMermaid(String value) {
+        return (value == null ? "" : value).replace("\"", "'");
     }
 
     private String escape(String value) {

@@ -5,9 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.example.SeedExpression;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,7 +43,11 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(Files.readString(bundle.htmlReport()).contains("searchSpaceSize"));
         assertTrue(Files.readString(bundle.htmlReport()).contains("artifactCounts"));
         assertTrue(Files.readString(bundle.htmlReport()).contains("Hypothesen"));
-        assertTrue(Files.readString(bundle.markdownReport()).contains("## Dashboard Metrics"));
+        String markdown = Files.readString(bundle.markdownReport());
+        assertTrue(markdown.contains("## Dashboard Metrics"));
+        assertTrue(markdown.contains("## Semantic Discovery View"));
+        assertTrue(markdown.contains("Renderer: semantic-main-path"));
+        assertTrue(markdown.contains("semantic main step"));
         assertTrue(Files.readString(bundle.replayJson()).contains("regelsuche.discovery-replay/v1"));
         assertTrue(Files.readString(bundle.replayJson()).contains("\"dashboardMetrics\""));
         assertTrue(Files.readString(bundle.hypothesesJson()).contains("regelsuche.hypotheses/v1"));
@@ -74,6 +81,12 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(Files.readString(bundle.reproducibilityPack()).contains("\"docker\""));
         assertTrue(Files.size(bundle.screenshotPng()) > 0, "PNG screenshot artifact must be written");
         assertTrue(Files.size(bundle.replayGif()) > 0, "GIF replay artifact must be written");
+        BufferedImage screenshot = ImageIO.read(bundle.screenshotPng().toFile());
+        assertEquals(new Color(22, 163, 74).getRGB(), screenshot.getRGB(220, 112),
+            "PNG must render the semantic main-path node");
+        BufferedImage replayFrame = ImageIO.read(bundle.replayGif().toFile());
+        assertEquals(new Color(22, 163, 74).getRGB(), replayFrame.getRGB(220, 112),
+            "GIF must render the semantic main-path node");
     }
 
     @Test
