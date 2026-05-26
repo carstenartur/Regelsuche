@@ -70,10 +70,10 @@ class SemanticLayoutServiceTest {
             edge("variant-b", "detour-b", SemanticEdgeKind.ALTERNATIVE),
             edge("dead-end-a", "detour-c", SemanticEdgeKind.ALTERNATIVE),
             edge("main-factor", "main-cancel", SemanticEdgeKind.MAIN_STEP),
-            edge("detour-a", "macro-a", SemanticEdgeKind.MACRO_STEP),
-            edge("detour-b", "macro-b", SemanticEdgeKind.MACRO_STEP),
-            edge("detour-c", "macro-c", SemanticEdgeKind.MACRO_STEP),
-            edge("main-cancel", "main-macro", SemanticEdgeKind.MACRO_STEP),
+            edge("detour-a", "macro-a", SemanticEdgeKind.MACRO_MOVE),
+            edge("detour-b", "macro-b", SemanticEdgeKind.MACRO_MOVE),
+            edge("detour-c", "macro-c", SemanticEdgeKind.MACRO_MOVE),
+            edge("main-cancel", "main-macro", SemanticEdgeKind.MACRO_MOVE),
             edge("macro-a", "proof-a", SemanticEdgeKind.ALTERNATIVE),
             edge("macro-b", "proof-b", SemanticEdgeKind.ALTERNATIVE),
             edge("main-macro", "target", SemanticEdgeKind.MAIN_STEP)
@@ -117,7 +117,7 @@ class SemanticLayoutServiceTest {
     private static SemanticGraphEdgeDto edge(String from, String to, SemanticEdgeKind kind) {
         return new SemanticGraphEdgeDto(from, to, kind.name().toLowerCase(), kind.name().toLowerCase(),
             null, kind, 1, kind == SemanticEdgeKind.LOW_SIGNAL_COLLAPSED ? 1 : 0,
-            kind == SemanticEdgeKind.LOW_SIGNAL_COLLAPSED, kind == SemanticEdgeKind.MACRO_STEP,
+            kind == SemanticEdgeKind.LOW_SIGNAL_COLLAPSED, kind == SemanticEdgeKind.MACRO_MOVE,
             null, List.of(from + "->" + to), kind == SemanticEdgeKind.MAIN_STEP ? 1.0 : 0.2);
     }
 }
