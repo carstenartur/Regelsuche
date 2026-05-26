@@ -63,6 +63,80 @@ class ProvenanceGraphAssemblerTest {
         assertTrue(lineage.contains("path:run-1:path-1"));
     }
 
+    @Test
+    void supportsAdvancedProvenanceAggregations() {
+        ProvenanceGraph graph = new ProvenanceGraphAssembler().assemble(sampleRecord());
+        ProvenanceGraphQueries queries = new ProvenanceGraphQueries();
+
+        List<String> proofLineage = queries.proofLineage(graph, "run-1", "hyp-strong")
+            .stream()
+            .map(ProvenanceNode::id)
+            .toList();
+        assertTrue(proofLineage.contains("hypothesis:run-1:hyp-strong"));
+        assertTrue(proofLineage.contains("proof:run-1:hyp-strong"));
+        assertTrue(proofLineage.contains("path:run-1:path-1"));
+
+        List<ProvenanceGraphQueries.HypothesisFamily> families =
+            queries.quantitativeHypothesisFamilies(graph, "run-1", 0.5);
+        assertTrue(families.stream().anyMatch(family ->
+            family.proofStatusCounts().containsKey(CandidateProofStatus.FORMALLY_PROVED.name())));
+
+        Map<String, ProvenanceGraphQueries.ErrorDistribution> errors =
+            queries.errorDistributionByDomain(graph, "run-1");
+        assertEquals(1, errors.get("complex").total());
+    }
+
+    @Test
+    void detectsHypothesesSharedAcrossRuns() {
+        ProvenanceGraph base = new ProvenanceGraphAssembler().assemble(sampleRecord());
+        java.util.ArrayList<ProvenanceNode> nodes = new java.util.ArrayList<>(base.nodes());
+        nodes.add(new ProvenanceNode("hypothesis:run-2:hyp-strong-copy", ProvenanceNodeType.HYPOTHESIS, "copy", Map.of(
+            "leftPattern", "A",
+            "rightPattern", "A + 0",
+            "proofStatus", CandidateProofStatus.SYMBOLICALLY_VERIFIED.name()
+        )));
+        ProvenanceGraph merged = new ProvenanceGraph(nodes, base.edges());
+
+        Map<String, List<ProvenanceNode>> shared =
+            new ProvenanceGraphQueries().crossRunProvenance(merged, List.of("run-1", "run-2"));
+
+        assertTrue(shared.values().stream().anyMatch(group -> group.size() == 2));
+    }
+
+    @Test
+    void inMemoryRepositoryExposesHypothesisSupportingPathCounterexampleAndProofJob() {
+        ProvenanceGraph graph = new ProvenanceGraphAssembler().assemble(sampleRecord());
+        InMemoryProvenanceRepository repository = new InMemoryProvenanceRepository();
+        repository.save("run-1", graph);
+
+        ProvenanceGraph stored = repository.findByRunId("run-1").orElseThrow();
+
+        assertTrue(hasEdge(stored, "hypothesis:run-1:hyp-strong", "path:run-1:path-1", ProvenanceEdgeType.SUPPORTED_BY));
+        assertTrue(hasEdge(stored, "hypothesis:run-1:hyp-rejected", "counterexample:run-1:hyp-rejected", ProvenanceEdgeType.REFUTED_BY));
+        assertTrue(hasEdge(stored, "hypothesis:run-1:hyp-strong", "proof:run-1:hyp-strong", ProvenanceEdgeType.SUPPORTED_BY));
+        assertEquals(List.of("path:run-1:path-1"), repository
+            .adjacent("run-1", "hypothesis:run-1:hyp-strong", ProvenanceEdgeType.SUPPORTED_BY)
+            .stream()
+            .filter(node -> node.type() == ProvenanceNodeType.TRANSFORMATION_PATH)
+            .map(ProvenanceNode::id)
+            .toList());
+    }
+
+    @Test
+    void inMemoryRepositoryExposesSeedToSearchRunRelation() {
+        ProvenanceGraph graph = new ProvenanceGraphAssembler().assemble(sampleRecord());
+        InMemoryProvenanceRepository repository = new InMemoryProvenanceRepository();
+        repository.save("run-1", graph);
+
+        assertTrue(hasEdge(repository.findByRunId("run-1").orElseThrow(),
+            "seed:run-1:n0", "search-run:run-1", ProvenanceEdgeType.GENERATED_BY));
+    }
+
+    private static boolean hasEdge(ProvenanceGraph graph, String fromId, String toId, ProvenanceEdgeType type) {
+        return graph.edges().stream().anyMatch(edge ->
+            edge.fromId().equals(fromId) && edge.toId().equals(toId) && edge.type() == type);
+    }
+
     private static SearchGraphRecord sampleRecord() {
         SearchGraphNodeDto seed = new SearchGraphNodeDto(
             "n0", "x", "x", 4, 0, 1, false, false,

@@ -2,7 +2,6 @@ package de.regelsuche.math.algorithms.equivalence;
 
 import de.regelsuche.equivalence.PolynomialEquivalenceService;
 import de.regelsuche.math.algorithms.equivalence.PolynomialArithmetic.LinearEquation;
-import de.regelsuche.math.algorithms.equivalence.PolynomialArithmetic.Polynomial;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.util.ArrayList;
 import java.util.List;

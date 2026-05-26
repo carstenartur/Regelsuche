@@ -73,6 +73,50 @@ class RootSymbolTermRuleIndexTest {
         assertEquals(1, candidates.metrics().rulesSkippedByBudget());
     }
 
+    @Test
+    void updateRemoveAndRebuildMaintainIncrementalIndexes() {
+        RootSymbolTermRuleIndex index = new RootSymbolTermRuleIndex();
+        RewriteRule plusRule = stubRule("plus-zero");
+        index.addAtomicRule("+", plusRule);
+        index.addMacroMove(rule("commute", "x + A", "A + x",
+            TermRuleIndex.ProofStatusRank.OBSERVED, "algebra"));
+
+        assertTrue(index.updateMacroMove(rule("commute", "x * A", "A * x",
+            TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "algebra")));
+        assertTrue(index.removeAtomicRule("+", plusRule));
+
+        CandidateSet plusCandidates = index.candidateSetForExpression(
+            "x + 1",
+            new SearchContext("", TermRuleIndex.ProofStatusRank.OBSERVED, "", true, true, java.util.Set.of()),
+            CandidateBudget.unbounded()
+        );
+        assertTrue(plusCandidates.atomicRules().isEmpty());
+        assertTrue(plusCandidates.macroMoves().isEmpty());
+
+        CandidateSet multiplyCandidates = index.candidateSetForExpression(
+            "x * 2",
+            new SearchContext("", TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "", false, true, java.util.Set.of()),
+            CandidateBudget.unbounded()
+        );
+        assertEquals(List.of("commute"), multiplyCandidates.macroMoves().stream()
+            .map(TermRuleIndex.IndexedMacroMove::id).toList());
+
+        index.rebuild(
+            List.of(new TermRuleIndex.AtomicRuleEntry("^", plusRule)),
+            List.of(rule("square", "(x + A) ^ 2", "x ^ 2 + 2 * A * x + A ^ 2",
+                TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "algebra"))
+        );
+
+        CandidateSet rebuilt = index.candidateSetForExpression(
+            "(x + 3) ^ 2",
+            new SearchContext("", TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES, "", true, true, java.util.Set.of()),
+            CandidateBudget.unbounded()
+        );
+        assertEquals(List.of(plusRule), rebuilt.atomicRules());
+        assertEquals(List.of("square"), rebuilt.macroMoves().stream()
+            .map(TermRuleIndex.IndexedMacroMove::id).toList());
+    }
+
     private static TermRuleIndex.IndexedMacroMove rule(
         String id,
         String left,

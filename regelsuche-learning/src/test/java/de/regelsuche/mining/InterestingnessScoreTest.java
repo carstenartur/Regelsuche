@@ -7,6 +7,7 @@ import de.regelsuche.validation.CandidateProofStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class InterestingnessScoreTest {
@@ -68,6 +69,18 @@ class InterestingnessScoreTest {
         assertTrue(recurringScore.crossDomainRecurrence() > singleScore.crossDomainRecurrence());
         assertTrue(recurringScore.macroReusability() > singleScore.macroReusability());
         assertTrue(recurringScore.total() > singleScore.total());
+    }
+
+    @Test
+    void structuredDomainTagsDriveCrossDomainScoreWithoutPathPrefixes() {
+        HypothesisCandidate recurring = candidate("recurring", "F(A, B)", "G(A, B)",
+            List.of("p1", "p2", "p3"),
+            List.of(new HypothesisCandidate.ExpressionPair("f(x,y)", "g(x,y)")), 0.8);
+
+        InterestingnessScore untagged = InterestingnessScore.from(recurring, 0.0);
+        InterestingnessScore tagged = InterestingnessScore.from(recurring, 0.0, Set.of("algebra", "trig", "matrix"));
+
+        assertTrue(tagged.crossDomainRecurrence() > untagged.crossDomainRecurrence());
     }
 
     @Test

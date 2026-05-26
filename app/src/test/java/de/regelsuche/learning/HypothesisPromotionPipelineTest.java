@@ -6,12 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.mining.HeuristicSymbolicRegressionHypothesisSource;
 import de.regelsuche.mining.HypothesisCandidate;
 import de.regelsuche.mining.InMemoryHypothesisRepository;
 import de.regelsuche.mining.KnownRuleRepository;
 import de.regelsuche.mining.RuleCandidateMiner;
 import de.regelsuche.mining.SuccessfulTransformationPath;
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.List;
 import java.util.Map;
@@ -161,5 +163,34 @@ class HypothesisPromotionPipelineTest {
         assertEquals(result.newHypotheses().size(), hypothesisRepo.findAll().size());
         assertTrue(hypothesisRepo.findAll().stream()
             .allMatch(hypothesis -> hypothesis.assumptions().contains("b != 0")));
+    }
+
+    @Test
+    void symbolicRegressionSourceAddsEvidenceOnlyHypothesesThroughCounterexampleGate() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        KnownRuleRepository knownRules = new KnownRuleRepository();
+        RuleCandidateMiner miner = new RuleCandidateMiner(knownRules);
+        InMemoryHypothesisRepository hypothesisRepo = new InMemoryHypothesisRepository();
+        MacroRuleLearningService learningService = new MacroRuleLearningService(
+            inventory, miner, knownRules, 3, 0.0
+        );
+        HypothesisPromotionPipeline pipe = new HypothesisPromotionPipeline(
+            miner,
+            hypothesisRepo,
+            NO_COUNTEREXAMPLE,
+            learningService,
+            false,
+            List.of(new HeuristicSymbolicRegressionHypothesisSource(true, 2))
+        );
+
+        HypothesisPromotionPipeline.PromotionResult result = pipe.run(List.of(
+            path("sym1", "f(1)", "2"),
+            path("sym2", "f(2)", "4")
+        ));
+
+        assertTrue(result.newHypotheses().stream()
+            .anyMatch(h -> h.id().startsWith("symreg-")
+                && h.proofStatus() == CandidateProofStatus.OBSERVED
+                && Boolean.FALSE.equals(h.counterexampleStatus())));
     }
 }

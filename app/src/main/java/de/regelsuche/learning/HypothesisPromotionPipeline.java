@@ -2,11 +2,15 @@ package de.regelsuche.learning;
 
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.HypothesisCandidate;
+import de.regelsuche.mining.HypothesisRankingStrategy;
+import de.regelsuche.mining.InterestingnessScore;
+import de.regelsuche.mining.InterestingnessRankingStrategy;
 import de.regelsuche.mining.HypothesisRepository;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleCandidateMiner;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.mining.SuccessfulTransformationPath;
+import de.regelsuche.mining.SymbolicRegressionHypothesisSource;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 
@@ -14,6 +18,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Orchestrates the full hypothesis promotion pipeline:
@@ -38,6 +44,8 @@ public class HypothesisPromotionPipeline {
     private final CounterexampleSearchService counterexampleService;
     private final MacroRuleLearningService learningService;
     private final boolean autoPromote;
+    private final List<SymbolicRegressionHypothesisSource> symbolicRegressionSources;
+    private final HypothesisRankingStrategy rankingStrategy;
 
     /**
      * Full-featured constructor.
@@ -57,11 +65,39 @@ public class HypothesisPromotionPipeline {
         MacroRuleLearningService learningService,
         boolean autoPromote
     ) {
+        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote, List.of());
+    }
+
+    public HypothesisPromotionPipeline(
+        RuleCandidateMiner miner,
+        HypothesisRepository hypothesisRepository,
+        CounterexampleSearchService counterexampleService,
+        MacroRuleLearningService learningService,
+        boolean autoPromote,
+        List<SymbolicRegressionHypothesisSource> symbolicRegressionSources
+    ) {
+        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,
+            symbolicRegressionSources, new InterestingnessRankingStrategy());
+    }
+
+    public HypothesisPromotionPipeline(
+        RuleCandidateMiner miner,
+        HypothesisRepository hypothesisRepository,
+        CounterexampleSearchService counterexampleService,
+        MacroRuleLearningService learningService,
+        boolean autoPromote,
+        List<SymbolicRegressionHypothesisSource> symbolicRegressionSources,
+        HypothesisRankingStrategy rankingStrategy
+    ) {
         this.miner = miner;
         this.hypothesisRepository = hypothesisRepository;
         this.counterexampleService = counterexampleService;
         this.learningService = learningService;
         this.autoPromote = autoPromote;
+        this.symbolicRegressionSources = symbolicRegressionSources == null
+            ? List.of()
+            : List.copyOf(symbolicRegressionSources);
+        this.rankingStrategy = rankingStrategy == null ? new InterestingnessRankingStrategy() : rankingStrategy;
     }
 
     /**
@@ -88,11 +124,12 @@ public class HypothesisPromotionPipeline {
         Map<String, List<String>> pathAssumptions = new LinkedHashMap<>();
         boolean anyValidatedForPromotion = false;
 
-        for (RuleCandidate candidate : candidates) {
-            // Step 2: Compute novelty score (simple heuristic: NEW rules score 1.0,
-            // known rules score 0.2).
-            double novelty = candidate.status() == RuleStatus.NEW ? 1.0 : 0.2;
-            HypothesisCandidate hypothesis = HypothesisCandidate.from(candidate, novelty, paths);
+        Map<String, Set<String>> domainsByPath = domainsByPath(paths);
+        List<ScoredCandidate> prioritizedCandidates = score(candidates, paths, domainsByPath);
+
+        for (ScoredCandidate scoredCandidate : prioritizedCandidates) {
+            RuleCandidate candidate = scoredCandidate.candidate();
+            HypothesisCandidate hypothesis = scoredCandidate.hypothesis();
 
             // Step 3: Counterexample search.
             CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =
@@ -135,7 +172,37 @@ public class HypothesisPromotionPipeline {
                     pathAssumptions.computeIfAbsent(pathId, k -> new ArrayList<>())
                         .addAll(candidateAssumptions);
                 }
+
                 anyValidatedForPromotion = true;
+            }
+        }
+
+        for (SymbolicRegressionHypothesisSource source : symbolicRegressionSources) {
+            if (!source.enabled()) {
+                continue;
+            }
+            for (HypothesisCandidate proposal : source.propose(paths)) {
+                HypothesisCandidate hypothesis = proposal.withNoveltyScore(
+                    normalized(InterestingnessScore.from(proposal, 0.0, domainsFor(proposal, domainsByPath)).total())
+                );
+                CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =
+                    counterexampleService.search(
+                        new CounterexampleSearchService.HypothesisInput(
+                            hypothesis.id(),
+                            hypothesis.leftPattern(),
+                            hypothesis.rightPattern(),
+                            hypothesis.assumptions()
+                        ),
+                        CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+                    );
+                if (counterexampleResult.counterexample().isPresent()) {
+                    hypothesis = hypothesis.withCounterexampleStatus(true)
+                        .withProofStatus(CandidateProofStatus.REJECTED);
+                } else {
+                    hypothesis = hypothesis.withCounterexampleStatus(false);
+                }
+                hypothesisRepository.save(hypothesis.id(), hypothesis);
+                newHypotheses.add(hypothesis);
             }
         }
 
@@ -169,6 +236,78 @@ public class HypothesisPromotionPipeline {
         public PromotionResult {
             newHypotheses = List.copyOf(newHypotheses);
             promotedRules = List.copyOf(promotedRules);
+        }
+    }
+
+    private List<ScoredCandidate> score(
+        List<RuleCandidate> candidates,
+        List<SuccessfulTransformationPath> paths,
+        Map<String, Set<String>> domainsByPath
+    ) {
+        Map<String, RuleCandidate> candidatesByHypothesisId = new LinkedHashMap<>();
+        Map<String, Double> similarities = new LinkedHashMap<>();
+        Map<String, Set<String>> domains = new LinkedHashMap<>();
+        List<HypothesisCandidate> hypotheses = new ArrayList<>();
+        for (RuleCandidate candidate : candidates) {
+            HypothesisCandidate base = HypothesisCandidate.from(candidate, 0.0, paths);
+            candidatesByHypothesisId.put(base.id(), candidate);
+            similarities.put(base.id(), candidate.status() == RuleStatus.NEW ? 0.0 : 1.0);
+            domains.put(base.id(), domainsFor(base, domainsByPath));
+            hypotheses.add(base);
+        }
+        return rankingStrategy.rank(hypotheses, similarities, domains).stream()
+            .map(ranked -> new ScoredCandidate(
+                candidatesByHypothesisId.get(ranked.hypothesis().id()),
+                ranked.hypothesis().withNoveltyScore(normalized(ranked.score().total())),
+                ranked.score()
+            ))
+            .toList();
+    }
+
+    private static double normalized(double score) {
+        return Math.max(0.0, Math.min(1.0, score / 10.0));
+    }
+
+    private static Map<String, Set<String>> domainsByPath(List<SuccessfulTransformationPath> paths) {
+        return paths.stream().collect(Collectors.toMap(
+            SuccessfulTransformationPath::id,
+            HypothesisPromotionPipeline::domainsOf,
+            (left, right) -> {
+                java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>(left);
+                merged.addAll(right);
+                return Set.copyOf(merged);
+            },
+            LinkedHashMap::new
+        ));
+    }
+
+    private static Set<String> domainsFor(HypothesisCandidate candidate, Map<String, Set<String>> domainsByPath) {
+        return candidate.supportingPaths().stream()
+            .flatMap(path -> domainsByPath.getOrDefault(path, Set.of()).stream())
+            .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+    }
+
+    private static Set<String> domainsOf(SuccessfulTransformationPath path) {
+        java.util.LinkedHashSet<String> domains = new java.util.LinkedHashSet<>();
+        String domain = path.variableStructure().get("domain");
+        if (domain != null && !domain.isBlank()) {
+            domains.add(domain);
+        }
+        String category = path.variableStructure().get("category");
+        if (category != null && !category.isBlank()) {
+            domains.add(category);
+        }
+        return Set.copyOf(domains);
+    }
+
+    private record ScoredCandidate(
+        RuleCandidate candidate,
+        HypothesisCandidate hypothesis,
+        InterestingnessScore score
+    ) implements Comparable<ScoredCandidate> {
+        @Override
+        public int compareTo(ScoredCandidate other) {
+            return score.compareTo(other.score);
         }
     }
 }

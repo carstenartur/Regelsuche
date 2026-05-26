@@ -108,6 +108,14 @@ public record HypothesisCandidate(
             parameterRelations, expressionPlaceholders, createdAt);
     }
 
+    /** Returns a copy with an updated ranking/novelty score. */
+    public HypothesisCandidate withNoveltyScore(double newNoveltyScore) {
+        return new HypothesisCandidate(id, leftPattern, rightPattern,
+            supportingPaths, supportingExpressions, assumptions,
+            newNoveltyScore, proofStatus, counterexampleStatus,
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
+
     /** Creates a {@link HypothesisCandidate} from a {@link RuleCandidate}. */
     public static HypothesisCandidate from(RuleCandidate candidate, double noveltyScore) {
         return from(candidate, noveltyScore, List.of());

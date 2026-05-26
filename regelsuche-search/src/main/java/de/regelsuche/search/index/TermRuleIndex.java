@@ -1,6 +1,7 @@
 package de.regelsuche.search.index;
 
 import de.regelsuche.transform.RewriteRule;
+import java.util.Collection;
 import java.util.List;
 
 /** Index for narrowing atomic rewrite rules and learned macro moves by term shape and metadata. */
@@ -8,6 +9,24 @@ public interface TermRuleIndex {
     void addAtomicRule(String rootSymbol, RewriteRule rule);
 
     void addMacroMove(IndexedMacroMove rule);
+
+    default boolean removeAtomicRule(String rootSymbol, RewriteRule rule) {
+        return false;
+    }
+
+    default boolean removeMacroMove(String id) {
+        return false;
+    }
+
+    default boolean updateMacroMove(IndexedMacroMove rule) {
+        boolean removed = removeMacroMove(rule.id());
+        addMacroMove(rule);
+        return removed;
+    }
+
+    default void rebuild(Collection<AtomicRuleEntry> atomicRules, Collection<IndexedMacroMove> macroMoves) {
+        throw new UnsupportedOperationException("bulk rebuild is not supported by this index");
+    }
 
     QueryResult query(String expression, Query query);
 
@@ -38,6 +57,15 @@ public interface TermRuleIndex {
     }
 
     record Metrics(int rulesConsidered, int rulesSkippedByIndex, int rulesMatched) {
+    }
+
+    record AtomicRuleEntry(String rootSymbol, RewriteRule rule) {
+        public AtomicRuleEntry {
+            rootSymbol = rootSymbol == null ? "" : rootSymbol;
+            if (rule == null) {
+                throw new IllegalArgumentException("rule must not be null");
+            }
+        }
     }
 
     record IndexedMacroMove(

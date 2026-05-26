@@ -228,10 +228,12 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
             p.put("type", node.type().name());
             p.put("label", node.label());
             p.put("properties", node.properties().toString());
+            p.put("typedProperties", typedProperties(node.properties()));
             session.run(
                 "MATCH (r:SearchRun {id: $runId}) "
                     + "MERGE (p:ProvenanceEntity:" + labelFor(node.type()) + " {runId: $runId, id: $id}) "
                     + "SET p.type = $type, p.label = $label, p.properties = $properties "
+                    + "SET p += $typedProperties "
                     + "MERGE (r)-[:HAS_PROVENANCE]->(p)",
                 p
             );
@@ -243,14 +245,60 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
             p.put("toId", edge.toId());
             p.put("edgeType", edge.type().name());
             p.put("properties", edge.properties().toString());
+            p.put("typedProperties", typedProperties(edge.properties()));
             session.run(
                 "MATCH (from:ProvenanceEntity {runId: $runId, id: $fromId}) "
                     + "MATCH (to:ProvenanceEntity {runId: $runId, id: $toId}) "
                     + "MERGE (from)-[e:" + edge.type().name() + "]->(to) "
-                    + "SET e.type = $edgeType, e.properties = $properties",
+                    + "SET e.type = $edgeType, e.properties = $properties "
+                    + "SET e += $typedProperties",
                 p
             );
         }
+    }
+
+    private static Map<String, Object> typedProperties(Map<String, String> properties) {
+        Map<String, Object> typed = new HashMap<>();
+        if (properties == null) {
+            return typed;
+        }
+        properties.forEach((key, value) -> {
+            if (key != null && !key.isBlank()) {
+                typed.put(key, typedValue(value));
+            }
+        });
+        return typed;
+    }
+
+    private static Object typedValue(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim();
+        if (trimmed.matches("-?\\d+")) {
+            try {
+                return Long.parseLong(trimmed);
+            } catch (NumberFormatException ignored) {
+                return trimmed;
+            }
+        }
+        if (trimmed.matches("-?\\d+\\.\\d+")) {
+            try {
+                return Double.parseDouble(trimmed);
+            } catch (NumberFormatException ignored) {
+                return trimmed;
+            }
+        }
+        if ("true".equalsIgnoreCase(trimmed) || "false".equalsIgnoreCase(trimmed)) {
+            return Boolean.parseBoolean(trimmed);
+        }
+        if (trimmed.contains(",")) {
+            return java.util.Arrays.stream(trimmed.split(","))
+                .map(String::trim)
+                .filter(part -> !part.isBlank())
+                .toList();
+        }
+        return value;
     }
 
     @Override

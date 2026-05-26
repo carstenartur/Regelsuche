@@ -5,6 +5,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +34,60 @@ public class RootSymbolTermRuleIndex implements TermRuleIndex, RuleCandidateInde
     @Override
     public void addMacroMove(IndexedMacroMove rule) {
         macroByRoot.computeIfAbsent(rootSymbol(rule.leftPattern()), ignored -> new ArrayList<>()).add(MacroEntry.from(rule));
+    }
+
+    @Override
+    public boolean removeAtomicRule(String rootSymbol, RewriteRule rule) {
+        if (rule == null) {
+            return false;
+        }
+        List<RewriteRule> rules = atomicByRoot.get(normalizeRoot(rootSymbol));
+        if (rules == null) {
+            return false;
+        }
+        boolean removed = rules.remove(rule);
+        if (rules.isEmpty()) {
+            atomicByRoot.remove(normalizeRoot(rootSymbol));
+        }
+        return removed;
+    }
+
+    @Override
+    public boolean removeMacroMove(String id) {
+        if (id == null || id.isBlank()) {
+            return false;
+        }
+        boolean removed = false;
+        List<String> emptyRoots = new ArrayList<>();
+        for (Map.Entry<String, List<MacroEntry>> entry : macroByRoot.entrySet()) {
+            if (entry.getValue().removeIf(macro -> macro.rule().id().equals(id))) {
+                removed = true;
+            }
+            if (entry.getValue().isEmpty()) {
+                emptyRoots.add(entry.getKey());
+            }
+        }
+        emptyRoots.forEach(macroByRoot::remove);
+        return removed;
+    }
+
+    @Override
+    public boolean updateMacroMove(IndexedMacroMove rule) {
+        boolean removed = removeMacroMove(rule.id());
+        addMacroMove(rule);
+        return removed;
+    }
+
+    @Override
+    public void rebuild(Collection<AtomicRuleEntry> atomicRules, Collection<IndexedMacroMove> macroMoves) {
+        atomicByRoot.clear();
+        macroByRoot.clear();
+        if (atomicRules != null) {
+            atomicRules.forEach(entry -> addAtomicRule(entry.rootSymbol(), entry.rule()));
+        }
+        if (macroMoves != null) {
+            macroMoves.forEach(this::addMacroMove);
+        }
     }
 
     @Override

@@ -1,6 +1,7 @@
 package de.regelsuche.mining;
 
 import java.util.List;
+import java.util.Set;
 
 /** Composite ranking for deciding which hypotheses deserve report/inventory attention first. */
 public record InterestingnessScore(
@@ -46,7 +47,16 @@ public record InterestingnessScore(
     }
 
     public static InterestingnessScore from(HypothesisCandidate candidate, double similarityToKnownRules) {
-        InterestingnessScoringContext context = new InterestingnessScoringContext(candidate, similarityToKnownRules);
+        return from(candidate, similarityToKnownRules, Set.of());
+    }
+
+    public static InterestingnessScore from(
+        HypothesisCandidate candidate,
+        double similarityToKnownRules,
+        Set<String> domainTags
+    ) {
+        InterestingnessScoringContext context =
+            new InterestingnessScoringContext(candidate, similarityToKnownRules, domainTags);
         double evidence = distinctEvidence(candidate);
         double compression = COMPRESSION.score(context);
         double generality = GENERALIZATION.score(context);
