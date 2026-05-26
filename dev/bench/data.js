@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779821813148,
+  "lastUpdate": 1779833877575,
   "repoUrl": "https://github.com/carstenartur/Regelsuche",
   "entries": {
     "Regelsuche JMH Benchmarks": [
@@ -1540,6 +1540,90 @@ window.BENCHMARK_DATA = {
           {
             "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
             "value": 1018.9941533359664,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "Copilot",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ec91f339dfcac42cb8fd9e62c585b3bec8dcef7b",
+          "message": "Use semantic graph assembler for discovery report artifacts (#59)",
+          "timestamp": "2026-05-27T00:16:14+02:00",
+          "tree_id": "fef15031b07616559f4ceaf128315a1afd3681e9",
+          "url": "https://github.com/carstenartur/Regelsuche/commit/ec91f339dfcac42cb8fd9e62c585b3bec8dcef7b"
+        },
+        "date": 1779833876981,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+            "value": 1.1761007962457974,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+            "value": 2.7883837670393468,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge",
+            "value": 3626.9487541115122,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+            "value": 6.577718026360391,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge",
+            "value": 1765.068472236508,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge",
+            "value": 514.5315323390452,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+            "value": 2.189521599629432,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+            "value": 78.67091880920721,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+            "value": 157.5004723835965,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
+            "value": 1063.5202922414921,
             "unit": "us/op",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
