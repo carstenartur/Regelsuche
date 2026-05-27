@@ -1,6 +1,7 @@
 package de.regelsuche.api;
 
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.mining.MacroRuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import java.util.List;
@@ -22,11 +23,39 @@ public record IdentityReportDto(
     double compressionRatio,
     CandidateProofStatus proofStatus,
     RuleStatus knownRuleStatus,
-    List<String> supportingTransformationIds
+    List<String> supportingTransformationIds,
+    CounterexampleSearchService.Status counterexampleStatus,
+    List<String> counterexampleAttemptedSources,
+    List<String> inferredAssumptions,
+    String counterexampleExplanation
 ) {
+    public IdentityReportDto(
+        String id,
+        String leftPattern,
+        String rightPattern,
+        List<String> ruleIdSequence,
+        int occurrences,
+        double compressionRatio,
+        CandidateProofStatus proofStatus,
+        RuleStatus knownRuleStatus,
+        List<String> supportingTransformationIds
+    ) {
+        this(id, leftPattern, rightPattern, ruleIdSequence, occurrences, compressionRatio,
+            proofStatus, knownRuleStatus, supportingTransformationIds,
+            proofStatus == CandidateProofStatus.REJECTED
+                ? CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND
+                : null,
+            List.of(), List.of(), "");
+    }
+
     public IdentityReportDto {
         ruleIdSequence = List.copyOf(ruleIdSequence);
         supportingTransformationIds = List.copyOf(supportingTransformationIds);
+        counterexampleAttemptedSources = counterexampleAttemptedSources == null
+            ? List.of()
+            : List.copyOf(counterexampleAttemptedSources);
+        inferredAssumptions = inferredAssumptions == null ? List.of() : List.copyOf(inferredAssumptions);
+        counterexampleExplanation = counterexampleExplanation == null ? "" : counterexampleExplanation;
     }
 
     public static IdentityReportDto from(MacroRuleCandidate candidate, RuleStatus knownRuleStatus) {

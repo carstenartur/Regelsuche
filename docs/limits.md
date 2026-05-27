@@ -11,6 +11,10 @@
 - **Proof-vs-Hypothesis strikt getrennt.** `PolynomialNormalFormEquivalenceService` darf für direkte Polynomidentitäten im unterstützten Domain `PROOF` liefern; `GroebnerBasisEquivalenceService` ist davon getrennt und reduziert Polynome modulo kleiner Ideale/Systeme. PSLQ und numerische Relationssuche liefern ausschließlich `HYPOTHESIS`, begrenzte erfolglose Suchen bleiben `UNKNOWN`.
 - **Runtime-Konfiguration für mathematische Algorithmen.** Flags können über explizite Properties-Maps (Tests/CLI), JVM-System-Properties (`regelsuche.math.*`) oder Environment Variables (`REGELSUCHE_MATH_*`) gesetzt werden. Präzedenz: explizite Map vor System Properties vor Environment Variables vor Registry-Defaults.
 - **Evidence-Provenance.** Symbolic-Regression-Proposals, numerische Relationskandidaten und CAS-Validierungsversuche werden als eigene Provenance-Knoten erfasst, bleiben aber semantisch Discovery-/Validierungsartefakte und kein vollständiger Knowledge-Graph-Ersatz.
+- **Counterexample Search als Angriffsmechanismus.** Gegenbeispielsuche liefert
+  `COUNTEREXAMPLE_FOUND`, `NO_COUNTEREXAMPLE_FOUND` oder `INCONCLUSIVE`.
+  Nur ein gefundenes Gegenbeispiel widerlegt; ein Nicht-Fund ist kein Beweis und
+  ein inconclusive Ergebnis darf nicht als robuste Validierung gewertet werden.
 
 ## Was bewusst (noch) nicht geht
 
@@ -24,5 +28,11 @@
 - **Web-Workbench ist auch im gehärteten Modus minimal.** Kein eingebautes OAuth/OIDC, keine Rate-Limits, kein CSRF-Schutz. Für produktiven Mehrnutzer-Betrieb wird weiterhin ein Reverse-Proxy/WAF empfohlen.
 - **SymPy ist optional.** `SymPyEquivalenceService` und `SymPyTransformationEngine` setzen ein installiertes Python/SymPy voraus; ohne Python fallen Tests auf `AstRewriteTransformationEngine` zurück.
 - **Symbolic Regression ist Backend-ready, aber nicht extern produktiv.** Die stabile Backend-Schnittstelle erlaubt spätere PySR-/Operon-/GP-Adapter; die eingebauten Quellen sind weiterhin Heuristik-/Template-Baselines und erzeugen nur beobachtete Hypothesen.
+- **Counterexample-Quellen sind budgetiert.** Aktiv sind deterministische
+  Boundary-/Rational-/Random-Numerik, Division-durch-Null-Annahmen, einfache
+  Domain-Kanten (`sqrt`, `log`/`ln`), optionale Complex-Samples und kleine
+  2x2-Matrix-Samples für nichtkommutative Kandidaten. Vollständige
+  Quantorenabdeckung, NaN/Infinity-Semantik und allgemeine SMT-Beweise sind
+  dadurch nicht ersetzt.
 - **Such-Budget bleibt hart.** Alle Profile haben Grenzen (max. Tiefe, max. besuchte Ausdrücke). Job-Resume kann über die `SearchCheckpointRepository`-Implementierungen (`InMemorySearchCheckpointRepository`, `JsonFileSearchCheckpointRepository`) den besten gefundenen Ausdruck als neuen Startpunkt verwenden; ein wirklich serialisierter Suchstack (komplette Frontier eines beliebigen Strategiezustands inkl. MCTS-Baum) ist nicht enthalten. Siehe [`docs/checkpointing.md`](checkpointing.md).
 - **Job-Manager hat keine Prioritäten / globalen Slots.** Der ServiceFactory-Block trägt die Verantwortung; eine geteilte Jobwarteschlange mit Quoten ist nicht enthalten.

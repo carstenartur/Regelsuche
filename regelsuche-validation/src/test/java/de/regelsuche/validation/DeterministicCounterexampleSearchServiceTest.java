@@ -24,6 +24,7 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertFalse(result.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND, result.status());
         assertTrue(result.inferredAssumptions().isEmpty(),
             "existing b != 0 assumption should filter b=0 samples instead of being re-inferred");
     }
@@ -41,6 +42,65 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertTrue(result.inferredAssumptions().contains("b != 0"));
+        assertEquals(CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND, result.status());
+    }
+
+    @Test
+    void falseRationalCancellationIsRefuted() {
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput("h", "(a + b) / b", "a", List.of()),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+        );
+
+        assertTrue(result.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, result.status());
+    }
+
+    @Test
+    void selfDivisionSuggestsNonZeroAssumption() {
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput("h", "x / x", "1", List.of()),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+        );
+
+        assertFalse(result.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND, result.status());
+        assertTrue(result.inferredAssumptions().contains("x != 0"));
+    }
+
+    @Test
+    void rationalSamplesAreTrackedAsSeparateSource() {
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput("h", "2 * x", "x", List.of()),
+            new CounterexampleSearchService.CounterexampleBudget(0, false, false, 1L, false, true, 0, 0L)
+        );
+
+        assertTrue(result.counterexample().isPresent());
+        assertEquals(List.of("rational-samples"), result.attemptedSources());
+    }
+
+    @Test
+    void parserFailureIsInconclusiveWithExplanation() {
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput("h", "sqrt(", "x", List.of()),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+        );
+
+        assertFalse(result.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.INCONCLUSIVE, result.status());
+        assertTrue(result.explanation().contains("unsupported expression"));
+    }
+
+    @Test
+    void realSqrtIdentityIsRefutedByNegativeBoundarySample() {
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput("h", "sqrt(x^2)", "x", List.of()),
+            new CounterexampleSearchService.CounterexampleBudget(0, true, false, 1L)
+        );
+
+        assertTrue(result.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, result.status());
+        assertEquals(List.of("numeric-boundary-values"), result.attemptedSources());
     }
 
     @Test
@@ -58,7 +118,20 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertFalse(exhausted.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.INCONCLUSIVE, exhausted.status());
+        assertEquals("no executable counterexample source was available", exhausted.explanation());
         assertTrue(sampled.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, sampled.status());
+    }
+
+    @Test
+    void domainAssumptionsAreOnlyInferredForDirectVariables() {
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput("h", "log(x^2 - 2)", "log(x^2 - 2)", List.of()),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+        );
+
+        assertTrue(result.inferredAssumptions().isEmpty());
     }
 
     @Test
@@ -93,7 +166,9 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertFalse(matrixDisabled.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.INCONCLUSIVE, matrixDisabled.status());
         assertTrue(matrixEnabled.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, matrixEnabled.status());
         assertEquals(List.of("matrix-non-commutative"), matrixEnabled.attemptedSources());
     }
 
@@ -105,6 +180,7 @@ class DeterministicCounterexampleSearchServiceTest {
         );
 
         assertTrue(result.counterexample().isPresent());
+        assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, result.status());
         assertEquals(List.of("complex-samples"), result.attemptedSources());
     }
 }

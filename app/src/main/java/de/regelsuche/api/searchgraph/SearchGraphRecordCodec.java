@@ -8,6 +8,7 @@ import de.regelsuche.json.JsonReader;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.mining.MacroMoveExpansion;
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.mining.MacroRuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.transform.RewriteKind;
@@ -210,6 +211,12 @@ public final class SearchGraphRecordCodec {
         writer.property("proofStatus", identity.proofStatus().name());
         writer.property("knownRuleStatus", identity.knownRuleStatus().name());
         writer.stringArray("supportingTransformationIds", identity.supportingTransformationIds());
+        if (identity.counterexampleStatus() != null) {
+            writer.property("counterexampleStatus", identity.counterexampleStatus().name());
+        }
+        writer.stringArray("counterexampleAttemptedSources", identity.counterexampleAttemptedSources());
+        writer.stringArray("inferredAssumptions", identity.inferredAssumptions());
+        writer.property("counterexampleExplanation", identity.counterexampleExplanation());
     }
 
     // ============================================================ fromJson
@@ -427,8 +434,17 @@ public final class SearchGraphRecordCodec {
             doubleValue(values.get("compressionRatio"), 0.0),
             CandidateProofStatus.valueOf(stringValue(values.get("proofStatus"), CandidateProofStatus.OBSERVED.name())),
             RuleStatus.valueOf(stringValue(values.get("knownRuleStatus"), RuleStatus.NEW.name())),
-            stringList(values.get("supportingTransformationIds"))
+            stringList(values.get("supportingTransformationIds")),
+            statusValue(values.get("counterexampleStatus")),
+            stringList(values.get("counterexampleAttemptedSources")),
+            stringList(values.get("inferredAssumptions")),
+            stringValue(values.get("counterexampleExplanation"), "")
         );
+    }
+
+    private static CounterexampleSearchService.Status statusValue(Object raw) {
+        String value = stringValue(raw, "");
+        return value.isBlank() ? null : CounterexampleSearchService.Status.valueOf(value);
     }
 
     // ============================================================ helpers

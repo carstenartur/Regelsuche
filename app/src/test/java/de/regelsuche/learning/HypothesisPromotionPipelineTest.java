@@ -26,6 +26,9 @@ class HypothesisPromotionPipelineTest {
     private static final CounterexampleSearchService NO_COUNTEREXAMPLE =
         (hypothesis, budget) -> CounterexampleSearchService.CounterexampleSearchResult.noCounterexample();
 
+    private static final CounterexampleSearchService INCONCLUSIVE =
+        (hypothesis, budget) -> CounterexampleSearchService.CounterexampleSearchResult.inconclusive("parser failure");
+
     private static final CounterexampleSearchService ALWAYS_COUNTEREXAMPLE =
         (hypothesis, budget) -> new CounterexampleSearchService.CounterexampleSearchResult(
             Optional.of(
@@ -108,10 +111,27 @@ class HypothesisPromotionPipelineTest {
         // Candidates that have a counterexample should be marked as such
         if (!result.newHypotheses().isEmpty()) {
             HypothesisCandidate hyp = result.newHypotheses().getFirst();
-            // counterexampleStatus may be true (found) or the candidate itself may be rejected
-            assertNotNull(hyp.counterexampleStatus(),
-                "counterexample status must be set when service returned a result");
+            assertEquals(CandidateProofStatus.REJECTED, hyp.proofStatus());
+            assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, hyp.counterexampleSearchStatus());
         }
+    }
+
+    @Test
+    void inconclusiveCounterexampleSearchRemainsObservedAndDoesNotPromote() {
+        HypothesisPromotionPipeline pipe = pipeline(INCONCLUSIVE, true);
+        List<SuccessfulTransformationPath> paths = List.of(
+            path("p1", "(x + 1) ^ 2", "1 + 2 * x + x ^ 2"),
+            path("p2", "(x + 2) ^ 2", "4 + 4 * x + x ^ 2"),
+            path("p3", "(x + 3) ^ 2", "9 + 6 * x + x ^ 2")
+        );
+
+        HypothesisPromotionPipeline.PromotionResult result = pipe.run(paths);
+
+        assertFalse(result.newHypotheses().isEmpty());
+        assertTrue(result.promotedRules().isEmpty());
+        assertTrue(result.newHypotheses().stream().allMatch(h ->
+            h.proofStatus() == CandidateProofStatus.OBSERVED
+                && h.counterexampleSearchStatus() == CounterexampleSearchService.Status.INCONCLUSIVE));
     }
 
     @Test
@@ -191,6 +211,6 @@ class HypothesisPromotionPipelineTest {
         assertTrue(result.newHypotheses().stream()
             .anyMatch(h -> h.id().startsWith("symreg-")
                 && h.proofStatus() == CandidateProofStatus.OBSERVED
-                && Boolean.FALSE.equals(h.counterexampleStatus())));
+                && h.counterexampleSearchStatus() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND));
     }
 }

@@ -109,7 +109,7 @@ public final class DiscoveryReplayArtifactWriter {
             .append("th{background:#eef2ff}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin:1rem 0}")
             .append(".card{background:#fff;border:1px solid #d8dee8;border-radius:.75rem;padding:.9rem}")
             .append(".metric{font-size:1.5rem;font-weight:700}.muted{color:#667085;font-size:.92rem}")
-            .append(".replay-step{margin:.2rem 0}.ok{color:#137333}.fail{color:#a50e0e}")
+            .append(".replay-step{margin:.2rem 0}.ok{color:#137333}.fail{color:#a50e0e}.unknown{color:#b45309}.neutral{color:#1d4ed8}")
             .append(".pill{display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:.08rem .45rem;margin:.08rem;font-size:.82rem}")
             .append("code{background:#f3f4f6;border-radius:.25rem;padding:.08rem .25rem}ul,ol{margin:.2rem 0 .2rem 1.2rem;padding:0}")
             .append("</style>");
@@ -139,6 +139,7 @@ public final class DiscoveryReplayArtifactWriter {
         for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
             out.append("<tr><td>").append(escape(row.seed().stableKey())).append("</td><td>")
                 .append(row.success() ? "<span class=\"ok\">OK</span>" : "<span class=\"fail\">FAIL</span>")
+                .append("<div>").append(renderCounterexampleStatusLabel(row)).append("</div>")
                 .append("<div class=\"muted\">Kategorie: ").append(escape(row.seed().category())).append("</div>")
                 .append("</td><td>")
                 .append(renderHtmlDiscoveryDetails(row))
@@ -199,6 +200,10 @@ public final class DiscoveryReplayArtifactWriter {
             out.append("- Kategorie: ").append(row.seed().category()).append('\n');
             out.append("- Annahmen: ").append(joinOrDash(row.seed().assumptions())).append('\n');
             out.append("- Hypothesen: ").append(joinOrDash(row.hypotheses())).append('\n');
+            out.append("- counterexampleStatus: ").append(row.counterexampleSearchStatus().name()).append('\n');
+            out.append("- attempted sources: ").append(joinOrDash(row.counterexampleAttemptedSources())).append('\n');
+            out.append("- inferred assumptions: ").append(joinOrDash(row.inferredAssumptions())).append('\n');
+            out.append("- explanation: ").append(row.counterexampleExplanation().isBlank() ? "–" : row.counterexampleExplanation()).append('\n');
             out.append("- Gegenbeispiele: ").append(joinOrDash(row.counterexamples())).append('\n');
             out.append("- Laufzeit: ").append(row.elapsedMillis()).append(" ms\n");
             out.append("- Speicher: ").append(row.memoryBytes()).append(" B\n");
@@ -253,7 +258,11 @@ public final class DiscoveryReplayArtifactWriter {
             object.property("category", row.seed().category());
             object.array("assumptions", assumptions -> row.seed().assumptions().forEach(assumptions::value));
             object.array("hypotheses", hypotheses -> row.hypotheses().forEach(hypotheses::value));
+            object.property("counterexampleStatus", row.counterexampleSearchStatus().name());
             object.array("counterexamples", counterexamples -> row.counterexamples().forEach(counterexamples::value));
+            object.array("attemptedSources", sources -> row.counterexampleAttemptedSources().forEach(sources::value));
+            object.array("inferredAssumptions", assumptions -> row.inferredAssumptions().forEach(assumptions::value));
+            object.property("explanation", row.counterexampleExplanation());
             object.array("replayPath", replay -> row.replayPath().forEach(replay::value));
         })));
         writer.object("semanticGraph", semantic -> {
@@ -292,6 +301,10 @@ public final class DiscoveryReplayArtifactWriter {
                 object.property("id", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
                 object.property("seedId", row.seed().id());
                 object.property("expression", hypothesis);
+                object.property("counterexampleStatus", row.counterexampleSearchStatus().name());
+                object.array("attemptedSources", sources -> row.counterexampleAttemptedSources().forEach(sources::value));
+                object.array("inferredAssumptions", assumptions -> row.inferredAssumptions().forEach(assumptions::value));
+                object.property("explanation", row.counterexampleExplanation());
                 object.property("evidenceCount", row.replayPath().size());
                 object.array("assumptions", assumptions -> row.seed().assumptions().forEach(assumptions::value));
                 object.array("interestingnessReasons", reasons -> {
@@ -332,13 +345,32 @@ public final class DiscoveryReplayArtifactWriter {
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("schema", "regelsuche.counterexamples/v1");
-        writer.array("counterexamples", arr -> report.rows().forEach(row -> row.counterexamples().forEach(counterexample ->
-            arr.objectValue(object -> {
+        writer.array("counterexamples", arr -> report.rows().forEach(row -> {
+            if (row.counterexamples().isEmpty()) {
+                arr.objectValue(object -> {
+                    object.property("id", stableArtifactId("counterexample-attempt", row.seed().id(), row.counterexampleSearchStatus().name()));
+                    object.property("seedId", row.seed().id());
+                    object.property("counterexampleStatus", row.counterexampleSearchStatus().name());
+                    object.property("description", "");
+                    object.property("counterexample", "");
+                    object.property("refutesHypothesis", "");
+                    object.array("attemptedSources", sources -> row.counterexampleAttemptedSources().forEach(sources::value));
+                    object.array("inferredAssumptions", assumptions -> row.inferredAssumptions().forEach(assumptions::value));
+                    object.property("explanation", row.counterexampleExplanation());
+                });
+            }
+            row.counterexamples().forEach(counterexample -> arr.objectValue(object -> {
                 object.property("id", stableArtifactId("counterexample", row.seed().id(), counterexample));
                 object.property("seedId", row.seed().id());
+                object.property("counterexampleStatus", row.counterexampleSearchStatus().name());
                 object.property("description", counterexample);
+                object.property("counterexample", counterexample);
                 object.property("refutesHypothesis", row.hypotheses().isEmpty() ? "" : row.hypotheses().getFirst());
-            }))));
+                object.array("attemptedSources", sources -> row.counterexampleAttemptedSources().forEach(sources::value));
+                object.array("inferredAssumptions", assumptions -> row.inferredAssumptions().forEach(assumptions::value));
+                object.property("explanation", row.counterexampleExplanation());
+            }));
+        }));
         writer.endObject();
         return writer.toString();
     }
@@ -362,6 +394,16 @@ public final class DiscoveryReplayArtifactWriter {
                 node.property("id", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
                 node.property("type", "Hypothesis");
                 node.property("label", hypothesis);
+                node.property("counterexampleStatus", row.counterexampleSearchStatus().name());
+            }));
+            row.hypotheses().forEach(hypothesis -> nodes.objectValue(node -> {
+                node.property("id", stableArtifactId("counterexample-attempt", row.seed().id(), hypothesis));
+                node.property("type", "CounterexampleSearchAttempt");
+                node.property("label", "Counterexample search for " + hypothesis);
+                node.property("status", row.counterexampleSearchStatus().name());
+                node.array("attemptedSources", sources -> row.counterexampleAttemptedSources().forEach(sources::value));
+                node.array("inferredAssumptions", assumptions -> row.inferredAssumptions().forEach(assumptions::value));
+                node.property("explanation", row.counterexampleExplanation());
             }));
             row.hypotheses().forEach(hypothesis -> nodes.objectValue(node -> {
                 node.property("id", stableArtifactId("symreg", row.seed().id(), hypothesis));
@@ -377,6 +419,7 @@ public final class DiscoveryReplayArtifactWriter {
                 node.property("id", stableArtifactId("counterexample", row.seed().id(), counterexample));
                 node.property("type", "Counterexample");
                 node.property("label", counterexample);
+                node.property("status", row.counterexampleSearchStatus().name());
             }));
             for (int i = 0; i < row.replayPath().size(); i++) {
                 int index = i;
@@ -408,12 +451,34 @@ public final class DiscoveryReplayArtifactWriter {
                 edge.property("to", stableArtifactId("cas-attempt", row.seed().id(), hypothesis));
                 edge.property("type", "CHECKED_BY");
             }));
+            row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                edge.property("from", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                edge.property("to", stableArtifactId("counterexample-attempt", row.seed().id(), hypothesis));
+                edge.property("type", "HYPOTHESIS_TESTED_BY");
+                edge.property("status", row.counterexampleSearchStatus().name());
+            }));
+            row.hypotheses().forEach(hypothesis -> edges.objectValue(edge -> {
+                edge.property("from", stableArtifactId("counterexample-attempt", row.seed().id(), hypothesis));
+                edge.property("to", stableArtifactId("hypothesis", row.seed().id(), hypothesis));
+                edge.property("type", switch (row.counterexampleSearchStatus()) {
+                    case COUNTEREXAMPLE_FOUND -> "FOUND_COUNTEREXAMPLE";
+                    case NO_COUNTEREXAMPLE_FOUND -> "NO_COUNTEREXAMPLE_WITHIN_BUDGET";
+                    case INCONCLUSIVE -> "INCONCLUSIVE_DUE_TO";
+                });
+            }));
             row.counterexamples().forEach(counterexample -> edges.objectValue(edge -> {
                 edge.property("from", row.hypotheses().isEmpty() ? "search-run:" + row.seed().id()
                     : stableArtifactId("hypothesis", row.seed().id(), row.hypotheses().getFirst()));
                 edge.property("to", stableArtifactId("counterexample", row.seed().id(), counterexample));
                 edge.property("type", row.hypotheses().isEmpty() ? "GENERATED" : "HAS_COUNTEREXAMPLE");
             }));
+            if (!row.hypotheses().isEmpty()) {
+                row.counterexamples().forEach(counterexample -> edges.objectValue(edge -> {
+                    edge.property("from", stableArtifactId("hypothesis", row.seed().id(), row.hypotheses().getFirst()));
+                    edge.property("to", stableArtifactId("counterexample", row.seed().id(), counterexample));
+                    edge.property("type", "REFUTED_BY");
+                }));
+            }
             for (int i = 0; i < row.replayPath().size(); i++) {
                 int index = i;
                 edges.objectValue(edge -> {
@@ -623,6 +688,7 @@ public final class DiscoveryReplayArtifactWriter {
             graphics.setColor(new Color(31, 41, 55));
             graphics.drawString("Main path: " + semanticView.semanticNodeCount() + " nodes", 20, 64);
             graphics.drawString("Collapsed low-signal: " + semanticView.collapsedLowSignalCount(), 20, 82);
+            graphics.drawString("Counterexample status: " + aggregateCounterexampleStatus(report), 20, 100);
             drawSemanticMainPath(graphics, semanticView, frame);
         } finally {
             graphics.dispose();
@@ -715,8 +781,34 @@ public final class DiscoveryReplayArtifactWriter {
         StringBuilder out = new StringBuilder();
         out.append("<div><strong>Annahmen</strong>: ").append(renderPills(row.seed().assumptions())).append("</div>");
         out.append("<div><strong>Hypothesen</strong>: ").append(renderPills(row.hypotheses())).append("</div>");
+        out.append("<div><strong>Counterexample Search</strong>: ").append(renderCounterexampleStatusLabel(row)).append("</div>");
+        out.append("<div><strong>Quellen</strong>: ").append(renderPills(row.counterexampleAttemptedSources())).append("</div>");
+        out.append("<div><strong>Abgeleitete Annahmen</strong>: ").append(renderPills(row.inferredAssumptions())).append("</div>");
         out.append("<div><strong>Gegenbeispiele</strong>: ").append(renderPills(row.counterexamples())).append("</div>");
+        if (!row.counterexampleExplanation().isBlank()) {
+            out.append("<div class=\"muted\">").append(escape(row.counterexampleExplanation())).append("</div>");
+        }
         return out.toString();
+    }
+
+    private String renderCounterexampleStatusLabel(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+        return switch (row.counterexampleSearchStatus()) {
+            case COUNTEREXAMPLE_FOUND -> "<span class=\"fail\">counterexampleStatus: COUNTEREXAMPLE_FOUND</span>";
+            case NO_COUNTEREXAMPLE_FOUND -> "<span class=\"neutral\">counterexampleStatus: NO_COUNTEREXAMPLE_FOUND</span>";
+            case INCONCLUSIVE -> "<span class=\"unknown\">counterexampleStatus: INCONCLUSIVE</span>";
+        };
+    }
+
+    private String aggregateCounterexampleStatus(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+        if (report.rows().stream().anyMatch(row ->
+            row.counterexampleSearchStatus() == de.regelsuche.validation.CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND)) {
+            return "COUNTEREXAMPLE_FOUND";
+        }
+        if (report.rows().stream().anyMatch(row ->
+            row.counterexampleSearchStatus() == de.regelsuche.validation.CounterexampleSearchService.Status.INCONCLUSIVE)) {
+            return "INCONCLUSIVE";
+        }
+        return "NO_COUNTEREXAMPLE_FOUND";
     }
 
     private String renderPills(java.util.List<String> values) {

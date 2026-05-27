@@ -114,12 +114,12 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         String pathId = stablePathId(root, best);
         context.graphStore().saveDiscoveredTransformation(toDiscovered(pathId, root, best, before));
         List<String> hypotheses = List.of("hyp-" + seed.id());
-        List<String> counters = counterexamples.search(new CounterexampleSearchService.HypothesisInput(
+        CounterexampleSearchService.CounterexampleSearchResult counterexampleResult = counterexamples.search(new CounterexampleSearchService.HypothesisInput(
                 hypotheses.getFirst(), root, best.expression(), seed.assumptions()),
-                CounterexampleSearchService.CounterexampleBudget.defaultBudget())
-            .counterexample().map(ce -> List.of(ce.toString())).orElse(List.of());
+                CounterexampleSearchService.CounterexampleBudget.defaultBudget());
         return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
-            counters.isEmpty(), seed.id() + " reproduced: " + label, hypotheses, counters, best.path(), 0L, 0L);
+            counterexampleResult.status() != CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND,
+            seed.id() + " reproduced: " + label, hypotheses, counterexampleResult, best.path(), 0L, 0L);
     }
 
     private DeterministicDiscoveryExperimentRunner.SeedRunOutcome factorization(SeedExpression seed) {
@@ -148,19 +148,25 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         CounterexampleSearchService.CounterexampleSearchResult result = counterexamples.search(
             new CounterexampleSearchService.HypothesisInput("hyp-" + seed.id(), seed.expression(), "a", seed.assumptions()),
             CounterexampleSearchService.CounterexampleBudget.defaultBudget());
-        List<String> found = result.counterexample().map(ce -> List.of(ce.toString())).orElse(List.of());
         return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
-            !found.isEmpty(), seed.id() + " refuted by deterministic counterexample search",
-            List.of("hyp-" + seed.id()), found,
-            List.of(seed.expression(), "counterexample-search", found.isEmpty() ? "none" : found.getFirst()), 0L, 0L);
+            result.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND,
+            seed.id() + " refuted by deterministic counterexample search",
+            List.of("hyp-" + seed.id()), result,
+            List.of(seed.expression(), "counterexample-search",
+                result.counterexample().map(Object::toString).orElse(result.status().name())), 0L, 0L);
     }
 
     private DeterministicDiscoveryExperimentRunner.SeedRunOutcome rational(SeedExpression seed) {
         CounterexampleSearchService.CounterexampleSearchResult result = counterexamples.search(
             new CounterexampleSearchService.HypothesisInput("hyp-" + seed.id(), seed.expression(), "a", seed.assumptions()),
             CounterexampleSearchService.CounterexampleBudget.defaultBudget());
-        if (result.counterexample().isPresent()) {
-            return DeterministicDiscoveryExperimentRunner.SeedRunOutcome.fail("rational cancellation refuted");
+        if (result.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {
+            return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(false, "rational cancellation refuted",
+                List.of("hyp-" + seed.id()), result, List.of(seed.expression(), "counterexample-search"), 0L, 0L);
+        }
+        if (result.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {
+            return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(false, "rational cancellation inconclusive",
+                List.of("hyp-" + seed.id()), result, List.of(seed.expression(), "counterexample-search"), 0L, 0L);
         }
         List<String> assumptions = result.inferredAssumptions().isEmpty()
             ? seed.assumptions()
@@ -238,8 +244,13 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
                 row.seed().expression(), target, List.of("run-" + row.seed().id()),
                 List.of(new HypothesisCandidate.ExpressionPair(row.seed().expression(), target)), row.seed().assumptions(),
                 row.success() ? 1.0 : 0.0,
-                row.success() ? CandidateProofStatus.VALIDATED_BY_EXAMPLES : CandidateProofStatus.REJECTED,
-                !row.counterexamples().isEmpty(), List.of("scientific-reproduction"), java.util.Map.of(), FIXED_INSTANT));
+                proofStatusFor(row), switch (row.counterexampleSearchStatus()) {
+                    case COUNTEREXAMPLE_FOUND -> Boolean.TRUE;
+                    case NO_COUNTEREXAMPLE_FOUND -> Boolean.FALSE;
+                    case INCONCLUSIVE -> null;
+                }, row.counterexampleSearchStatus(),
+                row.counterexampleAttemptedSources(), row.counterexampleExplanation(),
+                List.of("scientific-reproduction"), java.util.Map.of(), FIXED_INSTANT));
             adapters.searchRuns().save(new SearchRunEntity("run-" + row.seed().id(), row.seed().expression(), target,
                 "scientific-discovery-workflow", row.success() ? "SUCCEEDED" : "FAILED", row.replayPath().size(), 0,
                 row.hypotheses(), FIXED_INSTANT, FIXED_INSTANT));
@@ -268,6 +279,16 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             "Scientific Discovery " + format.toUpperCase(Locale.ROOT) + " artifact",
             "artifact=" + path.getFileName() + "; seeds=" + report.metrics().processedSeeds(),
             "scientific-discovery", List.of(), format, path.toUri().toString(), runIds, FIXED_INSTANT));
+    }
+
+    private CandidateProofStatus proofStatusFor(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+        return switch (row.counterexampleSearchStatus()) {
+            case COUNTEREXAMPLE_FOUND -> CandidateProofStatus.REJECTED;
+            case INCONCLUSIVE -> CandidateProofStatus.OBSERVED;
+            case NO_COUNTEREXAMPLE_FOUND -> row.success()
+                ? CandidateProofStatus.VALIDATED_BY_EXAMPLES
+                : CandidateProofStatus.OBSERVED;
+        };
     }
 
     @Override

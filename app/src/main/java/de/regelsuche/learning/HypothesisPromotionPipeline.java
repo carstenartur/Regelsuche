@@ -143,21 +143,21 @@ public class HypothesisPromotionPipeline {
                     CounterexampleSearchService.CounterexampleBudget.defaultBudget()
                 );
 
-            if (counterexampleResult.counterexample().isPresent()) {
-                hypothesis = hypothesis
-                    .withCounterexampleStatus(true)
-                    .withProofStatus(CandidateProofStatus.REJECTED);
+            hypothesis = hypothesis.withCounterexampleResult(counterexampleResult);
+            if (!counterexampleResult.inferredAssumptions().isEmpty()) {
+                List<String> mergedAssumptions = new ArrayList<>(hypothesis.assumptions());
+                mergedAssumptions.addAll(counterexampleResult.inferredAssumptions());
+                hypothesis = hypothesis.withAssumptions(mergedAssumptions);
+            }
+            if (counterexampleResult.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {
+                hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);
                 // Persist with REJECTED status so downstream readers see the correct state.
                 hypothesisRepository.save(hypothesis.id(), hypothesis);
                 newHypotheses.add(hypothesis);
                 continue;
             }
-
-            hypothesis = hypothesis.withCounterexampleStatus(false);
-            if (!counterexampleResult.inferredAssumptions().isEmpty()) {
-                List<String> mergedAssumptions = new ArrayList<>(hypothesis.assumptions());
-                mergedAssumptions.addAll(counterexampleResult.inferredAssumptions());
-                hypothesis = hypothesis.withAssumptions(mergedAssumptions);
+            if (counterexampleResult.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {
+                hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);
             }
 
             // Store as a pending hypothesis.
@@ -165,7 +165,9 @@ public class HypothesisPromotionPipeline {
             newHypotheses.add(hypothesis);
 
             // Track which paths back this validated candidate for the promotion step.
-            if (autoPromote && candidate.proofStatus().ordinal()
+            if (autoPromote
+                && counterexampleResult.status() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND
+                && candidate.proofStatus().ordinal()
                 >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {
                 List<String> candidateAssumptions = hypothesis.assumptions();
                 for (String pathId : candidate.supportingTransformationIds()) {
@@ -195,11 +197,16 @@ public class HypothesisPromotionPipeline {
                         ),
                         CounterexampleSearchService.CounterexampleBudget.defaultBudget()
                     );
-                if (counterexampleResult.counterexample().isPresent()) {
-                    hypothesis = hypothesis.withCounterexampleStatus(true)
-                        .withProofStatus(CandidateProofStatus.REJECTED);
-                } else {
-                    hypothesis = hypothesis.withCounterexampleStatus(false);
+                hypothesis = hypothesis.withCounterexampleResult(counterexampleResult);
+                if (!counterexampleResult.inferredAssumptions().isEmpty()) {
+                    List<String> mergedAssumptions = new ArrayList<>(hypothesis.assumptions());
+                    mergedAssumptions.addAll(counterexampleResult.inferredAssumptions());
+                    hypothesis = hypothesis.withAssumptions(mergedAssumptions);
+                }
+                if (counterexampleResult.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {
+                    hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);
+                } else if (counterexampleResult.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {
+                    hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);
                 }
                 hypothesisRepository.save(hypothesis.id(), hypothesis);
                 newHypotheses.add(hypothesis);
