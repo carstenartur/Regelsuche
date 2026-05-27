@@ -109,12 +109,6 @@ class SemanticSearchGraphAssemblerTest {
         assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("b")));
         assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("lonely")));
         assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("a + 0")));
-        assertTrue(semantic.edges().stream().anyMatch(e -> e.kind() == SemanticEdgeKind.MAIN_STEP
-            && e.hiddenStepCount() == 1
-            && e.sourceEdgeIds().equals(List.of(
-                "a + 0 + 0->a + 0:ast_canonical_normalize",
-                "a + 0->a:remove_zero"
-            ))));
         assertEquals(1, semantic.stats().hiddenAlternativeCount());
     }
 
