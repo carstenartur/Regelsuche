@@ -53,6 +53,12 @@ class ExpressionCanonicalizerTest {
     }
 
     @Test
+    void canonicalizesGlobalPolynomialLikeTerms() {
+        assertEquals("x ^ 2 + 3 * x + 2", canonicalizer.canonicalize("x*x + x*2 + x + 2"));
+        assertEquals("x ^ 2 + 3 * x + 2", canonicalizer.canonicalize("(x + 1)*(x + 2)"));
+    }
+
+    @Test
     void defaultDivisionIsAssumptionFree() {
         // Without an AssumptionContext, x/x must NOT collapse to 1 (would be
         // mathematically wrong in general).
