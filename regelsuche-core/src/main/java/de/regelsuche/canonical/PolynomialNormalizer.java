@@ -63,6 +63,9 @@ public final class PolynomialNormalizer {
         if (leftPolynomial == null || rightPolynomial == null) {
             return null;
         }
+        if (!leftPolynomial.isMonomial() || !rightPolynomial.isMonomial()) {
+            return null;
+        }
         return leftPolynomial.multiply(rightPolynomial);
     }
 
@@ -73,6 +76,9 @@ public final class PolynomialNormalizer {
         int exponentValue = (int) number.value();
         Polynomial basePolynomial = toPolynomial(base);
         if (basePolynomial == null) {
+            return null;
+        }
+        if (!basePolynomial.isMonomial()) {
             return null;
         }
         return basePolynomial.pow(exponentValue);
@@ -203,6 +209,10 @@ public final class PolynomialNormalizer {
                 }
             }
             return new Polynomial(result);
+        }
+
+        private boolean isMonomial() {
+            return terms.size() <= 1;
         }
 
         private Polynomial pow(int exponent) {

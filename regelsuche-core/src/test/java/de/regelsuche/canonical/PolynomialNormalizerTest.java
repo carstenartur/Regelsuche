@@ -25,14 +25,15 @@ class PolynomialNormalizerTest {
     }
 
     @Test
-    void expandsSafeIntegerPowers() {
-        assertEquals("x ^ 2 + 2 * x + 1", normalize("(x + 1)^2"));
+    void normalizesSafeIntegerPowersOfMonomials() {
+        assertEquals("8 * x ^ 3", normalize("(2*x)^3"));
     }
 
     @Test
     void rejectsUnsupportedOperatorsAndNonIntegerPowers() {
         assertTrue(normalizer.normalize(parse("x / y + x")).isEmpty());
         assertTrue(normalizer.normalize(parse("x ^ 0.5")).isEmpty());
+        assertTrue(normalizer.normalize(parse("(x + 1)^2")).isEmpty());
         assertTrue(normalizer.normalize(parse("sin(x) + x")).isEmpty());
     }
 
