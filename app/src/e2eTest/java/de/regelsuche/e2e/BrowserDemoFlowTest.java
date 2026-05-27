@@ -565,10 +565,13 @@ class BrowserDemoFlowTest {
         page.locator(".tab[data-tab='graph']").click();
         page.waitForSelector("#tab-graph.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
-        page.locator("#graphViewMode").selectOption("semantic");
-        page.locator("#graphFilter").fill("");
-        page.locator("#showLowSignal").setChecked(false);
-        page.locator("#showAlternatives").setChecked(false);
+        page.evaluate(
+            "() => {"
+                + " document.querySelector('#graphViewMode').value = 'semantic';"
+                + " document.querySelector('#graphFilter').value = '';"
+                + " document.querySelector('#showLowSignal').checked = false;"
+                + " document.querySelector('#showAlternatives').checked = false;"
+                + "}");
         page.locator("#reloadGraph").click();
         page.waitForFunction(
             "() => typeof window.cytoscape === 'function' || window.__cytoscapeFailed === true",
