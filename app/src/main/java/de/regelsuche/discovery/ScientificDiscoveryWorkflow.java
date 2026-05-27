@@ -244,7 +244,11 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
                 row.seed().expression(), target, List.of("run-" + row.seed().id()),
                 List.of(new HypothesisCandidate.ExpressionPair(row.seed().expression(), target)), row.seed().assumptions(),
                 row.success() ? 1.0 : 0.0,
-                proofStatusFor(row), !row.counterexamples().isEmpty(), row.counterexampleSearchStatus(),
+                proofStatusFor(row), switch (row.counterexampleSearchStatus()) {
+                    case COUNTEREXAMPLE_FOUND -> Boolean.TRUE;
+                    case NO_COUNTEREXAMPLE_FOUND -> Boolean.FALSE;
+                    case INCONCLUSIVE -> null;
+                }, row.counterexampleSearchStatus(),
                 row.counterexampleAttemptedSources(), row.counterexampleExplanation(),
                 List.of("scientific-reproduction"), java.util.Map.of(), FIXED_INSTANT));
             adapters.searchRuns().save(new SearchRunEntity("run-" + row.seed().id(), row.seed().expression(), target,

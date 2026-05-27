@@ -472,12 +472,13 @@ public final class DiscoveryReplayArtifactWriter {
                 edge.property("to", stableArtifactId("counterexample", row.seed().id(), counterexample));
                 edge.property("type", row.hypotheses().isEmpty() ? "GENERATED" : "HAS_COUNTEREXAMPLE");
             }));
-            row.counterexamples().forEach(counterexample -> edges.objectValue(edge -> {
-                edge.property("from", row.hypotheses().isEmpty() ? "search-run:" + row.seed().id()
-                    : stableArtifactId("hypothesis", row.seed().id(), row.hypotheses().getFirst()));
-                edge.property("to", stableArtifactId("counterexample", row.seed().id(), counterexample));
-                edge.property("type", row.hypotheses().isEmpty() ? "GENERATED" : "REFUTED_BY");
-            }));
+            if (!row.hypotheses().isEmpty()) {
+                row.counterexamples().forEach(counterexample -> edges.objectValue(edge -> {
+                    edge.property("from", stableArtifactId("hypothesis", row.seed().id(), row.hypotheses().getFirst()));
+                    edge.property("to", stableArtifactId("counterexample", row.seed().id(), counterexample));
+                    edge.property("type", "REFUTED_BY");
+                }));
+            }
             for (int i = 0; i < row.replayPath().size(); i++) {
                 int index = i;
                 edges.objectValue(edge -> {

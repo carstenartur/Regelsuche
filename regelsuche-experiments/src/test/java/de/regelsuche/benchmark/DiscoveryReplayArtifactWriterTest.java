@@ -1,6 +1,7 @@
 package de.regelsuche.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.example.SeedExpression;
@@ -159,6 +160,34 @@ class DiscoveryReplayArtifactWriterTest {
         assertTrue(first.contains("\"gitCommit\":\"test-commit\""));
         assertTrue(first.contains("\"enabledBackends\":[\"numericRelationSearch\",\"pslq\"]"));
         System.clearProperty("regelsuche.git.commit");
+    }
+
+    @Test
+    void provenanceCounterexampleEdgeUsesSingleGeneratedEdgeWithoutHypothesis() throws Exception {
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report = new DeterministicDiscoveryExperimentRunner.DiscoveryReport(
+            List.of(new DeterministicDiscoveryExperimentRunner.SeedRunReport(
+                new SeedExpression("no-hypothesis", "x", "generated", "none", List.of(), List.of()),
+                false,
+                "counterexample without hypothesis",
+                List.of(),
+                List.of("x=1"),
+                de.regelsuche.validation.CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND,
+                List.of("numeric-random"),
+                List.of(),
+                "refuting sample found",
+                List.of("x"),
+                1L,
+                1L
+            )),
+            new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, 0, 0, 1, 1L, 1L),
+            1L
+        );
+
+        DiscoveryReplayArtifactWriter.ArtifactBundle bundle = new DiscoveryReplayArtifactWriter().write(report, tempDir);
+        String provenance = Files.readString(bundle.provenanceGraphJson());
+
+        assertTrue(provenance.contains("\"type\":\"GENERATED\""));
+        assertFalse(provenance.contains("\"type\":\"REFUTED_BY\""));
     }
 
     private static DeterministicDiscoveryExperimentRunner.DiscoveryReport sampleReport() {

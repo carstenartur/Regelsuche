@@ -131,7 +131,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 Optional.empty(),
                 List.copyOf(inferredAssumptions),
                 attemptedSources,
-                "budget exhausted before any counterexample source could run"
+                "no executable counterexample source was available"
             );
         }
         return CounterexampleSearchResult.noCounterexampleFound(List.copyOf(inferredAssumptions), attemptedSources);
@@ -429,13 +429,10 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
     }
 
     private Set<String> domainAssumptions(Expr expression, String relation) {
-        Set<String> variables = new LinkedHashSet<>();
-        collectVariables(expression, variables);
-        Set<String> assumptions = new LinkedHashSet<>();
-        for (String variable : variables) {
-            assumptions.add(AssumptionSignature.normalizeExpression(variable + " " + relation));
+        if (expression instanceof VariableExpr variableExpr) {
+            return Set.of(AssumptionSignature.normalizeExpression(variableExpr.name() + " " + relation));
         }
-        return assumptions;
+        return Set.of();
     }
 
     private List<AssumptionGuard> assumptionGuards(List<String> assumptions) {

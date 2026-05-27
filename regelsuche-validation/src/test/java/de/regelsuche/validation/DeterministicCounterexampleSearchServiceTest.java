@@ -119,8 +119,19 @@ class DeterministicCounterexampleSearchServiceTest {
 
         assertFalse(exhausted.counterexample().isPresent());
         assertEquals(CounterexampleSearchService.Status.INCONCLUSIVE, exhausted.status());
+        assertEquals("no executable counterexample source was available", exhausted.explanation());
         assertTrue(sampled.counterexample().isPresent());
         assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, sampled.status());
+    }
+
+    @Test
+    void domainAssumptionsAreOnlyInferredForDirectVariables() {
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput("h", "log(x^2 - 2)", "log(x^2 - 2)", List.of()),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+        );
+
+        assertTrue(result.inferredAssumptions().isEmpty());
     }
 
     @Test
