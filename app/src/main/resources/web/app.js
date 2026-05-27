@@ -16,6 +16,7 @@
     window.__regelsucheDemoReady = false;
     window.__regelsucheMathRendered = false;
     window.__regelsucheGraphRendered = false;
+    window.__regelsucheSemanticGraphRendered = false;
     window.__regelsucheReplayReady = false;
     // Optional script loader for the interactive Cytoscape graph view.
     // KaTeX is loaded statically from index.html so cold page loads can
@@ -746,6 +747,7 @@
     /* ─── Graph tab ─── */
     $('reloadGraph').addEventListener('click', async () => {
         window.__regelsucheGraphRendered = false;
+        window.__regelsucheSemanticGraphRendered = false;
         const out = $('graphOutput');
         const canvas = $('graphCanvas');
         const inspector = $('graphInspector');
@@ -792,7 +794,9 @@
     });
 
     window.renderSemanticGraph = function renderSemanticGraph(graph, options) {
-        return renderCytoscape(graph, options);
+        const rendered = renderCytoscape(graph, options);
+        window.__regelsucheSemanticGraphRendered = window.__regelsucheGraphRendered === true;
+        return rendered;
     };
     window.expandSemanticNode = function expandSemanticNode(nodeId) {
         const inspector = $('graphInspector');

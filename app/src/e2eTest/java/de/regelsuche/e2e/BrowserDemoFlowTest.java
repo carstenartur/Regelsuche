@@ -556,16 +556,19 @@ class BrowserDemoFlowTest {
     }
 
     /**
-     * Captures the interactive graph view filtered to the best path. A
-     * Cytoscape/KaTeX overlay is mandatory for documentation assets; fallback
-     * Mermaid/full-page captures are intentionally not written to docs.
+     * Captures the interactive semantic graph view. A Cytoscape/KaTeX overlay
+     * is mandatory for documentation assets; fallback Mermaid/full-page
+     * captures are intentionally not written to docs.
      */
     private void screenshotGraphBestPath(String fileName) {
         if (!RECORD_DOCS) return;
         page.locator(".tab[data-tab='graph']").click();
         page.waitForSelector("#tab-graph.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
-        page.locator("#graphFilter").fill("bestPath=true,hideDeadEnds=true");
+        page.locator("#graphViewMode").selectOption("semantic");
+        page.locator("#graphFilter").fill("");
+        page.locator("#showLowSignal").setChecked(false);
+        page.locator("#showAlternatives").setChecked(false);
         page.locator("#reloadGraph").click();
         page.waitForFunction(
             "() => typeof window.cytoscape === 'function' || window.__cytoscapeFailed === true",
@@ -577,21 +580,13 @@ class BrowserDemoFlowTest {
             throw new TestAbortedException(
                 "Cytoscape unavailable; refusing to replace docs graph screenshot with fallback");
         }
-        waitForGraphRendered();
+        waitForSemanticGraphRendered();
         int renderedNodes = ((Number) page.evaluate(
             "() => document.querySelectorAll("
                 + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
                 + ").length")).intValue();
         assertTrue(renderedNodes >= 2,
-            fileName + " must show at least two KaTeX-rendered best-path nodes");
-        page.evaluate(
-            "() => {"
-                + " const cy = window.__cyForTests;"
-                + " if (cy) {"
-                + "   cy.layout({ name: 'breadthfirst', spacingFactor: 1.8 }).run();"
-                + "   cy.fit(cy.elements(), 80);"
-                + " }"
-                + "}");
+            fileName + " must show at least two KaTeX-rendered semantic graph nodes");
         Path target = SCREENSHOT_DIR.resolve(fileName);
         createParentDirectory(target);
         page.locator("#graphCanvas").scrollIntoViewIfNeeded();
@@ -600,6 +595,16 @@ class BrowserDemoFlowTest {
             .setPath(target)
             .setType(ScreenshotType.PNG));
         assertScreenshotQuality(target, fileName);
+    }
+
+    private void waitForSemanticGraphRendered() {
+        page.waitForFunction(
+            "() => window.__regelsucheSemanticGraphRendered === true "
+                + "&& document.querySelectorAll("
+                + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
+                + ").length > 0",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(10_000));
     }
 
     private void createParentDirectory(Path target) {
