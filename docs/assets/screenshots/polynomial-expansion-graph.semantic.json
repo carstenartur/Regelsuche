@@ -1,11 +1,18 @@
 {
   "schema": "regelsuche.semantic-graph-debug/v1",
   "fileName": "polynomial-expansion-graph.png",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-48636e31",
+  "requestParams": {
+    "mode": "semantic",
+    "showLowSignal": false,
+    "showAlternatives": false,
+    "showVariants": false,
+    "pathId": "demo-48636e31"
+  },
   "visibleNodeIds": [
     "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
     "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
-    "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
-    "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655"
+    "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69"
   ],
   "nodes": [
     {
@@ -23,7 +30,7 @@
       },
       "renderedLayout": {
         "x": 319,
-        "y": 53.07514450867052
+        "y": 58.40677966101697
       }
     },
     {
@@ -41,7 +48,7 @@
       },
       "renderedLayout": {
         "x": 319,
-        "y": 370.35838150289015
+        "y": 449
       }
     },
     {
@@ -59,25 +66,7 @@
       },
       "renderedLayout": {
         "x": 319,
-        "y": 687.6416184971098
-      }
-    },
-    {
-      "id": "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655",
-      "canonicalHash": "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655",
-      "normalizedLabel": "(x+3)*x+2",
-      "label": "(x + 3) * x + 2",
-      "revisit": false,
-      "cycle": false,
-      "onMainPath": true,
-      "explicitEndpoint": true,
-      "layout": {
-        "x": 0,
-        "y": 740
-      },
-      "renderedLayout": {
-        "x": 319,
-        "y": 1004.9248554913295
+        "y": 839.5932203389831
       }
     }
   ],
@@ -90,7 +79,7 @@
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
-        "y": 211.71676300578034
+        "y": 253.70338983050848
       }
     },
     {
@@ -101,18 +90,7 @@
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
-        "y": 529
-      }
-    },
-    {
-      "id": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69->e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655:ast_factor_common_right",
-      "from": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
-      "to": "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655",
-      "label": "ast_factor_common_right",
-      "kind": "MAIN_STEP",
-      "layout": {
-        "x": 319,
-        "y": 846.2832369942196
+        "y": 644.2966101694915
       }
     }
   ],
@@ -120,29 +98,22 @@
     {
       "id": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
       "x": 639.03125,
-      "y": 562.5048217773438,
+      "y": 567.8364868164062,
       "width": 121.9375,
       "height": 27.734375
     },
     {
       "id": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
       "x": 615.21875,
-      "y": 879.7880859375,
+      "y": 958.4296875,
       "width": 169.5625,
       "height": 27.734375
     },
     {
       "id": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
       "x": 626.71875,
-      "y": 1197.0712890625,
+      "y": 1349.02294921875,
       "width": 146.5625,
-      "height": 27.734375
-    },
-    {
-      "id": "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655",
-      "x": 645.03125,
-      "y": 1514.3544921875,
-      "width": 109.9375,
       "height": 27.734375
     }
   ],
@@ -150,22 +121,15 @@
     {
       "id": "\\text{distribute right add}",
       "x": 583.5,
-      "y": 724.310546875,
+      "y": 766.297119140625,
       "width": 137,
       "height": 21.40625
     },
     {
       "id": "\\text{distribute left add}",
       "x": 588.5,
-      "y": 1041.59375,
+      "y": 1156.890380859375,
       "width": 127,
-      "height": 21.40625
-    },
-    {
-      "id": "\\text{factor common right}",
-      "x": 578.5,
-      "y": 1358.876953125,
-      "width": 147,
       "height": 21.40625
     }
   ],
@@ -173,5 +137,7 @@
   "duplicateNormalizedLabelCount": 0,
   "nodeOverlapCount": 0,
   "edgeLabelOverlapCount": 0,
+  "visibleMainPathMeaningfulNodeCount": 3,
+  "collapsedMainPathStepCount": 2,
   "mainPathMeaningfulNodeCount": 4
 }

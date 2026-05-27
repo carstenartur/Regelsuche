@@ -1,16 +1,26 @@
 {
   "schema": "regelsuche.semantic-graph-debug/v1",
   "fileName": "binomial-graph.png",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-2ec3a7db",
+  "requestParams": {
+    "mode": "semantic",
+    "showLowSignal": false,
+    "showAlternatives": false,
+    "showVariants": false,
+    "pathId": "demo-2ec3a7db"
+  },
   "visibleNodeIds": [
-    "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
-    "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    "6ce06b615612d5de3405bc6d6be31cc33a36c7c73cc77d2dc7cdae88c1244c17",
+    "be655bb938f02f844075f5d0726dcc9bc3b71859bdc6e4eacf8d6c995b56ad2c",
+    "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10",
+    "6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d"
   ],
   "nodes": [
     {
-      "id": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
-      "canonicalHash": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
-      "normalizedLabel": "cos(x)^2+sin(x)^2",
-      "label": "cos(x) ^ 2 + sin(x) ^ 2",
+      "id": "6ce06b615612d5de3405bc6d6be31cc33a36c7c73cc77d2dc7cdae88c1244c17",
+      "canonicalHash": "6ce06b615612d5de3405bc6d6be31cc33a36c7c73cc77d2dc7cdae88c1244c17",
+      "normalizedLabel": "(x+3)^2",
+      "label": "(x + 3) ^ 2",
       "revisit": false,
       "cycle": false,
       "onMainPath": true,
@@ -21,63 +31,149 @@
       },
       "renderedLayout": {
         "x": 319,
-        "y": 83.20634920634916
+        "y": 53.07514450867052
       }
     },
     {
-      "id": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
-      "canonicalHash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
-      "normalizedLabel": "1",
-      "label": "1",
+      "id": "be655bb938f02f844075f5d0726dcc9bc3b71859bdc6e4eacf8d6c995b56ad2c",
+      "canonicalHash": "be655bb938f02f844075f5d0726dcc9bc3b71859bdc6e4eacf8d6c995b56ad2c",
+      "normalizedLabel": "(x+3)*x+(x+3)*3",
+      "label": "(x + 3) * x + (x + 3) * 3",
       "revisit": false,
       "cycle": false,
       "onMainPath": true,
-      "explicitEndpoint": true,
+      "explicitEndpoint": false,
       "layout": {
         "x": 0,
         "y": 300
       },
       "renderedLayout": {
         "x": 319,
-        "y": 814.7936507936508
+        "y": 370.35838150289015
+      }
+    },
+    {
+      "id": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10",
+      "canonicalHash": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10",
+      "normalizedLabel": "x*x+3*x+(x+3)*3",
+      "label": "x * x + 3 * x + (x + 3) * 3",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "layout": {
+        "x": 0,
+        "y": 520
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 687.6416184971098
+      }
+    },
+    {
+      "id": "6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d",
+      "canonicalHash": "6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d",
+      "normalizedLabel": "x*x+3*x+x*3+3*3",
+      "label": "x * x + 3 * x + x * 3 + 3 * 3",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "layout": {
+        "x": 0,
+        "y": 740
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 1004.9248554913295
       }
     }
   ],
   "edges": [
     {
-      "id": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b->6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b:trig_pythagorean_cos_sin",
-      "from": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
-      "to": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
-      "label": "trig_pythagorean_cos_sin",
+      "id": "6ce06b615612d5de3405bc6d6be31cc33a36c7c73cc77d2dc7cdae88c1244c17->be655bb938f02f844075f5d0726dcc9bc3b71859bdc6e4eacf8d6c995b56ad2c:ast_distribute_left_add",
+      "from": "6ce06b615612d5de3405bc6d6be31cc33a36c7c73cc77d2dc7cdae88c1244c17",
+      "to": "be655bb938f02f844075f5d0726dcc9bc3b71859bdc6e4eacf8d6c995b56ad2c",
+      "label": "ast_distribute_left_add",
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
-        "y": 449
+        "y": 211.71676300578034
+      }
+    },
+    {
+      "id": "be655bb938f02f844075f5d0726dcc9bc3b71859bdc6e4eacf8d6c995b56ad2c->1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10:ast_distribute_right_add",
+      "from": "be655bb938f02f844075f5d0726dcc9bc3b71859bdc6e4eacf8d6c995b56ad2c",
+      "to": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10",
+      "label": "ast_distribute_right_add",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 529
+      }
+    },
+    {
+      "id": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10->6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d:ast_distribute_right_add",
+      "from": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10",
+      "to": "6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d",
+      "label": "ast_distribute_right_add",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 846.2832369942196
       }
     }
   ],
   "nodeLabelRects": [
     {
-      "id": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
-      "x": 632.796875,
-      "y": 592.0188598632812,
-      "width": 134.40625,
+      "id": "6ce06b615612d5de3405bc6d6be31cc33a36c7c73cc77d2dc7cdae88c1244c17",
+      "x": 665.4375,
+      "y": 561.8876342773438,
+      "width": 69.125,
       "height": 28.4375
     },
     {
-      "id": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
-      "x": 689,
-      "y": 1324.957763671875,
-      "width": 22,
-      "height": 25.734375
+      "id": "be655bb938f02f844075f5d0726dcc9bc3b71859bdc6e4eacf8d6c995b56ad2c",
+      "x": 615.21875,
+      "y": 879.5224609375,
+      "width": 169.5625,
+      "height": 27.734375
+    },
+    {
+      "id": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10",
+      "x": 611.0625,
+      "y": 1196.8056640625,
+      "width": 177.875,
+      "height": 27.734375
+    },
+    {
+      "id": "6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d",
+      "x": 607.40625,
+      "y": 1514.0888671875,
+      "width": 185.1875,
+      "height": 27.734375
     }
   ],
   "edgeLabelRects": [
     {
-      "id": "\\text{trig pythagorean cos sin}",
-      "x": 568,
-      "y": 961.328125,
-      "width": 168,
+      "id": "\\text{distribute left add}",
+      "x": 588.5,
+      "y": 724.044921875,
+      "width": 127,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{distribute right add}",
+      "x": 583.5,
+      "y": 1041.328125,
+      "width": 137,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{distribute right add}",
+      "x": 583.5,
+      "y": 1358.611328125,
+      "width": 137,
       "height": 21.40625
     }
   ],
@@ -85,5 +181,7 @@
   "duplicateNormalizedLabelCount": 0,
   "nodeOverlapCount": 0,
   "edgeLabelOverlapCount": 0,
-  "mainPathMeaningfulNodeCount": 2
+  "visibleMainPathMeaningfulNodeCount": 4,
+  "collapsedMainPathStepCount": 3,
+  "mainPathMeaningfulNodeCount": 4
 }

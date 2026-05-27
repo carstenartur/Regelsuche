@@ -1118,11 +1118,7 @@ public class WebWorkbenchServer {
     ) {
         var transformations = graphStore.discoveredTransformations();
         var rawGraph = buildSearchGraph();
-        var selectedTransformations = pathId == null || pathId.isBlank()
-            ? transformations
-            : transformations.stream()
-                .filter(transformation -> pathId.equals(transformation.id()))
-                .toList();
+        var selectedTransformations = selectSemanticTransformations(transformations, pathId);
         var macroRules = new de.regelsuche.mining.MacroRuleMiner().mine(selectedTransformations);
         return new de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphAssembler().assemble(
             rawGraph,
@@ -1135,6 +1131,22 @@ public class WebWorkbenchServer {
             maxAlternatives,
             maxVariantsPerCluster
         );
+    }
+
+    private List<de.regelsuche.discovery.DiscoveredTransformation> selectSemanticTransformations(
+        List<de.regelsuche.discovery.DiscoveredTransformation> transformations,
+        String pathId
+    ) {
+        if (pathId == null || pathId.isBlank()) {
+            return transformations;
+        }
+        var selected = transformations.stream()
+            .filter(transformation -> pathId.equals(transformation.id()))
+            .toList();
+        if (selected.isEmpty()) {
+            return List.of();
+        }
+        return selected;
     }
 
     private void handleExplain(HttpExchange exchange) throws IOException {

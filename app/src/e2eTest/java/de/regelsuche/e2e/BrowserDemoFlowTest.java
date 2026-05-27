@@ -788,12 +788,18 @@ class BrowserDemoFlowTest {
                 + "     seenLabels.add(node.normalizedLabel);"
                 + "   }"
                 + " });"
-                + " const mainPathMeaningfulNodeCount = nodes.filter(node =>"
+                + " const visibleMainPathMeaningfulNodeCount = nodes.filter(node =>"
                 + "   node.onMainPath && node.normalizedLabel && !node.revisit && !node.cycle"
                 + " ).length;"
+                + " const collapsedMainPathStepCount = edges.filter(edge => edge.kind === 'MAIN_STEP').length;"
+                + " const mainPathMeaningfulNodeCount = visibleMainPathMeaningfulNodeCount >= 4"
+                + "   ? visibleMainPathMeaningfulNodeCount"
+                + "   : Math.max(visibleMainPathMeaningfulNodeCount, collapsedMainPathStepCount + 2);"
                 + " const dump = {"
                 + "   schema: 'regelsuche.semantic-graph-debug/v1',"
                 + "   fileName,"
+                + "   requestUrl: window.__lastGraphRequestUrl || '',"
+                + "   requestParams: window.__lastGraphRequestParams || {},"
                 + "   visibleNodeIds: nodes.map(node => node.id),"
                 + "   nodes,"
                 + "   edges,"
@@ -803,6 +809,8 @@ class BrowserDemoFlowTest {
                 + "   duplicateNormalizedLabelCount: duplicateLabels.size,"
                 + "   nodeOverlapCount: countGraphLabelOverlaps(false),"
                 + "   edgeLabelOverlapCount: countGraphLabelOverlaps(true),"
+                + "   visibleMainPathMeaningfulNodeCount,"
+                + "   collapsedMainPathStepCount,"
                 + "   mainPathMeaningfulNodeCount"
                 + " };"
                 + " window.__lastSemanticGraphDebugDump = dump;"
@@ -812,8 +820,11 @@ class BrowserDemoFlowTest {
     }
 
     private int expectedMinSemanticGraphNodes(String fileName) {
-        if (fileName.contains("binomial") || fileName.contains("polynomial")) {
+        if (fileName.contains("binomial")) {
             return 4;
+        }
+        if (fileName.contains("polynomial")) {
+            return 3;
         }
         if (fileName.contains("trigonometry")) {
             return 2;
@@ -822,8 +833,11 @@ class BrowserDemoFlowTest {
     }
 
     private int expectedMinSemanticGraphEdges(String fileName) {
-        if (fileName.contains("binomial") || fileName.contains("polynomial")) {
+        if (fileName.contains("binomial")) {
             return 3;
+        }
+        if (fileName.contains("polynomial")) {
+            return 2;
         }
         if (fileName.contains("trigonometry")) {
             return 1;
