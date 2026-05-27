@@ -17,6 +17,9 @@
     window.__regelsucheMathRendered = false;
     window.__regelsucheGraphRendered = false;
     window.__regelsucheSemanticGraphRendered = false;
+    window.__lastGraphRequestUrl = null;
+    window.__lastGraphRequestParams = null;
+    window.__lastGraphStats = null;
     window.__regelsucheReplayReady = false;
     // Optional script loader for the interactive Cytoscape graph view.
     // KaTeX is loaded statically from index.html so cold page loads can
@@ -767,8 +770,19 @@
         if (inspector) { inspector.style.display = 'none'; inspector.innerHTML = ''; }
         try {
             if (interactive && mode !== 'raw' && typeof cytoscape === 'function' && !window.__cytoscapeFailed) {
-                const response = await fetch('/api/search-graph/semantic' + semanticQuery);
+                const semanticGraphUrl = '/api/search-graph/semantic' + semanticQuery;
+                window.__lastGraphRequestUrl = semanticGraphUrl;
+                window.__lastGraphRequestParams = {
+                    mode: mode,
+                    showLowSignal: showLowSignal,
+                    showAlternatives: showAlternatives,
+                    showVariants: showVariants
+                };
+                const response = await fetch(semanticGraphUrl);
                 const data = await response.json();
+                window.__lastGraphStats = Object.assign(
+                    { semanticNodeCount: ((data && data.nodes) || []).length },
+                    (data && data.stats) || {});
                 renderSemanticGraph(data);
                 const mermaidResp = await fetch('/api/exports/search-graph-semantic.mmd' + semanticQuery);
                 out.textContent = (await mermaidResp.text());
@@ -795,6 +809,7 @@
 
     window.renderSemanticGraph = function renderSemanticGraph(graph, options) {
         const rendered = renderCytoscape(graph, options);
+        renderSemanticGraphBadge(graph);
         window.__regelsucheSemanticGraphRendered = window.__regelsucheGraphRendered === true;
         return rendered;
     };
@@ -884,6 +899,21 @@
             inspector.style.display = 'block';
             inspector.innerHTML = '<em>Klicke auf einen Knoten oder eine Kante, um Details anzuzeigen.</em>';
         }
+    }
+
+    function renderSemanticGraphBadge(graph) {
+        const canvas = $('graphCanvas');
+        if (!canvas) return;
+        const stats = (graph && graph.stats) || {};
+        const semanticNodeCount = ((graph && graph.nodes) || []).length;
+        const rawNodeCount = stats.rawNodeCount || semanticNodeCount;
+        const badge = document.createElement('div');
+        badge.className = 'graph-semantic-watermark';
+        badge.setAttribute('data-semantic-node-count', String(semanticNodeCount));
+        badge.setAttribute('data-raw-node-count', String(rawNodeCount));
+        badge.textContent = 'Semantic Discovery Graph · semanticNodeCount='
+            + semanticNodeCount + ' / rawNodeCount=' + rawNodeCount;
+        canvas.appendChild(badge);
     }
 
     function computeGraphLayout(graph) {

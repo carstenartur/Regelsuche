@@ -565,14 +565,21 @@ class BrowserDemoFlowTest {
         page.locator(".tab[data-tab='graph']").click();
         page.waitForSelector("#tab-graph.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
-        page.evaluate(
-            "() => {"
-                + " document.querySelector('#graphViewMode').value = 'semantic';"
-                + " document.querySelector('#graphFilter').value = '';"
-                + " document.querySelector('#showLowSignal').checked = false;"
-                + " document.querySelector('#showAlternatives').checked = false;"
-                + "}");
-        page.locator("#reloadGraph").click();
+        page.locator("#graphViewMode").selectOption("semantic");
+        page.locator("#graphFilter").fill("");
+        page.locator("#showLowSignal").setChecked(false);
+        page.locator("#showAlternatives").setChecked(false);
+        Response graphResponse = page.waitForResponse(
+            response -> response.url().contains("/api/search-graph/semantic")
+                && response.status() == 200,
+            () -> page.locator("#reloadGraph").click());
+        assertNotNull(graphResponse, fileName + " must request the semantic search graph");
+        assertTrue(graphResponse.url().contains("mode=semantic"),
+            fileName + " semantic graph request must use mode=semantic, got: " + graphResponse.url());
+        assertTrue(graphResponse.url().contains("showLowSignal=false"),
+            fileName + " semantic graph request must disable low-signal edges, got: " + graphResponse.url());
+        assertTrue(graphResponse.url().contains("showAlternatives=false"),
+            fileName + " semantic graph request must disable alternatives, got: " + graphResponse.url());
         page.waitForFunction(
             "() => typeof window.cytoscape === 'function' || window.__cytoscapeFailed === true",
             null,
@@ -584,6 +591,7 @@ class BrowserDemoFlowTest {
                 "Cytoscape unavailable; refusing to replace docs graph screenshot with fallback");
         }
         waitForSemanticGraphRendered();
+        assertSemanticGraphRequestState(fileName);
         int renderedNodes = ((Number) page.evaluate(
             "() => document.querySelectorAll("
                 + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
@@ -614,6 +622,10 @@ class BrowserDemoFlowTest {
             fileName + " must preserve the compressed explanation path");
         assertTrue(graphEdgeCount >= graphNodeCount - 1,
             fileName + " must connect the compressed explanation path");
+        assertSemanticGraphStatsReduction(fileName);
+        String semanticLabel = page.locator(".graph-semantic-watermark").innerText();
+        assertTrue(semanticLabel.contains("Semantic Discovery Graph"),
+            fileName + " must visibly identify the semantic discovery graph");
         if (fileName.contains("binomial") || fileName.contains("polynomial")) {
             int mainPathNodeCount = ((Number) page.evaluate(
                 "() => {"
@@ -637,6 +649,42 @@ class BrowserDemoFlowTest {
 
     private int expectedMinSemanticGraphNodes(String fileName) {
         return fileName.contains("trigonometry") ? 2 : 3;
+    }
+
+    private void assertSemanticGraphRequestState(String fileName) {
+        page.waitForFunction(
+            "() => window.__lastGraphRequestParams "
+                + "&& window.__lastGraphRequestParams.mode === 'semantic' "
+                + "&& window.__lastGraphRequestParams.showLowSignal === false "
+                + "&& window.__lastGraphRequestParams.showAlternatives === false",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
+        String requestUrl = (String) page.evaluate("() => window.__lastGraphRequestUrl || ''");
+        assertTrue(requestUrl.contains("/api/search-graph/semantic"),
+            fileName + " must expose the semantic graph request URL");
+        assertTrue(requestUrl.contains("mode=semantic")
+                && requestUrl.contains("showLowSignal=false")
+                && requestUrl.contains("showAlternatives=false"),
+            fileName + " must expose the active semantic graph request params, got: " + requestUrl);
+    }
+
+    private void assertSemanticGraphStatsReduction(String fileName) {
+        page.waitForSelector(".graph-semantic-watermark",
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(5_000));
+        int semanticNodeCount = ((Number) page.evaluate(
+            "() => window.__lastGraphStats && window.__lastGraphStats.semanticNodeCount || 0")).intValue();
+        int rawNodeCount = ((Number) page.evaluate(
+            "() => window.__lastGraphStats && window.__lastGraphStats.rawNodeCount || 0")).intValue();
+        assertTrue(semanticNodeCount > 0,
+            fileName + " must expose the rendered semantic node count");
+        assertTrue(rawNodeCount > semanticNodeCount,
+            fileName + " must show semanticNodeCount/rawNodeCount reduction");
+        String graphStats = page.locator(".graph-semantic-watermark").innerText();
+        assertTrue(graphStats.contains("semanticNodeCount=" + semanticNodeCount)
+                && graphStats.contains("rawNodeCount=" + rawNodeCount),
+            fileName + " must show semantic/raw graph stats, got: " + graphStats);
     }
 
     private void waitForSemanticGraphRendered() {
