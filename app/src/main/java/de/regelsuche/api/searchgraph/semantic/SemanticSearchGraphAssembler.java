@@ -84,9 +84,15 @@ public final class SemanticSearchGraphAssembler {
                 rawExpressionToClusterId.put(variant, c.canonicalHash());
             }
         }
-        MainPathProjection mainPathProjection = buildMainPathProjection(mainPath, rawExpressionToClusterId, showLowSignal);
+        MainPathProjection mainPathProjection = buildMainPathProjection(
+            mainPath,
+            rawExpressionToClusterId,
+            byHash,
+            showLowSignal
+        );
 
         List<SemanticGraphNodeDto> semanticNodes = canonicalClusters.stream()
+            .filter(c -> !mainPathProjection.shadowedCanonicalNodeIds().contains(c.canonicalHash()))
             .map(c -> toSemanticNode(
                 c,
                 mainPathExpressions.contains(c.canonicalHash()),
@@ -94,6 +100,9 @@ public final class SemanticSearchGraphAssembler {
                 showVariants,
                 maxVariantsPerCluster
             ))
+            .collect(Collectors.toCollection(ArrayList::new));
+        semanticNodes.addAll(mainPathProjection.nodes());
+        semanticNodes = semanticNodes.stream()
             .sorted(Comparator.comparingInt(SemanticGraphNodeDto::minDepth).thenComparing(SemanticGraphNodeDto::id))
             .toList();
 
@@ -370,20 +379,33 @@ public final class SemanticSearchGraphAssembler {
     private MainPathProjection buildMainPathProjection(
         DiscoveredTransformation mainPath,
         Map<String, String> rawExpressionToClusterId,
+        Map<String, CanonicalExpressionCluster> clustersByHash,
         boolean showLowSignal
     ) {
         if (mainPath == null) {
             return MainPathProjection.empty();
         }
         List<SemanticGraphEdgeDto> edges = new ArrayList<>();
+        List<SemanticGraphNodeDto> nodes = new ArrayList<>();
         Set<String> visibleNodeIds = new LinkedHashSet<>();
+        Set<String> shadowedCanonicalNodeIds = new LinkedHashSet<>();
         Set<String> sourceEdgeIds = new LinkedHashSet<>();
-        String currentVisible = clusterId(mainPath.originalExpression(), rawExpressionToClusterId);
-        String goal = clusterId(mainPath.improvedExpression(), rawExpressionToClusterId);
+        String currentVisible = mainPathNodeId(0, mainPath.originalExpression());
+        String goal = mainPathNodeId(mainPath.steps().size() + 1, mainPath.improvedExpression());
+        nodes.add(toMainPathNode(
+            currentVisible,
+            mainPath.originalExpression(),
+            0,
+            SemanticNodeKind.SEED,
+            rawExpressionToClusterId,
+            clustersByHash,
+            shadowedCanonicalNodeIds
+        ));
         visibleNodeIds.add(currentVisible);
         List<String> hiddenSources = new ArrayList<>();
         int hiddenSteps = 0;
-        for (TransformationStep step : mainPath.steps()) {
+        for (int i = 0; i < mainPath.steps().size(); i++) {
+            TransformationStep step = mainPath.steps().get(i);
             String rawId = edgeId(step.beforeExpression(), step.afterExpression(), step.ruleId());
             sourceEdgeIds.add(rawId);
             boolean lowSignal = classifyStepSignal(step) == RewriteSignal.LOW_SIGNAL;
@@ -392,7 +414,18 @@ public final class SemanticSearchGraphAssembler {
                 hiddenSteps++;
                 continue;
             }
-            String to = clusterId(step.afterExpression(), rawExpressionToClusterId);
+            boolean finalStep = i == mainPath.steps().size() - 1
+                && Objects.equals(step.afterExpression(), mainPath.improvedExpression());
+            String to = finalStep ? goal : mainPathNodeId(step.index() + 1, step.afterExpression());
+            nodes.add(toMainPathNode(
+                to,
+                step.afterExpression(),
+                finalStep ? mainPath.steps().size() + 1 : step.index() + 1,
+                finalStep ? SemanticNodeKind.GOAL : SemanticNodeKind.INTERMEDIATE,
+                rawExpressionToClusterId,
+                clustersByHash,
+                shadowedCanonicalNodeIds
+            ));
             List<String> edgeSources = new ArrayList<>(hiddenSources);
             edgeSources.add(rawId);
             if (!currentVisible.equals(to)) {
@@ -404,11 +437,72 @@ public final class SemanticSearchGraphAssembler {
             hiddenSteps = 0;
         }
         if (hiddenSteps > 0 && !currentVisible.equals(goal)) {
+            nodes.add(toMainPathNode(
+                goal,
+                mainPath.improvedExpression(),
+                mainPath.steps().size() + 1,
+                SemanticNodeKind.GOAL,
+                rawExpressionToClusterId,
+                clustersByHash,
+                shadowedCanonicalNodeIds
+            ));
             edges.add(collapsedMainPathTailEdge(currentVisible, goal, hiddenSteps, hiddenSources));
             currentVisible = goal;
         }
+        if (nodes.stream().noneMatch(n -> n.id().equals(goal))) {
+            nodes.add(toMainPathNode(
+                goal,
+                mainPath.improvedExpression(),
+                mainPath.steps().size() + 1,
+                SemanticNodeKind.GOAL,
+                rawExpressionToClusterId,
+                clustersByHash,
+                shadowedCanonicalNodeIds
+            ));
+        }
         visibleNodeIds.add(goal);
-        return new MainPathProjection(dedupeEdges(edges), visibleNodeIds, sourceEdgeIds);
+        return new MainPathProjection(dedupeEdges(edges), visibleNodeIds, sourceEdgeIds, dedupeNodes(nodes), shadowedCanonicalNodeIds);
+    }
+
+    private SemanticGraphNodeDto toMainPathNode(
+        String id,
+        String expression,
+        int depth,
+        SemanticNodeKind kind,
+        Map<String, String> rawExpressionToClusterId,
+        Map<String, CanonicalExpressionCluster> clustersByHash,
+        Set<String> shadowedCanonicalNodeIds
+    ) {
+        String canonicalId = clusterId(expression, rawExpressionToClusterId);
+        shadowedCanonicalNodeIds.add(canonicalId);
+        CanonicalExpressionCluster cluster = clustersByHash.get(canonicalId);
+        String canonicalExpression = cluster == null ? expression : cluster.canonicalExpression();
+        int variantCount = cluster == null ? 1 : cluster.variants().size();
+        int bestScore = cluster == null ? 0 : cluster.bestScore();
+        String representativeLatex = MathPresentation.DEFAULT.latex(expression);
+        return new SemanticGraphNodeDto(
+            id,
+            canonicalExpression,
+            expression,
+            representativeLatex,
+            MathPresentation.DEFAULT.layout(representativeLatex),
+            List.of(),
+            variantCount,
+            depth,
+            bestScore,
+            true,
+            variantCount > 1,
+            "canonical:" + canonicalId,
+            kind,
+            kind == SemanticNodeKind.SEED || kind == SemanticNodeKind.GOAL
+        );
+    }
+
+    private static String mainPathNodeId(int index, String expression) {
+        return "main-path-" + index + "-" + Integer.toUnsignedString(
+            (expression == null ? "" : expression).hashCode(),
+            16
+        );
     }
 
     private SemanticGraphEdgeDto projectedMainPathEdge(
@@ -501,17 +595,29 @@ public final class SemanticSearchGraphAssembler {
     private record MainPathProjection(
         List<SemanticGraphEdgeDto> edges,
         Set<String> visibleNodeIds,
-        Set<String> sourceEdgeIds
+        Set<String> sourceEdgeIds,
+        List<SemanticGraphNodeDto> nodes,
+        Set<String> shadowedCanonicalNodeIds
     ) {
         private MainPathProjection {
             edges = List.copyOf(edges);
             visibleNodeIds = Set.copyOf(visibleNodeIds);
             sourceEdgeIds = Set.copyOf(sourceEdgeIds);
+            nodes = List.copyOf(nodes);
+            shadowedCanonicalNodeIds = Set.copyOf(shadowedCanonicalNodeIds);
         }
 
         private static MainPathProjection empty() {
-            return new MainPathProjection(List.of(), Set.of(), Set.of());
+            return new MainPathProjection(List.of(), Set.of(), Set.of(), List.of(), Set.of());
         }
+    }
+
+    private static List<SemanticGraphNodeDto> dedupeNodes(Collection<SemanticGraphNodeDto> nodes) {
+        Map<String, SemanticGraphNodeDto> byId = new LinkedHashMap<>();
+        for (SemanticGraphNodeDto node : nodes) {
+            byId.putIfAbsent(node.id(), node);
+        }
+        return new ArrayList<>(byId.values());
     }
 
     private static List<SemanticGraphEdgeDto> dedupeEdges(Collection<SemanticGraphEdgeDto> edges) {

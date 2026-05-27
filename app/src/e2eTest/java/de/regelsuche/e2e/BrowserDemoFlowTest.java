@@ -596,33 +596,59 @@ class BrowserDemoFlowTest {
             "() => document.querySelectorAll("
                 + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
                 + ").length")).intValue();
-        assertTrue(renderedNodes > 0,
-            fileName + " must show at least one KaTeX-rendered semantic graph node");
+        int expectedMinNodes = expectedMinSemanticGraphNodes(fileName);
+        int expectedMinEdges = expectedMinSemanticGraphEdges(fileName);
+        assertTrue(renderedNodes >= expectedMinNodes,
+            fileName + " must show KaTeX-rendered semantic graph nodes; renderedNodes="
+                + renderedNodes + ", expectedMinNodes=" + expectedMinNodes);
         int isolatedNodes = ((Number) page.evaluate(
             "() => {"
                 + " const cy = window.__cyForTests;"
                 + " if (!cy) return 0;"
                 + " return cy.nodes().filter(n => n.connectedEdges().length === 0).length;"
                 + "}")).intValue();
-        int allowedStartGoalCount = ((Number) page.evaluate(
-            "() => {"
-                + " const cy = window.__cyForTests;"
-                + " if (!cy) return 0;"
-                + " return cy.nodes().filter(n => n.connectedEdges().length === 0"
-                + "   && n.data('payload') && n.data('payload').explicitEndpoint === true).length;"
-                + "}")).intValue();
-        assertTrue(isolatedNodes == 0 || isolatedNodes <= allowedStartGoalCount,
+        assertTrue(isolatedNodes == 0,
             fileName + " must not render orphan semantic graph nodes");
         int graphNodeCount = ((Number) page.evaluate(
             "() => { const cy = window.__cyForTests; return cy ? cy.nodes().length : 0; }")).intValue();
         int graphEdgeCount = ((Number) page.evaluate(
             "() => { const cy = window.__cyForTests; return cy ? cy.edges().length : 0; }")).intValue();
-        int expectedMinNodes = expectedMinSemanticGraphNodes(fileName);
         assertTrue(graphNodeCount >= expectedMinNodes,
             fileName + " must preserve the compressed explanation path; nodes="
                 + graphNodeCount + ", expectedMinNodes=" + expectedMinNodes);
+        assertTrue(graphEdgeCount >= expectedMinEdges,
+            fileName + " must preserve explanatory semantic edges; edges="
+                + graphEdgeCount + ", expectedMinEdges=" + expectedMinEdges);
         assertTrue(graphEdgeCount >= graphNodeCount - 1,
             fileName + " must connect the compressed explanation path");
+        int intermediateNodeCount = ((Number) page.evaluate(
+            "() => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return 0;"
+                + " return cy.nodes().filter(n => {"
+                + "   const payload = n.data('payload') || {};"
+                + "   return payload.explicitEndpoint !== true;"
+                + " }).length;"
+                + "}")).intValue();
+        assertTrue(intermediateNodeCount > 0,
+            fileName + " must include at least one non-endpoint intermediate node");
+        int endpointNodeCount = ((Number) page.evaluate(
+            "() => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return 0;"
+                + " return cy.nodes().filter(n => {"
+                + "   const payload = n.data('payload') || {};"
+                + "   return payload.explicitEndpoint === true;"
+                + " }).length;"
+                + "}")).intValue();
+        assertTrue(graphNodeCount > endpointNodeCount,
+            fileName + " must not collapse to only seed and goal nodes");
+        int visibleEdgeLabelCount = ((Number) page.evaluate(
+            "() => document.querySelectorAll("
+                + "'#graphCanvas .graph-overlay-layer .graph-edge-math .katex'"
+                + ").length")).intValue();
+        assertTrue(visibleEdgeLabelCount > 0,
+            fileName + " must show at least one visible, non-empty semantic edge label");
         assertSemanticGraphStatsReduction(fileName);
         String semanticLabel = page.locator(".graph-semantic-watermark").innerText();
         assertTrue(semanticLabel.contains("Semantic Discovery Graph"),
@@ -650,8 +676,21 @@ class BrowserDemoFlowTest {
     }
 
     private int expectedMinSemanticGraphNodes(String fileName) {
-        if (fileName.contains("polynomial")) {
-            return 1;
+        if (fileName.contains("binomial") || fileName.contains("polynomial")) {
+            return 4;
+        }
+        if (fileName.contains("trigonometry")) {
+            return 3;
+        }
+        return 3;
+    }
+
+    private int expectedMinSemanticGraphEdges(String fileName) {
+        if (fileName.contains("binomial") || fileName.contains("polynomial")) {
+            return 3;
+        }
+        if (fileName.contains("trigonometry")) {
+            return 2;
         }
         return 2;
     }

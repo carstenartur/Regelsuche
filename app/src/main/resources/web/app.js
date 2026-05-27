@@ -846,6 +846,7 @@
         }
         canvas.style.display = 'block';
         canvas.innerHTML = '';
+        canvas.setAttribute('data-graph-math-edges', 'true');
         const elements = [];
         (graph.nodes || []).forEach(n => elements.push({
             data: {

@@ -180,6 +180,63 @@ class SemanticSearchGraphAssemblerTest {
         ), shortcut.sourceEdgeIds());
     }
 
+    @Test
+    void preservesMainPathProjectionWhenCanonicalClusteringCollapsesEquivalentStates() {
+        var raw = new SearchGraphDto(
+            List.of(
+                node("a + b", 0, 10),
+                node("b + a", 1, 8),
+                node("a + b + 0", 2, 6),
+                node("0 + a + b", 3, 4)
+            ),
+            List.of(
+                edge("a + b", "b + a", "expand_binomial", RewriteKind.SIMPLIFY, -2),
+                edge("b + a", "a + b + 0", "collect_terms", RewriteKind.SIMPLIFY, -2),
+                edge("a + b + 0", "0 + a + b", "final_result", RewriteKind.SIMPLIFY, -2)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "main",
+            "a + b",
+            "0 + a + b",
+            List.of(
+                new TransformationStep(0, "a + b", "b + a",
+                    "expand_binomial", RewriteKind.SIMPLIFY, 10, 8, true, ""),
+                new TransformationStep(1, "b + a", "a + b + 0",
+                    "collect_terms", RewriteKind.SIMPLIFY, 8, 6, true, ""),
+                new TransformationStep(2, "a + b + 0", "0 + a + b",
+                    "final_result", RewriteKind.SIMPLIFY, 6, 4, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertEquals(4, semantic.nodes().size());
+        assertEquals(3, semantic.edges().size());
+        assertEquals(4, semantic.nodes().stream().filter(SemanticGraphNodeDto::onMainPath).count());
+        assertEquals(2, semantic.nodes().stream().filter(SemanticGraphNodeDto::explicitEndpoint).count());
+        assertTrue(semantic.nodes().stream().anyMatch(n -> !n.explicitEndpoint()));
+        Set<String> connected = new HashSet<>();
+        semantic.edges().forEach(e -> {
+            connected.add(e.from());
+            connected.add(e.to());
+        });
+        assertTrue(semantic.nodes().stream().allMatch(n -> connected.contains(n.id())));
+        assertTrue(semantic.edges().stream().allMatch(e -> !e.ruleLatex().isBlank()));
+    }
+
     private static SearchGraphNodeDto node(String expression, int depth, int score) {
         return new SearchGraphNodeDto(
             expression,
