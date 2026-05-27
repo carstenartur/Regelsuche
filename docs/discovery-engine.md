@@ -12,7 +12,18 @@ Zentrale Bausteine:
 - `PathReplayDto` und die Web-Workbench liefern das interaktive Schritt-für-Schritt-Replay inklusive Makrozügen, Domänenkarten und Proof-Status.
 - `DomainAwareCasRouter` ist der produktive Einstieg für Polynomidentitäten, kleine Gröbner-Idealprüfungen und numerische Relationssuche; numerische Treffer werden in Reports/Provenance als Hypothesen mit Koeffizienten und Residual geführt.
 - Symbolic-Regression-Proposals laufen über Backend-Ports und bleiben im Discovery-Workflow Evidence-only: Sample-Fit → Hypothese → Counterexample-Suche → optionaler unterstützter Proof-Versuch.
-- Der Provenance-Graph unterscheidet Hypothesen, Regression-Proposals, numerische Relationskandidaten und CAS-Validierungsversuche, damit Reports und spätere UI-Queries Quelle und Beweissemantik getrennt darstellen können.
+- Counterexample Search wird als Angriff auf Hypothesen durchgereicht. Der Status ist tri-state:
+  `COUNTEREXAMPLE_FOUND` widerlegt die Hypothese, `NO_COUNTEREXAMPLE_FOUND`
+  bedeutet nur "innerhalb Budget/Quellen nicht widerlegt", und `INCONCLUSIVE`
+  ist keine belastbare Aussage.
+- Reports, Replay-JSON, Hypothesen-/Counterexample-Exports und
+  `provenance.graph.json` enthalten `counterexampleStatus`, attempted
+  sources, inferred assumptions und explanation. `NO_COUNTEREXAMPLE_FOUND`
+  wird bewusst nicht als Beweis dargestellt.
+- Der Provenance-Graph unterscheidet Hypothesen, Counterexample-Search-Attempts,
+  Gegenbeispiele, Regression-Proposals, numerische Relationskandidaten und
+  CAS-Validierungsversuche, damit Reports und spätere UI-Queries Quelle und
+  Beweissemantik getrennt darstellen können.
 - `de.regelsuche.search.index.RuleCandidateIndex` erweitert den bisherigen
   `TermRuleIndex`-Pfad um `CandidateSet`, `SearchContext`, `CandidateBudget`
   und detaillierte `IndexMetrics`. `RootSymbolTermRuleIndex` bleibt die
