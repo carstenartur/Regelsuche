@@ -228,11 +228,115 @@ class SemanticSearchGraphAssemblerTest {
             8
         );
 
-        assertEquals(4, semantic.nodes().size());
-        assertEquals(3, semantic.edges().size());
-        assertEquals(4, semantic.nodes().stream().filter(SemanticGraphNodeDto::onMainPath).count());
-        assertEquals(2, semantic.nodes().stream().filter(SemanticGraphNodeDto::explicitEndpoint).count());
-        assertTrue(semantic.nodes().stream().anyMatch(n -> !n.explicitEndpoint()));
+        assertEquals(1, semantic.nodes().size());
+        assertEquals(0, semantic.edges().size());
+        assertEquals(1, semantic.nodes().stream().filter(SemanticGraphNodeDto::onMainPath).count());
+        assertUniqueCanonicalHashesAndLabels(semantic);
+    }
+
+    @Test
+    void deduplicatesConsecutiveMainPathStatesInSameCanonicalCluster() {
+        var raw = new SearchGraphDto(
+            List.of(
+                node("a", 0, 10),
+                node("b", 1, 8),
+                node("c", 3, 4)
+            ),
+            List.of(
+                edge("a", "b", "a_to_b", RewriteKind.SIMPLIFY, -2),
+                edge("b", "b", "rewrite_b_to_b", RewriteKind.SIMPLIFY, 0),
+                edge("b", "c", "b_to_c", RewriteKind.SIMPLIFY, -4)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "main",
+            "a",
+            "c",
+            List.of(
+                new TransformationStep(0, "a", "b",
+                    "a_to_b", RewriteKind.SIMPLIFY, 10, 8, true, ""),
+                new TransformationStep(1, "b", "b",
+                    "rewrite_b_to_b", RewriteKind.SIMPLIFY, 8, 8, true, ""),
+                new TransformationStep(2, "b", "c",
+                    "b_to_c", RewriteKind.SIMPLIFY, 8, 4, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertEquals(List.of("a", "b", "c"), semantic.nodes().stream()
+            .map(SemanticGraphNodeDto::representativeExpression)
+            .sorted()
+            .toList());
+        assertEquals(3, semantic.nodes().size());
+        assertUniqueCanonicalHashesAndLabels(semantic);
+        var collapsed = semantic.edges().stream()
+            .filter(e -> e.sourceEdgeIds().contains("b->b:rewrite_b_to_b"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(1, collapsed.hiddenStepCount());
+        assertEquals(List.of("a->b:a_to_b", "b->b:rewrite_b_to_b"), collapsed.sourceEdgeIds());
+    }
+
+    @Test
+    void reusesCanonicalNodeWhenMainPathReturnsToEarlierCluster() {
+        var raw = new SearchGraphDto(
+            List.of(
+                node("a", 0, 10),
+                node("b", 1, 8),
+                node("c", 3, 4)
+            ),
+            List.of(
+                edge("a", "b", "a_to_b", RewriteKind.SIMPLIFY, -2),
+                edge("b", "a", "b_to_a", RewriteKind.SIMPLIFY, -1),
+                edge("a", "c", "a_to_c", RewriteKind.SIMPLIFY, -4)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "main",
+            "a",
+            "c",
+            List.of(
+                new TransformationStep(0, "a", "b",
+                    "a_to_b", RewriteKind.SIMPLIFY, 10, 8, true, ""),
+                new TransformationStep(1, "b", "a",
+                    "b_to_a", RewriteKind.SIMPLIFY, 8, 7, true, ""),
+                new TransformationStep(2, "a", "c",
+                    "a_to_c", RewriteKind.SIMPLIFY, 7, 4, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertEquals(3, semantic.nodes().size());
+        assertEquals(1, semantic.nodes().stream()
+            .filter(n -> n.representativeExpression().equals("a"))
+            .count());
+        assertUniqueCanonicalHashesAndLabels(semantic);
         Set<String> connected = new HashSet<>();
         semantic.edges().forEach(e -> {
             connected.add(e.from());
@@ -240,6 +344,23 @@ class SemanticSearchGraphAssemblerTest {
         });
         assertTrue(semantic.nodes().stream().allMatch(n -> connected.contains(n.id())));
         assertTrue(semantic.edges().stream().allMatch(e -> !e.ruleLatex().isBlank()));
+    }
+
+    private static void assertUniqueCanonicalHashesAndLabels(SemanticSearchGraphDto semantic) {
+        Set<String> canonicalHashes = new HashSet<>();
+        Set<String> normalizedLabels = new HashSet<>();
+        for (SemanticGraphNodeDto node : semantic.nodes()) {
+            assertTrue(canonicalHashes.add(node.clusterId()),
+                "duplicate canonical hash for visible node: " + node.clusterId());
+            assertTrue(normalizedLabels.add(normalizedLabel(node)),
+                "duplicate normalized label for visible node: " + node.representativeExpression());
+        }
+    }
+
+    private static String normalizedLabel(SemanticGraphNodeDto node) {
+        return node.representativeExpression()
+            .replaceAll("\\s+", "")
+            .toLowerCase(java.util.Locale.ROOT);
     }
 
     private static SearchGraphNodeDto node(String expression, int depth, int score) {

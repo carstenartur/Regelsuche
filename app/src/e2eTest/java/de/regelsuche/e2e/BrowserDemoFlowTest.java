@@ -609,6 +609,7 @@ class BrowserDemoFlowTest {
                 + "}")).intValue();
         assertTrue(isolatedNodes == 0,
             fileName + " must not render orphan semantic graph nodes");
+        assertSemanticGraphNodeIdentityUniqueness(fileName);
         int graphNodeCount = ((Number) page.evaluate(
             "() => { const cy = window.__cyForTests; return cy ? cy.nodes().length : 0; }")).intValue();
         int graphEdgeCount = ((Number) page.evaluate(
@@ -719,6 +720,38 @@ class BrowserDemoFlowTest {
                 && requestUrl.contains("showLowSignal=false")
                 && requestUrl.contains("showAlternatives=false"),
             fileName + " must expose the active semantic graph request params, got: " + requestUrl);
+    }
+
+    private void assertSemanticGraphNodeIdentityUniqueness(String fileName) {
+        @SuppressWarnings("unchecked")
+        List<String> duplicates = (List<String>) page.evaluate(
+            "() => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return ['missing-cytoscape'];"
+                + " const seenHashes = new Map();"
+                + " const seenLabels = new Map();"
+                + " const duplicates = [];"
+                + " cy.nodes().forEach(n => {"
+                + "   const payload = n.data('payload') || {};"
+                + "   const markedRevisit = payload.revisit === true || payload.cycle === true"
+                + "     || payload.isRevisit === true || payload.isCycle === true;"
+                + "   const hash = payload.clusterId || payload.canonicalHash || n.id();"
+                + "   const label = String(payload.representativeExpression"
+                + "     || payload.expression || payload.canonicalExpression || n.data('label') || '')"
+                + "     .replace(/\\s+/g, '').toLowerCase();"
+                + "   if (hash) {"
+                + "     if (seenHashes.has(hash)) duplicates.push('canonicalHash:' + hash);"
+                + "     else seenHashes.set(hash, true);"
+                + "   }"
+                + "   if (label && !markedRevisit) {"
+                + "     if (seenLabels.has(label)) duplicates.push('label:' + label);"
+                + "     else seenLabels.set(label, true);"
+                + "   }"
+                + " });"
+                + " return duplicates;"
+                + "}");
+        assertTrue(duplicates.isEmpty(),
+            fileName + " must not render duplicate visible canonical hashes or labels: " + duplicates);
     }
 
     private void assertSemanticGraphStatsReduction(String fileName) {

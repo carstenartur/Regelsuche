@@ -390,8 +390,8 @@ public final class SemanticSearchGraphAssembler {
         Set<String> visibleNodeIds = new LinkedHashSet<>();
         Set<String> shadowedCanonicalNodeIds = new LinkedHashSet<>();
         Set<String> sourceEdgeIds = new LinkedHashSet<>();
-        String currentVisible = mainPathNodeId(0, mainPath.originalExpression());
-        String goal = mainPathNodeId(mainPath.steps().size() + 1, mainPath.improvedExpression());
+        String currentVisible = clusterId(mainPath.originalExpression(), rawExpressionToClusterId);
+        String goal = clusterId(mainPath.improvedExpression(), rawExpressionToClusterId);
         nodes.add(toMainPathNode(
             currentVisible,
             mainPath.originalExpression(),
@@ -417,21 +417,34 @@ public final class SemanticSearchGraphAssembler {
             }
             boolean finalStep = i == mainPath.steps().size() - 1
                 && Objects.equals(step.afterExpression(), mainPath.improvedExpression());
-            String to = finalStep ? goal : mainPathNodeId(step.index() + 1, step.afterExpression());
-            nodes.add(toMainPathNode(
-                to,
-                step.afterExpression(),
-                finalStep ? mainPath.steps().size() + 1 : step.index() + 1,
-                finalStep ? SemanticNodeKind.GOAL : SemanticNodeKind.INTERMEDIATE,
-                rawExpressionToClusterId,
-                clustersByHash,
-                shadowedCanonicalNodeIds
-            ));
+            String to = clusterId(step.afterExpression(), rawExpressionToClusterId);
+            if (!visibleNodeIds.contains(to)) {
+                nodes.add(toMainPathNode(
+                    to,
+                    step.afterExpression(),
+                    finalStep ? mainPath.steps().size() + 1 : step.index() + 1,
+                    finalStep ? SemanticNodeKind.GOAL : SemanticNodeKind.INTERMEDIATE,
+                    rawExpressionToClusterId,
+                    clustersByHash,
+                    shadowedCanonicalNodeIds
+                ));
+            }
             List<String> edgeSources = new ArrayList<>(hiddenSources);
             edgeSources.add(rawId);
-            if (!currentVisible.equals(to)) {
-                edges.add(projectedMainPathEdge(currentVisible, to, step, hiddenSteps, edgeSources, lowSignal));
+            if (currentVisible.equals(to)) {
+                if (edges.isEmpty()) {
+                    hiddenSources.add(rawId);
+                    hiddenSteps++;
+                } else {
+                    int lastIndex = edges.size() - 1;
+                    edges.set(lastIndex, mergeCollapsedStep(edges.get(lastIndex), hiddenSteps + 1, edgeSources, lowSignal));
+                    hiddenSources.clear();
+                    hiddenSteps = 0;
+                }
+                visibleNodeIds.add(to);
+                continue;
             }
+            edges.add(projectedMainPathEdge(currentVisible, to, step, hiddenSteps, edgeSources, lowSignal));
             visibleNodeIds.add(to);
             currentVisible = to;
             hiddenSources.clear();
@@ -531,13 +544,6 @@ public final class SemanticSearchGraphAssembler {
         );
     }
 
-    private static String mainPathNodeId(int index, String expression) {
-        return "main-path-" + index + "-" + Integer.toUnsignedString(
-            (expression == null ? "" : expression).hashCode(),
-            16
-        );
-    }
-
     private SemanticGraphEdgeDto projectedMainPathEdge(
         String from,
         String to,
@@ -561,6 +567,31 @@ public final class SemanticSearchGraphAssembler {
             null,
             sourceEdgeIds,
             Math.abs(step.scoreBefore() - step.scoreAfter()) + 1.0
+        );
+    }
+
+    private static SemanticGraphEdgeDto mergeCollapsedStep(
+        SemanticGraphEdgeDto edge,
+        int collapsedStepCount,
+        List<String> sourceEdgeIds,
+        boolean lowSignal
+    ) {
+        List<String> mergedSourceEdgeIds = new ArrayList<>(edge.sourceEdgeIds());
+        mergedSourceEdgeIds.addAll(sourceEdgeIds);
+        return new SemanticGraphEdgeDto(
+            edge.from(),
+            edge.to(),
+            edge.ruleId(),
+            edge.ruleLatex(),
+            edge.layout(),
+            edge.kind(),
+            edge.atomicStepCount() + collapsedStepCount,
+            edge.hiddenStepCount() + collapsedStepCount,
+            edge.lowSignal() || lowSignal,
+            edge.macroMove(),
+            edge.macroMoveExpansion(),
+            mergedSourceEdgeIds.stream().distinct().toList(),
+            edge.interestingness()
         );
     }
 
