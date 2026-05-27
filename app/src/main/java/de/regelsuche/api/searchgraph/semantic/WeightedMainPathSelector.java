@@ -31,10 +31,22 @@ public final class WeightedMainPathSelector implements MainPathSelector {
             return Optional.empty();
         }
         MainPathCriteria c = criteria == null ? MainPathCriteria.defaults() : criteria;
-        return paths.stream()
+        List<DiscoveredTransformation> candidates = paths.stream()
+            .filter(this::isNonDegenerate)
+            .toList();
+        if (candidates.isEmpty()) {
+            candidates = paths;
+        }
+        return candidates.stream()
             .max(Comparator.comparingDouble((DiscoveredTransformation p) -> score(p, rawGraph, c))
                 .thenComparingInt(DiscoveredTransformation::totalImprovement)
                 .thenComparing(p -> p.id() == null ? "" : p.id()));
+    }
+
+    private boolean isNonDegenerate(DiscoveredTransformation path) {
+        return path != null
+            && !Objects.equals(path.originalExpression(), path.improvedExpression())
+            && !path.steps().isEmpty();
     }
 
     private double score(DiscoveredTransformation path, SearchGraphDto rawGraph, MainPathCriteria c) {
@@ -44,10 +56,37 @@ public final class WeightedMainPathSelector implements MainPathSelector {
         return c.complexityReductionWeight() * path.totalImprovement()
             + c.proofConfidenceWeight() * path.validationStatus().ordinal()
             + c.macroCompressionWeight() * macroSteps
+            + 0.9 * explanatoryStepCount(path, rawGraph)
             + c.teachingScoreWeight() * Math.max(0, path.totalImprovement() - path.steps().size())
             - c.lowSignalPenalty() * lowSignal
             - c.lengthPenalty() * path.steps().size()
             - c.assumptionPenalty() * assumptions;
+    }
+
+    private int explanatoryStepCount(DiscoveredTransformation path, SearchGraphDto rawGraph) {
+        int count = 0;
+        for (TransformationStep step : path.steps()) {
+            if (step.ruleKind() == de.regelsuche.transform.RewriteKind.EXPAND || step.ruleKind() == de.regelsuche.transform.RewriteKind.SIMPLIFY) {
+                count++;
+                continue;
+            }
+            boolean highOrMedium = false;
+            if (rawGraph != null) {
+                for (SearchGraphEdgeDto edge : rawGraph.edges()) {
+                    if (edge.from().equals(step.beforeExpression())
+                        && edge.to().equals(step.afterExpression())
+                        && edge.ruleId().equals(step.ruleId())
+                        && classifier.classify(edge) != RewriteSignal.LOW_SIGNAL) {
+                        highOrMedium = true;
+                        break;
+                    }
+                }
+            }
+            if (highOrMedium) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private int countLowSignal(DiscoveredTransformation path, SearchGraphDto rawGraph) {

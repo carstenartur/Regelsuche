@@ -404,12 +404,13 @@ public final class SemanticSearchGraphAssembler {
         visibleNodeIds.add(currentVisible);
         List<String> hiddenSources = new ArrayList<>();
         int hiddenSteps = 0;
+        Set<Integer> preservedLowSignalSteps = lowSignalStepsNeededForReadableProjection(mainPath, showLowSignal);
         for (int i = 0; i < mainPath.steps().size(); i++) {
             TransformationStep step = mainPath.steps().get(i);
             String rawId = edgeId(step.beforeExpression(), step.afterExpression(), step.ruleId());
             sourceEdgeIds.add(rawId);
             boolean lowSignal = classifyStepSignal(step) == RewriteSignal.LOW_SIGNAL;
-            if (!showLowSignal && lowSignal) {
+            if (!showLowSignal && lowSignal && !preservedLowSignalSteps.contains(i)) {
                 hiddenSources.add(rawId);
                 hiddenSteps++;
                 continue;
@@ -462,6 +463,38 @@ public final class SemanticSearchGraphAssembler {
         }
         visibleNodeIds.add(goal);
         return new MainPathProjection(dedupeEdges(edges), visibleNodeIds, sourceEdgeIds, dedupeNodes(nodes), shadowedCanonicalNodeIds);
+    }
+
+    private static Set<Integer> lowSignalStepsNeededForReadableProjection(
+        DiscoveredTransformation mainPath,
+        boolean showLowSignal
+    ) {
+        if (showLowSignal || mainPath.steps().size() + 1 < 4) {
+            return Set.of();
+        }
+        int visibleStates = 1;
+        for (TransformationStep step : mainPath.steps()) {
+            if (classifyStepSignal(step) != RewriteSignal.LOW_SIGNAL) {
+                visibleStates++;
+            }
+        }
+        TransformationStep lastStep = mainPath.steps().isEmpty() ? null : mainPath.steps().getLast();
+        if (lastStep != null
+            && classifyStepSignal(lastStep) == RewriteSignal.LOW_SIGNAL
+            && Objects.equals(lastStep.afterExpression(), mainPath.improvedExpression())) {
+            visibleStates++;
+        }
+        int missingStates = Math.max(0, 4 - visibleStates);
+        if (missingStates == 0) {
+            return Set.of();
+        }
+        Set<Integer> preserved = new LinkedHashSet<>();
+        for (int i = 0; i < mainPath.steps().size() && preserved.size() < missingStates; i++) {
+            if (classifyStepSignal(mainPath.steps().get(i)) == RewriteSignal.LOW_SIGNAL) {
+                preserved.add(i);
+            }
+        }
+        return preserved;
     }
 
     private SemanticGraphNodeDto toMainPathNode(
@@ -566,8 +599,7 @@ public final class SemanticSearchGraphAssembler {
             || rule.contains("canonical")
             || rule.contains("normalize")
             || rule.contains("neutral")
-            || rule.contains("identity")
-            || rule.contains("ast_")) {
+            || rule.contains("identity")) {
             return RewriteSignal.LOW_SIGNAL;
         }
         if (step.ruleKind() == de.regelsuche.transform.RewriteKind.NORMALIZE) {

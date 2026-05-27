@@ -118,13 +118,15 @@ class SemanticSearchGraphAssemblerTest {
             List.of(
                 node("start", 0, 10),
                 node("normalized", 1, 10),
-                node("middle", 2, 7),
-                node("goal", 3, 3),
+                node("normalized-again", 2, 10),
+                node("middle", 3, 7),
+                node("goal", 4, 3),
                 node("branch", 2, 6)
             ),
             List.of(
                 edge("start", "normalized", "ast_canonical_normalize", RewriteKind.NORMALIZE, 0),
-                edge("normalized", "middle", "factor_terms", RewriteKind.SIMPLIFY, -3),
+                edge("normalized", "normalized-again", "sort_terms", RewriteKind.NORMALIZE, 0),
+                edge("normalized-again", "middle", "factor_terms", RewriteKind.SIMPLIFY, -3),
                 edge("middle", "goal", "collect_terms", RewriteKind.SIMPLIFY, -4),
                 edge("start", "branch", "alternative_branch", RewriteKind.SIMPLIFY, -4)
             ),
@@ -138,9 +140,11 @@ class SemanticSearchGraphAssemblerTest {
             List.of(
                 new TransformationStep(0, "start", "normalized",
                     "ast_canonical_normalize", RewriteKind.NORMALIZE, 10, 10, true, ""),
-                new TransformationStep(1, "normalized", "middle",
+                new TransformationStep(1, "normalized", "normalized-again",
+                    "sort_terms", RewriteKind.NORMALIZE, 10, 10, true, ""),
+                new TransformationStep(2, "normalized-again", "middle",
                     "factor_terms", RewriteKind.SIMPLIFY, 10, 7, true, ""),
-                new TransformationStep(2, "middle", "goal",
+                new TransformationStep(3, "middle", "goal",
                     "collect_terms", RewriteKind.SIMPLIFY, 7, 3, true, "")
             )
         );
@@ -157,26 +161,27 @@ class SemanticSearchGraphAssemblerTest {
             8
         );
 
-        assertEquals(3, semantic.nodes().size());
+        assertEquals(4, semantic.nodes().size());
         assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("start")));
+        assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("normalized")));
         assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("middle")));
         assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("goal")));
-        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("normalized")));
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("normalized-again")));
         assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("branch")));
         assertTrue(semantic.edges().size() >= semantic.nodes().size() - 1);
-        assertEquals(3, semantic.nodes().stream().filter(SemanticGraphNodeDto::onMainPath).count());
+        assertEquals(4, semantic.nodes().stream().filter(SemanticGraphNodeDto::onMainPath).count());
 
         Map<String, String> nodeIds = semantic.nodes().stream()
             .collect(Collectors.toMap(SemanticGraphNodeDto::representativeExpression, SemanticGraphNodeDto::id));
         var shortcut = semantic.edges().stream()
-            .filter(e -> e.from().equals(nodeIds.get("start")) && e.to().equals(nodeIds.get("middle")))
+            .filter(e -> e.from().equals(nodeIds.get("normalized")) && e.to().equals(nodeIds.get("middle")))
             .findFirst()
             .orElseThrow();
         assertEquals(SemanticEdgeKind.MAIN_STEP, shortcut.kind());
         assertEquals(1, shortcut.hiddenStepCount());
         assertEquals(List.of(
-            "start->normalized:ast_canonical_normalize",
-            "normalized->middle:factor_terms"
+            "normalized->normalized-again:sort_terms",
+            "normalized-again->middle:factor_terms"
         ), shortcut.sourceEdgeIds());
     }
 
