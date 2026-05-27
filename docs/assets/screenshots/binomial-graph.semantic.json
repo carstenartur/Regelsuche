@@ -1,0 +1,89 @@
+{
+  "schema": "regelsuche.semantic-graph-debug/v1",
+  "fileName": "binomial-graph.png",
+  "visibleNodeIds": [
+    "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
+    "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+  ],
+  "nodes": [
+    {
+      "id": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
+      "canonicalHash": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
+      "normalizedLabel": "cos(x)^2+sin(x)^2",
+      "label": "cos(x) ^ 2 + sin(x) ^ 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "layout": {
+        "x": 0,
+        "y": 80
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 83.20634920634916
+      }
+    },
+    {
+      "id": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "canonicalHash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "normalizedLabel": "1",
+      "label": "1",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "layout": {
+        "x": 0,
+        "y": 300
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 814.7936507936508
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b->6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b:trig_pythagorean_cos_sin",
+      "from": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
+      "to": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "label": "trig_pythagorean_cos_sin",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 449
+      }
+    }
+  ],
+  "nodeLabelRects": [
+    {
+      "id": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
+      "x": 632.796875,
+      "y": 592.0188598632812,
+      "width": 134.40625,
+      "height": 28.4375
+    },
+    {
+      "id": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "x": 689,
+      "y": 1324.957763671875,
+      "width": 22,
+      "height": 25.734375
+    }
+  ],
+  "edgeLabelRects": [
+    {
+      "id": "\\text{trig pythagorean cos sin}",
+      "x": 568,
+      "y": 961.328125,
+      "width": 168,
+      "height": 21.40625
+    }
+  ],
+  "duplicateCanonicalHashCount": 0,
+  "duplicateNormalizedLabelCount": 0,
+  "nodeOverlapCount": 0,
+  "edgeLabelOverlapCount": 0,
+  "mainPathMeaningfulNodeCount": 2
+}

@@ -591,6 +591,9 @@ class BrowserDemoFlowTest {
         }
         waitForSemanticGraphRendered();
         assertSemanticGraphRequestState(fileName);
+        waitForExpectedSemanticGraphContent(fileName);
+        Path target = SCREENSHOT_DIR.resolve(fileName);
+        assertSemanticDebugDump(fileName, target);
         int renderedNodes = ((Number) page.evaluate(
             "() => document.querySelectorAll("
                 + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
@@ -655,8 +658,6 @@ class BrowserDemoFlowTest {
             fileName + " must show at least one visible, non-empty semantic edge label");
         assertSemanticGraphVisualLayout(fileName);
         assertSemanticGraphStatsReduction(fileName);
-        Path target = SCREENSHOT_DIR.resolve(fileName);
-        assertSemanticDebugDump(fileName, target);
         String semanticLabel = page.locator(".graph-semantic-watermark").innerText();
         assertTrue(semanticLabel.contains("Semantic Discovery Graph"),
             fileName + " must visibly identify the semantic discovery graph");
@@ -910,6 +911,41 @@ class BrowserDemoFlowTest {
                 + ").length > 0",
             null,
             new Page.WaitForFunctionOptions().setTimeout(10_000));
+    }
+
+    private void waitForExpectedSemanticGraphContent(String fileName) {
+        String expectedLabel = expectedSemanticGraphLabel(fileName);
+        if (expectedLabel.isBlank()) {
+            return;
+        }
+        page.waitForFunction(
+            "expectedLabel => {"
+                + " const normalize = value => String(value || '').replace(/\\s+/g, '').toLowerCase();"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return false;"
+                + " const expected = normalize(expectedLabel);"
+                + " return cy.nodes().some(node => {"
+                + "   const payload = node.data('payload') || {};"
+                + "   const label = payload.representativeExpression || payload.expression"
+                + "     || payload.canonicalExpression || node.data('label') || '';"
+                + "   return normalize(label) === expected;"
+                + " });"
+                + "}",
+            expectedLabel,
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
+    }
+
+    private String expectedSemanticGraphLabel(String fileName) {
+        if (fileName.contains("binomial")) {
+            return "(x + 3) ^ 2";
+        }
+        if (fileName.contains("polynomial")) {
+            return "(x + 1) * (x + 2)";
+        }
+        if (fileName.contains("trigonometry")) {
+            return "cos(x) ^ 2 + sin(x) ^ 2";
+        }
+        return "";
     }
 
     private void assertSemanticGraphVisualLayout(String fileName) {

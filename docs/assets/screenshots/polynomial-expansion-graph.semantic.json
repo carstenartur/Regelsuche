@@ -1,0 +1,177 @@
+{
+  "schema": "regelsuche.semantic-graph-debug/v1",
+  "fileName": "polynomial-expansion-graph.png",
+  "visibleNodeIds": [
+    "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
+    "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
+    "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
+    "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655"
+  ],
+  "nodes": [
+    {
+      "id": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
+      "canonicalHash": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
+      "normalizedLabel": "(x+1)*(x+2)",
+      "label": "(x + 1) * (x + 2)",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "layout": {
+        "x": 0,
+        "y": 80
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 53.07514450867052
+      }
+    },
+    {
+      "id": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
+      "canonicalHash": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
+      "normalizedLabel": "x*(x+2)+1*(x+2)",
+      "label": "x * (x + 2) + 1 * (x + 2)",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "layout": {
+        "x": 0,
+        "y": 300
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 370.35838150289015
+      }
+    },
+    {
+      "id": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
+      "canonicalHash": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
+      "normalizedLabel": "x*x+x*2+x+2",
+      "label": "x * x + x * 2 + x + 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "layout": {
+        "x": 0,
+        "y": 520
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 687.6416184971098
+      }
+    },
+    {
+      "id": "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655",
+      "canonicalHash": "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655",
+      "normalizedLabel": "(x+3)*x+2",
+      "label": "(x + 3) * x + 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "layout": {
+        "x": 0,
+        "y": 740
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 1004.9248554913295
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1->bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893:ast_distribute_right_add",
+      "from": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
+      "to": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
+      "label": "ast_distribute_right_add",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 211.71676300578034
+      }
+    },
+    {
+      "id": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893->6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69:ast_distribute_left_add",
+      "from": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
+      "to": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
+      "label": "ast_distribute_left_add",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 529
+      }
+    },
+    {
+      "id": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69->e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655:ast_factor_common_right",
+      "from": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
+      "to": "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655",
+      "label": "ast_factor_common_right",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 846.2832369942196
+      }
+    }
+  ],
+  "nodeLabelRects": [
+    {
+      "id": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
+      "x": 639.03125,
+      "y": 562.5048217773438,
+      "width": 121.9375,
+      "height": 27.734375
+    },
+    {
+      "id": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
+      "x": 615.21875,
+      "y": 879.7880859375,
+      "width": 169.5625,
+      "height": 27.734375
+    },
+    {
+      "id": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
+      "x": 626.71875,
+      "y": 1197.0712890625,
+      "width": 146.5625,
+      "height": 27.734375
+    },
+    {
+      "id": "e7afe53e626d521124972b9158e215634d0efcd48bcf093cf7c8c43e3c3e5655",
+      "x": 645.03125,
+      "y": 1514.3544921875,
+      "width": 109.9375,
+      "height": 27.734375
+    }
+  ],
+  "edgeLabelRects": [
+    {
+      "id": "\\text{distribute right add}",
+      "x": 583.5,
+      "y": 724.310546875,
+      "width": 137,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{distribute left add}",
+      "x": 588.5,
+      "y": 1041.59375,
+      "width": 127,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{factor common right}",
+      "x": 578.5,
+      "y": 1358.876953125,
+      "width": 147,
+      "height": 21.40625
+    }
+  ],
+  "duplicateCanonicalHashCount": 0,
+  "duplicateNormalizedLabelCount": 0,
+  "nodeOverlapCount": 0,
+  "edgeLabelOverlapCount": 0,
+  "mainPathMeaningfulNodeCount": 4
+}

@@ -20,6 +20,7 @@
     window.__lastGraphRequestUrl = null;
     window.__lastGraphRequestParams = null;
     window.__lastGraphStats = null;
+    window.__lastSelectedPathId = null;
     window.__regelsucheReplayReady = false;
     // Optional script loader for the interactive Cytoscape graph view.
     // KaTeX is loaded statically from index.html so cold page loads can
@@ -288,6 +289,7 @@
         const m = data.metrics || {};
         const best = data.bestPath || {};
         const selected = data.selectedPath || best;
+        window.__lastSelectedPathId = selected && selected.id ? selected.id : null;
         const identities = (data.identities || []).slice(0, 5);
         const targetReached = !!data.targetReached;
         const assumptions = data.assumptions || [];
@@ -764,7 +766,10 @@
         const semanticQuery = '?mode=' + encodeURIComponent(mode)
             + '&showLowSignal=' + encodeURIComponent(String(showLowSignal))
             + '&showAlternatives=' + encodeURIComponent(String(showAlternatives))
-            + '&showVariants=' + encodeURIComponent(String(showVariants));
+            + '&showVariants=' + encodeURIComponent(String(showVariants))
+            + (window.__lastSelectedPathId
+                ? '&pathId=' + encodeURIComponent(window.__lastSelectedPathId)
+                : '');
         out.textContent = 'Lade …';
         if (canvas) canvas.style.display = 'none';
         if (inspector) { inspector.style.display = 'none'; inspector.innerHTML = ''; }
@@ -776,7 +781,8 @@
                     mode: mode,
                     showLowSignal: showLowSignal,
                     showAlternatives: showAlternatives,
-                    showVariants: showVariants
+                    showVariants: showVariants,
+                    pathId: window.__lastSelectedPathId || ''
                 };
                 const response = await fetch(semanticGraphUrl);
                 const data = await response.json();

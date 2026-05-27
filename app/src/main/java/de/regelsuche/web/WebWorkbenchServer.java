@@ -471,13 +471,15 @@ public class WebWorkbenchServer {
         boolean showVariants = parseBooleanParam(queryParam(exchange, "showVariants", "false"));
         int maxAlternatives = parseIntParam(queryParam(exchange, "maxAlternatives", "12"), 12);
         int maxVariantsPerCluster = parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8);
+        String pathId = queryParam(exchange, "pathId", "");
         var graph = buildSemanticSearchGraph(
             mode,
             showLowSignal,
             showAlternatives,
             showVariants,
             maxAlternatives,
-            maxVariantsPerCluster
+            maxVariantsPerCluster,
+            pathId
         );
         sendJson(exchange, 200, de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toJson(graph));
     }
@@ -990,7 +992,8 @@ public class WebWorkbenchServer {
                     parseBooleanParam(queryParam(exchange, "showAlternatives", "true")),
                     parseBooleanParam(queryParam(exchange, "showVariants", "false")),
                     parseIntParam(queryParam(exchange, "maxAlternatives", "12"), 12),
-                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8)
+                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8),
+                    queryParam(exchange, "pathId", "")
                 );
                 sendJson(exchange, 200, de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toJson(graph));
             }
@@ -1010,7 +1013,8 @@ public class WebWorkbenchServer {
                     parseBooleanParam(queryParam(exchange, "showAlternatives", "true")),
                     parseBooleanParam(queryParam(exchange, "showVariants", "false")),
                     parseIntParam(queryParam(exchange, "maxAlternatives", "12"), 12),
-                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8)
+                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8),
+                    queryParam(exchange, "pathId", "")
                 );
                 sendText(exchange, 200, de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toMermaid(graph));
             }
@@ -1109,14 +1113,20 @@ public class WebWorkbenchServer {
         boolean showAlternatives,
         boolean showVariants,
         int maxAlternatives,
-        int maxVariantsPerCluster
+        int maxVariantsPerCluster,
+        String pathId
     ) {
         var transformations = graphStore.discoveredTransformations();
         var rawGraph = buildSearchGraph();
-        var macroRules = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);
+        var selectedTransformations = pathId == null || pathId.isBlank()
+            ? transformations
+            : transformations.stream()
+                .filter(transformation -> pathId.equals(transformation.id()))
+                .toList();
+        var macroRules = new de.regelsuche.mining.MacroRuleMiner().mine(selectedTransformations);
         return new de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphAssembler().assemble(
             rawGraph,
-            transformations,
+            selectedTransformations,
             macroRules,
             mode,
             showLowSignal,
@@ -2330,7 +2340,8 @@ public class WebWorkbenchServer {
             true,
             false,
             12,
-            8
+            8,
+            ""
         );
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {
