@@ -18,7 +18,9 @@ import de.regelsuche.validation.CandidateProofStatus;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class SemanticSearchGraphAssemblerTest {
@@ -106,8 +108,82 @@ class SemanticSearchGraphAssemblerTest {
         assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("b + 0")));
         assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("b")));
         assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("lonely")));
-        assertTrue(semantic.edges().stream().anyMatch(e -> e.kind() == SemanticEdgeKind.LOW_SIGNAL_COLLAPSED));
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("a + 0")));
+        assertTrue(semantic.edges().stream().anyMatch(e -> e.kind() == SemanticEdgeKind.MAIN_STEP
+            && e.hiddenStepCount() == 1
+            && e.sourceEdgeIds().equals(List.of(
+                "a + 0 + 0->a + 0:ast_canonical_normalize",
+                "a + 0->a:remove_zero"
+            ))));
         assertEquals(1, semantic.stats().hiddenAlternativeCount());
+    }
+
+    @Test
+    void compressesHiddenLowSignalMainPathWithoutDestroyingExplanationPath() {
+        var raw = new SearchGraphDto(
+            List.of(
+                node("start", 0, 10),
+                node("normalized", 1, 10),
+                node("middle", 2, 7),
+                node("goal", 3, 3),
+                node("branch", 2, 6)
+            ),
+            List.of(
+                edge("start", "normalized", "ast_canonical_normalize", RewriteKind.NORMALIZE, 0),
+                edge("normalized", "middle", "factor_terms", RewriteKind.SIMPLIFY, -3),
+                edge("middle", "goal", "collect_terms", RewriteKind.SIMPLIFY, -4),
+                edge("start", "branch", "alternative_branch", RewriteKind.SIMPLIFY, -4)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "main",
+            "start",
+            "goal",
+            List.of(
+                new TransformationStep(0, "start", "normalized",
+                    "ast_canonical_normalize", RewriteKind.NORMALIZE, 10, 10, true, ""),
+                new TransformationStep(1, "normalized", "middle",
+                    "factor_terms", RewriteKind.SIMPLIFY, 10, 7, true, ""),
+                new TransformationStep(2, "middle", "goal",
+                    "collect_terms", RewriteKind.SIMPLIFY, 7, 3, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertEquals(3, semantic.nodes().size());
+        assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("start")));
+        assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("middle")));
+        assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("goal")));
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("normalized")));
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("branch")));
+        assertTrue(semantic.edges().size() >= semantic.nodes().size() - 1);
+        assertEquals(3, semantic.nodes().stream().filter(SemanticGraphNodeDto::onMainPath).count());
+
+        Map<String, String> nodeIds = semantic.nodes().stream()
+            .collect(Collectors.toMap(SemanticGraphNodeDto::representativeExpression, SemanticGraphNodeDto::id));
+        var shortcut = semantic.edges().stream()
+            .filter(e -> e.from().equals(nodeIds.get("start")) && e.to().equals(nodeIds.get("middle")))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(SemanticEdgeKind.MAIN_STEP, shortcut.kind());
+        assertEquals(1, shortcut.hiddenStepCount());
+        assertEquals(List.of(
+            "start->normalized:ast_canonical_normalize",
+            "normalized->middle:factor_terms"
+        ), shortcut.sourceEdgeIds());
     }
 
     private static SearchGraphNodeDto node(String expression, int depth, int score) {

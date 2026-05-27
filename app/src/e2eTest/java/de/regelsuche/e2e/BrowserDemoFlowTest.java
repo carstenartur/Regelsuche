@@ -605,6 +605,26 @@ class BrowserDemoFlowTest {
                 + "}")).intValue();
         assertTrue(isolatedNodes == 0 || isolatedNodes <= allowedStartGoalCount,
             fileName + " must not render orphan semantic graph nodes");
+        int graphNodeCount = ((Number) page.evaluate(
+            "() => { const cy = window.__cyForTests; return cy ? cy.nodes().length : 0; }")).intValue();
+        int graphEdgeCount = ((Number) page.evaluate(
+            "() => { const cy = window.__cyForTests; return cy ? cy.edges().length : 0; }")).intValue();
+        int expectedMinNodes = expectedMinSemanticGraphNodes(fileName);
+        assertTrue(graphNodeCount >= expectedMinNodes,
+            fileName + " must preserve the compressed explanation path");
+        assertTrue(graphEdgeCount >= graphNodeCount - 1,
+            fileName + " must connect the compressed explanation path");
+        if (fileName.contains("binomial") || fileName.contains("polynomial")) {
+            int mainPathNodeCount = ((Number) page.evaluate(
+                "() => {"
+                    + " const cy = window.__cyForTests;"
+                    + " if (!cy) return 0;"
+                    + " return cy.nodes().filter(n => n.data('payload')"
+                    + "   && n.data('payload').onMainPath === true).length;"
+                    + "}")).intValue();
+            assertTrue(mainPathNodeCount >= 3,
+                fileName + " must show start, relevant intermediate states, and goal");
+        }
         Path target = SCREENSHOT_DIR.resolve(fileName);
         createParentDirectory(target);
         page.locator("#graphCanvas").scrollIntoViewIfNeeded();
@@ -613,6 +633,10 @@ class BrowserDemoFlowTest {
             .setPath(target)
             .setType(ScreenshotType.PNG));
         assertScreenshotQuality(target, fileName);
+    }
+
+    private int expectedMinSemanticGraphNodes(String fileName) {
+        return fileName.contains("trigonometry") ? 2 : 3;
     }
 
     private void waitForSemanticGraphRendered() {
