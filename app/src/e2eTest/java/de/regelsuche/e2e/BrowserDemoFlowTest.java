@@ -653,6 +653,7 @@ class BrowserDemoFlowTest {
                 + ").length")).intValue();
         assertTrue(visibleEdgeLabelCount > 0,
             fileName + " must show at least one visible, non-empty semantic edge label");
+        assertSemanticGraphVisualLayout(fileName);
         assertSemanticGraphStatsReduction(fileName);
         String semanticLabel = page.locator(".graph-semantic-watermark").innerText();
         assertTrue(semanticLabel.contains("Semantic Discovery Graph"),
@@ -747,6 +748,33 @@ class BrowserDemoFlowTest {
                 + ").length > 0",
             null,
             new Page.WaitForFunctionOptions().setTimeout(10_000));
+    }
+
+    private void assertSemanticGraphVisualLayout(String fileName) {
+        page.waitForFunction(
+            "() => {"
+                + " const canvas = document.querySelector('#graphCanvas');"
+                + " if (!canvas) return false;"
+                + " const box = canvas.getBoundingClientRect();"
+                + " return box.height >= box.width && countGraphLabelOverlaps(false) === 0"
+                + "   && countGraphLabelOverlaps(true) === 0 && mainPathYPositionsIncrease();"
+                + "}",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
+        int nodeLabelOverlaps = ((Number) page.evaluate("() => countGraphLabelOverlaps(false)")).intValue();
+        assertTrue(nodeLabelOverlaps == 0,
+            fileName + " must not overlap node label bounding boxes; overlaps=" + nodeLabelOverlaps);
+        int edgeLabelOverlaps = ((Number) page.evaluate("() => countGraphLabelOverlaps(true)")).intValue();
+        assertTrue(edgeLabelOverlaps == 0,
+            fileName + " must not place edge labels over node labels; overlaps=" + edgeLabelOverlaps);
+        Boolean portrait = (Boolean) page.evaluate(
+            "() => { const box = document.querySelector('#graphCanvas').getBoundingClientRect();"
+                + " return box.height >= box.width; }");
+        assertTrue(Boolean.TRUE.equals(portrait),
+            fileName + " graph screenshot canvas must be portrait or vertical");
+        Boolean increasing = (Boolean) page.evaluate("() => mainPathYPositionsIncrease()");
+        assertTrue(Boolean.TRUE.equals(increasing),
+            fileName + " main-path y positions must be strictly increasing");
     }
 
     private void createParentDirectory(Path target) {

@@ -845,6 +845,7 @@
             return;
         }
         canvas.style.display = 'block';
+        configureGraphCanvas(canvas, graph);
         canvas.innerHTML = '';
         canvas.setAttribute('data-graph-math-edges', 'true');
         const elements = [];
@@ -878,7 +879,7 @@
                 { selector: 'node[?payload.isBest]', style: { 'background-color': '#10b981' } },
                 { selector: 'node[?payload.onMainPath]', style: { 'background-color': '#10b981' } },
                 { selector: 'node[?payload.isDeadEnd]', style: { 'background-color': '#9ca3af' } },
-                { selector: 'edge', style: { 'label': 'data(label)', 'font-size': 8, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle' } },
+                { selector: 'edge', style: { 'label': '', 'font-size': 8, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle' } },
                 { selector: 'edge[?payload.lowSignal]', style: { 'line-color': '#d1d5db', 'target-arrow-color': '#d1d5db', 'opacity': 0.6 } },
                 { selector: 'edge[kind = "MAIN_STEP"]', style: { 'line-color': '#0ea5e9', 'target-arrow-color': '#0ea5e9', 'width': 3 } },
                 { selector: 'edge[kind = "MACRO_MOVE"]', style: { 'line-color': '#8b5cf6', 'target-arrow-color': '#8b5cf6', 'width': 3 } }
@@ -899,6 +900,26 @@
         if (inspector) {
             inspector.style.display = 'block';
             inspector.innerHTML = '<em>Klicke auf einen Knoten oder eine Kante, um Details anzuzeigen.</em>';
+        }
+    }
+
+    function configureGraphCanvas(canvas, graph) {
+        const mode = graph && graph.view && graph.view.mode;
+        const semanticLayout = mode !== 'RAW';
+        canvas.classList.toggle('semantic-graph-canvas', semanticLayout);
+        if (semanticLayout) {
+            const nodeCount = Math.max(1, ((graph && graph.nodes) || []).length);
+            canvas.style.width = '640px';
+            canvas.style.maxWidth = '100%';
+            canvas.style.height = Math.max(900, 180 + nodeCount * 220) + 'px';
+            canvas.style.marginLeft = 'auto';
+            canvas.style.marginRight = 'auto';
+        } else {
+            canvas.style.width = '100%';
+            canvas.style.maxWidth = '';
+            canvas.style.height = '520px';
+            canvas.style.marginLeft = '';
+            canvas.style.marginRight = '';
         }
     }
 
@@ -1013,6 +1034,7 @@
             });
             // Optional edge captions.
             if (showEdges) {
+                const nodeHosts = Array.from(layer.querySelectorAll('.graph-node-math:not(.graph-edge-math)'));
                 cy.edges().forEach((edge) => {
                     const id = 'edge:' + edge.id();
                     nodeIds.add(id);
@@ -1024,15 +1046,13 @@
                         host = document.createElement('div');
                         host.className = 'graph-node-math graph-edge-math';
                         host.setAttribute('data-node-id', id);
+                        host.setAttribute('data-edge-label', 'true');
                         layer.appendChild(host);
                     }
                     host.setAttribute('data-math', '$' + latex + '$');
                     host.textContent = '$' + latex + '$';
-                    const bb = edge.renderedBoundingBox();
-                    const cx = (bb.x1 + bb.x2) / 2;
-                    const cy2 = (bb.y1 + bb.y2) / 2;
-                    host.style.transform = 'translate3d(' + cx + 'px,' + cy2 + 'px, 0) translate(-50%, -50%)';
                     window.renderMathLayout(payload.layout, host);
+                    placeEdgeLabel(edge, host, nodeHosts);
                 });
             }
             // Garbage-collect overlays for removed elements.
@@ -1048,6 +1068,42 @@
             }
             return String(value).replace(/[^a-zA-Z0-9_-]/g, (c) => '\\' + c);
         }
+        function placeEdgeLabel(edge, host, nodeHosts) {
+            const source = edge.source().renderedPosition();
+            const target = edge.target().renderedPosition();
+            const midX = (source.x + target.x) / 2;
+            const midY = (source.y + target.y) / 2;
+            const dx = target.x - source.x;
+            const dy = target.y - source.y;
+            const length = Math.max(1, Math.hypot(dx, dy));
+            const nx = -dy / length;
+            const ny = dx / length;
+            const candidates = [
+                [midX + nx * 48, midY + ny * 48],
+                [midX - nx * 48, midY - ny * 48],
+                [midX + 88, midY],
+                [midX - 88, midY],
+                [midX, midY + 64],
+                [midX, midY - 64]
+            ];
+            for (const candidate of candidates) {
+                setOverlayCenter(host, candidate[0], candidate[1]);
+                if (!intersectsAny(host, nodeHosts)) {
+                    return;
+                }
+            }
+            setOverlayCenter(host, midX + nx * 96, midY + ny * 96);
+        }
+        function setOverlayCenter(host, x, y) {
+            host.style.transform = 'translate3d(' + x + 'px,' + y + 'px, 0) translate(-50%, -50%)';
+        }
+        function intersectsAny(host, others) {
+            const rect = host.getBoundingClientRect();
+            return others.some((other) => rectanglesIntersect(rect, other.getBoundingClientRect()));
+        }
+        function rectanglesIntersect(a, b) {
+            return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        }
         function install(cy, canvas) {
             const layer = ensureLayer(canvas);
             // Initial sync; subsequent updates are wired to Cytoscape
@@ -1058,6 +1114,57 @@
         }
         return { install, syncOverlays, ensureLayer };
     })();
+
+    window.countGraphLabelOverlaps = function countGraphLabelOverlaps(edgeAgainstNodes) {
+        const nodeLabels = Array.from(document.querySelectorAll(
+            '#graphCanvas .graph-overlay-layer .graph-node-math:not(.graph-edge-math)'));
+        const edgeLabels = Array.from(document.querySelectorAll(
+            '#graphCanvas .graph-overlay-layer .graph-edge-math'));
+        let overlaps = 0;
+        if (edgeAgainstNodes) {
+            edgeLabels.forEach((edgeLabel) => {
+                const edgeRect = edgeLabel.getBoundingClientRect();
+                nodeLabels.forEach((nodeLabel) => {
+                    if (rectanglesIntersectForTests(edgeRect, nodeLabel.getBoundingClientRect())) {
+                        overlaps++;
+                    }
+                });
+            });
+            return overlaps;
+        }
+        for (let i = 0; i < nodeLabels.length; i++) {
+            for (let j = i + 1; j < nodeLabels.length; j++) {
+                if (rectanglesIntersectForTests(
+                    nodeLabels[i].getBoundingClientRect(),
+                    nodeLabels[j].getBoundingClientRect())) {
+                    overlaps++;
+                }
+            }
+        }
+        return overlaps;
+    };
+
+    window.mainPathYPositionsIncrease = function mainPathYPositionsIncrease() {
+        const cy = window.__cyForTests;
+        if (!cy) return false;
+        const mainPath = cy.nodes()
+            .filter((node) => node.data('payload') && node.data('payload').onMainPath === true)
+            .sort((a, b) => {
+                const ap = a.data('payload') || {};
+                const bp = b.data('payload') || {};
+                return (ap.minDepth || 0) - (bp.minDepth || 0) || String(a.id()).localeCompare(String(b.id()));
+            });
+        for (let i = 1; i < mainPath.length; i++) {
+            if (!(mainPath[i - 1].position('y') < mainPath[i].position('y'))) {
+                return false;
+            }
+        }
+        return mainPath.length > 0;
+    };
+
+    function rectanglesIntersectForTests(a, b) {
+        return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    }
 
     function showInspector(payload) {
         const inspector = $('graphInspector');
