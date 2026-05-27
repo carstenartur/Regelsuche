@@ -587,6 +587,21 @@ class BrowserDemoFlowTest {
                 + ").length")).intValue();
         assertTrue(renderedNodes >= 2,
             fileName + " must show at least two KaTeX-rendered semantic graph nodes");
+        int isolatedNodes = ((Number) page.evaluate(
+            "() => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return 0;"
+                + " return cy.nodes().filter(n => n.connectedEdges().length === 0).length;"
+                + "}")).intValue();
+        int allowedStartGoalCount = ((Number) page.evaluate(
+            "() => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return 0;"
+                + " return cy.nodes().filter(n => n.connectedEdges().length === 0"
+                + "   && n.data('payload') && n.data('payload').explicitEndpoint === true).length;"
+                + "}")).intValue();
+        assertTrue(isolatedNodes == 0 || isolatedNodes <= allowedStartGoalCount,
+            fileName + " must not render orphan semantic graph nodes");
         Path target = SCREENSHOT_DIR.resolve(fileName);
         createParentDirectory(target);
         page.locator("#graphCanvas").scrollIntoViewIfNeeded();

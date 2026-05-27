@@ -25,6 +25,7 @@ public final class SemanticSearchGraphJsonSerializer {
             inner.property("collapsed", node.collapsed());
             inner.property("clusterId", node.clusterId());
             inner.property("kind", node.kind().name());
+            inner.property("explicitEndpoint", node.explicitEndpoint());
         })));
         writer.array("edges", w -> dto.edges().forEach(edge -> w.objectValue(inner -> {
             inner.property("from", edge.from());
@@ -75,6 +76,7 @@ public final class SemanticSearchGraphJsonSerializer {
             stats.property("lowSignalEdgeCount", dto.stats().lowSignalEdgeCount());
             stats.property("macroMoveEdgeCount", dto.stats().macroMoveEdgeCount());
             stats.property("mainPathLength", dto.stats().mainPathLength());
+            stats.property("hiddenAlternativeCount", dto.stats().hiddenAlternativeCount());
         });
         writer.object("view", view -> {
             view.property("mode", dto.view().mode().name());

@@ -69,6 +69,7 @@ public final class SemanticSearchGraphAssembler {
         MainPathCriteria criteria = MainPathCriteria.defaults();
         var mainPath = mainPathSelector.selectMainPath(pathList, graph, criteria).orElse(null);
         Set<String> mainPathExpressions = canonicalMainPath(mainPath);
+        Map<String, SemanticNodeKind> explicitEndpointKinds = canonicalMainPathEndpointKinds(mainPath);
 
         List<CanonicalGraphClusterer.ExpressionEvidence> evidence = graph.nodes().stream()
             .map(n -> new CanonicalGraphClusterer.ExpressionEvidence(n.expression(), n.depth(), n.score()))
@@ -85,13 +86,22 @@ public final class SemanticSearchGraphAssembler {
         }
 
         List<SemanticGraphNodeDto> semanticNodes = canonicalClusters.stream()
-            .map(c -> toSemanticNode(c, mainPathExpressions.contains(c.canonicalHash()), showVariants, maxVariantsPerCluster))
+            .map(c -> toSemanticNode(
+                c,
+                mainPathExpressions.contains(c.canonicalHash()),
+                explicitEndpointKinds.get(c.canonicalHash()),
+                showVariants,
+                maxVariantsPerCluster
+            ))
             .sorted(Comparator.comparingInt(SemanticGraphNodeDto::minDepth).thenComparing(SemanticGraphNodeDto::id))
             .toList();
 
         List<SearchGraphEdgeDto> filteredRawEdges = graph.edges().stream()
             .filter(e -> showAlternatives || edgeOnMainPath(e, mainPath))
             .toList();
+        int hiddenAlternativeCount = showAlternatives
+            ? 0
+            : (int) graph.edges().stream().filter(e -> !edgeOnMainPath(e, mainPath)).count();
 
         List<SemanticGraphEdgeDto> macroEdges = macroCompressor.compress(filteredRawEdges, pathList, macroRules == null ? List.of() : macroRules);
         List<SemanticGraphEdgeDto> semanticEdges = collapseLowSignalEdges(
@@ -103,12 +113,17 @@ public final class SemanticSearchGraphAssembler {
             maxAlternatives
         );
 
-        List<SemanticGraphClusterDto> semanticClusters = buildClusters(canonicalClusters, graph.clusters(), rawExpressionToClusterId);
-        List<SemanticGraphNodeDto> visibleNodes = filterNodesByMode(semanticNodes, mode);
-        Set<String> visibleNodeIds = visibleNodes.stream().map(SemanticGraphNodeDto::id).collect(Collectors.toCollection(LinkedHashSet::new));
+        List<SemanticGraphNodeDto> modeNodes = filterNodesByMode(semanticNodes, mode);
+        Set<String> modeNodeIds = modeNodes.stream().map(SemanticGraphNodeDto::id).collect(Collectors.toCollection(LinkedHashSet::new));
         List<SemanticGraphEdgeDto> visibleEdges = semanticEdges.stream()
-            .filter(e -> visibleNodeIds.contains(e.from()) && visibleNodeIds.contains(e.to()))
+            .filter(e -> modeNodeIds.contains(e.from()) && modeNodeIds.contains(e.to()))
             .toList();
+        List<SemanticGraphNodeDto> visibleNodes = pruneNodesAfterEdgeFiltering(modeNodes, visibleEdges, mode);
+        Set<String> visibleNodeIds = visibleNodes.stream().map(SemanticGraphNodeDto::id).collect(Collectors.toCollection(LinkedHashSet::new));
+        List<SemanticGraphClusterDto> semanticClusters = filterClustersByVisibleNodes(
+            buildClusters(canonicalClusters, graph.clusters(), rawExpressionToClusterId),
+            visibleNodeIds
+        );
         SemanticLayoutKind layoutKind = switch (mode) {
             case COMPLEXITY -> SemanticLayoutKind.COMPLEXITY_AXIS;
             case MAIN_PATH -> SemanticLayoutKind.MAIN_PATH_LAYERED;
@@ -125,7 +140,8 @@ public final class SemanticSearchGraphAssembler {
             Math.max(0, graph.nodes().size() - semanticNodes.size()),
             (int) graph.edges().stream().filter(e -> rewriteSignalClassifier.classify(e) == RewriteSignal.LOW_SIGNAL).count(),
             (int) visibleEdges.stream().filter(SemanticGraphEdgeDto::macroMove).count(),
-            mainPath == null ? 0 : mainPath.steps().size()
+            mainPath == null ? 0 : mainPath.steps().size(),
+            hiddenAlternativeCount
         );
 
         return new SemanticSearchGraphDto(
@@ -148,6 +164,7 @@ public final class SemanticSearchGraphAssembler {
     private SemanticGraphNodeDto toSemanticNode(
         CanonicalExpressionCluster cluster,
         boolean onMainPath,
+        SemanticNodeKind explicitEndpointKind,
         boolean showVariants,
         int maxVariantsPerCluster
     ) {
@@ -158,7 +175,8 @@ public final class SemanticSearchGraphAssembler {
         } else {
             renderedVariants = List.of();
         }
-        SemanticNodeKind kind = classifyNodeKind(cluster.representativeExpression());
+        boolean explicitEndpoint = explicitEndpointKind != null;
+        SemanticNodeKind kind = classifyNodeKind(cluster.representativeExpression(), explicitEndpointKind);
         String representativeLatex = MathPresentation.DEFAULT.latex(cluster.representativeExpression());
         return new SemanticGraphNodeDto(
             cluster.canonicalHash(),
@@ -173,11 +191,15 @@ public final class SemanticSearchGraphAssembler {
             onMainPath,
             variants.size() > 1,
             "canonical:" + cluster.canonicalHash(),
-            kind
+            kind,
+            explicitEndpoint
         );
     }
 
-    private SemanticNodeKind classifyNodeKind(String expression) {
+    private SemanticNodeKind classifyNodeKind(String expression, SemanticNodeKind explicitEndpointKind) {
+        if (explicitEndpointKind != null) {
+            return explicitEndpointKind;
+        }
         SearchExpression type = SearchExpression.classify(expression);
         return switch (type) {
             case EQUATION, INEQUALITY -> SemanticNodeKind.GOAL;
@@ -198,6 +220,48 @@ public final class SemanticSearchGraphAssembler {
         }
         // Complexity mode currently keeps all nodes and relies on layout kind.
         return nodes;
+    }
+
+    private static List<SemanticGraphNodeDto> pruneNodesAfterEdgeFiltering(
+        List<SemanticGraphNodeDto> nodes,
+        List<SemanticGraphEdgeDto> edges,
+        SemanticGraphViewMode mode
+    ) {
+        if (mode == SemanticGraphViewMode.RAW || mode == SemanticGraphViewMode.COMPLEXITY) {
+            return nodes;
+        }
+        Set<String> connectedNodeIds = edges.stream()
+            .flatMap(e -> java.util.stream.Stream.of(e.from(), e.to()))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        return nodes.stream()
+            .filter(n -> n.onMainPath() || n.explicitEndpoint() || connectedNodeIds.contains(n.id()))
+            .toList();
+    }
+
+    private static List<SemanticGraphClusterDto> filterClustersByVisibleNodes(
+        List<SemanticGraphClusterDto> clusters,
+        Set<String> visibleNodeIds
+    ) {
+        return clusters.stream()
+            .map(cluster -> {
+                List<String> nodeIds = cluster.nodeIds().stream()
+                    .filter(visibleNodeIds::contains)
+                    .toList();
+                if (nodeIds.isEmpty()) {
+                    return null;
+                }
+                int hidden = cluster.hiddenNodeCount() + Math.max(0, cluster.nodeIds().size() - nodeIds.size());
+                return new SemanticGraphClusterDto(
+                    cluster.id(),
+                    cluster.label(),
+                    cluster.kind(),
+                    nodeIds,
+                    hidden,
+                    cluster.cohesion()
+                );
+            })
+            .filter(Objects::nonNull)
+            .toList();
     }
 
     private List<SemanticGraphEdgeDto> collapseLowSignalEdges(
@@ -364,6 +428,17 @@ public final class SemanticSearchGraphAssembler {
             result.add(canonicalizer.stableHash(canonicalizer.canonicalize(step.afterExpression())));
         }
         result.add(canonicalizer.stableHash(canonicalizer.canonicalize(path.improvedExpression())));
+        return result;
+    }
+
+    private static Map<String, SemanticNodeKind> canonicalMainPathEndpointKinds(DiscoveredTransformation path) {
+        if (path == null) {
+            return Map.of();
+        }
+        de.regelsuche.canonical.ExpressionCanonicalizer canonicalizer = new de.regelsuche.canonical.ExpressionCanonicalizer();
+        Map<String, SemanticNodeKind> result = new LinkedHashMap<>();
+        result.put(canonicalizer.stableHash(canonicalizer.canonicalize(path.originalExpression())), SemanticNodeKind.SEED);
+        result.put(canonicalizer.stableHash(canonicalizer.canonicalize(path.improvedExpression())), SemanticNodeKind.GOAL);
         return result;
     }
 
