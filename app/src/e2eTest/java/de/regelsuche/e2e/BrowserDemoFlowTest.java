@@ -561,7 +561,6 @@ class BrowserDemoFlowTest {
      * captures are intentionally not written to docs.
      */
     private void screenshotGraphBestPath(String fileName) {
-        if (!RECORD_DOCS) return;
         page.locator(".tab[data-tab='graph']").click();
         page.waitForSelector("#tab-graph.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
@@ -656,6 +655,8 @@ class BrowserDemoFlowTest {
             fileName + " must show at least one visible, non-empty semantic edge label");
         assertSemanticGraphVisualLayout(fileName);
         assertSemanticGraphStatsReduction(fileName);
+        Path target = SCREENSHOT_DIR.resolve(fileName);
+        assertSemanticDebugDump(fileName, target);
         String semanticLabel = page.locator(".graph-semantic-watermark").innerText();
         assertTrue(semanticLabel.contains("Semantic Discovery Graph"),
             fileName + " must visibly identify the semantic discovery graph");
@@ -671,7 +672,7 @@ class BrowserDemoFlowTest {
                 fileName + " must show start, relevant intermediate states, and goal; mainPathNodes="
                     + mainPathNodeCount + ", expectedMinNodes=" + expectedMinNodes);
         }
-        Path target = SCREENSHOT_DIR.resolve(fileName);
+        if (!RECORD_DOCS) return;
         createParentDirectory(target);
         page.locator("#graphCanvas").scrollIntoViewIfNeeded();
         waitForStableElement("#graphCanvas");
@@ -679,6 +680,134 @@ class BrowserDemoFlowTest {
             .setPath(target)
             .setType(ScreenshotType.PNG));
         assertScreenshotQuality(target, fileName);
+    }
+
+    private void assertSemanticDebugDump(String fileName, Path screenshotTarget) {
+        String dump = semanticDebugDump(fileName);
+        if (RECORD_DOCS) {
+            Path semanticTarget = screenshotTarget.resolveSibling(
+                screenshotTarget.getFileName().toString().replaceFirst("\\.png$", ".semantic.json"));
+            createParentDirectory(semanticTarget);
+            try {
+                Files.writeString(semanticTarget, dump);
+            } catch (IOException ex) {
+                throw new AssertionError("Could not write semantic graph debug dump for " + fileName, ex);
+            }
+        }
+        int duplicateCanonicalHashCount = semanticDumpInt("duplicateCanonicalHashCount");
+        int duplicateNormalizedLabelCount = semanticDumpInt("duplicateNormalizedLabelCount");
+        int nodeOverlapCount = semanticDumpInt("nodeOverlapCount");
+        int edgeLabelOverlapCount = semanticDumpInt("edgeLabelOverlapCount");
+        int mainPathMeaningfulNodeCount = semanticDumpInt("mainPathMeaningfulNodeCount");
+        assertTrue(duplicateCanonicalHashCount == 0,
+            fileName + " semantic dump must not contain duplicate canonical hashes: " + dump);
+        assertTrue(duplicateNormalizedLabelCount == 0,
+            fileName + " semantic dump must not contain duplicate normalized labels: " + dump);
+        assertTrue(nodeOverlapCount == 0,
+            fileName + " semantic dump must not contain node overlaps: " + dump);
+        assertTrue(edgeLabelOverlapCount == 0,
+            fileName + " semantic dump must not contain edge-label overlaps: " + dump);
+        if (fileName.contains("binomial") || fileName.contains("polynomial")) {
+            assertTrue(mainPathMeaningfulNodeCount >= 4,
+                fileName + " semantic dump must keep at least four meaningful main-path nodes: " + dump);
+        }
+    }
+
+    private int semanticDumpInt(String property) {
+        return ((Number) page.evaluate(
+            "property => (window.__lastSemanticGraphDebugDump && window.__lastSemanticGraphDebugDump[property]) || 0",
+            property)).intValue();
+    }
+
+    private String semanticDebugDump(String fileName) {
+        return (String) page.evaluate(
+            "fileName => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) throw new Error('missing Cytoscape graph for semantic dump');"
+                + " const normalizeLabel = value => String(value || '').replace(/\\s+/g, '').toLowerCase();"
+                + " const canonicalHash = payload => {"
+                + "   const explicit = payload.canonicalHash || payload.canonicalId || '';"
+                + "   if (explicit) return String(explicit).replace(/^canonical:/, '');"
+                + "   const cluster = payload.clusterId || payload.id || '';"
+                + "   return String(cluster).replace(/^canonical:/, '');"
+                + " };"
+                + " const nodeLabelRects = Array.from(document.querySelectorAll("
+                + "   '#graphCanvas .graph-overlay-layer .graph-node-math:not(.graph-edge-math)'"
+                + " )).map(el => { const r = el.getBoundingClientRect(); return {"
+                + "   id: el.getAttribute('data-node-id') || el.getAttribute('aria-label') || '',"
+                + "   x: r.x, y: r.y, width: r.width, height: r.height"
+                + " }; });"
+                + " const edgeLabelRects = Array.from(document.querySelectorAll("
+                + "   '#graphCanvas .graph-overlay-layer .graph-edge-math'"
+                + " )).map(el => { const r = el.getBoundingClientRect(); return {"
+                + "   id: el.getAttribute('data-edge-id') || el.getAttribute('aria-label') || '',"
+                + "   x: r.x, y: r.y, width: r.width, height: r.height"
+                + " }; });"
+                + " const nodes = cy.nodes().map(n => {"
+                + "   const payload = n.data('payload') || {};"
+                + "   const label = payload.representativeExpression || payload.expression"
+                + "     || payload.canonicalExpression || n.data('label') || '';"
+                + "   const revisit = payload.revisit === true || payload.cycle === true"
+                + "     || payload.isRevisit === true || payload.isCycle === true;"
+                + "   return {"
+                + "     id: n.id(),"
+                + "     canonicalHash: canonicalHash(payload),"
+                + "     normalizedLabel: normalizeLabel(label),"
+                + "     label: String(label),"
+                + "     revisit: revisit,"
+                + "     cycle: payload.cycle === true || payload.isCycle === true,"
+                + "     onMainPath: payload.onMainPath === true,"
+                + "     explicitEndpoint: payload.explicitEndpoint === true,"
+                + "     layout: { x: n.position('x'), y: n.position('y') },"
+                + "     renderedLayout: { x: n.renderedPosition('x'), y: n.renderedPosition('y') }"
+                + "   };"
+                + " });"
+                + " const edges = cy.edges().map(e => {"
+                + "   const payload = e.data('payload') || {};"
+                + "   const source = e.source().renderedPosition();"
+                + "   const target = e.target().renderedPosition();"
+                + "   return {"
+                + "     id: e.id(), from: e.source().id(), to: e.target().id(),"
+                + "     label: String(payload.ruleId || e.data('label') || ''),"
+                + "     kind: String(payload.kind || e.data('kind') || ''),"
+                + "     layout: { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 }"
+                + "   };"
+                + " });"
+                + " const duplicateHashes = new Set();"
+                + " const seenHashes = new Set();"
+                + " const duplicateLabels = new Set();"
+                + " const seenLabels = new Set();"
+                + " nodes.forEach(node => {"
+                + "   if (node.canonicalHash) {"
+                + "     if (seenHashes.has(node.canonicalHash)) duplicateHashes.add(node.canonicalHash);"
+                + "     seenHashes.add(node.canonicalHash);"
+                + "   }"
+                + "   if (node.normalizedLabel && !node.revisit && !node.cycle) {"
+                + "     if (seenLabels.has(node.normalizedLabel)) duplicateLabels.add(node.normalizedLabel);"
+                + "     seenLabels.add(node.normalizedLabel);"
+                + "   }"
+                + " });"
+                + " const mainPathMeaningfulNodeCount = nodes.filter(node =>"
+                + "   node.onMainPath && node.normalizedLabel && !node.revisit && !node.cycle"
+                + " ).length;"
+                + " const dump = {"
+                + "   schema: 'regelsuche.semantic-graph-debug/v1',"
+                + "   fileName,"
+                + "   visibleNodeIds: nodes.map(node => node.id),"
+                + "   nodes,"
+                + "   edges,"
+                + "   nodeLabelRects,"
+                + "   edgeLabelRects,"
+                + "   duplicateCanonicalHashCount: duplicateHashes.size,"
+                + "   duplicateNormalizedLabelCount: duplicateLabels.size,"
+                + "   nodeOverlapCount: countGraphLabelOverlaps(false),"
+                + "   edgeLabelOverlapCount: countGraphLabelOverlaps(true),"
+                + "   mainPathMeaningfulNodeCount"
+                + " };"
+                + " window.__lastSemanticGraphDebugDump = dump;"
+                + " return JSON.stringify(dump, null, 2);"
+                + "}",
+            fileName);
     }
 
     private int expectedMinSemanticGraphNodes(String fileName) {
