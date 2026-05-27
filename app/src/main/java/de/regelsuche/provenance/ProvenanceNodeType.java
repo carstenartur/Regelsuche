@@ -3,6 +3,7 @@ package de.regelsuche.provenance;
 /** First-class mathematical discovery entities stored in the provenance graph. */
 public enum ProvenanceNodeType {
     HYPOTHESIS,
+    COUNTEREXAMPLE_SEARCH_ATTEMPT,
     COUNTEREXAMPLE,
     PROOF_ATTEMPT,
     SEARCH_RUN,

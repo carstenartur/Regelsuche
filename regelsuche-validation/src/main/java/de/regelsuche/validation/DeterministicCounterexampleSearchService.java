@@ -28,7 +28,8 @@ import java.util.Set;
  */
 public class DeterministicCounterexampleSearchService implements CounterexampleSearchService {
     private static final double EPS = 1e-8;
-    private static final List<Double> EDGE_VALUES = List.of(0.0, 1.0, -1.0, 2.0, -2.0, 0.5, -0.5);
+    private static final List<Double> EDGE_VALUES = List.of(0.0, 1.0, -1.0, 2.0, -2.0);
+    private static final List<Double> RATIONAL_VALUES = List.of(0.5, -0.5, 2.0 / 3.0, -2.0 / 3.0);
 
     private final ExpressionParser parser = new ExpressionParser();
 
@@ -40,7 +41,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             left = parser.parse(new InputRequest(InputType.TERM, hypothesis.leftExpression())).terms().getFirst();
             right = parser.parse(new InputRequest(InputType.TERM, hypothesis.rightExpression())).terms().getFirst();
         } catch (RuntimeException ex) {
-            return CounterexampleSearchResult.inconclusive();
+            return CounterexampleSearchResult.inconclusive("unsupported expression: " + ex.getMessage());
         }
 
         List<String> attemptedSources = new ArrayList<>();
@@ -51,66 +52,89 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         List<String> orderedVariables = new ArrayList<>(variables);
         List<AssumptionGuard> assumptionGuards = assumptionGuards(hypothesis.assumptions());
 
-        if (budget.includeEdgeCases()) {
-            attemptedSources.add("edge-cases");
+        if (budget.includeBoundaryValues()) {
+            attemptedSources.add("numeric-boundary-values");
             Optional<Counterexample> edgeCounterexample = searchNumericAssignments(
                 left, right, orderedVariables, EDGE_VALUES, inferredAssumptions, assumptionGuards
             );
             if (edgeCounterexample.isPresent()) {
-                return new CounterexampleSearchResult(
-                    edgeCounterexample,
+                return CounterexampleSearchResult.counterexampleFound(
+                    edgeCounterexample.get(),
                     List.copyOf(inferredAssumptions),
                     attemptedSources
                 );
             }
         }
 
-        if (budget.numericRandomSamples() > 0) {
+        if (budget.includeRationals()) {
+            attemptedSources.add("rational-samples");
+            Optional<Counterexample> rationalCounterexample = searchNumericAssignments(
+                left, right, orderedVariables, RATIONAL_VALUES, inferredAssumptions, assumptionGuards
+            );
+            if (rationalCounterexample.isPresent()) {
+                return CounterexampleSearchResult.counterexampleFound(
+                    rationalCounterexample.get(),
+                    List.copyOf(inferredAssumptions),
+                    attemptedSources
+                );
+            }
+        }
+
+        if (budget.maxNumericSamples() > 0) {
             attemptedSources.add("numeric-random");
             Random random = new Random(budget.randomSeed());
-            List<Double> randomValues = new ArrayList<>(budget.numericRandomSamples());
-            for (int i = 0; i < budget.numericRandomSamples(); i++) {
+            List<Double> randomValues = new ArrayList<>(budget.maxNumericSamples());
+            for (int i = 0; i < budget.maxNumericSamples(); i++) {
                 randomValues.add(-5.0 + (10.0 * random.nextDouble()));
             }
             Optional<Counterexample> randomCounterexample = searchNumericAssignments(
                 left, right, orderedVariables, randomValues, inferredAssumptions, assumptionGuards
             );
             if (randomCounterexample.isPresent()) {
-                return new CounterexampleSearchResult(
-                    randomCounterexample,
+                return CounterexampleSearchResult.counterexampleFound(
+                    randomCounterexample.get(),
                     List.copyOf(inferredAssumptions),
                     attemptedSources
                 );
             }
         }
 
-        if (budget.includeMatrixAssignments()) {
+        if (budget.includeMatrices() && budget.maxMatrixDimension() >= 2) {
             Optional<Counterexample> matrixCounterexample = tryMatrixCounterexample(
                 left, right, orderedVariables, attemptedSources
             );
             if (matrixCounterexample.isPresent()) {
-                return new CounterexampleSearchResult(
-                    matrixCounterexample,
+                return CounterexampleSearchResult.counterexampleFound(
+                    matrixCounterexample.get(),
                     List.copyOf(inferredAssumptions),
                     attemptedSources
                 );
             }
         }
 
-        if (budget.includeComplexAssignments()) {
+        if (budget.includeComplex()) {
             Optional<Counterexample> complexCounterexample = tryComplexCounterexample(
                 left, right, orderedVariables, attemptedSources, assumptionGuards
             );
             if (complexCounterexample.isPresent()) {
-                return new CounterexampleSearchResult(
-                    complexCounterexample,
+                return CounterexampleSearchResult.counterexampleFound(
+                    complexCounterexample.get(),
                     List.copyOf(inferredAssumptions),
                     attemptedSources
                 );
             }
         }
 
-        return new CounterexampleSearchResult(Optional.empty(), List.copyOf(inferredAssumptions), attemptedSources);
+        if (attemptedSources.isEmpty()) {
+            return new CounterexampleSearchResult(
+                CounterexampleSearchService.Status.INCONCLUSIVE,
+                Optional.empty(),
+                List.copyOf(inferredAssumptions),
+                attemptedSources,
+                "budget exhausted before any counterexample source could run"
+            );
+        }
+        return CounterexampleSearchResult.noCounterexampleFound(List.copyOf(inferredAssumptions), attemptedSources);
     }
 
     private Optional<Counterexample> searchNumericAssignments(
@@ -121,6 +145,9 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         Set<String> inferredAssumptions,
         List<AssumptionGuard> assumptionGuards
     ) {
+        if (values.isEmpty()) {
+            return Optional.empty();
+        }
         if (orderedVariables.isEmpty()) {
             Evaluation leftEvaluation = evaluate(left, Map.of());
             Evaluation rightEvaluation = evaluate(right, Map.of());
@@ -151,6 +178,8 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             if (!leftEvaluation.defined() || !rightEvaluation.defined()) {
                 inferNonZeroAssumptions(leftEvaluation, inferredAssumptions);
                 inferNonZeroAssumptions(rightEvaluation, inferredAssumptions);
+                inferDomainAssumptions(leftEvaluation, inferredAssumptions);
+                inferDomainAssumptions(rightEvaluation, inferredAssumptions);
                 continue;
             }
             if (!leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {
@@ -292,9 +321,15 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 case "sin" -> Evaluation.defined(RuntimeValue.scalar(Math.sin(x)));
                 case "cos" -> Evaluation.defined(RuntimeValue.scalar(Math.cos(x)));
                 case "tan" -> Evaluation.defined(RuntimeValue.scalar(Math.tan(x)));
-                case "log" -> x <= 0 ? Evaluation.undefined(Set.of()) : Evaluation.defined(RuntimeValue.scalar(Math.log10(x)));
-                case "ln" -> x <= 0 ? Evaluation.undefined(Set.of()) : Evaluation.defined(RuntimeValue.scalar(Math.log(x)));
-                case "sqrt" -> x < 0 ? Evaluation.undefined(Set.of()) : Evaluation.defined(RuntimeValue.scalar(Math.sqrt(x)));
+                case "log" -> x <= 0
+                    ? Evaluation.undefined(Set.of(), domainAssumptions(functionExpr.arguments().getFirst(), "> 0"))
+                    : Evaluation.defined(RuntimeValue.scalar(Math.log10(x)));
+                case "ln" -> x <= 0
+                    ? Evaluation.undefined(Set.of(), domainAssumptions(functionExpr.arguments().getFirst(), "> 0"))
+                    : Evaluation.defined(RuntimeValue.scalar(Math.log(x)));
+                case "sqrt" -> x < 0
+                    ? Evaluation.undefined(Set.of(), domainAssumptions(functionExpr.arguments().getFirst(), ">= 0"))
+                    : Evaluation.defined(RuntimeValue.scalar(Math.sqrt(x)));
                 case "exp" -> Evaluation.defined(RuntimeValue.scalar(Math.exp(x)));
                 case "abs" -> Evaluation.defined(RuntimeValue.scalar(Math.abs(x)));
                 default -> Evaluation.undefined(Set.of());
@@ -306,7 +341,9 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         if (!left.defined() || !right.defined()) {
             Set<String> merged = new LinkedHashSet<>(left.zeroDenominatorSymbols());
             merged.addAll(right.zeroDenominatorSymbols());
-            return Evaluation.undefined(merged);
+            Set<String> domainAssumptions = new LinkedHashSet<>(left.domainAssumptions());
+            domainAssumptions.addAll(right.domainAssumptions());
+            return Evaluation.undefined(merged, domainAssumptions);
         }
         RuntimeValue leftValue = left.value();
         RuntimeValue rightValue = right.value();
@@ -387,6 +424,20 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         }
     }
 
+    private void inferDomainAssumptions(Evaluation evaluation, Set<String> inferredAssumptions) {
+        inferredAssumptions.addAll(evaluation.domainAssumptions());
+    }
+
+    private Set<String> domainAssumptions(Expr expression, String relation) {
+        Set<String> variables = new LinkedHashSet<>();
+        collectVariables(expression, variables);
+        Set<String> assumptions = new LinkedHashSet<>();
+        for (String variable : variables) {
+            assumptions.add(AssumptionSignature.normalizeExpression(variable + " " + relation));
+        }
+        return assumptions;
+    }
+
     private List<AssumptionGuard> assumptionGuards(List<String> assumptions) {
         if (assumptions == null || assumptions.isEmpty()) {
             return List.of();
@@ -423,13 +474,27 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         return Double.toString(value);
     }
 
-    private record Evaluation(RuntimeValue value, boolean defined, Set<String> zeroDenominatorSymbols) {
+    private record Evaluation(
+        RuntimeValue value,
+        boolean defined,
+        Set<String> zeroDenominatorSymbols,
+        Set<String> domainAssumptions
+    ) {
+        private Evaluation {
+            zeroDenominatorSymbols = zeroDenominatorSymbols == null ? Set.of() : Set.copyOf(zeroDenominatorSymbols);
+            domainAssumptions = domainAssumptions == null ? Set.of() : Set.copyOf(domainAssumptions);
+        }
+
         static Evaluation defined(RuntimeValue value) {
-            return new Evaluation(value, true, Set.of());
+            return new Evaluation(value, true, Set.of(), Set.of());
         }
 
         static Evaluation undefined(Set<String> zeroDenominatorSymbols) {
-            return new Evaluation(RuntimeValue.scalar(Double.NaN), false, Set.copyOf(zeroDenominatorSymbols));
+            return undefined(zeroDenominatorSymbols, Set.of());
+        }
+
+        static Evaluation undefined(Set<String> zeroDenominatorSymbols, Set<String> domainAssumptions) {
+            return new Evaluation(RuntimeValue.scalar(Double.NaN), false, zeroDenominatorSymbols, domainAssumptions);
         }
     }
 

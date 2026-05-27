@@ -2,6 +2,7 @@ package de.regelsuche.mining;
 
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +39,9 @@ import java.util.stream.Collectors;
  * @param proofStatus              current validation state
  * @param counterexampleStatus     {@code null} if no search was performed, {@code true}
  *                                 if a counterexample was found, {@code false} otherwise
+ * @param counterexampleSearchStatus tri-state status of the latest counterexample search
+ * @param counterexampleAttemptedSources attempted search sources for the latest counterexample run
+ * @param counterexampleExplanation human-readable explanation for the latest counterexample status
  * @param parameterRelations       human-readable algebraic relations between placeholders
  * @param expressionPlaceholders   expression-level placeholders introduced by anti-unification
  * @param createdAt                when the hypothesis was first created
@@ -52,12 +56,34 @@ public record HypothesisCandidate(
     double noveltyScore,
     CandidateProofStatus proofStatus,
     Boolean counterexampleStatus,
+    CounterexampleSearchService.Status counterexampleSearchStatus,
+    List<String> counterexampleAttemptedSources,
+    String counterexampleExplanation,
     List<String> parameterRelations,
     java.util.Map<String, List<String>> expressionPlaceholders,
     Instant createdAt
 ) {
     /** A concrete (before, after) expression pair that supports this hypothesis. */
     public record ExpressionPair(String left, String right) {}
+
+    public HypothesisCandidate(
+        String id,
+        String leftPattern,
+        String rightPattern,
+        List<String> supportingPaths,
+        List<ExpressionPair> supportingExpressions,
+        List<String> assumptions,
+        double noveltyScore,
+        CandidateProofStatus proofStatus,
+        Boolean counterexampleStatus,
+        List<String> parameterRelations,
+        java.util.Map<String, List<String>> expressionPlaceholders,
+        Instant createdAt
+    ) {
+        this(id, leftPattern, rightPattern, supportingPaths, supportingExpressions, assumptions, noveltyScore,
+            proofStatus, counterexampleStatus, statusFromLegacy(counterexampleStatus), List.of(), "",
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
 
     public HypothesisCandidate {
         if (id == null || id.isBlank()) {
@@ -73,6 +99,13 @@ public record HypothesisCandidate(
             noveltyScore = Math.max(0.0, Math.min(1.0, noveltyScore));
         }
         proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED : proofStatus;
+        if (counterexampleSearchStatus == null) {
+            counterexampleSearchStatus = statusFromLegacy(counterexampleStatus);
+        }
+        counterexampleAttemptedSources = counterexampleAttemptedSources == null
+            ? List.of()
+            : List.copyOf(counterexampleAttemptedSources);
+        counterexampleExplanation = counterexampleExplanation == null ? "" : counterexampleExplanation;
         parameterRelations = parameterRelations == null ? List.of() : List.copyOf(parameterRelations);
         expressionPlaceholders = expressionPlaceholders == null
             ? java.util.Map.of()
@@ -88,7 +121,8 @@ public record HypothesisCandidate(
     public HypothesisCandidate withProofStatus(CandidateProofStatus newStatus) {
         return new HypothesisCandidate(id, leftPattern, rightPattern,
             supportingPaths, supportingExpressions, assumptions,
-            noveltyScore, newStatus, counterexampleStatus,
+            noveltyScore, newStatus, counterexampleStatus, counterexampleSearchStatus,
+            counterexampleAttemptedSources, counterexampleExplanation,
             parameterRelations, expressionPlaceholders, createdAt);
     }
 
@@ -96,7 +130,22 @@ public record HypothesisCandidate(
     public HypothesisCandidate withCounterexampleStatus(boolean found) {
         return new HypothesisCandidate(id, leftPattern, rightPattern,
             supportingPaths, supportingExpressions, assumptions,
-            noveltyScore, proofStatus, found,
+            noveltyScore, proofStatus, found, statusFromLegacy(found),
+            counterexampleAttemptedSources, counterexampleExplanation,
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
+
+    /** Returns a copy annotated with the complete counterexample search result. */
+    public HypothesisCandidate withCounterexampleResult(CounterexampleSearchService.CounterexampleSearchResult result) {
+        Boolean legacyStatus = switch (result.status()) {
+            case COUNTEREXAMPLE_FOUND -> Boolean.TRUE;
+            case NO_COUNTEREXAMPLE_FOUND -> Boolean.FALSE;
+            case INCONCLUSIVE -> null;
+        };
+        return new HypothesisCandidate(id, leftPattern, rightPattern,
+            supportingPaths, supportingExpressions, assumptions,
+            noveltyScore, proofStatus, legacyStatus, result.status(),
+            result.attemptedSources(), result.explanation(),
             parameterRelations, expressionPlaceholders, createdAt);
     }
 
@@ -104,7 +153,8 @@ public record HypothesisCandidate(
     public HypothesisCandidate withAssumptions(List<String> newAssumptions) {
         return new HypothesisCandidate(id, leftPattern, rightPattern,
             supportingPaths, supportingExpressions, newAssumptions,
-            noveltyScore, proofStatus, counterexampleStatus,
+            noveltyScore, proofStatus, counterexampleStatus, counterexampleSearchStatus,
+            counterexampleAttemptedSources, counterexampleExplanation,
             parameterRelations, expressionPlaceholders, createdAt);
     }
 
@@ -112,7 +162,8 @@ public record HypothesisCandidate(
     public HypothesisCandidate withNoveltyScore(double newNoveltyScore) {
         return new HypothesisCandidate(id, leftPattern, rightPattern,
             supportingPaths, supportingExpressions, assumptions,
-            newNoveltyScore, proofStatus, counterexampleStatus,
+            newNoveltyScore, proofStatus, counterexampleStatus, counterexampleSearchStatus,
+            counterexampleAttemptedSources, counterexampleExplanation,
             parameterRelations, expressionPlaceholders, createdAt);
     }
 
@@ -144,9 +195,21 @@ public record HypothesisCandidate(
             noveltyScore,
             candidate.proofStatus(),
             null,
+            null,
+            List.of(),
+            "",
             candidate.parameterRelations(),
             java.util.Map.of(),
             Instant.now()
         );
+    }
+
+    private static CounterexampleSearchService.Status statusFromLegacy(Boolean counterexampleStatus) {
+        if (counterexampleStatus == null) {
+            return null;
+        }
+        return counterexampleStatus
+            ? CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND
+            : CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND;
     }
 }

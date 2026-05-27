@@ -64,11 +64,20 @@ public interface CounterexampleSearchService {
         boolean includeEdgeCases,
         boolean includeMatrixAssignments,
         long randomSeed,
-        boolean includeComplexAssignments
+        boolean includeComplexAssignments,
+        boolean includeRationalAssignments,
+        int maxMatrixDimension,
+        long timeoutMillis
     ) {
         public CounterexampleBudget {
             if (numericRandomSamples < 0) {
                 throw new IllegalArgumentException("numericRandomSamples must be >= 0");
+            }
+            if (maxMatrixDimension < 0) {
+                throw new IllegalArgumentException("maxMatrixDimension must be >= 0");
+            }
+            if (timeoutMillis < 0) {
+                throw new IllegalArgumentException("timeoutMillis must be >= 0");
             }
         }
 
@@ -81,8 +90,59 @@ public interface CounterexampleSearchService {
             this(numericRandomSamples, includeEdgeCases, includeMatrixAssignments, randomSeed, false);
         }
 
+        public CounterexampleBudget(
+            int numericRandomSamples,
+            boolean includeEdgeCases,
+            boolean includeMatrixAssignments,
+            long randomSeed,
+            boolean includeComplexAssignments
+        ) {
+            this(numericRandomSamples, includeEdgeCases, includeMatrixAssignments, randomSeed,
+                includeComplexAssignments, false, includeMatrixAssignments ? 2 : 0, 0L);
+        }
+
         public static CounterexampleBudget defaultBudget() {
-            return new CounterexampleBudget(16, true, true, 1L, false);
+            return new CounterexampleBudget(16, true, true, 1L, false, true, 2, 0L);
+        }
+
+        public int maxNumericSamples() {
+            return numericRandomSamples;
+        }
+
+        public boolean includeBoundaryValues() {
+            return includeEdgeCases;
+        }
+
+        public boolean includeMatrices() {
+            return includeMatrixAssignments;
+        }
+
+        public boolean includeComplex() {
+            return includeComplexAssignments;
+        }
+
+        public boolean includeRationals() {
+            return includeRationalAssignments;
+        }
+
+        public List<String> sourceFlags() {
+            List<String> flags = new java.util.ArrayList<>();
+            if (includeEdgeCases) {
+                flags.add("boundary-values");
+            }
+            if (includeRationalAssignments) {
+                flags.add("rational-samples");
+            }
+            if (numericRandomSamples > 0) {
+                flags.add("numeric-random");
+            }
+            if (includeMatrixAssignments) {
+                flags.add("matrix-non-commutative");
+            }
+            if (includeComplexAssignments) {
+                flags.add("complex-samples");
+            }
+            return List.copyOf(flags);
         }
     }
 
@@ -93,10 +153,22 @@ public interface CounterexampleSearchService {
         Status status,
         Optional<Counterexample> counterexample,
         List<String> inferredAssumptions,
-        List<String> attemptedSources
+        List<String> attemptedSources,
+        String explanation
     ) {
         public CounterexampleSearchResult(Optional<Counterexample> counterexample, List<String> inferredAssumptions, List<String> attemptedSources) {
-            this(deriveStatus(counterexample, attemptedSources), counterexample, inferredAssumptions, attemptedSources);
+            this(deriveStatus(counterexample, attemptedSources), counterexample, inferredAssumptions, attemptedSources,
+                deriveExplanation(deriveStatus(counterexample, attemptedSources), attemptedSources));
+        }
+
+        public CounterexampleSearchResult(
+            Status status,
+            Optional<Counterexample> counterexample,
+            List<String> inferredAssumptions,
+            List<String> attemptedSources
+        ) {
+            this(status, counterexample, inferredAssumptions, attemptedSources,
+                deriveExplanation(status == null ? deriveStatus(counterexample, attemptedSources) : status, attemptedSources));
         }
 
         public CounterexampleSearchResult {
@@ -104,6 +176,9 @@ public interface CounterexampleSearchService {
             counterexample = counterexample == null ? Optional.empty() : counterexample;
             inferredAssumptions = inferredAssumptions == null ? List.of() : List.copyOf(inferredAssumptions);
             attemptedSources = attemptedSources == null ? List.of() : List.copyOf(attemptedSources);
+            explanation = explanation == null || explanation.isBlank()
+                ? deriveExplanation(status, attemptedSources)
+                : explanation;
         }
 
         public static CounterexampleSearchResult noCounterexample() {
@@ -112,6 +187,10 @@ public interface CounterexampleSearchService {
 
         public static CounterexampleSearchResult inconclusive() {
             return new CounterexampleSearchResult(Status.INCONCLUSIVE, Optional.empty(), List.of(), List.of());
+        }
+
+        public static CounterexampleSearchResult inconclusive(String explanation) {
+            return new CounterexampleSearchResult(Status.INCONCLUSIVE, Optional.empty(), List.of(), List.of(), explanation);
         }
 
         public static CounterexampleSearchResult counterexampleFound(
@@ -123,7 +202,21 @@ public interface CounterexampleSearchService {
                 Status.COUNTEREXAMPLE_FOUND,
                 Optional.of(counterexample),
                 inferredAssumptions,
-                attemptedSources
+                attemptedSources,
+                "refuting sample found"
+            );
+        }
+
+        public static CounterexampleSearchResult noCounterexampleFound(
+            List<String> inferredAssumptions,
+            List<String> attemptedSources
+        ) {
+            return new CounterexampleSearchResult(
+                Status.NO_COUNTEREXAMPLE_FOUND,
+                Optional.empty(),
+                inferredAssumptions,
+                attemptedSources,
+                deriveExplanation(Status.NO_COUNTEREXAMPLE_FOUND, attemptedSources)
             );
         }
 
@@ -135,6 +228,16 @@ public interface CounterexampleSearchService {
                 return Status.INCONCLUSIVE;
             }
             return Status.NO_COUNTEREXAMPLE_FOUND;
+        }
+
+        private static String deriveExplanation(Status status, List<String> attemptedSources) {
+            return switch (status) {
+                case COUNTEREXAMPLE_FOUND -> "refuting sample found";
+                case NO_COUNTEREXAMPLE_FOUND -> "no refutation found within configured budget";
+                case INCONCLUSIVE -> attemptedSources == null || attemptedSources.isEmpty()
+                    ? "no executable counterexample source was available"
+                    : "counterexample search ended without a reliable verdict";
+            };
         }
     }
 

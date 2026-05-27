@@ -7,6 +7,7 @@ import de.regelsuche.api.searchgraph.SearchGraphNodeDto;
 import de.regelsuche.api.searchgraph.SearchGraphRecord;
 import de.regelsuche.mining.MacroRuleCandidate;
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -191,13 +192,36 @@ public final class ProvenanceGraphAssembler {
         IdentityReportDto identity,
         String hypothesisId
     ) {
-        if (identity.proofStatus() == CandidateProofStatus.REJECTED) {
+        CounterexampleSearchService.Status status = identity.counterexampleStatus();
+        if (status == null && identity.proofStatus() == CandidateProofStatus.REJECTED) {
+            status = CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND;
+        }
+        if (status != null) {
+            String attemptId = "counterexample-attempt:" + record.id() + ":" + identity.id();
+            Map<String, String> attemptProperties = new LinkedHashMap<>();
+            attemptProperties.put("status", status.name());
+            attemptProperties.put("attemptedSources", String.join(",", identity.counterexampleAttemptedSources()));
+            attemptProperties.put("inferredAssumptions", String.join(",", identity.inferredAssumptions()));
+            attemptProperties.put("explanation", identity.counterexampleExplanation());
+            attemptProperties.put("runId", record.id());
+            put(nodes, new ProvenanceNode(attemptId, ProvenanceNodeType.COUNTEREXAMPLE_SEARCH_ATTEMPT,
+                "Counterexample search " + identity.id(), attemptProperties));
+            edges.add(new ProvenanceEdge(hypothesisId, attemptId, ProvenanceEdgeType.HYPOTHESIS_TESTED_BY,
+                Map.of("status", status.name())));
+            edges.add(new ProvenanceEdge(attemptId, hypothesisId, switch (status) {
+                case COUNTEREXAMPLE_FOUND -> ProvenanceEdgeType.FOUND_COUNTEREXAMPLE;
+                case NO_COUNTEREXAMPLE_FOUND -> ProvenanceEdgeType.NO_COUNTEREXAMPLE_WITHIN_BUDGET;
+                case INCONCLUSIVE -> ProvenanceEdgeType.INCONCLUSIVE_DUE_TO;
+            }, Map.of("explanation", identity.counterexampleExplanation())));
+        }
+        if (status == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {
             String counterexampleId = "counterexample:" + record.id() + ":" + identity.id();
             put(nodes, new ProvenanceNode(counterexampleId, ProvenanceNodeType.COUNTEREXAMPLE,
                 "Counterexample " + identity.id(), Map.of(
                     "failedAssumptions", "",
                     "domains", String.join(",", record.domains()),
-                    "invalidRule", identity.id()
+                    "invalidRule", identity.id(),
+                    "status", status.name()
                 )));
             edges.add(new ProvenanceEdge(hypothesisId, counterexampleId, ProvenanceEdgeType.REFUTED_BY, Map.of()));
             return;

@@ -2,6 +2,7 @@ package de.regelsuche.persistence.relational;
 
 import de.regelsuche.mining.HypothesisCandidate;
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -59,6 +60,14 @@ public class HypothesisCandidateEntity {
     private String proofStatus;
     @Column(name = "counterexample_found")
     private Boolean counterexampleFound;
+    @KeywordField
+    @Column(name = "counterexample_status")
+    private String counterexampleStatus;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "counterexample_attempted_sources", nullable = false, columnDefinition = "jsonb")
+    private String counterexampleAttemptedSourcesJson;
+    @Column(name = "counterexample_explanation", nullable = false, columnDefinition = "text")
+    private String counterexampleExplanation;
     @GenericField
     @Column(name = "novelty_score", nullable = false)
     private double noveltyScore;
@@ -75,6 +84,20 @@ public class HypothesisCandidateEntity {
         List<HypothesisCandidate.ExpressionPair> supportingExpressions, List<String> parameterRelations,
         java.util.Map<String, List<String>> expressionPlaceholders, String proofStatus,
         Boolean counterexampleFound, double noveltyScore, Instant createdAt) {
+        this(id, experimentId, leftPattern, rightPattern, assumptions, supportingPaths, supportingExpressions,
+            parameterRelations, expressionPlaceholders, proofStatus, counterexampleFound,
+            counterexampleFound == null ? null : (counterexampleFound
+                ? CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND.name()
+                : CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND.name()),
+            List.of(), "", noveltyScore, createdAt);
+    }
+
+    public HypothesisCandidateEntity(String id, String experimentId, String leftPattern, String rightPattern,
+        List<String> assumptions, List<String> supportingPaths,
+        List<HypothesisCandidate.ExpressionPair> supportingExpressions, List<String> parameterRelations,
+        java.util.Map<String, List<String>> expressionPlaceholders, String proofStatus,
+        Boolean counterexampleFound, String counterexampleStatus, List<String> counterexampleAttemptedSources,
+        String counterexampleExplanation, double noveltyScore, Instant createdAt) {
         this.id = SearchRunEntity.requireId(id, "id");
         this.experimentId = experimentId == null || experimentId.isBlank() ? null : experimentId;
         if (leftPattern == null || rightPattern == null) {
@@ -90,6 +113,9 @@ public class HypothesisCandidateEntity {
         this.expressionPlaceholdersJson = RelationalJson.placeholderEntries(expressionPlaceholders);
         this.proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED.name() : proofStatus;
         this.counterexampleFound = counterexampleFound;
+        this.counterexampleStatus = counterexampleStatus;
+        this.counterexampleAttemptedSourcesJson = RelationalJson.array(counterexampleAttemptedSources);
+        this.counterexampleExplanation = counterexampleExplanation == null ? "" : counterexampleExplanation;
         this.noveltyScore = Math.max(0.0, Math.min(1.0, noveltyScore));
         this.createdAt = createdAt == null ? Instant.now() : createdAt;
     }
@@ -98,12 +124,17 @@ public class HypothesisCandidateEntity {
         return new HypothesisCandidateEntity(candidate.id(), "", candidate.leftPattern(), candidate.rightPattern(),
             candidate.assumptions(), candidate.supportingPaths(), candidate.supportingExpressions(),
             candidate.parameterRelations(), candidate.expressionPlaceholders(),
-            candidate.proofStatus().name(), candidate.counterexampleStatus(), candidate.noveltyScore(), candidate.createdAt());
+            candidate.proofStatus().name(), candidate.counterexampleStatus(),
+            candidate.counterexampleSearchStatus() == null ? null : candidate.counterexampleSearchStatus().name(),
+            candidate.counterexampleAttemptedSources(), candidate.counterexampleExplanation(),
+            candidate.noveltyScore(), candidate.createdAt());
     }
 
     public HypothesisCandidate toHypothesisCandidate() {
         return new HypothesisCandidate(id, leftPattern, rightPattern, supportingPaths(), supportingExpressions(), assumptions(),
             noveltyScore, CandidateProofStatus.valueOf(proofStatus), counterexampleFound,
+            counterexampleStatus == null ? null : CounterexampleSearchService.Status.valueOf(counterexampleStatus),
+            counterexampleAttemptedSources(), counterexampleExplanation,
             parameterRelations(), expressionPlaceholders(), createdAt);
     }
 
@@ -122,6 +153,9 @@ public class HypothesisCandidateEntity {
     }
     public String proofStatus() { return proofStatus; }
     public Boolean counterexampleFound() { return counterexampleFound; }
+    public String counterexampleStatus() { return counterexampleStatus; }
+    public List<String> counterexampleAttemptedSources() { return RelationalJson.arrayValues(counterexampleAttemptedSourcesJson); }
+    public String counterexampleExplanation() { return counterexampleExplanation; }
     public double noveltyScore() { return noveltyScore; }
     public Instant createdAt() { return createdAt; }
     public List<CounterexampleEntity> counterexamples() { return List.copyOf(counterexamples); }

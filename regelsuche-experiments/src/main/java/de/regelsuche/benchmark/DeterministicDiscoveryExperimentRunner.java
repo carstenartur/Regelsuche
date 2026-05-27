@@ -2,6 +2,7 @@ package de.regelsuche.benchmark;
 
 import de.regelsuche.example.SeedExpression;
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -82,6 +83,10 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                     outcome.summary(),
                     outcome.hypotheses(),
                     outcome.counterexamples(),
+                    outcome.counterexampleSearchStatus(),
+                    outcome.counterexampleAttemptedSources(),
+                    outcome.inferredAssumptions(),
+                    outcome.counterexampleExplanation(),
                     outcome.replayPath(),
                     outcome.elapsedMillis(),
                     outcome.memoryBytes()
@@ -112,19 +117,72 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
         String summary,
         List<String> hypotheses,
         List<String> counterexamples,
+        CounterexampleSearchService.Status counterexampleSearchStatus,
+        List<String> counterexampleAttemptedSources,
+        List<String> inferredAssumptions,
+        String counterexampleExplanation,
         List<String> replayPath,
         long elapsedMillis,
         long memoryBytes
     ) {
+        public SeedRunOutcome(
+            boolean success,
+            String summary,
+            List<String> hypotheses,
+            List<String> counterexamples,
+            List<String> replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+            this(success, summary, hypotheses, counterexamples, deriveStatus(counterexamples, null),
+                List.of(), List.of(), "", replayPath, elapsedMillis, memoryBytes);
+        }
+
+        public SeedRunOutcome(
+            boolean success,
+            String summary,
+            List<String> hypotheses,
+            CounterexampleSearchService.CounterexampleSearchResult counterexampleResult,
+            List<String> replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+            this(success, summary, hypotheses,
+                counterexampleResult.counterexample().map(counterexample -> List.of(counterexample.toString())).orElse(List.of()),
+                counterexampleResult.status(),
+                counterexampleResult.attemptedSources(),
+                counterexampleResult.inferredAssumptions(),
+                counterexampleResult.explanation(),
+                replayPath, elapsedMillis, memoryBytes);
+        }
+
         public SeedRunOutcome {
             summary = summary == null ? "" : summary;
             hypotheses = hypotheses == null ? List.of() : List.copyOf(hypotheses);
             counterexamples = counterexamples == null ? List.of() : List.copyOf(counterexamples);
+            counterexampleSearchStatus = deriveStatus(counterexamples, counterexampleSearchStatus);
+            counterexampleAttemptedSources = counterexampleAttemptedSources == null
+                ? List.of()
+                : List.copyOf(counterexampleAttemptedSources);
+            inferredAssumptions = inferredAssumptions == null ? List.of() : List.copyOf(inferredAssumptions);
+            counterexampleExplanation = counterexampleExplanation == null ? "" : counterexampleExplanation;
             replayPath = replayPath == null ? List.of() : List.copyOf(replayPath);
         }
 
         public static SeedRunOutcome fail(String summary) {
             return new SeedRunOutcome(false, summary, List.of(), List.of(), List.of(), 0L, 0L);
+        }
+
+        private static CounterexampleSearchService.Status deriveStatus(
+            List<String> counterexamples,
+            CounterexampleSearchService.Status explicitStatus
+        ) {
+            if (explicitStatus != null) {
+                return explicitStatus;
+            }
+            return counterexamples == null || counterexamples.isEmpty()
+                ? CounterexampleSearchService.Status.INCONCLUSIVE
+                : CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND;
         }
     }
 
@@ -134,10 +192,30 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
         String summary,
         List<String> hypotheses,
         List<String> counterexamples,
+        CounterexampleSearchService.Status counterexampleSearchStatus,
+        List<String> counterexampleAttemptedSources,
+        List<String> inferredAssumptions,
+        String counterexampleExplanation,
         List<String> replayPath,
         long elapsedMillis,
         long memoryBytes
     ) {
+        public SeedRunReport(
+            SeedExpression seed,
+            boolean success,
+            String summary,
+            List<String> hypotheses,
+            List<String> counterexamples,
+            List<String> replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+            this(seed, success, summary, hypotheses, counterexamples,
+                counterexamples == null || counterexamples.isEmpty()
+                    ? CounterexampleSearchService.Status.INCONCLUSIVE
+                    : CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND,
+                List.of(), List.of(), "", replayPath, elapsedMillis, memoryBytes);
+        }
     }
 
     public record DiscoveryMetrics(
@@ -185,7 +263,11 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                 object.property("success", row.success());
                 object.property("summary", row.summary());
                 object.array("hypotheses", h -> row.hypotheses().forEach(h::value));
+                object.property("counterexampleStatus", row.counterexampleSearchStatus().name());
                 object.array("counterexamples", c -> row.counterexamples().forEach(c::value));
+                object.array("attemptedSources", c -> row.counterexampleAttemptedSources().forEach(c::value));
+                object.array("inferredAssumptions", c -> row.inferredAssumptions().forEach(c::value));
+                object.property("explanation", row.counterexampleExplanation());
                 object.array("replayPath", r -> row.replayPath().forEach(r::value));
                 object.property("elapsedMillis", 0L);
                 object.property("memoryBytes", 0L);

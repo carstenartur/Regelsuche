@@ -9,6 +9,13 @@ public final class CounterexampleRobustnessScore implements InterestingnessScori
 
     @Override
     public double score(InterestingnessScoringContext context) {
+        if (context.candidate().counterexampleSearchStatus() != null) {
+            return switch (context.candidate().counterexampleSearchStatus()) {
+                case COUNTEREXAMPLE_FOUND -> -2.0;
+                case NO_COUNTEREXAMPLE_FOUND -> 1.0;
+                case INCONCLUSIVE -> 0.0;
+            };
+        }
         Boolean found = context.candidate().counterexampleStatus();
         if (Boolean.TRUE.equals(found)) {
             return -2.0;
