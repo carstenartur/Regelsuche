@@ -1,13 +1,13 @@
 {
   "schema": "regelsuche.semantic-graph-debug/v1",
   "fileName": "binomial-graph.png",
-  "requestUrl": "/api/search-graph/semantic?mode=semantic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-2ec3a7db",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-4f934d41",
   "requestParams": {
     "mode": "semantic",
     "showLowSignal": false,
     "showAlternatives": false,
     "showVariants": false,
-    "pathId": "demo-2ec3a7db"
+    "pathId": "demo-4f934d41"
   },
   "visibleNodeIds": [
     "6ce06b615612d5de3405bc6d6be31cc33a36c7c73cc77d2dc7cdae88c1244c17",
@@ -73,12 +73,12 @@
     {
       "id": "6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d",
       "canonicalHash": "6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d",
-      "normalizedLabel": "x*x+3*x+x*3+3*3",
-      "label": "x * x + 3 * x + x * 3 + 3 * 3",
+      "normalizedLabel": "x^2+6*x+9",
+      "label": "x ^ 2 + 6 * x + 9",
       "revisit": false,
       "cycle": false,
       "onMainPath": true,
-      "explicitEndpoint": false,
+      "explicitEndpoint": true,
       "layout": {
         "x": 0,
         "y": 740
@@ -113,10 +113,10 @@
       }
     },
     {
-      "id": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10->6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d:ast_distribute_right_add",
+      "id": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10->6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d:polynomial_collect_like_terms",
       "from": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10",
       "to": "6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d",
-      "label": "ast_distribute_right_add",
+      "label": "polynomial_collect_like_terms",
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
@@ -128,29 +128,29 @@
     {
       "id": "6ce06b615612d5de3405bc6d6be31cc33a36c7c73cc77d2dc7cdae88c1244c17",
       "x": 665.4375,
-      "y": 561.8876342773438,
+      "y": 561.7001342773438,
       "width": 69.125,
       "height": 28.4375
     },
     {
       "id": "be655bb938f02f844075f5d0726dcc9bc3b71859bdc6e4eacf8d6c995b56ad2c",
       "x": 615.21875,
-      "y": 879.5224609375,
+      "y": 879.3349609375,
       "width": 169.5625,
       "height": 27.734375
     },
     {
       "id": "1feb6815a3dd291e8e4a166a8d9b79d8c3f6944fbbc1d440bc3e144813f5aa10",
       "x": 611.0625,
-      "y": 1196.8056640625,
+      "y": 1196.6181640625,
       "width": 177.875,
       "height": 27.734375
     },
     {
       "id": "6b88895b1ce5737be808dd4a81a560da1e4daf82c8fd141b6c4da1f83c8dd99d",
-      "x": 607.40625,
-      "y": 1514.0888671875,
-      "width": 185.1875,
+      "x": 647.625,
+      "y": 1513.9013671875,
+      "width": 104.75,
       "height": 27.734375
     }
   ],
@@ -158,22 +158,22 @@
     {
       "id": "\\text{distribute left add}",
       "x": 588.5,
-      "y": 724.044921875,
+      "y": 723.857421875,
       "width": 127,
       "height": 21.40625
     },
     {
       "id": "\\text{distribute right add}",
       "x": 583.5,
-      "y": 1041.328125,
+      "y": 1041.140625,
       "width": 137,
       "height": 21.40625
     },
     {
-      "id": "\\text{distribute right add}",
-      "x": 583.5,
-      "y": 1358.611328125,
-      "width": 137,
+      "id": "\\text{collect like terms}",
+      "x": 591,
+      "y": 1358.423828125,
+      "width": 122,
       "height": 21.40625
     }
   ],
