@@ -83,11 +83,43 @@ class DemoDocumentationTest {
             "docker-compose.yml must declare a persistent Neo4j volume");
     }
 
+    @Test
+    void demoGraphSemanticAssetsEndInCollectedPolynomialNormalForm() throws IOException {
+        assertSemanticGraphAssetFinalNormalForm(
+            "binomial-graph.semantic.json",
+            "x^2+6*x+9",
+            "x*x+3*x+x*3+3*3"
+        );
+        assertSemanticGraphAssetFinalNormalForm(
+            "polynomial-expansion-graph.semantic.json",
+            "x^2+3*x+2",
+            "x*x+x*2+x+2"
+        );
+    }
+
     private static String readReadme() throws IOException {
         Path readme = REPO_ROOT.resolve("README.md");
         assertNotNull(readme);
         assertTrue(Files.exists(readme), "README.md must exist at repository root");
         return Files.readString(readme, StandardCharsets.UTF_8);
+    }
+
+    private static void assertSemanticGraphAssetFinalNormalForm(
+        String fileName,
+        String expectedFinalNormalizedLabel,
+        String forbiddenUncollectedFinalLabel
+    ) throws IOException {
+        Path asset = REPO_ROOT.resolve("docs/assets/screenshots").resolve(fileName);
+        assertTrue(Files.exists(asset), fileName + " must exist next to the graph PNG");
+        String json = Files.readString(asset, StandardCharsets.UTF_8);
+        assertTrue(json.contains("\"normalizedLabel\": \"" + expectedFinalNormalizedLabel + "\""),
+            fileName + " must contain the collected polynomial node");
+        assertTrue(json.contains("\"id\": \"\\\\text{collect like terms}\""),
+            fileName + " must contain the visible collect-like-terms edge label");
+        assertTrue(json.contains("\"finalNormalizedLabel\": \"" + expectedFinalNormalizedLabel + "\""),
+            fileName + " must assert finalNormalizedLabel as collected normal form");
+        assertTrue(!json.contains("\"finalNormalizedLabel\": \"" + forbiddenUncollectedFinalLabel + "\""),
+            fileName + " must not assert the uncollected expansion as finalNormalizedLabel");
     }
 
     private static Path locateRepoRoot() {

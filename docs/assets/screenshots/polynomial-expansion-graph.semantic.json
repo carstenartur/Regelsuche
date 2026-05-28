@@ -1,119 +1,237 @@
 {
   "schema": "regelsuche.semantic-graph-debug/v1",
   "fileName": "polynomial-expansion-graph.png",
-  "requestUrl": "/api/search-graph/semantic?mode=semantic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-48636e31",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showMacroSteps=didactic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-4d1e7b17",
   "requestParams": {
     "mode": "semantic",
+    "showMacroSteps": "didactic",
     "showLowSignal": false,
     "showAlternatives": false,
     "showVariants": false,
-    "pathId": "demo-48636e31"
+    "pathId": "demo-4d1e7b17"
   },
   "visibleNodeIds": [
-    "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
-    "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
-    "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69"
+    "didactic-seed-13vtrk3",
+    "didactic-1-1u0zexs",
+    "didactic-2-176q96m",
+    "didactic-3-lgh6e1",
+    "didactic-prepare-3-oit6kn",
+    "didactic-goal-1iheuhx"
   ],
   "nodes": [
     {
-      "id": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
-      "canonicalHash": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
+      "id": "didactic-seed-13vtrk3",
+      "canonicalHash": "didactic:didactic-seed-13vtrk3",
       "normalizedLabel": "(x+1)*(x+2)",
       "label": "(x + 1) * (x + 2)",
       "revisit": false,
       "cycle": false,
       "onMainPath": true,
       "explicitEndpoint": true,
+      "minDepth": 0,
       "layout": {
         "x": 0,
         "y": 80
       },
       "renderedLayout": {
         "x": 319,
-        "y": 58.40677966101697
+        "y": 50.32508833922272
       }
     },
     {
-      "id": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
-      "canonicalHash": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
+      "id": "didactic-1-1u0zexs",
+      "canonicalHash": "didactic:didactic-1-1u0zexs",
       "normalizedLabel": "x*(x+2)+1*(x+2)",
       "label": "x * (x + 2) + 1 * (x + 2)",
       "revisit": false,
       "cycle": false,
       "onMainPath": true,
       "explicitEndpoint": false,
+      "minDepth": 1,
       "layout": {
         "x": 0,
         "y": 300
       },
       "renderedLayout": {
         "x": 319,
-        "y": 449
+        "y": 329.79505300353367
       }
     },
     {
-      "id": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
-      "canonicalHash": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
-      "normalizedLabel": "x*x+x*2+x+2",
-      "label": "x * x + x * 2 + x + 2",
+      "id": "didactic-2-176q96m",
+      "canonicalHash": "didactic:didactic-2-176q96m",
+      "normalizedLabel": "x*(x+2)+x+2",
+      "label": "x * (x + 2) + x + 2",
       "revisit": false,
       "cycle": false,
       "onMainPath": true,
       "explicitEndpoint": false,
+      "minDepth": 2,
       "layout": {
         "x": 0,
         "y": 520
       },
       "renderedLayout": {
         "x": 319,
-        "y": 839.5932203389831
+        "y": 609.2650176678446
+      }
+    },
+    {
+      "id": "didactic-3-lgh6e1",
+      "canonicalHash": "didactic:didactic-3-lgh6e1",
+      "normalizedLabel": "x*x+x*2+x+2",
+      "label": "x * x + x * 2 + x + 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 3,
+      "layout": {
+        "x": 0,
+        "y": 740
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 888.7349823321555
+      }
+    },
+    {
+      "id": "didactic-prepare-3-oit6kn",
+      "canonicalHash": "didactic:didactic-prepare-3-oit6kn",
+      "normalizedLabel": "x^2+2*x+x+2",
+      "label": "x ^ 2 + 2 * x + x + 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 4,
+      "layout": {
+        "x": 0,
+        "y": 960
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 1168.2049469964666
+      }
+    },
+    {
+      "id": "didactic-goal-1iheuhx",
+      "canonicalHash": "didactic:didactic-goal-1iheuhx",
+      "normalizedLabel": "x^2+3*x+2",
+      "label": "x ^ 2 + 3 * x + 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "minDepth": 5,
+      "layout": {
+        "x": 0,
+        "y": 1180
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 1447.6749116607773
       }
     }
   ],
   "edges": [
     {
-      "id": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1->bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893:ast_distribute_right_add",
-      "from": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
-      "to": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
+      "id": "didactic-seed-13vtrk3->didactic-1-1u0zexs:ast_distribute_right_add",
+      "from": "didactic-seed-13vtrk3",
+      "to": "didactic-1-1u0zexs",
       "label": "ast_distribute_right_add",
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
-        "y": 253.70338983050848
+        "y": 190.06007067137818
       }
     },
     {
-      "id": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893->6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69:ast_distribute_left_add",
-      "from": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
-      "to": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
+      "id": "didactic-1-1u0zexs->didactic-2-176q96m:ast_multiply_one_left",
+      "from": "didactic-1-1u0zexs",
+      "to": "didactic-2-176q96m",
+      "label": "ast_multiply_one_left",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 469.53003533568915
+      }
+    },
+    {
+      "id": "didactic-2-176q96m->didactic-3-lgh6e1:ast_distribute_left_add",
+      "from": "didactic-2-176q96m",
+      "to": "didactic-3-lgh6e1",
       "label": "ast_distribute_left_add",
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
-        "y": 644.2966101694915
+        "y": 749
+      }
+    },
+    {
+      "id": "didactic-3-lgh6e1->didactic-prepare-3-oit6kn:polynomial_prepare_collect_like_terms",
+      "from": "didactic-3-lgh6e1",
+      "to": "didactic-prepare-3-oit6kn",
+      "label": "polynomial_prepare_collect_like_terms",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 1028.469964664311
+      }
+    },
+    {
+      "id": "didactic-prepare-3-oit6kn->didactic-goal-1iheuhx:polynomial_collect_like_terms",
+      "from": "didactic-prepare-3-oit6kn",
+      "to": "didactic-goal-1iheuhx",
+      "label": "polynomial_collect_like_terms",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 1307.939929328622
       }
     }
   ],
   "nodeLabelRects": [
     {
-      "id": "8cecb7c32d70f3c1e0836c15f70942fa6ec39cc8d829f66d9063e4b126b1c1b1",
+      "id": "didactic-seed-13vtrk3",
       "x": 639.03125,
-      "y": 567.8364868164062,
+      "y": 559.7547607421875,
       "width": 121.9375,
       "height": 27.734375
     },
     {
-      "id": "bad22939ff618834cb84a2305816db6b8ff84332f1353cb07c32077ed89b0893",
+      "id": "didactic-1-1u0zexs",
       "x": 615.21875,
-      "y": 958.4296875,
+      "y": 839.2247314453125,
       "width": 169.5625,
       "height": 27.734375
     },
     {
-      "id": "6b2fb44c4712469b8638cd95db721532decf9cd829e4a4b5be9155d15f6d9c69",
+      "id": "didactic-2-176q96m",
+      "x": 630.875,
+      "y": 1118.6947021484375,
+      "width": 138.25,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-3-lgh6e1",
       "x": 626.71875,
-      "y": 1349.02294921875,
+      "y": 1398.1646728515625,
       "width": 146.5625,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-prepare-3-oit6kn",
+      "x": 633.46875,
+      "y": 1677.6346435546875,
+      "width": 133.0625,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-goal-1iheuhx",
+      "x": 647.625,
+      "y": 1957.1046142578125,
+      "width": 104.75,
       "height": 27.734375
     }
   ],
@@ -121,15 +239,36 @@
     {
       "id": "\\text{distribute right add}",
       "x": 583.5,
-      "y": 766.297119140625,
+      "y": 702.65380859375,
       "width": 137,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{multiply one left}",
+      "x": 593,
+      "y": 982.123779296875,
+      "width": 118,
       "height": 21.40625
     },
     {
       "id": "\\text{distribute left add}",
       "x": 588.5,
-      "y": 1156.890380859375,
+      "y": 1261.59375,
       "width": 127,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{multiply constants and product to power}",
+      "x": 562,
+      "y": 1541.063720703125,
+      "width": 180,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{collect like terms}",
+      "x": 591,
+      "y": 1820.53369140625,
+      "width": 122,
       "height": 21.40625
     }
   ],
@@ -137,7 +276,8 @@
   "duplicateNormalizedLabelCount": 0,
   "nodeOverlapCount": 0,
   "edgeLabelOverlapCount": 0,
-  "visibleMainPathMeaningfulNodeCount": 3,
-  "collapsedMainPathStepCount": 2,
-  "mainPathMeaningfulNodeCount": 4
+  "visibleMainPathMeaningfulNodeCount": 6,
+  "collapsedMainPathStepCount": 5,
+  "finalNormalizedLabel": "x^2+3*x+2",
+  "mainPathMeaningfulNodeCount": 6
 }
