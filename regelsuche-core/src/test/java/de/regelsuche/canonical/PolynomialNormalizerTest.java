@@ -30,10 +30,21 @@ class PolynomialNormalizerTest {
     }
 
     @Test
+    void expandsPolynomialProductsAndPowers() {
+        assertEquals("x ^ 2 - 1", normalize("(x + 1) * (x - 1)"));
+        assertEquals("x ^ 2 + 2 * x + 1", normalize("(x + 1)^2"));
+    }
+
+    @Test
+    void combinesDecimalCoefficientsExactly() {
+        assertEquals("0.3 * x", normalize("0.1*x + 0.2*x"));
+        assertEquals("0", normalize("0.3*x - 0.1*x - 0.2*x"));
+    }
+
+    @Test
     void rejectsUnsupportedOperatorsAndNonIntegerPowers() {
         assertTrue(normalizer.normalize(parse("x / y + x")).isEmpty());
         assertTrue(normalizer.normalize(parse("x ^ 0.5")).isEmpty());
-        assertTrue(normalizer.normalize(parse("(x + 1)^2")).isEmpty());
         assertTrue(normalizer.normalize(parse("sin(x) + x")).isEmpty());
     }
 

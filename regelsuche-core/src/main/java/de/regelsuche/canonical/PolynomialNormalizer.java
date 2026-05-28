@@ -5,6 +5,8 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -26,7 +28,8 @@ public final class PolynomialNormalizer {
         if (polynomial == null) {
             return Optional.empty();
         }
-        return Optional.of(polynomial.toExpr());
+        Expr normalized = polynomial.toExpr();
+        return normalized == null ? Optional.empty() : Optional.of(normalized);
     }
 
     private Polynomial toPolynomial(Expr expression) {
@@ -63,9 +66,6 @@ public final class PolynomialNormalizer {
         if (leftPolynomial == null || rightPolynomial == null) {
             return null;
         }
-        if (!leftPolynomial.isMonomial() || !rightPolynomial.isMonomial()) {
-            return null;
-        }
         return leftPolynomial.multiply(rightPolynomial);
     }
 
@@ -76,9 +76,6 @@ public final class PolynomialNormalizer {
         int exponentValue = (int) number.value();
         Polynomial basePolynomial = toPolynomial(base);
         if (basePolynomial == null) {
-            return null;
-        }
-        if (!basePolynomial.isMonomial()) {
             return null;
         }
         return basePolynomial.pow(exponentValue);
@@ -104,7 +101,11 @@ public final class PolynomialNormalizer {
         private Monomial multiply(Monomial other) {
             Map<String, Integer> result = new TreeMap<>(powers);
             for (Map.Entry<String, Integer> entry : other.powers.entrySet()) {
-                result.merge(entry.getKey(), entry.getValue(), Integer::sum);
+                try {
+                    result.merge(entry.getKey(), entry.getValue(), Math::addExact);
+                } catch (ArithmeticException ex) {
+                    return null;
+                }
             }
             result.values().removeIf(value -> value == 0);
             return new Monomial(result);
@@ -113,7 +114,11 @@ public final class PolynomialNormalizer {
         private Monomial pow(int exponent) {
             Map<String, Integer> result = new TreeMap<>();
             for (Map.Entry<String, Integer> entry : powers.entrySet()) {
-                result.put(entry.getKey(), entry.getValue() * exponent);
+                try {
+                    result.put(entry.getKey(), Math.multiplyExact(entry.getValue(), exponent));
+                } catch (ArithmeticException ex) {
+                    return null;
+                }
             }
             return new Monomial(result);
         }
@@ -158,51 +163,122 @@ public final class PolynomialNormalizer {
         }
     }
 
+    private record Rational(BigInteger numerator, BigInteger denominator) {
+        private Rational {
+            if (denominator.signum() == 0) {
+                throw new IllegalArgumentException("denominator must be non-zero");
+            }
+            if (denominator.signum() < 0) {
+                numerator = numerator.negate();
+                denominator = denominator.negate();
+            }
+            BigInteger gcd = numerator.gcd(denominator);
+            numerator = numerator.divide(gcd);
+            denominator = denominator.divide(gcd);
+        }
+
+        private static Rational of(long value) {
+            return new Rational(BigInteger.valueOf(value), BigInteger.ONE);
+        }
+
+        private static Rational fromDouble(double value) {
+            if (!Double.isFinite(value)) {
+                return null;
+            }
+            BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();
+            BigInteger numerator = decimal.unscaledValue();
+            int scale = decimal.scale();
+            if (scale < 0) {
+                numerator = numerator.multiply(BigInteger.TEN.pow(-scale));
+                return new Rational(numerator, BigInteger.ONE);
+            }
+            return new Rational(numerator, BigInteger.TEN.pow(scale));
+        }
+
+        private Rational add(Rational other) {
+            return new Rational(
+                numerator.multiply(other.denominator).add(other.numerator.multiply(denominator)),
+                denominator.multiply(other.denominator));
+        }
+
+        private Rational multiply(Rational other) {
+            return new Rational(numerator.multiply(other.numerator), denominator.multiply(other.denominator));
+        }
+
+        private Rational negate() {
+            return new Rational(numerator.negate(), denominator);
+        }
+
+        private Rational abs() {
+            return signum() < 0 ? negate() : this;
+        }
+
+        private boolean isZero() {
+            return numerator.signum() == 0;
+        }
+
+        private boolean isOne() {
+            return numerator.equals(denominator);
+        }
+
+        private int signum() {
+            return numerator.signum();
+        }
+
+        private Double toFiniteDouble() {
+            double value = numerator.doubleValue() / denominator.doubleValue();
+            return Double.isFinite(value) ? value : null;
+        }
+    }
+
     private static final class Polynomial {
-        private static final Comparator<Map.Entry<Monomial, Double>> TERM_ORDER = Comparator
-            .<Map.Entry<Monomial, Double>>comparingInt(entry -> entry.getKey().degree())
+        private static final Comparator<Map.Entry<Monomial, Rational>> TERM_ORDER = Comparator
+            .<Map.Entry<Monomial, Rational>>comparingInt(entry -> entry.getKey().degree())
             .reversed()
             .thenComparing(entry -> entry.getKey().sortKey());
 
-        private final Map<Monomial, Double> terms;
+        private final Map<Monomial, Rational> terms;
 
-        private Polynomial(Map<Monomial, Double> terms) {
+        private Polynomial(Map<Monomial, Rational> terms) {
             this.terms = normalizedTerms(terms);
         }
 
         private static Polynomial constant(double value) {
-            return monomial(value, Monomial.constant());
+            Rational coefficient = Rational.fromDouble(value);
+            return coefficient == null ? null : monomial(coefficient, Monomial.constant());
         }
 
-        private static Polynomial monomial(double coefficient, Monomial monomial) {
-            Map<Monomial, Double> terms = new LinkedHashMap<>();
+        private static Polynomial monomial(long coefficient, Monomial monomial) {
+            return monomial(Rational.of(coefficient), monomial);
+        }
+
+        private static Polynomial monomial(Rational coefficient, Monomial monomial) {
+            Map<Monomial, Rational> terms = new LinkedHashMap<>();
             terms.put(monomial, coefficient);
             return new Polynomial(terms);
         }
 
         private Polynomial add(Polynomial other) {
-            Map<Monomial, Double> result = new LinkedHashMap<>(terms);
-            for (Map.Entry<Monomial, Double> entry : other.terms.entrySet()) {
-                result.merge(entry.getKey(), entry.getValue(), Double::sum);
-            }
-            return new Polynomial(result);
-        }
-
-        private Polynomial scale(double factor) {
-            Map<Monomial, Double> result = new LinkedHashMap<>();
-            for (Map.Entry<Monomial, Double> entry : terms.entrySet()) {
-                result.put(entry.getKey(), entry.getValue() * factor);
+            Map<Monomial, Rational> result = new LinkedHashMap<>(terms);
+            for (Map.Entry<Monomial, Rational> entry : other.terms.entrySet()) {
+                result.merge(entry.getKey(), entry.getValue(), Rational::add);
+                if (result.size() > MAX_EXPANDED_TERMS) {
+                    return null;
+                }
             }
             return new Polynomial(result);
         }
 
         private Polynomial multiply(Polynomial other) {
-            Map<Monomial, Double> result = new LinkedHashMap<>();
-            for (Map.Entry<Monomial, Double> left : terms.entrySet()) {
-                for (Map.Entry<Monomial, Double> right : other.terms.entrySet()) {
+            Map<Monomial, Rational> result = new LinkedHashMap<>();
+            for (Map.Entry<Monomial, Rational> left : terms.entrySet()) {
+                for (Map.Entry<Monomial, Rational> right : other.terms.entrySet()) {
                     Monomial monomial = left.getKey().multiply(right.getKey());
-                    double coefficient = left.getValue() * right.getValue();
-                    result.merge(monomial, coefficient, Double::sum);
+                    if (monomial == null) {
+                        return null;
+                    }
+                    Rational coefficient = left.getValue().multiply(right.getValue());
+                    result.merge(monomial, coefficient, Rational::add);
                     if (result.size() > MAX_EXPANDED_TERMS) {
                         return null;
                     }
@@ -211,8 +287,8 @@ public final class PolynomialNormalizer {
             return new Polynomial(result);
         }
 
-        private boolean isMonomial() {
-            return terms.size() <= 1;
+        private Polynomial scale(long factor) {
+            return factor == 1 ? this : multiply(constant(factor));
         }
 
         private Polynomial pow(int exponent) {
@@ -242,14 +318,17 @@ public final class PolynomialNormalizer {
                 return new NumberExpr(0);
             }
             Expr result = null;
-            for (Map.Entry<Monomial, Double> entry : orderedTerms()) {
-                double coefficient = entry.getValue();
-                Expr term = withCoefficient(Math.abs(coefficient), entry.getKey().toExpr());
+            for (Map.Entry<Monomial, Rational> entry : orderedTerms()) {
+                Rational coefficient = entry.getValue();
+                Expr term = withCoefficient(coefficient.abs(), entry.getKey().toExpr());
+                if (term == null) {
+                    return null;
+                }
                 if (result == null) {
-                    result = coefficient < 0
+                    result = coefficient.signum() < 0
                         ? new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, term)
                         : term;
-                } else if (coefficient < 0) {
+                } else if (coefficient.signum() < 0) {
                     result = new BinaryExpr(result, BinaryOperator.SUB, term);
                 } else {
                     result = new BinaryExpr(result, BinaryOperator.ADD, term);
@@ -258,16 +337,16 @@ public final class PolynomialNormalizer {
             return result;
         }
 
-        private List<Map.Entry<Monomial, Double>> orderedTerms() {
+        private List<Map.Entry<Monomial, Rational>> orderedTerms() {
             return terms.entrySet().stream()
                 .sorted(TERM_ORDER)
                 .toList();
         }
 
-        private static Map<Monomial, Double> normalizedTerms(Map<Monomial, Double> source) {
-            Map<Monomial, Double> normalized = new LinkedHashMap<>();
-            for (Map.Entry<Monomial, Double> entry : source.entrySet()) {
-                if (entry.getValue() != 0) {
+        private static Map<Monomial, Rational> normalizedTerms(Map<Monomial, Rational> source) {
+            Map<Monomial, Rational> normalized = new LinkedHashMap<>();
+            for (Map.Entry<Monomial, Rational> entry : source.entrySet()) {
+                if (!entry.getValue().isZero()) {
                     normalized.put(entry.getKey(), entry.getValue());
                 }
             }
@@ -275,14 +354,16 @@ public final class PolynomialNormalizer {
         }
     }
 
-    private static Expr withCoefficient(double coefficient, Expr term) {
+    private static Expr withCoefficient(Rational coefficient, Expr term) {
         if (term instanceof NumberExpr number && number.value() == 1) {
-            return new NumberExpr(coefficient);
+            Double value = coefficient.toFiniteDouble();
+            return value == null ? null : new NumberExpr(value);
         }
-        if (coefficient == 1) {
+        if (coefficient.isOne()) {
             return term;
         }
-        return new BinaryExpr(new NumberExpr(coefficient), BinaryOperator.MUL, term);
+        Double value = coefficient.toFiniteDouble();
+        return value == null ? null : new BinaryExpr(new NumberExpr(value), BinaryOperator.MUL, term);
     }
 
     private static Expr leftAssociate(List<Expr> expressions, BinaryOperator operator) {
