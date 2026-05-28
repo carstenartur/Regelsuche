@@ -59,8 +59,18 @@ class DemoEndToEndTest {
         // 9 + 6*x + x^2 (real mathematical hit, not just HTTP 200).
         assertTrue(body.contains("\"targetReached\":true"),
             "binomial demo must reach the canonical target: " + body);
-        assertTrue(body.contains("9 + 6 * x + x ^ 2"),
-            "selected path must end at 9 + 6 * x + x ^ 2: " + body);
+        assertTrue(body.contains("\"canonicalTargetExpression\":\"x ^ 2 + 6 * x + 9\""),
+            "binomial demo target must be the collected canonical polynomial: " + body);
+        assertTrue(body.contains("\"improvedExpression\":\"x ^ 2 + 6 * x + 9\""),
+            "selected path must end at x ^ 2 + 6 * x + 9: " + body);
+        assertTrue(body.contains("\"ruleId\":\"polynomial_collect_like_terms\""),
+            "selected path must expose the collect-like-terms step: " + body);
+        assertTrue(graphStore.snapshot().nodes().contains("x ^ 2 + 6 * x + 9"),
+            "binomial graph must contain final collected node");
+        assertTrue(graphStore.snapshot().edges().stream().anyMatch(edge ->
+                edge.toExpression().equals("x ^ 2 + 6 * x + 9")
+                    && edge.transformationRule().equals("polynomial_collect_like_terms")),
+            "binomial graph must contain collect-like-terms edge to final node");
         assertTrue(graphStore.discoveredTransformations().size() > 0,
             "expected demo to record discovered transformations");
         String firstPathId = graphStore.discoveredTransformations().get(0).id();

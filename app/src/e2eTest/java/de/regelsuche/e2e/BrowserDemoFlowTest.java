@@ -592,6 +592,7 @@ class BrowserDemoFlowTest {
         waitForSemanticGraphRendered();
         assertSemanticGraphRequestState(fileName);
         waitForExpectedSemanticGraphContent(fileName);
+        assertBinomialCollectStepIfNeeded(fileName);
         Path target = SCREENSHOT_DIR.resolve(fileName);
         assertSemanticDebugDump(fileName, target);
         int renderedNodes = ((Number) page.evaluate(
@@ -946,6 +947,46 @@ class BrowserDemoFlowTest {
                 + " });"
                 + "}",
             expectedLabel,
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
+    }
+
+    private void assertBinomialCollectStepIfNeeded(String fileName) {
+        if (!fileName.contains("binomial")) {
+            return;
+        }
+        page.waitForFunction(
+            "() => {"
+                + " const normalize = value => String(value || '').replace(/\\s+/g, '').toLowerCase();"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return false;"
+                + " const hasCollectedNode = cy.nodes().some(node => {"
+                + "   const payload = node.data('payload') || {};"
+                + "   const label = payload.representativeExpression || payload.expression"
+                + "     || payload.canonicalExpression || node.data('label') || '';"
+                + "   return payload.onMainPath === true && normalize(label) === 'x^2+6*x+9';"
+                + " });"
+                + " const hasCollectEdge = cy.edges().some(edge => {"
+                + "   const payload = edge.data('payload') || {};"
+                + "   return payload.kind === 'MAIN_STEP'"
+                + "     && (payload.ruleId === 'polynomial_collect_like_terms'"
+                + "       || edge.data('label') === 'polynomial_collect_like_terms');"
+                + " });"
+                + " const mainPathNodes = cy.nodes().filter(node => {"
+                + "   const payload = node.data('payload') || {};"
+                + "   return payload.onMainPath === true;"
+                + " });"
+                + " const finalNode = mainPathNodes.reduce((best, node) => {"
+                + "   const depth = Number((node.data('payload') || {}).minDepth || 0);"
+                + "   if (!best) return node;"
+                + "   const bestDepth = Number((best.data('payload') || {}).minDepth || 0);"
+                + "   return depth >= bestDepth ? node : best;"
+                + " }, null);"
+                + " const finalPayload = finalNode ? (finalNode.data('payload') || {}) : {};"
+                + " const finalLabel = finalPayload.representativeExpression || finalPayload.expression"
+                + "   || finalPayload.canonicalExpression || (finalNode ? finalNode.data('label') : '');"
+                + " return hasCollectedNode && hasCollectEdge && normalize(finalLabel) === 'x^2+6*x+9';"
+                + "}",
+            null,
             new Page.WaitForFunctionOptions().setTimeout(5_000));
     }
 

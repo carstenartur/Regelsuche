@@ -48,7 +48,9 @@ class PolynomialRulesTest {
         assertCollects("x*2 + x", "3 * x");
         assertCollects("2*x + x", "3 * x");
         assertCollects("x + x*2", "3 * x");
+        assertCollects("3*x + x*3", "6 * x");
         assertCollects("x*x + x*2 + x + 2", "x ^ 2 + 3 * x + 2");
+        assertCollects("x*x + 3*x + x*3 + 3*3", "x ^ 2 + 6 * x + 9");
     }
 
     @Test

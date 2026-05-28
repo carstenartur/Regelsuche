@@ -17,6 +17,7 @@ class PolynomialNormalizerTest {
     @Test
     void collectsGlobalLikeTermsAfterExpansion() {
         assertEquals("x ^ 2 + 3 * x + 2", normalize("x*x + x*2 + x + 2"));
+        assertEquals("6 * x", normalize("3*x + x*3"));
     }
 
     @Test

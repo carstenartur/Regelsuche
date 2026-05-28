@@ -56,7 +56,7 @@ public final class DemoCatalog {
             InputType.TERM,
             SearchProfile.DISCOVERY,
             "(a+b)^2 = a^2 + 2*a*b + b^2",
-            "9 + 6 * x + x ^ 2"
+            "x ^ 2 + 6 * x + 9"
         ));
         map.put("rational", new Demo(
             "rational",

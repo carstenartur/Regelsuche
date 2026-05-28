@@ -80,4 +80,49 @@ class MainPathSelectorTest {
             .orElseThrow().id();
         assertEquals("useful", id);
     }
+
+    @Test
+    void prefersCollectedCanonicalPolynomialPath() {
+        DiscoveredTransformation distributedOnly = new DiscoveredTransformation(
+            "distributed",
+            "(x+3)^2",
+            "x * x + 3 * x + x * 3 + 3 * 3",
+            List.of(
+                new TransformationStep(0, "(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, 20, 18, true, ""),
+                new TransformationStep(1, "(x + 3) * x + (x + 3) * 3", "x * x + 3 * x + x * 3 + 3 * 3",
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 18, 10, true, "")
+            ),
+            new ExpressionScore(20, 0, 0, 0, 0),
+            new ExpressionScore(10, 0, 0, 0, 0),
+            10,
+            CandidateProofStatus.OBSERVED,
+            Instant.now(),
+            ""
+        );
+        DiscoveredTransformation collected = new DiscoveredTransformation(
+            "collected",
+            "(x+3)^2",
+            "x ^ 2 + 6 * x + 9",
+            List.of(
+                new TransformationStep(0, "(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, 20, 18, true, ""),
+                new TransformationStep(1, "(x + 3) * x + (x + 3) * 3", "x * x + 3 * x + x * 3 + 3 * 3",
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 18, 10, true, ""),
+                new TransformationStep(2, "x * x + 3 * x + x * 3 + 3 * 3", "x ^ 2 + 6 * x + 9",
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, 10, 6, true, "")
+            ),
+            new ExpressionScore(20, 0, 0, 0, 0),
+            new ExpressionScore(6, 0, 0, 0, 0),
+            10,
+            CandidateProofStatus.OBSERVED,
+            Instant.now(),
+            ""
+        );
+
+        String id = selector.selectMainPath(List.of(distributedOnly, collected),
+                new SearchGraphDto(List.of(), List.of(), List.of(), null), MainPathCriteria.defaults())
+            .orElseThrow().id();
+        assertEquals("collected", id);
+    }
 }

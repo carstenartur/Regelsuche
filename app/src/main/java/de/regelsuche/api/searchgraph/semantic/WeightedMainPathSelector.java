@@ -57,10 +57,24 @@ public final class WeightedMainPathSelector implements MainPathSelector {
             + c.proofConfidenceWeight() * path.validationStatus().ordinal()
             + c.macroCompressionWeight() * macroSteps
             + 0.9 * explanatoryStepCount(path, rawGraph)
+            + collectedCanonicalPolynomialBonus(path)
             + c.teachingScoreWeight() * Math.max(0, path.totalImprovement() - path.steps().size())
             - c.lowSignalPenalty() * lowSignal
             - c.lengthPenalty() * path.steps().size()
             - c.assumptionPenalty() * assumptions;
+    }
+
+    private double collectedCanonicalPolynomialBonus(DiscoveredTransformation path) {
+        boolean collects = path.steps().stream()
+            .anyMatch(step -> "polynomial_collect_like_terms".equals(step.ruleId()));
+        if (!collects) {
+            return 0.0;
+        }
+        de.regelsuche.canonical.ExpressionCanonicalizer canonicalizer =
+            new de.regelsuche.canonical.ExpressionCanonicalizer();
+        return Objects.equals(path.improvedExpression(), canonicalizer.canonicalize(path.improvedExpression()))
+            ? 4.0
+            : 0.0;
     }
 
     private int explanatoryStepCount(DiscoveredTransformation path, SearchGraphDto rawGraph) {

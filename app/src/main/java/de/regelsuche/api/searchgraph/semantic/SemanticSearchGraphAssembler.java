@@ -432,7 +432,29 @@ public final class SemanticSearchGraphAssembler {
             List<String> edgeSources = new ArrayList<>(hiddenSources);
             edgeSources.add(rawId);
             if (currentVisible.equals(to)) {
-                if (edges.isEmpty()) {
+                if (finalStep) {
+                    replaceMainPathNode(
+                        nodes,
+                        toMainPathNode(
+                            to,
+                            step.afterExpression(),
+                            mainPath.steps().size() + 1,
+                            SemanticNodeKind.GOAL,
+                            rawExpressionToClusterId,
+                            clustersByHash,
+                            shadowedCanonicalNodeIds
+                        )
+                    );
+                    if (edges.isEmpty()) {
+                        hiddenSources.add(rawId);
+                        hiddenSteps++;
+                    } else {
+                        int lastIndex = edges.size() - 1;
+                        edges.set(lastIndex, reprojectFinalSameClusterEdge(edges.get(lastIndex), step, hiddenSteps, edgeSources, lowSignal));
+                        hiddenSources.clear();
+                        hiddenSteps = 0;
+                    }
+                } else if (edges.isEmpty()) {
                     hiddenSources.add(rawId);
                     hiddenSteps++;
                 } else {
@@ -544,6 +566,16 @@ public final class SemanticSearchGraphAssembler {
         );
     }
 
+    private static void replaceMainPathNode(List<SemanticGraphNodeDto> nodes, SemanticGraphNodeDto replacement) {
+        for (int i = 0; i < nodes.size(); i++) {
+            if (nodes.get(i).id().equals(replacement.id())) {
+                nodes.set(i, replacement);
+                return;
+            }
+        }
+        nodes.add(replacement);
+    }
+
     private SemanticGraphEdgeDto projectedMainPathEdge(
         String from,
         String to,
@@ -592,6 +624,33 @@ public final class SemanticSearchGraphAssembler {
             edge.macroMoveExpansion(),
             mergedSourceEdgeIds.stream().distinct().toList(),
             edge.interestingness()
+        );
+    }
+
+    private static SemanticGraphEdgeDto reprojectFinalSameClusterEdge(
+        SemanticGraphEdgeDto edge,
+        TransformationStep finalStep,
+        int hiddenSteps,
+        List<String> sourceEdgeIds,
+        boolean lowSignal
+    ) {
+        String ruleLatex = MathPresentation.DEFAULT.ruleLatex(finalStep.ruleId());
+        List<String> mergedSourceEdgeIds = new ArrayList<>(edge.sourceEdgeIds());
+        mergedSourceEdgeIds.addAll(sourceEdgeIds);
+        return new SemanticGraphEdgeDto(
+            edge.from(),
+            edge.to(),
+            finalStep.ruleId(),
+            ruleLatex,
+            MathPresentation.DEFAULT.layout(ruleLatex),
+            edge.kind(),
+            edge.atomicStepCount() + hiddenSteps + 1,
+            edge.hiddenStepCount() + hiddenSteps + 1,
+            edge.lowSignal() || lowSignal,
+            edge.macroMove(),
+            edge.macroMoveExpansion(),
+            mergedSourceEdgeIds.stream().distinct().toList(),
+            Math.abs(finalStep.scoreBefore() - finalStep.scoreAfter()) + 1.0
         );
     }
 

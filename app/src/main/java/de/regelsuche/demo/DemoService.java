@@ -136,9 +136,16 @@ public final class DemoService {
             if (best == null || transformation.totalImprovement() > best.totalImprovement()) {
                 best = transformation;
             }
-            // Prefer the SHORTEST path that lands on the canonical target.
+            // Prefer a path that lands on the canonical target through the
+            // visible polynomial collection step; otherwise use the shortest
+            // target path as a deterministic fallback.
             if (canonicalTarget != null && transformation.improvedExpression().equals(canonicalTarget)) {
-                if (targetPath == null || transformation.steps().size() < targetPath.steps().size()) {
+                boolean candidateCollects = hasRule(transformation, "polynomial_collect_like_terms");
+                boolean currentCollects = targetPath != null && hasRule(targetPath, "polynomial_collect_like_terms");
+                if (targetPath == null
+                    || (candidateCollects && !currentCollects)
+                    || (candidateCollects == currentCollects
+                        && transformation.steps().size() < targetPath.steps().size())) {
                     targetPath = transformation;
                     appliedRuleIdsOnTargetPath.clear();
                     appliedRuleIdsOnTargetPath.addAll(state.appliedRuleIds());
@@ -185,6 +192,11 @@ public final class DemoService {
             return List.of(Assumption.nonZero("x").expression());
         }
         return List.of();
+    }
+
+    private boolean hasRule(DiscoveredTransformation transformation, String ruleId) {
+        return transformation.steps().stream()
+            .anyMatch(step -> ruleId.equals(step.ruleId()));
     }
 
     private String stablePathId(String root, SearchState state) {

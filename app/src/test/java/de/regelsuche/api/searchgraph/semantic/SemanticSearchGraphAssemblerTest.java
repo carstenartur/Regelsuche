@@ -235,6 +235,69 @@ class SemanticSearchGraphAssemblerTest {
     }
 
     @Test
+    void keepsCollectedPolynomialAsFinalVisibleNodeWhenItSharesCanonicalClusterWithExpandedSum() {
+        String expanded = "x * x + 3 * x + x * 3 + 3 * 3";
+        String collected = "x ^ 2 + 6 * x + 9";
+        var raw = new SearchGraphDto(
+            List.of(
+                node("(x+3)^2", 0, 20),
+                node("(x + 3) * x + (x + 3) * 3", 1, 18),
+                node("x * x + 3 * x + (x + 3) * 3", 2, 14),
+                node(expanded, 3, 10),
+                node(collected, 4, 6)
+            ),
+            List.of(
+                edge("(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, -2),
+                edge("(x + 3) * x + (x + 3) * 3", "x * x + 3 * x + (x + 3) * 3",
+                    "ast_distribute_right_add", RewriteKind.EXPAND, -4),
+                edge("x * x + 3 * x + (x + 3) * 3", expanded,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, -4),
+                edge(expanded, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, -4)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "binomial",
+            "(x+3)^2",
+            collected,
+            List.of(
+                new TransformationStep(0, "(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, 20, 18, true, ""),
+                new TransformationStep(1, "(x + 3) * x + (x + 3) * 3", "x * x + 3 * x + (x + 3) * 3",
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 18, 14, true, ""),
+                new TransformationStep(2, "x * x + 3 * x + (x + 3) * 3", expanded,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 14, 10, true, ""),
+                new TransformationStep(3, expanded, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, 10, 6, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertTrue(semantic.nodes().stream().anyMatch(n ->
+            n.onMainPath() && n.explicitEndpoint() && n.representativeExpression().equals(collected)));
+        assertTrue(semantic.nodes().stream().noneMatch(n ->
+            n.onMainPath() && n.representativeExpression().equals(expanded)));
+        assertTrue(semantic.edges().stream().anyMatch(e ->
+            e.kind() == SemanticEdgeKind.MAIN_STEP
+                && e.ruleId().equals("polynomial_collect_like_terms")
+                && e.sourceEdgeIds().contains(expanded + "->" + collected + ":polynomial_collect_like_terms")));
+    }
+
+    @Test
     void deduplicatesConsecutiveMainPathStatesInSameCanonicalCluster() {
         var raw = new SearchGraphDto(
             List.of(
