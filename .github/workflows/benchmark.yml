@@ -67,24 +67,93 @@ jobs:
           touch .nojekyll
           mkdir -p coverage tests dev/bench
           printf '{"schemaVersion":1,"label":"coverage","message":"pending","color":"lightgrey"}\n' > coverage/badge.json
+          printf '<!doctype html><title>Coverage pending</title><h1>Coverage pending</h1>\n' > coverage/index.html
           printf '{"schemaVersion":1,"label":"tests","message":"pending","color":"lightgrey"}\n' > tests/badge.json
+          printf '<!doctype html><title>Tests pending</title><h1>Tests pending</h1>\n' > tests/index.html
+          printf '{"schemaVersion":1,"label":"performance","message":"pending","color":"lightgrey"}\n' > dev/bench/badge.json
+          printf '<!doctype html><title>Benchmarks pending</title><h1>Benchmarks pending</h1>\n' > dev/bench/index.html
           git add .
           git -c user.name='github-actions[bot]' -c user.email='github-actions[bot]@users.noreply.github.com' commit -m 'Initialize gh-pages'
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin gh-pages
 
-      - name: Publish benchmark results
-        uses: benchmark-action/github-action-benchmark@v1
+      - name: Generate benchmark Pages report and badge JSON
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import html
+          import json
+          from pathlib import Path
+
+          result_path = Path('${{ steps.locate.outputs.path }}')
+          target = Path('public/dev/bench')
+          target.mkdir(parents=True, exist_ok=True)
+
+          def escape(value):
+              return html.escape(str(value), quote=True)
+
+          def score(entry):
+              metric = entry.get('primaryMetric', {})
+              return metric.get('score'), metric.get('scoreUnit', '')
+
+          try:
+              results = json.loads(result_path.read_text(encoding='utf-8'))
+              if not isinstance(results, list):
+                  results = []
+          except Exception as exc:
+              print(f"Could not read JMH result JSON {result_path}: {exc}")
+              results = []
+
+          benchmark_count = len(results)
+          if benchmark_count:
+              badge = {
+                  "schemaVersion": 1,
+                  "label": "performance",
+                  "message": f"{benchmark_count} benchmarks",
+                  "color": "blue",
+              }
+          else:
+              badge = {
+                  "schemaVersion": 1,
+                  "label": "performance",
+                  "message": "no data",
+                  "color": "lightgrey",
+              }
+          (target / 'badge.json').write_text(json.dumps(badge, separators=(',', ':')) + '\n', encoding='utf-8')
+
+          rows = []
+          for entry in results:
+              value, unit = score(entry)
+              value_text = '' if value is None else f'{value:.3f}'
+              rows.append(
+                  '<tr>'
+                  f'<td>{escape(entry.get("benchmark", ""))}</td>'
+                  f'<td>{escape(entry.get("mode", ""))}</td>'
+                  f'<td>{escape(value_text)}</td>'
+                  f'<td>{escape(unit)}</td>'
+                  '</tr>'
+              )
+          table_rows = '\n'.join(rows) or '<tr><td colspan="4">No JMH benchmark data was generated.</td></tr>'
+          (target / 'index.html').write_text(f'''<!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><title>Regelsuche Performance</title>
+          <style>body{{font-family:system-ui,sans-serif;margin:2rem;max-width:1200px}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ddd;padding:.5rem;text-align:left}}th{{background:#f6f8fa}}</style>
+          </head><body><h1>Regelsuche Performance</h1>
+          <p>Latest JMH run: <strong>{benchmark_count}</strong> benchmark result(s).</p>
+          <table><thead><tr><th>Benchmark</th><th>Mode</th><th>Score</th><th>Unit</th></tr></thead><tbody>{table_rows}</tbody></table>
+          </body></html>\n''', encoding='utf-8')
+          EOF
+
+      - name: Deploy benchmark report to GitHub Pages
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          name: Regelsuche JMH Benchmarks
-          tool: 'jmh'
-          output-file-path: ${{ steps.locate.outputs.path }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          alert-threshold: '115%'
-          comment-on-alert: true
-          fail-on-alert: false
-          alert-comment-cc-users: '@carstenartur'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: public/dev/bench
+          destination_dir: dev/bench
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Update benchmark report (${{ github.sha }})'
 
       - name: Upload raw JMH artifact
         if: always()
