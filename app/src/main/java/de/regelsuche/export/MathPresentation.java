@@ -41,7 +41,7 @@ public final class MathPresentation {
         Map.entry("trig_pythagoras", "\\sin^2+\\cos^2=1"),
         Map.entry("rational_cancel_common_factor", "\\frac{ax}{bx}\\to\\frac{a}{b}"),
         Map.entry("polynomial_distribute", "a(b+c)\\to ab+ac"),
-        Map.entry("polynomial_collect_like_terms", "ax+bx\\to(a+b)x")
+        Map.entry("polynomial_collect_like_terms", "\\text{collect like terms}")
     );
 
     private final AstLatexRenderer renderer;

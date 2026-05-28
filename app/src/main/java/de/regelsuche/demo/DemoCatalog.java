@@ -88,7 +88,7 @@ public final class DemoCatalog {
             InputType.TERM,
             SearchProfile.DISCOVERY,
             "(x+1)*(x+2) = x^2 + 3*x + 2",
-            "2 + 3 * x + x ^ 2"
+            "x ^ 2 + 3 * x + 2"
         ));
         map.put("macro-learning", new Demo(
             "macro-learning",

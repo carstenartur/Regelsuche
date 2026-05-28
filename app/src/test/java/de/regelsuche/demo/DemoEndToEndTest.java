@@ -104,8 +104,16 @@ class DemoEndToEndTest {
         assertTrue(body.contains("(x+1)*(x+2)"), body);
         assertTrue(body.contains("\"targetReached\":true"),
             "polynomial-expansion demo must reach 2 + 3*x + x^2: " + body);
-        assertTrue(body.contains("2 + 3 * x + x ^ 2"),
-            "selected path must end at 2 + 3 * x + x ^ 2: " + body);
+        assertTrue(body.contains("x ^ 2 + 3 * x + 2"),
+            "selected path must end at x ^ 2 + 3 * x + 2: " + body);
+        assertTrue(graphStore.snapshot().nodes().contains("x ^ 2 + 3 * x + 2"),
+            "polynomial graph must contain final collected node");
+        assertTrue(graphStore.snapshot().edges().stream().anyMatch(edge ->
+                edge.toExpression().equals("x ^ 2 + 3 * x + 2")
+                    && edge.transformationRule().equals("polynomial_collect_like_terms")),
+            "polynomial graph must contain a collect like terms edge");
+        assertTrue(body.contains("\\\\text{collect like terms}") || body.contains("polynomial_collect_like_terms"),
+            "polynomial graph response must expose collect like terms label: " + body);
 
         // Backwards-compatible alias: /api/demo/equation must still resolve.
         String aliasBody = runDemo("equation");
