@@ -466,6 +466,9 @@ public class WebWorkbenchServer {
         de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode mode =
             de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.parse(
                 queryParam(exchange, "mode", "semantic"));
+        de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay showMacroSteps =
+            de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay.parse(
+                queryParam(exchange, "showMacroSteps", "compact"));
         boolean showLowSignal = parseBooleanParam(queryParam(exchange, "showLowSignal", "false"));
         boolean showAlternatives = parseBooleanParam(queryParam(exchange, "showAlternatives", "true"));
         boolean showVariants = parseBooleanParam(queryParam(exchange, "showVariants", "false"));
@@ -474,6 +477,7 @@ public class WebWorkbenchServer {
         String pathId = queryParam(exchange, "pathId", "");
         var graph = buildSemanticSearchGraph(
             mode,
+            showMacroSteps,
             showLowSignal,
             showAlternatives,
             showVariants,
@@ -988,6 +992,8 @@ public class WebWorkbenchServer {
                 var graph = buildSemanticSearchGraph(
                     de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.parse(
                         queryParam(exchange, "mode", "semantic")),
+                    de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay.parse(
+                        queryParam(exchange, "showMacroSteps", "compact")),
                     parseBooleanParam(queryParam(exchange, "showLowSignal", "false")),
                     parseBooleanParam(queryParam(exchange, "showAlternatives", "true")),
                     parseBooleanParam(queryParam(exchange, "showVariants", "false")),
@@ -1009,6 +1015,8 @@ public class WebWorkbenchServer {
                 var graph = buildSemanticSearchGraph(
                     de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.parse(
                         queryParam(exchange, "mode", "semantic")),
+                    de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay.parse(
+                        queryParam(exchange, "showMacroSteps", "compact")),
                     parseBooleanParam(queryParam(exchange, "showLowSignal", "false")),
                     parseBooleanParam(queryParam(exchange, "showAlternatives", "true")),
                     parseBooleanParam(queryParam(exchange, "showVariants", "false")),
@@ -1109,6 +1117,7 @@ public class WebWorkbenchServer {
 
     private de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphDto buildSemanticSearchGraph(
         de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode mode,
+        de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay showMacroSteps,
         boolean showLowSignal,
         boolean showAlternatives,
         boolean showVariants,
@@ -1125,6 +1134,7 @@ public class WebWorkbenchServer {
             selectedTransformations,
             macroRules,
             mode,
+            showMacroSteps,
             showLowSignal,
             showAlternatives,
             showVariants,
@@ -2348,6 +2358,7 @@ public class WebWorkbenchServer {
         var graph = buildSearchGraph();
         var semanticGraph = buildSemanticSearchGraph(
             de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.SEMANTIC,
+            de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay.COMPACT,
             false,
             true,
             false,

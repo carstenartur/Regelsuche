@@ -17,6 +17,7 @@ public record SemanticGraphEdgeDto(
     boolean macroMove,
     MacroMoveExpansion macroMoveExpansion,
     List<String> sourceEdgeIds,
+    List<String> hiddenSteps,
     double interestingness
 ) {
     public SemanticGraphEdgeDto {
@@ -29,5 +30,39 @@ public record SemanticGraphEdgeDto(
         atomicStepCount = Math.max(0, atomicStepCount);
         hiddenStepCount = Math.max(0, hiddenStepCount);
         sourceEdgeIds = sourceEdgeIds == null ? List.of() : List.copyOf(sourceEdgeIds);
+        hiddenSteps = hiddenSteps == null ? List.of() : List.copyOf(hiddenSteps);
+    }
+
+    public SemanticGraphEdgeDto(
+        String from,
+        String to,
+        String ruleId,
+        String ruleLatex,
+        MathLayout layout,
+        SemanticEdgeKind kind,
+        int atomicStepCount,
+        int hiddenStepCount,
+        boolean lowSignal,
+        boolean macroMove,
+        MacroMoveExpansion macroMoveExpansion,
+        List<String> sourceEdgeIds,
+        double interestingness
+    ) {
+        this(
+            from,
+            to,
+            ruleId,
+            ruleLatex,
+            layout,
+            kind,
+            atomicStepCount,
+            hiddenStepCount,
+            lowSignal,
+            macroMove,
+            macroMoveExpansion,
+            sourceEdgeIds,
+            List.of(),
+            interestingness
+        );
     }
 }

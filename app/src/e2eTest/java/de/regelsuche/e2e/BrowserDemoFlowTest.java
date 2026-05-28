@@ -565,6 +565,7 @@ class BrowserDemoFlowTest {
         page.waitForSelector("#tab-graph.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
         page.locator("#graphViewMode").selectOption("semantic");
+        page.locator("#showMacroSteps").selectOption("didactic");
         page.locator("#graphFilter").fill("");
         page.locator("#showLowSignal").setChecked(false);
         page.locator("#showAlternatives").setChecked(false);
@@ -575,6 +576,8 @@ class BrowserDemoFlowTest {
         assertNotNull(graphResponse, fileName + " must request the semantic search graph");
         assertTrue(graphResponse.url().contains("mode=semantic"),
             fileName + " semantic graph request must use mode=semantic, got: " + graphResponse.url());
+        assertTrue(graphResponse.url().contains("showMacroSteps=didactic"),
+            fileName + " semantic graph request must use didactic macro steps, got: " + graphResponse.url());
         assertTrue(graphResponse.url().contains("showLowSignal=false"),
             fileName + " semantic graph request must disable low-signal edges, got: " + graphResponse.url());
         assertTrue(graphResponse.url().contains("showAlternatives=false"),
@@ -854,6 +857,7 @@ class BrowserDemoFlowTest {
         page.waitForFunction(
             "() => window.__lastGraphRequestParams "
                 + "&& window.__lastGraphRequestParams.mode === 'semantic' "
+                + "&& window.__lastGraphRequestParams.showMacroSteps === 'didactic' "
                 + "&& window.__lastGraphRequestParams.showLowSignal === false "
                 + "&& window.__lastGraphRequestParams.showAlternatives === false",
             null,
@@ -862,6 +866,7 @@ class BrowserDemoFlowTest {
         assertTrue(requestUrl.contains("/api/search-graph/semantic"),
             fileName + " must expose the semantic graph request URL");
         assertTrue(requestUrl.contains("mode=semantic")
+                && requestUrl.contains("showMacroSteps=didactic")
                 && requestUrl.contains("showLowSignal=false")
                 && requestUrl.contains("showAlternatives=false"),
             fileName + " must expose the active semantic graph request params, got: " + requestUrl);

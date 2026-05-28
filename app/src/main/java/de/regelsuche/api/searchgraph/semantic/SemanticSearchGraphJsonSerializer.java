@@ -39,6 +39,7 @@ public final class SemanticSearchGraphJsonSerializer {
             inner.property("lowSignal", edge.lowSignal());
             inner.property("macroMove", edge.macroMove());
             inner.stringArray("sourceEdgeIds", edge.sourceEdgeIds());
+            inner.stringArray("hiddenSteps", edge.hiddenSteps());
             inner.property("interestingness", edge.interestingness());
             if (edge.macroMoveExpansion() == null) {
                 inner.nullProperty("macroMoveExpansion");
@@ -80,6 +81,7 @@ public final class SemanticSearchGraphJsonSerializer {
         });
         writer.object("view", view -> {
             view.property("mode", dto.view().mode().name());
+            view.property("showMacroSteps", dto.view().showMacroSteps().name());
             view.property("showLowSignal", dto.view().showLowSignal());
             view.property("showAlternatives", dto.view().showAlternatives());
             view.property("showVariants", dto.view().showVariants());

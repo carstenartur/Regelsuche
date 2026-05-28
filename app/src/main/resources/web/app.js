@@ -759,11 +759,13 @@
         const filter = $('graphFilter') && $('graphFilter').value || '';
         const interactive = $('graphInteractive') && $('graphInteractive').checked;
         const mode = $('graphViewMode') && $('graphViewMode').value || 'semantic';
+        const showMacroSteps = $('showMacroSteps') && $('showMacroSteps').value || 'compact';
         const showLowSignal = !!($('showLowSignal') && $('showLowSignal').checked);
         const showAlternatives = !($('showAlternatives') && !$('showAlternatives').checked);
         const showVariants = !!($('showVariants') && $('showVariants').checked);
         const filterQuery = filter ? ('?filter=' + encodeURIComponent(filter)) : '';
         const semanticQuery = '?mode=' + encodeURIComponent(mode)
+            + '&showMacroSteps=' + encodeURIComponent(showMacroSteps)
             + '&showLowSignal=' + encodeURIComponent(String(showLowSignal))
             + '&showAlternatives=' + encodeURIComponent(String(showAlternatives))
             + '&showVariants=' + encodeURIComponent(String(showVariants))
@@ -779,6 +781,7 @@
                 window.__lastGraphRequestUrl = semanticGraphUrl;
                 window.__lastGraphRequestParams = {
                     mode: mode,
+                    showMacroSteps: showMacroSteps,
                     showLowSignal: showLowSignal,
                     showAlternatives: showAlternatives,
                     showVariants: showVariants,
