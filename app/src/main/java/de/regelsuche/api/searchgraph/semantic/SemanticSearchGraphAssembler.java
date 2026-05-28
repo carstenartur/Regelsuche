@@ -485,7 +485,38 @@ public final class SemanticSearchGraphAssembler {
             List<String> edgeSources = new ArrayList<>(hiddenSources);
             edgeSources.add(rawId);
             if (didactic && "polynomial_collect_like_terms".equals(step.ruleId())) {
-                String prepared = didacticPreCollectExpression(step.beforeExpression(), step.afterExpression());
+                String expanded = didacticExpandedBeforeCollect(step.beforeExpression(), step.afterExpression());
+                String collectInputId = currentVisible;
+                String collectInputExpression = step.beforeExpression();
+                boolean insertedDidacticStep = false;
+                if (!expanded.isBlank()) {
+                    String expandedId = didacticNodeId("expand-" + step.index(), expanded);
+                    if (!visibleNodeIds.contains(expandedId)) {
+                        nodes.add(toMainPathNode(
+                            expandedId,
+                            expanded,
+                            step.index() + 1,
+                            SemanticNodeKind.INTERMEDIATE,
+                            rawExpressionToClusterId,
+                            clustersByHash,
+                            shadowedCanonicalNodeIds,
+                            true
+                        ));
+                    }
+                    edges.add(projectedMainPathEdge(
+                        collectInputId,
+                        expandedId,
+                        syntheticStep(step, expanded, "ast_distribute_right_add"),
+                        0,
+                        edgeSources,
+                        false
+                    ));
+                    visibleNodeIds.add(expandedId);
+                    collectInputId = expandedId;
+                    collectInputExpression = expanded;
+                    insertedDidacticStep = true;
+                }
+                String prepared = didacticPreCollectExpression(collectInputExpression, step.afterExpression());
                 if (!prepared.isBlank()) {
                     String preparedId = didacticNodeId("prepare-" + step.index(), prepared);
                     if (!visibleNodeIds.contains(preparedId)) {
@@ -501,26 +532,27 @@ public final class SemanticSearchGraphAssembler {
                         ));
                     }
                     edges.add(projectedMainPathEdge(
-                        currentVisible,
+                        collectInputId,
                         preparedId,
-                        new TransformationStep(
-                            step.index(),
-                            step.beforeExpression(),
-                            prepared,
-                            PREPARE_COLLECT_RULE_ID,
-                            step.ruleKind(),
-                            step.scoreBefore(),
-                            step.scoreAfter(),
-                            step.equivalencePreserving(),
-                            step.explanation(),
-                            step.assumptions()
-                        ),
+                        syntheticStep(step, prepared, PREPARE_COLLECT_RULE_ID),
                         0,
                         edgeSources,
                         false
                     ));
-                    edges.add(projectedMainPathEdge(preparedId, to, step, 0, edgeSources, false));
                     visibleNodeIds.add(preparedId);
+                    collectInputId = preparedId;
+                    collectInputExpression = prepared;
+                    insertedDidacticStep = true;
+                }
+                if (insertedDidacticStep) {
+                    edges.add(projectedMainPathEdge(
+                        collectInputId,
+                        to,
+                        syntheticStep(step, collectInputExpression, step.afterExpression(), step.ruleId()),
+                        0,
+                        edgeSources,
+                        false
+                    ));
                     visibleNodeIds.add(to);
                     currentVisible = to;
                     hiddenSources.clear();
@@ -685,7 +717,13 @@ public final class SemanticSearchGraphAssembler {
         List<String> sourceEdgeIds,
         boolean lowSignal
     ) {
-        boolean expandAndCollect = isExpandAndCollectMacro(step.ruleId(), hiddenSteps, sourceEdgeIds);
+        boolean expandAndCollect = isExpandAndCollectMacro(
+            step.ruleId(),
+            hiddenSteps,
+            sourceEdgeIds,
+            step.beforeExpression(),
+            step.afterExpression()
+        );
         String ruleId = expandAndCollect ? EXPAND_AND_COLLECT_RULE_ID : step.ruleId();
         String ruleLatex = MathPresentation.DEFAULT.ruleLatex(ruleId);
         return new SemanticGraphEdgeDto(
@@ -738,7 +776,13 @@ public final class SemanticSearchGraphAssembler {
         List<String> sourceEdgeIds,
         boolean lowSignal
     ) {
-        boolean expandAndCollect = isExpandAndCollectMacro(finalStep.ruleId(), hiddenSteps + edge.hiddenStepCount(), sourceEdgeIds);
+        boolean expandAndCollect = isExpandAndCollectMacro(
+            finalStep.ruleId(),
+            hiddenSteps + edge.hiddenStepCount(),
+            sourceEdgeIds,
+            finalStep.beforeExpression(),
+            finalStep.afterExpression()
+        );
         String ruleId = expandAndCollect ? EXPAND_AND_COLLECT_RULE_ID : finalStep.ruleId();
         String ruleLatex = MathPresentation.DEFAULT.ruleLatex(ruleId);
         List<String> mergedSourceEdgeIds = new ArrayList<>(edge.sourceEdgeIds());
@@ -786,11 +830,24 @@ public final class SemanticSearchGraphAssembler {
         );
     }
 
-    private static boolean isExpandAndCollectMacro(String ruleId, int hiddenSteps, List<String> sourceEdgeIds) {
+    private static boolean isExpandAndCollectMacro(
+        String ruleId,
+        int hiddenSteps,
+        List<String> sourceEdgeIds,
+        String beforeExpression,
+        String afterExpression
+    ) {
         return "polynomial_collect_like_terms".equals(ruleId)
-            && hiddenSteps > 0
-            && sourceEdgeIds != null
-            && sourceEdgeIds.stream().anyMatch(id -> id.contains("ast_distribute"));
+            && ((hiddenSteps > 0
+                && sourceEdgeIds != null
+                && sourceEdgeIds.stream().anyMatch(id -> id.contains("ast_distribute")))
+                || needsRemainingExpansionBeforeCollection(beforeExpression, afterExpression));
+    }
+
+    private static boolean needsRemainingExpansionBeforeCollection(String beforeExpression, String afterExpression) {
+        String before = beforeExpression == null ? "" : beforeExpression.replaceAll("\\s+", "");
+        String after = afterExpression == null ? "" : afterExpression.replaceAll("\\s+", "");
+        return before.contains("(") && before.contains(")*") && after.contains("^");
     }
 
     private static String didacticNodeId(String sequence, String expression) {
@@ -811,6 +868,74 @@ public final class SemanticSearchGraphAssembler {
             return "";
         }
         return "";
+    }
+
+    private static String didacticExpandedBeforeCollect(String beforeExpression, String afterExpression) {
+        try {
+            Expr expanded = expandProductsForDidacticCollect(new ExpressionParser().parseTerm(beforeExpression));
+            String formatted = ExpressionFormatter.format(expanded);
+            String before = ExpressionFormatter.format(new ExpressionParser().parseTerm(beforeExpression));
+            String after = ExpressionFormatter.format(new ExpressionParser().parseTerm(afterExpression));
+            if (!formatted.equals(before) && !formatted.equals(after)) {
+                return formatted;
+            }
+        } catch (RuntimeException ignored) {
+            return "";
+        }
+        return "";
+    }
+
+    private static TransformationStep syntheticStep(TransformationStep source, String afterExpression, String ruleId) {
+        return syntheticStep(source, source.beforeExpression(), afterExpression, ruleId);
+    }
+
+    private static TransformationStep syntheticStep(
+        TransformationStep source,
+        String beforeExpression,
+        String afterExpression,
+        String ruleId
+    ) {
+        return new TransformationStep(
+            source.index(),
+            beforeExpression,
+            afterExpression,
+            ruleId,
+            source.ruleKind(),
+            source.scoreBefore(),
+            source.scoreAfter(),
+            source.equivalencePreserving(),
+            source.explanation(),
+            source.assumptions()
+        );
+    }
+
+    private static Expr expandProductsForDidacticCollect(Expr expression) {
+        if (!(expression instanceof BinaryExpr binary)) {
+            return expression;
+        }
+        Expr left = expandProductsForDidacticCollect(binary.left());
+        Expr right = expandProductsForDidacticCollect(binary.right());
+        if (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB) {
+            return new BinaryExpr(left, binary.operator(), right);
+        }
+        if (binary.operator() != BinaryOperator.MUL) {
+            return new BinaryExpr(left, binary.operator(), right);
+        }
+        if (left instanceof BinaryExpr leftBinary && leftBinary.operator() == BinaryOperator.ADD) {
+            return new BinaryExpr(
+                new BinaryExpr(leftBinary.left(), BinaryOperator.MUL, right),
+                BinaryOperator.ADD,
+                new BinaryExpr(leftBinary.right(), BinaryOperator.MUL, right)
+            );
+        }
+        if (right instanceof BinaryExpr rightBinary && rightBinary.operator() == BinaryOperator.ADD) {
+            return new BinaryExpr(
+                new BinaryExpr(left, BinaryOperator.MUL, rightBinary.left()),
+                BinaryOperator.ADD,
+                new BinaryExpr(left, BinaryOperator.MUL, rightBinary.right())
+            );
+        }
+        return new BinaryExpr(left, BinaryOperator.MUL, right);
     }
 
     private static Expr simplifyProductsForDidacticCollect(Expr expression) {

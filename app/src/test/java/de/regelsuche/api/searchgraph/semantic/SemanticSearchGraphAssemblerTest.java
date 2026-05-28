@@ -298,6 +298,132 @@ class SemanticSearchGraphAssemblerTest {
     }
 
     @Test
+    void compactBinomialMacroEdgeExplainsHiddenExpansionAndCollection() {
+        String partial = "x * x + 3 * x + (x + 3) * 3";
+        String collected = "x ^ 2 + 6 * x + 9";
+        var raw = new SearchGraphDto(
+            List.of(
+                node("(x+3)^2", 0, 20),
+                node("(x + 3) * x + (x + 3) * 3", 1, 18),
+                node(partial, 2, 14),
+                node(collected, 3, 6)
+            ),
+            List.of(
+                edge("(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, -2),
+                edge("(x + 3) * x + (x + 3) * 3", partial,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, -4),
+                edge(partial, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, -8)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "binomial",
+            "(x+3)^2",
+            collected,
+            List.of(
+                new TransformationStep(0, "(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, 20, 18, true, ""),
+                new TransformationStep(1, "(x + 3) * x + (x + 3) * 3", partial,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 18, 14, true, ""),
+                new TransformationStep(2, partial, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, 14, 6, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            SemanticMacroStepDisplay.COMPACT,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        var macro = semantic.edges().stream()
+            .filter(e -> e.ruleId().equals("polynomial_expand_and_collect_like_terms"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("\\text{expand and collect like terms}", macro.ruleLatex());
+        assertEquals(List.of(
+            "distribute right add",
+            "multiply constants",
+            "product to power",
+            "collect like terms"
+        ), macro.hiddenSteps());
+        assertTrue(macro.macroMove());
+    }
+
+    @Test
+    void didacticBinomialModeShowsExpansionPowerAndCollectionNodes() {
+        String partial = "x * x + 3 * x + (x + 3) * 3";
+        String expanded = "x * x + 3 * x + x * 3 + 3 * 3";
+        String prepared = "x ^ 2 + 3 * x + 3 * x + 9";
+        String collected = "x ^ 2 + 6 * x + 9";
+        var raw = new SearchGraphDto(
+            List.of(
+                node("(x+3)^2", 0, 20),
+                node("(x + 3) * x + (x + 3) * 3", 1, 18),
+                node(partial, 2, 14),
+                node(collected, 3, 6)
+            ),
+            List.of(
+                edge("(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, -2),
+                edge("(x + 3) * x + (x + 3) * 3", partial,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, -4),
+                edge(partial, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, -8)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "binomial",
+            "(x+3)^2",
+            collected,
+            List.of(
+                new TransformationStep(0, "(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, 20, 18, true, ""),
+                new TransformationStep(1, "(x + 3) * x + (x + 3) * 3", partial,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 18, 14, true, ""),
+                new TransformationStep(2, partial, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, 14, 6, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            SemanticMacroStepDisplay.DIDACTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        List<String> labels = semantic.nodes().stream()
+            .map(SemanticGraphNodeDto::representativeExpression)
+            .toList();
+        assertTrue(labels.contains("(x+3)^2"), labels.toString());
+        assertTrue(labels.contains("(x + 3) * x + (x + 3) * 3"), labels.toString());
+        assertTrue(labels.contains(partial), labels.toString());
+        assertTrue(labels.contains(expanded), labels.toString());
+        assertTrue(labels.contains(prepared), labels.toString());
+        assertTrue(labels.contains(collected), labels.toString());
+        assertTrue(semantic.edges().stream().anyMatch(e -> e.ruleId().equals("polynomial_collect_like_terms")));
+    }
+
+    @Test
     void deduplicatesConsecutiveMainPathStatesInSameCanonicalCluster() {
         var raw = new SearchGraphDto(
             List.of(
