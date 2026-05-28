@@ -16,7 +16,8 @@ public record SemanticGraphNodeDto(
     boolean onMainPath,
     boolean collapsed,
     String clusterId,
-    SemanticNodeKind kind
+    SemanticNodeKind kind,
+    boolean explicitEndpoint
 ) {
     public SemanticGraphNodeDto {
         if (id == null || id.isBlank()) {
@@ -28,5 +29,24 @@ public record SemanticGraphNodeDto(
         variants = variants == null ? List.of() : List.copyOf(variants);
         clusterId = clusterId == null ? "" : clusterId;
         kind = kind == null ? SemanticNodeKind.INTERMEDIATE : kind;
+    }
+
+    public SemanticGraphNodeDto(
+        String id,
+        String canonicalExpression,
+        String representativeExpression,
+        String representativeLatex,
+        MathLayout layout,
+        List<String> variants,
+        int variantCount,
+        int minDepth,
+        int bestScore,
+        boolean onMainPath,
+        boolean collapsed,
+        String clusterId,
+        SemanticNodeKind kind
+    ) {
+        this(id, canonicalExpression, representativeExpression, representativeLatex, layout,
+            variants, variantCount, minDepth, bestScore, onMainPath, collapsed, clusterId, kind, false);
     }
 }

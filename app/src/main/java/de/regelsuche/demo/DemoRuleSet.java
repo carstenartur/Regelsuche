@@ -1,6 +1,7 @@
 package de.regelsuche.demo;
 
 import de.regelsuche.rules.RationalRules;
+import de.regelsuche.rules.PolynomialRules;
 import de.regelsuche.rules.TrigonometricRules;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.RewriteRule;
@@ -39,6 +40,9 @@ public final class DemoRuleSet {
         Map<String, RewriteRule> byId = new LinkedHashMap<>();
         for (RewriteRule rule : AstRewriteTransformationEngine.defaultRules()) {
             byId.put(rule.id(), rule);
+        }
+        for (RewriteRule rule : PolynomialRules.rules()) {
+            byId.putIfAbsent(rule.id(), rule);
         }
         for (RewriteRule rule : TrigonometricRules.rules()) {
             byId.putIfAbsent(rule.id(), rule);

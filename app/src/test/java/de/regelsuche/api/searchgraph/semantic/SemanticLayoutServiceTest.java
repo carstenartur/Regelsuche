@@ -18,9 +18,11 @@ class SemanticLayoutServiceTest {
             node("n2", 2, true)
         );
         SemanticLayoutDto layout = service.layout(nodes, List.of(), SemanticLayoutKind.MAIN_PATH_LAYERED);
-        assertTrue(layout.positions().get("n0").x() < layout.positions().get("n1").x());
-        assertTrue(layout.positions().get("n1").x() < layout.positions().get("n2").x());
-        assertEquals(0.0, layout.positions().get("n1").y());
+        assertEquals(layout.positions().get("n0").x(), layout.positions().get("n1").x());
+        assertEquals(layout.positions().get("n1").x(), layout.positions().get("n2").x());
+        assertTrue(layout.positions().get("n0").y() < layout.positions().get("n1").y());
+        assertTrue(layout.positions().get("n1").y() < layout.positions().get("n2").y());
+        assertTrue(layout.positions().get("n1").y() - layout.positions().get("n0").y() >= 180.0);
     }
 
     @Test
@@ -86,12 +88,13 @@ class SemanticLayoutServiceTest {
         assertEquals(nodes.size(), first.positions().size());
         assertTrue(nodes.stream()
             .filter(SemanticGraphNodeDto::onMainPath)
-            .allMatch(node -> first.positions().get(node.id()).y() == 0.0));
-        assertTrue(first.positions().get("seed").x() < first.positions().get("main-expand").x());
-        assertTrue(first.positions().get("main-expand").x() < first.positions().get("main-factor").x());
-        assertTrue(first.positions().get("main-factor").x() < first.positions().get("main-cancel").x());
-        assertTrue(first.positions().get("main-cancel").x() < first.positions().get("main-macro").x());
-        assertTrue(first.positions().get("main-macro").x() < first.positions().get("target").x());
+            .allMatch(node -> first.positions().get(node.id()).x() == 0.0));
+        assertTrue(first.positions().get("seed").y() < first.positions().get("main-expand").y());
+        assertTrue(first.positions().get("main-expand").y() < first.positions().get("main-factor").y());
+        assertTrue(first.positions().get("main-factor").y() < first.positions().get("main-cancel").y());
+        assertTrue(first.positions().get("main-cancel").y() < first.positions().get("main-macro").y());
+        assertTrue(first.positions().get("main-macro").y() < first.positions().get("target").y());
+        assertTrue(first.positions().get("main-expand").y() - first.positions().get("seed").y() >= 180.0);
         assertTrue(first.positions().values().stream()
             .noneMatch(position -> Double.isNaN(position.x()) || Double.isNaN(position.y())));
     }

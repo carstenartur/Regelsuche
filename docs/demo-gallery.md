@@ -91,10 +91,10 @@ Diese Begriffe werden in der UI zusätzlich als Tooltips angeboten
 
 ## Binomische Formel
 
-![Best-Pfad-Graph der Binomischen Formel mit lesbaren KaTeX-Knoten.](assets/screenshots/binomial-graph.png)
+![Semantischer Discovery-Erklärgraph der Binomischen Formel mit lesbaren KaTeX-Knoten.](assets/screenshots/binomial-graph.png)
 
-*Der Screenshot zeigt den auf den besten Rechenweg gefilterten Graphen
-von $(x+3)^2$ zum vollständig ausmultiplizierten Polynom.*
+*Der Screenshot zeigt den semantischen Discovery-Erklärgraphen von
+$(x+3)^2$ zum vollständig ausmultiplizierten Polynom.*
 
 **Eingabe** — Anzeigeform:
 
@@ -273,10 +273,10 @@ dass jemand händisch neue Regeln programmiert.
 
 ## Trigonometrische Identität
 
-![Best-Pfad-Graph für sin² + cos² → 1.](assets/screenshots/trigonometry-graph.png)
+![Semantischer Discovery-Erklärgraph für sin² + cos² → 1.](assets/screenshots/trigonometry-graph.png)
 
-*Der Screenshot zeigt den auf den besten Rechenweg gefilterten Graphen,
-der die Pythagoras-Identität als Pfad findet.*
+*Der Screenshot zeigt den semantischen Discovery-Erklärgraphen, der die
+Pythagoras-Identität als erklärbaren Pfad findet.*
 
 **Eingabe** — Anzeigeform:
 
@@ -313,11 +313,11 @@ echter Pfad im Suchraum gefunden.
 
 ## Polynom-Expansion
 
-![Best-Pfad-Graph für die Expansion eines Produkts zweier Linearfaktoren.](assets/screenshots/polynomial-expansion-graph.png)
+![Semantischer Discovery-Erklärgraph für die Expansion eines Produkts zweier Linearfaktoren.](assets/screenshots/polynomial-expansion-graph.png)
 
-*Der Screenshot zeigt im gefilterten Best-Pfad-Graphen, wie das Produkt
-zweier Linearfaktoren über Distributivgesetz und Zusammenfassen zum
-Polynom expandiert wird.*
+*Der Screenshot zeigt im semantischen Discovery-Erklärgraphen, wie das
+Produkt zweier Linearfaktoren über Distributivgesetz und Zusammenfassen
+zum Polynom expandiert wird.*
 
 **Eingabe** — Anzeigeform:
 

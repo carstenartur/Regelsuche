@@ -16,6 +16,7 @@ public record SemanticSearchGraphDto(
         stats = stats == null ? new SemanticGraphStatsDto(0, 0, 0, 0, 0, 0, 0, 0) : stats;
         view = view == null ? new SemanticGraphViewConfigDto(
             SemanticGraphViewMode.SEMANTIC,
+            SemanticMacroStepDisplay.COMPACT,
             false,
             true,
             false,

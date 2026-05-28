@@ -9,8 +9,11 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.RewriteRule;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class PolynomialRulesTest {
@@ -41,9 +44,36 @@ class PolynomialRulesTest {
     }
 
     @Test
+    void collectLikeTermsIsVisibleRewriteForRequestedCases() {
+        assertCollects("x*2 + x", "3 * x");
+        assertCollects("2*x + x", "3 * x");
+        assertCollects("x + x*2", "3 * x");
+        assertCollects("3*x + x*3", "6 * x");
+        assertCollects("x*x + x*2 + x + 2", "x ^ 2 + 3 * x + 2");
+        assertCollects("x*x + 3*x + x*3 + 3*3", "x ^ 2 + 6 * x + 9");
+    }
+
+    @Test
+    void collectLikeTermsRejectsPureExpansionGrowth() {
+        AstRewriteTransformationEngine engine = new AstRewriteTransformationEngine(PolynomialRules.rules());
+        assertFalse(engine.transform("(x+1)*(x+2)").stream()
+            .anyMatch(transformation -> "polynomial_collect_like_terms".equals(transformation.rule())));
+    }
+
+    @Test
     void domainRulesAreAtomicAndStable() {
         for (RewriteRule rule : PolynomialRules.rules()) {
             assertFalse(rule.id().isBlank(), "rule id must not be blank");
         }
+    }
+
+    private void assertCollects(String expression, String expected) {
+        AstRewriteTransformationEngine engine = new AstRewriteTransformationEngine(PolynomialRules.rules());
+        List<Transformation> transformations = engine.transform(expression);
+        assertTrue(transformations.stream().anyMatch(transformation ->
+            "polynomial_collect_like_terms".equals(transformation.rule())
+                && expected.equals(transformation.transformedExpression())
+                && transformation.estimatedCostDelta() < 0
+        ), () -> "Expected collect-like-terms rewrite to " + expected + " in " + transformations);
     }
 }

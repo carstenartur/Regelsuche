@@ -1,15 +1,26 @@
 package de.regelsuche.api.searchgraph.semantic;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.api.searchgraph.SearchGraphAssembler;
+import de.regelsuche.api.searchgraph.SearchGraphDto;
+import de.regelsuche.api.searchgraph.SearchGraphEdgeDto;
+import de.regelsuche.api.searchgraph.SearchGraphNodeDto;
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.graph.GraphSnapshot;
+import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.search.SimplificationSuccess;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class SemanticSearchGraphAssemblerTest {
@@ -39,5 +50,559 @@ class SemanticSearchGraphAssemblerTest {
             8
         );
         assertTrue(semantic.edges().stream().anyMatch(e -> e.kind() == SemanticEdgeKind.LOW_SIGNAL_COLLAPSED));
+    }
+
+    @Test
+    void hidesAlternativeOrphansWhenAlternativesAndLowSignalAreCollapsed() {
+        var raw = new SearchGraphDto(
+            List.of(
+                node("a + 0 + 0", 0, 10),
+                node("a + 0", 1, 8),
+                node("a", 2, 5),
+                node("b + 0", 0, 6),
+                node("b", 1, 3),
+                node("lonely", 4, 1)
+            ),
+            List.of(
+                edge("a + 0 + 0", "a + 0", "ast_canonical_normalize", RewriteKind.NORMALIZE, 0),
+                edge("a + 0", "a", "remove_zero", RewriteKind.SIMPLIFY, -3),
+                edge("b + 0", "b", "remove_zero", RewriteKind.SIMPLIFY, -3)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "main",
+            "a + 0 + 0",
+            "a",
+            List.of(
+                new TransformationStep(0, "a + 0 + 0", "a + 0",
+                    "ast_canonical_normalize", RewriteKind.NORMALIZE, 10, 10, true, ""),
+                new TransformationStep(1, "a + 0", "a",
+                    "remove_zero", RewriteKind.SIMPLIFY, 10, 7, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        Set<String> connected = new HashSet<>();
+        semantic.edges().forEach(e -> {
+            connected.add(e.from());
+            connected.add(e.to());
+        });
+        long nonEndpointOrphans = semantic.nodes().stream()
+            .filter(n -> !n.explicitEndpoint())
+            .filter(n -> !connected.contains(n.id()))
+            .count();
+        assertEquals(0, nonEndpointOrphans);
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("b + 0")));
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("b")));
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("lonely")));
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("a + 0")));
+        assertEquals(1, semantic.stats().hiddenAlternativeCount());
+    }
+
+    @Test
+    void compressesHiddenLowSignalMainPathWithoutDestroyingExplanationPath() {
+        var raw = new SearchGraphDto(
+            List.of(
+                node("start", 0, 10),
+                node("normalized", 1, 10),
+                node("normalized-again", 2, 10),
+                node("middle", 3, 7),
+                node("goal", 4, 3),
+                node("branch", 2, 6)
+            ),
+            List.of(
+                edge("start", "normalized", "ast_canonical_normalize", RewriteKind.NORMALIZE, 0),
+                edge("normalized", "normalized-again", "sort_terms", RewriteKind.NORMALIZE, 0),
+                edge("normalized-again", "middle", "factor_terms", RewriteKind.SIMPLIFY, -3),
+                edge("middle", "goal", "collect_terms", RewriteKind.SIMPLIFY, -4),
+                edge("start", "branch", "alternative_branch", RewriteKind.SIMPLIFY, -4)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "main",
+            "start",
+            "goal",
+            List.of(
+                new TransformationStep(0, "start", "normalized",
+                    "ast_canonical_normalize", RewriteKind.NORMALIZE, 10, 10, true, ""),
+                new TransformationStep(1, "normalized", "normalized-again",
+                    "sort_terms", RewriteKind.NORMALIZE, 10, 10, true, ""),
+                new TransformationStep(2, "normalized-again", "middle",
+                    "factor_terms", RewriteKind.SIMPLIFY, 10, 7, true, ""),
+                new TransformationStep(3, "middle", "goal",
+                    "collect_terms", RewriteKind.SIMPLIFY, 7, 3, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertEquals(4, semantic.nodes().size());
+        assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("start")));
+        assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("normalized")));
+        assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("middle")));
+        assertTrue(semantic.nodes().stream().anyMatch(n -> n.representativeExpression().equals("goal")));
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("normalized-again")));
+        assertTrue(semantic.nodes().stream().noneMatch(n -> n.representativeExpression().equals("branch")));
+        assertTrue(semantic.edges().size() >= semantic.nodes().size() - 1);
+        assertEquals(4, semantic.nodes().stream().filter(SemanticGraphNodeDto::onMainPath).count());
+
+        Map<String, String> nodeIds = semantic.nodes().stream()
+            .collect(Collectors.toMap(SemanticGraphNodeDto::representativeExpression, SemanticGraphNodeDto::id));
+        var shortcut = semantic.edges().stream()
+            .filter(e -> e.from().equals(nodeIds.get("normalized")) && e.to().equals(nodeIds.get("middle")))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(SemanticEdgeKind.MAIN_STEP, shortcut.kind());
+        assertEquals(1, shortcut.hiddenStepCount());
+        assertEquals(List.of(
+            "normalized->normalized-again:sort_terms",
+            "normalized-again->middle:factor_terms"
+        ), shortcut.sourceEdgeIds());
+    }
+
+    @Test
+    void preservesMainPathProjectionWhenCanonicalClusteringCollapsesEquivalentStates() {
+        var raw = new SearchGraphDto(
+            List.of(
+                node("a + b", 0, 10),
+                node("b + a", 1, 8),
+                node("a + b + 0", 2, 6),
+                node("0 + a + b", 3, 4)
+            ),
+            List.of(
+                edge("a + b", "b + a", "expand_binomial", RewriteKind.SIMPLIFY, -2),
+                edge("b + a", "a + b + 0", "collect_terms", RewriteKind.SIMPLIFY, -2),
+                edge("a + b + 0", "0 + a + b", "final_result", RewriteKind.SIMPLIFY, -2)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "main",
+            "a + b",
+            "0 + a + b",
+            List.of(
+                new TransformationStep(0, "a + b", "b + a",
+                    "expand_binomial", RewriteKind.SIMPLIFY, 10, 8, true, ""),
+                new TransformationStep(1, "b + a", "a + b + 0",
+                    "collect_terms", RewriteKind.SIMPLIFY, 8, 6, true, ""),
+                new TransformationStep(2, "a + b + 0", "0 + a + b",
+                    "final_result", RewriteKind.SIMPLIFY, 6, 4, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertEquals(1, semantic.nodes().size());
+        assertEquals(0, semantic.edges().size());
+        assertEquals(1, semantic.nodes().stream().filter(SemanticGraphNodeDto::onMainPath).count());
+        assertUniqueCanonicalHashesAndLabels(semantic);
+    }
+
+    @Test
+    void keepsCollectedPolynomialAsFinalVisibleNodeWhenItSharesCanonicalClusterWithExpandedSum() {
+        String expanded = "x * x + 3 * x + x * 3 + 3 * 3";
+        String collected = "x ^ 2 + 6 * x + 9";
+        var raw = new SearchGraphDto(
+            List.of(
+                node("(x+3)^2", 0, 20),
+                node("(x + 3) * x + (x + 3) * 3", 1, 18),
+                node("x * x + 3 * x + (x + 3) * 3", 2, 14),
+                node(expanded, 3, 10),
+                node(collected, 4, 6)
+            ),
+            List.of(
+                edge("(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, -2),
+                edge("(x + 3) * x + (x + 3) * 3", "x * x + 3 * x + (x + 3) * 3",
+                    "ast_distribute_right_add", RewriteKind.EXPAND, -4),
+                edge("x * x + 3 * x + (x + 3) * 3", expanded,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, -4),
+                edge(expanded, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, -4)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "binomial",
+            "(x+3)^2",
+            collected,
+            List.of(
+                new TransformationStep(0, "(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, 20, 18, true, ""),
+                new TransformationStep(1, "(x + 3) * x + (x + 3) * 3", "x * x + 3 * x + (x + 3) * 3",
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 18, 14, true, ""),
+                new TransformationStep(2, "x * x + 3 * x + (x + 3) * 3", expanded,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 14, 10, true, ""),
+                new TransformationStep(3, expanded, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, 10, 6, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertTrue(semantic.nodes().stream().anyMatch(n ->
+            n.onMainPath() && n.explicitEndpoint() && n.representativeExpression().equals(collected)));
+        assertTrue(semantic.nodes().stream().noneMatch(n ->
+            n.onMainPath() && n.representativeExpression().equals(expanded)));
+        assertTrue(semantic.edges().stream().anyMatch(e ->
+            e.kind() == SemanticEdgeKind.MAIN_STEP
+                && e.ruleId().equals("polynomial_collect_like_terms")
+                && e.sourceEdgeIds().contains(expanded + "->" + collected + ":polynomial_collect_like_terms")));
+    }
+
+    @Test
+    void compactBinomialMacroEdgeExplainsHiddenExpansionAndCollection() {
+        String partial = "x * x + 3 * x + (x + 3) * 3";
+        String collected = "x ^ 2 + 6 * x + 9";
+        var raw = new SearchGraphDto(
+            List.of(
+                node("(x+3)^2", 0, 20),
+                node("(x + 3) * x + (x + 3) * 3", 1, 18),
+                node(partial, 2, 14),
+                node(collected, 3, 6)
+            ),
+            List.of(
+                edge("(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, -2),
+                edge("(x + 3) * x + (x + 3) * 3", partial,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, -4),
+                edge(partial, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, -8)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "binomial",
+            "(x+3)^2",
+            collected,
+            List.of(
+                new TransformationStep(0, "(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, 20, 18, true, ""),
+                new TransformationStep(1, "(x + 3) * x + (x + 3) * 3", partial,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 18, 14, true, ""),
+                new TransformationStep(2, partial, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, 14, 6, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            SemanticMacroStepDisplay.COMPACT,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        var macro = semantic.edges().stream()
+            .filter(e -> e.ruleId().equals("polynomial_expand_and_collect_like_terms"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("\\text{expand and collect like terms}", macro.ruleLatex());
+        assertEquals(List.of(
+            "distribute right add",
+            "multiply constants",
+            "product to power",
+            "collect like terms"
+        ), macro.hiddenSteps());
+        assertTrue(macro.macroMove());
+    }
+
+    @Test
+    void didacticBinomialModeShowsExpansionPowerAndCollectionNodes() {
+        String partial = "x * x + 3 * x + (x + 3) * 3";
+        String expanded = "x * x + 3 * x + x * 3 + 3 * 3";
+        String prepared = "x ^ 2 + 3 * x + 3 * x + 9";
+        String collected = "x ^ 2 + 6 * x + 9";
+        var raw = new SearchGraphDto(
+            List.of(
+                node("(x+3)^2", 0, 20),
+                node("(x + 3) * x + (x + 3) * 3", 1, 18),
+                node(partial, 2, 14),
+                node(collected, 3, 6)
+            ),
+            List.of(
+                edge("(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, -2),
+                edge("(x + 3) * x + (x + 3) * 3", partial,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, -4),
+                edge(partial, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, -8)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "binomial",
+            "(x+3)^2",
+            collected,
+            List.of(
+                new TransformationStep(0, "(x+3)^2", "(x + 3) * x + (x + 3) * 3",
+                    "ast_distribute_left_add", RewriteKind.EXPAND, 20, 18, true, ""),
+                new TransformationStep(1, "(x + 3) * x + (x + 3) * 3", partial,
+                    "ast_distribute_right_add", RewriteKind.EXPAND, 18, 14, true, ""),
+                new TransformationStep(2, partial, collected,
+                    "polynomial_collect_like_terms", RewriteKind.SIMPLIFY, 14, 6, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            SemanticMacroStepDisplay.DIDACTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        List<String> labels = semantic.nodes().stream()
+            .map(SemanticGraphNodeDto::representativeExpression)
+            .toList();
+        assertTrue(labels.contains("(x+3)^2"), labels.toString());
+        assertTrue(labels.contains("(x + 3) * x + (x + 3) * 3"), labels.toString());
+        assertTrue(labels.contains(partial), labels.toString());
+        assertTrue(labels.contains(expanded), labels.toString());
+        assertTrue(labels.contains(prepared), labels.toString());
+        assertTrue(labels.contains(collected), labels.toString());
+        assertTrue(semantic.edges().stream().anyMatch(e -> e.ruleId().equals("polynomial_collect_like_terms")));
+    }
+
+    @Test
+    void deduplicatesConsecutiveMainPathStatesInSameCanonicalCluster() {
+        var raw = new SearchGraphDto(
+            List.of(
+                node("a", 0, 10),
+                node("b", 1, 8),
+                node("c", 3, 4)
+            ),
+            List.of(
+                edge("a", "b", "a_to_b", RewriteKind.SIMPLIFY, -2),
+                edge("b", "b", "rewrite_b_to_b", RewriteKind.SIMPLIFY, 0),
+                edge("b", "c", "b_to_c", RewriteKind.SIMPLIFY, -4)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "main",
+            "a",
+            "c",
+            List.of(
+                new TransformationStep(0, "a", "b",
+                    "a_to_b", RewriteKind.SIMPLIFY, 10, 8, true, ""),
+                new TransformationStep(1, "b", "b",
+                    "rewrite_b_to_b", RewriteKind.SIMPLIFY, 8, 8, true, ""),
+                new TransformationStep(2, "b", "c",
+                    "b_to_c", RewriteKind.SIMPLIFY, 8, 4, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertEquals(List.of("a", "b", "c"), semantic.nodes().stream()
+            .map(SemanticGraphNodeDto::representativeExpression)
+            .sorted()
+            .toList());
+        assertEquals(3, semantic.nodes().size());
+        assertUniqueCanonicalHashesAndLabels(semantic);
+        var collapsed = semantic.edges().stream()
+            .filter(e -> e.sourceEdgeIds().contains("b->b:rewrite_b_to_b"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(1, collapsed.hiddenStepCount());
+        assertEquals(List.of("a->b:a_to_b", "b->b:rewrite_b_to_b"), collapsed.sourceEdgeIds());
+    }
+
+    @Test
+    void reusesCanonicalNodeWhenMainPathReturnsToEarlierCluster() {
+        var raw = new SearchGraphDto(
+            List.of(
+                node("a", 0, 10),
+                node("b", 1, 8),
+                node("c", 3, 4)
+            ),
+            List.of(
+                edge("a", "b", "a_to_b", RewriteKind.SIMPLIFY, -2),
+                edge("b", "a", "b_to_a", RewriteKind.SIMPLIFY, -1),
+                edge("a", "c", "a_to_c", RewriteKind.SIMPLIFY, -4)
+            ),
+            List.of(),
+            null
+        );
+        var mainPath = path(
+            "main",
+            "a",
+            "c",
+            List.of(
+                new TransformationStep(0, "a", "b",
+                    "a_to_b", RewriteKind.SIMPLIFY, 10, 8, true, ""),
+                new TransformationStep(1, "b", "a",
+                    "b_to_a", RewriteKind.SIMPLIFY, 8, 7, true, ""),
+                new TransformationStep(2, "a", "c",
+                    "a_to_c", RewriteKind.SIMPLIFY, 7, 4, true, "")
+            )
+        );
+
+        var semantic = new SemanticSearchGraphAssembler().assemble(
+            raw,
+            List.of(mainPath),
+            List.of(),
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            false,
+            false,
+            12,
+            8
+        );
+
+        assertEquals(3, semantic.nodes().size());
+        assertEquals(1, semantic.nodes().stream()
+            .filter(n -> n.representativeExpression().equals("a"))
+            .count());
+        assertUniqueCanonicalHashesAndLabels(semantic);
+        Set<String> connected = new HashSet<>();
+        semantic.edges().forEach(e -> {
+            connected.add(e.from());
+            connected.add(e.to());
+        });
+        assertTrue(semantic.nodes().stream().allMatch(n -> connected.contains(n.id())));
+        assertTrue(semantic.edges().stream().allMatch(e -> !e.ruleLatex().isBlank()));
+    }
+
+    private static void assertUniqueCanonicalHashesAndLabels(SemanticSearchGraphDto semantic) {
+        Set<String> canonicalHashes = new HashSet<>();
+        Set<String> normalizedLabels = new HashSet<>();
+        for (SemanticGraphNodeDto node : semantic.nodes()) {
+            assertTrue(canonicalHashes.add(node.clusterId()),
+                "duplicate canonical hash for visible node: " + node.clusterId());
+            assertTrue(normalizedLabels.add(normalizedLabel(node)),
+                "duplicate normalized label for visible node: " + node.representativeExpression());
+        }
+    }
+
+    private static String normalizedLabel(SemanticGraphNodeDto node) {
+        return node.representativeExpression()
+            .replaceAll("\\s+", "")
+            .toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static SearchGraphNodeDto node(String expression, int depth, int score) {
+        return new SearchGraphNodeDto(
+            expression,
+            expression,
+            "",
+            score,
+            depth,
+            1,
+            false,
+            false,
+            CandidateProofStatus.OBSERVED,
+            ""
+        );
+    }
+
+    private static SearchGraphEdgeDto edge(
+        String from,
+        String to,
+        String ruleId,
+        RewriteKind kind,
+        int scoreDelta
+    ) {
+        return new SearchGraphEdgeDto(
+            from,
+            to,
+            ruleId,
+            kind,
+            scoreDelta,
+            List.of(),
+            List.of("path"),
+            true
+        );
+    }
+
+    private static DiscoveredTransformation path(
+        String id,
+        String original,
+        String improved,
+        List<TransformationStep> steps
+    ) {
+        return new DiscoveredTransformation(
+            id,
+            original,
+            improved,
+            steps,
+            new ExpressionScore(10, 0, 0, 0, 0),
+            new ExpressionScore(5, 0, 0, 0, 0),
+            5,
+            CandidateProofStatus.OBSERVED,
+            Instant.now(),
+            ""
+        );
     }
 }

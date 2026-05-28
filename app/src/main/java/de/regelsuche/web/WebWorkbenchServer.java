@@ -466,18 +466,24 @@ public class WebWorkbenchServer {
         de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode mode =
             de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.parse(
                 queryParam(exchange, "mode", "semantic"));
+        de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay showMacroSteps =
+            de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay.parse(
+                queryParam(exchange, "showMacroSteps", "compact"));
         boolean showLowSignal = parseBooleanParam(queryParam(exchange, "showLowSignal", "false"));
         boolean showAlternatives = parseBooleanParam(queryParam(exchange, "showAlternatives", "true"));
         boolean showVariants = parseBooleanParam(queryParam(exchange, "showVariants", "false"));
         int maxAlternatives = parseIntParam(queryParam(exchange, "maxAlternatives", "12"), 12);
         int maxVariantsPerCluster = parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8);
+        String pathId = queryParam(exchange, "pathId", "");
         var graph = buildSemanticSearchGraph(
             mode,
+            showMacroSteps,
             showLowSignal,
             showAlternatives,
             showVariants,
             maxAlternatives,
-            maxVariantsPerCluster
+            maxVariantsPerCluster,
+            pathId
         );
         sendJson(exchange, 200, de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toJson(graph));
     }
@@ -986,11 +992,14 @@ public class WebWorkbenchServer {
                 var graph = buildSemanticSearchGraph(
                     de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.parse(
                         queryParam(exchange, "mode", "semantic")),
+                    de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay.parse(
+                        queryParam(exchange, "showMacroSteps", "compact")),
                     parseBooleanParam(queryParam(exchange, "showLowSignal", "false")),
                     parseBooleanParam(queryParam(exchange, "showAlternatives", "true")),
                     parseBooleanParam(queryParam(exchange, "showVariants", "false")),
                     parseIntParam(queryParam(exchange, "maxAlternatives", "12"), 12),
-                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8)
+                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8),
+                    queryParam(exchange, "pathId", "")
                 );
                 sendJson(exchange, 200, de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toJson(graph));
             }
@@ -1006,11 +1015,14 @@ public class WebWorkbenchServer {
                 var graph = buildSemanticSearchGraph(
                     de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.parse(
                         queryParam(exchange, "mode", "semantic")),
+                    de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay.parse(
+                        queryParam(exchange, "showMacroSteps", "compact")),
                     parseBooleanParam(queryParam(exchange, "showLowSignal", "false")),
                     parseBooleanParam(queryParam(exchange, "showAlternatives", "true")),
                     parseBooleanParam(queryParam(exchange, "showVariants", "false")),
                     parseIntParam(queryParam(exchange, "maxAlternatives", "12"), 12),
-                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8)
+                    parseIntParam(queryParam(exchange, "maxVariantsPerCluster", "8"), 8),
+                    queryParam(exchange, "pathId", "")
                 );
                 sendText(exchange, 200, de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toMermaid(graph));
             }
@@ -1105,26 +1117,46 @@ public class WebWorkbenchServer {
 
     private de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphDto buildSemanticSearchGraph(
         de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode mode,
+        de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay showMacroSteps,
         boolean showLowSignal,
         boolean showAlternatives,
         boolean showVariants,
         int maxAlternatives,
-        int maxVariantsPerCluster
+        int maxVariantsPerCluster,
+        String pathId
     ) {
         var transformations = graphStore.discoveredTransformations();
         var rawGraph = buildSearchGraph();
-        var macroRules = new de.regelsuche.mining.MacroRuleMiner().mine(transformations);
+        var selectedTransformations = selectSemanticTransformations(transformations, pathId);
+        var macroRules = new de.regelsuche.mining.MacroRuleMiner().mine(selectedTransformations);
         return new de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphAssembler().assemble(
             rawGraph,
-            transformations,
+            selectedTransformations,
             macroRules,
             mode,
+            showMacroSteps,
             showLowSignal,
             showAlternatives,
             showVariants,
             maxAlternatives,
             maxVariantsPerCluster
         );
+    }
+
+    private List<de.regelsuche.discovery.DiscoveredTransformation> selectSemanticTransformations(
+        List<de.regelsuche.discovery.DiscoveredTransformation> transformations,
+        String pathId
+    ) {
+        if (pathId == null || pathId.isBlank()) {
+            return transformations;
+        }
+        var selected = transformations.stream()
+            .filter(transformation -> pathId.equals(transformation.id()))
+            .toList();
+        if (selected.isEmpty()) {
+            return List.of();
+        }
+        return selected;
     }
 
     private void handleExplain(HttpExchange exchange) throws IOException {
@@ -2326,11 +2358,13 @@ public class WebWorkbenchServer {
         var graph = buildSearchGraph();
         var semanticGraph = buildSemanticSearchGraph(
             de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.SEMANTIC,
+            de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay.COMPACT,
             false,
             true,
             false,
             12,
-            8
+            8,
+            ""
         );
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {

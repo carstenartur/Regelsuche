@@ -265,6 +265,7 @@ public class ExplanationService {
         RULE_NAMES_DE.put("ast_factor_common_right", "Gemeinsamen Faktor rechts ausklammern");
         RULE_NAMES_DE.put("ast_canonical_normalize", "Kanonische Normalform");
         RULE_NAMES_DE.put("polynomial_combine_like_terms", "Gleichartige Terme zusammenfassen");
+        RULE_NAMES_DE.put("polynomial_collect_like_terms", "Gleichartige Terme sammeln");
         RULE_NAMES_DE.put("rational_cancel_common_factor", "Bruch kürzen (gemeinsamer Faktor)");
         RULE_NAMES_DE.put("rational_multiply_fractions", "Brüche multiplizieren");
         RULE_NAMES_DE.put("rational_divide_by_fraction", "Durch einen Bruch dividieren");
@@ -299,6 +300,8 @@ public class ExplanationService {
             "Strukturelle Normalisierung (Reihenfolge, neutrale Elemente).");
         RULE_EXPLANATIONS_DE.put("polynomial_combine_like_terms",
             "Zwei Vielfache desselben Terms werden zu einem Term mit summierter Koeffizientensumme.");
+        RULE_EXPLANATIONS_DE.put("polynomial_collect_like_terms",
+            "Alle gleichartigen Polynomterme werden in einem sichtbaren Schritt gesammelt.");
         RULE_EXPLANATIONS_DE.put("rational_cancel_common_factor",
             "Gemeinsamer Faktor von Zähler und Nenner kann gekürzt werden.");
         RULE_EXPLANATIONS_DE.put("rational_multiply_fractions",
@@ -326,6 +329,7 @@ public class ExplanationService {
         RULE_NAMES_EN.put("ast_factor_common_right", "Factor out common factor on the right");
         RULE_NAMES_EN.put("ast_canonical_normalize", "Canonical normal form");
         RULE_NAMES_EN.put("polynomial_combine_like_terms", "Combine like terms");
+        RULE_NAMES_EN.put("polynomial_collect_like_terms", "Collect like terms");
         RULE_NAMES_EN.put("rational_cancel_common_factor", "Cancel common factor");
         RULE_NAMES_EN.put("rational_multiply_fractions", "Multiply fractions");
         RULE_NAMES_EN.put("rational_divide_by_fraction", "Divide by a fraction");
@@ -360,6 +364,8 @@ public class ExplanationService {
             "Structural normalisation (ordering, neutral elements).");
         RULE_EXPLANATIONS_EN.put("polynomial_combine_like_terms",
             "Two multiples of the same term are combined into one term with the summed coefficient.");
+        RULE_EXPLANATIONS_EN.put("polynomial_collect_like_terms",
+            "All like polynomial terms are collected in one visible step.");
         RULE_EXPLANATIONS_EN.put("rational_cancel_common_factor",
             "A common factor of numerator and denominator can be cancelled.");
         RULE_EXPLANATIONS_EN.put("rational_multiply_fractions",

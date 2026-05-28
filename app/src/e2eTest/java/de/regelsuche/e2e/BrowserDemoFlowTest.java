@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -556,17 +557,32 @@ class BrowserDemoFlowTest {
     }
 
     /**
-     * Captures the interactive graph view filtered to the best path. A
-     * Cytoscape/KaTeX overlay is mandatory for documentation assets; fallback
-     * Mermaid/full-page captures are intentionally not written to docs.
+     * Captures the interactive semantic graph view. A Cytoscape/KaTeX overlay
+     * is mandatory for documentation assets; fallback Mermaid/full-page
+     * captures are intentionally not written to docs.
      */
     private void screenshotGraphBestPath(String fileName) {
-        if (!RECORD_DOCS) return;
         page.locator(".tab[data-tab='graph']").click();
         page.waitForSelector("#tab-graph.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
-        page.locator("#graphFilter").fill("bestPath=true,hideDeadEnds=true");
-        page.locator("#reloadGraph").click();
+        page.locator("#graphViewMode").selectOption("semantic");
+        page.locator("#showMacroSteps").selectOption("didactic");
+        page.locator("#graphFilter").fill("");
+        page.locator("#showLowSignal").setChecked(false);
+        page.locator("#showAlternatives").setChecked(false);
+        Response graphResponse = page.waitForResponse(
+            response -> response.url().contains("/api/search-graph/semantic")
+                && response.status() == 200,
+            () -> page.locator("#reloadGraph").click());
+        assertNotNull(graphResponse, fileName + " must request the semantic search graph");
+        assertTrue(graphResponse.url().contains("mode=semantic"),
+            fileName + " semantic graph request must use mode=semantic, got: " + graphResponse.url());
+        assertTrue(graphResponse.url().contains("showMacroSteps=didactic"),
+            fileName + " semantic graph request must use didactic macro steps, got: " + graphResponse.url());
+        assertTrue(graphResponse.url().contains("showLowSignal=false"),
+            fileName + " semantic graph request must disable low-signal edges, got: " + graphResponse.url());
+        assertTrue(graphResponse.url().contains("showAlternatives=false"),
+            fileName + " semantic graph request must disable alternatives, got: " + graphResponse.url());
         page.waitForFunction(
             "() => typeof window.cytoscape === 'function' || window.__cytoscapeFailed === true",
             null,
@@ -577,22 +593,92 @@ class BrowserDemoFlowTest {
             throw new TestAbortedException(
                 "Cytoscape unavailable; refusing to replace docs graph screenshot with fallback");
         }
-        waitForGraphRendered();
+        waitForSemanticGraphRendered();
+        assertSemanticGraphRequestState(fileName);
+        waitForExpectedSemanticGraphContent(fileName);
+        assertCollectedPolynomialFinalStateIfNeeded(fileName);
+        Path target = SCREENSHOT_DIR.resolve(fileName);
+        assertSemanticDebugDump(fileName, target);
         int renderedNodes = ((Number) page.evaluate(
             "() => document.querySelectorAll("
                 + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
                 + ").length")).intValue();
-        assertTrue(renderedNodes >= 2,
-            fileName + " must show at least two KaTeX-rendered best-path nodes");
-        page.evaluate(
+        int expectedMinNodes = expectedMinSemanticGraphNodes(fileName);
+        int expectedMinEdges = expectedMinSemanticGraphEdges(fileName);
+        assertTrue(renderedNodes >= expectedMinNodes,
+            fileName + " must show KaTeX-rendered semantic graph nodes; renderedNodes="
+                + renderedNodes + ", expectedMinNodes=" + expectedMinNodes);
+        int isolatedNodes = ((Number) page.evaluate(
             "() => {"
                 + " const cy = window.__cyForTests;"
-                + " if (cy) {"
-                + "   cy.layout({ name: 'breadthfirst', spacingFactor: 1.8 }).run();"
-                + "   cy.fit(cy.elements(), 80);"
-                + " }"
-                + "}");
-        Path target = SCREENSHOT_DIR.resolve(fileName);
+                + " if (!cy) return 0;"
+                + " return cy.nodes().filter(n => n.connectedEdges().length === 0).length;"
+                + "}")).intValue();
+        assertTrue(isolatedNodes == 0,
+            fileName + " must not render orphan semantic graph nodes");
+        assertSemanticGraphNodeIdentityUniqueness(fileName);
+        int graphNodeCount = ((Number) page.evaluate(
+            "() => { const cy = window.__cyForTests; return cy ? cy.nodes().length : 0; }")).intValue();
+        int graphEdgeCount = ((Number) page.evaluate(
+            "() => { const cy = window.__cyForTests; return cy ? cy.edges().length : 0; }")).intValue();
+        assertTrue(graphNodeCount >= expectedMinNodes,
+            fileName + " must preserve the compressed explanation path; nodes="
+                + graphNodeCount + ", expectedMinNodes=" + expectedMinNodes);
+        assertTrue(graphEdgeCount >= expectedMinEdges,
+            fileName + " must preserve explanatory semantic edges; edges="
+                + graphEdgeCount + ", expectedMinEdges=" + expectedMinEdges);
+        assertTrue(graphEdgeCount >= graphNodeCount - 1,
+            fileName + " must connect the compressed explanation path");
+        int intermediateNodeCount = ((Number) page.evaluate(
+            "() => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return 0;"
+                + " return cy.nodes().filter(n => {"
+                + "   const payload = n.data('payload') || {};"
+                + "   return payload.explicitEndpoint !== true;"
+                + " }).length;"
+                + "}")).intValue();
+        if (!allowsGenuineOneStepDerivation(fileName)) {
+            assertTrue(intermediateNodeCount > 0,
+                fileName + " must include at least one non-endpoint intermediate node");
+        }
+        int endpointNodeCount = ((Number) page.evaluate(
+            "() => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return 0;"
+                + " return cy.nodes().filter(n => {"
+                + "   const payload = n.data('payload') || {};"
+                + "   return payload.explicitEndpoint === true;"
+                + " }).length;"
+                + "}")).intValue();
+        if (!allowsGenuineOneStepDerivation(fileName)) {
+            assertTrue(graphNodeCount > endpointNodeCount,
+                fileName + " must not collapse to only seed and goal nodes");
+        }
+        int visibleEdgeLabelCount = ((Number) page.evaluate(
+            "() => document.querySelectorAll("
+                + "'#graphCanvas .graph-overlay-layer .graph-edge-math .katex'"
+                + ").length")).intValue();
+        assertTrue(visibleEdgeLabelCount > 0,
+            fileName + " must show at least one visible, non-empty semantic edge label");
+        assertSemanticGraphVisualLayout(fileName);
+        assertSemanticGraphStatsReduction(fileName);
+        String semanticLabel = page.locator(".graph-semantic-watermark").innerText();
+        assertTrue(semanticLabel.contains("Semantic Discovery Graph"),
+            fileName + " must visibly identify the semantic discovery graph");
+        if (fileName.contains("binomial") || fileName.contains("polynomial")) {
+            int mainPathNodeCount = ((Number) page.evaluate(
+                "() => {"
+                    + " const cy = window.__cyForTests;"
+                    + " if (!cy) return 0;"
+                    + " return cy.nodes().filter(n => n.data('payload')"
+                    + "   && n.data('payload').onMainPath === true).length;"
+                    + "}")).intValue();
+            assertTrue(mainPathNodeCount >= expectedMinNodes,
+                fileName + " must show start, relevant intermediate states, and goal; mainPathNodes="
+                    + mainPathNodeCount + ", expectedMinNodes=" + expectedMinNodes);
+        }
+        if (!RECORD_DOCS) return;
         createParentDirectory(target);
         page.locator("#graphCanvas").scrollIntoViewIfNeeded();
         waitForStableElement("#graphCanvas");
@@ -600,6 +686,408 @@ class BrowserDemoFlowTest {
             .setPath(target)
             .setType(ScreenshotType.PNG));
         assertScreenshotQuality(target, fileName);
+    }
+
+    private void assertSemanticDebugDump(String fileName, Path screenshotTarget) {
+        String dump = semanticDebugDump(fileName);
+        if (RECORD_DOCS) {
+            Path semanticTarget = screenshotTarget.resolveSibling(
+                screenshotTarget.getFileName().toString().replaceFirst("\\.png$", ".semantic.json"));
+            createParentDirectory(semanticTarget);
+            try {
+                Files.writeString(semanticTarget, dump);
+            } catch (IOException ex) {
+                throw new AssertionError("Could not write semantic graph debug dump for " + fileName, ex);
+            }
+        }
+        int duplicateCanonicalHashCount = semanticDumpInt("duplicateCanonicalHashCount");
+        int duplicateNormalizedLabelCount = semanticDumpInt("duplicateNormalizedLabelCount");
+        int nodeOverlapCount = semanticDumpInt("nodeOverlapCount");
+        int edgeLabelOverlapCount = semanticDumpInt("edgeLabelOverlapCount");
+        int mainPathMeaningfulNodeCount = semanticDumpInt("mainPathMeaningfulNodeCount");
+        String expectedFinalLabel = expectedCollectedPolynomialFinalLabel(fileName);
+        String finalNormalizedLabel = semanticDumpString("finalNormalizedLabel");
+        assertTrue(duplicateCanonicalHashCount == 0,
+            fileName + " semantic dump must not contain duplicate canonical hashes: " + dump);
+        assertTrue(duplicateNormalizedLabelCount == 0,
+            fileName + " semantic dump must not contain duplicate normalized labels: " + dump);
+        assertTrue(nodeOverlapCount == 0,
+            fileName + " semantic dump must not contain node overlaps: " + dump);
+        assertTrue(edgeLabelOverlapCount == 0,
+            fileName + " semantic dump must not contain edge-label overlaps: " + dump);
+        if (fileName.contains("binomial") || fileName.contains("polynomial")) {
+            assertTrue(mainPathMeaningfulNodeCount >= 4,
+                fileName + " semantic dump must keep at least four meaningful main-path nodes: " + dump);
+            assertTrue(normalizeGraphLabel(finalNormalizedLabel).equals(normalizeGraphLabel(expectedFinalLabel)),
+                fileName + " semantic dump must assert finalNormalizedLabel is collected polynomial "
+                    + expectedFinalLabel + ": " + dump);
+            assertTrue(!normalizeGraphLabel(finalNormalizedLabel).equals(
+                    normalizeGraphLabel(forbiddenUncollectedPolynomialFinalLabel(fileName))),
+                fileName + " semantic dump finalNormalizedLabel must not be the uncollected expansion: " + dump);
+        }
+    }
+
+    private int semanticDumpInt(String property) {
+        return ((Number) page.evaluate(
+            "property => (window.__lastSemanticGraphDebugDump && window.__lastSemanticGraphDebugDump[property]) || 0",
+            property)).intValue();
+    }
+
+    private String semanticDumpString(String property) {
+        return (String) page.evaluate(
+            "property => String((window.__lastSemanticGraphDebugDump"
+                + " && window.__lastSemanticGraphDebugDump[property]) || '')",
+            property);
+    }
+
+    private String normalizeGraphLabel(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "").toLowerCase();
+    }
+
+    private String semanticDebugDump(String fileName) {
+        return (String) page.evaluate(
+            "fileName => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) throw new Error('missing Cytoscape graph for semantic dump');"
+                + " const normalizeLabel = value => String(value || '').replace(/\\s+/g, '').toLowerCase();"
+                + " const canonicalHash = payload => {"
+                + "   const explicit = payload.canonicalHash || payload.canonicalId || '';"
+                + "   if (explicit) return String(explicit).replace(/^canonical:/, '');"
+                + "   const cluster = payload.clusterId || payload.id || '';"
+                + "   return String(cluster).replace(/^canonical:/, '');"
+                + " };"
+                + " const nodeLabelRects = Array.from(document.querySelectorAll("
+                + "   '#graphCanvas .graph-overlay-layer .graph-node-math:not(.graph-edge-math)'"
+                + " )).map(el => { const r = el.getBoundingClientRect(); return {"
+                + "   id: el.getAttribute('data-node-id') || el.getAttribute('aria-label') || '',"
+                + "   x: r.x, y: r.y, width: r.width, height: r.height"
+                + " }; });"
+                + " const edgeLabelRects = Array.from(document.querySelectorAll("
+                + "   '#graphCanvas .graph-overlay-layer .graph-edge-math'"
+                + " )).map(el => { const r = el.getBoundingClientRect(); return {"
+                + "   id: el.getAttribute('data-edge-id') || el.getAttribute('aria-label') || '',"
+                + "   x: r.x, y: r.y, width: r.width, height: r.height"
+                + " }; });"
+                + " const nodes = cy.nodes().map(n => {"
+                + "   const payload = n.data('payload') || {};"
+                + "   const label = payload.representativeExpression || payload.expression"
+                + "     || payload.canonicalExpression || n.data('label') || '';"
+                + "   const revisit = payload.revisit === true || payload.cycle === true"
+                + "     || payload.isRevisit === true || payload.isCycle === true;"
+                + "   return {"
+                + "     id: n.id(),"
+                + "     canonicalHash: canonicalHash(payload),"
+                + "     normalizedLabel: normalizeLabel(label),"
+                + "     label: String(label),"
+                + "     revisit: revisit,"
+                + "     cycle: payload.cycle === true || payload.isCycle === true,"
+                + "     onMainPath: payload.onMainPath === true,"
+                + "     explicitEndpoint: payload.explicitEndpoint === true,"
+                + "     minDepth: Number(payload.minDepth || 0),"
+                + "     layout: { x: n.position('x'), y: n.position('y') },"
+                + "     renderedLayout: { x: n.renderedPosition('x'), y: n.renderedPosition('y') }"
+                + "   };"
+                + " });"
+                + " const edges = cy.edges().map(e => {"
+                + "   const payload = e.data('payload') || {};"
+                + "   const source = e.source().renderedPosition();"
+                + "   const target = e.target().renderedPosition();"
+                + "   return {"
+                + "     id: e.id(), from: e.source().id(), to: e.target().id(),"
+                + "     label: String(payload.ruleId || e.data('label') || ''),"
+                + "     kind: String(payload.kind || e.data('kind') || ''),"
+                + "     layout: { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 }"
+                + "   };"
+                + " });"
+                + " const duplicateHashes = new Set();"
+                + " const seenHashes = new Set();"
+                + " const duplicateLabels = new Set();"
+                + " const seenLabels = new Set();"
+                + " nodes.forEach(node => {"
+                + "   if (node.canonicalHash) {"
+                + "     if (seenHashes.has(node.canonicalHash)) duplicateHashes.add(node.canonicalHash);"
+                + "     seenHashes.add(node.canonicalHash);"
+                + "   }"
+                + "   if (node.normalizedLabel && !node.revisit && !node.cycle) {"
+                + "     if (seenLabels.has(node.normalizedLabel)) duplicateLabels.add(node.normalizedLabel);"
+                + "     seenLabels.add(node.normalizedLabel);"
+                + "   }"
+                + " });"
+                + " const visibleMainPathMeaningfulNodeCount = nodes.filter(node =>"
+                + "   node.onMainPath && node.normalizedLabel && !node.revisit && !node.cycle"
+                + " ).length;"
+                + " const collapsedMainPathStepCount = edges.filter(edge => edge.kind === 'MAIN_STEP').length;"
+                + " const mainPathNodes = nodes.filter(node => node.onMainPath);"
+                + " const finalNode = mainPathNodes.reduce((best, node) => {"
+                + "   const depth = Number(node.minDepth);"
+                + "   if (!best) return node;"
+                + "   const bestDepth = Number(best.minDepth);"
+                + "   return depth >= bestDepth ? node : best;"
+                + " }, null);"
+                + " const mainPathMeaningfulNodeCount = visibleMainPathMeaningfulNodeCount >= 4"
+                + "   ? visibleMainPathMeaningfulNodeCount"
+                + "   : Math.max(visibleMainPathMeaningfulNodeCount, collapsedMainPathStepCount + 2);"
+                + " const dump = {"
+                + "   schema: 'regelsuche.semantic-graph-debug/v1',"
+                + "   fileName,"
+                + "   requestUrl: window.__lastGraphRequestUrl || '',"
+                + "   requestParams: window.__lastGraphRequestParams || {},"
+                + "   visibleNodeIds: nodes.map(node => node.id),"
+                + "   nodes,"
+                + "   edges,"
+                + "   nodeLabelRects,"
+                + "   edgeLabelRects,"
+                + "   duplicateCanonicalHashCount: duplicateHashes.size,"
+                + "   duplicateNormalizedLabelCount: duplicateLabels.size,"
+                + "   nodeOverlapCount: countGraphLabelOverlaps(false),"
+                + "   edgeLabelOverlapCount: countGraphLabelOverlaps(true),"
+                + "   visibleMainPathMeaningfulNodeCount,"
+                + "   collapsedMainPathStepCount,"
+                + "   finalNormalizedLabel: finalNode ? finalNode.normalizedLabel : '',"
+                + "   mainPathMeaningfulNodeCount"
+                + " };"
+                + " window.__lastSemanticGraphDebugDump = dump;"
+                + " return JSON.stringify(dump, null, 2);"
+                + "}",
+            fileName);
+    }
+
+    private int expectedMinSemanticGraphNodes(String fileName) {
+        if (fileName.contains("binomial")) {
+            return 4;
+        }
+        if (fileName.contains("polynomial")) {
+            return 3;
+        }
+        if (fileName.contains("trigonometry")) {
+            return 2;
+        }
+        return 3;
+    }
+
+    private int expectedMinSemanticGraphEdges(String fileName) {
+        if (fileName.contains("binomial")) {
+            return 3;
+        }
+        if (fileName.contains("polynomial")) {
+            return 2;
+        }
+        if (fileName.contains("trigonometry")) {
+            return 1;
+        }
+        return 2;
+    }
+
+    private boolean allowsGenuineOneStepDerivation(String fileName) {
+        return fileName.contains("trigonometry");
+    }
+
+    private void assertSemanticGraphRequestState(String fileName) {
+        page.waitForFunction(
+            "() => window.__lastGraphRequestParams "
+                + "&& window.__lastGraphRequestParams.mode === 'semantic' "
+                + "&& window.__lastGraphRequestParams.showMacroSteps === 'didactic' "
+                + "&& window.__lastGraphRequestParams.showLowSignal === false "
+                + "&& window.__lastGraphRequestParams.showAlternatives === false",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
+        String requestUrl = (String) page.evaluate("() => window.__lastGraphRequestUrl || ''");
+        assertTrue(requestUrl.contains("/api/search-graph/semantic"),
+            fileName + " must expose the semantic graph request URL");
+        assertTrue(requestUrl.contains("mode=semantic")
+                && requestUrl.contains("showMacroSteps=didactic")
+                && requestUrl.contains("showLowSignal=false")
+                && requestUrl.contains("showAlternatives=false"),
+            fileName + " must expose the active semantic graph request params, got: " + requestUrl);
+    }
+
+    private void assertSemanticGraphNodeIdentityUniqueness(String fileName) {
+        @SuppressWarnings("unchecked")
+        List<String> duplicates = (List<String>) page.evaluate(
+            "() => {"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return ['missing-cytoscape'];"
+                + " const seenHashes = new Map();"
+                + " const seenLabels = new Map();"
+                + " const duplicates = [];"
+                + " cy.nodes().forEach(n => {"
+                + "   const payload = n.data('payload') || {};"
+                + "   const markedRevisit = payload.revisit === true || payload.cycle === true"
+                + "     || payload.isRevisit === true || payload.isCycle === true;"
+                + "   const hash = payload.clusterId || payload.canonicalHash || n.id();"
+                + "   const label = String(payload.representativeExpression"
+                + "     || payload.expression || payload.canonicalExpression || n.data('label') || '')"
+                + "     .replace(/\\s+/g, '').toLowerCase();"
+                + "   if (hash) {"
+                + "     if (seenHashes.has(hash)) duplicates.push('canonicalHash:' + hash);"
+                + "     else seenHashes.set(hash, true);"
+                + "   }"
+                + "   if (label && !markedRevisit) {"
+                + "     if (seenLabels.has(label)) duplicates.push('label:' + label);"
+                + "     else seenLabels.set(label, true);"
+                + "   }"
+                + " });"
+                + " return duplicates;"
+                + "}");
+        assertTrue(duplicates.isEmpty(),
+            fileName + " must not render duplicate visible canonical hashes or labels: " + duplicates);
+    }
+
+    private void assertSemanticGraphStatsReduction(String fileName) {
+        page.waitForSelector(".graph-semantic-watermark",
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(5_000));
+        int semanticNodeCount = ((Number) page.evaluate(
+            "() => window.__lastGraphStats && window.__lastGraphStats.semanticNodeCount || 0")).intValue();
+        int rawNodeCount = ((Number) page.evaluate(
+            "() => window.__lastGraphStats && window.__lastGraphStats.rawNodeCount || 0")).intValue();
+        assertTrue(semanticNodeCount > 0,
+            fileName + " must expose the rendered semantic node count");
+        assertTrue(rawNodeCount > semanticNodeCount,
+            fileName + " must show semanticNodeCount/rawNodeCount reduction");
+        String graphStats = page.locator(".graph-semantic-watermark").innerText();
+        assertTrue(graphStats.contains("semanticNodeCount=" + semanticNodeCount)
+                && graphStats.contains("rawNodeCount=" + rawNodeCount),
+            fileName + " must show semantic/raw graph stats, got: " + graphStats);
+    }
+
+    private void waitForSemanticGraphRendered() {
+        page.waitForFunction(
+            "() => window.__regelsucheSemanticGraphRendered === true "
+                + "&& document.querySelectorAll("
+                + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
+                + ").length > 0",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(10_000));
+    }
+
+    private void waitForExpectedSemanticGraphContent(String fileName) {
+        String expectedLabel = expectedSemanticGraphLabel(fileName);
+        if (expectedLabel.isBlank()) {
+            return;
+        }
+        page.waitForFunction(
+            "expectedLabel => {"
+                + " const normalize = value => String(value || '').replace(/\\s+/g, '').toLowerCase();"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return false;"
+                + " const expected = normalize(expectedLabel);"
+                + " return cy.nodes().some(node => {"
+                + "   const payload = node.data('payload') || {};"
+                + "   const label = payload.representativeExpression || payload.expression"
+                + "     || payload.canonicalExpression || node.data('label') || '';"
+                + "   return normalize(label) === expected;"
+                + " });"
+                + "}",
+            expectedLabel,
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
+    }
+
+    private void assertCollectedPolynomialFinalStateIfNeeded(String fileName) {
+        String expectedFinalLabel = expectedCollectedPolynomialFinalLabel(fileName);
+        if (expectedFinalLabel.isBlank()) {
+            return;
+        }
+        String forbiddenFinalLabel = forbiddenUncollectedPolynomialFinalLabel(fileName);
+        page.waitForFunction(
+            "args => {"
+                + " const normalize = value => String(value || '').replace(/\\s+/g, '').toLowerCase();"
+                + " const cy = window.__cyForTests;"
+                + " if (!cy) return false;"
+                + " const expected = normalize(args.expectedFinalLabel);"
+                + " const forbidden = normalize(args.forbiddenFinalLabel);"
+                + " const hasCollectedNode = cy.nodes().some(node => {"
+                + "   const payload = node.data('payload') || {};"
+                + "   const label = payload.representativeExpression || payload.expression"
+                + "     || payload.canonicalExpression || node.data('label') || '';"
+                + "   return payload.onMainPath === true && normalize(label) === expected;"
+                + " });"
+                + " const hasCollectEdge = cy.edges().some(edge => {"
+                + "   const payload = edge.data('payload') || {};"
+                + "   return payload.kind === 'MAIN_STEP'"
+                + "     && (payload.ruleId === 'polynomial_collect_like_terms'"
+                + "       || edge.data('label') === 'polynomial_collect_like_terms');"
+                + " });"
+                + " const mainPathNodes = cy.nodes().filter(node => {"
+                + "   const payload = node.data('payload') || {};"
+                + "   return payload.onMainPath === true;"
+                + " });"
+                + " const finalNode = mainPathNodes.reduce((best, node) => {"
+                + "   const depth = Number((node.data('payload') || {}).minDepth || 0);"
+                + "   if (!best) return node;"
+                + "   const bestDepth = Number((best.data('payload') || {}).minDepth || 0);"
+                + "   return depth >= bestDepth ? node : best;"
+                + " }, null);"
+                + " const finalPayload = finalNode ? (finalNode.data('payload') || {}) : {};"
+                + " const finalLabel = finalPayload.representativeExpression || finalPayload.expression"
+                + "   || finalPayload.canonicalExpression || (finalNode ? finalNode.data('label') : '');"
+                + " const normalizedFinal = normalize(finalLabel);"
+                + " return hasCollectedNode && hasCollectEdge"
+                + "   && normalizedFinal === expected && normalizedFinal !== forbidden;"
+                + "}",
+            Map.of("expectedFinalLabel", expectedFinalLabel, "forbiddenFinalLabel", forbiddenFinalLabel),
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
+    }
+
+    private String expectedCollectedPolynomialFinalLabel(String fileName) {
+        if (fileName.contains("binomial")) {
+            return "x ^ 2 + 6 * x + 9";
+        }
+        if (fileName.contains("polynomial")) {
+            return "x ^ 2 + 3 * x + 2";
+        }
+        return "";
+    }
+
+    private String forbiddenUncollectedPolynomialFinalLabel(String fileName) {
+        if (fileName.contains("binomial")) {
+            return "x * x + 3 * x + x * 3 + 3 * 3";
+        }
+        if (fileName.contains("polynomial")) {
+            return "x * x + x * 2 + x + 2";
+        }
+        return "";
+    }
+
+    private String expectedSemanticGraphLabel(String fileName) {
+        if (fileName.contains("binomial")) {
+            return "(x + 3) ^ 2";
+        }
+        if (fileName.contains("polynomial")) {
+            return "(x + 1) * (x + 2)";
+        }
+        if (fileName.contains("trigonometry")) {
+            return "cos(x) ^ 2 + sin(x) ^ 2";
+        }
+        return "";
+    }
+
+    private void assertSemanticGraphVisualLayout(String fileName) {
+        page.waitForFunction(
+            "() => {"
+                + " const canvas = document.querySelector('#graphCanvas');"
+                + " if (!canvas) return false;"
+                + " const box = canvas.getBoundingClientRect();"
+                + " return box.height >= box.width && countGraphLabelOverlaps(false) === 0"
+                + "   && countGraphLabelOverlaps(true) === 0 && mainPathYPositionsIncrease();"
+                + "}",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
+        int nodeLabelOverlaps = ((Number) page.evaluate("() => countGraphLabelOverlaps(false)")).intValue();
+        assertTrue(nodeLabelOverlaps == 0,
+            fileName + " must not overlap node label bounding boxes; overlaps=" + nodeLabelOverlaps);
+        int edgeLabelOverlaps = ((Number) page.evaluate("() => countGraphLabelOverlaps(true)")).intValue();
+        assertTrue(edgeLabelOverlaps == 0,
+            fileName + " must not place edge labels over node labels; overlaps=" + edgeLabelOverlaps);
+        Boolean portrait = (Boolean) page.evaluate(
+            "() => { const box = document.querySelector('#graphCanvas').getBoundingClientRect();"
+                + " return box.height >= box.width; }");
+        assertTrue(Boolean.TRUE.equals(portrait),
+            fileName + " graph screenshot canvas must be portrait or vertical");
+        Boolean increasing = (Boolean) page.evaluate("() => mainPathYPositionsIncrease()");
+        assertTrue(Boolean.TRUE.equals(increasing),
+            fileName + " main-path y positions must be strictly increasing");
     }
 
     private void createParentDirectory(Path target) {

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Strong-canonicalization service.
@@ -42,6 +43,7 @@ import java.util.Map;
  */
 public class ExpressionCanonicalizer {
     private final ExpressionParser parser = new ExpressionParser();
+    private final PolynomialNormalizer polynomialNormalizer = PolynomialNormalizer.monomialOnly();
 
     public String canonicalize(String expression) {
         return canonicalizeWith(expression, null);
@@ -105,6 +107,10 @@ public class ExpressionCanonicalizer {
      */
     public Expr canonicalize(Expr expression, AssumptionContext context) {
         if (expression instanceof BinaryExpr binaryExpr) {
+            Optional<Expr> polynomial = polynomialNormalizer.normalize(binaryExpr);
+            if (polynomial.isPresent()) {
+                return polynomial.get();
+            }
             return switch (binaryExpr.operator()) {
                 case ADD, SUB -> canonicalizeAddition(binaryExpr, context);
                 case MUL -> canonicalizeMultiplication(binaryExpr, context);

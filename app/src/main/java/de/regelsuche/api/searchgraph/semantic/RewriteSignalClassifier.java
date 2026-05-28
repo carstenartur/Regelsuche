@@ -31,7 +31,6 @@ public final class RewriteSignalClassifier {
             || rule.contains("canonical")
             || rule.contains("normalize")
             || rule.contains("neutral")
-            || rule.contains("identity")
-            || rule.contains("ast_");
+            || rule.contains("identity");
     }
 }

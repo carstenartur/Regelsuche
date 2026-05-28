@@ -281,8 +281,15 @@ footer { text-align: center; padding: 1rem; color: #9ca3af; font-size: 0.8rem; }
     font-size: 0.85rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
     pointer-events: auto;
-    white-space: nowrap;
+    max-width: 260px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
     z-index: 2;
+}
+.graph-node-math .katex {
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 .graph-node-math.is-best {
     border-color: #10b981;
@@ -298,9 +305,28 @@ footer { text-align: center; padding: 1rem; color: #9ca3af; font-size: 0.8rem; }
 .graph-edge-math {
     font-size: 0.75rem;
     background: rgba(255, 255, 255, 0.85);
-    border: none;
-    box-shadow: none;
-    padding: 0 2px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    padding: 1px 4px;
+    max-width: 180px;
+    z-index: 1;
+}
+.semantic-graph-canvas {
+    min-height: 900px;
+}
+.graph-semantic-watermark {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    z-index: 3;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(14, 165, 233, 0.92);
+    color: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
 }
 
 /* ─── Stage 5 — layout-aware aligned rows ─── */

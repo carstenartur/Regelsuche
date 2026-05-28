@@ -56,7 +56,7 @@ class MathPresentationTest {
         assertTrue(latex.endsWith("\\end{aligned}"), latex);
         assertTrue(latex.contains("(x+3)^2"));
         assertTrue(latex.contains("\\xrightarrow{a(b+c)\\to ab+ac}"), latex);
-        assertTrue(latex.contains("\\xrightarrow{ax+bx\\to(a+b)x}"), latex);
+        assertTrue(latex.contains("\\xrightarrow{\\text{collect like terms}}"), latex);
         assertTrue(latex.contains(" \\\\\n&"), "rows must be separated by `\\\\\\n&`: " + latex);
     }
 
