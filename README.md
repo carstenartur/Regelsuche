@@ -1,15 +1,10 @@
 # Regelsuche
 
-[![Java CI](https://github.com/carstenartur/Regelsuche/actions/workflows/gradle.yml/badge.svg)](https://github.com/carstenartur/Regelsuche/actions/workflows/gradle.yml)
-[![Docker](https://github.com/carstenartur/Regelsuche/actions/workflows/docker-image.yml/badge.svg)](https://github.com/carstenartur/Regelsuche/actions/workflows/docker-image.yml)
-[![CI/CD](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml)
+[![CI/CD](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/coverage/badge.json)](https://carstenartur.github.io/Regelsuche/coverage/)
 [![Tests](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/tests/badge.json)](https://carstenartur.github.io/Regelsuche/tests/)
-[![Benchmarks](https://github.com/carstenartur/Regelsuche/actions/workflows/benchmark.yml/badge.svg)](https://github.com/carstenartur/Regelsuche/actions/workflows/benchmark.yml)
-[![Release](https://github.com/carstenartur/Regelsuche/actions/workflows/release.yml/badge.svg)](https://github.com/carstenartur/Regelsuche/actions/workflows/release.yml)
+[![Performance](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/dev/bench/badge.json)](https://carstenartur.github.io/Regelsuche/dev/bench/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![SBOM](https://img.shields.io/badge/SBOM-CycloneDX-informational?logo=owasp&style=flat)](https://github.com/carstenartur/Regelsuche/dependency-graph/sbom)
-[![GitHub release](https://img.shields.io/github/v/release/carstenartur/Regelsuche?display_name=tag&sort=semver)](https://github.com/carstenartur/Regelsuche/releases)
 
 📊 **[Coverage report](https://carstenartur.github.io/Regelsuche/coverage/)** ·
 📋 **[Test report](https://carstenartur.github.io/Regelsuche/tests/)** ·
