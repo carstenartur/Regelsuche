@@ -43,7 +43,7 @@ import java.util.Optional;
  */
 public class ExpressionCanonicalizer {
     private final ExpressionParser parser = new ExpressionParser();
-    private final PolynomialNormalizer polynomialNormalizer = new PolynomialNormalizer();
+    private final PolynomialNormalizer polynomialNormalizer = PolynomialNormalizer.monomialOnly();
 
     public String canonicalize(String expression) {
         return canonicalizeWith(expression, null);

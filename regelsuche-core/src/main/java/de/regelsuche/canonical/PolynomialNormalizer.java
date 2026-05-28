@@ -23,6 +23,20 @@ import java.util.TreeMap;
 public final class PolynomialNormalizer {
     private static final int MAX_EXPANDED_TERMS = 1_000;
 
+    private final boolean expandCompositePolynomials;
+
+    public PolynomialNormalizer() {
+        this(true);
+    }
+
+    private PolynomialNormalizer(boolean expandCompositePolynomials) {
+        this.expandCompositePolynomials = expandCompositePolynomials;
+    }
+
+    public static PolynomialNormalizer monomialOnly() {
+        return new PolynomialNormalizer(false);
+    }
+
     public Optional<Expr> normalize(Expr expression) {
         Polynomial polynomial = toPolynomial(expression);
         if (polynomial == null) {
@@ -66,6 +80,9 @@ public final class PolynomialNormalizer {
         if (leftPolynomial == null || rightPolynomial == null) {
             return null;
         }
+        if (!expandCompositePolynomials && (!leftPolynomial.isMonomial() || !rightPolynomial.isMonomial())) {
+            return null;
+        }
         return leftPolynomial.multiply(rightPolynomial);
     }
 
@@ -76,6 +93,9 @@ public final class PolynomialNormalizer {
         int exponentValue = (int) number.value();
         Polynomial basePolynomial = toPolynomial(base);
         if (basePolynomial == null) {
+            return null;
+        }
+        if (!expandCompositePolynomials && !basePolynomial.isMonomial()) {
             return null;
         }
         return basePolynomial.pow(exponentValue);
@@ -289,6 +309,10 @@ public final class PolynomialNormalizer {
 
         private Polynomial scale(long factor) {
             return factor == 1 ? this : multiply(constant(factor));
+        }
+
+        private boolean isMonomial() {
+            return terms.size() <= 1;
         }
 
         private Polynomial pow(int exponent) {

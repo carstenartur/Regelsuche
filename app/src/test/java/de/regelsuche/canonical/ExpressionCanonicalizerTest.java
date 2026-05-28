@@ -58,6 +58,11 @@ class ExpressionCanonicalizerTest {
     }
 
     @Test
+    void canonicalizerKeepsCompositePolynomialExpansionAsExplicitSearchStep() {
+        assertEquals("(x + 1) ^ 2", canonicalizer.canonicalize("(x + 1)^2"));
+    }
+
+    @Test
     void defaultDivisionIsAssumptionFree() {
         // Without an AssumptionContext, x/x must NOT collapse to 1 (would be
         // mathematically wrong in general).
