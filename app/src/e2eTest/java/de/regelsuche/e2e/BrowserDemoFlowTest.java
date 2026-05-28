@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -595,7 +596,7 @@ class BrowserDemoFlowTest {
         waitForSemanticGraphRendered();
         assertSemanticGraphRequestState(fileName);
         waitForExpectedSemanticGraphContent(fileName);
-        assertBinomialCollectStepIfNeeded(fileName);
+        assertCollectedPolynomialFinalStateIfNeeded(fileName);
         Path target = SCREENSHOT_DIR.resolve(fileName);
         assertSemanticDebugDump(fileName, target);
         int renderedNodes = ((Number) page.evaluate(
@@ -704,6 +705,8 @@ class BrowserDemoFlowTest {
         int nodeOverlapCount = semanticDumpInt("nodeOverlapCount");
         int edgeLabelOverlapCount = semanticDumpInt("edgeLabelOverlapCount");
         int mainPathMeaningfulNodeCount = semanticDumpInt("mainPathMeaningfulNodeCount");
+        String expectedFinalLabel = expectedCollectedPolynomialFinalLabel(fileName);
+        String finalNormalizedLabel = semanticDumpString("finalNormalizedLabel");
         assertTrue(duplicateCanonicalHashCount == 0,
             fileName + " semantic dump must not contain duplicate canonical hashes: " + dump);
         assertTrue(duplicateNormalizedLabelCount == 0,
@@ -715,6 +718,12 @@ class BrowserDemoFlowTest {
         if (fileName.contains("binomial") || fileName.contains("polynomial")) {
             assertTrue(mainPathMeaningfulNodeCount >= 4,
                 fileName + " semantic dump must keep at least four meaningful main-path nodes: " + dump);
+            assertTrue(normalizeGraphLabel(finalNormalizedLabel).equals(normalizeGraphLabel(expectedFinalLabel)),
+                fileName + " semantic dump must assert finalNormalizedLabel is collected polynomial "
+                    + expectedFinalLabel + ": " + dump);
+            assertTrue(!normalizeGraphLabel(finalNormalizedLabel).equals(
+                    normalizeGraphLabel(forbiddenUncollectedPolynomialFinalLabel(fileName))),
+                fileName + " semantic dump finalNormalizedLabel must not be the uncollected expansion: " + dump);
         }
     }
 
@@ -722,6 +731,17 @@ class BrowserDemoFlowTest {
         return ((Number) page.evaluate(
             "property => (window.__lastSemanticGraphDebugDump && window.__lastSemanticGraphDebugDump[property]) || 0",
             property)).intValue();
+    }
+
+    private String semanticDumpString(String property) {
+        return (String) page.evaluate(
+            "property => String((window.__lastSemanticGraphDebugDump"
+                + " && window.__lastSemanticGraphDebugDump[property]) || '')",
+            property);
+    }
+
+    private String normalizeGraphLabel(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "").toLowerCase();
     }
 
     private String semanticDebugDump(String fileName) {
@@ -763,6 +783,7 @@ class BrowserDemoFlowTest {
                 + "     cycle: payload.cycle === true || payload.isCycle === true,"
                 + "     onMainPath: payload.onMainPath === true,"
                 + "     explicitEndpoint: payload.explicitEndpoint === true,"
+                + "     minDepth: Number(payload.minDepth || 0),"
                 + "     layout: { x: n.position('x'), y: n.position('y') },"
                 + "     renderedLayout: { x: n.renderedPosition('x'), y: n.renderedPosition('y') }"
                 + "   };"
@@ -796,6 +817,13 @@ class BrowserDemoFlowTest {
                 + "   node.onMainPath && node.normalizedLabel && !node.revisit && !node.cycle"
                 + " ).length;"
                 + " const collapsedMainPathStepCount = edges.filter(edge => edge.kind === 'MAIN_STEP').length;"
+                + " const mainPathNodes = nodes.filter(node => node.onMainPath);"
+                + " const finalNode = mainPathNodes.reduce((best, node) => {"
+                + "   const depth = Number(node.minDepth || node.layout.y || 0);"
+                + "   if (!best) return node;"
+                + "   const bestDepth = Number(best.minDepth || best.layout.y || 0);"
+                + "   return depth >= bestDepth ? node : best;"
+                + " }, null);"
                 + " const mainPathMeaningfulNodeCount = visibleMainPathMeaningfulNodeCount >= 4"
                 + "   ? visibleMainPathMeaningfulNodeCount"
                 + "   : Math.max(visibleMainPathMeaningfulNodeCount, collapsedMainPathStepCount + 2);"
@@ -815,6 +843,7 @@ class BrowserDemoFlowTest {
                 + "   edgeLabelOverlapCount: countGraphLabelOverlaps(true),"
                 + "   visibleMainPathMeaningfulNodeCount,"
                 + "   collapsedMainPathStepCount,"
+                + "   finalNormalizedLabel: finalNode ? finalNode.normalizedLabel : '',"
                 + "   mainPathMeaningfulNodeCount"
                 + " };"
                 + " window.__lastSemanticGraphDebugDump = dump;"
@@ -955,20 +984,24 @@ class BrowserDemoFlowTest {
             new Page.WaitForFunctionOptions().setTimeout(5_000));
     }
 
-    private void assertBinomialCollectStepIfNeeded(String fileName) {
-        if (!fileName.contains("binomial")) {
+    private void assertCollectedPolynomialFinalStateIfNeeded(String fileName) {
+        String expectedFinalLabel = expectedCollectedPolynomialFinalLabel(fileName);
+        if (expectedFinalLabel.isBlank()) {
             return;
         }
+        String forbiddenFinalLabel = forbiddenUncollectedPolynomialFinalLabel(fileName);
         page.waitForFunction(
-            "() => {"
+            "args => {"
                 + " const normalize = value => String(value || '').replace(/\\s+/g, '').toLowerCase();"
                 + " const cy = window.__cyForTests;"
                 + " if (!cy) return false;"
+                + " const expected = normalize(args.expectedFinalLabel);"
+                + " const forbidden = normalize(args.forbiddenFinalLabel);"
                 + " const hasCollectedNode = cy.nodes().some(node => {"
                 + "   const payload = node.data('payload') || {};"
                 + "   const label = payload.representativeExpression || payload.expression"
                 + "     || payload.canonicalExpression || node.data('label') || '';"
-                + "   return payload.onMainPath === true && normalize(label) === 'x^2+6*x+9';"
+                + "   return payload.onMainPath === true && normalize(label) === expected;"
                 + " });"
                 + " const hasCollectEdge = cy.edges().some(edge => {"
                 + "   const payload = edge.data('payload') || {};"
@@ -989,10 +1022,32 @@ class BrowserDemoFlowTest {
                 + " const finalPayload = finalNode ? (finalNode.data('payload') || {}) : {};"
                 + " const finalLabel = finalPayload.representativeExpression || finalPayload.expression"
                 + "   || finalPayload.canonicalExpression || (finalNode ? finalNode.data('label') : '');"
-                + " return hasCollectedNode && hasCollectEdge && normalize(finalLabel) === 'x^2+6*x+9';"
+                + " const normalizedFinal = normalize(finalLabel);"
+                + " return hasCollectedNode && hasCollectEdge"
+                + "   && normalizedFinal === expected && normalizedFinal !== forbidden;"
                 + "}",
-            null,
+            Map.of("expectedFinalLabel", expectedFinalLabel, "forbiddenFinalLabel", forbiddenFinalLabel),
             new Page.WaitForFunctionOptions().setTimeout(5_000));
+    }
+
+    private String expectedCollectedPolynomialFinalLabel(String fileName) {
+        if (fileName.contains("binomial")) {
+            return "x ^ 2 + 6 * x + 9";
+        }
+        if (fileName.contains("polynomial")) {
+            return "x ^ 2 + 3 * x + 2";
+        }
+        return "";
+    }
+
+    private String forbiddenUncollectedPolynomialFinalLabel(String fileName) {
+        if (fileName.contains("binomial")) {
+            return "x * x + 3 * x + x * 3 + 3 * 3";
+        }
+        if (fileName.contains("polynomial")) {
+            return "x * x + x * 2 + x + 2";
+        }
+        return "";
     }
 
     private String expectedSemanticGraphLabel(String fileName) {
