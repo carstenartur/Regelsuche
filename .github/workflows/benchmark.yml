@@ -167,6 +167,8 @@ jobs:
       - name: Report deployed URL
         if: always()
         run: |
-          echo "### ⚡ Benchmark dashboard" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "📊 [View Performance Charts](https://carstenartur.github.io/Regelsuche/dev/bench/)" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### ⚡ Benchmark dashboard"
+            echo ""
+            echo "📊 [View Performance Charts](https://carstenartur.github.io/Regelsuche/dev/bench/)"
+          } >> "$GITHUB_STEP_SUMMARY"
