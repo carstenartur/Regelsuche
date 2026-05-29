@@ -21,6 +21,7 @@ public final class ScientificSeedCorpora {
             new SeedExpression("identity-binomial-1", "(x + a)^2", "known-identity", "binomial", List.of("scientific"), List.of()),
             new SeedExpression("identity-geometric-series-1", "1 + x + x^2 + x^3", "known-identity", "geometric-series", List.of("scientific"), List.of()),
             new SeedExpression("identity-factorization-1", "x^2 - a^2", "known-identity", "factorization", List.of("scientific"), List.of()),
+            new SeedExpression("hidden-structure-1", "x^4 + 4", "scientific-experiment", "hidden-structure", List.of("scientific", "hidden-structure"), List.of()),
             new SeedExpression("dlmf-trigonometric-1", "sin(x)^2 + cos(x)^2", "DLMF", "trigonometric", List.of("DLMF", "scientific"), List.of()),
             new SeedExpression("matrix-identity-1", "A * (B + C)", "known-identity", "matrix", List.of("matrix", "scientific"), List.of()),
             new SeedExpression("rational-simplification-1", "(a * b) / b", "known-identity", "rational", List.of("scientific"), List.of("b != 0")),
