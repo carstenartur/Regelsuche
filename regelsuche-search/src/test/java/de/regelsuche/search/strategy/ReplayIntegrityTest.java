@@ -38,9 +38,10 @@ class ReplayIntegrityTest {
         for (int index = 1; index < hypothesisState.path().size(); index++) {
             String previous = hypothesisState.path().get(index - 1);
             String current = hypothesisState.path().get(index);
+            String ruleId = hypothesisState.appliedRuleIds().get(index - 1);
             assertTrue(engine.transform(previous).stream().anyMatch(transformation ->
                 transformation.transformedExpression().equals(current)
-                    && transformation.rule().equals(hypothesisState.appliedRuleIds().get(index - 1))));
+                    && transformation.rule().equals(ruleId)));
         }
     }
 }

@@ -153,7 +153,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             expand("ast_distribute_right_subtract", op(BinaryOperator.MUL, op(BinaryOperator.SUB, b, c), a),
                 op(BinaryOperator.SUB, op(BinaryOperator.MUL, b, a), op(BinaryOperator.MUL, c, a)), 5),
             new PatternRewriteRule(
-                "ast_difference_of_squares",
+                "ast_square_difference_factor",
                 op(BinaryOperator.SUB, op(BinaryOperator.POW, a, num(2)), op(BinaryOperator.POW, b, num(2))),
                 op(BinaryOperator.MUL, op(BinaryOperator.SUB, a, b), op(BinaryOperator.ADD, a, b)),
                 RewriteKind.FACTOR,
