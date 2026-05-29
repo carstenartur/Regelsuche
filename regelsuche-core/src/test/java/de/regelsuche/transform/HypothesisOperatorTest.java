@@ -21,4 +21,13 @@ class HypothesisOperatorTest {
             candidate.transformedExpression().contains("^ 2 -")
                 && candidate.transformedExpression().contains("2 * x")));
     }
+
+    @Test
+    void doesNotGeneratePairCandidateWhenAdditionalAddendsExist() {
+        DifferenceOfSquaresPreparationOperator operator = new DifferenceOfSquaresPreparationOperator();
+
+        List<Transformation> candidates = operator.generateCandidates("x^4 + 4 + y^2");
+
+        assertTrue(candidates.isEmpty());
+    }
 }

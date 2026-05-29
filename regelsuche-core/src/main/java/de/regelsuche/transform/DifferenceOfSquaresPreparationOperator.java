@@ -43,6 +43,9 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
         String formattedInput = ExpressionFormatter.format(root);
         int originalSize = canonicalizer.astNodeCount(formattedInput);
         List<Expr> terms = flattenPositiveAddends(root);
+        if (terms.size() > 2) {
+            return List.of();
+        }
         Map<String, ScoredCandidate> candidates = new LinkedHashMap<>();
         for (int left = 0; left < terms.size(); left++) {
             SquareRoot leftRoot = squareRoot(terms.get(left));

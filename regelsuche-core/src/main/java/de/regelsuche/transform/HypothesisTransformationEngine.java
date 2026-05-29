@@ -1,9 +1,9 @@
 package de.regelsuche.transform;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 public class HypothesisTransformationEngine implements TransformationEngine {
     private final TransformationEngine baseEngine;
@@ -29,22 +29,23 @@ public class HypothesisTransformationEngine implements TransformationEngine {
 
     @Override
     public List<Transformation> transform(String expression) {
-        Map<String, Transformation> combined = new LinkedHashMap<>();
-        for (Transformation transformation : baseEngine.transform(expression)) {
-            combined.putIfAbsent(transformation.applicationKey(), transformation);
+        List<Transformation> combined = new ArrayList<>(baseEngine.transform(expression));
+        Set<String> applicationKeys = new HashSet<>();
+        for (Transformation transformation : combined) {
+            applicationKeys.add(transformation.applicationKey());
         }
         int generated = 0;
         for (HypothesisOperator operator : operators) {
             for (Transformation transformation : operator.generateCandidates(expression)) {
                 if (generated >= maxHypothesisCandidates) {
-                    return new ArrayList<>(combined.values());
+                    return combined;
                 }
-                if (!combined.containsKey(transformation.applicationKey())) {
-                    combined.put(transformation.applicationKey(), transformation);
+                if (applicationKeys.add(transformation.applicationKey())) {
+                    combined.add(transformation);
                     generated++;
                 }
             }
         }
-        return new ArrayList<>(combined.values());
+        return combined;
     }
 }
