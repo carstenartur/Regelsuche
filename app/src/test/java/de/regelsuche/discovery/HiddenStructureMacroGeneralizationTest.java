@@ -134,13 +134,14 @@ class HiddenStructureMacroGeneralizationTest {
 
         MacroLearningResult result = service.learn(List.of(path));
 
-        assertFalse(result.activatedRules().isEmpty());
+        assertFalse(result.newlyActivated().isEmpty());
         ReusableRule rule = inventory.findAll().stream()
             .filter(candidate -> candidate.leftPattern().equals("A^4 + 4"))
             .findFirst()
             .orElseThrow();
         assertTrue(inventory.isEnabled(rule.id()));
-        return new LearnedMacro(path, inventory, rule, "macro_" + rule.id());
+        String macroRuleId = rule.id().startsWith("macro_") ? rule.id() : "macro_" + rule.id();
+        return new LearnedMacro(path, inventory, rule, macroRuleId);
     }
 
     private MacroMoveTransformationEngine macroEngine(LearnedMacro learned) {
