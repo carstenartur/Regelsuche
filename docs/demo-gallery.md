@@ -35,13 +35,13 @@ In dieser Reihenfolge erschließt sich der Funktionsumfang am schnellsten:
 4. [Binomische Formel](#binomische-formel) — der „Hello World“ der Suche.
 5. [Bruchkürzung mit Annahme `x ≠ 0`](#bruchkürzung-mit-annahme-x--0) —
    warum Annahmen sichtbar bleiben müssen.
-5. [Ungleichung mit Vorzeichen-Flip](#ungleichung-mit-vorzeichen-flip) —
+6. [Ungleichung mit Vorzeichen-Flip](#ungleichung-mit-vorzeichen-flip) —
    der kritische Schritt wird hervorgehoben.
-6. [Makroregel-Lernen](#makroregel-lernen) — wie das System eigene
+7. [Makroregel-Lernen](#makroregel-lernen) — wie das System eigene
    Abkürzungen aufbaut.
-7. [Proof-Job-Panel](#proof-job-panel--a--0--a) — von der Regel zum
+8. [Proof-Job-Panel](#proof-job-panel--a--0--a) — von der Regel zum
    formalen Beweis.
-8. [Export-Bundle](#export-bundle) — den Rechenweg außerhalb der App
+9. [Export-Bundle](#export-bundle) — den Rechenweg außerhalb der App
    nutzen.
 
 Die übrigen Demos (Trigonometrie, Polynom-Expansion, Lineare Gleichung,
@@ -103,26 +103,10 @@ kanonischen Zielzustand konvergieren — und sichtbar machen, wann ein
 entdeckter Weg zur gelernten Abkürzung wird.
 
 Der Graph wird aus `ConvergentDiscoveryReport`-Daten erzeugt; er ist kein
-handgezeichnetes Diagramm.
-
-```mermaid
-graph TD
-  input["x^4 + 4*y^4"]:::input
-  bridge["(x^2 + 2*y^2)^2 - (2*x*y)^2"]:::didactic
-  factor["(x^2 - 2*x*y + 2*y^2)*(x^2 + 2*x*y + 2*y^2)"]:::convergence
-  input -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| bridge
-  bridge -->|FACTORIZATION: ast_square_difference_factor| factor
-  input -->|LEARNED_MACRO: macro_sophie_germain| factor
-  classDef input fill:#eef2ff,stroke:#4338ca,stroke-width:2px
-  classDef convergence fill:#dcfce7,stroke:#15803d,stroke-width:3px
-  classDef didactic fill:#fef3c7,stroke:#d97706,stroke-width:2px
-  classDef macro fill:#e0f2fe,stroke:#0284c7,stroke-width:3px
-```
-
-*Der passende generierte Mermaid-Graph liegt unter
+handgezeichnetes Diagramm. Der passende generierte Mermaid-Graph liegt unter
 [`assets/screenshots/convergent-sophie-germain.mmd`](assets/screenshots/convergent-sophie-germain.mmd),
 die Roh-Gallery-Evidence unter
-[`assets/screenshots/convergent-sophie-germain-gallery-snippet.md`](assets/screenshots/convergent-sophie-germain-gallery-snippet.md).*
+[`assets/screenshots/convergent-sophie-germain-gallery-snippet.md`](assets/screenshots/convergent-sophie-germain-gallery-snippet.md).
 
 **A. Sophie-Germain: discovery path vs learned macro shortcut**
 
