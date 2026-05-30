@@ -42,6 +42,18 @@ public class ParameterRelationMiner {
         if (matches(values, baseValues, a -> -a)) {
             return new Relation(NormalizedNode.multiply(List.of(NormalizedNode.number(-1), NormalizedNode.variable("A"))), "-A");
         }
+        for (int offset = -10; offset <= 10; offset++) {
+            if (offset == 0) {
+                continue;
+            }
+            int currentOffset = offset;
+            if (matches(values, baseValues, a -> a + currentOffset)) {
+                return new Relation(
+                    NormalizedNode.add(List.of(NormalizedNode.variable("A"), NormalizedNode.number(currentOffset))),
+                    currentOffset > 0 ? "A + " + currentOffset : "A - " + Math.abs(currentOffset)
+                );
+            }
+        }
         for (int factor = -10; factor <= 10; factor++) {
             if (factor == -1 || factor == 0 || factor == 1) {
                 continue;
@@ -52,6 +64,23 @@ public class ParameterRelationMiner {
                     NormalizedNode.multiply(List.of(NormalizedNode.number(currentFactor), NormalizedNode.variable("A"))),
                     currentFactor + "*A"
                 );
+            }
+            for (int offset = -10; offset <= 10; offset++) {
+                if (offset == 0) {
+                    continue;
+                }
+                int currentOffset = offset;
+                if (matches(values, baseValues, a -> currentFactor * a + currentOffset)) {
+                    return new Relation(
+                        NormalizedNode.add(List.of(
+                            NormalizedNode.multiply(List.of(NormalizedNode.number(currentFactor), NormalizedNode.variable("A"))),
+                            NormalizedNode.number(currentOffset)
+                        )),
+                        currentOffset > 0
+                            ? currentFactor + "*A + " + currentOffset
+                            : currentFactor + "*A - " + Math.abs(currentOffset)
+                    );
+                }
             }
         }
         if (matches(values, baseValues, a -> a * a)) {

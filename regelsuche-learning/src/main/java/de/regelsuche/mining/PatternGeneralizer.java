@@ -1,15 +1,29 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PatternGeneralizer {
+    private static final Pattern TEMPORARY_PLACEHOLDER = Pattern.compile("\\b(?:v|tmp)\\d+\\b");
+    private static final Pattern MACRO_PLACEHOLDER = Pattern.compile("\\b[A-Z]\\b");
     private final AstNormalizer normalizer;
     private final ParameterRelationMiner relationMiner;
+    private final ExpressionParser expressionParser = new ExpressionParser();
 
     public PatternGeneralizer() {
         this(new AstNormalizer(), new ParameterRelationMiner());
@@ -23,6 +37,7 @@ public class PatternGeneralizer {
     public String skeleton(SuccessfulTransformationPath path) {
         NormalizedNode left = normalizer.normalize(path.originalExpression());
         NormalizedNode right = normalizer.normalize(path.targetExpression());
+        Map<String, String> canonicalVariableBindings = canonicalVariableBindings(path.originalExpression(), path.targetExpression());
         return left.skeletonString() + "->" + right.skeletonString();
     }
 
@@ -59,17 +74,22 @@ public class PatternGeneralizer {
         for (Map.Entry<String, List<String>> entry : state.expressionValues.entrySet()) {
             descriptions.add(entry.getKey() + " \u2208 {" + String.join(", ", entry.getValue()) + "}");
         }
-        return Optional.of(new GeneralizedPattern(
+        return Optional.of(normalizeGeneratedPlaceholders(new GeneralizedPattern(
             left, right, state.values, descriptions, state.expressionValues
-        ));
+        )));
     }
 
     public Optional<GeneralizedPattern> generalizeSingleExampleSchema(SuccessfulTransformationPath path) {
         if (path == null) {
             return Optional.empty();
         }
+        Optional<GeneralizedPattern> variableSchema = generalizeSingleVariableSchema(path);
+        if (variableSchema.isPresent()) {
+            return variableSchema;
+        }
         NormalizedNode left = normalizer.normalize(path.originalExpression());
         NormalizedNode right = normalizer.normalize(path.targetExpression());
+        Map<String, String> canonicalVariableBindings = canonicalVariableBindings(path.originalExpression(), path.targetExpression());
         Optional<NormalizedNode> placeholderSubtree = commonExpressionSubtrees(left, right).stream()
             .max(Comparator
                 .comparingInt(this::nodeCount)
@@ -81,6 +101,12 @@ public class PatternGeneralizer {
         String placeholder = "A";
         NormalizedNode generalizedLeft = replaceSubtree(left, placeholderSubtree.orElseThrow(), placeholder);
         NormalizedNode generalizedRight = replaceSubtree(right, placeholderSubtree.orElseThrow(), placeholder);
+        Map<String, String> generatedPlaceholders = new LinkedHashMap<>();
+        String reservedVariable = placeholderSubtree.orElseThrow().kind() == NormalizedNode.Kind.VARIABLE
+            ? placeholderSubtree.orElseThrow().name()
+            : null;
+        generalizedLeft = promoteRemainingVariables(generalizedLeft, reservedVariable, generatedPlaceholders);
+        generalizedRight = promoteRemainingVariables(generalizedRight, reservedVariable, generatedPlaceholders);
         if (!containsPlaceholder(generalizedLeft, placeholder) || !containsPlaceholder(generalizedRight, placeholder)) {
             return Optional.empty();
         }
@@ -89,17 +115,245 @@ public class PatternGeneralizer {
         if (leftPattern.equals(left.canonicalString()) && rightPattern.equals(right.canonicalString())) {
             return Optional.empty();
         }
-        Map<String, List<String>> expressionValues = Map.of(
-            placeholder,
-            List.of(placeholderSubtree.orElseThrow().canonicalString())
+        Map<String, List<String>> expressionValues = new LinkedHashMap<>();
+        expressionValues.put(placeholder, List.of(bindingFor(placeholderSubtree.orElseThrow(), canonicalVariableBindings)));
+        for (Map.Entry<String, String> entry : generatedPlaceholders.entrySet()) {
+            expressionValues.put(entry.getValue(), List.of(canonicalVariableBindings.getOrDefault(entry.getKey(), entry.getKey())));
+        }
+        return Optional.of(normalizeGeneratedPlaceholders(new GeneralizedPattern(
+            leftPattern,
+            rightPattern,
+            Map.of(),
+            expressionValues.entrySet().stream()
+                .map(entry -> entry.getKey() + " \u2208 {" + String.join(", ", entry.getValue()) + "}")
+                .toList(),
+            expressionValues
+        )));
+    }
+
+    private GeneralizedPattern normalizeGeneratedPlaceholders(GeneralizedPattern pattern) {
+        Map<String, String> renames = temporaryPlaceholderRenames(pattern);
+        if (renames.isEmpty()) {
+            return pattern;
+        }
+        Map<String, List<Integer>> placeholderValues = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Integer>> entry : pattern.placeholderValues().entrySet()) {
+            placeholderValues.put(renames.getOrDefault(entry.getKey(), entry.getKey()), entry.getValue());
+        }
+        Map<String, List<String>> expressionValues = new LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> entry : pattern.expressionPlaceholderValues().entrySet()) {
+            expressionValues.put(
+                renames.getOrDefault(entry.getKey(), entry.getKey()),
+                entry.getValue().stream().map(value -> replaceTemporaryPlaceholders(value, renames)).toList()
+            );
+        }
+        return new GeneralizedPattern(
+            replaceTemporaryPlaceholders(pattern.leftPattern(), renames),
+            replaceTemporaryPlaceholders(pattern.rightPattern(), renames),
+            placeholderValues,
+            pattern.parameterRelations().stream()
+                .map(relation -> replaceTemporaryPlaceholders(relation, renames))
+                .toList(),
+            expressionValues
         );
+    }
+
+    private Map<String, String> temporaryPlaceholderRenames(GeneralizedPattern pattern) {
+        Set<String> existingMacroPlaceholders = new LinkedHashSet<>();
+        collectMacroPlaceholders(pattern.leftPattern(), existingMacroPlaceholders);
+        collectMacroPlaceholders(pattern.rightPattern(), existingMacroPlaceholders);
+        pattern.parameterRelations().forEach(relation -> collectMacroPlaceholders(relation, existingMacroPlaceholders));
+        Map<String, String> renames = new LinkedHashMap<>();
+        collectTemporaryPlaceholders(pattern.leftPattern(), renames, existingMacroPlaceholders);
+        collectTemporaryPlaceholders(pattern.rightPattern(), renames, existingMacroPlaceholders);
+        pattern.parameterRelations().forEach(relation -> collectTemporaryPlaceholders(relation, renames, existingMacroPlaceholders));
+        pattern.expressionPlaceholderValues().forEach((key, values) -> {
+            collectTemporaryPlaceholders(key, renames, existingMacroPlaceholders);
+            values.forEach(value -> collectTemporaryPlaceholders(value, renames, existingMacroPlaceholders));
+        });
+        return renames;
+    }
+
+    private void collectMacroPlaceholders(String text, Set<String> placeholders) {
+        Matcher matcher = MACRO_PLACEHOLDER.matcher(text == null ? "" : text);
+        while (matcher.find()) {
+            placeholders.add(matcher.group());
+        }
+    }
+
+    private void collectTemporaryPlaceholders(String text, Map<String, String> renames, Set<String> existingMacroPlaceholders) {
+        Matcher matcher = TEMPORARY_PLACEHOLDER.matcher(text == null ? "" : text);
+        while (matcher.find()) {
+            renames.computeIfAbsent(matcher.group(), ignored -> nextStableMacroPlaceholder(existingMacroPlaceholders));
+        }
+    }
+
+    private String nextStableMacroPlaceholder(Set<String> existingMacroPlaceholders) {
+        for (char name = 'B'; name <= 'Z'; name++) {
+            String candidate = String.valueOf(name);
+            if (existingMacroPlaceholders.add(candidate)) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("exhausted stable macro placeholders");
+    }
+
+    private String replaceTemporaryPlaceholders(String text, Map<String, String> renames) {
+        String result = text;
+        for (Map.Entry<String, String> entry : renames.entrySet()) {
+            result = result.replaceAll("\\b" + Pattern.quote(entry.getKey()) + "\\b", entry.getValue());
+        }
+        return result;
+    }
+
+    private Optional<GeneralizedPattern> generalizeSingleVariableSchema(SuccessfulTransformationPath path) {
+        Expr left;
+        Expr right;
+        try {
+            left = expressionParser.parseTerm(path.originalExpression());
+            right = expressionParser.parseTerm(path.targetExpression());
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+        Set<String> variables = new LinkedHashSet<>();
+        collectVariables(left, variables);
+        collectVariables(right, variables);
+        if (variables.size() != 1) {
+            return Optional.empty();
+        }
+        String variable = variables.iterator().next();
+        Expr placeholder = new VariableExpr("A");
+        Expr generalizedLeft = replaceVariable(left, variable, placeholder);
+        Expr generalizedRight = replaceVariable(right, variable, placeholder);
+        String leftPattern = compactPower(ExpressionFormatter.format(generalizedLeft));
+        String rightPattern = compactPower(ExpressionFormatter.format(generalizedRight));
+        if (leftPattern.equals(path.originalExpression()) && rightPattern.equals(path.targetExpression())) {
+            return Optional.empty();
+        }
         return Optional.of(new GeneralizedPattern(
             leftPattern,
             rightPattern,
             Map.of(),
-            List.of(placeholder + " \u2208 {" + placeholderSubtree.orElseThrow().canonicalString() + "}"),
-            expressionValues
+            List.of("A \u2208 {" + variable + "}"),
+            Map.of("A", List.of(variable))
         ));
+    }
+
+    private String compactPower(String expression) {
+        return expression.replace(" ^ ", "^");
+    }
+
+    private void collectVariables(Expr expression, Set<String> variables) {
+        if (expression instanceof VariableExpr variable) {
+            variables.add(variable.name());
+            return;
+        }
+        if (expression instanceof FunctionExpr function) {
+            for (Expr argument : function.arguments()) {
+                collectVariables(argument, variables);
+            }
+            return;
+        }
+        if (expression instanceof BinaryExpr binary) {
+            collectVariables(binary.left(), variables);
+            collectVariables(binary.right(), variables);
+        }
+    }
+
+    private Expr replaceVariable(Expr expression, String variable, Expr placeholder) {
+        if (expression instanceof VariableExpr variableExpr) {
+            return variableExpr.name().equals(variable) ? placeholder : variableExpr;
+        }
+        if (expression instanceof NumberExpr) {
+            return expression;
+        }
+        if (expression instanceof FunctionExpr function) {
+            return new FunctionExpr(function.name(), function.arguments().stream()
+                .map(argument -> replaceVariable(argument, variable, placeholder))
+                .toList());
+        }
+        BinaryExpr binary = (BinaryExpr) expression;
+        return new BinaryExpr(
+            replaceVariable(binary.left(), variable, placeholder),
+            binary.operator(),
+            replaceVariable(binary.right(), variable, placeholder)
+        );
+    }
+
+    private Map<String, String> canonicalVariableBindings(String originalExpression, String targetExpression) {
+        Map<String, String> bindings = new LinkedHashMap<>();
+        collectCanonicalVariableBindings(originalExpression, bindings);
+        collectCanonicalVariableBindings(targetExpression, bindings);
+        return bindings;
+    }
+
+    private void collectCanonicalVariableBindings(String expression, Map<String, String> canonicalBindings) {
+        try {
+            collectCanonicalVariableBindings(expressionParser.parseTerm(expression), new LinkedHashMap<>(), canonicalBindings);
+        } catch (IllegalArgumentException exception) {
+            // Keep normalization-based bindings only; callers fall back to canonical variable names.
+        }
+    }
+
+    private void collectCanonicalVariableBindings(
+        Expr expression,
+        Map<String, String> localVariables,
+        Map<String, String> canonicalBindings
+    ) {
+        if (expression instanceof VariableExpr variable) {
+            String canonical = localVariables.computeIfAbsent(
+                variable.name(),
+                key -> localVariables.isEmpty() ? "x" : "v" + localVariables.size()
+            );
+            canonicalBindings.putIfAbsent(canonical, variable.name());
+            return;
+        }
+        if (expression instanceof FunctionExpr function) {
+            for (Expr argument : function.arguments()) {
+                collectCanonicalVariableBindings(argument, localVariables, canonicalBindings);
+            }
+            return;
+        }
+        if (expression instanceof BinaryExpr binary) {
+            collectCanonicalVariableBindings(binary.left(), localVariables, canonicalBindings);
+            collectCanonicalVariableBindings(binary.right(), localVariables, canonicalBindings);
+        }
+    }
+
+    private String bindingFor(NormalizedNode node, Map<String, String> canonicalVariableBindings) {
+        if (node.kind() == NormalizedNode.Kind.VARIABLE) {
+            return canonicalVariableBindings.getOrDefault(node.name(), node.name());
+        }
+        return node.canonicalString();
+    }
+
+    private NormalizedNode promoteRemainingVariables(
+        NormalizedNode node,
+        String reservedVariable,
+        Map<String, String> generatedPlaceholders
+    ) {
+        if (node.kind() == NormalizedNode.Kind.VARIABLE && !node.name().equals(reservedVariable)) {
+            return NormalizedNode.placeholder(generatedPlaceholders.computeIfAbsent(
+                node.name(),
+                key -> nextStableExpressionPlaceholder(generatedPlaceholders.size())
+            ));
+        }
+        List<NormalizedNode> children = node.children().stream()
+            .map(child -> promoteRemainingVariables(child, reservedVariable, generatedPlaceholders))
+            .toList();
+        return switch (node.kind()) {
+            case NUMBER -> NormalizedNode.number(node.number());
+            case VARIABLE -> NormalizedNode.variable(node.name());
+            case PLACEHOLDER -> NormalizedNode.placeholder(node.name());
+            case ADD -> NormalizedNode.add(children);
+            case MUL -> NormalizedNode.multiply(children);
+            case POW -> NormalizedNode.pow(children.get(0), children.get(1));
+            case FUNCTION -> NormalizedNode.function(node.name(), children);
+        };
+    }
+
+    private String nextStableExpressionPlaceholder(int index) {
+        return String.valueOf((char) ('B' + index));
     }
 
     private Optional<NormalizedNode> generalizeNodes(List<NormalizedNode> nodes, PlaceholderState state) {

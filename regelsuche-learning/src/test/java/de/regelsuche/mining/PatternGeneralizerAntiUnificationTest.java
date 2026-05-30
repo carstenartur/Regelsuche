@@ -1,6 +1,7 @@
 package de.regelsuche.mining;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -119,6 +120,40 @@ class PatternGeneralizerAntiUnificationTest {
     void emptyPathListReturnsEmpty() {
         Optional<GeneralizedPattern> result = generalizer.generalize(List.of());
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void singleReplayPreservesUnitStepRelationInsideSchema() {
+        Optional<GeneralizedPattern> result = generalizer.generalizeSingleExampleSchema(
+            path("1 / (n * (n + 1))", "1 / n - 1 / (n + 1)")
+        );
+
+        assertTrue(result.isPresent());
+        assertTrue(result.get().leftPattern().contains("A + 1"), result.get().leftPattern());
+        assertTrue(result.get().rightPattern().contains("A + 1"), result.get().rightPattern());
+        assertFalse(result.get().leftPattern().contains("A * B"),
+            "unsafe independent-factor schema must not be emitted");
+    }
+
+    @Test
+    void normalizesGeneratedPlaceholdersToStableMacroNames() {
+        Optional<GeneralizedPattern> result = generalizer.generalizeSingleExampleSchema(
+            path(
+                "x^4 + 4*y^4",
+                "(x^2 - 2*x*y + 2*y^2) * (x^2 + 2*x*y + 2*y^2)"
+            )
+        );
+
+        assertTrue(result.isPresent());
+        GeneralizedPattern pattern = result.get();
+        assertEquals("A^4 + 4*B^4", pattern.leftPattern());
+        assertTrue(pattern.rightPattern().equals("(A^2 + 2*A*B + 2*B^2)*(A^2 - 2*A*B + 2*B^2)")
+                || pattern.rightPattern().equals("(A^2 - 2*A*B + 2*B^2)*(A^2 + 2*A*B + 2*B^2)"),
+            pattern.rightPattern());
+        assertFalse(pattern.leftPattern().contains("v1"), pattern.leftPattern());
+        assertFalse(pattern.rightPattern().contains("v1"), pattern.rightPattern());
+        assertTrue(pattern.parameterRelations().contains("A \u2208 {x}"), pattern.parameterRelations().toString());
+        assertTrue(pattern.parameterRelations().contains("B \u2208 {y}"), pattern.parameterRelations().toString());
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────────

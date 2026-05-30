@@ -137,6 +137,7 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
     private Expr squareRootOfProduct(List<Expr> factors) {
         double coefficient = 1;
         List<Expr> symbolicFactors = new ArrayList<>();
+        Map<String, Expr> pendingUnpairedFactors = new LinkedHashMap<>();
         for (Expr factor : flattenMultiplication(buildProduct(factors))) {
             if (factor instanceof NumberExpr numberExpr) {
                 coefficient *= numberExpr.value();
@@ -144,12 +145,22 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
             }
             SquareRoot root = squareRoot(factor);
             if (root == null) {
-                return null;
+                String key = ExpressionFormatter.format(factor);
+                Expr pending = pendingUnpairedFactors.remove(key);
+                if (pending == null) {
+                    pendingUnpairedFactors.put(key, factor);
+                } else {
+                    symbolicFactors.add(pending);
+                }
+            } else {
+                symbolicFactors.add(root.root());
             }
-            symbolicFactors.add(root.root());
         }
         Double numericRoot = perfectSquareRoot(coefficient);
         if (numericRoot == null) {
+            return null;
+        }
+        if (!pendingUnpairedFactors.isEmpty()) {
             return null;
         }
         List<Expr> rootedFactors = new ArrayList<>();
@@ -158,6 +169,10 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
         }
         rootedFactors.addAll(symbolicFactors);
         return buildProduct(rootedFactors);
+    }
+
+    Expr squareRootOfProduct(Expr product) {
+        return squareRootOfProduct(flattenMultiplication(product));
     }
 
     private List<Expr> flattenMultiplication(Expr expression) {

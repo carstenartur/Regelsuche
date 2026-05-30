@@ -1,7 +1,16 @@
 package de.regelsuche.mining;
 
 import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
 import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
@@ -33,6 +42,8 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
     private final Map<String, List<TransformationStep>> atomicStepsByRuleId;
     private final boolean macroMovesEnabled;
     private final MacroApplicabilityGuard applicabilityGuard;
+    private final ExpressionParser expressionParser = new ExpressionParser();
+    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final Map<String, MacroMoveExpansion> expansionsByEdge = new HashMap<>();
     private final Map<String, MacroMoveStatistics> statisticsByRuleId = new HashMap<>();
 
@@ -128,6 +139,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(List.of(rewriteRule), Integer.MAX_VALUE, 80);
         MacroMoveStatistics before = statisticsByRuleId.getOrDefault(rule.id(), MacroMoveStatistics.empty());
         List<Transformation> transformations = macroEngine.transform(expression);
+        specialUnitStepTransformation(expression, rule).ifPresent(transformations::add);
         transformations = transformations.stream()
             .filter(transformation -> applicabilityGuard.allows(expression, rule, transformation))
             .toList();
@@ -150,6 +162,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
                 transformation.transformedExpression(),
                 atomicStepsByRuleId.getOrDefault(rule.id(), List.of()),
                 rule.supportingPathIds(),
+                rule.assumptions(),
                 Math.max(1.0, rule.supportingPathIds().isEmpty() ? 1.0 : rule.supportingPathIds().size()),
                 false,
                 stats
@@ -157,6 +170,94 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
             expansionsByEdge.put(edgeKey(expression, transformation.transformedExpression(), transformation.rule()), expansion);
         }
         return transformations;
+    }
+
+    private Optional<Transformation> specialUnitStepTransformation(String expression, ReusableRule rule) {
+        String compactPattern = rule.leftPattern().replace(" ", "");
+        if (!compactPattern.contains("A*(A+1)") && !compactPattern.contains("(A*(A+1))")) {
+            return Optional.empty();
+        }
+        Expr parsed;
+        try {
+            parsed = expressionParser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+        if (!(parsed instanceof BinaryExpr division)
+            || division.operator() != BinaryOperator.DIV
+            || !isOne(division.left())) {
+            return Optional.empty();
+        }
+        List<Expr> factors = flattenMultiplication(division.right());
+        if (factors.size() != 2) {
+            return Optional.empty();
+        }
+        Expr lower = factors.get(0);
+        Expr upper = factors.get(1);
+        if (!isUnitStepPair(lower, upper)) {
+            lower = factors.get(1);
+            upper = factors.get(0);
+            if (!isUnitStepPair(lower, upper)) {
+                return Optional.empty();
+            }
+        }
+        String transformed = "1 / (" + ExpressionFormatter.format(lower) + ") - 1 / (" + ExpressionFormatter.format(upper) + ")";
+        return Optional.of(new Transformation(
+            macroRuleId(rule),
+            transformed,
+            RewriteKind.NORMALIZE,
+            false,
+            -Math.max(1, (int) Math.round(Math.max(1.0, rule.averageImprovement()))),
+            true,
+            macroRuleId(rule) + ":" + transformed,
+            rule.assumptions()
+        ));
+    }
+
+    private List<Expr> flattenMultiplication(Expr expression) {
+        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL) {
+            return java.util.stream.Stream.concat(
+                flattenMultiplication(binary.left()).stream(),
+                flattenMultiplication(binary.right()).stream()
+            ).toList();
+        }
+        return List.of(expression);
+    }
+
+    private boolean isUnitStepPair(Expr lower, Expr upper) {
+        AdditiveOffset lowerOffset = additiveOffset(lower);
+        AdditiveOffset upperOffset = additiveOffset(upper);
+        return lowerOffset != null
+            && upperOffset != null
+            && same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())
+            && Double.compare(upperOffset.offset() - lowerOffset.offset(), 1.0) == 0;
+    }
+
+    private AdditiveOffset additiveOffset(Expr expression) {
+        if (expression instanceof NumberExpr number) {
+            return new AdditiveOffset(new NumberExpr(0), number.value());
+        }
+        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.ADD) {
+            if (binary.right() instanceof NumberExpr right) {
+                return new AdditiveOffset(binary.left(), right.value());
+            }
+            if (binary.left() instanceof NumberExpr left) {
+                return new AdditiveOffset(binary.right(), left.value());
+            }
+        }
+        return new AdditiveOffset(expression, 0.0);
+    }
+
+    private boolean isOne(Expr expression) {
+        return expression instanceof NumberExpr number && Double.compare(number.value(), 1.0) == 0;
+    }
+
+    private boolean same(Expr left, Expr right) {
+        return canonicalizer.stableHash(ExpressionFormatter.format(left))
+            .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));
+    }
+
+    private record AdditiveOffset(Expr symbolicPart, double offset) {
     }
 
     private String macroRuleId(ReusableRule rule) {
