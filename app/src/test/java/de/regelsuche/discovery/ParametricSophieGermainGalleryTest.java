@@ -71,7 +71,7 @@ class ParametricSophieGermainGalleryTest {
 
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report =
             new DeterministicDiscoveryExperimentRunner.DiscoveryReport(
-                List.of(discoveryRow(discoveryPath), macroReuseRow(reuseInput, reused.getFirst(), learned)),
+                List.of(discoveryRow(discoveryPath), macroReuseRow(reuseInput, reused.getFirst(), learned, discoveryPath.id())),
                 new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(2, 2, 2, 0, 0L, 0L),
                 0L
             );
@@ -99,7 +99,7 @@ class ParametricSophieGermainGalleryTest {
 
     private DeterministicDiscoveryExperimentRunner.SeedRunReport discoveryRow(SuccessfulTransformationPath path) {
         return new DeterministicDiscoveryExperimentRunner.SeedRunReport(
-            new SeedExpression("hidden-sophie-germain-parametric", path.sourceExpression(), "test", "hidden-structure",
+            new SeedExpression("hidden-sophie-germain-parametric", path.originalExpression(), "test", "hidden-structure",
                 List.of(), List.of()),
             true,
             "parametric Sophie-Germain path reached square-difference state and factored",
@@ -121,10 +121,11 @@ class ParametricSophieGermainGalleryTest {
     private DeterministicDiscoveryExperimentRunner.SeedRunReport macroReuseRow(
         String reuseInput,
         Transformation reused,
-        ReusableRule learned
+        ReusableRule learned,
+        String supportingPathId
     ) {
         return new DeterministicDiscoveryExperimentRunner.SeedRunReport(
-            new SeedExpression("sophie-germain-parametric-macro-reuse", reuseInput, "test", "hidden-structure",
+            new SeedExpression(supportingPathId, reuseInput, "test", "hidden-structure",
                 List.of(), List.of()),
             true,
             "parametric Sophie-Germain macro learned from replay evidence and reused",

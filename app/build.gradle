@@ -44,6 +44,8 @@ application {
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
+    systemProperty 'regelsuche.recordDocs',
+        providers.gradleProperty('regelsuche.recordDocs').getOrElse('false')
 }
 
 // ─── Coverage (JaCoCo) ────────────────────────────────────────────────
