@@ -4,6 +4,7 @@ import de.regelsuche.discovery.HypothesisOperatorRegistry;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.transform.PolynomialBridgeAstPredicate;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import de.regelsuche.validation.DiscoveryEvidenceKind;
 import de.regelsuche.validation.DiscoveryResultKind;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -22,6 +23,7 @@ import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
@@ -42,6 +44,7 @@ public final class DiscoveryReplayArtifactWriter {
             java.util.Optional.empty(),
             List.of("hypothesis_difference_of_squares_preparation", "ast_square_difference_factor"),
             DiscoveryResultKind.TRANSFORMED,
+            Set.of(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED, DiscoveryEvidenceKind.FACTORED),
             List.of(),
             row -> List.of(
                 "input: `" + row.seed().expression() + "`",
@@ -58,7 +61,8 @@ public final class DiscoveryReplayArtifactWriter {
             java.util.Optional.empty(),
             List.of(),
             DiscoveryResultKind.HYPOTHESIS_ONLY,
-            List.of(row -> hasMacroReuseEvidence(row)),
+            Set.of(DiscoveryEvidenceKind.MACRO_REUSED),
+            List.of(),
             row -> List.of(
                 "input discovery: `" + row.seed().expression() + "`",
                 "extracted/reused macro evidence: " + escapeMarkdownStatic(String.join(" -> ", row.rulePath())),
@@ -320,6 +324,7 @@ public final class DiscoveryReplayArtifactWriter {
             object.property("explanation", row.counterexampleExplanation());
             object.array("replayPath", replay -> row.replayPath().forEach(replay::value));
             object.array("rulePath", rules -> row.rulePath().forEach(rules::value));
+            object.array("evidence", evidence -> row.evidence().stream().map(Enum::name).sorted().forEach(evidence::value));
         })));
         writer.object("semanticGraph", semantic -> {
             semantic.property("renderer", semanticView.renderer());
@@ -831,11 +836,13 @@ public final class DiscoveryReplayArtifactWriter {
     }
 
     private boolean isMacroLearnedKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
-        return row.rulePath().stream().anyMatch(rule -> rule.contains("macro"));
+        return row.evidence().contains(DiscoveryEvidenceKind.MACRO_LEARNED)
+            || row.rulePath().stream().anyMatch(rule -> rule.contains("macro") && rule.contains("learn"));
     }
 
     private static boolean hasMacroReuseEvidence(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
-        return row.rulePath().stream().anyMatch(rule -> rule.contains("macro"));
+        return row.evidence().contains(DiscoveryEvidenceKind.MACRO_REUSED)
+            || row.rulePath().stream().anyMatch(rule -> rule.contains("macro"));
     }
 
     private String operatorLabel(List<String> rulePath) {

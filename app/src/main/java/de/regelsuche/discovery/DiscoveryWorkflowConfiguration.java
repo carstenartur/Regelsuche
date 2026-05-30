@@ -33,4 +33,11 @@ public record DiscoveryWorkflowConfiguration(
     public DiscoveryLearningOptions effectiveLearningOptions() {
         return macroLearningEnabled() ? options.learning() : DiscoveryLearningOptions.disabled();
     }
+
+    public DiscoveryOptions effectiveOptions() {
+        DiscoveryLearningOptions learning = effectiveLearningOptions();
+        return learning == options.learning()
+            ? options
+            : new DiscoveryOptions(options.profile(), options.engine(), learning, options.enableGeneratedGallery());
+    }
 }

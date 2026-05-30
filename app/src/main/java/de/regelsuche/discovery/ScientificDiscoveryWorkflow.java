@@ -37,6 +37,7 @@ import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import de.regelsuche.validation.DiscoveryEvidenceKind;
 import de.regelsuche.validation.DiscoveryResultKind;
 import java.io.PrintStream;
 import java.nio.file.Path;
@@ -45,6 +46,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /** App-level Seed → Discovery → Replay → Persistence workflow. */
@@ -71,7 +73,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         this.workflowConfiguration = workflowConfiguration == null
             ? DiscoveryWorkflowConfiguration.defaults()
             : workflowConfiguration;
-        this.hiddenStructureOptions = this.workflowConfiguration.options();
+        this.hiddenStructureOptions = this.workflowConfiguration.effectiveOptions();
         this.hypothesisOperatorRegistry = this.workflowConfiguration.operatorRegistry();
         this.hiddenStructureSearchEngine = new DiscoveryEngineFactory(hypothesisOperatorRegistry).create(
             new AstRewriteTransformationEngine(DemoRuleSet.rules()),
@@ -213,8 +215,28 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             resultKind,
             reportedState == null ? List.of() : reportedState.appliedRuleIds(),
             0L,
-            0L
+            0L,
+            hiddenStructureEvidence(reportedState, resultKind)
         );
+    }
+
+    private Set<DiscoveryEvidenceKind> hiddenStructureEvidence(SearchState reportedState, DiscoveryResultKind resultKind) {
+        if (reportedState == null) {
+            return Set.of();
+        }
+        java.util.EnumSet<DiscoveryEvidenceKind> evidence = java.util.EnumSet.noneOf(DiscoveryEvidenceKind.class);
+        if (resultKind == DiscoveryResultKind.TRANSFORMED) {
+            evidence.add(DiscoveryEvidenceKind.SIMPLIFIED);
+        }
+        if (reportedState.appliedRuleIds().contains("ast_square_difference_factor")
+            || FactoredProductAstPredicate.containsFactoredProduct(reportedState.expression())) {
+            evidence.add(DiscoveryEvidenceKind.FACTORED);
+        }
+        if (reportedState.appliedRuleIds().stream().anyMatch(this::isHiddenStructureHypothesisRule)
+            && resultKind != DiscoveryResultKind.NO_CANDIDATE) {
+            evidence.add(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED);
+        }
+        return evidence.isEmpty() ? Set.of() : Set.copyOf(evidence);
     }
 
     private DeterministicDiscoveryExperimentRunner.SeedRunOutcome geometricSeries(SeedExpression seed) {

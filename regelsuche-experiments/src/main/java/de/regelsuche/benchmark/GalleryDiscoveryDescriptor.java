@@ -1,8 +1,10 @@
 package de.regelsuche.benchmark;
 
+import de.regelsuche.validation.DiscoveryEvidenceKind;
 import de.regelsuche.validation.DiscoveryResultKind;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -13,6 +15,7 @@ public record GalleryDiscoveryDescriptor(
     Optional<Pattern> requiredInputPattern,
     List<String> requiredRuleIds,
     DiscoveryResultKind minimumResultKind,
+    Set<DiscoveryEvidenceKind> requiredEvidenceKinds,
     List<Function<DeterministicDiscoveryExperimentRunner.SeedRunReport, Boolean>> requiredPredicates,
     Function<DeterministicDiscoveryExperimentRunner.SeedRunReport, List<String>> renderMetadata
 ) {
@@ -23,6 +26,7 @@ public record GalleryDiscoveryDescriptor(
         requiredInputPattern = requiredInputPattern == null ? Optional.empty() : requiredInputPattern;
         requiredRuleIds = requiredRuleIds == null ? List.of() : List.copyOf(requiredRuleIds);
         minimumResultKind = minimumResultKind == null ? DiscoveryResultKind.NO_CANDIDATE : minimumResultKind;
+        requiredEvidenceKinds = requiredEvidenceKinds == null ? Set.of() : Set.copyOf(requiredEvidenceKinds);
         requiredPredicates = requiredPredicates == null ? List.of() : List.copyOf(requiredPredicates);
         renderMetadata = renderMetadata == null ? row -> List.of() : renderMetadata;
     }
@@ -31,13 +35,16 @@ public record GalleryDiscoveryDescriptor(
         if (row == null || row.replayPath().isEmpty()) {
             return false;
         }
-        if (requiredInputPattern.isPresent() && !requiredInputPattern.get().matcher(row.seed().expression()).matches()) {
-            return false;
-        }
         if (!row.rulePath().containsAll(requiredRuleIds)) {
             return false;
         }
         if (rank(row.resultKind()) < rank(minimumResultKind)) {
+            return false;
+        }
+        if (!row.evidence().containsAll(requiredEvidenceKinds)) {
+            return false;
+        }
+        if (requiredInputPattern.isPresent() && !requiredInputPattern.get().matcher(row.seed().expression()).matches()) {
             return false;
         }
         return requiredPredicates.stream().allMatch(predicate -> Boolean.TRUE.equals(predicate.apply(row)));
