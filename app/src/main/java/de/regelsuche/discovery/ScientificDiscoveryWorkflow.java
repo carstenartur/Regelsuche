@@ -198,6 +198,11 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             ? factoredState
             : squareDifferenceState != null ? squareDifferenceState : hypothesisState;
         DiscoveryResultKind resultKind = classifyHiddenStructure(hypothesisCandidates, hypothesisState, squareDifferenceState, factoredState);
+        boolean equivalent = reportedState != null
+            && polynomialEquivalence.arePolynomiallyEquivalent(root, reportedState.expression());
+        if (resultKind == DiscoveryResultKind.TRANSFORMED && !equivalent) {
+            resultKind = DiscoveryResultKind.FALSE_POSITIVE;
+        }
         if (factoredState != null) {
             String pathId = stablePathId(root, factoredState);
             context.graphStore().saveDiscoveredTransformation(toDiscovered(pathId, root, factoredState, before));
@@ -216,21 +221,28 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             reportedState == null ? List.of() : reportedState.appliedRuleIds(),
             0L,
             0L,
-            hiddenStructureEvidence(reportedState, resultKind)
+            hiddenStructureEvidence(reportedState, resultKind, equivalent)
         );
     }
 
-    private Set<DiscoveryEvidenceKind> hiddenStructureEvidence(SearchState reportedState, DiscoveryResultKind resultKind) {
+    private Set<DiscoveryEvidenceKind> hiddenStructureEvidence(
+        SearchState reportedState,
+        DiscoveryResultKind resultKind,
+        boolean equivalent
+    ) {
         if (reportedState == null) {
-            return Set.of();
+           return Set.of();
         }
         java.util.EnumSet<DiscoveryEvidenceKind> evidence = java.util.EnumSet.noneOf(DiscoveryEvidenceKind.class);
         if (resultKind == DiscoveryResultKind.TRANSFORMED) {
-            evidence.add(DiscoveryEvidenceKind.SIMPLIFIED);
+           evidence.add(DiscoveryEvidenceKind.SIMPLIFIED);
+        }
+        if (equivalent) {
+           evidence.add(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED);
         }
         if (reportedState.appliedRuleIds().contains("ast_square_difference_factor")
-            || FactoredProductAstPredicate.containsFactoredProduct(reportedState.expression())) {
-            evidence.add(DiscoveryEvidenceKind.FACTORED);
+           || FactoredProductAstPredicate.containsFactoredProduct(reportedState.expression())) {
+           evidence.add(DiscoveryEvidenceKind.FACTORED);
         }
         return evidence.isEmpty() ? Set.of() : Set.copyOf(evidence);
     }

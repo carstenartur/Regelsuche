@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.example.SeedExpression;
 import de.regelsuche.persistence.PersistenceConfig;
+import de.regelsuche.validation.DiscoveryEvidenceKind;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -36,12 +37,15 @@ class GalleryHiddenStructureWorkflowTest {
             );
 
             String markdown = Files.readString(run.artifacts().markdownReport());
+            var row = run.report().rows().getFirst();
             assertTrue(markdown.contains("Generated Discovery Gallery"));
             assertTrue(markdown.contains("Sophie-Germain discovery replay"));
             assertTrue(markdown.contains("hypothesis_difference_of_squares_preparation"));
             assertTrue(markdown.contains("ast_square_difference_factor"));
-            assertTrue(run.report().rows().getFirst().rulePath().contains("hypothesis_difference_of_squares_preparation"));
-            assertTrue(run.report().rows().getFirst().rulePath().contains("ast_square_difference_factor"));
+            assertTrue(row.evidence().contains(DiscoveryEvidenceKind.FACTORED));
+            assertTrue(row.evidence().contains(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED));
+            assertTrue(row.rulePath().contains("hypothesis_difference_of_squares_preparation"));
+            assertTrue(row.rulePath().contains("ast_square_difference_factor"));
         }
     }
 
