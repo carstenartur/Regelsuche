@@ -1,6 +1,7 @@
 package de.regelsuche.mining;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,11 +64,109 @@ public class PatternGeneralizer {
         ));
     }
 
+    public Optional<GeneralizedPattern> generalizeSingleExampleSchema(SuccessfulTransformationPath path) {
+        if (path == null) {
+            return Optional.empty();
+        }
+        NormalizedNode left = normalizer.normalize(path.originalExpression());
+        NormalizedNode right = normalizer.normalize(path.targetExpression());
+        Optional<NormalizedNode> placeholderSubtree = commonExpressionSubtrees(left, right).stream()
+            .max(Comparator
+                .comparingInt(this::nodeCount)
+                .thenComparing(NormalizedNode::canonicalString));
+        if (placeholderSubtree.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String placeholder = "A";
+        NormalizedNode generalizedLeft = replaceSubtree(left, placeholderSubtree.orElseThrow(), placeholder);
+        NormalizedNode generalizedRight = replaceSubtree(right, placeholderSubtree.orElseThrow(), placeholder);
+        if (!containsPlaceholder(generalizedLeft, placeholder) || !containsPlaceholder(generalizedRight, placeholder)) {
+            return Optional.empty();
+        }
+        String leftPattern = generalizedLeft.canonicalString();
+        String rightPattern = generalizedRight.canonicalString();
+        if (leftPattern.equals(left.canonicalString()) && rightPattern.equals(right.canonicalString())) {
+            return Optional.empty();
+        }
+        Map<String, List<String>> expressionValues = Map.of(
+            placeholder,
+            List.of(placeholderSubtree.orElseThrow().canonicalString())
+        );
+        return Optional.of(new GeneralizedPattern(
+            leftPattern,
+            rightPattern,
+            Map.of(),
+            List.of(placeholder + " \u2208 {" + placeholderSubtree.orElseThrow().canonicalString() + "}"),
+            expressionValues
+        ));
+    }
+
     private Optional<NormalizedNode> generalizeNodes(List<NormalizedNode> nodes, PlaceholderState state) {
         NormalizedNode first = nodes.getFirst();
         boolean allEqual = nodes.stream().allMatch(first::equals);
         if (allEqual) {
             return Optional.of(first);
+        }
+
+        private List<NormalizedNode> commonExpressionSubtrees(NormalizedNode left, NormalizedNode right) {
+            Map<String, NormalizedNode> leftSubtrees = new LinkedHashMap<>();
+            collectExpressionSubtrees(left, left, leftSubtrees);
+            Map<String, NormalizedNode> rightSubtrees = new LinkedHashMap<>();
+            collectExpressionSubtrees(right, right, rightSubtrees);
+            List<NormalizedNode> common = new ArrayList<>();
+            for (Map.Entry<String, NormalizedNode> entry : leftSubtrees.entrySet()) {
+                if (rightSubtrees.containsKey(entry.getKey())) {
+                    common.add(entry.getValue());
+                }
+            }
+            return common;
+        }
+
+        private void collectExpressionSubtrees(
+            NormalizedNode node,
+            NormalizedNode root,
+            Map<String, NormalizedNode> subtrees
+        ) {
+            if (node.kind() != NormalizedNode.Kind.NUMBER && node != root) {
+                subtrees.putIfAbsent(node.canonicalString(), node);
+            }
+            for (NormalizedNode child : node.children()) {
+                collectExpressionSubtrees(child, root, subtrees);
+            }
+        }
+
+        private NormalizedNode replaceSubtree(NormalizedNode node, NormalizedNode target, String placeholder) {
+            if (node.equals(target)) {
+                return NormalizedNode.placeholder(placeholder);
+            }
+            List<NormalizedNode> children = node.children().stream()
+                .map(child -> replaceSubtree(child, target, placeholder))
+                .toList();
+            return switch (node.kind()) {
+                case NUMBER -> NormalizedNode.number(node.number());
+                case VARIABLE -> NormalizedNode.variable(node.name());
+                case PLACEHOLDER -> NormalizedNode.placeholder(node.name());
+                case ADD -> NormalizedNode.add(children);
+                case MUL -> NormalizedNode.multiply(children);
+                case POW -> NormalizedNode.pow(children.get(0), children.get(1));
+                case FUNCTION -> NormalizedNode.function(node.name(), children);
+            };
+        }
+
+        private boolean containsPlaceholder(NormalizedNode node, String placeholder) {
+            if (node.kind() == NormalizedNode.Kind.PLACEHOLDER && placeholder.equals(node.name())) {
+                return true;
+            }
+            return node.children().stream().anyMatch(child -> containsPlaceholder(child, placeholder));
+        }
+
+        private int nodeCount(NormalizedNode node) {
+            int total = 1;
+            for (NormalizedNode child : node.children()) {
+                total += nodeCount(child);
+            }
+            return total;
         }
         boolean allNumbers = nodes.stream().allMatch(node -> node.kind() == NormalizedNode.Kind.NUMBER);
         if (allNumbers) {
