@@ -151,8 +151,8 @@ public class GoalAwareMacroMoveSelector {
 <span class="fc" id="L151">                namedStructuralOverlap(rule.leftPattern(), goalExpression)</span>
             );
 <span class="fc" id="L153">        boolean exposesNewApplicableRules = exposesNewApplicableRules(rule, currentExpression);</span>
-<span class="pc bpc" id="L154" title="4 of 8 branches missed.">        if (goalExpression != null &amp;&amp; !goalExpression.isBlank() &amp;&amp; namedGoalOverlap &lt;= 0 &amp;&amp; !exposesNewApplicableRules) {</span>
-<span class="nc" id="L155">            return 0.0;</span>
+<span class="pc bpc" id="L154" title="1 of 8 branches missed.">        if (goalExpression != null &amp;&amp; !goalExpression.isBlank() &amp;&amp; namedGoalOverlap &lt;= 0 &amp;&amp; !exposesNewApplicableRules) {</span>
+<span class="fc" id="L155">            return 0.0;</span>
         }
 <span class="fc bfc" id="L157" title="All 2 branches covered.">        double exposureBonus = exposesNewApplicableRules ? 1.0 : 0.0;</span>
 <span class="fc" id="L158">        return (rule.confidenceScore() * 10.0)</span>

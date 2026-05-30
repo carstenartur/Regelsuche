@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConvergentDiscoveryGallerySnippetWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.convergence</a> &gt; <span class="el_source">ConvergentDiscoveryGallerySnippetWriter.java</span></div><h1>ConvergentDiscoveryGallerySnippetWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.convergence;
+
+import java.util.stream.Collectors;
+
+/** Markdown snippet writer for generated convergent discovery gallery evidence. */
+<span class="nc" id="L6">public final class ConvergentDiscoveryGallerySnippetWriter {</span>
+    public String render(ConvergentDiscoveryReport report) {
+<span class="nc" id="L8">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L9">        out.append(&quot;### Convergent discovery: multiple paths to one result\n\n&quot;);</span>
+<span class="nc" id="L10">        out.append(&quot;- input: `&quot;).append(report.inputExpression()).append(&quot;`\n&quot;);</span>
+<span class="nc" id="L11">        out.append(&quot;- target: `&quot;).append(report.canonicalTargetExpression()).append(&quot;`\n&quot;);</span>
+<span class="nc" id="L12">        out.append(&quot;- number of distinct paths: &quot;).append(report.pathsToTarget().size()).append('\n');</span>
+<span class="nc" id="L13">        out.append(&quot;- path families: &quot;).append(report.ruleFamiliesUsed()).append('\n');</span>
+<span class="nc" id="L14">        report.convergentStates().stream().findFirst().ifPresent(state -&gt; {</span>
+<span class="nc" id="L15">            out.append(&quot;- shortest path: &quot;).append(state.shortestPathId()).append('\n');</span>
+<span class="nc" id="L16">            out.append(&quot;- most didactic path: &quot;).append(state.mostDidacticPathId()).append('\n');</span>
+<span class="nc" id="L17">            state.macroPathId().ifPresent(path -&gt; out.append(&quot;- macro shortcut path: &quot;).append(path).append('\n'));</span>
+<span class="nc" id="L18">        });</span>
+<span class="nc" id="L19">        out.append(&quot;- validation status: &quot;)</span>
+<span class="nc" id="L20">            .append(report.pathsToTarget().stream()</span>
+<span class="nc" id="L21">                .map(ConvergentPath::validationStatus)</span>
+<span class="nc" id="L22">                .distinct()</span>
+<span class="nc" id="L23">                .collect(Collectors.joining(&quot;, &quot;)))</span>
+<span class="nc" id="L24">            .append('\n');</span>
+<span class="nc" id="L25">        out.append(&quot;- source replay ids: &quot;)</span>
+<span class="nc" id="L26">            .append(report.pathsToTarget().stream()</span>
+<span class="nc" id="L27">                .flatMap(path -&gt; path.sourceReplayIds().stream())</span>
+<span class="nc" id="L28">                .distinct()</span>
+<span class="nc" id="L29">                .collect(Collectors.joining(&quot;, &quot;)))</span>
+<span class="nc" id="L30">            .append(&quot;\n\n&quot;);</span>
+<span class="nc" id="L31">        int index = 1;</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        for (ConvergentPath path : report.pathsToTarget()) {</span>
+<span class="nc" id="L33">            out.append(&quot;#### Path &quot;).append(index++).append(&quot;: &quot;).append(path.pathId()).append(&quot;\n\n&quot;);</span>
+<span class="nc" id="L34">            out.append(&quot;- rules: `&quot;).append(String.join(&quot; -&gt; &quot;, path.ruleIds())).append(&quot;`\n&quot;);</span>
+<span class="nc" id="L35">            out.append(&quot;- families: &quot;).append(path.ruleFamilies()).append('\n');</span>
+<span class="nc" id="L36">            out.append(&quot;- length: &quot;).append(path.length()).append('\n');</span>
+<span class="nc" id="L37">            out.append(&quot;- proofStatus: &quot;).append(path.proofStatus()).append(&quot;\n\n&quot;);</span>
+<span class="nc" id="L38">        }</span>
+<span class="nc" id="L39">        return out.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

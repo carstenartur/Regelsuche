@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QuadraticFactorizationHypothesisOperator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">QuadraticFactorizationHypothesisOperator.java</span></div><h1>QuadraticFactorizationHypothesisOperator.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/** Bounded integer-root factorization for monic quadratics such as {@code x^2 + 6*x + 5}. */
+<span class="fc" id="L17">public final class QuadraticFactorizationHypothesisOperator implements HypothesisOperator {</span>
+    public static final String RULE_ID = &quot;hypothesis_quadratic_factorization&quot;;
+
+<span class="fc" id="L20">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L21">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+
+    @Override
+    public List&lt;Transformation&gt; generateCandidates(String expression) {
+        Expr parsed;
+        try {
+<span class="fc" id="L27">            parsed = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="nc" id="L28">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L29">            return List.of();</span>
+<span class="fc" id="L30">        }</span>
+<span class="fc" id="L31">        Optional&lt;Quadratic&gt; quadratic = monicQuadratic(parsed);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (quadratic.isEmpty()) {</span>
+<span class="nc" id="L33">            return List.of();</span>
+        }
+<span class="fc" id="L35">        Quadratic q = quadratic.get();</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        for (int left = -Math.abs(q.constant()) - 1; left &lt;= Math.abs(q.constant()) + 1; left++) {</span>
+<span class="fc" id="L37">            int right = q.sum() - left;</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            if (left * right == q.constant()) {</span>
+<span class="fc" id="L39">                Expr factored = new BinaryExpr(</span>
+<span class="fc" id="L40">                    factor(q.variable(), left),</span>
+                    BinaryOperator.MUL,
+<span class="fc" id="L42">                    factor(q.variable(), right)</span>
+                );
+<span class="fc" id="L44">                String output = ExpressionFormatter.format(factored);</span>
+<span class="fc" id="L45">                String input = ExpressionFormatter.format(parsed);</span>
+<span class="fc" id="L46">                return List.of(new Transformation(</span>
+                    RULE_ID,
+                    output,
+                    RewriteKind.FACTOR,
+                    false,
+                    -4,
+                    true,
+<span class="fc" id="L53">                    RULE_ID + &quot;:&quot; + canonicalizer.stableHash(input) + &quot;-&gt;&quot; + canonicalizer.stableHash(output)</span>
+                ));
+            }
+        }
+<span class="nc" id="L57">        return List.of();</span>
+    }
+
+    private Optional&lt;Quadratic&gt; monicQuadratic(Expr expression) {
+<span class="fc" id="L61">        List&lt;Expr&gt; terms = flattenAddends(expression);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (terms.size() != 3) {</span>
+<span class="nc" id="L63">            return Optional.empty();</span>
+        }
+<span class="fc" id="L65">        Expr variable = null;</span>
+<span class="fc" id="L66">        Integer sum = null;</span>
+<span class="fc" id="L67">        Integer constant = null;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (Expr term : terms) {</span>
+<span class="fc" id="L69">            Expr square = squareBase(term);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (square != null) {</span>
+<span class="fc" id="L71">                variable = square;</span>
+<span class="fc" id="L72">                continue;</span>
+            }
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">            if (term instanceof NumberExpr number &amp;&amp; isInteger(number.value())) {</span>
+<span class="fc" id="L75">                constant = (int) number.value();</span>
+<span class="fc" id="L76">                continue;</span>
+            }
+<span class="fc" id="L78">        }</span>
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if (variable == null || constant == null) {</span>
+<span class="nc" id="L80">            return Optional.empty();</span>
+        }
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (Expr term : terms) {</span>
+<span class="fc bfc" id="L83" title="All 4 branches covered.">            if (squareBase(term) == null &amp;&amp; !(term instanceof NumberExpr)) {</span>
+<span class="fc" id="L84">                Integer coefficient = linearCoefficient(term, variable);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                if (coefficient != null) {</span>
+<span class="fc" id="L86">                    sum = coefficient;</span>
+                }
+            }
+<span class="fc" id="L89">        }</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        return sum == null ? Optional.empty() : Optional.of(new Quadratic(variable, sum, constant));</span>
+    }
+
+    private Expr factor(Expr variable, int constant) {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (constant == 0) {</span>
+<span class="nc" id="L95">            return variable;</span>
+        }
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        return constant &gt; 0</span>
+<span class="nc" id="L98">            ? new BinaryExpr(variable, BinaryOperator.ADD, new NumberExpr(constant))</span>
+<span class="fc" id="L99">            : new BinaryExpr(variable, BinaryOperator.SUB, new NumberExpr(-constant));</span>
+    }
+
+    private Expr squareBase(Expr expression) {
+<span class="fc" id="L103">        return expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            &amp;&amp; binary.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            &amp;&amp; binary.right() instanceof NumberExpr exponent</span>
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">            &amp;&amp; Double.compare(exponent.value(), 2.0) == 0</span>
+<span class="fc" id="L107">            ? binary.left()</span>
+<span class="fc" id="L108">            : null;</span>
+    }
+
+    private Integer linearCoefficient(Expr expression, Expr variable) {
+<span class="fc" id="L112">        List&lt;Expr&gt; factors = flattenFactors(expression);</span>
+<span class="fc" id="L113">        int coefficient = 1;</span>
+<span class="fc" id="L114">        int variableCount = 0;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (Expr factor : factors) {</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">            if (factor instanceof NumberExpr number &amp;&amp; isInteger(number.value())) {</span>
+<span class="fc" id="L117">                coefficient *= (int) number.value();</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            } else if (same(factor, variable)) {</span>
+<span class="fc" id="L119">                variableCount++;</span>
+            } else {
+<span class="nc" id="L121">                return null;</span>
+            }
+<span class="fc" id="L123">        }</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        return variableCount == 1 ? coefficient : null;</span>
+    }
+
+    private List&lt;Expr&gt; flattenAddends(Expr expression) {
+<span class="fc" id="L128">        List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L129">        collectAddends(expression, 1, result);</span>
+<span class="fc" id="L130">        return result;</span>
+    }
+
+    private void collectAddends(Expr expression, int sign, List&lt;Expr&gt; out) {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L136">                collectAddends(binary.left(), sign, out);</span>
+<span class="fc" id="L137">                collectAddends(binary.right(), sign, out);</span>
+<span class="fc" id="L138">                return;</span>
+            }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.SUB) {</span>
+<span class="fc" id="L141">                collectAddends(binary.left(), sign, out);</span>
+<span class="fc" id="L142">                collectAddends(binary.right(), -sign, out);</span>
+<span class="fc" id="L143">                return;</span>
+            }
+        }
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        out.add(sign &gt;= 0 ? expression : negate(expression));</span>
+<span class="fc" id="L147">    }</span>
+
+    private Expr negate(Expr expression) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
+<span class="nc" id="L151">            return new NumberExpr(-number.value());</span>
+        }
+<span class="fc" id="L153">        return new BinaryExpr(new NumberExpr(-1), BinaryOperator.MUL, expression);</span>
+    }
+
+    private List&lt;Expr&gt; flattenFactors(Expr expression) {
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L158">            List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L159">            result.addAll(flattenFactors(binary.left()));</span>
+<span class="fc" id="L160">            result.addAll(flattenFactors(binary.right()));</span>
+<span class="fc" id="L161">            return result;</span>
+        }
+<span class="fc" id="L163">        return List.of(expression);</span>
+    }
+
+    private boolean same(Expr left, Expr right) {
+<span class="fc" id="L167">        return canonicalizer.stableHash(ExpressionFormatter.format(left))</span>
+<span class="fc" id="L168">            .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));</span>
+    }
+
+    private boolean isInteger(double value) {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        return Math.rint(value) == value;</span>
+    }
+
+<span class="fc" id="L175">    private record Quadratic(Expr variable, int sum, int constant) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

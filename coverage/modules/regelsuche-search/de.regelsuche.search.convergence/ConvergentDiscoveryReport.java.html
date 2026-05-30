@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConvergentDiscoveryReport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.convergence</a> &gt; <span class="el_source">ConvergentDiscoveryReport.java</span></div><h1>ConvergentDiscoveryReport.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.convergence;
+
+import java.util.List;
+import java.util.Set;
+
+public record ConvergentDiscoveryReport(
+    String inputExpression,
+    String canonicalTargetExpression,
+    List&lt;ConvergentState&gt; convergentStates,
+    List&lt;ConvergentPath&gt; pathsToTarget,
+    List&lt;ConvergentState&gt; sharedIntermediateStates,
+    List&lt;ConvergentPath&gt; interestingAlternativePaths,
+    Set&lt;RuleFamily&gt; ruleFamiliesUsed,
+    Set&lt;String&gt; evidenceKinds
+) {
+<span class="fc" id="L16">    public ConvergentDiscoveryReport {</span>
+<span class="fc" id="L17">        convergentStates = List.copyOf(convergentStates);</span>
+<span class="fc" id="L18">        pathsToTarget = List.copyOf(pathsToTarget);</span>
+<span class="fc" id="L19">        sharedIntermediateStates = List.copyOf(sharedIntermediateStates);</span>
+<span class="fc" id="L20">        interestingAlternativePaths = List.copyOf(interestingAlternativePaths);</span>
+<span class="fc" id="L21">        ruleFamiliesUsed = Set.copyOf(ruleFamiliesUsed);</span>
+<span class="fc" id="L22">        evidenceKinds = Set.copyOf(evidenceKinds);</span>
+<span class="fc" id="L23">    }</span>
+
+    public boolean isGalleryEligible() {
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        return pathsToTarget.size() &gt;= 2 &amp;&amp; ruleFamiliesUsed.stream()</span>
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">            .filter(family -&gt; family != RuleFamily.NORMALIZATION &amp;&amp; family != RuleFamily.OTHER)</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">            .count() &gt;= 2;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConvergentDiscoveryAnalysis.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.convergence</a> &gt; <span class="el_source">ConvergentDiscoveryAnalysis.java</span></div><h1>ConvergentDiscoveryAnalysis.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.convergence;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Finds canonical states reached by genuinely different rule-family paths. */
+public final class ConvergentDiscoveryAnalysis {
+    private final RuleFamilyClassifier classifier;
+
+    public ConvergentDiscoveryAnalysis() {
+<span class="fc" id="L21">        this(new RuleFamilyClassifier());</span>
+<span class="fc" id="L22">    }</span>
+
+<span class="fc" id="L24">    public ConvergentDiscoveryAnalysis(RuleFamilyClassifier classifier) {</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        this.classifier = classifier == null ? new RuleFamilyClassifier() : classifier;</span>
+<span class="fc" id="L26">    }</span>
+
+    public ConvergentDiscoveryReport analyze(SearchProblem problem, Collection&lt;SearchState&gt; states) {
+<span class="nc" id="L29">        return analyze(</span>
+<span class="nc" id="L30">            problem.rootExpression(),</span>
+            states,
+<span class="nc" id="L32">            problem.canonicalizer(),</span>
+<span class="nc" id="L33">            problem.scorer()</span>
+        );
+    }
+
+    public ConvergentDiscoveryReport analyze(
+        String inputExpression,
+        Collection&lt;SearchState&gt; states,
+        ExpressionCanonicalizer canonicalizer,
+        ExpressionScorer scorer
+    ) {
+<span class="fc" id="L43">        Map&lt;String, List&lt;ConvergentPath&gt;&gt; byFinalHash = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">        for (SearchState state : states == null ? List.&lt;SearchState&gt;of() : states) {</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">            if (state.depth() == 0 || state.appliedRuleIds().isEmpty()) {</span>
+<span class="nc" id="L46">                continue;</span>
+            }
+<span class="fc" id="L48">            ConvergentPath path = toPath(inputExpression, state, scorer);</span>
+<span class="fc" id="L49">            byFinalHash.computeIfAbsent(state.canonicalHash(), ignored -&gt; new ArrayList&lt;&gt;()).add(path);</span>
+<span class="fc" id="L50">        }</span>
+
+<span class="fc" id="L52">        List&lt;ConvergentState&gt; convergentStates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;ConvergentPath&gt;&gt; entry : byFinalHash.entrySet()) {</span>
+<span class="fc" id="L54">            List&lt;ConvergentPath&gt; distinct = distinctInterestingPaths(entry.getValue());</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            if (distinct.size() &lt; 2) {</span>
+<span class="fc" id="L56">                continue;</span>
+            }
+<span class="fc" id="L58">            Set&lt;RuleFamily&gt; families = nonNormalizationFamilies(distinct);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (families.size() &lt; 2) {</span>
+<span class="nc" id="L60">                continue;</span>
+            }
+<span class="fc" id="L62">            convergentStates.add(toState(entry.getKey(), distinct));</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">        convergentStates.sort(Comparator</span>
+<span class="pc" id="L65">            .comparingInt((ConvergentState state) -&gt; -familyPriority(state.incomingPaths()))</span>
+<span class="pc" id="L66">            .thenComparingInt(state -&gt; -bestLength(state.incomingPaths()))</span>
+<span class="pc" id="L67">            .thenComparingInt(state -&gt; bestScore(state.incomingPaths()))</span>
+<span class="fc" id="L68">            .thenComparing(ConvergentState::canonicalHash));</span>
+
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        ConvergentState target = convergentStates.isEmpty() ? null : convergentStates.getFirst();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        List&lt;ConvergentPath&gt; pathsToTarget = target == null ? List.of() : target.incomingPaths();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        List&lt;ConvergentState&gt; sharedIntermediateStates = target == null</span>
+<span class="fc" id="L73">            ? List.of()</span>
+<span class="fc" id="L74">            : sharedIntermediateStates(inputExpression, pathsToTarget, canonicalizer);</span>
+<span class="fc" id="L75">        Set&lt;RuleFamily&gt; families = nonNormalizationFamilies(pathsToTarget);</span>
+<span class="fc" id="L76">        Set&lt;String&gt; evidenceKinds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (!pathsToTarget.isEmpty()) {</span>
+<span class="fc" id="L78">            evidenceKinds.add(&quot;SEARCH_GRAPH&quot;);</span>
+<span class="fc" id="L79">            evidenceKinds.add(&quot;CANONICAL_CONVERGENCE&quot;);</span>
+        }
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (pathsToTarget.stream().anyMatch(ConvergentPath::containsHypothesisStep)) {</span>
+<span class="fc" id="L82">            evidenceKinds.add(&quot;HYPOTHESIS_PATH&quot;);</span>
+        }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (pathsToTarget.stream().anyMatch(ConvergentPath::containsMacroStep)) {</span>
+<span class="fc" id="L85">            evidenceKinds.add(&quot;MACRO_REUSE&quot;);</span>
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        String targetExpression = target == null ? &quot;&quot; : canonicalizer.canonicalize(target.expression());</span>
+<span class="fc" id="L88">        return new ConvergentDiscoveryReport(</span>
+            inputExpression,
+            targetExpression,
+            convergentStates,
+            pathsToTarget,
+            sharedIntermediateStates,
+<span class="fc" id="L94">            interestingAlternatives(pathsToTarget),</span>
+            families,
+            evidenceKinds
+        );
+    }
+
+    private ConvergentPath toPath(String inputExpression, SearchState state, ExpressionScorer scorer) {
+<span class="fc" id="L101">        List&lt;String&gt; rules = state.appliedRuleIds();</span>
+<span class="fc" id="L102">        List&lt;RuleFamily&gt; families = rules.stream().map(classifier::classify).toList();</span>
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">        boolean hypothesis = rules.stream().anyMatch(rule -&gt; rule != null &amp;&amp; rule.startsWith(&quot;hypothesis_&quot;));</span>
+<span class="fc" id="L104">        boolean macro = families.contains(RuleFamily.LEARNED_MACRO);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        boolean validated = state.equivalencePreservingFlags().isEmpty()</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            || state.equivalencePreservingFlags().stream().allMatch(Boolean::booleanValue);</span>
+<span class="fc" id="L107">        return new ConvergentPath(</span>
+<span class="fc" id="L108">            &quot;path-&quot; + Integer.toHexString(String.join(&quot;\u0001&quot;, state.path()) .hashCode())</span>
+<span class="fc" id="L109">                + &quot;-&quot; + Integer.toHexString(String.join(&quot;\u0001&quot;, rules).hashCode()),</span>
+<span class="fc" id="L110">            state.path(),</span>
+            rules,
+            families,
+<span class="fc" id="L113">            state.expression(),</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            state.score() == null ? scorer.score(state.expression()) : state.score(),</span>
+<span class="fc" id="L115">            Math.max(0, state.path().size() - 1),</span>
+            hypothesis,
+            macro,
+            macro,
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            validated ? &quot;EQUIVALENCE_PRESERVING&quot; : &quot;MIXED&quot;,</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            validated ? &quot;VALIDATED_BY_CONSTRUCTION&quot; : &quot;REQUIRES_VALIDATION&quot;,</span>
+<span class="fc" id="L121">            List.of()</span>
+        );
+    }
+
+    private List&lt;ConvergentPath&gt; distinctInterestingPaths(List&lt;ConvergentPath&gt; candidates) {
+<span class="fc" id="L126">        Map&lt;String, ConvergentPath&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (ConvergentPath path : candidates.stream()</span>
+<span class="fc" id="L128">            .sorted(Comparator.comparingInt(ConvergentPath::length).thenComparing(ConvergentPath::pathId))</span>
+<span class="fc" id="L129">            .toList()) {</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (hasRepeatedExpression(path)) {</span>
+<span class="fc" id="L131">                continue;</span>
+            }
+<span class="fc" id="L133">            String signature = semanticSignature(path);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (signature.isBlank()) {</span>
+<span class="nc" id="L135">                continue;</span>
+            }
+<span class="fc" id="L137">            distinct.putIfAbsent(signature, path);</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        return List.copyOf(distinct.values());</span>
+    }
+
+    private boolean hasRepeatedExpression(ConvergentPath path) {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        return new LinkedHashSet&lt;&gt;(path.expressions()).size() != path.expressions().size();</span>
+    }
+
+    private String semanticSignature(ConvergentPath path) {
+<span class="fc" id="L147">        List&lt;String&gt; nonNormalizationRules = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L148">        List&lt;RuleFamily&gt; nonNormalizationFamilies = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (int i = 0; i &lt; path.ruleIds().size(); i++) {</span>
+<span class="fc" id="L150">            RuleFamily family = path.ruleFamilies().get(i);</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (family == RuleFamily.NORMALIZATION) {</span>
+<span class="nc" id="L152">                continue;</span>
+            }
+<span class="fc" id="L154">            nonNormalizationRules.add(path.ruleIds().get(i));</span>
+<span class="fc" id="L155">            nonNormalizationFamilies.add(family);</span>
+        }
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">        if (nonNormalizationFamilies.stream().allMatch(family -&gt; family == RuleFamily.OTHER)) {</span>
+<span class="nc" id="L158">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L160">        return String.join(&quot;&gt;&quot;, nonNormalizationRules) + &quot;|&quot; + nonNormalizationFamilies;</span>
+    }
+
+    private Set&lt;RuleFamily&gt; nonNormalizationFamilies(Collection&lt;ConvergentPath&gt; paths) {
+<span class="fc" id="L164">        Set&lt;RuleFamily&gt; families = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (ConvergentPath path : paths) {</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            for (RuleFamily family : path.ruleFamilies()) {</span>
+<span class="pc bpc" id="L167" title="2 of 4 branches missed.">                if (family != RuleFamily.NORMALIZATION &amp;&amp; family != RuleFamily.OTHER) {</span>
+<span class="fc" id="L168">                    families.add(family);</span>
+                }
+<span class="fc" id="L170">            }</span>
+<span class="fc" id="L171">        }</span>
+<span class="fc" id="L172">        return families;</span>
+    }
+
+    private ConvergentState toState(String canonicalHash, List&lt;ConvergentPath&gt; paths) {
+<span class="fc" id="L176">        ConvergentPath shortest = paths.stream()</span>
+<span class="fc" id="L177">            .min(Comparator.comparingInt(ConvergentPath::length).thenComparing(ConvergentPath::pathId))</span>
+<span class="fc" id="L178">            .orElseThrow();</span>
+<span class="fc" id="L179">        ConvergentPath didactic = paths.stream()</span>
+<span class="fc" id="L180">            .max(Comparator.comparingInt(this::didacticScore).thenComparing(ConvergentPath::pathId))</span>
+<span class="fc" id="L181">            .orElse(shortest);</span>
+<span class="fc" id="L182">        ConvergentPath representative = paths.stream()</span>
+<span class="fc" id="L183">            .min(Comparator.comparingInt(path -&gt; path.score().weightedTotal()))</span>
+<span class="fc" id="L184">            .orElse(shortest);</span>
+<span class="fc" id="L185">        return new ConvergentState(</span>
+<span class="fc" id="L186">            representative.finalExpression(),</span>
+            canonicalHash,
+            paths,
+<span class="fc" id="L189">            shortest.pathId(),</span>
+<span class="fc" id="L190">            didactic.pathId(),</span>
+<span class="fc" id="L191">            paths.stream().filter(ConvergentPath::containsMacroStep).map(ConvergentPath::pathId).findFirst()</span>
+        );
+    }
+
+    private int didacticScore(ConvergentPath path) {
+<span class="fc" id="L196">        int score = new LinkedHashSet&lt;&gt;(path.ruleFamilies()).size();</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (path.ruleFamilies().contains(RuleFamily.HIDDEN_STRUCTURE)) {</span>
+<span class="fc" id="L198">            score += 4;</span>
+        }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (path.ruleFamilies().contains(RuleFamily.COMPLETE_SQUARE)) {</span>
+<span class="fc" id="L201">            score += 3;</span>
+        }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (path.containsMacroStep()) {</span>
+<span class="fc" id="L204">            score += 2;</span>
+        }
+<span class="fc" id="L206">        return score;</span>
+    }
+
+    private int bestLength(List&lt;ConvergentPath&gt; paths) {
+<span class="nc" id="L210">        return paths.stream().mapToInt(ConvergentPath::length).min().orElse(Integer.MAX_VALUE);</span>
+    }
+
+    private int bestScore(List&lt;ConvergentPath&gt; paths) {
+<span class="nc" id="L214">        return paths.stream().mapToInt(path -&gt; path.score().weightedTotal()).min().orElse(Integer.MAX_VALUE);</span>
+    }
+
+    private int familyPriority(List&lt;ConvergentPath&gt; paths) {
+<span class="nc" id="L218">        Set&lt;RuleFamily&gt; families = nonNormalizationFamilies(paths);</span>
+<span class="nc" id="L219">        int priority = families.size();</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (families.contains(RuleFamily.LEARNED_MACRO)) {</span>
+<span class="nc" id="L221">            priority += 8;</span>
+        }
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (families.contains(RuleFamily.COMPLETE_SQUARE)) {</span>
+<span class="nc" id="L224">            priority += 6;</span>
+        }
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (families.contains(RuleFamily.HIDDEN_STRUCTURE)) {</span>
+<span class="nc" id="L227">            priority += 5;</span>
+        }
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (families.contains(RuleFamily.FACTORIZATION)) {</span>
+<span class="nc" id="L230">            priority += 3;</span>
+        }
+<span class="nc" id="L232">        return priority;</span>
+    }
+
+    private List&lt;ConvergentPath&gt; interestingAlternatives(List&lt;ConvergentPath&gt; paths) {
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (paths.size() &lt;= 1) {</span>
+<span class="fc" id="L237">            return List.of();</span>
+        }
+<span class="fc" id="L239">        String shortest = paths.stream()</span>
+<span class="fc" id="L240">            .min(Comparator.comparingInt(ConvergentPath::length).thenComparing(ConvergentPath::pathId))</span>
+<span class="fc" id="L241">            .map(ConvergentPath::pathId)</span>
+<span class="fc" id="L242">            .orElse(&quot;&quot;);</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        return paths.stream().filter(path -&gt; !path.pathId().equals(shortest)).toList();</span>
+    }
+
+    private List&lt;ConvergentState&gt; sharedIntermediateStates(
+        String inputExpression,
+        List&lt;ConvergentPath&gt; paths,
+        ExpressionCanonicalizer canonicalizer
+    ) {
+<span class="fc" id="L251">        String inputHash = canonicalizer.stableHash(inputExpression);</span>
+<span class="fc" id="L252">        Set&lt;String&gt; finalHashes = paths.stream()</span>
+<span class="fc" id="L253">            .map(ConvergentPath::finalExpression)</span>
+<span class="fc" id="L254">            .map(canonicalizer::stableHash)</span>
+<span class="fc" id="L255">            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L256">        Set&lt;String&gt; finalExpressions = paths.stream()</span>
+<span class="fc" id="L257">            .map(ConvergentPath::finalExpression)</span>
+<span class="fc" id="L258">            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L259">        Map&lt;String, List&lt;ConvergentPath&gt;&gt; incoming = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L260">        Map&lt;String, String&gt; expressionByHash = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        for (ConvergentPath path : paths) {</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            for (int i = 1; i &lt; path.expressions().size() - 1; i++) {</span>
+<span class="fc" id="L263">                String expression = path.expressions().get(i);</span>
+<span class="fc" id="L264">                String hash = canonicalizer.stableHash(expression);</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                if (hash.equals(inputHash)</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                    || finalHashes.contains(hash)</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                    || finalExpressions.contains(expression)</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                    || path.finalExpression().equals(expression)) {</span>
+<span class="nc" id="L269">                    continue;</span>
+                }
+<span class="fc" id="L271">                expressionByHash.putIfAbsent(hash, expression);</span>
+<span class="fc" id="L272">                incoming.computeIfAbsent(hash, ignored -&gt; new ArrayList&lt;&gt;()).add(path);</span>
+            }
+<span class="fc" id="L274">        }</span>
+<span class="fc" id="L275">        List&lt;ConvergentState&gt; shared = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;ConvergentPath&gt;&gt; entry : incoming.entrySet()) {</span>
+<span class="fc" id="L277">            List&lt;ConvergentPath&gt; incomingPaths = entry.getValue();</span>
+<span class="fc" id="L278">            Set&lt;String&gt; pathIds = incomingPaths.stream()</span>
+<span class="fc" id="L279">                .map(ConvergentPath::pathId)</span>
+<span class="fc" id="L280">                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            if (pathIds.size() &gt;= 2) {</span>
+<span class="fc" id="L282">                shared.add(toState(entry.getKey(), expressionByHash.get(entry.getKey()),</span>
+<span class="fc" id="L283">                    incomingPaths.stream().distinct().toList()));</span>
+            }
+<span class="fc" id="L285">        }</span>
+<span class="pc" id="L286">        shared.sort(Comparator.comparingInt((ConvergentState state) -&gt; firstDepth(state.expression(), paths))</span>
+<span class="fc" id="L287">            .thenComparing(ConvergentState::canonicalHash));</span>
+<span class="fc" id="L288">        return shared;</span>
+    }
+
+    private int firstDepth(String expression, List&lt;ConvergentPath&gt; paths) {
+<span class="nc" id="L292">        int best = Integer.MAX_VALUE;</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        for (ConvergentPath path : paths) {</span>
+<span class="nc" id="L294">            int index = path.expressions().indexOf(expression);</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            if (index &gt;= 0) {</span>
+<span class="nc" id="L296">                best = Math.min(best, index);</span>
+            }
+<span class="nc" id="L298">        }</span>
+<span class="nc" id="L299">        return best;</span>
+    }
+
+    private ConvergentState toState(String canonicalHash, String expression, List&lt;ConvergentPath&gt; paths) {
+<span class="fc" id="L303">        ConvergentState state = toState(canonicalHash, paths);</span>
+<span class="fc" id="L304">        return new ConvergentState(</span>
+            expression,
+<span class="fc" id="L306">            state.canonicalHash(),</span>
+<span class="fc" id="L307">            state.incomingPaths(),</span>
+<span class="fc" id="L308">            state.shortestPathId(),</span>
+<span class="fc" id="L309">            state.mostDidacticPathId(),</span>
+<span class="fc" id="L310">            state.macroPathId()</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

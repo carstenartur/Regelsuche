@@ -1344,8 +1344,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1344">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1345">            .findFirst();</span>
 <span class="fc bfc" id="L1346" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="fc" id="L1347">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="fc" id="L1348">            return;</span>
+<span class="nc" id="L1347">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1348">            return;</span>
         }
 <span class="fc" id="L1350">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
 <span class="fc" id="L1351">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>
@@ -2175,8 +2175,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2176">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2177" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="fc" id="L2178">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="fc" id="L2179">            return;</span>
+<span class="nc" id="L2178">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="nc" id="L2179">            return;</span>
         }
 <span class="fc" id="L2181">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
 <span class="fc" id="L2182">        Object raw = body.get(&quot;assumptions&quot;);</span>
