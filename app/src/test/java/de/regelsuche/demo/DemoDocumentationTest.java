@@ -171,11 +171,24 @@ class DemoDocumentationTest {
             "README milestone must show the convergent graph, not the old single-path screenshot");
 
         String image = Files.readString(imagePath, StandardCharsets.UTF_8);
+        String mermaid = Files.readString(mermaidPath, StandardCharsets.UTF_8);
         assertTrue(image.contains("x^4 + 4*y^4"), "image must visibly show the Sophie-Germain input");
-        assertTrue(image.contains("hidden structure"), "image must visibly show the hidden-structure path");
-        assertTrue(image.contains("square difference"), "image must visibly show the square-difference bridge");
-        assertTrue(image.contains("learned macro shortcut"), "image must visibly show the learned macro shortcut");
-        assertTrue(image.contains("same target node"), "image must visibly show the converged target node");
+        assertTrue(image.contains("data-source=\"convergent-sophie-germain.mmd\""),
+            "image must declare its generated Mermaid source");
+        assertTrue(image.contains("data-generated-by=\"ConvergentDiscoveryMermaidWriter\""),
+            "image must carry generated provenance");
+        assertTrue(image.contains("HIDDEN_STRUCTURE"),
+            "image must show the hidden-structure path from generated report data");
+        assertTrue(image.contains("ast_square_difference_factor"),
+            "image must show the square-difference bridge from generated report data");
+        assertTrue(image.contains("LEARNED_MACRO"),
+            "image must show the learned macro path from generated report data");
+        assertTrue(mermaidLabels(mermaid).stream().allMatch(label -> image.contains(escapeXml(label))),
+            "image content must correspond to generated Mermaid nodes and labels");
+        assertTrue(!image.contains("path 1: hidden structure")
+                && !image.contains("path 2: learned macro shortcut")
+                && !image.contains("same target node"),
+            "image must not contain manual-only SVG nodes");
         assertTrue(!image.contains("parametric-sophie-germain-discovery.png"),
             "convergent image must not be the old parametric single-path screenshot");
     }
@@ -316,5 +329,26 @@ class DemoDocumentationTest {
             || mermaid.contains("convergent-sophie-germain")
             || (mermaid.contains("hypothesis_difference_of_squares_preparation")
                 && mermaid.contains("x^4 + 4*y^4"));
+    }
+
+    private static Set<String> mermaidLabels(String mermaid) {
+        Set<String> labels = new HashSet<>();
+        Matcher nodeMatcher = Pattern.compile("\\[\"([^\"]+)\"\\]").matcher(mermaid);
+        while (nodeMatcher.find()) {
+            labels.add(nodeMatcher.group(1));
+        }
+        Matcher edgeMatcher = Pattern.compile("\\|([^|]+)\\|").matcher(mermaid);
+        while (edgeMatcher.find()) {
+            labels.add(edgeMatcher.group(1));
+        }
+        return labels;
+    }
+
+    private static String escapeXml(String value) {
+        return (value == null ? "" : value)
+            .replace("&", "&amp;")
+            .replace("\"", "&quot;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;");
     }
 }
