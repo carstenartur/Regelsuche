@@ -15,6 +15,7 @@ import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.SquareDifferenceAstPredicate;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.io.IOException;
@@ -108,7 +109,7 @@ class HiddenStructureDiscoveryExperimentTest {
     }
 
     private boolean isSquareDifferenceState(String expression) {
-        return expression.contains("^ 2 -");
+        return SquareDifferenceAstPredicate.containsSquareDifference(expression);
     }
 
     private String summary(SearchState hypothesisState, SearchState squareDifferenceState, SearchState factoredState) {

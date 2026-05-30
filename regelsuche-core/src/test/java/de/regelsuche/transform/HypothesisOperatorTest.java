@@ -19,7 +19,7 @@ class HypothesisOperatorTest {
             DifferenceOfSquaresPreparationOperator.RULE_ID.equals(candidate.rule())));
         assertTrue(candidates.stream().allMatch(Transformation::equivalencePreservingByConstruction));
         assertTrue(candidates.stream().anyMatch(candidate ->
-            candidate.transformedExpression().contains("^ 2 -")
+            SquareDifferenceAstPredicate.containsSquareDifference(candidate.transformedExpression())
                 && candidate.transformedExpression().contains("2 * x")));
     }
 

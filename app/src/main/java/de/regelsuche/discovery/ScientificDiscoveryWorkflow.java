@@ -30,6 +30,7 @@ import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.SquareDifferenceAstPredicate;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.SymPyTransformationEngine;
 import de.regelsuche.transform.Transformation;
@@ -266,7 +267,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     }
 
     private boolean isSquareDifferenceState(String expression) {
-        return expression.contains("^ 2 -");
+        return SquareDifferenceAstPredicate.containsSquareDifference(expression);
     }
 
     private String hiddenStructureSummary(SearchState hypothesisState, SearchState squareDifferenceState, SearchState factoredState) {
