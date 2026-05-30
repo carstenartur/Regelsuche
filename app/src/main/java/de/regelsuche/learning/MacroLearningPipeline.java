@@ -92,7 +92,7 @@ public class MacroLearningPipeline {
                     stages.add("extract source/target pairs: " + path.id());
                     stages.add("generalize schema: " + pattern.leftPattern() + " -> " + pattern.rightPattern());
                     stages.add("mine parameter relations: " + pattern.parameterRelations());
-                    List<MacroValidationExample> examples = validateGeneratedSchema(pattern);
+                    List<MacroValidationExample> examples = validateGeneratedSchema(pattern, stages);
                     validationExamples.addAll(examples);
                     boolean generatedValid = !examples.isEmpty() && examples.stream().allMatch(MacroValidationExample::equivalent);
                     boolean symbolic = equivalenceService.areEquivalent(pattern.leftPattern(), pattern.rightPattern());
@@ -122,15 +122,26 @@ public class MacroLearningPipeline {
         return new MacroLearningResult(touched, promoted, validationExamples, counterexampleResults, stages);
     }
 
-    private List<MacroValidationExample> validateGeneratedSchema(GeneralizedPattern pattern) {
+    private List<MacroValidationExample> validateGeneratedSchema(GeneralizedPattern pattern, List<String> stages) {
         RulePatternNode leftPattern = patternParser.parse(pattern.leftPattern());
         RulePatternNode rightPattern = patternParser.parse(pattern.rightPattern());
+        Set<String> detectedPlaceholders = new LinkedHashSet<>(placeholders(pattern.leftPattern()));
+        detectedPlaceholders.addAll(placeholders(pattern.rightPattern()));
+        if (detectedPlaceholders.size() > 1) {
+            stages.add("multi-placeholder validation not supported yet: " + detectedPlaceholders);
+            return List.of();
+        }
+        if (detectedPlaceholders.isEmpty()) {
+            stages.add("reject: generated schema has no placeholders");
+            return List.of();
+        }
+        String placeholder = detectedPlaceholders.iterator().next();
         List<MacroValidationExample> examples = new ArrayList<>();
         for (String sample : GENERATED_SUBSTITUTIONS) {
             Expr sampleExpression = expressionParser.parseTerm(sample);
-            String left = ExpressionFormatter.format(instantiator.instantiate(leftPattern, Map.of("A", sampleExpression)));
-            String right = ExpressionFormatter.format(instantiator.instantiate(rightPattern, Map.of("A", sampleExpression)));
-            examples.add(new MacroValidationExample("A = " + sample, left, right, equivalenceService.areEquivalent(left, right)));
+            String left = ExpressionFormatter.format(instantiator.instantiate(leftPattern, Map.of(placeholder, sampleExpression)));
+            String right = ExpressionFormatter.format(instantiator.instantiate(rightPattern, Map.of(placeholder, sampleExpression)));
+            examples.add(new MacroValidationExample(placeholder + " = " + sample, left, right, equivalenceService.areEquivalent(left, right)));
         }
         return examples;
     }
