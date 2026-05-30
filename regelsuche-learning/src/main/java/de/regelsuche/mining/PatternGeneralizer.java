@@ -135,8 +135,8 @@ public class PatternGeneralizer {
         Expr placeholder = new VariableExpr("A");
         Expr generalizedLeft = replaceVariable(left, variable, placeholder);
         Expr generalizedRight = replaceVariable(right, variable, placeholder);
-        String leftPattern = ExpressionFormatter.format(generalizedLeft);
-        String rightPattern = ExpressionFormatter.format(generalizedRight);
+        String leftPattern = compactPower(ExpressionFormatter.format(generalizedLeft));
+        String rightPattern = compactPower(ExpressionFormatter.format(generalizedRight));
         if (leftPattern.equals(path.originalExpression()) && rightPattern.equals(path.targetExpression())) {
             return Optional.empty();
         }
@@ -147,6 +147,10 @@ public class PatternGeneralizer {
             List.of("A \u2208 {" + variable + "}"),
             Map.of("A", List.of(variable))
         ));
+    }
+
+    private String compactPower(String expression) {
+        return expression.replace(" ^ ", "^");
     }
 
     private void collectVariables(Expr expression, Set<String> variables) {
