@@ -149,6 +149,38 @@ class DemoDocumentationTest {
     }
 
     @Test
+    void convergentSophieGermainVisibleImageIsDocumented() throws IOException {
+        String imageName = "convergent-sophie-germain.svg";
+        Path readmePath = REPO_ROOT.resolve("README.md");
+        Path galleryPath = REPO_ROOT.resolve("docs/demo-gallery.md");
+        Path imagePath = REPO_ROOT.resolve("docs/assets/screenshots").resolve(imageName);
+        Path mermaidPath = REPO_ROOT.resolve("docs/assets/screenshots/convergent-sophie-germain.mmd");
+        String readme = Files.readString(readmePath, StandardCharsets.UTF_8);
+        String gallery = Files.readString(galleryPath, StandardCharsets.UTF_8);
+
+        assertTrue(readme.contains(imageName), "README.md must reference " + imageName);
+        assertTrue(gallery.contains("<img") && gallery.contains(imageName),
+            "docs/demo-gallery.md must embed " + imageName + " with an <img> tag");
+        assertTrue(Files.exists(imagePath), imageName + " must exist next to the Mermaid source");
+        assertTrue(Files.exists(mermaidPath), "convergent-sophie-germain.mmd source must still exist");
+
+        String milestone = readme.substring(
+            readme.indexOf("## Recent discovery milestone"),
+            readme.indexOf("## 30 Sekunden"));
+        assertTrue(!milestone.contains("parametric-sophie-germain-discovery.png"),
+            "README milestone must show the convergent graph, not the old single-path screenshot");
+
+        String image = Files.readString(imagePath, StandardCharsets.UTF_8);
+        assertTrue(image.contains("x^4 + 4*y^4"), "image must visibly show the Sophie-Germain input");
+        assertTrue(image.contains("hidden structure"), "image must visibly show the hidden-structure path");
+        assertTrue(image.contains("square difference"), "image must visibly show the square-difference bridge");
+        assertTrue(image.contains("learned macro shortcut"), "image must visibly show the learned macro shortcut");
+        assertTrue(image.contains("same target node"), "image must visibly show the converged target node");
+        assertTrue(!image.contains("parametric-sophie-germain-discovery.png"),
+            "convergent image must not be the old parametric single-path screenshot");
+    }
+
+    @Test
     void localDocsLinksAndImagesResolve() throws IOException {
         assertMarkdownReferencesResolve(REPO_ROOT.resolve("README.md"));
         assertMarkdownReferencesResolve(REPO_ROOT.resolve("docs/demo-gallery.md"));

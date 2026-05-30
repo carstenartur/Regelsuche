@@ -110,6 +110,10 @@ die Roh-Gallery-Evidence unter
 
 **A. Sophie-Germain: discovery path vs learned macro shortcut**
 
+<img src="assets/screenshots/convergent-sophie-germain.svg" alt="Convergent Sophie-Germain graph showing the hidden-structure discovery path and learned macro shortcut reaching the same factored result.">
+
+*Two real search paths converge: the didactic hidden-structure path and the learned macro shortcut.*
+
 - **Input** — `x^4 + 4*y^4`
 - **Path 1** — hidden structure discovery:
   `hypothesis_difference_of_squares_preparation` →
