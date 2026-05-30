@@ -1,8 +1,10 @@
 package de.regelsuche.search.convergence;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /** Renders a convergent discovery SVG from report data only. */
 public final class ConvergentDiscoverySvgWriter {
@@ -35,6 +37,17 @@ public final class ConvergentDiscoverySvgWriter {
             .append("\" data-rendered-by=\"ConvergentDiscoverySvgWriter\">\n");
         out.append("  <title id=\"title\">Convergent Sophie-Germain discovery graph</title>\n");
         out.append("  <desc id=\"desc\">Generated from convergent discovery report data.</desc>\n");
+        out.append("  <metadata>");
+        out.append(escapeXml(report.inputExpression()));
+        for (ConvergentPath path : report.pathsToTarget()) {
+            for (String expression : path.expressions()) {
+                out.append(" | ").append(escapeXml(expression));
+            }
+            for (int i = 0; i < path.ruleIds().size(); i++) {
+                out.append(" | ").append(escapeXml(path.ruleFamilies().get(i) + ": " + path.ruleIds().get(i)));
+            }
+        }
+        out.append("</metadata>\n");
         out.append("  <defs>\n");
         out.append("    <marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" ")
             .append("markerWidth=\"9\" markerHeight=\"9\" orient=\"auto-start-reverse\">\n");
@@ -52,12 +65,16 @@ public final class ConvergentDiscoverySvgWriter {
             .append(escapeXml("Generated from report data; " + report.pathsToTarget().size()
                 + " paths converge."))
             .append("</text>\n");
+        Set<String> renderedEdges = new HashSet<>();
         for (ConvergentPath path : report.pathsToTarget()) {
             for (int i = 1; i < path.expressions().size(); i++) {
                 Node from = layout.nodes().get(key(path.expressions().get(i - 1)));
                 Node to = layout.nodes().get(key(path.expressions().get(i)));
                 String rule = path.ruleFamilies().get(i - 1) + ": " + path.ruleIds().get(i - 1);
-                edge(out, from, to, rule, path.containsMacroStep());
+                String edgeKey = from.id() + "->" + to.id() + "|" + rule;
+                if (!from.id().equals(to.id()) && renderedEdges.add(edgeKey)) {
+                    edge(out, from, to, rule, path.containsMacroStep());
+                }
             }
         }
         for (Node node : layout.nodes().values()) {

@@ -1,49 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1690" height="1290" viewBox="0 0 1690 1290" role="img" aria-labelledby="title desc" data-source="convergent-sophie-germain.mmd" data-generated-by="ConvergentDiscoveryMermaidWriter" data-rendered-by="ConvergentDiscoverySvgWriter">
   <title id="title">Convergent Sophie-Germain discovery graph</title>
-  <desc id="desc">Two real search paths converge: the didactic hidden-structure path and the learned macro shortcut.</desc>
+  <desc id="desc">Generated from convergent discovery report data.</desc>
+  <metadata>x^4 + 4*y^4 | x^4 + 4*y^4 | (x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2) | LEARNED_MACRO: macro_6bd0496b | x^4 + 4*y^4 | (x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2) | (x ^ 2 + 2 * x * y + 2 * y * y) * (x ^ 2 - 2 * x * y + 2 * y ^ 2) | LEARNED_MACRO: macro_6bd0496b | OTHER: ast_power_two_to_product | x^4 + 4*y^4 | (x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2 | (x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y) | HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation | FACTORIZATION: ast_square_difference_factor | x^4 + 4*y^4 | (x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2 | (x ^ 2 + 2 * y * y) ^ 2 - (2 * x * y) ^ 2 | (x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y * y + 2 * x * y) | HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation | OTHER: ast_power_two_to_product | FACTORIZATION: ast_square_difference_factor | x^4 + 4*y^4 | (x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2) | (x * x + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2) | (x * x + 2 * x * y + 2 * y * y) * (x ^ 2 - 2 * x * y + 2 * y ^ 2) | LEARNED_MACRO: macro_6bd0496b | OTHER: ast_power_two_to_product | OTHER: ast_power_two_to_product | x^4 + 4*y^4 | (x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2 | (x * x + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2 | (x * x + 2 * y ^ 2 - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y) | (x * x + 2 * y * y - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y) | HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation | OTHER: ast_power_two_to_product | FACTORIZATION: ast_square_difference_factor | OTHER: ast_power_two_to_product | x^4 + 4*y^4 | (x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2 | (x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y) | (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2) | (0 - 2 * x * y + x * x + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2) | HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation | FACTORIZATION: ast_square_difference_factor | NORMALIZATION: ast_canonical_normalize | OTHER: ast_power_two_to_product</metadata>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155" />
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
     </marker>
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.18"/>
-    </filter>
   </defs>
-  <rect width="1200" height="560" fill="#f8fafc"/>
-  <text x="600" y="45" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="28" font-weight="700" fill="#0f172a">Sophie-Germain convergence: discovery and learned shortcut</text>
-  <text x="600" y="78" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" fill="#475569">Two distinct search paths reach the same factored result.</text>
-
-  <g filter="url(#shadow)">
-    <rect x="60" y="220" width="255" height="96" rx="18" fill="#eef2ff" stroke="#4338ca" stroke-width="3"/>
-    <text x="187.5" y="252" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="700" fill="#312e81">input</text>
-    <text x="187.5" y="289" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="24" fill="#111827">x^4 + 4*y^4</text>
-
-    <rect x="475" y="132" width="310" height="116" rx="18" fill="#fef3c7" stroke="#d97706" stroke-width="3"/>
-    <text x="630" y="164" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="700" fill="#92400e">path 1: hidden structure</text>
-    <text x="630" y="195" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="19" fill="#111827">(x^2 + 2*y^2)^2 - (2*x*y)^2</text>
-    <text x="630" y="222" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" fill="#92400e">square difference</text>
-
-    <rect x="475" y="333" width="310" height="92" rx="18" fill="#e0f2fe" stroke="#0284c7" stroke-width="3"/>
-    <text x="630" y="365" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="700" fill="#075985">path 2: learned macro shortcut</text>
-    <text x="630" y="397" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" fill="#075985">macro_sophie_germain</text>
-
-    <rect x="900" y="216" width="245" height="126" rx="18" fill="#dcfce7" stroke="#15803d" stroke-width="4"/>
-    <text x="1022.5" y="249" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="700" fill="#14532d">same target node</text>
-    <text x="1022.5" y="282" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="17" fill="#111827">(x^2 - 2xy + 2y^2)</text>
-    <text x="1022.5" y="311" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="17" fill="#111827">× (x^2 + 2xy + 2y^2)</text>
+  <rect width="100%" height="100%" fill="#f8fafc"/>
+  <text x="845" y="52" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="26" font-weight="700" fill="#0f172a">Convergent discovery: x^4 + 4*y^4</text>
+  <text x="845" y="84" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" fill="#475569">Generated from report data; 7 paths converge.</text>
+  <path d="M 310 611 C 845 611, 845 611, 1380 611" fill="none" stroke="#0284c7" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="845" y="601" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700" fill="#075985">LEARNED_MACRO: macro_6bd0496b</text>
+  <path d="M 310 611 C 350 611, 350 461, 390 461" fill="none" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="350" y="526" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700" fill="#334155">HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation</text>
+  <path d="M 640 461 C 1010 461, 1010 611, 1380 611" fill="none" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="1010" y="526" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700" fill="#334155">FACTORIZATION: ast_square_difference_factor</text>
+  <g data-node-id="conv_d60ad9a1">
+    <rect x="60" y="570" width="250" height="82" rx="16" fill="#eef2ff" stroke="#4338ca" stroke-width="3"/>
+    <text x="185" y="601" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#312e81">input</text>
+    <text x="185" y="628" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" fill="#111827">x^4 + 4*y^4</text>
   </g>
-
-  <path d="M 315 253 C 380 210, 410 190, 475 190" fill="none" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>
-  <text x="380" y="169" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" fill="#92400e">HIDDEN_STRUCTURE</text>
-
-  <path d="M 785 190 C 835 202, 860 231, 900 259" fill="none" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>
-  <text x="838" y="174" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" fill="#92400e">FACTORIZATION</text>
-
-  <path d="M 315 286 C 410 351, 432 379, 475 379" fill="none" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>
-  <text x="388" y="371" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" fill="#075985">LEARNED_MACRO</text>
-
-  <path d="M 785 379 C 844 378, 866 323, 900 300" fill="none" stroke="#334155" stroke-width="3" marker-end="url(#arrow)"/>
-
-  <text x="600" y="500" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-style="italic" fill="#334155">Two real search paths converge: the didactic hidden-structure path and the learned macro shortcut.</text>
-  <text x="600" y="528" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" fill="#64748b">Rendered from docs/assets/screenshots/convergent-sophie-germain.mmd</text>
+  <g data-node-id="conv_cec0e1bc">
+    <rect x="1380" y="570" width="250" height="82" rx="16" fill="#dcfce7" stroke="#15803d" stroke-width="3"/>
+    <text x="1505" y="601" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#14532d">convergence</text>
+    <text x="1505" y="628" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" fill="#111827">(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)</text>
+  </g>
+  <g data-node-id="conv_51309728">
+    <rect x="390" y="420" width="250" height="82" rx="16" fill="#e0f2fe" stroke="#0284c7" stroke-width="3"/>
+    <text x="515" y="451" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#075985">path</text>
+    <text x="515" y="478" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" fill="#111827">(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2</text>
+  </g>
 </svg>
