@@ -16,7 +16,6 @@ import de.regelsuche.mining.RulePatternParser;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.mining.SuccessfulTransformationPath;
 import de.regelsuche.parse.ExpressionFormatter;
-import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
@@ -32,8 +31,6 @@ import java.util.regex.Pattern;
 /** Evidence-first pipeline that promotes macros only after validation gates pass. */
 public class MacroLearningPipeline {
     public static final double DEFAULT_CONFIDENCE_THRESHOLD = 0.8;
-    private static final List<String> GENERATED_SUBSTITUTIONS =
-        List.of("x", "y", "x + 1", "2*x", "x^2", "n + 2");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\b[A-Z]\\b");
 
     private final RuleInventoryRepository inventory;
@@ -44,7 +41,7 @@ public class MacroLearningPipeline {
     private final double confidenceThreshold;
     private final RulePatternParser patternParser = new RulePatternParser();
     private final RulePatternInstantiator instantiator = new RulePatternInstantiator();
-    private final ExpressionParser expressionParser = new ExpressionParser();
+    private final PlaceholderSubstitutionGenerator substitutionGenerator = new PlaceholderSubstitutionGenerator();
 
     public MacroLearningPipeline(RuleInventoryRepository inventory) {
         this(
@@ -135,15 +132,37 @@ public class MacroLearningPipeline {
             stages.add("reject: generated schema has no placeholders");
             return List.of();
         }
-        String placeholder = detectedPlaceholders.iterator().next();
+        List<Map<String, Expr>> substitutions;
+        try {
+            substitutions = substitutionGenerator.generate(detectedPlaceholders, pattern.parameterRelations());
+        } catch (PlaceholderSubstitutionGenerator.UnsupportedRelationException exception) {
+            stages.add("reject: unsupported placeholder relation: " + exception.getMessage());
+            return List.of();
+        }
+        if (substitutions.isEmpty()) {
+            stages.add("reject: no safe placeholder substitutions generated for " + detectedPlaceholders);
+            return List.of();
+        }
+        stages.add("generate placeholder substitutions: " + substitutions.size());
         List<MacroValidationExample> examples = new ArrayList<>();
-        for (String sample : GENERATED_SUBSTITUTIONS) {
-            Expr sampleExpression = expressionParser.parseTerm(sample);
-            String left = ExpressionFormatter.format(instantiator.instantiate(leftPattern, Map.of(placeholder, sampleExpression)));
-            String right = ExpressionFormatter.format(instantiator.instantiate(rightPattern, Map.of(placeholder, sampleExpression)));
-            examples.add(new MacroValidationExample(placeholder + " = " + sample, left, right, equivalenceService.areEquivalent(left, right)));
+        for (Map<String, Expr> substitution : substitutions) {
+            String left = ExpressionFormatter.format(instantiator.instantiate(leftPattern, substitution));
+            String right = ExpressionFormatter.format(instantiator.instantiate(rightPattern, substitution));
+            examples.add(new MacroValidationExample(
+                substitutionLabel(detectedPlaceholders, substitution),
+                left,
+                right,
+                equivalenceService.areEquivalent(left, right)
+            ));
         }
         return examples;
+    }
+
+    private String substitutionLabel(Set<String> placeholders, Map<String, Expr> substitution) {
+        return placeholders.stream()
+            .map(placeholder -> placeholder + " = " + ExpressionFormatter.format(substitution.get(placeholder)))
+            .toList()
+            .toString();
     }
 
     private boolean qualityGatesPass(

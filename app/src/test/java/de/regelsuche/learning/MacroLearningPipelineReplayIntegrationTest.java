@@ -92,7 +92,7 @@ class MacroLearningPipelineReplayIntegrationTest {
     }
 
     @Test
-    void multiPlaceholderSchemasAreRejectedWithStageEvidence() {
+    void multiPlaceholderSchemasAreValidatedAndPromoted() {
         InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
         PatternGeneralizer generalizer = new PatternGeneralizer() {
             @Override
@@ -126,10 +126,55 @@ class MacroLearningPipelineReplayIntegrationTest {
             Map.of()
         )));
 
+        assertFalse(result.newlyActivated().isEmpty(), result.stageEvidence().toString());
+        assertTrue(result.validationExamples().size() > 1, result.validationExamples().toString());
+        assertTrue(result.validationExamples().stream().allMatch(MacroValidationExample::equivalent));
+        assertTrue(result.stageEvidence().stream()
+        .anyMatch(stage -> stage.contains("generate placeholder substitutions")),
+        result.stageEvidence().toString());
+        assertFalse(result.stageEvidence().stream()
+        .anyMatch(stage -> stage.contains("multi-placeholder validation not supported yet")));
+    }
+
+    @Test
+    void unsupportedPlaceholderRelationsAreRejectedWithStageEvidence() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        PatternGeneralizer generalizer = new PatternGeneralizer() {
+        @Override
+        public Optional<GeneralizedPattern> generalizeSingleExampleSchema(SuccessfulTransformationPath path) {
+            return Optional.of(new GeneralizedPattern(
+                "A + B",
+                "B + A",
+                Map.of(),
+                List.of("A + B = C"),
+                Map.of("A", List.of("x"), "B", List.of("y"))
+            ));
+        }
+        };
+        MacroLearningResult result = new MacroLearningPipeline(
+        inventory,
+        generalizer,
+        equivalence,
+        NO_COUNTEREXAMPLES,
+        new KnownRuleRepository(),
+        0.0
+        ).learn(List.of(new SuccessfulTransformationPath(
+        "unsupported-relation-replay",
+        "x + y",
+        "y + x",
+        List.of("x + y", "y + x"),
+        List.of("commute"),
+        scorer.score("x + y"),
+        scorer.score("y + x"),
+        true,
+        "unit-test",
+        Map.of()
+        )));
+
         assertTrue(result.newlyActivated().isEmpty());
         assertTrue(result.stageEvidence().stream()
-            .anyMatch(stage -> stage.contains("multi-placeholder validation not supported yet")),
-            result.stageEvidence().toString());
+        .anyMatch(stage -> stage.contains("reject: unsupported placeholder relation")),
+        result.stageEvidence().toString());
     }
 
     private void assertDiscoveryReplayLearnsAndReuses(ReplayCase replayCase) {
