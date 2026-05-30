@@ -14,6 +14,7 @@ import de.regelsuche.mining.MacroMoveTransformationEngine;
 import de.regelsuche.mining.SuccessfulTransformationPath;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.convergence.ArtifactMetadata;
 import de.regelsuche.search.convergence.ConvergentDiscoveryAnalysis;
 import de.regelsuche.search.convergence.ConvergentDiscoveryGallerySnippetWriter;
 import de.regelsuche.search.convergence.ConvergentDiscoveryMermaidWriter;
@@ -87,7 +88,8 @@ class ConvergentSophieGermainGalleryTest {
         String mermaid = new ConvergentDiscoveryMermaidWriter().render(report);
         assertTrue(mermaid.contains(DifferenceOfSquaresPreparationOperator.RULE_ID), mermaid);
         assertTrue(mermaid.contains("macro_"), mermaid);
-        String svg = new ConvergentDiscoverySvgWriter().render(report);
+        String svg = new ConvergentDiscoverySvgWriter().render(report,
+            new ArtifactMetadata("convergent-sophie-germain.mmd", "Convergent Sophie-Germain discovery graph"));
         assertTrue(svg.contains("data-source=\"convergent-sophie-germain.mmd\""), svg);
         assertTrue(svg.contains("data-generated-by=\"ConvergentDiscoverySvgWriter\""), svg);
         assertMermaidLabelsAppearInSvg(mermaid, svg);

@@ -9,6 +9,7 @@ import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.RewriteKind;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -79,6 +80,54 @@ class ConvergentDiscoveryAnalysisTest {
         assertEquals(RuleFamily.NORMALIZATION, classifier.classify("ast_canonical_normalize"));
     }
 
+    @Test
+    void rendersSyntheticSvgWithArtifactMetadata() {
+        String input = "a^2 + 2*a*b + b^2";
+        String target = "(a + b)^2";
+        ConvergentPath algebraPath = syntheticPath(
+            "binomial-factorization-path",
+            List.of(input, target),
+            List.of("ast_binomial_square_factor"),
+            List.of(RuleFamily.FACTORIZATION),
+            false
+        );
+        ConvergentPath macroPath = syntheticPath(
+            "binomial-macro-path",
+            List.of(input, "square(a + b)", target),
+            List.of("macro_binomial_square", "ast_expand_square_notation"),
+            List.of(RuleFamily.LEARNED_MACRO, RuleFamily.NORMALIZATION),
+            true
+        );
+        ConvergentDiscoveryReport report = new ConvergentDiscoveryReport(
+            input,
+            canonicalizer.canonicalize(target),
+            List.of(new ConvergentState(
+                target,
+                canonicalizer.stableHash(target),
+                List.of(algebraPath, macroPath),
+                algebraPath.pathId(),
+                macroPath.pathId(),
+                Optional.of(macroPath.pathId())
+            )),
+            List.of(algebraPath, macroPath),
+            List.of(),
+            List.of(),
+            Set.of(RuleFamily.FACTORIZATION, RuleFamily.LEARNED_MACRO),
+            Set.of("synthetic")
+        );
+
+        String svg = new ConvergentDiscoverySvgWriter().render(report,
+            new ArtifactMetadata("synthetic-binomial.mmd", "Synthetic binomial convergence graph"));
+        assertTrue(svg.contains("data-source=\"synthetic-binomial.mmd\""), svg);
+        assertTrue(svg.contains("<title id=\"title\">Synthetic binomial convergence graph</title>"), svg);
+        assertFalse(svg.contains("Sophie-Germain"), svg);
+
+        String inputTitledSvg = new ConvergentDiscoverySvgWriter().render(report,
+            new ArtifactMetadata("synthetic-binomial.mmd", ""));
+        assertTrue(inputTitledSvg.contains("<title id=\"title\">Convergent discovery: "
+            + input + "</title>"), inputTitledSvg);
+    }
+
     private SearchState state(List<String> path, List<String> rules) {
         String expression = path.getLast();
         return new SearchState(
@@ -99,6 +148,30 @@ class ConvergentDiscoveryAnalysisTest {
             1,
             rules.stream().map(ignored -> RewriteKind.NORMALIZE).toList(),
             rules.stream().map(ignored -> true).toList()
+        );
+    }
+
+    private ConvergentPath syntheticPath(
+        String pathId,
+        List<String> expressions,
+        List<String> ruleIds,
+        List<RuleFamily> ruleFamilies,
+        boolean containsMacroStep
+    ) {
+        return new ConvergentPath(
+            pathId,
+            expressions,
+            ruleIds,
+            ruleFamilies,
+            expressions.getLast(),
+            scorer.score(expressions.getLast()),
+            ruleIds.size(),
+            false,
+            containsMacroStep,
+            containsMacroStep,
+            "proved",
+            "validated",
+            List.of()
         );
     }
 }

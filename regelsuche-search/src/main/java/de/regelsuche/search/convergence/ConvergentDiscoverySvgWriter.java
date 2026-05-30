@@ -8,7 +8,6 @@ import java.util.Set;
 
 /** Renders a convergent discovery SVG from report data only. */
 public final class ConvergentDiscoverySvgWriter {
-    private static final String SOURCE = "convergent-sophie-germain.mmd";
     private static final String GENERATED_BY = "ConvergentDiscoverySvgWriter";
     private static final int MARGIN_X = 60;
     private static final int MARGIN_Y = 120;
@@ -20,6 +19,12 @@ public final class ConvergentDiscoverySvgWriter {
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
 
     public String render(ConvergentDiscoveryReport report) {
+        return render(report, new ArtifactMetadata("", ""));
+    }
+
+    public String render(ConvergentDiscoveryReport report, ArtifactMetadata metadata) {
+        ArtifactMetadata safeMetadata = metadata == null ? new ArtifactMetadata("", "") : metadata;
+        String title = title(report, safeMetadata);
         GraphLayout layout = layout(report);
         StringBuilder out = new StringBuilder();
         out.append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"")
@@ -31,11 +36,11 @@ public final class ConvergentDiscoverySvgWriter {
             .append(' ')
             .append(layout.height())
             .append("\" role=\"img\" aria-labelledby=\"title desc\" data-source=\"")
-            .append(SOURCE)
+            .append(escapeXml(safeMetadata.dataSource()))
             .append("\" data-generated-by=\"")
             .append(GENERATED_BY)
             .append("\">\n");
-        out.append("  <title id=\"title\">Convergent Sophie-Germain discovery graph</title>\n");
+        out.append("  <title id=\"title\">").append(escapeXml(title)).append("</title>\n");
         out.append("  <desc id=\"desc\">Generated from convergent discovery report data.</desc>\n");
         out.append("  <metadata>");
         out.append(escapeXml(report.inputExpression()));
@@ -173,6 +178,13 @@ public final class ConvergentDiscoverySvgWriter {
 
     private String key(String expression) {
         return "conv_" + canonicalizer.stableHash(expression == null ? "" : expression);
+    }
+
+    private String title(ConvergentDiscoveryReport report, ArtifactMetadata metadata) {
+        if (!metadata.title().isBlank()) {
+            return metadata.title();
+        }
+        return "Convergent discovery: " + report.inputExpression();
     }
 
     private String escapeXml(String value) {
