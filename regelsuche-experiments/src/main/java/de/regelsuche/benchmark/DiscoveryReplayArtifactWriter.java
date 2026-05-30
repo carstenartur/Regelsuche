@@ -222,7 +222,7 @@ public final class DiscoveryReplayArtifactWriter {
                 .append(" | ").append(isBridgeKind(row) ? "yes" : "no")
                 .append(" | ").append(isTransformedKind(row) ? "yes" : "no")
                 .append(" | ").append(isMacroLearnedKind(row) ? "yes" : "no")
-                .append(" | ").append(row.resultKind().name().equals("MACRO_REUSED") ? "yes" : "no")
+                .append(" | ").append(row.resultKind().hasMacroReuse() ? "yes" : "no")
                 .append(" | ").append(row.counterexampleSearchStatus().name())
                 .append(" | ").append(escapeMarkdown(row.rulePath().isEmpty() ? "—" : String.join(" -> ", row.rulePath())))
                 .append(" | ").append(escapeMarkdown(row.summary()))
@@ -776,7 +776,7 @@ public final class DiscoveryReplayArtifactWriter {
                     .append("- replay source: generated search/replay path in this report\n\n")
                     .append("```mermaid\n").append(renderSemanticMermaid(semanticView)).append("```\n\n");
             }
-            if (row.resultKind().name().equals("MACRO_REUSED") || row.rulePath().stream().anyMatch(rule -> rule.contains("macro"))) {
+            if (row.resultKind().hasMacroReuse() || row.rulePath().stream().anyMatch(rule -> rule.contains("macro"))) {
                 emitted = true;
                 out.append("### Learned macro reuse\n\n")
                     .append("- input discovery: `").append(row.seed().expression()).append("`\n")
@@ -799,20 +799,15 @@ public final class DiscoveryReplayArtifactWriter {
     }
 
     private boolean isBridgeKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
-        String kind = row.resultKind().name();
-        return kind.equals("BRIDGE_FOUND") || kind.equals("FACTORED") || kind.equals("SIMPLIFIED")
-            || kind.equals("MACRO_LEARNED") || kind.equals("MACRO_REUSED");
+        return row.resultKind().hasBridge();
     }
 
     private boolean isTransformedKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
-        String kind = row.resultKind().name();
-        return kind.equals("FACTORED") || kind.equals("SIMPLIFIED")
-            || kind.equals("MACRO_LEARNED") || kind.equals("MACRO_REUSED");
+        return row.resultKind().hasTransformedResult();
     }
 
     private boolean isMacroLearnedKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
-        String kind = row.resultKind().name();
-        return kind.equals("MACRO_LEARNED") || kind.equals("MACRO_REUSED");
+        return row.resultKind().hasMacroLearning();
     }
 
     private String operatorLabel(List<String> rulePath) {

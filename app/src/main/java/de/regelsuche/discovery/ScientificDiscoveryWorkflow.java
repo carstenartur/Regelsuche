@@ -28,10 +28,10 @@ import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.CompleteSquareHypothesisOperator;
-import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.DiscoveryOptions;
+import de.regelsuche.transform.DiscoveryProfile;
 import de.regelsuche.transform.FactoredProductAstPredicate;
-import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.HypothesisOperatorRegistry;
 import de.regelsuche.transform.SquareDifferenceAstPredicate;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.SymPyTransformationEngine;
@@ -58,10 +58,11 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final AstRewriteTransformationEngine searchEngine = new AstRewriteTransformationEngine(DemoRuleSet.rules());
-    private final TransformationEngine hiddenStructureSearchEngine = new HypothesisTransformationEngine(
-        new AstRewriteTransformationEngine(DemoRuleSet.rules()),
-        List.of(new DifferenceOfSquaresPreparationOperator(), new CompleteSquareHypothesisOperator())
-    );
+    private final DiscoveryOptions hiddenStructureOptions = DiscoveryOptions.forProfile(DiscoveryProfile.FULL_DISCOVERY);
+    private final HypothesisOperatorRegistry hypothesisOperatorRegistry = new HypothesisOperatorRegistry();
+    private final DiscoveryEngineFactory discoveryEngineFactory = new DiscoveryEngineFactory(hypothesisOperatorRegistry);
+    private final TransformationEngine hiddenStructureSearchEngine = discoveryEngineFactory.create(
+        new AstRewriteTransformationEngine(DemoRuleSet.rules()), hiddenStructureOptions);
     private final BestFirstSearchStrategy searchStrategy = new BestFirstSearchStrategy();
     private final DeterministicCounterexampleSearchService counterexamples = new DeterministicCounterexampleSearchService();
     private final DefaultMathematicalAlgorithmRegistry algorithmRegistry = new DefaultMathematicalAlgorithmRegistry();
@@ -157,7 +158,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             .filter(transformation -> isHiddenStructureHypothesisRule(transformation.rule()))
             .toList();
         SearchProblem problem = new SearchProblem(root, hiddenStructureSearchEngine, scorer, canonicalizer,
-            new SearchHeuristic(4, 160, 1, 10, 200, 200));
+            new SearchHeuristic(hiddenStructureOptions.searchDepth(), hiddenStructureOptions.searchBudget(), 1, 10, 200, 200));
         List<SearchState> states = searchStrategy.search(problem);
         SearchState hypothesisState = states.stream()
             .filter(state -> state.appliedRuleIds().stream().anyMatch(this::isHiddenStructureHypothesisRule))
@@ -186,7 +187,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             context.graphStore().saveDiscoveredTransformation(toDiscovered(pathId, root, factoredState, before));
         }
         return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
-            resultKind.discovered() && resultKind != DiscoveryResultKind.HYPOTHESIS_ONLY,
+            resultKind.discovered(),
             hiddenStructureSummary(resultKind),
             hypothesisCandidates.stream().map(Transformation::transformedExpression).toList(),
             List.of(),
@@ -283,8 +284,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     }
 
     private boolean isHiddenStructureHypothesisRule(String ruleId) {
-        return DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
-            || CompleteSquareHypothesisOperator.RULE_ID.equals(ruleId);
+        return hypothesisOperatorRegistry.stableIds().contains(ruleId);
     }
 
     private DiscoveryResultKind classifyHiddenStructure(

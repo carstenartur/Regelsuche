@@ -252,3 +252,42 @@ kann den Status auf `VALIDATED_BY_EXAMPLES` oder höher anheben.
 - `DiscoveryIntegrationTest` (binomial formula, commutativity)
 - `MacroMoveTransformationEngineTest` (aktive MacroMoves verkürzen Suchtiefe)
 - `PathReplayDtoTest#replayStepCarriesCollapsedMacroExpansionWithAtomicSteps`
+
+## Discovery profiles
+
+`DiscoveryOptions` bündelt die Schalter für Hypothesenoperatoren, Makro-Lernen,
+Makro-Wiederverwendung, Gallery-Ausgabe sowie Suchbudget und -tiefe. Die benannten
+`DiscoveryProfile`s reduzieren hart verdrahtete Spezialfälle:
+
+| Profil | Verwendung |
+|--------|------------|
+| `PURE_REWRITE` | deterministische Baseline nur mit atomaren Rewrite-Regeln |
+| `HYPOTHESIS_ONLY` | Experimente mit Hypothesenoperatoren, aber ohne gelernte Regeln |
+| `MACRO_REUSE_ONLY` | Evaluation eines vorhandenen Makroregel-Inventars ohne neue Hypothesen |
+| `FULL_DISCOVERY` | vollständige Forschungspipeline mit Hypothesen, Makro-Lernen, Makro-Reuse und Gallery |
+
+`HypothesisOperatorRegistry` ist die zentrale Liste der verfügbaren Operatoren.
+Die aktuelle Reihenfolge ist deterministisch:
+
+1. `hypothesis_difference_of_squares_preparation`
+2. `hypothesis_complete_square_preparation`
+
+`DiscoveryEngineFactory` komponiert Engines immer in der Reihenfolge
+**base rewrite → hypothesis operators → learned macro moves**. Dadurch muss der
+Workflow nicht mehr wissen, welche Operator-Klassen direkt zu instanziieren sind,
+und neue Varianten lassen sich über Optionen statt über verstreute Konstruktoren
+steuern. Das senkt die kognitive Last, weil Profilwahl, Operatorliste und
+Engine-Reihenfolge jeweils genau eine Zuständigkeit haben.
+
+Neue Hypothesenoperatoren werden so ergänzt:
+
+1. `HypothesisOperator` implementieren.
+2. Operator mit stabiler Rule-ID in die Registry aufnehmen.
+3. Corpus-Tests für positive Fälle ergänzen.
+4. False-Positive-/Near-Miss-Tests ergänzen.
+5. Optional eine Gallery-Regel ergänzen, wenn ein echtes Replay sie belegt.
+
+`CompleteSquareHypothesisOperator` ist bewusst konservativ: Der bounded
+square-completion Operator emittiert nur Kandidaten mit Rest `0` oder negativem
+perfekten Quadrat. Er erhebt keinen Anspruch, alle gültigen quadratischen
+Ergänzungen abzudecken, z. B. nicht jede Form wie `x^2 + 6*x + 6`.

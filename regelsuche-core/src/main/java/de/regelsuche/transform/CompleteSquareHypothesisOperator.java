@@ -15,7 +15,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Bounded AST-based hypothesis operator for conservative square completion. */
+/**
+ * Bounded conservative square-completion operator.
+ *
+ * <p>It only emits candidates with zero or negative perfect-square remainder;
+ * it does not cover every valid square completion.</p>
+ */
 public class CompleteSquareHypothesisOperator implements HypothesisOperator {
     public static final String RULE_ID = "hypothesis_complete_square_preparation";
     private static final int DEFAULT_MAX_CANDIDATES = 6;

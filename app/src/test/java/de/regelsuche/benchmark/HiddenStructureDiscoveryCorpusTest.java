@@ -30,6 +30,7 @@ import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.SquareDifferenceAstPredicate;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.validation.DiscoveryResultKind;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -90,11 +91,12 @@ class HiddenStructureDiscoveryCorpusTest {
             if (row.seed().expectation() == Expectation.REQUIRE_NO_DISCOVERY) {
                 assertFalse(row.bridgeDiscovered(), row.seed().expression() + "\n" + summaryTable);
                 assertFalse(row.factoredDiscovery(), row.seed().expression() + "\n" + summaryTable);
-                assertEquals(ObservedResult.NO_CANDIDATE, row.observedResult(), row.seed().expression() + "\n" + summaryTable);
+                assertEquals(DiscoveryResultKind.NO_CANDIDATE, row.observedResult(), row.seed().expression() + "\n" + summaryTable);
             }
             if (row.seed().expectation() == Expectation.DOCUMENT_ONLY) {
-                assertTrue(List.of(ObservedResult.NO_CANDIDATE, ObservedResult.BRIDGE_ONLY,
-                    ObservedResult.FACTORED, ObservedResult.MACRO_REUSED, ObservedResult.FALSE_POSITIVE)
+                assertTrue(List.of(DiscoveryResultKind.NO_CANDIDATE, DiscoveryResultKind.BRIDGE_FOUND,
+                    DiscoveryResultKind.FACTORED, DiscoveryResultKind.MACRO_LEARNED, DiscoveryResultKind.MACRO_REUSED,
+                    DiscoveryResultKind.FALSE_POSITIVE)
                     .contains(row.observedResult()), row.seed().expression() + "\n" + summaryTable);
             }
         }
@@ -127,10 +129,11 @@ class HiddenStructureDiscoveryCorpusTest {
         boolean reusable = learnedMacro && macroAppliesToSecondExpression(seed.expression(), learned);
         List<String> rulePath = reportedState == null ? List.of() : reportedState.appliedRuleIds();
         List<String> replayPath = reportedState == null ? List.of() : reportedState.path();
-        ObservedResult observedResult = observedResult(seed, hypothesisCandidates, bridgeDiscovered, factoredDiscovery, reusable);
+        DiscoveryResultKind observedResult = observedResult(seed, hypothesisCandidates, bridgeDiscovered, factoredDiscovery,
+            learnedMacro, reusable);
         String notes = notes(seed, reportedState, hypothesisCandidates, observedResult, learned);
-        return new CorpusRow(seed, bridgeDiscovered, factoredDiscovery, rulePath, learnedMacro, reusable,
-            replayPath, observedResult, notes);
+        return new CorpusRow(seed, observedResult.hasBridge(), observedResult.hasTransformedResult(), rulePath,
+            observedResult.hasMacroLearning(), observedResult.hasMacroReuse(), replayPath, observedResult, notes);
     }
 
     private TransformationEngine hiddenStructureEngine() {
@@ -238,26 +241,30 @@ class HiddenStructureDiscoveryCorpusTest {
         return rule.id().startsWith("macro_") ? rule.id() : "macro_" + rule.id();
     }
 
-    private ObservedResult observedResult(
+    private DiscoveryResultKind observedResult(
         CorpusCase seed,
         List<Transformation> hypothesisCandidates,
         boolean bridgeDiscovered,
         boolean factoredDiscovery,
+        boolean learnedMacro,
         boolean reusable
     ) {
         if (reusable) {
-            return ObservedResult.MACRO_REUSED;
+            return DiscoveryResultKind.MACRO_REUSED;
+        }
+        if (learnedMacro) {
+            return DiscoveryResultKind.MACRO_LEARNED;
         }
         if (factoredDiscovery) {
-            return ObservedResult.FACTORED;
+            return DiscoveryResultKind.FACTORED;
         }
         if (bridgeDiscovered) {
-            return ObservedResult.BRIDGE_ONLY;
+            return DiscoveryResultKind.BRIDGE_FOUND;
         }
         if (!hypothesisCandidates.isEmpty() && seed.expectation() == Expectation.REQUIRE_NO_DISCOVERY) {
-            return ObservedResult.FALSE_POSITIVE;
+            return DiscoveryResultKind.FALSE_POSITIVE;
         }
-        return ObservedResult.NO_CANDIDATE;
+        return DiscoveryResultKind.NO_CANDIDATE;
     }
 
     private void assertValidReplay(CorpusRow row) {
@@ -279,12 +286,12 @@ class HiddenStructureDiscoveryCorpusTest {
         CorpusCase seed,
         SearchState reportedState,
         List<Transformation> hypothesisCandidates,
-        ObservedResult observedResult,
+        DiscoveryResultKind observedResult,
         LearnedMacro learned
     ) {
         List<String> notes = new ArrayList<>();
         notes.add(seed.notes());
-        notes.add("observed result: " + observedResult.label());
+        notes.add("observed result: " + label(observedResult));
         if (hypothesisCandidates.isEmpty()) {
             notes.add("no hypothesis candidate");
         } else {
@@ -323,7 +330,7 @@ class HiddenStructureDiscoveryCorpusTest {
                 .append(" | ")
                 .append(row.reusable() ? "yes" : "no")
                 .append(" | ")
-                .append(row.observedResult().label())
+                .append(label(row.observedResult()))
                 .append(" | ")
                 .append(escape(row.notes()))
                 .append(" |\n");
@@ -341,22 +348,8 @@ class HiddenStructureDiscoveryCorpusTest {
         DOCUMENT_ONLY
     }
 
-    private enum ObservedResult {
-        NO_CANDIDATE("no_candidate"),
-        BRIDGE_ONLY("bridge_only"),
-        FACTORED("factored"),
-        MACRO_REUSED("macro_reused"),
-        FALSE_POSITIVE("false_positive");
-
-        private final String label;
-
-        ObservedResult(String label) {
-            this.label = label;
-        }
-
-        private String label() {
-            return label;
-        }
+    private String label(DiscoveryResultKind kind) {
+        return kind.name().toLowerCase(java.util.Locale.ROOT);
     }
 
     private record CorpusCase(String group, String expression, Expectation expectation, String notes) {
@@ -378,7 +371,7 @@ class HiddenStructureDiscoveryCorpusTest {
         boolean learnedMacro,
         boolean reusable,
         List<String> replayPath,
-        ObservedResult observedResult,
+        DiscoveryResultKind observedResult,
         String notes
     ) {
     }

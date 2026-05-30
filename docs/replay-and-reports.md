@@ -69,3 +69,30 @@ Siehe auch:
 - [docs/replay-mode.md](replay-mode.md)
 - [docs/testing.md](testing.md)
 - [docs/demo-gallery.md](demo-gallery.md)
+
+## Discovery profiles
+
+Reports entstehen aus Discovery-Läufen, deren Engine über `DiscoveryOptions` und
+`DiscoveryProfile` zusammengesetzt wird:
+
+| Profil | Zweck |
+|--------|-------|
+| `PURE_REWRITE` | deterministische Baseline ohne Hypothesenoperatoren und ohne gelernte Makros |
+| `HYPOTHESIS_ONLY` | Hidden-Structure-Experimente ohne Makro-Lernen oder Makro-Reuse |
+| `MACRO_REUSE_ONLY` | Prüfung eines aktivierten Makroregel-Inventars ohne neue Hypothesengenerierung |
+| `FULL_DISCOVERY` | vollständige Forschungsstrecke mit Hypothesen, Makro-Lernen, Makro-Reuse und Gallery |
+
+Die `HypothesisOperatorRegistry` liefert stabile Rule-IDs für Reports und hält die
+Operator-Reihenfolge zentral. `DiscoveryEngineFactory` dokumentiert und erzwingt
+die deterministische Komposition **base rewrite → hypothesis operators → learned
+macro moves**. Diese Trennung reduziert Sonderfälle in Workflows: Ein Report kann
+anhand von Profil und Rule-Path erklären, welche Erweiterungen aktiv waren.
+
+Eine neue Gallery wird nur ergänzt, wenn ein echtes Replay mit passenden Rule-IDs
+vorliegt. Für neue Operatoren gilt: erst `HypothesisOperator` implementieren, dann
+in die Registry aufnehmen, Corpus- und False-Positive-Tests ergänzen und nur bei
+nachweisbarem Replay eine Gallery-Darstellung aktivieren.
+
+Der Complete-Square-Operator ist ein bounded conservative square-completion
+Operator: Er emittiert nur Kandidaten mit Rest `0` oder negativem perfekten
+Quadrat und deckt nicht alle algebraisch möglichen quadratischen Ergänzungen ab.
