@@ -15,6 +15,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Bounded preparation heuristic for sums of two square terms.
+ *
+ * <p>The operator rewrites {@code U^2 + V^2} into the equivalent bridge form
+ * {@code (U + V)^2 - (sqrt(2UV))^2} when the bridge root is representable by
+ * the AST subset supported here. It is intentionally not a general hidden-structure
+ * generator.</p>
+ */
 public class DifferenceOfSquaresPreparationOperator implements HypothesisOperator {
     public static final String RULE_ID = "hypothesis_difference_of_squares_preparation";
     private static final int DEFAULT_MAX_CANDIDATES = 5;

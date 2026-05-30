@@ -47,4 +47,24 @@ class HypothesisTransformationEngineTest {
         assertEquals("base_rule_1", transformations.get(0).rule());
         assertEquals("base_rule_2", transformations.get(1).rule());
     }
+
+    @Test
+    void boundsAndOrdersHypothesisCandidatesDeterministically() {
+        HypothesisOperator firstOperator = expression -> List.of(
+            new Transformation("hyp_1", "a", RewriteKind.NORMALIZE, true, 1, true, "hyp-1"),
+            new Transformation("hyp_2", "b", RewriteKind.NORMALIZE, true, 1, true, "hyp-2")
+        );
+        HypothesisOperator secondOperator = expression -> List.of(
+            new Transformation("hyp_3", "c", RewriteKind.NORMALIZE, true, 1, true, "hyp-3")
+        );
+        HypothesisTransformationEngine engine = new HypothesisTransformationEngine(
+            expression -> List.of(),
+            List.of(firstOperator, secondOperator),
+            2
+        );
+
+        List<Transformation> transformations = engine.transform("x");
+
+        assertEquals(List.of("hyp_1", "hyp_2"), transformations.stream().map(Transformation::rule).toList());
+    }
 }
