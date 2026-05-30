@@ -44,7 +44,7 @@ Discovery-Zeilen tragen zusätzlich die zentrale Klassifikation
 |--------|--------|
 | `expression` | Eingabeausdruck |
 | `operator` | beteiligter Hypothesenoperator |
-| `resultKind` | `NO_CANDIDATE`, `HYPOTHESIS_ONLY`, `BRIDGE_FOUND`, `FACTORED`, `SIMPLIFIED`, `MACRO_LEARNED`, `MACRO_REUSED` oder `FALSE_POSITIVE` |
+| `resultKind` | `NO_CANDIDATE`, `HYPOTHESIS_ONLY`, `BRIDGE_FOUND`, `TRANSFORMED` oder `FALSE_POSITIVE` |
 | `bridge?` | ob ein Bridge-Zustand im Replay erreicht wurde |
 | `simplified/factored?` | ob ein transformiertes Ziel erreicht wurde |
 | `learnedMacro?` / `macroReused?` | Makro-Lern- und Wiederverwendungsstatus |
@@ -53,9 +53,9 @@ Discovery-Zeilen tragen zusätzlich die zentrale Klassifikation
 | `notes` | kurze Zusammenfassung |
 
 Die generierte Discovery-Gallery im Markdown-Report verwendet ausschließlich
-vorhandene Replay-Pfade, Rule-Paths und den bestehenden Mermaid-Export. Wenn ein
-Lauf keinen passenden Sophie-Germain- oder Makro-Reuse-Pfad enthält, wird keine
-Gallery-Demo erfunden.
+vorhandene Replay-Pfade, Rule-Paths, `GalleryDiscoveryDescriptor`-Eligibility und
+den bestehenden Mermaid-Export. Wenn ein Lauf keinen passenden Descriptor erfüllt,
+wird keine Gallery-Demo erfunden.
 
 Browser-E2E und Doku-Assets:
 
@@ -80,19 +80,22 @@ Reports entstehen aus Discovery-Läufen, deren Engine über `DiscoveryOptions` u
 | `PURE_REWRITE` | deterministische Baseline ohne Hypothesenoperatoren und ohne gelernte Makros |
 | `HYPOTHESIS_ONLY` | Hidden-Structure-Experimente ohne Makro-Lernen oder Makro-Reuse |
 | `MACRO_REUSE_ONLY` | Prüfung eines aktivierten Makroregel-Inventars ohne neue Hypothesengenerierung |
-| `FULL_DISCOVERY` | vollständige Forschungsstrecke mit Hypothesen, Makro-Lernen, Makro-Reuse und Gallery |
+| `HYPOTHESIS_AND_MACRO_REUSE` | Engine-Profil mit Hypothesenoperatoren und Wiederverwendung bereits gelernter Makros |
+| `RESEARCH_DISCOVERY_PIPELINE` | Orchestrierungsprofil mit Hypothesen, Makro-Reuse, optionalem Makro-Lernen/Promotion und Gallery |
 
-Die `HypothesisOperatorRegistry` liefert stabile Rule-IDs für Reports und hält die
-Operator-Reihenfolge zentral. `DiscoveryEngineFactory` dokumentiert und erzwingt
+Die `HypothesisOperatorRegistry` liefert stabile Rule-IDs, Display-Namen, Familien
+und Tags für Reports und hält die Operator-Reihenfolge zentral.
+`DiscoveryEngineFactory` dokumentiert und erzwingt
 die deterministische Komposition **base rewrite → hypothesis operators → learned
-macro moves**. Diese Trennung reduziert Sonderfälle in Workflows: Ein Report kann
-anhand von Profil und Rule-Path erklären, welche Erweiterungen aktiv waren.
+macro moves**. Lernen und Promotion gehören zur Workflow-Orchestrierung und werden
+über `DiscoveryLearningOptions` gesteuert, nicht über die Engine-Factory.
 
 Eine neue Gallery wird nur ergänzt, wenn ein echtes Replay mit passenden Rule-IDs
 vorliegt. Für neue Operatoren gilt: erst `HypothesisOperator` implementieren, dann
 in die Registry aufnehmen, Corpus- und False-Positive-Tests ergänzen und nur bei
 nachweisbarem Replay eine Gallery-Darstellung aktivieren.
 
-Der Complete-Square-Operator ist ein bounded conservative square-completion
-Operator: Er emittiert nur Kandidaten mit Rest `0` oder negativem perfekten
-Quadrat und deckt nicht alle algebraisch möglichen quadratischen Ergänzungen ab.
+Der `ConservativeCompleteSquareHypothesisOperator` ist ein bounded conservative
+square-completion Operator: Er emittiert nur Kandidaten mit Rest `0` oder
+negativem perfekten Quadrat und deckt nicht alle algebraisch möglichen
+quadratischen Ergänzungen ab.

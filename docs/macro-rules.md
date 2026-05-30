@@ -27,19 +27,18 @@ Implementiert in zwei komplementären Pfaden:
 
 ## Hidden-Structure Generalisierung
 
-Hidden-Structure-Funde werden über `DiscoveryResultKind` klassifiziert:
+Hidden-Structure-Funde trennen `DiscoveryResultKind` (Suchzustand) von Evidence:
 
 | Level | `DiscoveryResultKind` | Bedeutung |
 |-------|------------------------|-----------|
 | 0 | `NO_CANDIDATE` | kein begrenzter Hypothesenkandidat |
 | 1 | `HYPOTHESIS_ONLY` | Kandidat erzeugt, aber kein Replay-Bridge-State |
 | 2 | `BRIDGE_FOUND` | validierter Zwischenzustand wie Quadratdifferenz oder quadratische Ergänzung |
-| 3 | `FACTORED` / `SIMPLIFIED` | Replay erreicht faktorisierte oder vereinfachte Form |
-| 4 | `MACRO_LEARNED` | ein validiertes Schema wurde aus einem realen Pfad gelernt |
-| 5 | `MACRO_REUSED` | das gelernte Schema wurde in einem zweiten strukturell passenden Fall angewandt |
+| 3 | `TRANSFORMED` | Replay erreicht ein transformiertes Ziel |
+| Evidence | `FACTORED`, `SIMPLIFIED`, `MACRO_LEARNED`, `MACRO_REUSED`, `EQUIVALENCE_VALIDATED` | zusätzliche Fähigkeiten/Belege, nicht Suchzustand |
 
 Die aktuelle Infrastruktur unterstützt Sophie-Germain-Bridges und konservative
-quadratische Ergänzung (`CompleteSquareHypothesisOperator`). Alle Gallery- und
+quadratische Ergänzung (`ConservativeCompleteSquareHypothesisOperator`). Alle Gallery- und
 Report-Einträge werden aus echten Replay-/Suchartefakten erzeugt; statische
 Diagramme oder erfundene Pfade sind nicht Teil des Flows.
 
@@ -255,8 +254,9 @@ kann den Status auf `VALIDATED_BY_EXAMPLES` oder höher anheben.
 
 ## Discovery profiles
 
-`DiscoveryOptions` bündelt die Schalter für Hypothesenoperatoren, Makro-Lernen,
-Makro-Wiederverwendung, Gallery-Ausgabe sowie Suchbudget und -tiefe. Die benannten
+`DiscoveryOptions` bündelt `DiscoveryEngineOptions` für Hypothesenoperatoren,
+Makro-Wiederverwendung, Suchbudget/-tiefe und `DiscoveryLearningOptions` für
+Makro-Lernen, Validierung generierter Instanzen und Promotion. Die benannten
 `DiscoveryProfile`s reduzieren hart verdrahtete Spezialfälle:
 
 | Profil | Verwendung |
@@ -264,10 +264,12 @@ Makro-Wiederverwendung, Gallery-Ausgabe sowie Suchbudget und -tiefe. Die benannt
 | `PURE_REWRITE` | deterministische Baseline nur mit atomaren Rewrite-Regeln |
 | `HYPOTHESIS_ONLY` | Experimente mit Hypothesenoperatoren, aber ohne gelernte Regeln |
 | `MACRO_REUSE_ONLY` | Evaluation eines vorhandenen Makroregel-Inventars ohne neue Hypothesen |
-| `FULL_DISCOVERY` | vollständige Forschungspipeline mit Hypothesen, Makro-Lernen, Makro-Reuse und Gallery |
+| `HYPOTHESIS_AND_MACRO_REUSE` | Engine-Profil mit Hypothesen und Wiederverwendung bereits gelernter Makros |
+| `RESEARCH_DISCOVERY_PIPELINE` | Orchestrierungsprofil mit Hypothesen, Makro-Reuse, optionalem Makro-Lernen/Promotion und Gallery |
 
-`HypothesisOperatorRegistry` ist die zentrale Liste der verfügbaren Operatoren.
-Die aktuelle Reihenfolge ist deterministisch:
+`HypothesisOperatorRegistry` ist die zentrale Liste der verfügbaren
+`HypothesisOperatorDescriptor`s mit stabiler ID, Display-Name, Familie, Factory,
+Default-Enablement und Tags. Die aktuelle Reihenfolge ist deterministisch:
 
 1. `hypothesis_difference_of_squares_preparation`
 2. `hypothesis_complete_square_preparation`
@@ -277,7 +279,8 @@ Die aktuelle Reihenfolge ist deterministisch:
 Workflow nicht mehr wissen, welche Operator-Klassen direkt zu instanziieren sind,
 und neue Varianten lassen sich über Optionen statt über verstreute Konstruktoren
 steuern. Das senkt die kognitive Last, weil Profilwahl, Operatorliste und
-Engine-Reihenfolge jeweils genau eine Zuständigkeit haben.
+Engine-Reihenfolge jeweils genau eine Zuständigkeit haben. Die Factory lernt oder
+promotet keine Makros; das ist ausschließlich Orchestrierungslogik.
 
 Neue Hypothesenoperatoren werden so ergänzt:
 
@@ -287,7 +290,7 @@ Neue Hypothesenoperatoren werden so ergänzt:
 4. False-Positive-/Near-Miss-Tests ergänzen.
 5. Optional eine Gallery-Regel ergänzen, wenn ein echtes Replay sie belegt.
 
-`CompleteSquareHypothesisOperator` ist bewusst konservativ: Der bounded
+`ConservativeCompleteSquareHypothesisOperator` ist bewusst konservativ: Der bounded
 square-completion Operator emittiert nur Kandidaten mit Rest `0` oder negativem
 perfekten Quadrat. Er erhebt keinen Anspruch, alle gültigen quadratischen
 Ergänzungen abzudecken, z. B. nicht jede Form wie `x^2 + 6*x + 6`.

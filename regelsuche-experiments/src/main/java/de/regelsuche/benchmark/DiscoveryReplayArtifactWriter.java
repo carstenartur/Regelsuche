@@ -795,16 +795,17 @@ public final class DiscoveryReplayArtifactWriter {
         StringBuilder out = new StringBuilder("## Generated Discovery Gallery\n\n");
         boolean emitted = false;
         for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
-        for (GalleryDiscoveryDescriptor descriptor : GALLERY_DESCRIPTORS) {
-            if (descriptor.matches(row)) {
-                emitted = true;
-                out.append("### ").append(descriptor.title()).append("\n\n");
-                for (String metadata : descriptor.renderMetadata().apply(row)) {
-                    out.append("- ").append(metadata).append('\n');
-                }
-                out.append('\n');
-                if (descriptor.id().equals("sophie-germain-discovery")) {
-                    out.append("```mermaid\n").append(renderSemanticMermaid(semanticView)).append("```\n\n");
+            for (GalleryDiscoveryDescriptor descriptor : GALLERY_DESCRIPTORS) {
+                if (descriptor.matches(row)) {
+                    emitted = true;
+                    out.append("### ").append(descriptor.title()).append("\n\n");
+                    for (String metadata : descriptor.renderMetadata().apply(row)) {
+                        out.append("- ").append(metadata).append('\n');
+                    }
+                    out.append('\n');
+                    if (descriptor.id().equals("sophie-germain-discovery")) {
+                        out.append("```mermaid\n").append(renderSemanticMermaid(semanticView)).append("```\n\n");
+                    }
                 }
             }
         }
