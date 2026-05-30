@@ -1,6 +1,7 @@
 package de.regelsuche.benchmark;
 
 import de.regelsuche.example.SeedExpression;
+import de.regelsuche.discovery.DiscoveryResultKind;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.ArrayList;
@@ -88,6 +89,8 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                     outcome.inferredAssumptions(),
                     outcome.counterexampleExplanation(),
                     outcome.replayPath(),
+                    outcome.resultKind(),
+                    outcome.rulePath(),
                     outcome.elapsedMillis(),
                     outcome.memoryBytes()
                 ));
@@ -122,6 +125,8 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
         List<String> inferredAssumptions,
         String counterexampleExplanation,
         List<String> replayPath,
+        DiscoveryResultKind resultKind,
+        List<String> rulePath,
         long elapsedMillis,
         long memoryBytes
     ) {
@@ -135,7 +140,8 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
             long memoryBytes
         ) {
             this(success, summary, hypotheses, counterexamples, deriveStatus(counterexamples, null),
-                List.of(), List.of(), "", replayPath, elapsedMillis, memoryBytes);
+                List.of(), List.of(), "", replayPath, defaultResultKind(success, hypotheses, replayPath), List.of(),
+                elapsedMillis, memoryBytes);
         }
 
         public SeedRunOutcome(
@@ -153,7 +159,25 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                 counterexampleResult.attemptedSources(),
                 counterexampleResult.inferredAssumptions(),
                 counterexampleResult.explanation(),
-                replayPath, elapsedMillis, memoryBytes);
+                replayPath, defaultResultKind(success, hypotheses, replayPath), List.of(), elapsedMillis, memoryBytes);
+        }
+
+        public SeedRunOutcome(
+            boolean success,
+            String summary,
+            List<String> hypotheses,
+            List<String> counterexamples,
+            CounterexampleSearchService.Status counterexampleSearchStatus,
+            List<String> counterexampleAttemptedSources,
+            List<String> inferredAssumptions,
+            String counterexampleExplanation,
+            List<String> replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+            this(success, summary, hypotheses, counterexamples, counterexampleSearchStatus,
+                counterexampleAttemptedSources, inferredAssumptions, counterexampleExplanation, replayPath,
+                defaultResultKind(success, hypotheses, replayPath), List.of(), elapsedMillis, memoryBytes);
         }
 
         public SeedRunOutcome {
@@ -167,6 +191,8 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
             inferredAssumptions = inferredAssumptions == null ? List.of() : List.copyOf(inferredAssumptions);
             counterexampleExplanation = counterexampleExplanation == null ? "" : counterexampleExplanation;
             replayPath = replayPath == null ? List.of() : List.copyOf(replayPath);
+            resultKind = resultKind == null ? defaultResultKind(success, hypotheses, replayPath) : resultKind;
+            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
         }
 
         public static SeedRunOutcome fail(String summary) {
@@ -184,6 +210,18 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                 ? CounterexampleSearchService.Status.INCONCLUSIVE
                 : CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND;
         }
+
+        private static DiscoveryResultKind defaultResultKind(boolean success, List<String> hypotheses, List<String> replayPath) {
+            if (!success && (hypotheses == null || hypotheses.isEmpty())) {
+                return DiscoveryResultKind.NO_CANDIDATE;
+            }
+            if (success && replayPath != null && replayPath.size() > 1) {
+                return DiscoveryResultKind.SIMPLIFIED;
+            }
+            return hypotheses == null || hypotheses.isEmpty()
+                ? DiscoveryResultKind.NO_CANDIDATE
+                : DiscoveryResultKind.HYPOTHESIS_ONLY;
+        }
     }
 
     public record SeedRunReport(
@@ -197,6 +235,8 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
         List<String> inferredAssumptions,
         String counterexampleExplanation,
         List<String> replayPath,
+        DiscoveryResultKind resultKind,
+        List<String> rulePath,
         long elapsedMillis,
         long memoryBytes
     ) {
@@ -214,7 +254,32 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                 counterexamples == null || counterexamples.isEmpty()
                     ? CounterexampleSearchService.Status.INCONCLUSIVE
                     : CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND,
-                List.of(), List.of(), "", replayPath, elapsedMillis, memoryBytes);
+                List.of(), List.of(), "", replayPath,
+                SeedRunOutcome.defaultResultKind(success, hypotheses, replayPath), List.of(), elapsedMillis, memoryBytes);
+        }
+
+        public SeedRunReport(
+            SeedExpression seed,
+            boolean success,
+            String summary,
+            List<String> hypotheses,
+            List<String> counterexamples,
+            CounterexampleSearchService.Status counterexampleSearchStatus,
+            List<String> counterexampleAttemptedSources,
+            List<String> inferredAssumptions,
+            String counterexampleExplanation,
+            List<String> replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+            this(seed, success, summary, hypotheses, counterexamples, counterexampleSearchStatus,
+                counterexampleAttemptedSources, inferredAssumptions, counterexampleExplanation, replayPath,
+                SeedRunOutcome.defaultResultKind(success, hypotheses, replayPath), List.of(), elapsedMillis, memoryBytes);
+        }
+
+        public SeedRunReport {
+            resultKind = resultKind == null ? SeedRunOutcome.defaultResultKind(success, hypotheses, replayPath) : resultKind;
+            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
         }
     }
 
@@ -261,6 +326,7 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                 object.property("seedId", row.seed().id());
                 object.property("expression", row.seed().expression());
                 object.property("success", row.success());
+                object.property("resultKind", row.resultKind().name());
                 object.property("summary", row.summary());
                 object.array("hypotheses", h -> row.hypotheses().forEach(h::value));
                 object.property("counterexampleStatus", row.counterexampleSearchStatus().name());
@@ -269,6 +335,7 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                 object.array("inferredAssumptions", c -> row.inferredAssumptions().forEach(c::value));
                 object.property("explanation", row.counterexampleExplanation());
                 object.array("replayPath", r -> row.replayPath().forEach(r::value));
+                object.array("rulePath", r -> row.rulePath().forEach(r::value));
                 object.property("elapsedMillis", 0L);
                 object.property("memoryBytes", 0L);
             })));

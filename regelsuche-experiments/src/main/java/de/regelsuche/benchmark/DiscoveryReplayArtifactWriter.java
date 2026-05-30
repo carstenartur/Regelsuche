@@ -1,6 +1,7 @@
 package de.regelsuche.benchmark;
 
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.transform.SquareDifferenceAstPredicate;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -135,14 +136,16 @@ public final class DiscoveryReplayArtifactWriter {
             .append(" · erfolgreich: ").append(report.metrics().successfulSeeds())
             .append(" · Hypothesen: ").append(report.metrics().hypotheses())
             .append(" · Gegenbeispiele: ").append(report.metrics().counterexamples())
-            .append("</p><table><thead><tr><th>Seed</th><th>Status</th><th>Discovery</th><th>Replay</th><th>Summary</th></tr></thead><tbody>");
+            .append("</p><table><thead><tr><th>Seed</th><th>Status</th><th>ResultKind</th><th>Discovery</th><th>Rules</th><th>Replay</th><th>Summary</th></tr></thead><tbody>");
         for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
             out.append("<tr><td>").append(escape(row.seed().stableKey())).append("</td><td>")
                 .append(row.success() ? "<span class=\"ok\">OK</span>" : "<span class=\"fail\">FAIL</span>")
                 .append("<div>").append(renderCounterexampleStatusLabel(row)).append("</div>")
                 .append("<div class=\"muted\">Kategorie: ").append(escape(row.seed().category())).append("</div>")
+                .append("</td><td>").append(escape(row.resultKind().name()))
                 .append("</td><td>")
                 .append(renderHtmlDiscoveryDetails(row))
+                .append("</td><td>").append(escape(row.rulePath().isEmpty() ? "—" : String.join(" → ", row.rulePath())))
                 .append("</td><td><ol>");
             for (String step : row.replayPath()) {
                 out.append("<li class=\"replay-step\"><code>").append(escape(step)).append("</code></li>");
@@ -194,9 +197,11 @@ public final class DiscoveryReplayArtifactWriter {
         out.append("- Collapsed variants: ").append(semanticView.collapsedVariantCount()).append('\n');
         out.append("- Collapsed low-signal steps: ").append(semanticView.collapsedLowSignalCount()).append("\n\n");
         out.append("```mermaid\n").append(renderSemanticMermaid(semanticView)).append("```\n\n");
+        out.append(renderGeneratedGallery(report, semanticView));
         for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
             out.append("## ").append(row.seed().stableKey()).append("\n\n");
             out.append("- Status: ").append(row.success() ? "OK" : "FAIL").append('\n');
+            out.append("- resultKind: ").append(row.resultKind().name()).append('\n');
             out.append("- Kategorie: ").append(row.seed().category()).append('\n');
             out.append("- Annahmen: ").append(joinOrDash(row.seed().assumptions())).append('\n');
             out.append("- Hypothesen: ").append(joinOrDash(row.hypotheses())).append('\n');
@@ -208,6 +213,20 @@ public final class DiscoveryReplayArtifactWriter {
             out.append("- Laufzeit: ").append(row.elapsedMillis()).append(" ms\n");
             out.append("- Speicher: ").append(row.memoryBytes()).append(" B\n");
             out.append("- Summary: ").append(row.summary()).append("\n\n");
+            out.append("### Discovery summary table\n\n");
+            out.append("| expression | operator | resultKind | bridge? | simplified/factored? | learnedMacro? | macroReused? | proofStatus | rulePath | notes |\n");
+            out.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+            out.append("| ").append(escapeMarkdown(row.seed().expression()))
+                .append(" | ").append(escapeMarkdown(operatorLabel(row.rulePath())))
+                .append(" | ").append(row.resultKind().name())
+                .append(" | ").append(isBridgeKind(row) ? "yes" : "no")
+                .append(" | ").append(isTransformedKind(row) ? "yes" : "no")
+                .append(" | ").append(isMacroLearnedKind(row) ? "yes" : "no")
+                .append(" | ").append(row.resultKind().name().equals("MACRO_REUSED") ? "yes" : "no")
+                .append(" | ").append(row.counterexampleSearchStatus().name())
+                .append(" | ").append(escapeMarkdown(row.rulePath().isEmpty() ? "—" : String.join(" -> ", row.rulePath())))
+                .append(" | ").append(escapeMarkdown(row.summary()))
+                .append(" |\n\n");
             out.append("### Replay\n\n");
             if (row.replayPath().isEmpty()) {
                 out.append("- Kein Replay vorhanden\n\n");
@@ -256,6 +275,7 @@ public final class DiscoveryReplayArtifactWriter {
             object.property("seedId", row.seed().id());
             object.property("seedStableKey", row.seed().stableKey());
             object.property("category", row.seed().category());
+            object.property("resultKind", row.resultKind().name());
             object.array("assumptions", assumptions -> row.seed().assumptions().forEach(assumptions::value));
             object.array("hypotheses", hypotheses -> row.hypotheses().forEach(hypotheses::value));
             object.property("counterexampleStatus", row.counterexampleSearchStatus().name());
@@ -264,6 +284,7 @@ public final class DiscoveryReplayArtifactWriter {
             object.array("inferredAssumptions", assumptions -> row.inferredAssumptions().forEach(assumptions::value));
             object.property("explanation", row.counterexampleExplanation());
             object.array("replayPath", replay -> row.replayPath().forEach(replay::value));
+            object.array("rulePath", rules -> row.rulePath().forEach(rules::value));
         })));
         writer.object("semanticGraph", semantic -> {
             semantic.property("renderer", semanticView.renderer());
@@ -732,6 +753,78 @@ public final class DiscoveryReplayArtifactWriter {
         }
     }
 
+    private String renderGeneratedGallery(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView
+    ) {
+        StringBuilder out = new StringBuilder("## Generated Discovery Gallery\n\n");
+        boolean emitted = false;
+        for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {
+            if (row.replayPath().isEmpty()) {
+                continue;
+            }
+            if (row.seed().expression().equals("x^4 + 4")
+                && row.rulePath().contains("hypothesis_difference_of_squares_preparation")
+                && row.rulePath().contains("ast_square_difference_factor")) {
+                emitted = true;
+                out.append("### Sophie-Germain discovery replay\n\n")
+                    .append("- input: `").append(row.seed().expression()).append("`\n")
+                    .append("- discovered bridge: `").append(bridgeFrom(row.replayPath())).append("`\n")
+                    .append("- factored output: `").append(row.replayPath().getLast()).append("`\n")
+                    .append("- rules used: ").append(escapeMarkdown(String.join(" -> ", row.rulePath()))).append('\n')
+                    .append("- proof/equivalence status: ").append(row.counterexampleSearchStatus().name()).append('\n')
+                    .append("- replay source: generated search/replay path in this report\n\n")
+                    .append("```mermaid\n").append(renderSemanticMermaid(semanticView)).append("```\n\n");
+            }
+            if (row.resultKind().name().equals("MACRO_REUSED") || row.rulePath().stream().anyMatch(rule -> rule.contains("macro"))) {
+                emitted = true;
+                out.append("### Learned macro reuse\n\n")
+                    .append("- input discovery: `").append(row.seed().expression()).append("`\n")
+                    .append("- extracted/reused macro evidence: ").append(escapeMarkdown(String.join(" -> ", row.rulePath()))).append('\n')
+                    .append("- validation examples: generated by the macro-learning/replay run\n")
+                    .append("- limitation: structural matching plus normalization, not full equivalence-class matching\n\n");
+            }
+        }
+        if (!emitted) {
+            out.append("- No gallery entry emitted: no qualifying generated replay or macro-reuse artifact in this run.\n\n");
+        }
+        return out.toString();
+    }
+
+    private String bridgeFrom(List<String> replayPath) {
+        return replayPath.stream()
+            .filter(SquareDifferenceAstPredicate::containsSquareDifference)
+            .findFirst()
+            .orElse(replayPath.getLast());
+    }
+
+    private boolean isBridgeKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+        String kind = row.resultKind().name();
+        return kind.equals("BRIDGE_FOUND") || kind.equals("FACTORED") || kind.equals("SIMPLIFIED")
+            || kind.equals("MACRO_LEARNED") || kind.equals("MACRO_REUSED");
+    }
+
+    private boolean isTransformedKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+        String kind = row.resultKind().name();
+        return kind.equals("FACTORED") || kind.equals("SIMPLIFIED")
+            || kind.equals("MACRO_LEARNED") || kind.equals("MACRO_REUSED");
+    }
+
+    private boolean isMacroLearnedKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+        String kind = row.resultKind().name();
+        return kind.equals("MACRO_LEARNED") || kind.equals("MACRO_REUSED");
+    }
+
+    private String operatorLabel(List<String> rulePath) {
+        if (rulePath.stream().anyMatch(rule -> rule.contains("complete_square"))) {
+            return "complete-square";
+        }
+        if (rulePath.stream().anyMatch(rule -> rule.contains("difference_of_squares"))) {
+            return "difference-of-squares";
+        }
+        return "—";
+    }
+
     private String renderSemanticMermaid(DiscoverySemanticReportView semanticView) {
         StringBuilder builder = new StringBuilder("graph TD\n");
         for (DiscoverySemanticReportView.SemanticPath path : semanticView.paths()) {
@@ -770,6 +863,10 @@ public final class DiscoveryReplayArtifactWriter {
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
             .replace("'", "&#39;");
+    }
+
+    private String escapeMarkdown(String value) {
+        return (value == null ? "" : value).replace("|", "\\|");
     }
 
     private String metricCard(String label, String value) {
