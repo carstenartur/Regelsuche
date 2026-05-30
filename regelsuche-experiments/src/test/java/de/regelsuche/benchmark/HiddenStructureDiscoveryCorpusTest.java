@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
-import de.regelsuche.example.SeedExpression;
 import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
 import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
 import de.regelsuche.scoring.ExpressionScorer;
