@@ -13,6 +13,10 @@ Implementiert in zwei komplementären Pfaden:
 - `de.regelsuche.mining.RuleCandidateMiner` +
   `PatternGeneralizer` + `CandidateValidator` für validierte Regel-Schemata aus
   erfolgreichen Transformationspfaden.
+- `de.regelsuche.learning.MacroLearningPipeline` als Evidence-Grade-Pipeline:
+  erfolgreiche Replay-Pfade sammeln, Source/Target-Paare extrahieren, Schema
+  generalisieren, Parameterrelationen minen, generierte Instanzen validieren,
+  Counterexamples suchen, Confidence bewerten und erst danach promoten.
 
 1. Pro `DiscoveredTransformation` wird die Regel-Id-Sequenz extrahiert.
 2. Für jede Fensterlänge `n ∈ [minSequenceLength, maxSequenceLength]` werden alle
@@ -51,7 +55,7 @@ Hidden-Structure-Funde werden anschließend in drei Stufen behandelt:
    Ausdrucks-Teilbäume konsistent durch denselben Platzhalter ersetzen, z. B.
    `A^4 + 4 → (A^2 - 2*A + 2) * (A^2 + 2*A + 2)`. Vor der Promotion validiert
    `CandidateValidator` generierte Instanzen wie `A=x`, `A=y`, `A=x+1`,
-   `A=2*x` und `A=x^2` mit dem konfigurierten `EquivalenceService`.
+   `A=2*x`, `A=x^2` und `A=n+2` mit dem konfigurierten `EquivalenceService`.
    Dieser Pfad ist explizit opt-in und senkt nicht die normalen Mining-Schwellen.
 3. **Zukünftiges Mehrparameter-Schema:** Breitere Schemata wie
    `A^4 + 4*B^4 → …` bleiben Future Work.
@@ -236,11 +240,68 @@ Liefert alle Makroregel-Kandidaten als `IdentityReportDto`:
 Speichert die Makroregel als `ReusableRule` im `RuleInventoryRepository`.
 Liefert die neu vergebene Regel-Id zurück.
 
-## Validierungsstatus
+## Evidence-grade MacroLearningPipeline
 
-Vorerst wird `CandidateProofStatus.OBSERVED` gesetzt. Eine zukünftige
-Integration mit `CandidateValidator` (Random-Sampling über `EquivalenceService`)
-kann den Status auf `VALIDATED_BY_EXAMPLES` oder höher anheben.
+`MacroLearningPipeline` lernt aus tatsächlichen `SuccessfulTransformationPath`-
+Replay-Pfaden und schreibt nur validierte `ReusableRule`s in das Inventar.
+Eine Promotion ohne Validierung ist nicht erlaubt. Die Ergebnisstruktur
+`MacroLearningResult` enthält die berührten/promoteten Regeln, alle generierten
+Validierungsbeispiele, Counterexample-Suchergebnisse und Stage-Evidence.
+
+Qualitätsgates vor Promotion:
+
+- Source-Pattern enthält mindestens einen Platzhalter.
+- Target-Pattern nutzt nur gebundene Platzhalter und Konstanten.
+- strukturierte `ParameterRelation`s sind parsebar und durch Guards erzwingbar.
+- Annahmen aus dem Replay werden normalisiert und in Regel sowie Replay-Expansion
+  getragen.
+- generierte Instanzen sind äquivalent.
+- Counterexample-Suche findet keinen Gegenbeleg oder symbolische Äquivalenz liegt
+  vor.
+- Confidence liegt über dem Schwellwert.
+
+### Parameterrelationen
+
+Relationen werden als `ParameterRelation(left, operator, right, relationType)`
+modelliert; Strings bleiben nur Anzeige-/Legacy-Format. Beispiele:
+
+- `B = A + 1` mit `UNIT_STEP`
+- `B = A + k` mit `AFFINE_OFFSET`
+- `C = A^2` mit `POWER`
+- `K != 0` mit `NON_ZERO_ASSUMPTION`
+
+`MacroApplicabilityGuard` nutzt strukturierte Relationen, um unsichere
+Wiederverwendung zu verhindern. Das Teleskoping-Schema wird deshalb als
+`1/(A*(A+1)) -> 1/A - 1/(A+1)` gelernt; die unsichere Variante
+`1/(A*B) -> 1/A - 1/B` wird nicht promotet, solange `B=A+1` nicht erhalten und
+erzwingbar ist.
+
+### Annahmen
+
+Rationalisierungs-Makros tragen Annahmen weiter. Aus
+`1/(sqrt(x)+1) -> (sqrt(x)-1)/(x-1)` wird
+`1/(sqrt(A)+1) -> (sqrt(A)-1)/(A-1)` mit `A != 1`. Die Annahme wird in
+`ReusableRule.assumptions()` und in `MacroMoveExpansion.assumptions()` sichtbar.
+
+### Validierungslevel
+
+- `VALIDATED_BY_EXAMPLES`: alle generierten Substitutionen bestehen und die
+  Counterexample-Suche findet keinen Gegenbeleg.
+- `SYMBOLICALLY_VERIFIED`: zusätzlich bestätigt der symbolische
+  `EquivalenceService` das Schema.
+- `OBSERVED`: nur gesehen; nicht ausreichend für Promotion.
+
+Ein einzelnes Replay reicht nur dann zur Promotion, wenn diese Validierung
+bestanden ist. Andernfalls bleibt die Generalisierung verworfen, auch wenn der
+konkrete Replay-Pfad erfolgreich war.
+
+### Beispiele abgelehnter Generalisierungen
+
+- `1/(A*B) -> 1/A - 1/B` ohne `B=A+1`: übergeneralisiert und erzeugt
+  False Positives wie `1/(n*(n+2))`.
+- Target-Patterns mit ungebundenen Platzhaltern.
+- Schemas, bei denen eine der generierten Substitutionen (`A=x`, `A=y`,
+  `A=x+1`, `A=2*x`, `A=x^2`, `A=n+2`) nicht äquivalent ist.
 
 ## Tests
 
