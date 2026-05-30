@@ -25,4 +25,12 @@ public record DiscoveryWorkflowConfiguration(
             Optional.empty()
         );
     }
+
+    public boolean macroLearningEnabled() {
+        return options.learning().enableMacroLearning() && macroLearningService.isPresent();
+    }
+
+    public DiscoveryLearningOptions effectiveLearningOptions() {
+        return macroLearningEnabled() ? options.learning() : DiscoveryLearningOptions.disabled();
+    }
 }
