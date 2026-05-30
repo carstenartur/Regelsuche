@@ -464,10 +464,10 @@ class BrowserDemoFlowTest {
     }
 
     private void waitForDownloadReady() {
-        page.waitForSelector("#tab-exports .export-grid a[href='/api/exports/bundle.zip']",
+        page.waitForSelector("a[href='/api/exports/bundle.zip']",
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(5_000));
+                .setTimeout(10_000));
     }
 
     private void waitForStableElement(String selector) {

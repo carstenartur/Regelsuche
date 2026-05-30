@@ -16,7 +16,8 @@ public final class DatabaseMigrationRunner {
         new DatabaseMigration(1, "discovery_persistence", "db/migration/V1__discovery_persistence.sql"),
         new DatabaseMigration(2, "full_text_and_facets", "db/migration/V2__full_text_and_facets.sql"),
         new DatabaseMigration(3, "hibernate_search_fields", "db/migration/V3__hibernate_search_fields.sql"),
-        new DatabaseMigration(4, "hypothesis_candidate_metadata", "db/migration/V4__hypothesis_candidate_metadata.sql")
+        new DatabaseMigration(4, "hypothesis_candidate_metadata", "db/migration/V4__hypothesis_candidate_metadata.sql"),
+        new DatabaseMigration(5, "counterexample_search_status", "db/migration/V5__counterexample_search_status.sql")
     );
 
     private final List<DatabaseMigration> migrations;

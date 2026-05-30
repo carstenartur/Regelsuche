@@ -9,6 +9,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: pages-publish-${{ github.repository }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -87,11 +91,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Build, test, coverage
         run: ./gradlew build jacocoTestReport
-      - name: Generate badge JSON for coverage & tests
+      - name: Generate Pages reports and badge JSON
         if: always()
         run: |
           python3 - <<'EOF'
-          import json, os, glob, xml.etree.ElementTree as ET
+          import html
+          import json
+          import shutil
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
 
           GREEN, YELLOW = 80, 60
 
@@ -102,63 +110,141 @@ jobs:
                   return 'yellow'
               return 'red'
 
-          # ── Coverage badge (JaCoCo INSTRUCTION counters) ──────────────────
+          def write_json(path, payload):
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_text(json.dumps(payload, separators=(',', ':')) + '\n', encoding='utf-8')
+
+          def escape(value):
+              return html.escape(str(value), quote=True)
+
+          public = Path('public')
+          coverage_dir = public / 'coverage'
+          tests_dir = public / 'tests'
+          coverage_dir.mkdir(parents=True, exist_ok=True)
+          tests_dir.mkdir(parents=True, exist_ok=True)
+
+          # ── Coverage badge and report index (JaCoCo INSTRUCTION counters) ──
           covered = missed = 0
-          for jacoco_file in glob.glob('**/build/reports/jacoco/**/jacocoTestReport.xml',
-                                        recursive=True):
-              for counter in ET.parse(jacoco_file).getroot().iter('counter'):
+          coverage_reports = []
+          for jacoco_file in sorted(Path('.').glob('**/build/reports/jacoco/**/jacocoTestReport.xml')):
+              try:
+                  root = ET.parse(jacoco_file).getroot()
+              except ET.ParseError as exc:
+                  print(f"Skipping malformed JaCoCo XML {jacoco_file}: {exc}")
+                  continue
+              file_covered = file_missed = 0
+              for counter in root.iter('counter'):
                   if counter.get('type') == 'INSTRUCTION':
-                      covered += int(counter.get('covered', 0))
-                      missed  += int(counter.get('missed', 0))
+                      c = int(counter.get('covered', 0))
+                      m = int(counter.get('missed', 0))
+                      covered += c
+                      missed += m
+                      file_covered += c
+                      file_missed += m
+              total = file_covered + file_missed
+              pct = round(file_covered / total * 100) if total else 0
+              module = jacoco_file.parts[0] if jacoco_file.parts[0] != 'build' else 'root'
+              html_source = jacoco_file.parent / 'html'
+              if html_source.is_dir():
+                  target = coverage_dir / 'modules' / module
+                  shutil.copytree(html_source, target, dirs_exist_ok=True)
+                  coverage_reports.append((module, pct, f"modules/{module}/index.html"))
+
           total = covered + missed
           pct = round(covered / total * 100) if total else 0
-          coverage = {"schemaVersion": 1, "label": "coverage",
-                      "message": f"{pct}%", "color": colour(pct)}
+          write_json(coverage_dir / 'badge.json', {
+              "schemaVersion": 1,
+              "label": "coverage",
+              "message": f"{pct}%",
+              "color": colour(pct),
+          })
 
-          os.makedirs('public/coverage', exist_ok=True)
-          with open('public/coverage/badge.json', 'w') as f:
-              json.dump(coverage, f)
+          coverage_rows = '\n'.join(
+              f'<tr><td><a href="{escape(link)}">{escape(module)}</a></td><td>{module_pct}%</td></tr>'
+              for module, module_pct, link in coverage_reports
+          ) or '<tr><td colspan="2">No JaCoCo HTML reports were generated.</td></tr>'
+          (coverage_dir / 'index.html').write_text(f'''<!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><title>Regelsuche Coverage</title>
+          <style>body{{font-family:system-ui,sans-serif;margin:2rem;max-width:960px}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ddd;padding:.5rem;text-align:left}}th{{background:#f6f8fa}}</style>
+          </head><body><h1>Regelsuche Coverage</h1>
+          <p>Total instruction coverage: <strong>{pct}%</strong></p>
+          <table><thead><tr><th>Module</th><th>Instruction coverage</th></tr></thead><tbody>{coverage_rows}</tbody></table>
+          </body></html>\n''', encoding='utf-8')
 
-          # Mirror the JaCoCo HTML report so gh-pages can serve it.
-          import shutil
-          for html_dir in glob.glob('**/build/reports/jacoco/test/html',
-                                     recursive=True):
-              shutil.copytree(html_dir, 'public/coverage', dirs_exist_ok=True)
+          # ── Tests badge and report index (Gradle/JUnit XML) ────────────────
+          tests = failures = errors = skipped = 0
+          suites = []
+          for path in sorted(Path('.').glob('**/build/test-results/*/TEST-*.xml')):
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError as exc:
+                  print(f"Skipping malformed JUnit XML {path}: {exc}")
+                  continue
+              suite_tests = int(root.get('tests', 0))
+              suite_failures = int(root.get('failures', 0))
+              suite_errors = int(root.get('errors', 0))
+              suite_skipped = int(root.get('skipped', 0))
+              tests += suite_tests
+              failures += suite_failures
+              errors += suite_errors
+              skipped += suite_skipped
+              parts = path.parts
+              module = parts[0] if parts[0] != 'build' else 'root'
+              task = parts[parts.index('test-results') + 1]
+              suites.append((module, task, root.get('name', path.stem), suite_tests, suite_failures + suite_errors, suite_skipped))
 
-          # ── Tests badge (Surefire / JUnit XML) ────────────────────────────
-          tests = failures = errors = 0
-          xml_files = []
-          for root_dir in ('app/build/test-results/test', 'app/build/test-results/e2eTest'):
-              xml_files.extend(glob.glob(f'{root_dir}/TEST-*.xml'))
-          for path in xml_files:
-              root = ET.parse(path).getroot()
-              tests    += int(root.get('tests',    0))
-              failures += int(root.get('failures', 0))
-              errors   += int(root.get('errors',   0))
           failed = failures + errors
-          passed = tests - failed
+          passed = tests - failed - skipped
           if failed:
               msg, colr = f"{failed}/{tests} failed", 'red'
           else:
               msg, colr = f"{passed} passed", 'brightgreen'
-          tests_badge = {"schemaVersion": 1, "label": "tests",
-                         "message": msg, "color": colr}
-          os.makedirs('public/tests', exist_ok=True)
-          with open('public/tests/badge.json', 'w') as f:
-              json.dump(tests_badge, f)
+          write_json(tests_dir / 'badge.json', {
+              "schemaVersion": 1,
+              "label": "tests",
+              "message": msg,
+              "color": colr,
+          })
 
-          # Mirror the JUnit HTML report so gh-pages can serve it.
-          for html_dir in glob.glob('app/build/reports/tests/test'):
-              shutil.copytree(html_dir, 'public/tests', dirs_exist_ok=True)
+          test_reports = []
+          for report_dir in sorted(Path('.').glob('**/build/reports/tests/*')):
+              if not report_dir.is_dir() or not (report_dir / 'index.html').is_file():
+                  continue
+              parts = report_dir.parts
+              module = parts[0] if parts[0] != 'build' else 'root'
+              task = parts[parts.index('tests') + 1]
+              target_name = f'{module}-{task}'
+              target = tests_dir / 'reports' / target_name
+              shutil.copytree(report_dir, target, dirs_exist_ok=True)
+              test_reports.append((module, task, f'reports/{target_name}/index.html'))
 
-          print(f"Coverage: {pct}%   Tests: {tests} ({failed} failed)")
+          report_links = {(module, task): link for module, task, link in test_reports}
+          suite_row_items = []
+          for module, task, name, suite_tests, suite_failed, suite_skipped in suites:
+              link = report_links.get((module, task))
+              report_link = f'<a href="{escape(link)}">HTML</a>' if link else ''
+              suite_row_items.append(
+                  f'<tr><td>{escape(module)}</td><td>{escape(task)}</td><td>{escape(name)}</td>'
+                  f'<td>{suite_tests}</td><td>{suite_failed}</td><td>{suite_skipped}</td>'
+                  f'<td>{report_link}</td></tr>'
+              )
+          suite_rows = '\n'.join(suite_row_items) or '<tr><td colspan="7">No JUnit XML reports were generated.</td></tr>'
+          (tests_dir / 'index.html').write_text(f'''<!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><title>Regelsuche Tests</title>
+          <style>body{{font-family:system-ui,sans-serif;margin:2rem;max-width:1200px}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ddd;padding:.5rem;text-align:left}}th{{background:#f6f8fa}}</style>
+          </head><body><h1>Regelsuche Tests</h1>
+          <p><strong>{passed}</strong> passed, <strong>{failed}</strong> failed, <strong>{skipped}</strong> skipped, <strong>{tests}</strong> total.</p>
+          <table><thead><tr><th>Module</th><th>Task</th><th>Suite</th><th>Tests</th><th>Failed</th><th>Skipped</th><th>Report</th></tr></thead><tbody>{suite_rows}</tbody></table>
+          </body></html>\n''', encoding='utf-8')
+
+          print(f"Coverage: {pct}%   Tests: {tests} ({failed} failed, {skipped} skipped)")
           EOF
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: app/build/reports/jacoco/test/**
+          path: '**/build/reports/jacoco/**'
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
@@ -183,7 +269,11 @@ jobs:
           touch .nojekyll
           mkdir -p coverage tests dev/bench
           printf '{"schemaVersion":1,"label":"coverage","message":"pending","color":"lightgrey"}\n' > coverage/badge.json
+          printf '<!doctype html><title>Coverage pending</title><h1>Coverage pending</h1>\n' > coverage/index.html
           printf '{"schemaVersion":1,"label":"tests","message":"pending","color":"lightgrey"}\n' > tests/badge.json
+          printf '<!doctype html><title>Tests pending</title><h1>Tests pending</h1>\n' > tests/index.html
+          printf '{"schemaVersion":1,"label":"performance","message":"pending","color":"lightgrey"}\n' > dev/bench/badge.json
+          printf '<!doctype html><title>Benchmarks pending</title><h1>Benchmarks pending</h1>\n' > dev/bench/index.html
           git add .
           git -c user.name='github-actions[bot]' -c user.email='github-actions[bot]@users.noreply.github.com' commit -m 'Initialize gh-pages'
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
@@ -282,8 +372,8 @@ jobs:
         with:
           branch: chore/docs-screenshots-refresh
           delete-branch: false
-          commit-message: chore(docs): refresh demo-gallery screenshots
-          title: chore(docs): refresh demo-gallery screenshots
+          commit-message: 'chore(docs): refresh demo-gallery screenshots'
+          title: 'chore(docs): refresh demo-gallery screenshots'
           body: |
             This PR refreshes demo-gallery screenshots from CI.
 

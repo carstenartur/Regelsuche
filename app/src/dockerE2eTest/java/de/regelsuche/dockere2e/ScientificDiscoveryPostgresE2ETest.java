@@ -71,7 +71,8 @@ class ScientificDiscoveryPostgresE2ETest {
             assertEquals(seeds.size(), adapters.seeds().findAll().size());
             assertEquals(seeds.size(), adapters.searchRuns().findAll().size());
             assertEquals(seeds.size(), adapters.proofJobs().findAll().size());
-            assertEquals(4, adapters.reports().findAll().size(), "json/html/png/gif artifact metadata must be stored");
+            assertEquals(6, adapters.reports().findAll().size(),
+                "json/html/png/gif/markdown/replay artifact metadata must be stored");
             assertTrue(adapters.hypotheses().orElseThrow().findById("hyp-identity-binomial-1").isPresent());
             assertFalse(adapters.counterexamples().findAll().isEmpty(), "counterexample-trap seed must persist a counterexample");
             assertEquals("SUCCEEDED", adapters.experiments().findById("exp-scientific-reproduction").orElseThrow().status());
