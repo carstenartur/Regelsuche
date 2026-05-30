@@ -124,10 +124,6 @@ public class MacroLearningPipeline {
         RulePatternNode rightPattern = patternParser.parse(pattern.rightPattern());
         Set<String> detectedPlaceholders = new LinkedHashSet<>(placeholders(pattern.leftPattern()));
         detectedPlaceholders.addAll(placeholders(pattern.rightPattern()));
-        if (detectedPlaceholders.size() > 1) {
-            stages.add("multi-placeholder validation not supported yet: " + detectedPlaceholders);
-            return List.of();
-        }
         if (detectedPlaceholders.isEmpty()) {
             stages.add("reject: generated schema has no placeholders");
             return List.of();
