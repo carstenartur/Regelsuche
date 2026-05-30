@@ -8,6 +8,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -25,6 +33,9 @@ import org.junit.jupiter.api.Test;
 class DemoDocumentationTest {
 
     private static final Path REPO_ROOT = locateRepoRoot();
+    private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[[^]]*]\\(([^)]+)\\)");
+    private static final Pattern MARKDOWN_LINK = Pattern.compile("(?<!!)\\[[^]]*]\\(([^)]+)\\)");
+    private static final Pattern MARKDOWN_HEADING = Pattern.compile("^#{1,6}\\s+(.+)$", Pattern.MULTILINE);
 
     @Test
     void singleDockerImageDocumentedAsPrimaryMode() throws IOException {
@@ -97,6 +108,30 @@ class DemoDocumentationTest {
         );
     }
 
+    @Test
+    void demoGalleryDoesNotReuseScreenshotReferences() throws IOException {
+        Path gallery = REPO_ROOT.resolve("docs/demo-gallery.md");
+        Map<String, Integer> counts = new HashMap<>();
+        for (String image : localReferences(Files.readString(gallery, StandardCharsets.UTF_8), MARKDOWN_IMAGE)) {
+            if (image.startsWith("assets/screenshots/")) {
+                counts.merge(image, 1, Integer::sum);
+            }
+        }
+
+        List<String> duplicates = counts.entrySet().stream()
+            .filter(entry -> entry.getValue() > 1)
+            .map(entry -> entry.getKey() + " x" + entry.getValue())
+            .sorted()
+            .toList();
+        assertTrue(duplicates.isEmpty(), "demo-gallery.md must not repeat screenshot references: " + duplicates);
+    }
+
+    @Test
+    void localDocsLinksAndImagesResolve() throws IOException {
+        assertMarkdownReferencesResolve(REPO_ROOT.resolve("README.md"));
+        assertMarkdownReferencesResolve(REPO_ROOT.resolve("docs/demo-gallery.md"));
+    }
+
     private static String readReadme() throws IOException {
         Path readme = REPO_ROOT.resolve("README.md");
         assertNotNull(readme);
@@ -140,5 +175,85 @@ class DemoDocumentationTest {
         }
         throw new IllegalStateException(
             "Could not locate repository root from " + Paths.get(".").toAbsolutePath());
+    }
+
+    private static void assertMarkdownReferencesResolve(Path markdownFile) throws IOException {
+        String markdown = Files.readString(markdownFile, StandardCharsets.UTF_8);
+        for (String image : localReferences(markdown, MARKDOWN_IMAGE)) {
+            Path imagePath = resolveReference(markdownFile, image);
+            assertTrue(Files.exists(imagePath), "Referenced image must exist: " + image + " in " + markdownFile);
+            assertTrue(Files.isRegularFile(imagePath), "Referenced image must be a file: " + image + " in " + markdownFile);
+        }
+
+        for (String link : localReferences(markdown, MARKDOWN_LINK)) {
+            String[] targetAndFragment = splitFragment(link);
+            Path targetPath = targetAndFragment[0].isBlank()
+                ? markdownFile
+                : resolveReference(markdownFile, targetAndFragment[0]);
+            assertTrue(Files.exists(targetPath), "Referenced link target must exist: " + link + " in " + markdownFile);
+            if (!targetAndFragment[1].isBlank()) {
+                assertTrue(Files.isRegularFile(targetPath), "Anchor target must be a file: " + link + " in " + markdownFile);
+                Set<String> anchors = markdownAnchors(Files.readString(targetPath, StandardCharsets.UTF_8));
+                assertTrue(anchors.contains(targetAndFragment[1]),
+                    "Referenced anchor must exist: " + link + " in " + markdownFile + " anchors=" + anchors);
+            }
+        }
+    }
+
+    private static List<String> localReferences(String markdown, Pattern pattern) {
+        Matcher matcher = pattern.matcher(markdown);
+        List<String> references = new ArrayList<>();
+        while (matcher.find()) {
+            String reference = matcher.group(1).trim();
+            int titleSeparator = reference.indexOf(' ');
+            if (titleSeparator > 0) {
+                reference = reference.substring(0, titleSeparator);
+            }
+            if (!reference.isBlank() && isLocalReference(reference)) {
+                references.add(reference);
+            }
+        }
+        return references;
+    }
+
+    private static boolean isLocalReference(String reference) {
+        return !reference.startsWith("http://")
+            && !reference.startsWith("https://")
+            && !reference.startsWith("mailto:")
+            && !reference.startsWith("data:");
+    }
+
+    private static String[] splitFragment(String reference) {
+        String withoutQuery = reference.split("\\?", 2)[0];
+        String[] parts = withoutQuery.split("#", 2);
+        return new String[] { parts[0], parts.length == 2 ? parts[1] : "" };
+    }
+
+    private static Path resolveReference(Path markdownFile, String reference) {
+        String target = splitFragment(reference)[0];
+        if (target.isBlank()) {
+            return markdownFile;
+        }
+        return markdownFile.getParent().resolve(target).normalize();
+    }
+
+    private static Set<String> markdownAnchors(String markdown) {
+        Matcher matcher = MARKDOWN_HEADING.matcher(markdown);
+        Set<String> anchors = new HashSet<>();
+        while (matcher.find()) {
+            anchors.add(githubAnchor(matcher.group(1)));
+        }
+        return anchors;
+    }
+
+    private static String githubAnchor(String heading) {
+        String withoutFormatting = heading
+            .replace("`", "")
+            .replaceAll("<[^>]+>", "");
+        String slug = withoutFormatting.toLowerCase(java.util.Locale.ROOT)
+            .trim()
+            .replaceAll("\\s+", "-")
+            .replaceAll("[^\\p{IsAlphabetic}\\p{IsDigit}-]", "");
+        return slug;
     }
 }

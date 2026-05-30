@@ -25,7 +25,7 @@ The build is a Gradle multi-project setup with a single `app` module
 | `./gradlew :app:compileJava` | Compile production sources only. |
 | `./gradlew :app:test` | Unit + integration tests. |
 | `./gradlew e2eTest` | Browser flows (`BrowserDemoFlowTest`). |
-| `./gradlew e2eTest -Pregelsuche.recordDocs=true` | Re-record screenshots into `docs/assets/screenshots/`. |
+| `./gradlew test e2eTest -Pregelsuche.recordDocs=true` | Re-record screenshots into `docs/assets/screenshots/`. |
 | `./gradlew :app:installDist` | Produce `app/build/install/app/bin/app`. |
 | `docker build -t regelsuche .` | Build the standard Docker image. |
 | `docker build -f Dockerfile.proof -t regelsuche-proof .` | Build the proof-enabled image (Z3 + cvc5). |

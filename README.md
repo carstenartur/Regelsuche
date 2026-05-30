@@ -12,11 +12,28 @@
 📋 **[Test report](https://carstenartur.github.io/Regelsuche/tests/)** ·
 ⚡ **[Performance charts](https://carstenartur.github.io/Regelsuche/dev/bench/)**
 
+**Navigation:** [Demo Gallery](docs/demo-gallery.md) ·
+[Discovery Engine](docs/discovery-engine.md) ·
+[Macro Rules](docs/macro-rules.md) ·
+[Recent discovery milestone](#recent-discovery-milestone)
+
 > **Regelsuche macht mathematische Umformungsräume sichtbar.**
 > Knoten sind Ausdrücke, Kanten sind Umformungen, Pfade sind Rechenwege —
 > mit Replay, Proof-Bridge und einem klickbaren Web-Workbench.
 
-![Binomial-Demo](docs/assets/screenshots/binomial-graph.png)
+## Recent discovery milestone
+
+![Generated parametric Sophie-Germain discovery graph](docs/assets/screenshots/parametric-sophie-germain-discovery.png)
+
+PR #70 made the hidden structure in `x^4 + 4*y^4` visible as a
+difference of squares:
+`(x^2 + 2*y^2)^2 - (2xy)^2`.
+The same replay/search evidence taught the macro `A^4 + 4*B^4`, then
+reused it on `(x+1)^4 + 4*z^4`; the linked graph and gallery snippet are
+generated from those replay artifacts, not hand-drawn.
+
+See the full [Demo Gallery](docs/demo-gallery.md#symbolic-sophie-germain-discovery)
+for the replay path and macro reuse entry.
 
 ## 30 Sekunden (Demo Standard)
 
@@ -184,8 +201,8 @@ Pull Requests sind willkommen — bitte beachte:
 * `./gradlew test` muss grün sein,
 * `./gradlew e2eTest` muss grün sein, sobald UI-Code geändert wurde
   (siehe [docs/testing.md](docs/testing.md)),
-* Screenshots in [docs/demo-gallery.md](docs/demo-gallery.md) werden
-  ausschließlich über `./gradlew e2eTest -Pregelsuche.recordDocs=true`
+* Screenshots in [docs/demo-gallery.md](docs/demo-gallery.md) werden über
+  `./gradlew test e2eTest -Pregelsuche.recordDocs=true`
   aktualisiert — niemals händisch ersetzen.
 * Nutzerseitige Texte (Demo-Gallery, UI, Replay-Karten, Berichte)
   bitte gegen die

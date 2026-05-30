@@ -7,7 +7,7 @@ Regelsuche fährt vier Test-Schichten, alle als Gradle-Tasks:
 | Unit & Integration | `./gradlew test` | JUnit-5-Tests aller Module (`app/src/test/java`) | im JVM, kein Browser |
 | Browser-E2E | `./gradlew e2eTest` | Playwright steuert Chromium gegen die echte `WebWorkbenchServer`-Instanz | `app/src/e2eTest/java` |
 | Docker-Image-E2E | `./gradlew dockerE2eTest` | Testcontainers baut das Dockerfile, fährt den Container hoch und prüft Asset-Serving und KaTeX-Rendering | `app/src/dockerE2eTest/java` |
-| Doku-Assets | `./gradlew e2eTest -Pregelsuche.recordDocs=true` | gleiche Tests + Screenshots/Videos für die [Demo-Gallery](demo-gallery.md) | Output unter `docs/assets/` |
+| Doku-Assets | `./gradlew test e2eTest -Pregelsuche.recordDocs=true` | Test- + E2E-Läufe schreiben Screenshots/Videos für die [Demo-Gallery](demo-gallery.md) | Output unter `docs/assets/` |
 | Benchmark-Report | `./gradlew benchmarkReport` | rendert `docs/benchmark-report.md` + `docs/assets/benchmark-summary.json` aus der `BenchmarkSuite` | JVM, kein Browser |
 
 ## `./gradlew test`
@@ -64,9 +64,9 @@ läuft explizit im CI-Job `docker-image-e2e` oder lokal mit
 Docker-Daemon skippen sich die Tests automatisch (via
 `DockerClientFactory.instance().isDockerAvailable()`).
 
-## `./gradlew e2eTest -Pregelsuche.recordDocs=true`
+## `./gradlew test e2eTest -Pregelsuche.recordDocs=true`
 
-Identisch zum `e2eTest`-Lauf, schreibt aber zusätzlich:
+`test` + `e2eTest` im Record-Docs-Modus schreiben zusätzlich:
 
 * `docs/assets/screenshots/*.png` — pro Demo ein Full-Page-Screenshot,
 * `docs/assets/videos/*.webm` — pro Test eine WebM-Aufnahme
@@ -118,7 +118,7 @@ die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
   `discovery-summary.png` (synthetischer Report-Screenshot) und
   `discovery-replay.gif` (mehrere Replay-Frames). Echte UI-Screenshots bleiben
   Aufgabe der Playwright-Flows.
-* `docs-assets` — nur auf `main`: `./gradlew e2eTest -Pregelsuche.recordDocs=true`
+* `docs-assets` — nur auf `main`: `./gradlew test e2eTest -Pregelsuche.recordDocs=true`
   und lädt die frischen Screenshots/Videos als CI-Artifact hoch.
 * `benchmark-report` — `./gradlew benchmarkReport` rendert die aktuelle
   Qualitäts-Übersicht und lädt `docs/benchmark-report.md` +
