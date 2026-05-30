@@ -49,8 +49,11 @@ class HiddenStructureDiscoveryExperimentTest {
         DeterministicDiscoveryExperimentRunner.SeedRunReport row = first.rows().getFirst();
         assertEquals("x^4 + 4", row.seed().expression());
         assertTrue(row.success(), row.summary());
+        assertTrue(row.summary().contains("factored via ast_square_difference_factor"), row.summary());
         assertFalse(row.hypotheses().isEmpty());
-        assertTrue(row.replayPath().size() >= 2);
+        assertTrue(row.replayPath().stream().anyMatch(this::isSquareDifferenceState), row.replayPath().toString());
+        assertTrue(row.replayPath().getLast().contains("*"), row.replayPath().toString());
+        assertTrue(row.replayPath().getLast().contains("x ^ 2"), row.replayPath().toString());
         assertTrue(Files.exists(artifacts.jsonReport()));
         assertTrue(Files.exists(artifacts.replayJson()));
         assertTrue(Files.exists(artifacts.markdownReport()));
@@ -80,15 +83,44 @@ class HiddenStructureDiscoveryExperimentTest {
             .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
             .findFirst()
             .orElse(null);
-        boolean participated = hypothesisState != null;
+        SearchState squareDifferenceState = states.stream()
+            .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
+            .filter(state -> isSquareDifferenceState(state.expression()))
+            .findFirst()
+            .orElse(null);
+        SearchState factoredState = states.stream()
+            .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
+            .filter(state -> state.appliedRuleIds().contains("ast_square_difference_factor"))
+            .findFirst()
+            .orElse(null);
+        SearchState reportedState = factoredState != null
+            ? factoredState
+            : squareDifferenceState != null ? squareDifferenceState : hypothesisState;
         return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
-            !hypothesisCandidates.isEmpty() && participated,
-            participated ? "hypothesis candidate participated in search" : "no hypothesis path found",
+            !hypothesisCandidates.isEmpty() && factoredState != null,
+            summary(hypothesisState, squareDifferenceState, factoredState),
             hypothesisCandidates.stream().map(Transformation::transformedExpression).toList(),
             List.of(),
-            participated ? hypothesisState.path() : List.of(),
+            reportedState == null ? List.of() : reportedState.path(),
             0L,
             0L
         );
+    }
+
+    private boolean isSquareDifferenceState(String expression) {
+        return expression.contains("^ 2 -");
+    }
+
+    private String summary(SearchState hypothesisState, SearchState squareDifferenceState, SearchState factoredState) {
+        if (factoredState != null) {
+            return "hypothesis path reached square-difference state and factored via ast_square_difference_factor";
+        }
+        if (squareDifferenceState != null) {
+            return "hypothesis path reached square-difference state but did not reach ast_square_difference_factor";
+        }
+        if (hypothesisState != null) {
+            return "hypothesis candidate participated but did not reach a square-difference state";
+        }
+        return "no hypothesis path found";
     }
 }

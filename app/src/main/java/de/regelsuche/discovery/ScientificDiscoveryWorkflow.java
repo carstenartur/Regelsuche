@@ -28,9 +28,12 @@ import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.SymPyTransformationEngine;
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
@@ -51,6 +54,10 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final AstRewriteTransformationEngine searchEngine = new AstRewriteTransformationEngine(DemoRuleSet.rules());
+    private final TransformationEngine hiddenStructureSearchEngine = new HypothesisTransformationEngine(
+        new AstRewriteTransformationEngine(DemoRuleSet.rules()),
+        List.of(new DifferenceOfSquaresPreparationOperator())
+    );
     private final BestFirstSearchStrategy searchStrategy = new BestFirstSearchStrategy();
     private final DeterministicCounterexampleSearchService counterexamples = new DeterministicCounterexampleSearchService();
     private final DefaultMathematicalAlgorithmRegistry algorithmRegistry = new DefaultMathematicalAlgorithmRegistry();
@@ -88,6 +95,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             case "matrix" -> oneStep(seed, "A * B + A * C", "linalg_distributivity",
                 CandidateProofStatus.SYMBOLICALLY_VERIFIED, List.of(), "matrix distributivity reproduced");
             case "factorization" -> factorization(seed);
+            case "hidden-structure" -> hiddenStructure(seed);
             case "geometric-series" -> geometricSeries(seed);
             case "counterexample" -> counterexample(seed);
             default -> DeterministicDiscoveryExperimentRunner.SeedRunOutcome.fail("unsupported scientific seed category: " + seed.category());
@@ -135,6 +143,51 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         String result = sympy.map(Transformation::transformedExpression).orElse(target);
         return oneStep(seed, result, "polynomial_factorization", CandidateProofStatus.SYMBOLICALLY_VERIFIED,
             List.of(), "factorization reproduced");
+    }
+
+    private DeterministicDiscoveryExperimentRunner.SeedRunOutcome hiddenStructure(SeedExpression seed) {
+        String root = canonicalizer.canonicalize(seed.expression());
+        ExpressionScore before = scorer.score(root);
+        context.graphStore().saveNode(root, before.weightedTotal());
+        List<Transformation> hypothesisCandidates = hiddenStructureSearchEngine.transform(root).stream()
+            .filter(transformation -> transformation.rule().equals(DifferenceOfSquaresPreparationOperator.RULE_ID))
+            .toList();
+        SearchProblem problem = new SearchProblem(root, hiddenStructureSearchEngine, scorer, canonicalizer,
+            new SearchHeuristic(4, 160, 1, 10, 200, 200));
+        List<SearchState> states = searchStrategy.search(problem);
+        SearchState hypothesisState = states.stream()
+            .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
+            .findFirst()
+            .orElse(null);
+        SearchState squareDifferenceState = states.stream()
+            .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
+            .filter(state -> isSquareDifferenceState(state.expression()))
+            .findFirst()
+            .orElse(null);
+        SearchState factoredState = states.stream()
+            .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
+            .filter(state -> state.appliedRuleIds().contains("ast_square_difference_factor"))
+            .findFirst()
+            .orElse(null);
+        for (SearchState state : states) {
+            saveState(root, state);
+        }
+        SearchState reportedState = factoredState != null
+            ? factoredState
+            : squareDifferenceState != null ? squareDifferenceState : hypothesisState;
+        if (factoredState != null) {
+            String pathId = stablePathId(root, factoredState);
+            context.graphStore().saveDiscoveredTransformation(toDiscovered(pathId, root, factoredState, before));
+        }
+        return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
+            !hypothesisCandidates.isEmpty() && factoredState != null,
+            hiddenStructureSummary(hypothesisState, squareDifferenceState, factoredState),
+            hypothesisCandidates.stream().map(Transformation::transformedExpression).toList(),
+            List.of(),
+            reportedState == null ? List.of() : reportedState.path(),
+            0L,
+            0L
+        );
     }
 
     private DeterministicDiscoveryExperimentRunner.SeedRunOutcome geometricSeries(SeedExpression seed) {
@@ -203,6 +256,23 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         context.graphStore().saveNode(state.expression(), state.score().weightedTotal());
         if (state.parentExpression() == null || state.appliedRuleId() == null) {
             return;
+        }
+
+        private boolean isSquareDifferenceState(String expression) {
+            return expression.contains("^ 2 -");
+        }
+
+        private String hiddenStructureSummary(SearchState hypothesisState, SearchState squareDifferenceState, SearchState factoredState) {
+            if (factoredState != null) {
+                return "hidden-structure reproduced: hypothesis path reached square-difference state and factored via ast_square_difference_factor";
+            }
+            if (squareDifferenceState != null) {
+                return "hidden-structure incomplete: reached square-difference state but did not reach ast_square_difference_factor";
+            }
+            if (hypothesisState != null) {
+                return "hidden-structure incomplete: hypothesis candidate participated but did not reach a square-difference state";
+            }
+            return "hidden-structure failed: no hypothesis path found";
         }
         context.graphStore().saveEdge(new GraphEdge(
             state.parentExpression(), state.expression(), state.appliedRuleId(), state.depth(), state.improvement(),

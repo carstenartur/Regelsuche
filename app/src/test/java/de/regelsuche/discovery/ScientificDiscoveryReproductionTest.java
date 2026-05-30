@@ -37,6 +37,7 @@ class ScientificDiscoveryReproductionTest {
             assertCategoryCovered(report, "binomial");
             assertCategoryCovered(report, "geometric-series");
             assertCategoryCovered(report, "factorization");
+            assertCategoryCovered(report, "hidden-structure");
             assertCategoryCovered(report, "trigonometric");
             assertCategoryCovered(report, "matrix");
             assertCategoryCovered(report, "rational");
@@ -100,6 +101,7 @@ class ScientificDiscoveryReproductionTest {
                 "binomial",
                 "geometric-series",
                 "factorization",
+                "hidden-structure",
                 "trigonometric",
                 "matrix",
                 "rational"
