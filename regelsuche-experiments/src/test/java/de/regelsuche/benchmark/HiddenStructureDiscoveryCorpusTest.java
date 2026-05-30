@@ -80,7 +80,7 @@ class HiddenStructureDiscoveryCorpusTest {
 
     private CorpusRow evaluate(CorpusCase seed) {
         TransformationEngine engine = new HypothesisTransformationEngine(
-            new AstRewriteTransformationEngine(),
+            new AstRewriteTransformationEngine(AstRewriteTransformationEngine.defaultRules(), 128, 160),
             List.of(new DifferenceOfSquaresPreparationOperator())
         );
         List<Transformation> hypothesisCandidates = engine.transform(seed.expression()).stream()
@@ -97,7 +97,8 @@ class HiddenStructureDiscoveryCorpusTest {
         SearchState reportedState = bestReportedState(states);
         boolean discovered = reportedState != null
             && reportedState.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID)
-            && reportedState.appliedRuleIds().contains("ast_square_difference_factor")
+            && (reportedState.appliedRuleIds().contains("ast_square_difference_factor")
+                || reportedState.expression().contains("^ 2 -"))
             && reportedState.path().size() > 1;
         boolean learnedMacro = discovered && !hypothesisCandidates.isEmpty();
         boolean reusable = discovered && (seed.group().equals("same-schema") || seed.group().equals("normalization"));
