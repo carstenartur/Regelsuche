@@ -67,7 +67,8 @@ public class RationalizationHypothesisOperator implements HypothesisOperator {
             -1,
             true,
             RULE_ID + ":" + canonicalizer.stableHash(formattedInput) + "->" + key
-                + ";assumption:" + assumption(denominator)
+                + ";assumption:" + assumption(denominator),
+            List.of(assumption(denominator))
         );
         return List.of(transformation).stream()
             .sorted(Comparator.comparing(Transformation::transformedExpression))

@@ -15,9 +15,9 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-class MacroReuseTelescopingTest {
+class ProvidedGuardedMacroReuseTelescopingTest {
     @Test
-    void learnedTelescopingMacroReusesOnlyOnUnitStepProducts() {
+    void providedTelescopingMacroReusesOnlyOnUnitStepProducts() {
         ReusableRule learned = new ReusableRule(
             "telescoping_fraction_learned",
             "1 / (A * B)",
