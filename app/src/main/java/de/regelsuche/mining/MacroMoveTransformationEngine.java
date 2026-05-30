@@ -150,6 +150,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
                 transformation.transformedExpression(),
                 atomicStepsByRuleId.getOrDefault(rule.id(), List.of()),
                 rule.supportingPathIds(),
+                rule.assumptions(),
                 Math.max(1.0, rule.supportingPathIds().isEmpty() ? 1.0 : rule.supportingPathIds().size()),
                 false,
                 stats

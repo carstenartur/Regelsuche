@@ -29,6 +29,7 @@ public record MacroMoveExpansion(
     String toExpression,
     List<TransformationStep> atomicSteps,
     List<String> supportingPathIds,
+    List<String> assumptions,
     double compressionRatio,
     boolean expanded,
     MacroMoveStatistics stats
@@ -39,6 +40,7 @@ public record MacroMoveExpansion(
         }
         atomicSteps = atomicSteps == null ? List.of() : List.copyOf(atomicSteps);
         supportingPathIds = supportingPathIds == null ? List.of() : List.copyOf(supportingPathIds);
+        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         if (compressionRatio < 1.0) {
             compressionRatio = 1.0;
         }
@@ -54,7 +56,7 @@ public record MacroMoveExpansion(
         double compressionRatio,
         boolean expanded
     ) {
-        this(macroRuleId, fromExpression, toExpression, atomicSteps, supportingPathIds,
+        this(macroRuleId, fromExpression, toExpression, atomicSteps, supportingPathIds, List.of(),
             compressionRatio, expanded, MacroMoveStatistics.empty());
     }
 
@@ -66,7 +68,7 @@ public record MacroMoveExpansion(
         double compressionRatio,
         boolean expanded
     ) {
-        this(macroRuleId, fromExpression, toExpression, atomicSteps, List.of(), compressionRatio, expanded,
+        this(macroRuleId, fromExpression, toExpression, atomicSteps, List.of(), List.of(), compressionRatio, expanded,
             MacroMoveStatistics.empty());
     }
 
@@ -74,7 +76,7 @@ public record MacroMoveExpansion(
     public MacroMoveExpansion withExpanded(boolean newExpanded) {
         return new MacroMoveExpansion(
             macroRuleId, fromExpression, toExpression,
-            atomicSteps, supportingPathIds, compressionRatio, newExpanded, stats
+            atomicSteps, supportingPathIds, assumptions, compressionRatio, newExpanded, stats
         );
     }
 
@@ -105,6 +107,7 @@ public record MacroMoveExpansion(
             to,
             atomicSteps,
             candidate.supportingTransformationIds(),
+            List.of(),
             candidate.compressionRatio(),
             false,
             MacroMoveStatistics.empty()

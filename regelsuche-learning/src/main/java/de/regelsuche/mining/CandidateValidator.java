@@ -75,7 +75,7 @@ public class CandidateValidator {
         if (expressionPlaceholders.isEmpty()) {
             return false;
         }
-        for (String sample : List.of("x", "y", "x + 1", "2*x", "x^2")) {
+        for (String sample : List.of("x", "y", "x + 1", "2*x", "x^2", "n + 2")) {
             Map<String, Expr> bindings = new LinkedHashMap<>();
             Expr sampleExpression = expressionParser.parseTerm(sample);
             for (String placeholder : expressionPlaceholders) {

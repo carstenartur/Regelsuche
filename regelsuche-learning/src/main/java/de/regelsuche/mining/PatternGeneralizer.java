@@ -1,15 +1,25 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 public class PatternGeneralizer {
     private final AstNormalizer normalizer;
     private final ParameterRelationMiner relationMiner;
+    private final ExpressionParser expressionParser = new ExpressionParser();
 
     public PatternGeneralizer() {
         this(new AstNormalizer(), new ParameterRelationMiner());
@@ -68,6 +78,10 @@ public class PatternGeneralizer {
         if (path == null) {
             return Optional.empty();
         }
+        Optional<GeneralizedPattern> variableSchema = generalizeSingleVariableSchema(path);
+        if (variableSchema.isPresent()) {
+            return variableSchema;
+        }
         NormalizedNode left = normalizer.normalize(path.originalExpression());
         NormalizedNode right = normalizer.normalize(path.targetExpression());
         Optional<NormalizedNode> placeholderSubtree = commonExpressionSubtrees(left, right).stream()
@@ -100,6 +114,76 @@ public class PatternGeneralizer {
             List.of(placeholder + " \u2208 {" + placeholderSubtree.orElseThrow().canonicalString() + "}"),
             expressionValues
         ));
+    }
+
+    private Optional<GeneralizedPattern> generalizeSingleVariableSchema(SuccessfulTransformationPath path) {
+        Expr left;
+        Expr right;
+        try {
+            left = expressionParser.parseTerm(path.originalExpression());
+            right = expressionParser.parseTerm(path.targetExpression());
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+        Set<String> variables = new LinkedHashSet<>();
+        collectVariables(left, variables);
+        collectVariables(right, variables);
+        if (variables.size() != 1) {
+            return Optional.empty();
+        }
+        String variable = variables.iterator().next();
+        Expr placeholder = new VariableExpr("A");
+        Expr generalizedLeft = replaceVariable(left, variable, placeholder);
+        Expr generalizedRight = replaceVariable(right, variable, placeholder);
+        String leftPattern = ExpressionFormatter.format(generalizedLeft);
+        String rightPattern = ExpressionFormatter.format(generalizedRight);
+        if (leftPattern.equals(path.originalExpression()) && rightPattern.equals(path.targetExpression())) {
+            return Optional.empty();
+        }
+        return Optional.of(new GeneralizedPattern(
+            leftPattern,
+            rightPattern,
+            Map.of(),
+            List.of("A \u2208 {" + variable + "}"),
+            Map.of("A", List.of(variable))
+        ));
+    }
+
+    private void collectVariables(Expr expression, Set<String> variables) {
+        if (expression instanceof VariableExpr variable) {
+            variables.add(variable.name());
+            return;
+        }
+        if (expression instanceof FunctionExpr function) {
+            for (Expr argument : function.arguments()) {
+                collectVariables(argument, variables);
+            }
+            return;
+        }
+        if (expression instanceof BinaryExpr binary) {
+            collectVariables(binary.left(), variables);
+            collectVariables(binary.right(), variables);
+        }
+    }
+
+    private Expr replaceVariable(Expr expression, String variable, Expr placeholder) {
+        if (expression instanceof VariableExpr variableExpr) {
+            return variableExpr.name().equals(variable) ? placeholder : variableExpr;
+        }
+        if (expression instanceof NumberExpr) {
+            return expression;
+        }
+        if (expression instanceof FunctionExpr function) {
+            return new FunctionExpr(function.name(), function.arguments().stream()
+                .map(argument -> replaceVariable(argument, variable, placeholder))
+                .toList());
+        }
+        BinaryExpr binary = (BinaryExpr) expression;
+        return new BinaryExpr(
+            replaceVariable(binary.left(), variable, placeholder),
+            binary.operator(),
+            replaceVariable(binary.right(), variable, placeholder)
+        );
     }
 
     private Optional<NormalizedNode> generalizeNodes(List<NormalizedNode> nodes, PlaceholderState state) {

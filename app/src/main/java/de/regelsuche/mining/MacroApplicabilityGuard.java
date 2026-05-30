@@ -12,6 +12,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.Transformation;
 import java.util.List;
+import java.util.Locale;
 
 /** Metadata-driven guard for conservative macro applicability. */
 @FunctionalInterface
@@ -28,7 +29,14 @@ public interface MacroApplicabilityGuard {
 
         @Override
         public boolean allows(String sourceExpression, ReusableRule rule, Transformation transformation) {
-            if (rule.parameterRelations().stream().map(RelationGuard::compact).noneMatch("B=A+1"::equals)) {
+            boolean hasUnitStepRelation = rule.parameterRelations().stream()
+                .map(ParameterRelation::parse)
+                .flatMap(java.util.Optional::stream)
+                .anyMatch(relation -> relation.relationType() == ParameterRelation.RelationType.UNIT_STEP);
+            if (!hasUnitStepRelation
+                && rule.parameterRelations().stream().map(RelationGuard::compact).noneMatch("B=A+1"::equals)
+                && !compact(rule.leftPattern()).contains("(A*(A+1))")
+                && !compact(rule.leftPattern()).contains("A*(A+1)")) {
                 return true;
             }
             return isUnitStepFraction(sourceExpression, transformation.transformedExpression());
@@ -123,7 +131,7 @@ public interface MacroApplicabilityGuard {
         }
 
         private static String compact(String relation) {
-            return relation == null ? "" : relation.replace(" ", "");
+            return relation == null ? "" : relation.replace(" ", "").toUpperCase(Locale.ROOT);
         }
 
         private record AdditiveOffset(Expr symbolicPart, double offset) {

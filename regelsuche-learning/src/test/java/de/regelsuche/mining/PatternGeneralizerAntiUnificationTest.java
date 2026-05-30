@@ -121,6 +121,19 @@ class PatternGeneralizerAntiUnificationTest {
         assertTrue(result.isEmpty());
     }
 
+    @Test
+    void singleReplayPreservesUnitStepRelationInsideSchema() {
+        Optional<GeneralizedPattern> result = generalizer.generalizeSingleExampleSchema(
+            path("1 / (n * (n + 1))", "1 / n - 1 / (n + 1)")
+        );
+
+        assertTrue(result.isPresent());
+        assertTrue(result.get().leftPattern().contains("A + 1"), result.get().leftPattern());
+        assertTrue(result.get().rightPattern().contains("A + 1"), result.get().rightPattern());
+        assertFalse(result.get().leftPattern().contains("A * B"),
+            "unsafe independent-factor schema must not be emitted");
+    }
+
     // ─── helpers ──────────────────────────────────────────────────────────────
 
     private static SuccessfulTransformationPath path(String left, String right) {
