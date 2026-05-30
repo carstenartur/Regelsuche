@@ -18,6 +18,7 @@ import de.regelsuche.search.convergence.ConvergentDiscoveryAnalysis;
 import de.regelsuche.search.convergence.ConvergentDiscoveryGallerySnippetWriter;
 import de.regelsuche.search.convergence.ConvergentDiscoveryMermaidWriter;
 import de.regelsuche.search.convergence.ConvergentDiscoveryReport;
+import de.regelsuche.search.convergence.ConvergentDiscoverySvgWriter;
 import de.regelsuche.search.convergence.RuleFamily;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
@@ -28,8 +29,12 @@ import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -82,23 +87,86 @@ class ConvergentSophieGermainGalleryTest {
         String mermaid = new ConvergentDiscoveryMermaidWriter().render(report);
         assertTrue(mermaid.contains(DifferenceOfSquaresPreparationOperator.RULE_ID), mermaid);
         assertTrue(mermaid.contains("macro_"), mermaid);
+        String svg = new ConvergentDiscoverySvgWriter().render(report);
+        assertTrue(svg.contains("data-source=\"convergent-sophie-germain.mmd\""), svg);
+        assertTrue(svg.contains("data-generated-by=\"ConvergentDiscoveryMermaidWriter\""), svg);
+        assertMermaidLabelsAppearInSvg(mermaid, svg);
+        assertNoManualOnlyNodes(svg);
         String snippet = new ConvergentDiscoveryGallerySnippetWriter().render(report);
         assertTrue(snippet.contains("number of distinct paths"), snippet);
         assertTrue(snippet.contains("macro shortcut path"), snippet);
 
         Path graph = tempDir.resolve("convergent-sophie-germain.mmd");
+        Path svgFile = tempDir.resolve("convergent-sophie-germain.svg");
         Path snippetFile = tempDir.resolve("convergent-sophie-germain-gallery-snippet.md");
         Files.writeString(graph, mermaid);
+        Files.writeString(svgFile, svg);
         Files.writeString(snippetFile, snippet);
+        assertTrue(Files.exists(graph));
+        assertTrue(Files.exists(svgFile));
         assertTrue(Files.size(graph) > 0);
+        assertTrue(Files.size(svgFile) > 0);
         assertTrue(Files.size(snippetFile) > 0);
+        assertGeneratedOrProvenancePresent(graph, svgFile, svg);
 
         if (Boolean.getBoolean("regelsuche.recordDocs")) {
             Path screenshots = locateRepoRoot().resolve("docs/assets/screenshots");
             Files.createDirectories(screenshots);
             Files.writeString(screenshots.resolve("convergent-sophie-germain.mmd"), mermaid);
+            Files.writeString(screenshots.resolve("convergent-sophie-germain.svg"), svg);
             Files.writeString(screenshots.resolve("convergent-sophie-germain-gallery-snippet.md"), snippet);
         }
+        Path screenshots = locateRepoRoot().resolve("docs/assets/screenshots");
+        Path docsMmd = screenshots.resolve("convergent-sophie-germain.mmd");
+        Path docsSvg = screenshots.resolve("convergent-sophie-germain.svg");
+        assertTrue(Files.exists(docsMmd), "Missing generated Mermaid asset");
+        assertTrue(Files.exists(docsSvg), "Missing generated SVG asset");
+        String docsSvgContent = Files.readString(docsSvg);
+        assertTrue(Boolean.getBoolean("regelsuche.recordDocs")
+            || docsSvgContent.contains("data-generated-by=\"ConvergentDiscoveryMermaidWriter\""),
+            "SVG must be freshly generated in recordDocs mode or carry generated provenance");
+    }
+
+    private void assertMermaidLabelsAppearInSvg(String mermaid, String svg) {
+        for (String label : mermaidLabels(mermaid)) {
+            assertTrue(svg.contains(escapeXml(label)), "Missing SVG label from Mermaid: " + label + "\n" + svg);
+        }
+    }
+
+    private Set<String> mermaidLabels(String mermaid) {
+        Set<String> labels = new LinkedHashSet<>();
+        Matcher nodeMatcher = Pattern.compile("\\[\"([^\"]+)\"\\]").matcher(mermaid);
+        while (nodeMatcher.find()) {
+            labels.add(nodeMatcher.group(1));
+        }
+        Matcher edgeMatcher = Pattern.compile("\\|([^|]+)\\|").matcher(mermaid);
+        while (edgeMatcher.find()) {
+            labels.add(edgeMatcher.group(1));
+        }
+        return labels;
+    }
+
+    private void assertNoManualOnlyNodes(String svg) {
+        assertFalse(svg.contains("path 1: hidden structure"), svg);
+        assertFalse(svg.contains("path 2: learned macro shortcut"), svg);
+        assertFalse(svg.contains("same target node"), svg);
+    }
+
+    private void assertGeneratedOrProvenancePresent(Path mmd, Path svg, String svgContent) throws Exception {
+        boolean generatedInRecordDocs = Boolean.getBoolean("regelsuche.recordDocs")
+            && Files.getLastModifiedTime(svg).toMillis() >= Files.getLastModifiedTime(mmd).toMillis();
+        boolean hasProvenance = svgContent.contains("data-source=\"convergent-sophie-germain.mmd\"")
+            && svgContent.contains("data-generated-by=\"ConvergentDiscoveryMermaidWriter\"");
+        assertTrue(generatedInRecordDocs || hasProvenance,
+            "SVG must be newer/generated in recordDocs mode or carry generated provenance");
+    }
+
+    private String escapeXml(String value) {
+        return (value == null ? "" : value)
+            .replace("&", "&amp;")
+            .replace("\"", "&quot;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;");
     }
 
     private SuccessfulTransformationPath hiddenStructureReplayPath(String source) {
