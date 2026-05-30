@@ -18,6 +18,7 @@ regelsuche-core
   <- app
 regelsuche-egraph <- regelsuche-search
 regelsuche-search <- regelsuche-experiments
+regelsuche-discovery <- regelsuche-experiments
 regelsuche-validation <- regelsuche-learning
 regelsuche-search <- regelsuche-learning
 regelsuche-validation <- regelsuche-experiments
@@ -38,7 +39,7 @@ regelsuche-cli <- app
 - `:regelsuche-persistence` darf vom Core abhängen und enthält Ports/Konfiguration ohne Hibernate/JPA/Datenbanktreiber.
 - `:regelsuche-persistence-hibernate` darf Hibernate/JPA/PostgreSQL und Hibernate Search kapseln und hängt von Persistence-Ports, Learning-Hypothesen und Validation-Status ab.
 - `:regelsuche-learning` darf von Core, Search und Validation abhängen; Discovery-/Graph-/Inventory-Orchestrierung bleibt außerhalb.
-- `:regelsuche-experiments` darf von Search und Validation abhängen; Web-/CLI-/Persistenzadapter bleiben außerhalb.
+- `:regelsuche-experiments` darf von Search, Validation und Discovery-Metadaten abhängen; Web-/CLI-/Persistenzadapter bleiben außerhalb.
 - `:regelsuche-cli` bleibt projektabhängigkeitsfrei; app-spezifisches Routing und Serverstart-Wiring bleiben in `:app`.
 - `:regelsuche-discovery` darf von Core, Search und Validation abhängen; Graph-/Export-/Web-Orchestrierung bleibt außerhalb.
 - `:app` ist die Composition Root und darf die Module verdrahten.
@@ -92,9 +93,9 @@ SCCs bestehen.
 ## Discovery-Regel
 
 `:regelsuche-discovery` enthält portable Pfad- und Schritt-DTOs wie
-`DiscoveredTransformation` und `TransformationStep`. Repositories,
-Export-Adapter, Web-APIs und Discovery-Orchestrierung bleiben in `:app`, solange
-die oberen SCCs bestehen.
+`DiscoveredTransformation` und `TransformationStep`, Discovery-Profile/-Optionen
+sowie Operator-Deskriptoren. Repositories, Web-APIs und app-spezifische
+Discovery-Orchestrierung bleiben in `:app`, solange die oberen SCCs bestehen.
 
 ## CLI-Regel
 
@@ -108,7 +109,8 @@ Workbench starten, bleiben im app-spezifischen Router.
 (`SearchBenchmark`, Result-DTOs, Report-Renderer, `DiscoveryExperimentRunner`,
 `DeterministicDiscoveryExperimentRunner`) sowie den portablen Seed-Corpus
 (`AlgebraicExampleGenerator`, `SeedExpression`, `ScientificSeedCorpora` inkl.
-lokaler YAML/JSON-Kataloge). App-spezifische Demo-Szenarien und Web-/CLI-Ausgabe
+lokaler YAML/JSON-Kataloge). Report- und Gallery-Metadaten dürfen die portablen
+Discovery-Deskriptoren verwenden; app-spezifische Demo-Szenarien und Web-/CLI-Ausgabe
 bleiben in `:app`.
 
 ## Interface-first für große Erweiterungen

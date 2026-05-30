@@ -4,7 +4,6 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionParser;
@@ -26,7 +25,9 @@ public final class SquareDifferenceAstPredicate {
 
     private static boolean containsSquareDifference(Expr expression) {
         if (expression instanceof BinaryExpr binary) {
-            if (binary.operator() == BinaryOperator.SUB && isSquare(binary.left()) && isSquare(binary.right())) {
+            if (binary.operator() == BinaryOperator.SUB
+                && PerfectSquareAstPredicate.isSquare(binary.left())
+                && PerfectSquareAstPredicate.isSquare(binary.right())) {
                 return true;
             }
             return containsSquareDifference(binary.left()) || containsSquareDifference(binary.right());
@@ -37,10 +38,4 @@ public final class SquareDifferenceAstPredicate {
         return false;
     }
 
-    private static boolean isSquare(Expr expression) {
-        return expression instanceof BinaryExpr binary
-            && binary.operator() == BinaryOperator.POW
-            && binary.right() instanceof NumberExpr exponent
-            && Double.compare(exponent.value(), 2.0) == 0;
-    }
 }

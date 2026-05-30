@@ -6,6 +6,16 @@ Die produktive Discovery-Pipeline in Regelsuche folgt dem Pfad:
 
 Zentrale Bausteine:
 
+- **Layer 1 – TransformationEngine:** lokale Rewrites, Hypothesenoperatoren und
+  Wiederverwendung bereits gelernter Makrozüge.
+- **Layer 2 – Search:** Suchstrategien explorieren die von der Engine gelieferten
+  Transformationen unter Tiefe/Budget.
+- **Layer 3 – Discovery-Orchestrierung:** Workflows klassifizieren Ergebnisse,
+  validieren Äquivalenz und lernen/promoten Makros nur, wenn
+  `DiscoveryLearningOptions` dies explizit erlaubt.
+- **Layer 4 – Reporting/Gallery:** Reports rendern ausschließlich
+  `DiscoveryTrace`-/Replay-Evidence und Descriptor-Metadaten, keine hart
+  codierten Seed-Sonderfälle.
 - `ScientificDiscoveryWorkflow` bootet die produktive App-Wiring-Schicht und führt reproduzierbare Discovery-Läufe aus.
 - `DeterministicDiscoveryExperimentRunner` wertet Seeds deterministisch, budgetiert und optional parallel aus.
 - `DiscoveryReplayArtifactWriter` erzeugt `discovery-report.{json,html,md}`, `discovery-replay.json`, `discovery-summary.png` und `discovery-replay.gif`.
@@ -24,6 +34,11 @@ Zentrale Bausteine:
   Gegenbeispiele, Regression-Proposals, numerische Relationskandidaten und
   CAS-Validierungsversuche, damit Reports und spätere UI-Queries Quelle und
   Beweissemantik getrennt darstellen können.
+- `DiscoveryOptions` liegt in `de.regelsuche.discovery` und aggregiert
+  `DiscoveryEngineOptions` (Hypothesenoperatoren, Makro-Reuse, Tiefe/Budget) und
+  `DiscoveryLearningOptions` (Makro-Lernen, Validierung generierter Instanzen,
+  Promotion). `DiscoveryEngineFactory` konsumiert nur Engine-Optionen und führt
+  kein Lernen aus.
 - `de.regelsuche.search.index.RuleCandidateIndex` erweitert den bisherigen
   `TermRuleIndex`-Pfad um `CandidateSet`, `SearchContext`, `CandidateBudget`
   und detaillierte `IndexMetrics`. `RootSymbolTermRuleIndex` bleibt die

@@ -28,8 +28,7 @@ import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
-import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.FactoredProductAstPredicate;
 import de.regelsuche.transform.SquareDifferenceAstPredicate;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.SymPyTransformationEngine;
@@ -38,6 +37,8 @@ import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import de.regelsuche.validation.DiscoveryEvidenceKind;
+import de.regelsuche.validation.DiscoveryResultKind;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -45,6 +46,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /** App-level Seed → Discovery → Replay → Persistence workflow. */
@@ -52,13 +54,13 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     private static final Instant FIXED_INSTANT = Instant.EPOCH;
 
     private final PersistenceContext context;
+    private final DiscoveryWorkflowConfiguration workflowConfiguration;
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final AstRewriteTransformationEngine searchEngine = new AstRewriteTransformationEngine(DemoRuleSet.rules());
-    private final TransformationEngine hiddenStructureSearchEngine = new HypothesisTransformationEngine(
-        new AstRewriteTransformationEngine(DemoRuleSet.rules()),
-        List.of(new DifferenceOfSquaresPreparationOperator())
-    );
+    private final DiscoveryOptions hiddenStructureOptions;
+    private final HypothesisOperatorRegistry hypothesisOperatorRegistry;
+    private final TransformationEngine hiddenStructureSearchEngine;
     private final BestFirstSearchStrategy searchStrategy = new BestFirstSearchStrategy();
     private final DeterministicCounterexampleSearchService counterexamples = new DeterministicCounterexampleSearchService();
     private final DefaultMathematicalAlgorithmRegistry algorithmRegistry = new DefaultMathematicalAlgorithmRegistry();
@@ -66,12 +68,30 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         new PolynomialNormalFormEquivalenceService(algorithmRegistry);
     private final DomainAwareCasRouter casRouter = new DomainAwareCasRouter(algorithmRegistry);
 
-    private ScientificDiscoveryWorkflow(PersistenceContext context) {
+    private ScientificDiscoveryWorkflow(PersistenceContext context, DiscoveryWorkflowConfiguration workflowConfiguration) {
         this.context = context;
+        this.workflowConfiguration = workflowConfiguration == null
+            ? DiscoveryWorkflowConfiguration.defaults()
+            : workflowConfiguration;
+        this.hiddenStructureOptions = this.workflowConfiguration.effectiveOptions();
+        this.hypothesisOperatorRegistry = this.workflowConfiguration.operatorRegistry();
+        this.hiddenStructureSearchEngine = new DiscoveryEngineFactory(hypothesisOperatorRegistry).create(
+            new AstRewriteTransformationEngine(DemoRuleSet.rules()),
+            hiddenStructureOptions,
+            this.workflowConfiguration.macroMoveSelector().orElse(null)
+        );
     }
 
     public static ScientificDiscoveryWorkflow boot(PersistenceConfig config, PrintStream log) {
-        return new ScientificDiscoveryWorkflow(PersistenceContext.from(config, log));
+        return boot(config, log, DiscoveryWorkflowConfiguration.defaults());
+    }
+
+    public static ScientificDiscoveryWorkflow boot(
+        PersistenceConfig config,
+        PrintStream log,
+        DiscoveryWorkflowConfiguration workflowConfiguration
+    ) {
+        return new ScientificDiscoveryWorkflow(PersistenceContext.from(config, log), workflowConfiguration);
     }
 
     public RunResult run(String experimentId, List<SeedExpression> seeds, int globalBudget, int parallelism, Path artifactDirectory) {
@@ -151,23 +171,24 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         ExpressionScore before = scorer.score(root);
         context.graphStore().saveNode(root, before.weightedTotal());
         List<Transformation> hypothesisCandidates = hiddenStructureSearchEngine.transform(root).stream()
-            .filter(transformation -> transformation.rule().equals(DifferenceOfSquaresPreparationOperator.RULE_ID))
+            .filter(transformation -> isHiddenStructureHypothesisRule(transformation.rule()))
             .toList();
         SearchProblem problem = new SearchProblem(root, hiddenStructureSearchEngine, scorer, canonicalizer,
-            new SearchHeuristic(4, 160, 1, 10, 200, 200));
+            new SearchHeuristic(hiddenStructureOptions.engine().searchDepth(), hiddenStructureOptions.engine().searchBudget(), 1, 10, 200, 200));
         List<SearchState> states = searchStrategy.search(problem);
         SearchState hypothesisState = states.stream()
-            .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
+            .filter(state -> state.appliedRuleIds().stream().anyMatch(this::isHiddenStructureHypothesisRule))
             .findFirst()
             .orElse(null);
         SearchState squareDifferenceState = states.stream()
-            .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
-            .filter(state -> isSquareDifferenceState(state.expression()))
+            .filter(state -> state.appliedRuleIds().stream().anyMatch(this::isHiddenStructureHypothesisRule))
+            .filter(state -> isBridgeState(state.expression()))
             .findFirst()
             .orElse(null);
         SearchState factoredState = states.stream()
-            .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
-            .filter(state -> state.appliedRuleIds().contains("ast_square_difference_factor"))
+            .filter(state -> state.appliedRuleIds().stream().anyMatch(this::isHiddenStructureHypothesisRule))
+            .filter(state -> state.appliedRuleIds().contains("ast_square_difference_factor")
+                || FactoredProductAstPredicate.containsFactoredProduct(state.expression()))
             .findFirst()
             .orElse(null);
         for (SearchState state : states) {
@@ -176,19 +197,54 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         SearchState reportedState = factoredState != null
             ? factoredState
             : squareDifferenceState != null ? squareDifferenceState : hypothesisState;
+        DiscoveryResultKind resultKind = classifyHiddenStructure(hypothesisCandidates, hypothesisState, squareDifferenceState, factoredState);
+        boolean equivalent = reportedState != null
+            && polynomialEquivalence.arePolynomiallyEquivalent(root, reportedState.expression());
+        if (resultKind == DiscoveryResultKind.TRANSFORMED && !equivalent) {
+            resultKind = DiscoveryResultKind.FALSE_POSITIVE;
+        }
         if (factoredState != null) {
             String pathId = stablePathId(root, factoredState);
             context.graphStore().saveDiscoveredTransformation(toDiscovered(pathId, root, factoredState, before));
         }
         return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
-            !hypothesisCandidates.isEmpty() && factoredState != null,
-            hiddenStructureSummary(hypothesisState, squareDifferenceState, factoredState),
+            isDiscovered(resultKind),
+            hiddenStructureSummary(resultKind),
             hypothesisCandidates.stream().map(Transformation::transformedExpression).toList(),
             List.of(),
+            CounterexampleSearchService.Status.INCONCLUSIVE,
+            List.of(),
+            List.of(),
+            "",
             reportedState == null ? List.of() : reportedState.path(),
+            resultKind,
+            reportedState == null ? List.of() : reportedState.appliedRuleIds(),
             0L,
-            0L
+            0L,
+            hiddenStructureEvidence(reportedState, resultKind, equivalent)
         );
+    }
+
+    private Set<DiscoveryEvidenceKind> hiddenStructureEvidence(
+        SearchState reportedState,
+        DiscoveryResultKind resultKind,
+        boolean equivalent
+    ) {
+        if (reportedState == null) {
+           return Set.of();
+        }
+        java.util.EnumSet<DiscoveryEvidenceKind> evidence = java.util.EnumSet.noneOf(DiscoveryEvidenceKind.class);
+        if (resultKind == DiscoveryResultKind.TRANSFORMED) {
+           evidence.add(DiscoveryEvidenceKind.SIMPLIFIED);
+        }
+        if (equivalent) {
+           evidence.add(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED);
+        }
+        if (reportedState.appliedRuleIds().contains("ast_square_difference_factor")
+           || FactoredProductAstPredicate.containsFactoredProduct(reportedState.expression())) {
+           evidence.add(DiscoveryEvidenceKind.FACTORED);
+        }
+        return evidence.isEmpty() ? Set.of() : Set.copyOf(evidence);
     }
 
     private DeterministicDiscoveryExperimentRunner.SeedRunOutcome geometricSeries(SeedExpression seed) {
@@ -266,21 +322,46 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             state.estimatedCostDelta(), state.equivalencePreservingByConstruction(), CandidateProofStatus.OBSERVED));
     }
 
-    private boolean isSquareDifferenceState(String expression) {
-        return SquareDifferenceAstPredicate.containsSquareDifference(expression);
+    private boolean isBridgeState(String expression) {
+        return SquareDifferenceAstPredicate.containsSquareDifference(expression)
+            || de.regelsuche.transform.PerfectSquareAstPredicate.containsPerfectSquare(expression);
     }
 
-    private String hiddenStructureSummary(SearchState hypothesisState, SearchState squareDifferenceState, SearchState factoredState) {
+    private boolean isHiddenStructureHypothesisRule(String ruleId) {
+        return hypothesisOperatorRegistry.stableIds().contains(ruleId);
+    }
+
+    private DiscoveryResultKind classifyHiddenStructure(
+        List<Transformation> hypothesisCandidates,
+        SearchState hypothesisState,
+        SearchState bridgeState,
+        SearchState factoredState
+    ) {
         if (factoredState != null) {
-            return "hidden-structure reproduced: hypothesis path reached square-difference state and factored via ast_square_difference_factor";
+            return DiscoveryResultKind.TRANSFORMED;
         }
-        if (squareDifferenceState != null) {
-            return "hidden-structure incomplete: reached square-difference state but did not reach ast_square_difference_factor";
+        if (bridgeState != null) {
+            return DiscoveryResultKind.BRIDGE_FOUND;
         }
-        if (hypothesisState != null) {
-            return "hidden-structure incomplete: hypothesis candidate participated but did not reach a square-difference state";
+        if (hypothesisState != null || !hypothesisCandidates.isEmpty()) {
+            return DiscoveryResultKind.HYPOTHESIS_ONLY;
         }
-        return "hidden-structure failed: no hypothesis path found";
+        return DiscoveryResultKind.NO_CANDIDATE;
+    }
+
+    private String hiddenStructureSummary(DiscoveryResultKind resultKind) {
+        return switch (resultKind) {
+            case TRANSFORMED ->
+                "hidden-structure reproduced: hypothesis path reached bridge state and factored via ast_square_difference_factor";
+            case BRIDGE_FOUND -> "hidden-structure incomplete: reached bridge state but did not factor";
+            case HYPOTHESIS_ONLY ->
+                "hidden-structure incomplete: hypothesis candidate participated but did not reach a bridge state";
+            default -> "hidden-structure failed: no hypothesis path found";
+        };
+    }
+
+    private boolean isDiscovered(DiscoveryResultKind resultKind) {
+        return resultKind == DiscoveryResultKind.BRIDGE_FOUND || resultKind == DiscoveryResultKind.TRANSFORMED;
     }
 
     private DiscoveredTransformation toDiscovered(String pathId, String root, SearchState state, ExpressionScore before) {

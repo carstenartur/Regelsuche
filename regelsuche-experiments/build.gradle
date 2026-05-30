@@ -16,6 +16,7 @@ java {
 dependencies {
     api project(':regelsuche-search')
     api project(':regelsuche-validation')
+    api project(':regelsuche-discovery')
 
     testImplementation project(':regelsuche-math-algorithms')
     testImplementation libs.junit.jupiter
