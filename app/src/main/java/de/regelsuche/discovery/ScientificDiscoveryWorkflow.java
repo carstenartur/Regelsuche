@@ -258,27 +258,28 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             return;
         }
 
-        private boolean isSquareDifferenceState(String expression) {
-            return expression.contains("^ 2 -");
-        }
-
-        private String hiddenStructureSummary(SearchState hypothesisState, SearchState squareDifferenceState, SearchState factoredState) {
-            if (factoredState != null) {
-                return "hidden-structure reproduced: hypothesis path reached square-difference state and factored via ast_square_difference_factor";
-            }
-            if (squareDifferenceState != null) {
-                return "hidden-structure incomplete: reached square-difference state but did not reach ast_square_difference_factor";
-            }
-            if (hypothesisState != null) {
-                return "hidden-structure incomplete: hypothesis candidate participated but did not reach a square-difference state";
-            }
-            return "hidden-structure failed: no hypothesis path found";
-        }
         context.graphStore().saveEdge(new GraphEdge(
             state.parentExpression(), state.expression(), state.appliedRuleId(), state.depth(), state.improvement(),
             root + "#" + state.depth(), state.canonicalHash(), scorer.score(state.parentExpression()).weightedTotal(),
             state.score().weightedTotal(), state.appliedRuleKind(), state.mayIncreaseComplexity(),
             state.estimatedCostDelta(), state.equivalencePreservingByConstruction(), CandidateProofStatus.OBSERVED));
+    }
+
+    private boolean isSquareDifferenceState(String expression) {
+        return expression.contains("^ 2 -");
+    }
+
+    private String hiddenStructureSummary(SearchState hypothesisState, SearchState squareDifferenceState, SearchState factoredState) {
+        if (factoredState != null) {
+            return "hidden-structure reproduced: hypothesis path reached square-difference state and factored via ast_square_difference_factor";
+        }
+        if (squareDifferenceState != null) {
+            return "hidden-structure incomplete: reached square-difference state but did not reach ast_square_difference_factor";
+        }
+        if (hypothesisState != null) {
+            return "hidden-structure incomplete: hypothesis candidate participated but did not reach a square-difference state";
+        }
+        return "hidden-structure failed: no hypothesis path found";
     }
 
     private DiscoveredTransformation toDiscovered(String pathId, String root, SearchState state, ExpressionScore before) {
