@@ -84,6 +84,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 appliedRuleKinds.add(transformation.kind());
                 List<Boolean> equivalenceFlags = new ArrayList<>(current.equivalencePreservingFlags());
                 equivalenceFlags.add(transformation.equivalencePreservingByConstruction());
+                List<String> assumptions = new ArrayList<>(current.assumptions());
+                assumptions.addAll(transformation.assumptions());
                 SearchState nextState = new SearchState(
                     nextExpression,
                     current.depth() + 1,
@@ -101,7 +103,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                     transformation.equivalencePreservingByConstruction(),
                     improvement,
                     appliedRuleKinds,
-                    equivalenceFlags
+                    equivalenceFlags,
+                    assumptions
                 );
                 if (visited.contains(stateKey(nextState))) {
                     continue;

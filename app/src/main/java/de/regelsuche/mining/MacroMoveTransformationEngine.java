@@ -32,6 +32,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
     private final List<String> carriedAssumptions;
     private final Map<String, List<TransformationStep>> atomicStepsByRuleId;
     private final boolean macroMovesEnabled;
+    private final MacroApplicabilityGuard applicabilityGuard;
     private final Map<String, MacroMoveExpansion> expansionsByEdge = new HashMap<>();
     private final Map<String, MacroMoveStatistics> statisticsByRuleId = new HashMap<>();
 
@@ -69,6 +70,19 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         List<String> carriedAssumptions,
         boolean macroMovesEnabled
     ) {
+        this(baseEngine, selector, goalExpression, atomicStepsByRuleId, carriedAssumptions,
+            macroMovesEnabled, MacroApplicabilityGuard.metadataRelations());
+    }
+
+    public MacroMoveTransformationEngine(
+        TransformationEngine baseEngine,
+        GoalAwareMacroMoveSelector selector,
+        String goalExpression,
+        Map<String, List<TransformationStep>> atomicStepsByRuleId,
+        List<String> carriedAssumptions,
+        boolean macroMovesEnabled,
+        MacroApplicabilityGuard applicabilityGuard
+    ) {
         if (baseEngine == null || selector == null) {
             throw new IllegalArgumentException("baseEngine and selector are required");
         }
@@ -78,6 +92,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         this.carriedAssumptions = carriedAssumptions == null ? List.of() : List.copyOf(carriedAssumptions);
         this.atomicStepsByRuleId = atomicStepsByRuleId == null ? Map.of() : Map.copyOf(atomicStepsByRuleId);
         this.macroMovesEnabled = macroMovesEnabled;
+        this.applicabilityGuard = applicabilityGuard == null ? MacroApplicabilityGuard.metadataRelations() : applicabilityGuard;
     }
 
     @Override
@@ -113,6 +128,9 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(List.of(rewriteRule), Integer.MAX_VALUE, 80);
         MacroMoveStatistics before = statisticsByRuleId.getOrDefault(rule.id(), MacroMoveStatistics.empty());
         List<Transformation> transformations = macroEngine.transform(expression);
+        transformations = transformations.stream()
+            .filter(transformation -> applicabilityGuard.allows(expression, rule, transformation))
+            .toList();
         int improved = (int) transformations.stream().filter(t -> t.estimatedCostDelta() < 0).count();
         double averageReduction = transformations.isEmpty()
             ? before.averageCostReduction()

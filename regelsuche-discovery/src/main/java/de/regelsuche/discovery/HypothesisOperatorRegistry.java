@@ -3,6 +3,8 @@ package de.regelsuche.discovery;
 import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.RationalizationHypothesisOperator;
+import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +29,22 @@ public final class HypothesisOperatorRegistry {
                 ConservativeCompleteSquareHypothesisOperator::new,
                 true,
                 List.of("conservative", "quadratic", "bridge")
+            ),
+            new HypothesisOperatorDescriptor(
+                TelescopingFractionHypothesisOperator.RULE_ID,
+                "telescoping-fraction",
+                "fraction-decomposition",
+                TelescopingFractionHypothesisOperator::new,
+                true,
+                List.of("telescoping", "fraction", "decomposition")
+            ),
+            new HypothesisOperatorDescriptor(
+                RationalizationHypothesisOperator.RULE_ID,
+                "rationalization",
+                "radical-conjugate",
+                RationalizationHypothesisOperator::new,
+                true,
+                List.of("rationalization", "radical", "conjugate")
             )
         ));
     }

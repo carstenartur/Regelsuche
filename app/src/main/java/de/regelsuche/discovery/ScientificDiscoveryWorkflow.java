@@ -5,6 +5,8 @@ import de.regelsuche.benchmark.DiscoveryReplayArtifactWriter;
 import de.regelsuche.benchmark.DiscoverySemanticReportView;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.demo.DemoRuleSet;
+import de.regelsuche.equivalence.EquivalenceService;
+import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.example.SeedExpression;
 import de.regelsuche.graph.GraphEdge;
 import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
@@ -29,6 +31,8 @@ import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.FactoredProductAstPredicate;
+import de.regelsuche.transform.FractionDecompositionAstPredicate;
+import de.regelsuche.transform.RationalizedDenominatorAstPredicate;
 import de.regelsuche.transform.SquareDifferenceAstPredicate;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.SymPyTransformationEngine;
@@ -67,6 +71,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     private final PolynomialNormalFormEquivalenceService polynomialEquivalence =
         new PolynomialNormalFormEquivalenceService(algorithmRegistry);
     private final DomainAwareCasRouter casRouter = new DomainAwareCasRouter(algorithmRegistry);
+    private final EquivalenceService equivalenceService = new SymPyEquivalenceService();
 
     private ScientificDiscoveryWorkflow(PersistenceContext context, DiscoveryWorkflowConfiguration workflowConfiguration) {
         this.context = context;
@@ -117,6 +122,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
                 CandidateProofStatus.SYMBOLICALLY_VERIFIED, List.of(), "matrix distributivity reproduced");
             case "factorization" -> factorization(seed);
             case "hidden-structure" -> hiddenStructure(seed);
+            case "operator-corpus" -> operatorCorpus(seed);
             case "geometric-series" -> geometricSeries(seed);
             case "counterexample" -> counterexample(seed);
             default -> DeterministicDiscoveryExperimentRunner.SeedRunOutcome.fail("unsupported scientific seed category: " + seed.category());
@@ -245,6 +251,106 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
            evidence.add(DiscoveryEvidenceKind.FACTORED);
         }
         return evidence.isEmpty() ? Set.of() : Set.copyOf(evidence);
+    }
+
+    private DeterministicDiscoveryExperimentRunner.SeedRunOutcome operatorCorpus(SeedExpression seed) {
+        long started = System.nanoTime();
+        String operatorId = operatorId(seed);
+        String root = seed.expression();
+        ExpressionScore before = scorer.score(root);
+        context.graphStore().saveNode(root, before.weightedTotal());
+        List<Transformation> hypothesisCandidates = hiddenStructureSearchEngine.transform(root).stream()
+            .filter(transformation -> operatorId.isBlank() || transformation.rule().equals(operatorRuleId(operatorId)))
+            .toList();
+        SearchProblem problem = new SearchProblem(root, hiddenStructureSearchEngine, scorer, canonicalizer,
+            new SearchHeuristic(hiddenStructureOptions.engine().searchDepth(), hiddenStructureOptions.engine().searchBudget(), 1, 10, 200, 200));
+        List<SearchState> states = searchStrategy.search(problem);
+        for (SearchState state : states) {
+            saveState(root, state);
+        }
+        SearchState transformedState = states.stream()
+            .filter(state -> state.depth() > 0)
+            .filter(state -> operatorId.isBlank() || state.appliedRuleIds().contains(operatorRuleId(operatorId)))
+            .filter(state -> matchesOperatorTarget(operatorId, state.expression()))
+            .findFirst()
+            .orElse(null);
+        boolean equivalent = transformedState != null
+            && equivalenceService.areEquivalent(root, transformedState.expression());
+        DiscoveryResultKind resultKind;
+        if (equivalent) {
+            resultKind = DiscoveryResultKind.TRANSFORMED;
+            context.graphStore().saveDiscoveredTransformation(toDiscovered(stablePathId(root, transformedState), root, transformedState, before));
+        } else if (transformedState != null || !hypothesisCandidates.isEmpty()) {
+            resultKind = DiscoveryResultKind.FALSE_POSITIVE;
+        } else {
+            resultKind = DiscoveryResultKind.NO_CANDIDATE;
+        }
+        java.util.EnumSet<DiscoveryEvidenceKind> evidence = java.util.EnumSet.noneOf(DiscoveryEvidenceKind.class);
+        if (equivalent) {
+            evidence.add(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED);
+            evidence.add(DiscoveryEvidenceKind.SIMPLIFIED);
+        }
+        List<String> replayPath = transformedState == null ? List.of() : transformedState.path();
+        List<String> rulePath = transformedState == null ? List.of() : transformedState.appliedRuleIds();
+        List<String> assumptions = transformedState == null
+            ? seed.assumptions()
+            : mergeAssumptions(seed.assumptions(), transformedState.assumptions());
+        long elapsed = (System.nanoTime() - started) / 1_000_000L;
+        return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
+            equivalent,
+            operatorCorpusSummary(operatorId, resultKind),
+            hypothesisCandidates.stream().map(Transformation::transformedExpression).toList(),
+            List.of(),
+            equivalent ? CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND : CounterexampleSearchService.Status.INCONCLUSIVE,
+            List.of(),
+            assumptions,
+            equivalent ? equivalenceService.evidence(root, transformedState.expression()) : "",
+            replayPath,
+            resultKind,
+            rulePath,
+            elapsed,
+            0L,
+            evidence
+        );
+    }
+
+    private String operatorId(SeedExpression seed) {
+        return seed.tags().stream()
+            .filter(tag -> tag.startsWith("operator:"))
+            .map(tag -> tag.substring("operator:".length()))
+            .findFirst()
+            .orElse("");
+    }
+
+    private String operatorRuleId(String operatorId) {
+        return switch (operatorId) {
+            case "telescoping-fraction" -> de.regelsuche.transform.TelescopingFractionHypothesisOperator.RULE_ID;
+            case "rationalization" -> de.regelsuche.transform.RationalizationHypothesisOperator.RULE_ID;
+            default -> operatorId;
+        };
+    }
+
+    private boolean matchesOperatorTarget(String operatorId, String expression) {
+        return switch (operatorId) {
+            case "telescoping-fraction" -> FractionDecompositionAstPredicate.containsFractionDecomposition(expression);
+            case "rationalization" -> RationalizedDenominatorAstPredicate.hasRationalizedDenominator(expression);
+            default -> true;
+        };
+    }
+
+    private String operatorCorpusSummary(String operatorId, DiscoveryResultKind resultKind) {
+        return "operator-corpus " + operatorId + ": " + resultKind.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    private List<String> mergeAssumptions(List<String> left, List<String> right) {
+        List<String> combined = new ArrayList<>();
+        if (left != null) {
+            combined.addAll(left);
+        }
+        if (right != null) {
+            combined.addAll(right);
+        }
+        return de.regelsuche.assumption.AssumptionSignature.ofExpressions(combined).normalizedAssumptions();
     }
 
     private DeterministicDiscoveryExperimentRunner.SeedRunOutcome geometricSeries(SeedExpression seed) {

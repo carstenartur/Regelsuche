@@ -19,6 +19,7 @@ public record DiscoveryTrace(
     Optional<String> reusedMacroId,
     Set<DiscoveryEvidenceKind> evidence,
     CandidateProofStatus proofStatus,
+    List<String> assumptions,
     String notes
 ) {
     public DiscoveryTrace {
@@ -34,6 +35,7 @@ public record DiscoveryTrace(
         reusedMacroId = reusedMacroId == null ? Optional.empty() : reusedMacroId;
         evidence = evidence == null ? Set.of() : Set.copyOf(evidence);
         proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED : proofStatus;
+        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         notes = notes == null ? "" : notes;
     }
 
@@ -50,11 +52,29 @@ public record DiscoveryTrace(
         String notes
     ) {
         this(inputExpression, finalExpression, resultKind, replayPath, rulePath, hypothesisCandidates,
-            learnedMacroId, reusedMacroId, Set.of(), proofStatus, notes);
+            learnedMacroId, reusedMacroId, Set.of(), proofStatus, List.of(), notes);
+    }
+
+    public DiscoveryTrace(
+        String inputExpression,
+        String finalExpression,
+        DiscoveryResultKind resultKind,
+        List<String> replayPath,
+        List<String> rulePath,
+        List<String> hypothesisCandidates,
+        Optional<String> learnedMacroId,
+        Optional<String> reusedMacroId,
+        Set<DiscoveryEvidenceKind> evidence,
+        CandidateProofStatus proofStatus,
+        String notes
+    ) {
+        this(inputExpression, finalExpression, resultKind, replayPath, rulePath, hypothesisCandidates,
+            learnedMacroId, reusedMacroId, evidence, proofStatus, List.of(), notes);
     }
 
     public static DiscoveryTrace noCandidate(String inputExpression, String notes) {
         return new DiscoveryTrace(inputExpression, inputExpression, DiscoveryResultKind.NO_CANDIDATE,
-            List.of(), List.of(), List.of(), Optional.empty(), Optional.empty(), Set.of(), CandidateProofStatus.OBSERVED, notes);
+            List.of(), List.of(), List.of(), Optional.empty(), Optional.empty(), Set.of(), CandidateProofStatus.OBSERVED,
+            List.of(), notes);
     }
 }

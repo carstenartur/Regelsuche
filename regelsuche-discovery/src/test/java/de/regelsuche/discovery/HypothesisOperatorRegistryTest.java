@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.RationalizationHypothesisOperator;
+import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import de.regelsuche.transform.Transformation;
 import java.util.HashSet;
 import java.util.List;
@@ -20,8 +22,12 @@ class HypothesisOperatorRegistryTest {
 
         assertTrue(ids.contains(DifferenceOfSquaresPreparationOperator.RULE_ID));
         assertTrue(ids.contains(ConservativeCompleteSquareHypothesisOperator.RULE_ID));
+        assertTrue(ids.contains(TelescopingFractionHypothesisOperator.RULE_ID));
+        assertTrue(ids.contains(RationalizationHypothesisOperator.RULE_ID));
         assertEquals(ids.size(), new HashSet<>(ids).size());
         assertEquals("complete-square", registry.byId(ConservativeCompleteSquareHypothesisOperator.RULE_ID).orElseThrow().displayName());
+        assertEquals("telescoping-fraction", registry.byId(TelescopingFractionHypothesisOperator.RULE_ID).orElseThrow().displayName());
+        assertEquals("rationalization", registry.byId(RationalizationHypothesisOperator.RULE_ID).orElseThrow().displayName());
     }
 
     @Test
