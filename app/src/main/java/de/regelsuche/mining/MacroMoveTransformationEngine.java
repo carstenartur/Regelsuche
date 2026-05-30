@@ -7,13 +7,16 @@ import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Adds executable, goal-aware MacroMoves to the normal search path.
@@ -113,6 +116,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(List.of(rewriteRule), Integer.MAX_VALUE, 80);
         MacroMoveStatistics before = statisticsByRuleId.getOrDefault(rule.id(), MacroMoveStatistics.empty());
         List<Transformation> transformations = macroEngine.transform(expression);
+        transformations = applyConservativeRelationFilters(expression, rule, transformations);
         int improved = (int) transformations.stream().filter(t -> t.estimatedCostDelta() < 0).count();
         double averageReduction = transformations.isEmpty()
             ? before.averageCostReduction()
@@ -139,6 +143,28 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
             expansionsByEdge.put(edgeKey(expression, transformation.transformedExpression(), transformation.rule()), expansion);
         }
         return transformations;
+    }
+
+    private List<Transformation> applyConservativeRelationFilters(
+        String expression,
+        ReusableRule rule,
+        List<Transformation> transformations
+    ) {
+        if (!isTelescopingUnitStepRule(rule)) {
+            return transformations;
+        }
+        Set<String> allowed = new HashSet<>();
+        for (Transformation candidate : new TelescopingFractionHypothesisOperator().generateCandidates(expression)) {
+            allowed.add(candidate.transformedExpression());
+        }
+        return transformations.stream()
+            .filter(transformation -> allowed.contains(transformation.transformedExpression()))
+            .toList();
+    }
+
+    private boolean isTelescopingUnitStepRule(ReusableRule rule) {
+        return rule.id().contains("telescoping")
+            || rule.parameterRelations().stream().anyMatch(relation -> relation.replace(" ", "").equals("B=A+1"));
     }
 
     private String macroRuleId(ReusableRule rule) {

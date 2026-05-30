@@ -32,7 +32,7 @@ public final class TelescopingDifferenceAstPredicate {
         if (expression instanceof BinaryExpr binary) {
             if (binary.operator() == BinaryOperator.SUB
                 && unitDenominator(binary.left()) != null
-                && isPlusOne(unitDenominator(binary.right()), unitDenominator(binary.left()))) {
+                && isUnitStep(unitDenominator(binary.right()), unitDenominator(binary.left()))) {
                 return true;
             }
             return containsTelescopingDifference(binary.left()) || containsTelescopingDifference(binary.right());
@@ -53,6 +53,18 @@ public final class TelescopingDifferenceAstPredicate {
         return null;
     }
 
+    private static boolean isUnitStep(Expr candidate, Expr base) {
+        AdditiveOffset candidateOffset = additiveOffset(candidate);
+        AdditiveOffset baseOffset = additiveOffset(base);
+        if (candidateOffset != null
+            && baseOffset != null
+            && same(candidateOffset.symbolicPart(), baseOffset.symbolicPart())
+            && Double.compare(candidateOffset.offset() - baseOffset.offset(), 1.0) == 0) {
+            return true;
+        }
+        return isPlusOne(candidate, base);
+    }
+
     private static boolean isPlusOne(Expr candidate, Expr base) {
         if (!(candidate instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.ADD) {
             return false;
@@ -68,5 +80,23 @@ public final class TelescopingDifferenceAstPredicate {
     private static boolean same(Expr left, Expr right) {
         return CANONICALIZER.stableHash(ExpressionFormatter.format(left))
             .equals(CANONICALIZER.stableHash(ExpressionFormatter.format(right)));
+    }
+
+    private static AdditiveOffset additiveOffset(Expr expression) {
+        if (expression instanceof NumberExpr number) {
+            return new AdditiveOffset(new NumberExpr(0), number.value());
+        }
+        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.ADD) {
+            if (binary.right() instanceof NumberExpr right) {
+                return new AdditiveOffset(binary.left(), right.value());
+            }
+            if (binary.left() instanceof NumberExpr left) {
+                return new AdditiveOffset(binary.right(), left.value());
+            }
+        }
+        return new AdditiveOffset(expression, 0.0);
+    }
+
+    private record AdditiveOffset(Expr symbolicPart, double offset) {
     }
 }
