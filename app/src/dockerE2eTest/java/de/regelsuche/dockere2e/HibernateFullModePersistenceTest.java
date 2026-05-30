@@ -51,7 +51,7 @@ class HibernateFullModePersistenceTest {
             try (ResultSet resultSet = connection.createStatement()
                 .executeQuery("SELECT count(*) FROM regelsuche_schema_history")) {
                 assertTrue(resultSet.next());
-                assertEquals(4, resultSet.getInt(1));
+                assertEquals(5, resultSet.getInt(1));
             }
         }
     }
