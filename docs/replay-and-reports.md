@@ -74,6 +74,24 @@ Siehe auch:
 - [docs/testing.md](testing.md)
 - [docs/demo-gallery.md](demo-gallery.md)
 
+## Convergent reports
+
+`ConvergentDiscoveryReport` summarizes cases where the same canonical
+expression is reached by at least two distinct rule paths. A path is distinct
+only when its rule sequence or non-normalization rule family differs; duplicate
+normalization-only variants are rejected so the gallery cannot imply fake
+convergence.
+
+The lightweight `RuleFamilyClassifier` labels rules for readable graph edges:
+expansion/distribution, complete square, hidden structure, factorization,
+learned macro, telescoping, rationalization, normalization, or other.
+
+Gallery eligibility requires at least two convergent paths and at least two
+distinct non-normalization families. Generated snippets include input, target,
+path count, path families, shortest path, most didactic path, macro shortcut
+path when present, validation status, and source replay ids. Mermaid graphs are
+rendered from report data by `ConvergentDiscoveryMermaidWriter`.
+
 ## Discovery profiles
 
 Reports entstehen aus Discovery-Läufen, deren Engine über `DiscoveryOptions` und
