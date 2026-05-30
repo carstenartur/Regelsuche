@@ -36,7 +36,7 @@ Hidden-Structure-Funde werden in drei Stufen behandelt:
    Ausdrucks-Teilbäume konsistent durch denselben Platzhalter ersetzen, z. B.
    `A^4 + 4 → (A^2 - 2*A + 2) * (A^2 + 2*A + 2)`. Vor der Promotion validiert
    `CandidateValidator` generierte Instanzen wie `A=x`, `A=y`, `A=x+1`,
-   `A=2*x` und `A=x^2` mit der vorhandenen Polynomial-Äquivalenz-Infrastruktur.
+   `A=2*x` und `A=x^2` mit dem konfigurierten `EquivalenceService`.
    Dieser Pfad ist explizit opt-in und senkt nicht die normalen Mining-Schwellen.
 3. **Zukünftiges Mehrparameter-Schema:** Breitere Schemata wie
    `A^4 + 4*B^4 → …` bleiben Future Work.

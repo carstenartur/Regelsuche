@@ -41,6 +41,11 @@ class HypothesisOperatorTest {
     }
 
     @Test
+    void squareDifferencePredicateTraversesFunctionArguments() {
+        assertTrue(SquareDifferenceAstPredicate.containsSquareDifference("sin(x^2 - y^2)"));
+    }
+
+    @Test
     void respectsConfiguredCandidateBound() {
         DifferenceOfSquaresPreparationOperator operator = new DifferenceOfSquaresPreparationOperator(0);
 

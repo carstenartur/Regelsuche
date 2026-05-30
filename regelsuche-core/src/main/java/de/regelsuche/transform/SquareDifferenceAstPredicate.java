@@ -3,6 +3,7 @@ package de.regelsuche.transform;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
@@ -29,6 +30,9 @@ public final class SquareDifferenceAstPredicate {
                 return true;
             }
             return containsSquareDifference(binary.left()) || containsSquareDifference(binary.right());
+        }
+        if (expression instanceof FunctionExpr function) {
+            return function.arguments().stream().anyMatch(SquareDifferenceAstPredicate::containsSquareDifference);
         }
         return false;
     }
