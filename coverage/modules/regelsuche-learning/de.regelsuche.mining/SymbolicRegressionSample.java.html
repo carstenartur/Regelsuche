@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymbolicRegressionSample.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">SymbolicRegressionSample.java</span></div><h1>SymbolicRegressionSample.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+/** Numeric sample consumed by symbolic-regression backends. */
+public record SymbolicRegressionSample(String pathId, double x, double y) {
+<span class="fc" id="L5">    public SymbolicRegressionSample {</span>
+<span class="pc bpc" id="L6" title="2 of 4 branches missed.">        if (pathId == null || pathId.isBlank()) {</span>
+<span class="nc" id="L7">            throw new IllegalArgumentException(&quot;pathId must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L9" title="2 of 4 branches missed.">        if (!Double.isFinite(x) || !Double.isFinite(y)) {</span>
+<span class="nc" id="L10">            throw new IllegalArgumentException(&quot;sample values must be finite&quot;);</span>
+        }
+<span class="fc" id="L12">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

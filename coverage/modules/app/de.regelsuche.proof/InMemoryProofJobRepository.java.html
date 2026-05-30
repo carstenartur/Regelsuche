@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InMemoryProofJobRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">InMemoryProofJobRepository.java</span></div><h1>InMemoryProofJobRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Thread-safe in-memory {@link ProofJobRepository}.
+ */
+<span class="fc" id="L13">public final class InMemoryProofJobRepository implements ProofJobRepository {</span>
+
+<span class="fc" id="L15">    private final Map&lt;String, ProofJob&gt; jobs = new ConcurrentHashMap&lt;&gt;();</span>
+
+    @Override
+    public void save(ProofJob job) {
+<span class="fc" id="L19">        jobs.put(job.id(), job);</span>
+<span class="fc" id="L20">    }</span>
+
+    @Override
+    public Optional&lt;ProofJob&gt; findById(String id) {
+<span class="fc" id="L24">        return Optional.ofNullable(jobs.get(id));</span>
+    }
+
+    @Override
+    public List&lt;ProofJob&gt; findAll() {
+<span class="fc" id="L29">        return List.copyOf(jobs.values());</span>
+    }
+
+    @Override
+    public List&lt;ProofJob&gt; findByStatus(ProofJobStatus status) {
+<span class="nc" id="L34">        return jobs.values().stream()</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">            .filter(j -&gt; j.status() == status)</span>
+<span class="nc" id="L36">            .toList();</span>
+    }
+
+    @Override
+    public Optional&lt;ProofJob&gt; findNextQueued() {
+<span class="fc" id="L41">        return jobs.values().stream()</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            .filter(j -&gt; j.status() == ProofJobStatus.QUEUED</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                || j.status() == ProofJobStatus.RETRYING)</span>
+<span class="fc" id="L44">            .min(Comparator</span>
+<span class="fc" id="L45">                .comparingInt(ProofJob::priority)</span>
+<span class="fc" id="L46">                .thenComparing(ProofJob::createdAt));</span>
+    }
+
+    @Override
+    public void delete(String id) {
+<span class="nc" id="L51">        jobs.remove(id);</span>
+<span class="nc" id="L52">    }</span>
+
+    /** @return a snapshot of all jobs sorted by creation time. */
+    public List&lt;ProofJob&gt; listSorted() {
+<span class="nc" id="L56">        List&lt;ProofJob&gt; sorted = new ArrayList&lt;&gt;(jobs.values());</span>
+<span class="nc" id="L57">        sorted.sort(Comparator.comparing(ProofJob::createdAt));</span>
+<span class="nc" id="L58">        return sorted;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

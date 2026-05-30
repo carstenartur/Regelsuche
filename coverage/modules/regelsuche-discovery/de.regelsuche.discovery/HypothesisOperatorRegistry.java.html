@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HypothesisOperatorRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery</a> &gt; <span class="el_source">HypothesisOperatorRegistry.java</span></div><h1>HypothesisOperatorRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery;
+
+import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
+import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.RationalizationHypothesisOperator;
+import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
+import java.util.List;
+import java.util.Optional;
+
+/** Central registry for stable hypothesis operator metadata and deterministic operator selection. */
+public final class HypothesisOperatorRegistry {
+    private final List&lt;HypothesisOperatorDescriptor&gt; descriptors;
+
+    public HypothesisOperatorRegistry() {
+<span class="fc" id="L16">        this(List.of(</span>
+            new HypothesisOperatorDescriptor(
+                DifferenceOfSquaresPreparationOperator.RULE_ID,
+                &quot;difference-of-squares&quot;,
+                &quot;factorization-bridge&quot;,
+                DifferenceOfSquaresPreparationOperator::new,
+                true,
+<span class="fc" id="L23">                List.of(&quot;sophie-germain&quot;, &quot;bridge&quot;, &quot;factorization&quot;)</span>
+            ),
+            new HypothesisOperatorDescriptor(
+                ConservativeCompleteSquareHypothesisOperator.RULE_ID,
+                &quot;complete-square&quot;,
+                &quot;quadratic-bridge&quot;,
+                ConservativeCompleteSquareHypothesisOperator::new,
+                true,
+<span class="fc" id="L31">                List.of(&quot;conservative&quot;, &quot;quadratic&quot;, &quot;bridge&quot;)</span>
+            ),
+            new HypothesisOperatorDescriptor(
+                TelescopingFractionHypothesisOperator.RULE_ID,
+                &quot;telescoping-fraction&quot;,
+                &quot;fraction-decomposition&quot;,
+                TelescopingFractionHypothesisOperator::new,
+                true,
+<span class="fc" id="L39">                List.of(&quot;telescoping&quot;, &quot;fraction&quot;, &quot;decomposition&quot;)</span>
+            ),
+            new HypothesisOperatorDescriptor(
+                RationalizationHypothesisOperator.RULE_ID,
+                &quot;rationalization&quot;,
+                &quot;radical-conjugate&quot;,
+                RationalizationHypothesisOperator::new,
+                true,
+<span class="fc" id="L47">                List.of(&quot;rationalization&quot;, &quot;radical&quot;, &quot;conjugate&quot;)</span>
+            )
+        ));
+<span class="fc" id="L50">    }</span>
+
+<span class="fc" id="L52">    public HypothesisOperatorRegistry(List&lt;HypothesisOperatorDescriptor&gt; descriptors) {</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        this.descriptors = descriptors == null ? List.of() : List.copyOf(descriptors);</span>
+<span class="fc" id="L54">        long uniqueIds = this.descriptors.stream().map(HypothesisOperatorDescriptor::id).distinct().count();</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (uniqueIds != this.descriptors.size()) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;hypothesis operator ids must be unique&quot;);</span>
+        }
+<span class="fc" id="L58">    }</span>
+
+    public List&lt;HypothesisOperatorDescriptor&gt; all() {
+<span class="fc" id="L61">        return descriptors;</span>
+    }
+
+    public Optional&lt;HypothesisOperatorDescriptor&gt; byId(String id) {
+<span class="fc" id="L65">        return descriptors.stream().filter(descriptor -&gt; descriptor.id().equals(id)).findFirst();</span>
+    }
+
+    public List&lt;HypothesisOperatorDescriptor&gt; enabledFor(DiscoveryOptions options) {
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        DiscoveryEngineOptions engine = options == null ? DiscoveryEngineOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options.engine();</span>
+<span class="fc" id="L70">        return enabledFor(engine.profile(), engine);</span>
+    }
+
+    public List&lt;HypothesisOperatorDescriptor&gt; enabledFor(DiscoveryProfile profile, DiscoveryEngineOptions options) {
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        DiscoveryEngineOptions engine = options == null ? DiscoveryEngineOptions.forProfile(profile) : options;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (!engine.enableHypothesisOperators()) {</span>
+<span class="fc" id="L76">            return List.of();</span>
+        }
+<span class="fc" id="L78">        return descriptors.stream().filter(HypothesisOperatorDescriptor::defaultEnabled).toList();</span>
+    }
+
+    public List&lt;String&gt; stableIds() {
+<span class="nc" id="L82">        return descriptors.stream().map(HypothesisOperatorDescriptor::id).toList();</span>
+    }
+
+    public List&lt;String&gt; selectedStableIds(DiscoveryOptions options) {
+<span class="nc" id="L86">        return enabledFor(options).stream().map(HypothesisOperatorDescriptor::id).toList();</span>
+    }
+
+    public List&lt;HypothesisOperator&gt; selectOperators(DiscoveryOptions options) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        DiscoveryEngineOptions engine = options == null ? DiscoveryEngineOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options.engine();</span>
+<span class="fc" id="L91">        int maxCandidates = engine.maxHypothesisCandidatesPerOperator();</span>
+<span class="fc" id="L92">        return enabledFor(options).stream().map(descriptor -&gt; descriptor.create(maxCandidates)).toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

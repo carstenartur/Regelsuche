@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RationalizedDenominatorAstPredicate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RationalizedDenominatorAstPredicate.java</span></div><h1>RationalizedDenominatorAstPredicate.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
+
+/** Structural predicate for fractions whose denominator no longer contains {@code sqrt(...)}. */
+public final class RationalizedDenominatorAstPredicate {
+<span class="fc" id="L13">    private static final ExpressionParser PARSER = new ExpressionParser();</span>
+
+    private RationalizedDenominatorAstPredicate() {
+    }
+
+    public static boolean hasRationalizedDenominator(String expression) {
+        try {
+<span class="fc" id="L20">            Expr root = PARSER.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="fc" id="L21">            return hasRationalizedDenominator(root);</span>
+<span class="nc" id="L22">        } catch (RuntimeException ignored) {</span>
+<span class="nc" id="L23">            return false;</span>
+        }
+    }
+
+    private static boolean hasRationalizedDenominator(Expr expression) {
+<span class="pc bpc" id="L28" title="2 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.DIV) {</span>
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">            return containsSqrt(binary.left()) &amp;&amp; !containsSqrt(binary.right());</span>
+        }
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">            return hasRationalizedDenominator(binary.left()) || hasRationalizedDenominator(binary.right());</span>
+        }
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L35">            return function.arguments().stream().anyMatch(RationalizedDenominatorAstPredicate::hasRationalizedDenominator);</span>
+        }
+<span class="nc" id="L37">        return false;</span>
+    }
+
+    private static boolean containsSqrt(Expr expression) {
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            return &quot;sqrt&quot;.equals(function.name())</span>
+<span class="pc bnc" id="L43" title="All 2 branches missed.">                || function.arguments().stream().anyMatch(RationalizedDenominatorAstPredicate::containsSqrt);</span>
+        }
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">            return containsSqrt(binary.left()) || containsSqrt(binary.right());</span>
+        }
+<span class="fc" id="L48">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

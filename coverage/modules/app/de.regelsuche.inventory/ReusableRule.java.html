@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReusableRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">ReusableRule.java</span></div><h1>ReusableRule.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.mining.RuleStatus;
+import java.time.Instant;
+import java.util.List;
+
+public record ReusableRule(
+    String id,
+    String leftPattern,
+    String rightPattern,
+    List&lt;String&gt; parameterRelations,
+    CandidateProofStatus proofStatus,
+    RuleStatus knownRuleStatus,
+    int supportingExamples,
+    double averageImprovement,
+    Instant createdAt,
+    String canonicalHash,
+    Instant lastUsedAt,
+    int usageCount,
+    int occurrenceCount,
+    List&lt;String&gt; supportingPathIds,
+    double confidenceScore,
+    List&lt;String&gt; assumptions
+) {
+<span class="fc" id="L27">    public ReusableRule {</span>
+<span class="pc bpc" id="L28" title="4 of 8 branches missed.">        if (id == null || id.isBlank() || leftPattern == null || rightPattern == null) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;id and patterns are required&quot;);</span>
+        }
+<span class="fc" id="L31">        parameterRelations = List.copyOf(parameterRelations);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED : proofStatus;</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        knownRuleStatus = knownRuleStatus == null ? RuleStatus.NEW : knownRuleStatus;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        canonicalHash = canonicalHash == null ? &quot;&quot; : canonicalHash;</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (usageCount &lt; 0) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;usageCount must not be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (occurrenceCount &lt; 0) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;occurrenceCount must not be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        supportingPathIds = supportingPathIds == null ? List.of() : List.copyOf(supportingPathIds);</span>
+<span class="fc" id="L43">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (confidenceScore &lt; 0.0 || confidenceScore &gt; 1.0) {</span>
+            // Clamp instead of throwing so adapters loading legacy data don't blow up.
+<span class="nc" id="L46">            confidenceScore = Math.max(0.0, Math.min(1.0, confidenceScore));</span>
+        }
+<span class="fc" id="L48">    }</span>
+
+    public ReusableRule(
+        String id,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; parameterRelations,
+        CandidateProofStatus proofStatus,
+        RuleStatus knownRuleStatus,
+        int supportingExamples,
+        double averageImprovement,
+        Instant createdAt,
+        String canonicalHash,
+        Instant lastUsedAt,
+        int usageCount,
+        int occurrenceCount,
+        List&lt;String&gt; supportingPathIds,
+        double confidenceScore
+    ) {
+<span class="fc" id="L67">        this(</span>
+            id, leftPattern, rightPattern, parameterRelations, proofStatus, knownRuleStatus,
+            supportingExamples, averageImprovement, createdAt, canonicalHash, lastUsedAt,
+<span class="fc" id="L70">            usageCount, occurrenceCount, supportingPathIds, confidenceScore, List.of()</span>
+        );
+<span class="fc" id="L72">    }</span>
+
+    /** Backwards-compatible 9-argument constructor used by older callers/tests. */
+    public ReusableRule(
+        String id,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; parameterRelations,
+        CandidateProofStatus proofStatus,
+        RuleStatus knownRuleStatus,
+        int supportingExamples,
+        double averageImprovement,
+        Instant createdAt
+    ) {
+<span class="fc" id="L86">        this(</span>
+            id,
+            leftPattern,
+            rightPattern,
+            parameterRelations,
+            proofStatus,
+            knownRuleStatus,
+            supportingExamples,
+            averageImprovement,
+            createdAt,
+            &quot;&quot;,
+            null,
+            0,
+            0,
+<span class="fc" id="L100">            List.of(),</span>
+            0.0,
+<span class="fc" id="L102">            List.of()</span>
+        );
+<span class="fc" id="L104">    }</span>
+
+    /** Backwards-compatible 12-argument constructor used by older callers/tests. */
+    public ReusableRule(
+        String id,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; parameterRelations,
+        CandidateProofStatus proofStatus,
+        RuleStatus knownRuleStatus,
+        int supportingExamples,
+        double averageImprovement,
+        Instant createdAt,
+        String canonicalHash,
+        Instant lastUsedAt,
+        int usageCount
+    ) {
+<span class="fc" id="L121">        this(</span>
+            id,
+            leftPattern,
+            rightPattern,
+            parameterRelations,
+            proofStatus,
+            knownRuleStatus,
+            supportingExamples,
+            averageImprovement,
+            createdAt,
+            canonicalHash,
+            lastUsedAt,
+            usageCount,
+            0,
+<span class="fc" id="L135">            List.of(),</span>
+            0.0,
+<span class="fc" id="L137">            List.of()</span>
+        );
+<span class="fc" id="L139">    }</span>
+
+    public ReusableRule withUsage(Instant lastUsedAt, int usageCount) {
+<span class="fc" id="L142">        return new ReusableRule(</span>
+            id,
+            leftPattern,
+            rightPattern,
+            parameterRelations,
+            proofStatus,
+            knownRuleStatus,
+            supportingExamples,
+            averageImprovement,
+            createdAt,
+            canonicalHash,
+            lastUsedAt,
+            usageCount,
+            occurrenceCount,
+            supportingPathIds,
+            confidenceScore,
+            assumptions
+        );
+    }
+
+    /** Returns a copy reflecting one additional successful occurrence in a path. */
+    public ReusableRule withLearningProgress(
+        int newOccurrenceCount,
+        double newAverageImprovement,
+        List&lt;String&gt; mergedSupportingPathIds,
+        double newConfidenceScore
+    ) {
+<span class="nc" id="L169">        return new ReusableRule(</span>
+            id,
+            leftPattern,
+            rightPattern,
+            parameterRelations,
+            proofStatus,
+            knownRuleStatus,
+            supportingExamples,
+            newAverageImprovement,
+            createdAt,
+            canonicalHash,
+            lastUsedAt,
+            usageCount,
+            newOccurrenceCount,
+            mergedSupportingPathIds,
+            newConfidenceScore,
+            assumptions
+        );
+    }
+
+    public ReusableRule withAssumptions(List&lt;String&gt; newAssumptions) {
+<span class="fc" id="L190">        return new ReusableRule(</span>
+            id, leftPattern, rightPattern, parameterRelations, proofStatus, knownRuleStatus,
+            supportingExamples, averageImprovement, createdAt, canonicalHash, lastUsedAt,
+            usageCount, occurrenceCount, supportingPathIds, confidenceScore, newAssumptions
+        );
+    }
+
+    public String assumptionFingerprint() {
+<span class="nc" id="L198">        return AssumptionSignature.ofExpressions(assumptions).fingerprint();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

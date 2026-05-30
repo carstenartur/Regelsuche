@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainAwareCasRouter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.cas</a> &gt; <span class="el_source">DomainAwareCasRouter.java</span></div><h1>DomainAwareCasRouter.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.cas;
+
+import de.regelsuche.math.algorithms.equivalence.GroebnerBasisEquivalenceService;
+import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.numeric.PslqNumericRelationService;
+import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import de.regelsuche.validation.NumericRelationService;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+
+/** Routes mathematical validation requests to proof-semantics-safe CAS backends. */
+public final class DomainAwareCasRouter {
+    private final MathematicalAlgorithmRegistry registry;
+    private final PolynomialNormalFormEquivalenceService normalForm;
+    private final GroebnerBasisEquivalenceService groebner;
+    private final SingularWorker singularWorker;
+    private final NumericRelationService numericRelations;
+
+    public DomainAwareCasRouter(MathematicalAlgorithmRegistry registry) {
+<span class="fc" id="L21">        this(registry,</span>
+            new PolynomialNormalFormEquivalenceService(registry),
+            new GroebnerBasisEquivalenceService(registry),
+            new DisabledSingularWorker(),
+            new PslqNumericRelationService(registry));
+<span class="fc" id="L26">    }</span>
+
+    public DomainAwareCasRouter(
+        MathematicalAlgorithmRegistry registry,
+        PolynomialNormalFormEquivalenceService normalForm,
+        GroebnerBasisEquivalenceService groebner,
+        SingularWorker singularWorker
+    ) {
+<span class="fc" id="L34">        this(registry, normalForm, groebner, singularWorker, new PslqNumericRelationService(registry));</span>
+<span class="fc" id="L35">    }</span>
+
+    public DomainAwareCasRouter(
+        MathematicalAlgorithmRegistry registry,
+        PolynomialNormalFormEquivalenceService normalForm,
+        GroebnerBasisEquivalenceService groebner,
+        SingularWorker singularWorker,
+        NumericRelationService numericRelations
+<span class="fc" id="L43">    ) {</span>
+<span class="fc" id="L44">        this.registry = registry;</span>
+<span class="fc" id="L45">        this.normalForm = normalForm;</span>
+<span class="fc" id="L46">        this.groebner = groebner;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        this.singularWorker = singularWorker == null ? new DisabledSingularWorker() : singularWorker;</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        this.numericRelations = numericRelations == null ? new PslqNumericRelationService(registry) : numericRelations;</span>
+<span class="fc" id="L49">    }</span>
+
+    public MathematicalAlgorithmRegistry.AlgorithmExecutionResult provePolynomialIdentity(String left, String right) {
+<span class="fc" id="L52">        normalForm.arePolynomiallyEquivalent(left, right);</span>
+<span class="fc" id="L53">        return normalForm.lastResult();</span>
+    }
+
+    public MathematicalAlgorithmRegistry.AlgorithmExecutionResult proveIdealMembership(
+        String polynomialExpression,
+        List&lt;String&gt; generatorExpressions
+    ) {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (registry.isEnabled(MathematicalAlgorithmRegistry.SINGULAR_BACKEND)) {</span>
+<span class="fc" id="L61">            MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.SINGULAR_BACKEND)</span>
+<span class="fc" id="L62">                .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L63">                .orElse(MathematicalAlgorithmRegistry.AlgorithmBudget.unbounded());</span>
+<span class="fc" id="L64">            MathematicalAlgorithmRegistry.AlgorithmExecutionResult singular = singularWorker.reduceModuloIdeal(polynomialExpression, generatorExpressions,</span>
+<span class="fc" id="L65">                singularTimeout(budget));</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (singular.status() == MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                || !registry.isEnabled(MathematicalAlgorithmRegistry.GROEBNER_BASIS)) {</span>
+<span class="fc" id="L68">                return singular;</span>
+            }
+        }
+<span class="fc" id="L71">        groebner.normalFormModuloIdeal(polynomialExpression, generatorExpressions);</span>
+<span class="fc" id="L72">        return groebner.lastResult();</span>
+    }
+
+    public MathematicalAlgorithmRegistry.AlgorithmExecutionResult discoverNumericRelation(List&lt;Double&gt; samples) {
+<span class="fc" id="L76">        NumericRelationService.NumericRelationResult result = numericRelations.findIntegerRelation(samples);</span>
+<span class="fc" id="L77">        MathematicalAlgorithmRegistry.ResultType resultType = result.result().resultType();</span>
+<span class="fc" id="L78">        String detail = result.result().detail();</span>
+<span class="fc bfc" id="L79" title="All 4 branches covered.">        if (result.result().status() == MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS</span>
+            &amp;&amp; resultType != MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS) {
+<span class="fc" id="L81">            resultType = MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS;</span>
+<span class="fc" id="L82">            detail = detail + &quot; (downgraded to hypothesis-only numeric relation semantics)&quot;;</span>
+        }
+<span class="fc" id="L84">        Map&lt;String, Object&gt; payload = new java.util.LinkedHashMap&lt;&gt;(result.result().payload());</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        payload.put(&quot;sampleCount&quot;, samples == null ? 0 : samples.size());</span>
+<span class="fc" id="L86">        payload.put(&quot;coefficients&quot;, result.coefficients());</span>
+<span class="fc" id="L87">        payload.put(&quot;residual&quot;, result.residual());</span>
+<span class="fc" id="L88">        payload.put(&quot;proofSemantics&quot;, MathematicalAlgorithmRegistry.ProofSemantics.HYPOTHESIS_ONLY.name());</span>
+<span class="fc" id="L89">        return new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(</span>
+<span class="fc" id="L90">            result.result().status(),</span>
+            resultType,
+            detail,
+            payload
+        );
+    }
+
+    private static Duration singularTimeout(MathematicalAlgorithmRegistry.AlgorithmBudget budget) {
+<span class="fc" id="L98">        long timeoutSeconds = Math.max(1L, budget.maxSteps());</span>
+<span class="fc" id="L99">        return Duration.ofSeconds(timeoutSeconds);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

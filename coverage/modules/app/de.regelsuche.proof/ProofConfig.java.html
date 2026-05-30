@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofConfig.java</span></div><h1>ProofConfig.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Resolved configuration for the persistent proof pipeline.
+ *
+ * &lt;p&gt;Three knobs control where the proof infrastructure stores its state:&lt;/p&gt;
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@code REGELSUCHE_PROOF_ENABLED} (or JVM property
+ *       {@code regelsuche.proof.enabled}) — turns the scheduler / REST endpoints
+ *       on or off. Defaults to {@code true}; set to {@code false} for tests or
+ *       lean (pun intended) deployments that don't need real prover wiring.&lt;/li&gt;
+ *   &lt;li&gt;{@code REGELSUCHE_PROOF_ARTIFACT_PATH} (or
+ *       {@code regelsuche.proof.artifactPath}) — directory under which the
+ *       {@link JsonFileProofArtifactRepository} writes per-job artifact bundles
+ *       ({@code proof.lean}, {@code stdout.txt}, ...). Default:
+ *       {@code &lt;persistencePath&gt;/proofs}.&lt;/li&gt;
+ *   &lt;li&gt;{@code REGELSUCHE_PROOF_JOB_STORE} (or
+ *       {@code regelsuche.proof.jobStore}) — JSON file that holds the persistent
+ *       job queue. Default: {@code &lt;persistencePath&gt;/proof-jobs.json}.&lt;/li&gt;
+ *   &lt;li&gt;{@code REGELSUCHE_PROOF_CACHE} (or
+ *       {@code regelsuche.proof.cache}) — JSON file that holds the persistent
+ *       proof cache. Default: {@code &lt;persistencePath&gt;/proof-cache.json}.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;The Docker image wires sensible defaults so a plain
+ * {@code docker run regelsuche} immediately exposes a usable proof workbench
+ * with file-backed state under {@code /opt/regelsuche/data}.&lt;/p&gt;
+ */
+public record ProofConfig(
+    boolean enabled,
+    Path artifactPath,
+    Path jobStorePath,
+    Path cachePath
+) {
+
+    public static final String ENV_ENABLED = &quot;REGELSUCHE_PROOF_ENABLED&quot;;
+    public static final String ENV_ARTIFACT_PATH = &quot;REGELSUCHE_PROOF_ARTIFACT_PATH&quot;;
+    public static final String ENV_JOB_STORE = &quot;REGELSUCHE_PROOF_JOB_STORE&quot;;
+    public static final String ENV_CACHE = &quot;REGELSUCHE_PROOF_CACHE&quot;;
+
+    public static final String PROP_ENABLED = &quot;regelsuche.proof.enabled&quot;;
+    public static final String PROP_ARTIFACT_PATH = &quot;regelsuche.proof.artifactPath&quot;;
+    public static final String PROP_JOB_STORE = &quot;regelsuche.proof.jobStore&quot;;
+    public static final String PROP_CACHE = &quot;regelsuche.proof.cache&quot;;
+
+<span class="fc" id="L53">    public ProofConfig {</span>
+<span class="fc" id="L54">        Objects.requireNonNull(artifactPath, &quot;artifactPath&quot;);</span>
+<span class="fc" id="L55">        Objects.requireNonNull(jobStorePath, &quot;jobStorePath&quot;);</span>
+<span class="fc" id="L56">        Objects.requireNonNull(cachePath, &quot;cachePath&quot;);</span>
+<span class="fc" id="L57">    }</span>
+
+    /** Disabled configuration with placeholder paths. */
+    public static ProofConfig disabled() {
+<span class="fc" id="L61">        Path placeholder = Paths.get(&quot;./data/regelsuche/proofs&quot;);</span>
+<span class="fc" id="L62">        return new ProofConfig(false, placeholder,</span>
+<span class="fc" id="L63">            placeholder.resolveSibling(&quot;proof-jobs.json&quot;),</span>
+<span class="fc" id="L64">            placeholder.resolveSibling(&quot;proof-cache.json&quot;));</span>
+    }
+
+    /**
+     * Resolve a {@link ProofConfig} from environment + JVM properties, using
+     * {@code persistenceRoot} as the base directory for defaults.
+     *
+     * &lt;p&gt;Explicit JVM properties win over environment variables, which in turn
+     * win over the defaults derived from {@code persistenceRoot}.&lt;/p&gt;
+     */
+    public static ProofConfig fromEnvironment(Map&lt;String, String&gt; env, Path persistenceRoot) {
+<span class="fc" id="L75">        Objects.requireNonNull(env, &quot;env&quot;);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        Path base = persistenceRoot == null</span>
+<span class="nc" id="L77">            ? Paths.get(&quot;./data/regelsuche&quot;)</span>
+<span class="fc" id="L78">            : persistenceRoot;</span>
+
+<span class="fc" id="L80">        boolean enabled = parseBoolean(</span>
+<span class="fc" id="L81">            firstNonBlank(System.getProperty(PROP_ENABLED), env.get(ENV_ENABLED)),</span>
+            true
+        );
+<span class="fc" id="L84">        Path artifactPath = resolvePath(</span>
+<span class="fc" id="L85">            firstNonBlank(System.getProperty(PROP_ARTIFACT_PATH), env.get(ENV_ARTIFACT_PATH)),</span>
+<span class="fc" id="L86">            base.resolve(&quot;proofs&quot;)</span>
+        );
+<span class="fc" id="L88">        Path jobStorePath = resolvePath(</span>
+<span class="fc" id="L89">            firstNonBlank(System.getProperty(PROP_JOB_STORE), env.get(ENV_JOB_STORE)),</span>
+<span class="fc" id="L90">            base.resolve(&quot;proof-jobs.json&quot;)</span>
+        );
+<span class="fc" id="L92">        Path cachePath = resolvePath(</span>
+<span class="fc" id="L93">            firstNonBlank(System.getProperty(PROP_CACHE), env.get(ENV_CACHE)),</span>
+<span class="fc" id="L94">            base.resolve(&quot;proof-cache.json&quot;)</span>
+        );
+<span class="fc" id="L96">        return new ProofConfig(enabled, artifactPath, jobStorePath, cachePath);</span>
+    }
+
+    /** Convenience overload that reads the JVM's real environment. */
+    public static ProofConfig fromEnvironment(Path persistenceRoot) {
+<span class="nc" id="L101">        return fromEnvironment(System.getenv(), persistenceRoot);</span>
+    }
+
+    private static boolean parseBoolean(String value, boolean fallback) {
+<span class="pc bpc" id="L105" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L106">            return fallback;</span>
+        }
+<span class="pc bpc" id="L108" title="1 of 3 branches missed.">        return switch (value.trim().toLowerCase(Locale.ROOT)) {</span>
+<span class="fc" id="L109">            case &quot;true&quot;, &quot;1&quot;, &quot;yes&quot;, &quot;on&quot; -&gt; true;</span>
+<span class="fc" id="L110">            case &quot;false&quot;, &quot;0&quot;, &quot;no&quot;, &quot;off&quot; -&gt; false;</span>
+<span class="nc" id="L111">            default -&gt; fallback;</span>
+        };
+    }
+
+    private static Path resolvePath(String value, Path fallback) {
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L117">            return fallback;</span>
+        }
+<span class="fc" id="L119">        return Paths.get(value);</span>
+    }
+
+    private static String firstNonBlank(String... values) {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">            if (value != null &amp;&amp; !value.isBlank()) {</span>
+<span class="fc" id="L125">                return value;</span>
+            }
+        }
+<span class="fc" id="L128">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

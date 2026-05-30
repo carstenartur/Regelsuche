@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCacheKey.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofCacheKey.java</span></div><h1>ProofCacheKey.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionSignature;
+import java.util.List;
+
+/**
+ * Immutable key that uniquely identifies a proof obligation for caching.
+ *
+ * &lt;p&gt;Two obligations are considered identical (and thus share a cached result)
+ * when:&lt;/p&gt;
+ * &lt;ol&gt;
+ *   &lt;li&gt;The canonical left- and right-hand side patterns match.&lt;/li&gt;
+ *   &lt;li&gt;The sorted set of assumption expressions matches.&lt;/li&gt;
+ *   &lt;li&gt;The prover version string matches — guaranteeing that a result cached
+ *       with an older prover is not accidentally reused after an upgrade.&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;Use {@link #of(String, String, List, String)} for construction; the
+ * factory sorts and normalises the assumptions automatically.&lt;/p&gt;
+ */
+public record ProofCacheKey(
+    String canonicalLeft,
+    String canonicalRight,
+    String assumptionsSorted,
+    String proverVersion
+) {
+<span class="fc" id="L28">    public ProofCacheKey {</span>
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">        if (canonicalLeft == null || canonicalRight == null) {</span>
+<span class="nc" id="L30">            throw new IllegalArgumentException(&quot;patterns must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        assumptionsSorted = assumptionsSorted == null ? &quot;&quot; : assumptionsSorted;</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        proverVersion = proverVersion == null ? &quot;unknown&quot; : proverVersion;</span>
+<span class="fc" id="L34">    }</span>
+
+    /**
+     * Factory that sorts and joins {@code assumptions} so key equality is
+     * independent of the order in which assumptions were supplied.
+     */
+    public static ProofCacheKey of(String left, String right,
+                                   List&lt;Assumption&gt; assumptions, String proverVersion) {
+<span class="fc" id="L42">        String sorted = AssumptionSignature.ofAssumptions(assumptions).fingerprint();</span>
+<span class="fc" id="L43">        return new ProofCacheKey(left, right, sorted, proverVersion);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TranspositionGate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.strategy</a> &gt; <span class="el_source">TranspositionGate.java</span></div><h1>TranspositionGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.strategy;
+
+import de.regelsuche.search.memory.PruningDecision;
+import de.regelsuche.search.memory.PruningReason;
+import de.regelsuche.search.memory.SearchMemory;
+import de.regelsuche.search.memory.TranspositionEntry;
+import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Helper used by {@link SearchStrategy} implementations to consult the
+ * {@link SearchMemory transposition table} attached to a {@link SearchProblem}.
+ *
+ * &lt;p&gt;Returns a {@link Verdict#KEEP keep verdict} if the state should be
+ * expanded, or a {@link Verdict#PRUNE prune verdict} if not. When
+ * {@code memory} is non-null, the helper records a {@link PruningDecision}
+ * for revisits (and other non-first-sighting cases) to keep pruning decisions
+ * explainable. Strategies that pass {@code null} memory behave exactly as
+ * before – no lookup, no recording.&lt;/p&gt;
+ */
+public final class TranspositionGate {
+
+<span class="fc" id="L25">    public enum Verdict { KEEP, PRUNE }</span>
+
+    private TranspositionGate() {
+    }
+
+    /**
+     * Evaluate a candidate state against the {@link SearchMemory}. The
+     * helper:
+     * &lt;ul&gt;
+     *   &lt;li&gt;Records the visit in the {@link
+     *       de.regelsuche.search.memory.TranspositionTable} (so subsequent
+     *       lookups see it).&lt;/li&gt;
+     *   &lt;li&gt;Returns {@link Verdict#KEEP KEEP} for first sightings, states
+     *       with strictly better score, states reached at lower depth, or
+     *       states whose applied rule set adds at least one previously
+     *       unseen rule id.&lt;/li&gt;
+     *   &lt;li&gt;Otherwise returns {@link Verdict#PRUNE PRUNE} and emits a
+     *       matching {@link PruningDecision}.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param memory      may be {@code null} – {@link Verdict#KEEP} is
+     *                    returned unconditionally in that case.
+     * @param state       candidate state about to be expanded.
+     * @param pathId      stable identifier of the path leading to {@code state}.
+     */
+    public static Verdict evaluate(SearchMemory memory, SearchState state, String pathId) {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (memory == null) {</span>
+<span class="fc" id="L52">            return Verdict.KEEP;</span>
+        }
+<span class="fc" id="L54">        String identityHash = identityHash(state);</span>
+<span class="fc" id="L55">        Optional&lt;TranspositionEntry&gt; existingOpt = memory.table().lookup(identityHash);</span>
+<span class="fc" id="L56">        Set&lt;String&gt; ruleIds = new LinkedHashSet&lt;&gt;(state.appliedRuleIds());</span>
+<span class="fc" id="L57">        int score = state.score().weightedTotal();</span>
+<span class="fc" id="L58">        Instant now = Instant.now();</span>
+<span class="fc" id="L59">        TranspositionEntry candidate = new TranspositionEntry(</span>
+            identityHash,
+<span class="fc" id="L61">            state.expression(),</span>
+            score,
+<span class="fc" id="L63">            state.depth(),</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            pathId == null ? &quot;&quot; : pathId,</span>
+            ruleIds,
+            1,
+            now,
+            now
+        );
+
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (existingOpt.isEmpty()) {</span>
+<span class="fc" id="L72">            memory.table().record(candidate);</span>
+<span class="fc" id="L73">            return Verdict.KEEP;</span>
+        }
+<span class="fc" id="L75">        TranspositionEntry existing = existingOpt.get();</span>
+        // Better score wins.
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (score &lt; existing.bestScore()) {</span>
+<span class="nc" id="L78">            memory.table().record(candidate);</span>
+<span class="nc" id="L79">            memory.recordDecision(new PruningDecision(</span>
+<span class="nc" id="L80">                state.expression(), identityHash,</span>
+                PruningReason.REPLACED_WORSE_PATH));
+<span class="nc" id="L82">            return Verdict.KEEP;</span>
+        }
+        // Same-score, shallower path wins.
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">        if (score == existing.bestScore() &amp;&amp; state.depth() &lt; existing.minDepthSeen()) {</span>
+<span class="nc" id="L86">            memory.table().record(candidate);</span>
+<span class="nc" id="L87">            memory.recordDecision(new PruningDecision(</span>
+<span class="nc" id="L88">                state.expression(), identityHash,</span>
+                PruningReason.KEPT_LOWER_DEPTH));
+<span class="nc" id="L90">            return Verdict.KEEP;</span>
+        }
+        // New rule combination is interesting for the miner even at equal score.
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        boolean hasNewRules = !existing.reachedByRuleIds().containsAll(ruleIds);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (hasNewRules) {</span>
+<span class="fc" id="L95">            memory.table().record(candidate);</span>
+<span class="fc" id="L96">            memory.recordDecision(new PruningDecision(</span>
+<span class="fc" id="L97">                state.expression(), identityHash,</span>
+                PruningReason.KEPT_NEW_RULE_COMBO));
+<span class="fc" id="L99">            return Verdict.KEEP;</span>
+        }
+        // Otherwise: prune, but still update visit count.
+<span class="fc" id="L102">        memory.table().record(candidate);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        PruningReason reason = score &gt; existing.bestScore()</span>
+<span class="nc" id="L104">            ? PruningReason.ALREADY_KNOWN_BETTER</span>
+<span class="fc" id="L105">            : PruningReason.ALREADY_KNOWN_EQUAL;</span>
+<span class="fc" id="L106">        memory.recordDecision(new PruningDecision(</span>
+<span class="fc" id="L107">            state.expression(), identityHash, reason));</span>
+<span class="fc" id="L108">        return Verdict.PRUNE;</span>
+    }
+
+    private static String identityHash(SearchState state) {
+<span class="fc" id="L112">        String assumptions = state.assumptionFingerprint();</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (assumptions.isBlank()) {</span>
+<span class="fc" id="L114">            return state.canonicalHash();</span>
+        }
+<span class="fc" id="L116">        return state.canonicalHash() + &quot;\u0001assumptions:&quot; + assumptions;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

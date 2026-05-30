@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MacroLearningPipeline.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.learning</a> &gt; <span class="el_source">MacroLearningPipeline.java</span></div><h1>MacroLearningPipeline.java</h1><pre class="source lang-java linenums">package de.regelsuche.learning;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.equivalence.EquivalenceService;
+import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.mining.GeneralizedPattern;
+import de.regelsuche.mining.KnownRuleRepository;
+import de.regelsuche.mining.ParameterRelation;
+import de.regelsuche.mining.PatternGeneralizer;
+import de.regelsuche.mining.RulePatternCanonicalizer;
+import de.regelsuche.mining.RulePatternInstantiator;
+import de.regelsuche.mining.RulePatternNode;
+import de.regelsuche.mining.RulePatternParser;
+import de.regelsuche.mining.RuleStatus;
+import de.regelsuche.mining.SuccessfulTransformationPath;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Evidence-first pipeline that promotes macros only after validation gates pass. */
+public class MacroLearningPipeline {
+    public static final double DEFAULT_CONFIDENCE_THRESHOLD = 0.8;
+<span class="fc" id="L34">    private static final Pattern PLACEHOLDER = Pattern.compile(&quot;\\b[A-Z]\\b&quot;);</span>
+<span class="fc" id="L35">    private static final Pattern TEMPORARY_PLACEHOLDER = Pattern.compile(&quot;\\b(?:v|tmp)\\d+\\b&quot;);</span>
+
+    private final RuleInventoryRepository inventory;
+    private final PatternGeneralizer generalizer;
+    private final EquivalenceService equivalenceService;
+    private final CounterexampleSearchService counterexampleSearchService;
+    private final KnownRuleRepository knownRules;
+    private final double confidenceThreshold;
+<span class="fc" id="L43">    private final RulePatternParser patternParser = new RulePatternParser();</span>
+<span class="fc" id="L44">    private final RulePatternInstantiator instantiator = new RulePatternInstantiator();</span>
+<span class="fc" id="L45">    private final PlaceholderSubstitutionGenerator substitutionGenerator = new PlaceholderSubstitutionGenerator();</span>
+
+    public MacroLearningPipeline(RuleInventoryRepository inventory) {
+<span class="fc" id="L48">        this(</span>
+            inventory,
+            new PatternGeneralizer(),
+            new SymPyEquivalenceService(),
+            new DeterministicCounterexampleSearchService(),
+            new KnownRuleRepository(),
+            DEFAULT_CONFIDENCE_THRESHOLD
+        );
+<span class="fc" id="L56">    }</span>
+
+    public MacroLearningPipeline(
+        RuleInventoryRepository inventory,
+        PatternGeneralizer generalizer,
+        EquivalenceService equivalenceService,
+        CounterexampleSearchService counterexampleSearchService,
+        KnownRuleRepository knownRules,
+        double confidenceThreshold
+<span class="fc" id="L65">    ) {</span>
+<span class="pc bpc" id="L66" title="4 of 8 branches missed.">        if (inventory == null || generalizer == null || equivalenceService == null || counterexampleSearchService == null) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(&quot;pipeline dependencies must not be null&quot;);</span>
+        }
+<span class="fc" id="L69">        this.inventory = inventory;</span>
+<span class="fc" id="L70">        this.generalizer = generalizer;</span>
+<span class="fc" id="L71">        this.equivalenceService = equivalenceService;</span>
+<span class="fc" id="L72">        this.counterexampleSearchService = counterexampleSearchService;</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        this.knownRules = knownRules == null ? new KnownRuleRepository() : knownRules;</span>
+<span class="fc" id="L74">        this.confidenceThreshold = confidenceThreshold;</span>
+<span class="fc" id="L75">    }</span>
+
+    public MacroLearningResult learn(List&lt;SuccessfulTransformationPath&gt; replayPaths) {
+<span class="fc" id="L78">        List&lt;String&gt; stages = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        List&lt;SuccessfulTransformationPath&gt; successful = replayPaths == null</span>
+<span class="nc" id="L80">            ? List.of()</span>
+<span class="fc" id="L81">            : replayPaths.stream().filter(SuccessfulTransformationPath::equivalenceVerified).toList();</span>
+<span class="fc" id="L82">        stages.add(&quot;collect successful paths: &quot; + successful.size());</span>
+<span class="fc" id="L83">        List&lt;ReusableRule&gt; touched = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L84">        List&lt;ReusableRule&gt; promoted = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L85">        List&lt;MacroValidationExample&gt; validationExamples = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L86">        List&lt;CounterexampleSearchService.CounterexampleSearchResult&gt; counterexampleResults = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (SuccessfulTransformationPath path : successful) {</span>
+<span class="fc" id="L88">            generalizer.generalizeSingleExampleSchema(path)</span>
+<span class="fc" id="L89">                .ifPresent(pattern -&gt; {</span>
+<span class="fc" id="L90">                    stages.add(&quot;extract source/target pairs: &quot; + path.id());</span>
+<span class="fc" id="L91">                    stages.add(&quot;generalize schema: &quot; + pattern.leftPattern() + &quot; -&gt; &quot; + pattern.rightPattern());</span>
+<span class="fc" id="L92">                    stages.add(&quot;mine parameter relations: &quot; + pattern.parameterRelations());</span>
+<span class="fc" id="L93">                    stages.add(&quot;placeholder count: &quot; + placeholders(pattern.leftPattern()).size());</span>
+<span class="fc" id="L94">                    stages.add(&quot;source path id: &quot; + path.id());</span>
+<span class="fc" id="L95">                    List&lt;MacroValidationExample&gt; examples = validateGeneratedSchema(pattern, stages);</span>
+<span class="fc" id="L96">                    validationExamples.addAll(examples);</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">                    boolean generatedValid = !examples.isEmpty() &amp;&amp; examples.stream().allMatch(MacroValidationExample::equivalent);</span>
+<span class="fc" id="L98">                    boolean symbolic = equivalenceService.areEquivalent(pattern.leftPattern(), pattern.rightPattern());</span>
+<span class="fc" id="L99">                    CounterexampleSearchService.CounterexampleSearchResult counterexamples = counterexampleSearchService.search(</span>
+                        new CounterexampleSearchService.HypothesisInput(
+<span class="fc" id="L101">                            path.id(),</span>
+<span class="fc" id="L102">                            pattern.leftPattern(),</span>
+<span class="fc" id="L103">                            pattern.rightPattern(),</span>
+<span class="fc" id="L104">                            generalizedAssumptions(path.assumptions())</span>
+                        ),
+<span class="fc" id="L106">                        CounterexampleSearchService.CounterexampleBudget.defaultBudget()</span>
+                    );
+<span class="fc" id="L108">                    counterexampleResults.add(counterexamples);</span>
+<span class="fc" id="L109">                    stages.add(&quot;search for counterexamples: &quot; + counterexamples.status());</span>
+<span class="fc" id="L110">                    double confidence = confidence(symbolic, generatedValid, counterexamples);</span>
+<span class="fc" id="L111">                    stages.add(&quot;score confidence: &quot; + confidence);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                    if (qualityGatesPass(pattern, examples, symbolic, generatedValid, counterexamples, confidence)) {</span>
+<span class="fc" id="L113">                        ReusableRule rule = promote(path, pattern, confidence, symbolic, generalizedAssumptions(path.assumptions()));</span>
+<span class="fc" id="L114">                        touched.add(rule);</span>
+<span class="fc" id="L115">                        promoted.add(rule);</span>
+<span class="fc" id="L116">                        stages.add(&quot;promotion reason: generated substitutions validate and no counterexample found for &quot; + path.id());</span>
+<span class="fc" id="L117">                        stages.add(&quot;promote: &quot; + rule.id());</span>
+<span class="fc" id="L118">                    } else {</span>
+<span class="fc" id="L119">                        stages.add(stageEvidenceOnlyReason(pattern, path.id()));</span>
+                    }
+<span class="fc" id="L121">                });</span>
+<span class="fc" id="L122">        }</span>
+<span class="fc" id="L123">        return new MacroLearningResult(touched, promoted, validationExamples, counterexampleResults, stages);</span>
+    }
+
+    private List&lt;MacroValidationExample&gt; validateGeneratedSchema(GeneralizedPattern pattern, List&lt;String&gt; stages) {
+<span class="fc" id="L127">        RulePatternNode leftPattern = patternParser.parse(pattern.leftPattern());</span>
+<span class="fc" id="L128">        RulePatternNode rightPattern = patternParser.parse(pattern.rightPattern());</span>
+<span class="fc" id="L129">        Set&lt;String&gt; detectedPlaceholders = new LinkedHashSet&lt;&gt;(placeholders(pattern.leftPattern()));</span>
+<span class="fc" id="L130">        detectedPlaceholders.addAll(placeholders(pattern.rightPattern()));</span>
+<span class="fc" id="L131">        Set&lt;String&gt; temporaryPlaceholders = temporaryPlaceholders(pattern);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (!temporaryPlaceholders.isEmpty()) {</span>
+<span class="nc" id="L133">            stages.add(&quot;reject: unnormalized temporary placeholders: &quot; + temporaryPlaceholders);</span>
+<span class="nc" id="L134">            return List.of();</span>
+        }
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (detectedPlaceholders.isEmpty()) {</span>
+<span class="nc" id="L137">            stages.add(&quot;reject: generated schema has no placeholders&quot;);</span>
+<span class="nc" id="L138">            return List.of();</span>
+        }
+        List&lt;Map&lt;String, Expr&gt;&gt; substitutions;
+        try {
+<span class="fc" id="L142">            substitutions = substitutionGenerator.generate(detectedPlaceholders, pattern.parameterRelations());</span>
+<span class="fc" id="L143">        } catch (PlaceholderSubstitutionGenerator.UnsupportedRelationException exception) {</span>
+<span class="fc" id="L144">            stages.add(&quot;reject: unsupported placeholder relation: &quot; + exception.getMessage());</span>
+<span class="fc" id="L145">            return List.of();</span>
+<span class="fc" id="L146">        }</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (substitutions.isEmpty()) {</span>
+<span class="nc" id="L148">            stages.add(&quot;reject: no safe placeholder substitutions generated for &quot; + detectedPlaceholders);</span>
+<span class="nc" id="L149">            return List.of();</span>
+        }
+<span class="fc" id="L151">        stages.add(&quot;generate placeholder substitutions: &quot; + substitutions.size());</span>
+<span class="fc" id="L152">        stages.add(&quot;generated assignment count: &quot; + substitutions.size());</span>
+<span class="fc" id="L153">        List&lt;MacroValidationExample&gt; examples = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (Map&lt;String, Expr&gt; substitution : substitutions) {</span>
+<span class="fc" id="L155">            String left = ExpressionFormatter.format(instantiator.instantiate(leftPattern, substitution));</span>
+<span class="fc" id="L156">            String right = ExpressionFormatter.format(instantiator.instantiate(rightPattern, substitution));</span>
+<span class="fc" id="L157">            examples.add(new MacroValidationExample(</span>
+<span class="fc" id="L158">                substitutionLabel(detectedPlaceholders, substitution),</span>
+                left,
+                right,
+<span class="fc" id="L161">                equivalenceService.areEquivalent(left, right)</span>
+            ));
+<span class="fc" id="L163">        }</span>
+<span class="fc" id="L164">        return examples;</span>
+    }
+
+    private String substitutionLabel(Set&lt;String&gt; placeholders, Map&lt;String, Expr&gt; substitution) {
+<span class="fc" id="L168">        return placeholders.stream()</span>
+<span class="fc" id="L169">            .map(placeholder -&gt; placeholder + &quot; = &quot; + ExpressionFormatter.format(substitution.get(placeholder)))</span>
+<span class="fc" id="L170">            .toList()</span>
+<span class="fc" id="L171">            .toString();</span>
+    }
+
+    private boolean qualityGatesPass(
+        GeneralizedPattern pattern,
+        List&lt;MacroValidationExample&gt; examples,
+        boolean symbolic,
+        boolean generatedValid,
+        CounterexampleSearchService.CounterexampleSearchResult counterexamples,
+        double confidence
+    ) {
+<span class="fc" id="L182">        Set&lt;String&gt; sourcePlaceholders = placeholders(pattern.leftPattern());</span>
+<span class="fc" id="L183">        Set&lt;String&gt; targetPlaceholders = placeholders(pattern.rightPattern());</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        boolean hasPlaceholder = !sourcePlaceholders.isEmpty();</span>
+<span class="fc" id="L185">        boolean targetBound = sourcePlaceholders.containsAll(targetPlaceholders);</span>
+<span class="fc" id="L186">        boolean hasNoTemporaryPlaceholders = temporaryPlaceholders(pattern).isEmpty();</span>
+<span class="fc" id="L187">        boolean structuredRelations = pattern.parameterRelations().stream()</span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">            .filter(relation -&gt; relation.contains(&quot;=&quot;) || relation.contains(&quot;!=&quot;))</span>
+<span class="fc" id="L189">            .allMatch(relation -&gt; ParameterRelation.parse(relation).isPresent());</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        boolean noCounterexample = counterexamples.status() != CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND;</span>
+<span class="pc bpc" id="L191" title="8 of 16 branches missed.">        return hasPlaceholder</span>
+            &amp;&amp; targetBound
+            &amp;&amp; hasNoTemporaryPlaceholders
+            &amp;&amp; structuredRelations
+            &amp;&amp; generatedValid
+            &amp;&amp; (symbolic || noCounterexample)
+            &amp;&amp; confidence &gt;= confidenceThreshold
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            &amp;&amp; examples.stream().allMatch(MacroValidationExample::equivalent);</span>
+    }
+
+    private String stageEvidenceOnlyReason(GeneralizedPattern pattern, String pathId) {
+<span class="fc" id="L202">        Set&lt;String&gt; temporaryPlaceholders = temporaryPlaceholders(pattern);</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (!temporaryPlaceholders.isEmpty()) {</span>
+<span class="nc" id="L204">            return &quot;reject: unnormalized temporary placeholders: &quot; + temporaryPlaceholders;</span>
+        }
+<span class="fc" id="L206">        return &quot;reject: quality gates failed for &quot; + pathId;</span>
+    }
+
+    private Set&lt;String&gt; placeholders(String pattern) {
+<span class="fc" id="L210">        Set&lt;String&gt; placeholders = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L211">        Matcher matcher = PLACEHOLDER.matcher(pattern);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L213">            placeholders.add(matcher.group());</span>
+        }
+<span class="fc" id="L215">        return placeholders;</span>
+    }
+
+    private Set&lt;String&gt; temporaryPlaceholders(GeneralizedPattern pattern) {
+<span class="fc" id="L219">        Set&lt;String&gt; placeholders = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L220">        collectTemporaryPlaceholders(pattern.leftPattern(), placeholders);</span>
+<span class="fc" id="L221">        collectTemporaryPlaceholders(pattern.rightPattern(), placeholders);</span>
+<span class="fc" id="L222">        pattern.parameterRelations().forEach(relation -&gt; collectTemporaryPlaceholders(relation, placeholders));</span>
+<span class="fc" id="L223">        pattern.expressionPlaceholderValues().forEach((key, values) -&gt; {</span>
+<span class="fc" id="L224">            collectTemporaryPlaceholders(key, placeholders);</span>
+<span class="fc" id="L225">            values.forEach(value -&gt; collectTemporaryPlaceholders(value, placeholders));</span>
+<span class="fc" id="L226">        });</span>
+<span class="fc" id="L227">        return placeholders;</span>
+    }
+
+    private void collectTemporaryPlaceholders(String text, Set&lt;String&gt; placeholders) {
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        Matcher matcher = TEMPORARY_PLACEHOLDER.matcher(text == null ? &quot;&quot; : text);</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L233">            placeholders.add(matcher.group());</span>
+        }
+<span class="fc" id="L235">    }</span>
+
+    private double confidence(
+        boolean symbolic,
+        boolean generatedValid,
+        CounterexampleSearchService.CounterexampleSearchResult counterexamples
+    ) {
+<span class="pc bpc" id="L242" title="1 of 4 branches missed.">        if (!generatedValid || counterexamples.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {</span>
+<span class="fc" id="L243">            return 0.0;</span>
+        }
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (symbolic) {</span>
+<span class="fc" id="L246">            return 0.95;</span>
+        }
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        return counterexamples.status() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND ? 0.85 : 0.75;</span>
+    }
+
+    private ReusableRule promote(
+        SuccessfulTransformationPath path,
+        GeneralizedPattern pattern,
+        double confidence,
+        boolean symbolic,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L258">        String hash = RulePatternCanonicalizer.hash(pattern.leftPattern(), pattern.rightPattern());</span>
+<span class="fc" id="L259">        ReusableRule rule = new ReusableRule(</span>
+<span class="fc" id="L260">            &quot;macro_&quot; + Integer.toHexString(hash.hashCode()),</span>
+<span class="fc" id="L261">            pattern.leftPattern(),</span>
+<span class="fc" id="L262">            pattern.rightPattern(),</span>
+<span class="fc" id="L263">            pattern.parameterRelations(),</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            symbolic ? CandidateProofStatus.SYMBOLICALLY_VERIFIED : CandidateProofStatus.VALIDATED_BY_EXAMPLES,</span>
+<span class="fc" id="L265">            knownRules.statusFor(pattern.leftPattern(), pattern.rightPattern()),</span>
+            1,
+<span class="fc" id="L267">            Math.max(1.0, path.scoreImprovement()),</span>
+<span class="fc" id="L268">            Instant.now(),</span>
+            hash,
+            null,
+            0,
+            1,
+<span class="fc" id="L273">            List.of(path.id()),</span>
+            confidence,
+            assumptions
+        );
+<span class="fc" id="L277">        inventory.save(rule);</span>
+<span class="fc" id="L278">        inventory.setEnabled(rule.id(), true);</span>
+<span class="fc" id="L279">        return rule;</span>
+    }
+
+    private List&lt;String&gt; generalizedAssumptions(List&lt;String&gt; assumptions) {
+<span class="pc bpc" id="L283" title="1 of 4 branches missed.">        if (assumptions == null || assumptions.isEmpty()) {</span>
+<span class="fc" id="L284">            return List.of();</span>
+        }
+<span class="fc" id="L286">        return assumptions.stream()</span>
+<span class="fc" id="L287">            .map(assumption -&gt; assumption.replaceAll(&quot;\\b[a-z][a-zA-Z0-9_]*\\b&quot;, &quot;A&quot;))</span>
+<span class="fc" id="L288">            .distinct()</span>
+<span class="fc" id="L289">            .toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

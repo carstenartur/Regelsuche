@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleIndexBenchmark.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">RuleIndexBenchmark.java</span></div><h1>RuleIndexBenchmark.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.egraph.EGraph;
+import de.regelsuche.egraph.EGraphPatternMatcher;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.index.CandidateBudget;
+import de.regelsuche.search.index.CandidateSet;
+import de.regelsuche.search.index.RootSymbolTermRuleIndex;
+import de.regelsuche.search.index.SearchContext;
+import de.regelsuche.search.index.TermRuleIndex;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.json.JsonWriter;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Deterministic benchmark harness for comparing rule-candidate retrieval strategies. */
+<span class="fc" id="L18">public final class RuleIndexBenchmark {</span>
+    private static final String QUERY = &quot;(x + 7) ^ 2&quot;;
+<span class="fc" id="L20">    private static final SearchContext CONTEXT = new SearchContext(</span>
+        &quot;x ^ 2 + 14 * x + 49&quot;,
+        TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES,
+        &quot;algebra&quot;,
+        false,
+        true,
+<span class="fc" id="L26">        java.util.Set.of()</span>
+    );
+
+    public List&lt;Result&gt; growingRuleInventory(int inventorySize) {
+<span class="fc" id="L30">        List&lt;TermRuleIndex.IndexedMacroMove&gt; inventory = macroInventory(inventorySize);</span>
+<span class="fc" id="L31">        return compareRuleIndexes(inventory, CONTEXT, CandidateBudget.unbounded());</span>
+    }
+
+    public List&lt;Result&gt; macroHeavyDiscovery(int inventorySize, int macroBudget) {
+<span class="fc" id="L35">        List&lt;TermRuleIndex.IndexedMacroMove&gt; inventory = macroHeavyInventory(inventorySize);</span>
+<span class="fc" id="L36">        return compareRuleIndexes(inventory, new SearchContext(</span>
+            &quot;x ^ 2 + 14 * x + 49&quot;,
+            TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES,
+            &quot;&quot;,
+            false,
+            true,
+<span class="fc" id="L42">            java.util.Set.of()</span>
+        ), new CandidateBudget(0, macroBudget));
+    }
+
+    public Result growingEGraph(int expressionCount) {
+<span class="fc" id="L47">        ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L48">        EGraph graph = new EGraph();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (int i = 0; i &lt; Math.max(0, expressionCount); i++) {</span>
+<span class="fc" id="L50">            graph.addExpression(parser.parseTerm(&quot;(x&quot; + i + &quot; + &quot; + i + &quot;)&quot;));</span>
+<span class="fc" id="L51">            graph.addExpression(parser.parseTerm(&quot;(x&quot; + i + &quot; * &quot; + (i + 1) + &quot;)&quot;));</span>
+<span class="fc" id="L52">            graph.addExpression(parser.parseTerm(&quot;sin(x&quot; + i + &quot;)&quot;));</span>
+        }
+<span class="fc" id="L54">        EGraphPatternMatcher matcher = new EGraphPatternMatcher(graph);</span>
+<span class="fc" id="L55">        PatternExpr addPattern = PatternExpr.op(BinaryOperator.ADD, PatternExpr.var(&quot;L&quot;), PatternExpr.var(&quot;R&quot;));</span>
+<span class="fc" id="L56">        long started = System.nanoTime();</span>
+<span class="fc" id="L57">        int firstMatches = matcher.matchAll(&quot;add-pattern&quot;, addPattern, null).size();</span>
+<span class="fc" id="L58">        int secondMatches = matcher.matchAll(&quot;add-pattern&quot;, addPattern, null).size();</span>
+<span class="fc" id="L59">        long elapsedNanos = System.nanoTime() - started;</span>
+<span class="fc" id="L60">        EGraphPatternMatcher.MatcherStats stats = matcher.stats();</span>
+<span class="fc" id="L61">        return new Result(</span>
+            &quot;growing-egraph-indexed&quot;,
+<span class="fc" id="L63">            graph.classCount(),</span>
+            secondMatches,
+<span class="fc" id="L65">            stats.candidateClassesSkipped(),</span>
+            secondMatches,
+<span class="fc" id="L67">            stats.nodesScanned(),</span>
+<span class="fc" id="L68">            stats.matcherCacheHits(),</span>
+            elapsedNanos
+        );
+    }
+
+    private List&lt;Result&gt; compareRuleIndexes(
+        List&lt;TermRuleIndex.IndexedMacroMove&gt; inventory,
+        SearchContext context,
+        CandidateBudget budget
+    ) {
+<span class="fc" id="L78">        RootSymbolTermRuleIndex rootOnly = new RootSymbolTermRuleIndex(false);</span>
+<span class="fc" id="L79">        RootSymbolTermRuleIndex multiStage = new RootSymbolTermRuleIndex(true);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (TermRuleIndex.IndexedMacroMove rule : inventory) {</span>
+<span class="fc" id="L81">            rootOnly.addMacroMove(rule);</span>
+<span class="fc" id="L82">            multiStage.addMacroMove(rule);</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">        return List.of(</span>
+<span class="fc" id="L85">            naiveScan(inventory, context, budget),</span>
+<span class="fc" id="L86">            indexed(&quot;root-symbol&quot;, rootOnly, context, budget),</span>
+<span class="fc" id="L87">            indexed(&quot;multi-stage&quot;, multiStage, context, budget)</span>
+        );
+    }
+
+    private Result naiveScan(List&lt;TermRuleIndex.IndexedMacroMove&gt; inventory, SearchContext context, CandidateBudget budget) {
+<span class="fc" id="L92">        long started = System.nanoTime();</span>
+<span class="fc" id="L93">        List&lt;TermRuleIndex.IndexedMacroMove&gt; candidates = inventory.stream()</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            .filter(rule -&gt; rule.proofStatus().ordinal() &gt;= context.minimumProofStatus().ordinal())</span>
+<span class="fc bfc" id="L95" title="All 4 branches covered.">            .filter(rule -&gt; context.domain().isBlank() || rule.domain().contains(context.domain()))</span>
+<span class="fc" id="L96">            .limit(budget.maxMacroMoves())</span>
+<span class="fc" id="L97">            .toList();</span>
+<span class="fc" id="L98">        long elapsedNanos = System.nanoTime() - started;</span>
+<span class="fc" id="L99">        return new Result(&quot;naive-scan&quot;, inventory.size(), candidates.size(), 0, candidates.size(), 0, 0, elapsedNanos);</span>
+    }
+
+    private Result indexed(String name, RootSymbolTermRuleIndex index, SearchContext context, CandidateBudget budget) {
+<span class="fc" id="L103">        long started = System.nanoTime();</span>
+<span class="fc" id="L104">        CandidateSet candidates = index.candidateSetForExpression(QUERY, context, budget);</span>
+<span class="fc" id="L105">        long elapsedNanos = System.nanoTime() - started;</span>
+<span class="fc" id="L106">        return new Result(</span>
+            name,
+<span class="fc" id="L108">            candidates.metrics().rulesConsidered(),</span>
+<span class="fc" id="L109">            candidates.macroMoves().size(),</span>
+<span class="fc" id="L110">            candidates.metrics().rulesSkippedByIndex(),</span>
+<span class="fc" id="L111">            candidates.metrics().averageCandidateSetSize(),</span>
+            0,
+            0,
+            elapsedNanos
+        );
+    }
+
+    private static List&lt;TermRuleIndex.IndexedMacroMove&gt; macroInventory(int inventorySize) {
+<span class="fc" id="L119">        List&lt;TermRuleIndex.IndexedMacroMove&gt; rules = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (int i = 0; i &lt; Math.max(0, inventorySize); i++) {</span>
+<span class="fc bfc" id="L121" title="All 4 branches covered.">            rules.add(switch (i % 4) {</span>
+<span class="fc" id="L122">                case 0 -&gt; rule(i, &quot;(x + A&quot; + i + &quot;) ^ 2&quot;, &quot;x ^ 2 + 2 * A&quot; + i + &quot; * x + A&quot; + i + &quot; ^ 2&quot;, &quot;algebra&quot;);</span>
+<span class="fc" id="L123">                case 1 -&gt; rule(i, &quot;sin(x&quot; + i + &quot;) ^ 2&quot;, &quot;1 - cos(x&quot; + i + &quot;) ^ 2&quot;, &quot;trig&quot;);</span>
+<span class="fc" id="L124">                case 2 -&gt; rule(i, &quot;(x + A&quot; + i + &quot;) ^ 3&quot;, &quot;x ^ 3 + A&quot; + i, &quot;algebra&quot;);</span>
+<span class="fc" id="L125">                default -&gt; rule(i, &quot;x&quot; + i + &quot; * 1&quot;, &quot;x&quot; + i, &quot;algebra&quot;);</span>
+            });
+        }
+<span class="fc" id="L128">        return List.copyOf(rules);</span>
+    }
+
+    private static List&lt;TermRuleIndex.IndexedMacroMove&gt; macroHeavyInventory(int inventorySize) {
+<span class="fc" id="L132">        List&lt;TermRuleIndex.IndexedMacroMove&gt; rules = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int i = 0; i &lt; Math.max(0, inventorySize); i++) {</span>
+<span class="fc bfc" id="L134" title="All 5 branches covered.">            rules.add(switch (i % 5) {</span>
+<span class="fc" id="L135">                case 0 -&gt; rule(i, &quot;(x + A&quot; + i + &quot;) ^ 2&quot;, &quot;x ^ 2 + 2 * A&quot; + i + &quot; * x + A&quot; + i + &quot; ^ 2&quot;, &quot;algebra&quot;);</span>
+<span class="fc" id="L136">                case 1 -&gt; rule(i, &quot;(x + A&quot; + i + &quot;) ^ 3&quot;, &quot;x ^ 3 + A&quot; + i, &quot;algebra&quot;);</span>
+<span class="fc" id="L137">                case 2 -&gt; rule(i, &quot;sin(x) ^ 2&quot;, &quot;1 - cos(x) ^ 2&quot;, &quot;trig&quot;);</span>
+<span class="fc" id="L138">                case 3 -&gt; rule(i, &quot;(M&quot; + i + &quot; + N&quot; + i + &quot;) ^ 2&quot;, &quot;M&quot; + i + &quot; ^ 2 + 2 * M&quot; + i + &quot; * N&quot; + i, &quot;matrix&quot;);</span>
+<span class="fc" id="L139">                default -&gt; rule(i, &quot;x + A&quot; + i, &quot;A&quot; + i + &quot; + x&quot;, &quot;algebra&quot;);</span>
+            });
+        }
+<span class="fc" id="L142">        return List.copyOf(rules);</span>
+    }
+
+    private static TermRuleIndex.IndexedMacroMove rule(int index, String left, String right, String domain) {
+<span class="fc" id="L146">        return new TermRuleIndex.IndexedMacroMove(</span>
+            &quot;macro-&quot; + index,
+            left,
+            right,
+            TermRuleIndex.ProofStatusRank.VALIDATED_BY_EXAMPLES,
+            domain
+        );
+    }
+
+<span class="fc" id="L155">    public record Result(</span>
+        String strategy,
+        int rulesConsidered,
+        int candidateSetSize,
+        long rulesSkippedByIndex,
+        double averageCandidateSetSize,
+        long nodesScanned,
+        long matcherCacheHits,
+        long elapsedNanos
+    ) {
+        public String renderJson() {
+<span class="fc" id="L166">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L167">            writer.beginObject();</span>
+<span class="fc" id="L168">            writer.property(&quot;schema&quot;, &quot;regelsuche.rule-index-benchmark-result/v1&quot;);</span>
+<span class="fc" id="L169">            writer.property(&quot;strategy&quot;, strategy);</span>
+<span class="fc" id="L170">            writer.property(&quot;rulesConsidered&quot;, rulesConsidered);</span>
+<span class="fc" id="L171">            writer.property(&quot;candidateSetSize&quot;, candidateSetSize);</span>
+<span class="fc" id="L172">            writer.property(&quot;rulesSkippedByIndex&quot;, rulesSkippedByIndex);</span>
+<span class="fc" id="L173">            writer.property(&quot;averageCandidateSetSize&quot;, averageCandidateSetSize);</span>
+<span class="fc" id="L174">            writer.property(&quot;nodesScanned&quot;, nodesScanned);</span>
+<span class="fc" id="L175">            writer.property(&quot;matcherCacheHits&quot;, matcherCacheHits);</span>
+<span class="fc" id="L176">            writer.property(&quot;elapsedNanos&quot;, elapsedNanos);</span>
+<span class="fc" id="L177">            writer.endObject();</span>
+<span class="fc" id="L178">            return writer.toString();</span>
+        }
+
+        public static String renderJsonArray(List&lt;Result&gt; results) {
+<span class="fc" id="L182">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L183">            writer.beginObject();</span>
+<span class="fc" id="L184">            writer.property(&quot;schema&quot;, &quot;regelsuche.rule-index-benchmark/v1&quot;);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            writer.array(&quot;results&quot;, array -&gt; (results == null ? List.&lt;Result&gt;of() : results)</span>
+<span class="fc" id="L186">                .forEach(result -&gt; array.objectValue(object -&gt; {</span>
+<span class="fc" id="L187">                    object.property(&quot;strategy&quot;, result.strategy());</span>
+<span class="fc" id="L188">                    object.property(&quot;rulesConsidered&quot;, result.rulesConsidered());</span>
+<span class="fc" id="L189">                    object.property(&quot;candidateSetSize&quot;, result.candidateSetSize());</span>
+<span class="fc" id="L190">                    object.property(&quot;rulesSkippedByIndex&quot;, result.rulesSkippedByIndex());</span>
+<span class="fc" id="L191">                    object.property(&quot;averageCandidateSetSize&quot;, result.averageCandidateSetSize());</span>
+<span class="fc" id="L192">                    object.property(&quot;nodesScanned&quot;, result.nodesScanned());</span>
+<span class="fc" id="L193">                    object.property(&quot;matcherCacheHits&quot;, result.matcherCacheHits());</span>
+<span class="fc" id="L194">                    object.property(&quot;elapsedNanos&quot;, result.elapsedNanos());</span>
+<span class="fc" id="L195">                })));</span>
+<span class="fc" id="L196">            writer.endObject();</span>
+<span class="fc" id="L197">            return writer.toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

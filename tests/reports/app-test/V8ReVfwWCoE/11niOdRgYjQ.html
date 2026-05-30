@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="x-ua-compatible" content="IE=edge"/>
+<title>Test results - hiddenStructureDiscoveryCorpusDocumentsGeneralizationAndRejectsNearMisses()</title>
+<link href="../css/base-style.css" rel="stylesheet" type="text/css"/>
+<link href="../css/style.css" rel="stylesheet" type="text/css"/>
+<script src="../js/report.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="content">
+<div class="breadcrumbs">
+<a class="breadcrumb" href="../index.html">all</a> &gt; 
+<a class="breadcrumb" href="index.html">de.regelsuche.benchmark.HiddenStructureDiscoveryCorpusTest</a> &gt; 
+<span class="breadcrumb">hiddenStructureDiscoveryCorpusDocumentsGeneralizationAndRejectsNearMisses()</span>
+</div>
+<div class="tab-container">
+<ul class="tabLinks">
+<li>
+<a class="successGroup" href="#">Gradle Test Run :app:test</a>
+</li>
+</ul>
+<div class="tab">
+<h2>Gradle Test Run :app:test</h2>
+<h1>hiddenStructureDiscoveryCorpusDocumentsGeneralizationAndRejectsNearMisses()</h1>
+<div class="tab-container">
+<ul class="tabLinks">
+<li>
+<a class="" href="#">summary</a>
+</li>
+<li>
+<a class="" href="#">standard output</a>
+</li>
+</ul>
+<div class="tab">
+<h2>summary</h2>
+<div>
+<div class="summary">
+<table>
+<tr>
+<td>
+<div class="summaryGroup">
+<table>
+<tr>
+<td>
+<div class="infoBox">
+<div class="counter">1</div>
+<p>tests</p>
+</div>
+</td>
+<td>
+<div class="infoBox">
+<div class="counter">0</div>
+<p>failures</p>
+</div>
+</td>
+<td>
+<div class="infoBox">
+<div class="counter">0</div>
+<p>skipped</p>
+</div>
+</td>
+<td>
+<div class="infoBox duration">
+<div class="counter">2.120s</div>
+<p>duration</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</td>
+<td>
+<div class="infoBox success successRate">
+<div class="percent">100%</div>
+<p>successful</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="tab">
+<h2>standard output</h2>
+<span class="code">
+<pre id="root-0-test-stdout-hiddenStructureDiscoveryCorpusDocumentsGeneralizationAndRejectsNearMisses()">| expression | bridge? | factored? | rule path | learned macro? | reusable? | observed result | notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| y^4 + 4 | yes | yes | hypothesis_difference_of_squares_preparation -&gt; ast_square_difference_factor | yes | yes | transformed | A^4 + 4 with a different symbol; observed result: transformed; hypothesis candidates: 1; promoted macro: macro_p1^4+4-&gt;(p1^2+2-2*p1)*(p1^2+2+2*p1); validated factored replay state |
+| (x + 1)^4 + 4 | yes | yes | hypothesis_difference_of_squares_preparation -&gt; ast_square_difference_factor | yes | no | transformed | A^4 + 4 with a compound base; observed result: transformed; hypothesis candidates: 1; promoted macro: macro_(p1+1)^4+4-&gt;((p1+1)^2+2-2*(p1+1))*((p1+1)^2+2+2*(p1+1)); validated factored replay state |
+| (2*x)^4 + 4 | yes | no | ast_canonical_normalize -&gt; hypothesis_difference_of_squares_preparation | no | no | bridge_found | A^4 + 4 with a scaled base; observed result: bridge_found; hypothesis candidates: 1; reached square-difference bridge only |
+| (x^2)^4 + 4 | yes | no | ast_power_of_power -&gt; hypothesis_difference_of_squares_preparation | no | no | bridge_found | A^4 + 4 with a power base; observed result: bridge_found; hypothesis candidates: 1; reached square-difference bridge only |
+| (x^2)^2 + 4 | yes | no | hypothesis_difference_of_squares_preparation | no | no | bridge_found | should work directly or after power normalization; observed result: bridge_found; hypothesis candidates: 1; reached square-difference bridge only |
+| x^2 * x^2 + 4 | yes | no | hypothesis_difference_of_squares_preparation | no | no | bridge_found | documents whether product-to-power normalization feeds the hypothesis; observed result: bridge_found; hypothesis candidates: 1; reached square-difference bridge only |
+| x^4 + 5 | no | no | — | no | no | no_candidate | constant is not a square compatible with the Sophie-Germain bridge; observed result: no_candidate; no hypothesis candidate; no replay/search state reported |
+| x^4 + 2 | no | no | — | no | no | no_candidate | constant is not a square compatible with the Sophie-Germain bridge; observed result: no_candidate; no hypothesis candidate; no replay/search state reported |
+| x^4 + 4 + y | no | no | — | no | no | no_candidate | extra addend must not become a false positive; observed result: no_candidate; no hypothesis candidate; no replay/search state reported |
+| x^4 + 4*y^4 | yes | yes | hypothesis_difference_of_squares_preparation -&gt; ast_square_difference_factor | yes | no | transformed | future general Sophie-Germain form; observed result: transformed; hypothesis candidates: 1; promoted macro: macro_p1^4+4*p2^4-&gt;(p1^2+2*p1*p2+2*p2^2)*(p1^2-2*p1*p2+2*p2^2); validated factored replay state |
+| x^4 + 64 | yes | yes | hypothesis_difference_of_squares_preparation -&gt; ast_square_difference_factor | yes | no | transformed | future numeric Sophie-Germain form; observed result: transformed; hypothesis candidates: 1; promoted macro: macro_p1^4+64-&gt;(p1^2+8-4*p1)*(p1^2+8+4*p1); validated factored replay state |
+| 16*x^4 + 4*y^4 | yes | yes | hypothesis_difference_of_squares_preparation -&gt; ast_square_difference_factor | yes | no | transformed | future scaled Sophie-Germain form; observed result: transformed; hypothesis candidates: 1; promoted macro: macro_16*p1^4+4*p2^4-&gt;(2*p1^2+4*p2*p1+4*p2^2)*(2*p1^2-4*p2*p1+4*p2^2); validated factored replay state |
+| x^2 + 6*x + 5 | no | no | — | no | no | no_candidate | hidden square-completion candidate; observed result: no_candidate; no hypothesis candidate; no replay/search state reported |
+| x^2 + 10*x + 21 | no | no | — | no | no | no_candidate | hidden square-completion candidate; observed result: no_candidate; no hypothesis candidate; no replay/search state reported |
+| x^2 + 2*x*y + y^2 | no | no | — | no | no | no_candidate | perfect-square candidate; observed result: no_candidate; no hypothesis candidate; no replay/search state reported |
+
+</pre>
+<button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="root-0-test-stdout-hiddenStructureDiscoveryCorpusDocumentsGeneralizationAndRejectsNearMisses()">Copy</button>
+</span>
+</div>
+</div>
+</div>
+</div>
+<div id="footer">
+<p>
+<div>
+<label class="hidden" id="label-for-line-wrapping-toggle" for="line-wrapping-toggle">Wrap lines
+<input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
+</label>
+</div>Generated by 
+<a href="https://www.gradle.org">Gradle 9.5.1</a> at May 30, 2026, 4:13:50 PM</p>
+</div>
+</div>
+</body>
+</html>

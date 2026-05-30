@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TermRuleIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.index</a> &gt; <span class="el_source">TermRuleIndex.java</span></div><h1>TermRuleIndex.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.index;
+
+import de.regelsuche.transform.RewriteRule;
+import java.util.Collection;
+import java.util.List;
+
+/** Index for narrowing atomic rewrite rules and learned macro moves by term shape and metadata. */
+public interface TermRuleIndex {
+    void addAtomicRule(String rootSymbol, RewriteRule rule);
+
+    void addMacroMove(IndexedMacroMove rule);
+
+    default boolean removeAtomicRule(String rootSymbol, RewriteRule rule) {
+<span class="nc" id="L14">        return false;</span>
+    }
+
+    default boolean removeMacroMove(String id) {
+<span class="nc" id="L18">        return false;</span>
+    }
+
+    default boolean updateMacroMove(IndexedMacroMove rule) {
+<span class="nc" id="L22">        boolean removed = removeMacroMove(rule.id());</span>
+<span class="nc" id="L23">        addMacroMove(rule);</span>
+<span class="nc" id="L24">        return removed;</span>
+    }
+
+    default void rebuild(Collection&lt;AtomicRuleEntry&gt; atomicRules, Collection&lt;IndexedMacroMove&gt; macroMoves) {
+<span class="nc" id="L28">        throw new UnsupportedOperationException(&quot;bulk rebuild is not supported by this index&quot;);</span>
+    }
+
+    QueryResult query(String expression, Query query);
+
+    record Query(
+        String goalExpression,
+        ProofStatusRank minimumProofStatus,
+        String domain,
+        boolean includeAtomicRules,
+        boolean includeMacroMoves
+    ) {
+<span class="fc" id="L40">        public Query {</span>
+<span class="pc bpc" id="L41" title="3 of 4 branches missed.">            includeAtomicRules = includeAtomicRules || !includeMacroMoves;</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            minimumProofStatus = minimumProofStatus == null ? ProofStatusRank.OBSERVED : minimumProofStatus;</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            domain = domain == null ? &quot;&quot; : domain;</span>
+<span class="fc" id="L44">        }</span>
+
+        public static Query all() {
+<span class="nc" id="L47">            return new Query(&quot;&quot;, ProofStatusRank.OBSERVED, &quot;&quot;, true, true);</span>
+        }
+    }
+
+    record QueryResult(List&lt;RewriteRule&gt; atomicRules, List&lt;IndexedMacroMove&gt; macroMoves, Metrics metrics) {
+<span class="fc" id="L52">        public QueryResult {</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            atomicRules = atomicRules == null ? List.of() : List.copyOf(atomicRules);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            macroMoves = macroMoves == null ? List.of() : List.copyOf(macroMoves);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            metrics = metrics == null ? new Metrics(0, 0, 0) : metrics;</span>
+<span class="fc" id="L56">        }</span>
+    }
+
+<span class="fc" id="L59">    record Metrics(int rulesConsidered, int rulesSkippedByIndex, int rulesMatched) {</span>
+    }
+
+    record AtomicRuleEntry(String rootSymbol, RewriteRule rule) {
+<span class="fc" id="L63">        public AtomicRuleEntry {</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            rootSymbol = rootSymbol == null ? &quot;&quot; : rootSymbol;</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            if (rule == null) {</span>
+<span class="nc" id="L66">                throw new IllegalArgumentException(&quot;rule must not be null&quot;);</span>
+            }
+<span class="fc" id="L68">        }</span>
+    }
+
+    record IndexedMacroMove(
+        String id,
+        String leftPattern,
+        String rightPattern,
+        ProofStatusRank proofStatus,
+        String domain
+    ) {
+<span class="fc" id="L78">        public IndexedMacroMove {</span>
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L80">                throw new IllegalArgumentException(&quot;id must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            leftPattern = leftPattern == null ? &quot;&quot; : leftPattern;</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            rightPattern = rightPattern == null ? &quot;&quot; : rightPattern;</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            proofStatus = proofStatus == null ? ProofStatusRank.OBSERVED : proofStatus;</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            domain = domain == null ? &quot;&quot; : domain;</span>
+<span class="fc" id="L86">        }</span>
+    }
+
+<span class="fc" id="L89">    enum ProofStatusRank {</span>
+<span class="fc" id="L90">        REJECTED,</span>
+<span class="fc" id="L91">        OBSERVED,</span>
+<span class="fc" id="L92">        VALIDATED_BY_EXAMPLES,</span>
+<span class="fc" id="L93">        SYMBOLICALLY_VERIFIED,</span>
+<span class="fc" id="L94">        FORMALLY_PROVABLE,</span>
+<span class="fc" id="L95">        FORMALLY_PROVED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

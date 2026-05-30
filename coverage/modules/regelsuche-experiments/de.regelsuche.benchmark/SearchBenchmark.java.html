@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchBenchmark.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">SearchBenchmark.java</span></div><h1>SearchBenchmark.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.validation.CandidateProofStatus;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.memory.PruningReason;
+import de.regelsuche.search.memory.SearchMemory;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.strategy.SearchStrategy;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+
+public class SearchBenchmark {
+<span class="fc" id="L20">    private static final Map&lt;String, String&gt; EXPECTED_RESULTS = Map.of(</span>
+        &quot;x + 0&quot;, &quot;x&quot;,
+        &quot;x * 1&quot;, &quot;x&quot;,
+        &quot;x * 0&quot;, &quot;0&quot;
+    );
+
+    private final TransformationEngine engine;
+    private final ExpressionScorer scorer;
+    private final ExpressionCanonicalizer canonicalizer;
+    private final SearchHeuristic heuristic;
+
+<span class="fc" id="L31">    public SearchBenchmark(TransformationEngine engine, SearchHeuristic heuristic) {</span>
+<span class="fc" id="L32">        this.engine = engine;</span>
+<span class="fc" id="L33">        this.heuristic = heuristic;</span>
+<span class="fc" id="L34">        this.scorer = new ExpressionScorer();</span>
+<span class="fc" id="L35">        this.canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L36">    }</span>
+
+    public List&lt;SearchBenchmarkResult&gt; run(List&lt;String&gt; expressions, List&lt;NamedSearchStrategy&gt; strategies) {
+<span class="fc" id="L39">        List&lt;SearchBenchmarkResult&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (String expression : expressions) {</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            for (NamedSearchStrategy strategy : strategies) {</span>
+<span class="fc" id="L42">                long startedNanos = System.nanoTime();</span>
+<span class="fc" id="L43">                SearchMemory memory = new SearchMemory();</span>
+<span class="fc" id="L44">                List&lt;SearchState&gt; states = strategy.strategy().search(new SearchProblem(</span>
+                    expression,
+                    engine,
+                    scorer,
+                    canonicalizer,
+                    heuristic
+<span class="fc" id="L50">                ).withMemory(memory));</span>
+<span class="fc" id="L51">                long elapsedMillis = (System.nanoTime() - startedNanos) / 1_000_000L;</span>
+<span class="fc" id="L52">                int bestImprovement = states.stream().mapToInt(SearchState::improvement).max().orElse(0);</span>
+<span class="fc" id="L53">                SearchState bestState = states.stream()</span>
+<span class="fc" id="L54">                    .max(Comparator.comparingInt(SearchState::improvement))</span>
+<span class="fc" id="L55">                    .orElse(null);</span>
+<span class="fc" id="L56">                int shortestImprovingDepth = states.stream()</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                    .filter(state -&gt; state.improvement() &gt; 0)</span>
+<span class="fc" id="L58">                    .map(SearchState::depth)</span>
+<span class="fc" id="L59">                    .min(Comparator.naturalOrder())</span>
+<span class="fc" id="L60">                    .orElse(-1);</span>
+<span class="fc" id="L61">                int expandedSteps = states.stream().mapToInt(SearchState::expandedStepCount).max().orElse(0);</span>
+<span class="fc" id="L62">                int distinctRules = (int) states.stream()</span>
+<span class="fc" id="L63">                    .flatMap(state -&gt; state.appliedRuleIds().stream())</span>
+<span class="fc" id="L64">                    .distinct()</span>
+<span class="fc" id="L65">                    .count();</span>
+                // The bare benchmark only runs the search; it does not validate
+                // identities formally. An improving path corresponds to a
+                // concrete equivalent expression -&gt; VALIDATED_BY_EXAMPLES.
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                de.regelsuche.validation.CandidateProofStatus proofStatus = bestImprovement &gt; 0</span>
+<span class="fc" id="L70">                    ? de.regelsuche.validation.CandidateProofStatus.VALIDATED_BY_EXAMPLES</span>
+<span class="pc" id="L71">                    : de.regelsuche.validation.CandidateProofStatus.OBSERVED;</span>
+                // Quality metrics — derived from the same `states` traversal
+                // so adding them carries no extra search cost.
+<span class="fc" id="L74">                boolean learnedRuleUsed = states.stream()</span>
+<span class="fc" id="L75">                    .flatMap(state -&gt; state.appliedRuleIds().stream())</span>
+<span class="pc bpc" id="L76" title="3 of 6 branches missed.">                    .anyMatch(id -&gt; id != null &amp;&amp; (id.startsWith(&quot;learned-&quot;) || id.startsWith(&quot;macro-&quot;)));</span>
+<span class="fc" id="L77">                int eGraphClasses = 0;</span>
+<span class="fc" id="L78">                int eGraphNodes = 0;</span>
+<span class="fc" id="L79">                double saturationSavings = 0.0;</span>
+<span class="fc" id="L80">                long classesScanned = 0L;</span>
+<span class="fc" id="L81">                long nodesScanned = 0L;</span>
+<span class="fc" id="L82">                long candidateClassesSkipped = 0L;</span>
+<span class="fc" id="L83">                long matchesFound = 0L;</span>
+<span class="fc" id="L84">                long matcherCacheHits = 0L;</span>
+<span class="fc" id="L85">                long matcherCacheMisses = 0L;</span>
+<span class="fc" id="L86">                int saturationIterations = 0;</span>
+<span class="fc" id="L87">                int rulesFired = 0;</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (strategy.strategy() instanceof de.regelsuche.search.strategy.EqualitySaturationStrategy es</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                        &amp;&amp; es.lastStats() != null) {</span>
+<span class="nc" id="L90">                    var stats = es.lastStats();</span>
+<span class="nc" id="L91">                    eGraphClasses = stats.eclasses();</span>
+<span class="nc" id="L92">                    eGraphNodes = stats.enodes();</span>
+<span class="nc" id="L93">                    int applications = stats.totalApplications();</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                    saturationSavings = applications == 0</span>
+<span class="nc" id="L95">                        ? 0.0</span>
+<span class="nc" id="L96">                        : stats.merges() / (double) applications;</span>
+<span class="nc" id="L97">                    classesScanned = stats.classesScanned();</span>
+<span class="nc" id="L98">                    nodesScanned = stats.nodesScanned();</span>
+<span class="nc" id="L99">                    candidateClassesSkipped = stats.candidateClassesSkipped();</span>
+<span class="nc" id="L100">                    matchesFound = stats.matchesFound();</span>
+<span class="nc" id="L101">                    matcherCacheHits = stats.matcherCacheHits();</span>
+<span class="nc" id="L102">                    matcherCacheMisses = stats.matcherCacheMisses();</span>
+<span class="nc" id="L103">                    saturationIterations = stats.saturationIterations();</span>
+<span class="nc" id="L104">                    rulesFired = stats.rulesFired();</span>
+                }
+<span class="fc" id="L106">                String expected = EXPECTED_RESULTS.get(expression);</span>
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">                Boolean expectedResultMatched = expected == null || bestState == null</span>
+<span class="nc" id="L108">                    ? null</span>
+<span class="fc" id="L109">                    : canonicalizer.stableHash(expected)</span>
+<span class="fc" id="L110">                        .equals(canonicalizer.stableHash(bestState.expression()));</span>
+<span class="fc" id="L111">                int prunedStates = (int) memory.decisions().stream()</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                    .filter(d -&gt; d.reason() == PruningReason.ALREADY_KNOWN_BETTER</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                        || d.reason() == PruningReason.ALREADY_KNOWN_EQUAL</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                        || d.reason() == PruningReason.BUDGET_EXCEEDED)</span>
+<span class="fc" id="L115">                    .count();</span>
+<span class="fc" id="L116">                results.add(new SearchBenchmarkResult(</span>
+<span class="fc" id="L117">                    strategy.name(),</span>
+                    expression,
+<span class="fc" id="L119">                    states.size(),</span>
+                    bestImprovement,
+                    shortestImprovingDepth,
+                    expandedSteps,
+                    distinctRules,
+                    elapsedMillis,
+                    proofStatus,
+                    expectedResultMatched,
+                    prunedStates,
+                    eGraphClasses,
+                    eGraphNodes,
+                    saturationSavings,
+                    classesScanned,
+                    nodesScanned,
+                    candidateClassesSkipped,
+                    matchesFound,
+                    matcherCacheHits,
+                    matcherCacheMisses,
+                    saturationIterations,
+                    rulesFired,
+                    learnedRuleUsed,
+                    /* exportBundleValid     */ true
+                ));
+<span class="fc" id="L142">            }</span>
+<span class="fc" id="L143">        }</span>
+<span class="fc" id="L144">        return results;</span>
+    }
+
+<span class="fc" id="L147">    public record NamedSearchStrategy(String name, SearchStrategy strategy) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

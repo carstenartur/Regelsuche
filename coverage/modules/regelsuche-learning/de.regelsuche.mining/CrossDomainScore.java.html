@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrossDomainScore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">CrossDomainScore.java</span></div><h1>CrossDomainScore.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.Locale;
+
+/** Rewards recurrence of the same structure across mathematical domains. */
+<span class="fc" id="L6">public final class CrossDomainScore implements InterestingnessScoringModule {</span>
+    @Override
+    public String name() {
+<span class="fc" id="L9">        return &quot;crossDomain&quot;;</span>
+    }
+
+    @Override
+    public double score(InterestingnessScoringContext context) {
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        long domains = explicitDomains(context) &gt; 0</span>
+<span class="fc" id="L15">            ? explicitDomains(context)</span>
+<span class="fc" id="L16">            : context.candidate().supportingPaths().stream()</span>
+<span class="fc" id="L17">                .map(CrossDomainScore::domainPrefix)</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">                .filter(domain -&gt; !domain.isBlank())</span>
+<span class="fc" id="L19">                .distinct()</span>
+<span class="fc" id="L20">                .count();</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        return domains &lt;= 1 ? domains : 1.0 + Math.log(domains);</span>
+    }
+
+    private static long explicitDomains(InterestingnessScoringContext context) {
+<span class="fc" id="L25">        return context.domainTags().stream()</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            .map(domain -&gt; domain == null ? &quot;&quot; : domain.trim().toLowerCase(Locale.ROOT))</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            .filter(domain -&gt; !domain.isBlank())</span>
+<span class="fc" id="L28">            .distinct()</span>
+<span class="fc" id="L29">            .count();</span>
+    }
+
+    private static String domainPrefix(String path) {
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        if (path == null || path.isBlank()) {</span>
+<span class="nc" id="L34">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L36">        String trimmed = path.trim().toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L37">        int separator = firstSeparator(trimmed);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        return separator &lt;= 0 ? &quot;&quot; : trimmed.substring(0, separator);</span>
+    }
+
+    private static int firstSeparator(String value) {
+<span class="fc" id="L42">        int best = -1;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (char separator : new char[] {':', '/', '#', '-'}) {</span>
+<span class="fc" id="L44">            int index = value.indexOf(separator);</span>
+<span class="pc bpc" id="L45" title="3 of 6 branches missed.">            if (index &gt; 0 &amp;&amp; (best &lt; 0 || index &lt; best)) {</span>
+<span class="fc" id="L46">                best = index;</span>
+            }
+        }
+<span class="fc" id="L49">        return best;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

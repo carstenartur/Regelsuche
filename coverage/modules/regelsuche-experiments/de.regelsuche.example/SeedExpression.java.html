@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeedExpression.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.example</a> &gt; <span class="el_source">SeedExpression.java</span></div><h1>SeedExpression.java</h1><pre class="source lang-java linenums">package de.regelsuche.example;
+
+import java.util.List;
+
+/** Deterministic seed expression descriptor for reproducible discovery runs. */
+public record SeedExpression(
+    String id,
+    String expression,
+    String source,
+    String category,
+    List&lt;String&gt; tags,
+    List&lt;String&gt; assumptions
+) {
+<span class="fc" id="L14">    public SeedExpression {</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        id = id == null ? &quot;&quot; : id.trim();</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        expression = expression == null ? &quot;&quot; : expression.trim();</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        source = source == null ? &quot;local&quot; : source.trim();</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        category = category == null ? &quot;general&quot; : category.trim();</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        tags = tags == null ? List.of() : List.copyOf(tags);</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc" id="L21">    }</span>
+
+    public String stableKey() {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (!id.isBlank()) {</span>
+<span class="fc" id="L25">            return id;</span>
+        }
+<span class="nc" id="L27">        return expression;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

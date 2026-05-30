@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonFileDidacticEventStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.didactic.analytics</a> &gt; <span class="el_source">JsonFileDidacticEventStore.java</span></div><h1>JsonFileDidacticEventStore.java</h1><pre class="source lang-java linenums">package de.regelsuche.didactic.analytics;
+
+import de.regelsuche.didactic.DifficultyLevel;
+import de.regelsuche.didactic.HintGenerator;
+import de.regelsuche.didactic.PedagogyProfile;
+import de.regelsuche.json.MiniJson;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Persistent {@link DidacticEventStore} backed by a single JSON file.
+ *
+ * &lt;p&gt;Each {@link #record(DidacticEvent)} call atomically rewrites the
+ * file (temp + rename), the same approach used by
+ * {@link de.regelsuche.proof.JsonFileProofCache} and the proof
+ * job/artifact repositories. The format intentionally stays minimal —
+ * one top-level {@code &quot;events&quot;} array of flat objects — so that the
+ * analytics dashboard can stream and aggregate it without a JSON
+ * library.&lt;/p&gt;
+ */
+public final class JsonFileDidacticEventStore implements DidacticEventStore {
+
+    private final Path file;
+<span class="fc" id="L35">    private final List&lt;DidacticEvent&gt; events =</span>
+<span class="fc" id="L36">        Collections.synchronizedList(new ArrayList&lt;&gt;());</span>
+
+<span class="fc" id="L38">    public JsonFileDidacticEventStore(Path file) throws IOException {</span>
+<span class="fc" id="L39">        this.file = Objects.requireNonNull(file, &quot;file&quot;);</span>
+<span class="fc" id="L40">        Path parent = file.getParent();</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (parent != null) {</span>
+<span class="fc" id="L42">            Files.createDirectories(parent);</span>
+        }
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (Files.isRegularFile(file)) {</span>
+<span class="fc" id="L45">            load();</span>
+        }
+<span class="fc" id="L47">    }</span>
+
+    @Override
+    public synchronized void record(DidacticEvent event) {
+<span class="fc" id="L51">        events.add(Objects.requireNonNull(event, &quot;event&quot;));</span>
+        try {
+<span class="fc" id="L53">            persist();</span>
+<span class="nc" id="L54">        } catch (IOException ex) {</span>
+<span class="nc" id="L55">            throw new UncheckedIOException(&quot;Failed to persist didactic event&quot;, ex);</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">    }</span>
+
+    @Override
+    public List&lt;DidacticEvent&gt; events() {
+<span class="fc" id="L61">        synchronized (events) {</span>
+<span class="fc" id="L62">            return List.copyOf(events);</span>
+        }
+    }
+
+    @Override
+    public synchronized void clear() {
+<span class="nc" id="L68">        events.clear();</span>
+        try {
+<span class="nc" id="L70">            persist();</span>
+<span class="nc" id="L71">        } catch (IOException ex) {</span>
+<span class="nc" id="L72">            throw new UncheckedIOException(&quot;Failed to persist didactic event&quot;, ex);</span>
+<span class="nc" id="L73">        }</span>
+<span class="nc" id="L74">    }</span>
+
+    // ── persistence ─────────────────────────────────────────────────────────
+
+    private void load() throws IOException {
+<span class="fc" id="L79">        String content = Files.readString(file, StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (Map&lt;String, String&gt; raw : MiniJson.parseObjectArray(content, &quot;events&quot;)) {</span>
+<span class="fc" id="L81">            DidacticEvent.Kind kind = parseEnum(DidacticEvent.Kind.class,</span>
+<span class="fc" id="L82">                raw.getOrDefault(&quot;kind&quot;, DidacticEvent.Kind.STEP_CHECK.name()),</span>
+                DidacticEvent.Kind.STEP_CHECK);
+<span class="fc" id="L84">            Instant ts = parseInstant(raw.getOrDefault(&quot;timestamp&quot;, Instant.EPOCH.toString()));</span>
+<span class="fc" id="L85">            Optional&lt;String&gt; pathId = optionalString(raw.get(&quot;pathId&quot;));</span>
+<span class="fc" id="L86">            Optional&lt;DifficultyLevel&gt; difficulty = optionalEnum(</span>
+<span class="fc" id="L87">                DifficultyLevel.class, raw.get(&quot;difficulty&quot;));</span>
+<span class="fc" id="L88">            Optional&lt;PedagogyProfile&gt; profile = optionalEnum(</span>
+<span class="fc" id="L89">                PedagogyProfile.class, raw.get(&quot;pedagogyProfile&quot;));</span>
+<span class="fc" id="L90">            Optional&lt;Boolean&gt; correct = optionalBoolean(raw.get(&quot;correct&quot;));</span>
+<span class="fc" id="L91">            Optional&lt;Boolean&gt; appropriate = optionalBoolean(raw.get(&quot;didacticallyAppropriate&quot;));</span>
+<span class="fc" id="L92">            Optional&lt;String&gt; misconception = optionalString(raw.get(&quot;misconceptionId&quot;));</span>
+<span class="fc" id="L93">            Optional&lt;HintGenerator.Strength&gt; strength = optionalEnum(</span>
+<span class="fc" id="L94">                HintGenerator.Strength.class, raw.get(&quot;hintStrength&quot;));</span>
+<span class="fc" id="L95">            events.add(new DidacticEvent(</span>
+                kind, ts, pathId, difficulty, profile,
+                correct, appropriate, misconception, strength));
+<span class="fc" id="L98">        }</span>
+<span class="fc" id="L99">    }</span>
+
+    private synchronized void persist() throws IOException {
+<span class="fc" id="L102">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L103">        builder.append(&quot;{\n  \&quot;events\&quot;: [\n&quot;);</span>
+        List&lt;DidacticEvent&gt; snapshot;
+<span class="fc" id="L105">        synchronized (events) {</span>
+<span class="fc" id="L106">            snapshot = new ArrayList&lt;&gt;(events);</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (int i = 0; i &lt; snapshot.size(); i++) {</span>
+<span class="fc" id="L109">            DidacticEvent event = snapshot.get(i);</span>
+<span class="fc" id="L110">            builder.append(&quot;    {&quot;);</span>
+<span class="fc" id="L111">            builder.append(&quot;\&quot;kind\&quot;:&quot;).append(quote(event.kind().name()));</span>
+<span class="fc" id="L112">            builder.append(&quot;,\&quot;timestamp\&quot;:&quot;).append(quote(event.timestamp().toString()));</span>
+<span class="fc" id="L113">            event.pathId().ifPresent(v -&gt;</span>
+<span class="fc" id="L114">                builder.append(&quot;,\&quot;pathId\&quot;:&quot;).append(quote(v)));</span>
+<span class="fc" id="L115">            event.difficulty().ifPresent(v -&gt;</span>
+<span class="fc" id="L116">                builder.append(&quot;,\&quot;difficulty\&quot;:&quot;).append(quote(v.name())));</span>
+<span class="fc" id="L117">            event.pedagogyProfile().ifPresent(v -&gt;</span>
+<span class="fc" id="L118">                builder.append(&quot;,\&quot;pedagogyProfile\&quot;:&quot;).append(quote(v.name())));</span>
+<span class="fc" id="L119">            event.correct().ifPresent(v -&gt;</span>
+<span class="fc" id="L120">                builder.append(&quot;,\&quot;correct\&quot;:&quot;).append(v));</span>
+<span class="fc" id="L121">            event.didacticallyAppropriate().ifPresent(v -&gt;</span>
+<span class="fc" id="L122">                builder.append(&quot;,\&quot;didacticallyAppropriate\&quot;:&quot;).append(v));</span>
+<span class="fc" id="L123">            event.misconceptionId().ifPresent(v -&gt;</span>
+<span class="nc" id="L124">                builder.append(&quot;,\&quot;misconceptionId\&quot;:&quot;).append(quote(v)));</span>
+<span class="fc" id="L125">            event.hintStrength().ifPresent(v -&gt;</span>
+<span class="fc" id="L126">                builder.append(&quot;,\&quot;hintStrength\&quot;:&quot;).append(quote(v.name())));</span>
+<span class="fc" id="L127">            builder.append('}');</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (i &lt; snapshot.size() - 1) {</span>
+<span class="fc" id="L129">                builder.append(',');</span>
+            }
+<span class="fc" id="L131">            builder.append('\n');</span>
+        }
+<span class="fc" id="L133">        builder.append(&quot;  ]\n}\n&quot;);</span>
+<span class="fc" id="L134">        AtomicJsonFile.writeUtf8(file, builder.toString());</span>
+<span class="fc" id="L135">    }</span>
+
+    // ── helpers ────────────────────────────────────────────────────────────
+
+    private static Optional&lt;String&gt; optionalString(String raw) {
+<span class="pc bpc" id="L140" title="1 of 4 branches missed.">        return raw == null || raw.isBlank() ? Optional.empty() : Optional.of(raw);</span>
+    }
+
+    private static Optional&lt;Boolean&gt; optionalBoolean(String raw) {
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">        if (raw == null || raw.isBlank()) {</span>
+<span class="fc" id="L145">            return Optional.empty();</span>
+        }
+<span class="fc" id="L147">        return Optional.of(Boolean.parseBoolean(raw));</span>
+    }
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; Optional&lt;E&gt; optionalEnum(Class&lt;E&gt; type, String raw) {
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">        if (raw == null || raw.isBlank()) {</span>
+<span class="fc" id="L152">            return Optional.empty();</span>
+        }
+        try {
+<span class="fc" id="L155">            return Optional.of(Enum.valueOf(type, raw));</span>
+<span class="nc" id="L156">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L157">            return Optional.empty();</span>
+        }
+    }
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; E parseEnum(Class&lt;E&gt; type, String raw, E fallback) {
+        try {
+<span class="fc" id="L163">            return Enum.valueOf(type, raw);</span>
+<span class="nc" id="L164">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L165">            return fallback;</span>
+        }
+    }
+
+    private static Instant parseInstant(String raw) {
+        try {
+<span class="fc" id="L171">            return Instant.parse(raw);</span>
+<span class="nc" id="L172">        } catch (RuntimeException ex) {</span>
+<span class="nc" id="L173">            return Instant.EPOCH;</span>
+        }
+    }
+
+    private static String quote(String value) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L179">            return &quot;null&quot;;</span>
+        }
+<span class="fc" id="L181">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L183">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L184" title="5 of 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L185">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L186">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L187">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L188">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L189">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+                default -&gt; {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L192">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+                    } else {
+<span class="fc" id="L194">                        builder.append(c);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L199">        builder.append('&quot;');</span>
+<span class="fc" id="L200">        return builder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

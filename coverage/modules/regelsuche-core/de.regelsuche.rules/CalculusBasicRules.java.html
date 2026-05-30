@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalculusBasicRules.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.rules</a> &gt; <span class="el_source">CalculusBasicRules.java</span></div><h1>CalculusBasicRules.java</h1><pre class="source lang-java linenums">package de.regelsuche.rules;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import java.util.List;
+
+/**
+ * Curated calculus / exponential rewrite rules.
+ *
+ * &lt;p&gt;Currently focused on the exponential/logarithm interplay; derivative
+ * and integral operators are reserved for a follow-up once the AST grows
+ * dedicated operator nodes.&lt;/p&gt;
+ */
+public final class CalculusBasicRules {
+    private CalculusBasicRules() {
+    }
+
+    public static List&lt;RewriteRule&gt; rules() {
+<span class="fc" id="L24">        return List.of(</span>
+            new ExpOfLogRule(&quot;log&quot;),
+            new ExpOfLogRule(&quot;ln&quot;),
+            new LogOfExpRule(&quot;log&quot;),
+            new LogOfExpRule(&quot;ln&quot;),
+            new ExpOfZeroRule()
+        );
+    }
+
+    /** {@code exp(log(x)) -&gt; x} with {@code x &gt; 0}. */
+    static final class ExpOfLogRule implements RewriteRule {
+        private final String logName;
+
+<span class="fc" id="L37">        ExpOfLogRule(String logName) {</span>
+<span class="fc" id="L38">            this.logName = logName;</span>
+<span class="fc" id="L39">        }</span>
+
+        @Override
+        public String id() {
+<span class="fc" id="L43">            return &quot;calculus_exp_of_&quot; + logName;</span>
+        }
+
+        @Override
+        public RewriteKind kind() {
+<span class="nc" id="L48">            return RewriteKind.SIMPLIFY;</span>
+        }
+
+        @Override
+        public boolean mayIncreaseComplexity() {
+<span class="nc" id="L53">            return false;</span>
+        }
+
+        @Override
+        public int estimatedCostDelta() {
+<span class="nc" id="L58">            return -3;</span>
+        }
+
+        @Override
+        public boolean isEquivalencePreservingByConstruction() {
+<span class="nc" id="L63">            return true;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            return inner(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="fc" id="L73">            Expr inner = inner(subtree);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (inner == null) {</span>
+<span class="nc" id="L75">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="fc" id="L77">            return inner;</span>
+        }
+
+        @Override
+        public List&lt;Assumption&gt; assumptions(Expr subtree) {
+<span class="fc" id="L82">            Expr inner = inner(subtree);</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (inner == null) {</span>
+<span class="nc" id="L84">                return List.of();</span>
+            }
+<span class="fc" id="L86">            return List.of(Assumption.positive(ExpressionFormatter.format(inner)));</span>
+        }
+
+        private Expr inner(Expr subtree) {
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">            if (!(subtree instanceof FunctionExpr exp) || !&quot;exp&quot;.equals(exp.name())</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                || exp.arguments().size() != 1) {</span>
+<span class="nc" id="L92">                return null;</span>
+            }
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (exp.arguments().get(0) instanceof FunctionExpr log</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                &amp;&amp; log.name().equals(logName)</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                &amp;&amp; log.arguments().size() == 1) {</span>
+<span class="fc" id="L97">                return log.arguments().get(0);</span>
+            }
+<span class="nc" id="L99">            return null;</span>
+        }
+    }
+
+    /** {@code log(exp(x)) -&gt; x} — unconditional. */
+    static final class LogOfExpRule implements RewriteRule {
+        private final String logName;
+
+<span class="fc" id="L107">        LogOfExpRule(String logName) {</span>
+<span class="fc" id="L108">            this.logName = logName;</span>
+<span class="fc" id="L109">        }</span>
+
+        @Override
+        public String id() {
+<span class="nc" id="L113">            return &quot;calculus_&quot; + logName + &quot;_of_exp&quot;;</span>
+        }
+
+        @Override
+        public RewriteKind kind() {
+<span class="nc" id="L118">            return RewriteKind.SIMPLIFY;</span>
+        }
+
+        @Override
+        public boolean mayIncreaseComplexity() {
+<span class="nc" id="L123">            return false;</span>
+        }
+
+        @Override
+        public int estimatedCostDelta() {
+<span class="nc" id="L128">            return -3;</span>
+        }
+
+        @Override
+        public boolean isEquivalencePreservingByConstruction() {
+<span class="nc" id="L133">            return true;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            return inner(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="nc" id="L143">            Expr inner = inner(subtree);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (inner == null) {</span>
+<span class="nc" id="L145">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="nc" id="L147">            return inner;</span>
+        }
+
+        private Expr inner(Expr subtree) {
+<span class="nc bnc" id="L151" title="All 4 branches missed.">            if (!(subtree instanceof FunctionExpr log) || !log.name().equals(logName)</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                || log.arguments().size() != 1) {</span>
+<span class="nc" id="L153">                return null;</span>
+            }
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (log.arguments().get(0) instanceof FunctionExpr exp</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                &amp;&amp; &quot;exp&quot;.equals(exp.name())</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                &amp;&amp; exp.arguments().size() == 1) {</span>
+<span class="nc" id="L158">                return exp.arguments().get(0);</span>
+            }
+<span class="nc" id="L160">            return null;</span>
+        }
+    }
+
+    /** {@code exp(0) -&gt; 1}. */
+<span class="fc" id="L165">    static final class ExpOfZeroRule implements RewriteRule {</span>
+        @Override
+        public String id() {
+<span class="nc" id="L168">            return &quot;calculus_exp_of_zero&quot;;</span>
+        }
+
+        @Override
+        public RewriteKind kind() {
+<span class="nc" id="L173">            return RewriteKind.SIMPLIFY;</span>
+        }
+
+        @Override
+        public boolean mayIncreaseComplexity() {
+<span class="nc" id="L178">            return false;</span>
+        }
+
+        @Override
+        public int estimatedCostDelta() {
+<span class="nc" id="L183">            return -2;</span>
+        }
+
+        @Override
+        public boolean isEquivalencePreservingByConstruction() {
+<span class="nc" id="L188">            return true;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="nc" id="L193">            return subtree instanceof FunctionExpr fn</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                &amp;&amp; &quot;exp&quot;.equals(fn.name())</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
+<span class="nc bnc" id="L196" title="All 6 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof NumberExpr n &amp;&amp; n.value() == 0.0;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            if (!matches(subtree)) {</span>
+<span class="nc" id="L202">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="nc" id="L204">            return new NumberExpr(1);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

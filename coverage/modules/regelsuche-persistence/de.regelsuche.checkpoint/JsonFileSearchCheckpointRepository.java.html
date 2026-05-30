@@ -1,0 +1,442 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonFileSearchCheckpointRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.checkpoint</a> &gt; <span class="el_source">JsonFileSearchCheckpointRepository.java</span></div><h1>JsonFileSearchCheckpointRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.checkpoint;
+
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+/**
+ * JSON-file backed implementation of {@link SearchCheckpointRepository}.
+ *
+ * &lt;p&gt;Stores all checkpoints in a single JSON document so the file can be
+ * inspected/edited and is easy to back up. The repository keeps an
+ * in-memory copy for fast reads and rewrites the file on every save.&lt;/p&gt;
+ *
+ * &lt;p&gt;Format:&lt;/p&gt;
+ * &lt;pre&gt;
+ * {
+ *   &quot;checkpoints&quot;: [
+ *     {
+ *       &quot;jobId&quot;: &quot;...&quot;,
+ *       &quot;originalExpression&quot;: &quot;...&quot;,
+ *       &quot;profile&quot;: &quot;...&quot;,
+ *       &quot;heuristicName&quot;: &quot;...&quot;,
+ *       &quot;randomSeed&quot;: 42,
+ *       &quot;createdAt&quot;: &quot;...&quot;,
+ *       &quot;updatedAt&quot;: &quot;...&quot;,
+ *       &quot;frontier&quot;: [&quot;...&quot;, &quot;...&quot;],
+ *       &quot;visitedHashes&quot;: [&quot;...&quot;, &quot;...&quot;],
+ *       &quot;bestPaths&quot;: [
+ *         {&quot;expression&quot;: &quot;...&quot;, &quot;improvement&quot;: 4, &quot;lastRuleId&quot;: &quot;...&quot;}
+ *       ]
+ *     }
+ *   ]
+ * }
+ * &lt;/pre&gt;
+ */
+public class JsonFileSearchCheckpointRepository implements SearchCheckpointRepository {
+    private final Path file;
+<span class="fc" id="L49">    private final ConcurrentMap&lt;String, SearchCheckpoint&gt; cache = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L51">    public JsonFileSearchCheckpointRepository(Path file) {</span>
+<span class="fc" id="L52">        this.file = file;</span>
+<span class="fc" id="L53">        loadFromDisk();</span>
+<span class="fc" id="L54">    }</span>
+
+    @Override
+    public synchronized void save(SearchCheckpoint checkpoint) {
+<span class="fc" id="L58">        cache.put(checkpoint.jobId(), checkpoint);</span>
+<span class="fc" id="L59">        flush();</span>
+<span class="fc" id="L60">    }</span>
+
+    @Override
+    public Optional&lt;SearchCheckpoint&gt; findByJobId(String jobId) {
+<span class="fc" id="L64">        return Optional.ofNullable(cache.get(jobId));</span>
+    }
+
+    @Override
+    public List&lt;SearchCheckpoint&gt; findAll() {
+<span class="nc" id="L69">        return new ArrayList&lt;&gt;(cache.values());</span>
+    }
+
+    @Override
+    public synchronized boolean delete(String jobId) {
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        boolean removed = cache.remove(jobId) != null;</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (removed) {</span>
+<span class="nc" id="L76">            flush();</span>
+        }
+<span class="nc" id="L78">        return removed;</span>
+    }
+
+    private void loadFromDisk() {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (!Files.exists(file)) {</span>
+<span class="fc" id="L83">            return;</span>
+        }
+        try {
+<span class="fc" id="L86">            String json = Files.readString(file, StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (SearchCheckpoint checkpoint : parse(json)) {</span>
+<span class="fc" id="L88">                cache.put(checkpoint.jobId(), checkpoint);</span>
+<span class="fc" id="L89">            }</span>
+<span class="nc" id="L90">        } catch (IOException ex) {</span>
+<span class="nc" id="L91">            throw new UncheckedIOException(&quot;Failed to load checkpoints from &quot; + file, ex);</span>
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">    }</span>
+
+    private void flush() {
+        try {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">            if (file.getParent() != null) {</span>
+<span class="fc" id="L98">                Files.createDirectories(file.getParent());</span>
+            }
+<span class="fc" id="L100">            AtomicJsonFile.writeUtf8(file, render());</span>
+<span class="nc" id="L101">        } catch (IOException ex) {</span>
+<span class="nc" id="L102">            throw new UncheckedIOException(&quot;Failed to write checkpoint file &quot; + file, ex);</span>
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">    }</span>
+
+    private String render() {
+<span class="fc" id="L107">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L108">        builder.append(&quot;{\n  \&quot;checkpoints\&quot;: [\n&quot;);</span>
+<span class="fc" id="L109">        List&lt;SearchCheckpoint&gt; all = new ArrayList&lt;&gt;(cache.values());</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (int i = 0; i &lt; all.size(); i++) {</span>
+<span class="fc" id="L111">            SearchCheckpoint checkpoint = all.get(i);</span>
+<span class="fc" id="L112">            builder.append(&quot;    {\n&quot;);</span>
+<span class="fc" id="L113">            builder.append(&quot;      \&quot;jobId\&quot;: &quot;).append(quote(checkpoint.jobId())).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L114">            builder.append(&quot;      \&quot;originalExpression\&quot;: &quot;).append(quote(checkpoint.originalExpression())).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L115">            builder.append(&quot;      \&quot;profile\&quot;: &quot;).append(quote(checkpoint.profile())).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L116">            builder.append(&quot;      \&quot;heuristicName\&quot;: &quot;).append(quote(checkpoint.heuristicName())).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L117">            builder.append(&quot;      \&quot;randomSeed\&quot;: &quot;).append(checkpoint.randomSeed()).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L118">            builder.append(&quot;      \&quot;createdAt\&quot;: &quot;).append(quote(checkpoint.createdAt().toString())).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L119">            builder.append(&quot;      \&quot;updatedAt\&quot;: &quot;).append(quote(checkpoint.updatedAt().toString())).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L120">            builder.append(&quot;      \&quot;frontier\&quot;: &quot;).append(renderStringList(checkpoint.frontier())).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L121">            builder.append(&quot;      \&quot;visitedHashes\&quot;: &quot;).append(renderStringList(checkpoint.visitedHashes())).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L122">            builder.append(&quot;      \&quot;bestPaths\&quot;: &quot;).append(renderBestPaths(checkpoint.bestPaths())).append('\n');</span>
+<span class="fc" id="L123">            builder.append(&quot;    }&quot;);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (i &lt; all.size() - 1) {</span>
+<span class="nc" id="L125">                builder.append(',');</span>
+            }
+<span class="fc" id="L127">            builder.append('\n');</span>
+        }
+<span class="fc" id="L129">        builder.append(&quot;  ]\n}\n&quot;);</span>
+<span class="fc" id="L130">        return builder.toString();</span>
+    }
+
+    private String renderStringList(List&lt;String&gt; values) {
+<span class="fc" id="L134">        StringBuilder builder = new StringBuilder(&quot;[&quot;);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (int i = 0; i &lt; values.size(); i++) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L137">                builder.append(&quot;, &quot;);</span>
+            }
+<span class="fc" id="L139">            builder.append(quote(values.get(i)));</span>
+        }
+<span class="fc" id="L141">        builder.append(']');</span>
+<span class="fc" id="L142">        return builder.toString();</span>
+    }
+
+    private String renderBestPaths(List&lt;SearchCheckpoint.BestPath&gt; paths) {
+<span class="fc" id="L146">        StringBuilder builder = new StringBuilder(&quot;[&quot;);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (int i = 0; i &lt; paths.size(); i++) {</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L149">                builder.append(&quot;, &quot;);</span>
+            }
+<span class="fc" id="L151">            SearchCheckpoint.BestPath path = paths.get(i);</span>
+<span class="fc" id="L152">            builder.append(&quot;{\&quot;expression\&quot;: &quot;).append(quote(path.expression()))</span>
+<span class="fc" id="L153">                .append(&quot;, \&quot;improvement\&quot;: &quot;).append(path.improvement())</span>
+<span class="fc" id="L154">                .append(&quot;, \&quot;lastRuleId\&quot;: &quot;).append(quote(path.lastRuleId()))</span>
+<span class="fc" id="L155">                .append('}');</span>
+        }
+<span class="fc" id="L157">        builder.append(']');</span>
+<span class="fc" id="L158">        return builder.toString();</span>
+    }
+
+    private List&lt;SearchCheckpoint&gt; parse(String json) {
+<span class="fc" id="L162">        List&lt;SearchCheckpoint&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L163">        int start = json.indexOf(&quot;\&quot;checkpoints\&quot;&quot;);</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (start &lt; 0) {</span>
+<span class="nc" id="L165">            return result;</span>
+        }
+<span class="fc" id="L167">        int arrayStart = json.indexOf('[', start);</span>
+<span class="fc" id="L168">        int arrayEnd = json.lastIndexOf(']');</span>
+<span class="pc bpc" id="L169" title="2 of 4 branches missed.">        if (arrayStart &lt; 0 || arrayEnd &lt;= arrayStart) {</span>
+<span class="nc" id="L170">            return result;</span>
+        }
+<span class="fc" id="L172">        String body = json.substring(arrayStart + 1, arrayEnd);</span>
+<span class="fc" id="L173">        int position = 0;</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        while (position &lt; body.length()) {</span>
+<span class="fc" id="L175">            int objectStart = body.indexOf('{', position);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (objectStart &lt; 0) {</span>
+<span class="fc" id="L177">                break;</span>
+            }
+<span class="fc" id="L179">            int objectEnd = matchBrace(body, objectStart);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            if (objectEnd &lt; 0) {</span>
+<span class="nc" id="L181">                break;</span>
+            }
+<span class="fc" id="L183">            String object = body.substring(objectStart, objectEnd + 1);</span>
+<span class="fc" id="L184">            Map&lt;String, String&gt; fields = parseFlatFields(object);</span>
+<span class="fc" id="L185">            SearchCheckpoint checkpoint = new SearchCheckpoint(</span>
+<span class="fc" id="L186">                fields.getOrDefault(&quot;jobId&quot;, &quot;&quot;),</span>
+<span class="fc" id="L187">                fields.getOrDefault(&quot;originalExpression&quot;, &quot;&quot;),</span>
+<span class="fc" id="L188">                fields.getOrDefault(&quot;profile&quot;, &quot;FAST_SIMPLIFY&quot;),</span>
+<span class="fc" id="L189">                fields.getOrDefault(&quot;heuristicName&quot;, &quot;default&quot;),</span>
+<span class="fc" id="L190">                parseStringArray(fields.getOrDefault(&quot;frontier&quot;, &quot;[]&quot;)),</span>
+<span class="fc" id="L191">                parseStringArray(fields.getOrDefault(&quot;visitedHashes&quot;, &quot;[]&quot;)),</span>
+<span class="fc" id="L192">                parseBestPaths(fields.getOrDefault(&quot;bestPaths&quot;, &quot;[]&quot;)),</span>
+<span class="fc" id="L193">                parseLong(fields.getOrDefault(&quot;randomSeed&quot;, &quot;0&quot;)),</span>
+<span class="fc" id="L194">                parseInstant(fields.get(&quot;createdAt&quot;)),</span>
+<span class="fc" id="L195">                parseInstant(fields.get(&quot;updatedAt&quot;))</span>
+            );
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (!checkpoint.jobId().isEmpty()) {</span>
+<span class="fc" id="L198">                result.add(checkpoint);</span>
+            }
+<span class="fc" id="L200">            position = objectEnd + 1;</span>
+<span class="fc" id="L201">        }</span>
+<span class="fc" id="L202">        return result;</span>
+    }
+
+    private Map&lt;String, String&gt; parseFlatFields(String object) {
+<span class="fc" id="L206">        Map&lt;String, String&gt; map = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L207">        int position = 1;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        while (position &lt; object.length() - 1) {</span>
+<span class="fc" id="L209">            position = skipWhitespaceAndCommas(object, position);</span>
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">            if (position &gt;= object.length() - 1 || object.charAt(position) != '&quot;') {</span>
+<span class="nc" id="L211">                break;</span>
+            }
+<span class="fc" id="L213">            int keyEnd = findStringEnd(object, position + 1);</span>
+<span class="fc" id="L214">            String key = object.substring(position + 1, keyEnd);</span>
+<span class="fc" id="L215">            position = keyEnd + 1;</span>
+<span class="pc bpc" id="L216" title="2 of 4 branches missed.">            while (position &lt; object.length() &amp;&amp; object.charAt(position) != ':') {</span>
+<span class="nc" id="L217">                position++;</span>
+            }
+<span class="fc" id="L219">            position++;</span>
+<span class="fc" id="L220">            position = skipWhitespace(object, position);</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">            if (position &gt;= object.length()) {</span>
+<span class="nc" id="L222">                break;</span>
+            }
+<span class="fc" id="L224">            char c = object.charAt(position);</span>
+            String value;
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L227">                int valueEnd = findStringEnd(object, position + 1);</span>
+<span class="fc" id="L228">                value = unescape(object.substring(position + 1, valueEnd));</span>
+<span class="fc" id="L229">                position = valueEnd + 1;</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            } else if (c == '[') {</span>
+<span class="fc" id="L231">                int arrayEnd = matchBracket(object, position);</span>
+<span class="fc" id="L232">                value = object.substring(position, arrayEnd + 1);</span>
+<span class="fc" id="L233">                position = arrayEnd + 1;</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            } else if (c == '{') {</span>
+<span class="nc" id="L235">                int braceEnd = matchBrace(object, position);</span>
+<span class="nc" id="L236">                value = object.substring(position, braceEnd + 1);</span>
+<span class="nc" id="L237">                position = braceEnd + 1;</span>
+<span class="nc" id="L238">            } else {</span>
+<span class="fc" id="L239">                int valueStart = position;</span>
+<span class="pc bpc" id="L240" title="1 of 4 branches missed.">                while (position &lt; object.length() &amp;&amp; &quot;,}\n\r&quot;.indexOf(object.charAt(position)) &lt; 0) {</span>
+<span class="fc" id="L241">                    position++;</span>
+                }
+<span class="fc" id="L243">                value = object.substring(valueStart, position).trim();</span>
+            }
+<span class="fc" id="L245">            map.put(key, value);</span>
+<span class="fc" id="L246">        }</span>
+<span class="fc" id="L247">        return map;</span>
+    }
+
+    private List&lt;String&gt; parseStringArray(String raw) {
+<span class="fc" id="L251">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L252" title="2 of 4 branches missed.">        if (raw == null || raw.isBlank()) {</span>
+<span class="nc" id="L253">            return result;</span>
+        }
+<span class="fc" id="L255">        String body = raw.trim();</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (body.startsWith(&quot;[&quot;)) {</span>
+<span class="fc" id="L257">            body = body.substring(1);</span>
+        }
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (body.endsWith(&quot;]&quot;)) {</span>
+<span class="fc" id="L260">            body = body.substring(0, body.length() - 1);</span>
+        }
+<span class="fc" id="L262">        int position = 0;</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        while (position &lt; body.length()) {</span>
+<span class="fc" id="L264">            position = skipWhitespaceAndCommas(body, position);</span>
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">            if (position &gt;= body.length() || body.charAt(position) != '&quot;') {</span>
+<span class="nc" id="L266">                break;</span>
+            }
+<span class="fc" id="L268">            int end = findStringEnd(body, position + 1);</span>
+<span class="fc" id="L269">            result.add(unescape(body.substring(position + 1, end)));</span>
+<span class="fc" id="L270">            position = end + 1;</span>
+<span class="fc" id="L271">        }</span>
+<span class="fc" id="L272">        return result;</span>
+    }
+
+    private List&lt;SearchCheckpoint.BestPath&gt; parseBestPaths(String raw) {
+<span class="fc" id="L276">        List&lt;SearchCheckpoint.BestPath&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L277" title="2 of 4 branches missed.">        if (raw == null || raw.isBlank()) {</span>
+<span class="nc" id="L278">            return result;</span>
+        }
+<span class="fc" id="L280">        String body = raw.trim();</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (body.startsWith(&quot;[&quot;)) {</span>
+<span class="fc" id="L282">            body = body.substring(1);</span>
+        }
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (body.endsWith(&quot;]&quot;)) {</span>
+<span class="fc" id="L285">            body = body.substring(0, body.length() - 1);</span>
+        }
+<span class="fc" id="L287">        int position = 0;</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        while (position &lt; body.length()) {</span>
+<span class="fc" id="L289">            int objectStart = body.indexOf('{', position);</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            if (objectStart &lt; 0) {</span>
+<span class="nc" id="L291">                break;</span>
+            }
+<span class="fc" id="L293">            int objectEnd = matchBrace(body, objectStart);</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            if (objectEnd &lt; 0) {</span>
+<span class="nc" id="L295">                break;</span>
+            }
+<span class="fc" id="L297">            Map&lt;String, String&gt; fields = parseFlatFields(body.substring(objectStart, objectEnd + 1));</span>
+<span class="fc" id="L298">            result.add(new SearchCheckpoint.BestPath(</span>
+<span class="fc" id="L299">                fields.getOrDefault(&quot;expression&quot;, &quot;&quot;),</span>
+<span class="fc" id="L300">                (int) parseLong(fields.getOrDefault(&quot;improvement&quot;, &quot;0&quot;)),</span>
+<span class="fc" id="L301">                fields.getOrDefault(&quot;lastRuleId&quot;, &quot;&quot;)</span>
+            ));
+<span class="fc" id="L303">            position = objectEnd + 1;</span>
+<span class="fc" id="L304">        }</span>
+<span class="fc" id="L305">        return result;</span>
+    }
+
+    private static int matchBrace(String text, int openIndex) {
+<span class="fc" id="L309">        return matchBracketing(text, openIndex, '{', '}');</span>
+    }
+
+    private static int matchBracket(String text, int openIndex) {
+<span class="fc" id="L313">        return matchBracketing(text, openIndex, '[', ']');</span>
+    }
+
+    private static int matchBracketing(String text, int openIndex, char open, char close) {
+<span class="fc" id="L317">        int depth = 0;</span>
+<span class="fc" id="L318">        boolean inString = false;</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        for (int i = openIndex; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L320">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (inString) {</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                if (c == '\\') {</span>
+<span class="nc" id="L323">                    i++;</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">                } else if (c == '&quot;') {</span>
+<span class="fc" id="L325">                    inString = false;</span>
+                }
+                continue;
+            }
+<span class="fc bfc" id="L329" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L330">                inString = true;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">            } else if (c == open) {</span>
+<span class="fc" id="L332">                depth++;</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            } else if (c == close) {</span>
+<span class="fc" id="L334">                depth--;</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">                if (depth == 0) {</span>
+<span class="fc" id="L336">                    return i;</span>
+                }
+            }
+        }
+<span class="nc" id="L340">        return -1;</span>
+    }
+
+    private static int skipWhitespace(String text, int position) {
+<span class="pc bpc" id="L344" title="1 of 4 branches missed.">        while (position &lt; text.length() &amp;&amp; Character.isWhitespace(text.charAt(position))) {</span>
+<span class="fc" id="L345">            position++;</span>
+        }
+<span class="fc" id="L347">        return position;</span>
+    }
+
+    private static int skipWhitespaceAndCommas(String text, int position) {
+<span class="pc bpc" id="L351" title="1 of 6 branches missed.">        while (position &lt; text.length() &amp;&amp; (Character.isWhitespace(text.charAt(position)) || text.charAt(position) == ',')) {</span>
+<span class="fc" id="L352">            position++;</span>
+        }
+<span class="fc" id="L354">        return position;</span>
+    }
+
+    private static int findStringEnd(String text, int start) {
+<span class="fc" id="L358">        int position = start;</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        while (position &lt; text.length()) {</span>
+<span class="fc" id="L360">            char c = text.charAt(position);</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc" id="L362">                position += 2;</span>
+<span class="nc" id="L363">                continue;</span>
+            }
+<span class="fc bfc" id="L365" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L366">                return position;</span>
+            }
+<span class="fc" id="L368">            position++;</span>
+<span class="fc" id="L369">        }</span>
+<span class="nc" id="L370">        return text.length();</span>
+    }
+
+    private static String unescape(String value) {
+<span class="fc" id="L374">        StringBuilder builder = new StringBuilder(value.length());</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L376">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L377" title="3 of 4 branches missed.">            if (c == '\\' &amp;&amp; i + 1 &lt; value.length()) {</span>
+<span class="nc" id="L378">                char next = value.charAt(++i);</span>
+<span class="nc bnc" id="L379" title="All 6 branches missed.">                switch (next) {</span>
+<span class="nc" id="L380">                    case '&quot;' -&gt; builder.append('&quot;');</span>
+<span class="nc" id="L381">                    case '\\' -&gt; builder.append('\\');</span>
+<span class="nc" id="L382">                    case 'n' -&gt; builder.append('\n');</span>
+<span class="nc" id="L383">                    case 'r' -&gt; builder.append('\r');</span>
+<span class="nc" id="L384">                    case 't' -&gt; builder.append('\t');</span>
+<span class="nc" id="L385">                    default -&gt; builder.append(next);</span>
+                }
+<span class="nc" id="L387">            } else {</span>
+<span class="fc" id="L388">                builder.append(c);</span>
+            }
+        }
+<span class="fc" id="L391">        return builder.toString();</span>
+    }
+
+    private static long parseLong(String raw) {
+<span class="pc bpc" id="L395" title="2 of 4 branches missed.">        if (raw == null || raw.isBlank()) {</span>
+<span class="nc" id="L396">            return 0L;</span>
+        }
+        try {
+<span class="fc" id="L399">            return Long.parseLong(raw.trim());</span>
+<span class="nc" id="L400">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L401">            return 0L;</span>
+        }
+    }
+
+    private static Instant parseInstant(String raw) {
+<span class="pc bpc" id="L406" title="2 of 4 branches missed.">        if (raw == null || raw.isBlank()) {</span>
+<span class="nc" id="L407">            return null;</span>
+        }
+        try {
+<span class="fc" id="L410">            return Instant.parse(raw.trim());</span>
+<span class="nc" id="L411">        } catch (RuntimeException ex) {</span>
+<span class="nc" id="L412">            return null;</span>
+        }
+    }
+
+    private static String quote(String value) {
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L418">            return &quot;\&quot;\&quot;&quot;;</span>
+        }
+<span class="fc" id="L420">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L422">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L423" title="5 of 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L424">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L425">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L426">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L427">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L428">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+                default -&gt; {
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L431">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+                    } else {
+<span class="fc" id="L433">                        builder.append(c);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L438">        builder.append('&quot;');</span>
+<span class="fc" id="L439">        return builder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

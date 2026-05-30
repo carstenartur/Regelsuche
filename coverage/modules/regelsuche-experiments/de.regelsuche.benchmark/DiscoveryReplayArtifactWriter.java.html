@@ -1,0 +1,1101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryReplayArtifactWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">DiscoveryReplayArtifactWriter.java</span></div><h1>DiscoveryReplayArtifactWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.discovery.HypothesisOperatorRegistry;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.transform.PolynomialBridgeAstPredicate;
+import de.regelsuche.transform.TelescopingDifferenceAstPredicate;
+import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import de.regelsuche.validation.DiscoveryEvidenceKind;
+import de.regelsuche.validation.DiscoveryResultKind;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.BasicStroke;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+
+/** Writes deterministic replay/report artefacts for CI discovery runs. */
+<span class="fc" id="L34">public final class DiscoveryReplayArtifactWriter {</span>
+    private static final String CONTAINER_SECTION_KEY = &quot;doc&quot; + &quot;ker&quot;;
+    private static final String CONTAINER_FILE_KEY = CONTAINER_SECTION_KEY + &quot;file&quot;;
+    private static final String CONTAINER_FILE_SHA_KEY = CONTAINER_FILE_KEY + &quot;Sha256&quot;;
+    private static final String CONTAINER_IMAGE_ENV = &quot;REGELSUCHE_&quot; + &quot;DOCKER&quot; + &quot;_IMAGE&quot;;
+    private static final String CONTAINER_FILE_NAME = &quot;Doc&quot; + &quot;kerfile&quot;;
+<span class="fc" id="L40">    private static final HypothesisOperatorRegistry OPERATOR_REGISTRY = new HypothesisOperatorRegistry();</span>
+<span class="fc" id="L41">    private static final List&lt;GalleryDiscoveryDescriptor&gt; GALLERY_DESCRIPTORS = List.of(</span>
+        new GalleryDiscoveryDescriptor(
+            &quot;sophie-germain-discovery&quot;,
+            &quot;Sophie-Germain discovery replay&quot;,
+<span class="fc" id="L45">            java.util.Optional.empty(),</span>
+<span class="fc" id="L46">            List.of(&quot;hypothesis_difference_of_squares_preparation&quot;, &quot;ast_square_difference_factor&quot;),</span>
+            DiscoveryResultKind.TRANSFORMED,
+<span class="fc" id="L48">            Set.of(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED, DiscoveryEvidenceKind.FACTORED),</span>
+<span class="fc" id="L49">            List.of(),</span>
+<span class="fc" id="L50">            row -&gt; List.of(</span>
+<span class="fc" id="L51">                &quot;input: `&quot; + row.seed().expression() + &quot;`&quot;,</span>
+<span class="fc" id="L52">                &quot;discovered bridge: `&quot; + bridgeFromPath(row.replayPath()) + &quot;`&quot;,</span>
+<span class="fc" id="L53">                &quot;factored output: `&quot; + row.replayPath().getLast() + &quot;`&quot;,</span>
+<span class="fc" id="L54">                &quot;rules used: &quot; + escapeMarkdownStatic(String.join(&quot; -&gt; &quot;, row.rulePath())),</span>
+<span class="fc" id="L55">                &quot;proof/equivalence status: &quot; + row.counterexampleSearchStatus().name(),</span>
+                &quot;replay source: generated search/replay path in this report&quot;
+            )
+        ),
+        new GalleryDiscoveryDescriptor(
+            &quot;learned-sophie-germain-macro-reuse&quot;,
+            &quot;Learned Macro Reuse: Sophie-Germain&quot;,
+<span class="fc" id="L62">            java.util.Optional.empty(),</span>
+<span class="fc" id="L63">            List.of(),</span>
+            DiscoveryResultKind.HYPOTHESIS_ONLY,
+<span class="fc" id="L65">            Set.of(</span>
+                DiscoveryEvidenceKind.MACRO_LEARNED,
+                DiscoveryEvidenceKind.MACRO_REUSED,
+                DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED
+            ),
+<span class="fc" id="L70">            List.of(),</span>
+<span class="nc" id="L71">            row -&gt; List.of(</span>
+<span class="nc" id="L72">                &quot;input discovery: `&quot; + row.seed().expression() + &quot;`&quot;,</span>
+<span class="nc" id="L73">                &quot;learned/reused macro evidence: &quot; + escapeMarkdownStatic(String.join(&quot; -&gt; &quot;, row.rulePath())),</span>
+                &quot;validation examples: generated by the macro-learning/replay run&quot;,
+<span class="nc" id="L75">                &quot;supporting discovery path id: &quot; + escapeMarkdownStatic(row.seed().id()),</span>
+<span class="nc" id="L76">                &quot;replay path: `&quot; + escapeMarkdownStatic(String.join(&quot; -&gt; &quot;, row.replayPath())) + &quot;`&quot;</span>
+            )
+        ),
+        new GalleryDiscoveryDescriptor(
+            &quot;learned-telescoping-macro-reuse&quot;,
+            &quot;Learned Macro Reuse: Telescoping&quot;,
+<span class="fc" id="L82">            java.util.Optional.empty(),</span>
+<span class="fc" id="L83">            List.of(),</span>
+            DiscoveryResultKind.HYPOTHESIS_ONLY,
+<span class="fc" id="L85">            Set.of(</span>
+                DiscoveryEvidenceKind.MACRO_LEARNED,
+                DiscoveryEvidenceKind.MACRO_REUSED,
+                DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED
+            ),
+<span class="pc" id="L90">            List.of(row -&gt; row.replayPath().stream().anyMatch(</span>
+                TelescopingDifferenceAstPredicate::containsTelescopingDifference)),
+<span class="nc" id="L92">            row -&gt; List.of(</span>
+<span class="nc" id="L93">                &quot;input discovery: `&quot; + row.seed().expression() + &quot;`&quot;,</span>
+                &quot;unit-step macro learned and reused from actual replay evidence&quot;,
+<span class="nc" id="L95">                &quot;supporting discovery path id: &quot; + escapeMarkdownStatic(row.seed().id()),</span>
+<span class="nc" id="L96">                &quot;replay path: `&quot; + escapeMarkdownStatic(String.join(&quot; -&gt; &quot;, row.replayPath())) + &quot;`&quot;,</span>
+                &quot;false-positive guard: non-unit-step denominators rejected&quot;
+            )
+        ),
+        new GalleryDiscoveryDescriptor(
+            &quot;learned-rationalization-macro-reuse&quot;,
+            &quot;Learned Macro Reuse: Rationalization&quot;,
+<span class="fc" id="L103">            java.util.Optional.empty(),</span>
+<span class="fc" id="L104">            List.of(),</span>
+            DiscoveryResultKind.HYPOTHESIS_ONLY,
+<span class="fc" id="L106">            Set.of(</span>
+                DiscoveryEvidenceKind.MACRO_LEARNED,
+                DiscoveryEvidenceKind.MACRO_REUSED,
+                DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED
+            ),
+<span class="pc" id="L111">            List.of(row -&gt; row.replayPath().stream().anyMatch(step -&gt; step.contains(&quot;sqrt&quot;))),</span>
+<span class="nc" id="L112">            row -&gt; List.of(</span>
+<span class="nc" id="L113">                &quot;input discovery: `&quot; + row.seed().expression() + &quot;`&quot;,</span>
+                &quot;assumptions carried by the learned macro/replay result&quot;,
+<span class="nc" id="L115">                &quot;supporting discovery path id: &quot; + escapeMarkdownStatic(row.seed().id()),</span>
+<span class="nc" id="L116">                &quot;replay path: `&quot; + escapeMarkdownStatic(String.join(&quot; -&gt; &quot;, row.replayPath())) + &quot;`&quot;</span>
+            )
+        ),
+        new GalleryDiscoveryDescriptor(
+            &quot;telescoping-fraction-discovery&quot;,
+            &quot;Telescoping fraction discovery&quot;,
+<span class="fc" id="L122">            java.util.Optional.empty(),</span>
+<span class="fc" id="L123">            List.of(&quot;hypothesis_telescoping_fraction&quot;),</span>
+            DiscoveryResultKind.TRANSFORMED,
+<span class="fc" id="L125">            Set.of(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED),</span>
+<span class="fc" id="L126">            List.of(row -&gt; row.replayPath().stream().anyMatch(</span>
+                TelescopingDifferenceAstPredicate::containsTelescopingDifference)),
+<span class="fc" id="L128">            row -&gt; List.of(</span>
+<span class="fc" id="L129">                &quot;input: `&quot; + row.seed().expression() + &quot;`&quot;,</span>
+<span class="fc" id="L130">                &quot;telescoping output: `&quot; + row.replayPath().getLast() + &quot;`&quot;,</span>
+<span class="fc" id="L131">                &quot;rules used: &quot; + escapeMarkdownStatic(String.join(&quot; -&gt; &quot;, row.rulePath())),</span>
+<span class="fc" id="L132">                &quot;evidence: &quot; + escapeMarkdownStatic(row.evidence().toString()),</span>
+<span class="fc" id="L133">                &quot;validation status: &quot; + row.counterexampleSearchStatus().name(),</span>
+                &quot;limitations / assumptions: unit-step denominator pattern only&quot;
+            )
+        )
+    );
+
+    public ArtifactBundle write(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        Path outputDirectory
+    ) {
+<span class="fc" id="L143">        return write(report, outputDirectory, List.of(), null);</span>
+    }
+
+    public ArtifactBundle write(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        Path outputDirectory,
+        Collection&lt;MathematicalAlgorithmRegistry.AlgorithmDescriptor&gt; algorithmSnapshot
+    ) {
+<span class="nc" id="L151">        return write(report, outputDirectory, algorithmSnapshot, null);</span>
+    }
+
+    public ArtifactBundle write(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        Path outputDirectory,
+        Collection&lt;MathematicalAlgorithmRegistry.AlgorithmDescriptor&gt; algorithmSnapshot,
+        DiscoverySemanticReportView semanticView
+    ) {
+        try {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            DiscoverySemanticReportView effectiveSemanticView = semanticView == null</span>
+<span class="fc" id="L162">                ? DiscoverySemanticReportView.fromReplayPaths(report)</span>
+<span class="fc" id="L163">                : semanticView;</span>
+<span class="fc" id="L164">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L165">            Path json = outputDirectory.resolve(&quot;discovery-report.json&quot;);</span>
+<span class="fc" id="L166">            Path html = outputDirectory.resolve(&quot;discovery-report.html&quot;);</span>
+<span class="fc" id="L167">            Path markdown = outputDirectory.resolve(&quot;discovery-report.md&quot;);</span>
+<span class="fc" id="L168">            Path replayExport = outputDirectory.resolve(&quot;discovery-replay.json&quot;);</span>
+<span class="fc" id="L169">            Path screenshot = outputDirectory.resolve(&quot;discovery-summary.png&quot;);</span>
+<span class="fc" id="L170">            Path gif = outputDirectory.resolve(&quot;discovery-replay.gif&quot;);</span>
+<span class="fc" id="L171">            Path reproPack = outputDirectory.resolve(&quot;reproducibility-pack.json&quot;);</span>
+<span class="fc" id="L172">            Path hypotheses = outputDirectory.resolve(&quot;hypotheses.json&quot;);</span>
+<span class="fc" id="L173">            Path macroRules = outputDirectory.resolve(&quot;macro-rules.json&quot;);</span>
+<span class="fc" id="L174">            Path counterexamples = outputDirectory.resolve(&quot;counterexamples.json&quot;);</span>
+<span class="fc" id="L175">            Path provenanceGraph = outputDirectory.resolve(&quot;provenance.graph.json&quot;);</span>
+<span class="fc" id="L176">            Path campaign = outputDirectory.resolve(&quot;discovery-campaign.json&quot;);</span>
+<span class="fc" id="L177">            Files.writeString(json, report.renderDeterministicJson());</span>
+<span class="fc" id="L178">            Files.writeString(html, renderHtml(report));</span>
+<span class="fc" id="L179">            Files.writeString(markdown, renderMarkdown(report, effectiveSemanticView));</span>
+<span class="fc" id="L180">            Files.writeString(replayExport, renderReplayExport(report, effectiveSemanticView));</span>
+<span class="fc" id="L181">            Files.writeString(hypotheses, renderHypothesesExport(report));</span>
+<span class="fc" id="L182">            Files.writeString(macroRules, renderMacroRulesExport(report));</span>
+<span class="fc" id="L183">            Files.writeString(counterexamples, renderCounterexamplesExport(report));</span>
+<span class="fc" id="L184">            Files.writeString(provenanceGraph, renderProvenanceGraphExport(report));</span>
+<span class="fc" id="L185">            Files.writeString(campaign, DiscoveryCampaign.fromReport(</span>
+<span class="fc" id="L186">                &quot;campaign-&quot; + sha256Utf8Lines(report.rows().stream().map(row -&gt; row.seed().id()).sorted().toList()).substring(0, 12),</span>
+                report,
+<span class="fc" id="L188">                report.metrics().processedSeeds(),</span>
+                1,
+<span class="fc" id="L190">                enabledBackends(algorithmSnapshot),</span>
+                &quot;JSON_FILE&quot;
+<span class="fc" id="L192">            ).renderJson());</span>
+<span class="fc" id="L193">            writeScreenshot(screenshot, report, effectiveSemanticView);</span>
+<span class="fc" id="L194">            writeReplayGif(gif, report, effectiveSemanticView);</span>
+<span class="fc" id="L195">            Files.writeString(reproPack, renderReproducibilityPack(report,</span>
+<span class="fc" id="L196">                List.of(json, html, markdown, replayExport, screenshot, gif, hypotheses, macroRules, counterexamples, provenanceGraph, campaign),</span>
+                algorithmSnapshot));
+<span class="fc" id="L198">            return new ArtifactBundle(json, html, markdown, replayExport, screenshot, gif, reproPack,</span>
+                hypotheses, macroRules, counterexamples, provenanceGraph, campaign);
+<span class="nc" id="L200">        } catch (IOException exception) {</span>
+<span class="nc" id="L201">            throw new IllegalStateException(&quot;Could not write discovery replay artefacts to &quot; + outputDirectory, exception);</span>
+        }
+    }
+
+    public String renderHtml(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+<span class="fc" id="L206">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L207">        out.append(&quot;&lt;!doctype html&gt;&lt;html lang=\&quot;de\&quot;&gt;&lt;head&gt;&lt;meta charset=\&quot;utf-8\&quot;&gt;&quot;);</span>
+<span class="fc" id="L208">        out.append(&quot;&lt;title&gt;Regelsuche Discovery Report&lt;/title&gt;&quot;);</span>
+<span class="fc" id="L209">        out.append(&quot;&lt;style&gt;&quot;)</span>
+<span class="fc" id="L210">            .append(&quot;body{font-family:system-ui,sans-serif;background:#f6f8fb;color:#1f2937;margin:0;padding:2rem}&quot;)</span>
+<span class="fc" id="L211">            .append(&quot;h1,h2{margin:.2rem 0 1rem}table{width:100%;border-collapse:collapse;background:#fff}&quot;)</span>
+<span class="fc" id="L212">            .append(&quot;td,th{border:1px solid #d8dee8;padding:.5rem;vertical-align:top;text-align:left}&quot;)</span>
+<span class="fc" id="L213">            .append(&quot;th{background:#eef2ff}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin:1rem 0}&quot;)</span>
+<span class="fc" id="L214">            .append(&quot;.card{background:#fff;border:1px solid #d8dee8;border-radius:.75rem;padding:.9rem}&quot;)</span>
+<span class="fc" id="L215">            .append(&quot;.metric{font-size:1.5rem;font-weight:700}.muted{color:#667085;font-size:.92rem}&quot;)</span>
+<span class="fc" id="L216">            .append(&quot;.replay-step{margin:.2rem 0}.ok{color:#137333}.fail{color:#a50e0e}.unknown{color:#b45309}.neutral{color:#1d4ed8}&quot;)</span>
+<span class="fc" id="L217">            .append(&quot;.pill{display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:.08rem .45rem;margin:.08rem;font-size:.82rem}&quot;)</span>
+<span class="fc" id="L218">            .append(&quot;code{background:#f3f4f6;border-radius:.25rem;padding:.08rem .25rem}ul,ol{margin:.2rem 0 .2rem 1.2rem;padding:0}&quot;)</span>
+<span class="fc" id="L219">            .append(&quot;&lt;/style&gt;&quot;);</span>
+<span class="fc" id="L220">        out.append(&quot;&lt;/head&gt;&lt;body&gt;&lt;h1&gt;Regelsuche Discovery Report&lt;/h1&gt;&quot;);</span>
+<span class="fc" id="L221">        out.append(&quot;&lt;p class=\&quot;muted\&quot;&gt;Deterministischer Replay-/Discovery-Bericht für wissenschaftliche Reproduktionsläufe.&lt;/p&gt;&quot;);</span>
+<span class="fc" id="L222">        DiscoveryDashboardMetrics dashboard = dashboardMetrics(report);</span>
+<span class="fc" id="L223">        out.append(&quot;&lt;div class=\&quot;cards\&quot;&gt;&quot;)</span>
+<span class="fc" id="L224">            .append(metricCard(&quot;searchSpaceSize&quot;, String.valueOf(dashboard.searchSpaceSize())))</span>
+<span class="fc" id="L225">            .append(metricCard(&quot;matchStats&quot;, dashboard.matchStats().matched() + &quot; / &quot; + dashboard.matchStats().unmatched()))</span>
+<span class="fc" id="L226">            .append(metricCard(&quot;macroMoveUsage&quot;, dashboard.macroMoveUsage().applied() + &quot; applied&quot;))</span>
+<span class="fc" id="L227">            .append(metricCard(&quot;memoryUsage&quot;, dashboard.memoryUsage() + &quot; B&quot;))</span>
+<span class="fc" id="L228">            .append(metricCard(&quot;counterexampleStats&quot;, dashboard.counterexampleStats().found() + &quot; / &quot; + dashboard.counterexampleStats().checked()))</span>
+<span class="fc" id="L229">            .append(metricCard(&quot;proofSuccessRate&quot;, String.format(java.util.Locale.ROOT, &quot;%.2f&quot;, dashboard.proofSuccessRate())))</span>
+<span class="fc" id="L230">            .append(metricCard(&quot;artifactCounts&quot;, String.valueOf(dashboard.artifactCounts().values().stream().mapToInt(Integer::intValue).sum())))</span>
+<span class="fc" id="L231">            .append(metricCard(&quot;Seeds&quot;, String.valueOf(report.metrics().processedSeeds())))</span>
+<span class="fc" id="L232">            .append(metricCard(&quot;Erfolgreich&quot;, String.valueOf(report.metrics().successfulSeeds())))</span>
+<span class="fc" id="L233">            .append(metricCard(&quot;Hypothesen&quot;, String.valueOf(report.metrics().hypotheses())))</span>
+<span class="fc" id="L234">            .append(metricCard(&quot;Gegenbeispiele&quot;, String.valueOf(report.metrics().counterexamples())))</span>
+<span class="fc" id="L235">            .append(metricCard(&quot;Runtime Σ&quot;, report.metrics().accumulatedRuntimeMillis() + &quot; ms&quot;))</span>
+<span class="fc" id="L236">            .append(metricCard(&quot;Speicher Σ&quot;, report.metrics().accumulatedMemoryBytes() + &quot; B&quot;))</span>
+<span class="fc" id="L237">            .append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="fc" id="L238">        out.append(&quot;&lt;p class=\&quot;muted\&quot;&gt;Seeds: &quot;).append(report.metrics().processedSeeds())</span>
+<span class="fc" id="L239">            .append(&quot; · erfolgreich: &quot;).append(report.metrics().successfulSeeds())</span>
+<span class="fc" id="L240">            .append(&quot; · Hypothesen: &quot;).append(report.metrics().hypotheses())</span>
+<span class="fc" id="L241">            .append(&quot; · Gegenbeispiele: &quot;).append(report.metrics().counterexamples())</span>
+<span class="fc" id="L242">            .append(&quot;&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Seed&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;th&gt;ResultKind&lt;/th&gt;&lt;th&gt;Discovery&lt;/th&gt;&lt;th&gt;Rules&lt;/th&gt;&lt;th&gt;Replay&lt;/th&gt;&lt;th&gt;Summary&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&quot;);</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {</span>
+<span class="fc" id="L244">            out.append(&quot;&lt;tr&gt;&lt;td&gt;&quot;).append(escape(row.seed().stableKey())).append(&quot;&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">                .append(row.success() ? &quot;&lt;span class=\&quot;ok\&quot;&gt;OK&lt;/span&gt;&quot; : &quot;&lt;span class=\&quot;fail\&quot;&gt;FAIL&lt;/span&gt;&quot;)</span>
+<span class="fc" id="L246">                .append(&quot;&lt;div&gt;&quot;).append(renderCounterexampleStatusLabel(row)).append(&quot;&lt;/div&gt;&quot;)</span>
+<span class="fc" id="L247">                .append(&quot;&lt;div class=\&quot;muted\&quot;&gt;Kategorie: &quot;).append(escape(row.seed().category())).append(&quot;&lt;/div&gt;&quot;)</span>
+<span class="fc" id="L248">                .append(&quot;&lt;/td&gt;&lt;td&gt;&quot;).append(escape(row.resultKind().name()))</span>
+<span class="fc" id="L249">                .append(&quot;&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="fc" id="L250">                .append(renderHtmlDiscoveryDetails(row))</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                .append(&quot;&lt;/td&gt;&lt;td&gt;&quot;).append(escape(row.rulePath().isEmpty() ? &quot;—&quot; : String.join(&quot; → &quot;, row.rulePath())))</span>
+<span class="fc" id="L252">                .append(&quot;&lt;/td&gt;&lt;td&gt;&lt;ol&gt;&quot;);</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            for (String step : row.replayPath()) {</span>
+<span class="fc" id="L254">                out.append(&quot;&lt;li class=\&quot;replay-step\&quot;&gt;&lt;code&gt;&quot;).append(escape(step)).append(&quot;&lt;/code&gt;&lt;/li&gt;&quot;);</span>
+<span class="fc" id="L255">            }</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            if (row.replayPath().isEmpty()) {</span>
+<span class="nc" id="L257">                out.append(&quot;&lt;li class=\&quot;replay-step muted\&quot;&gt;Kein Replay vorhanden&lt;/li&gt;&quot;);</span>
+            }
+<span class="fc" id="L259">            out.append(&quot;&lt;/ol&gt;&lt;/td&gt;&lt;td&gt;&quot;).append(escape(row.summary()))</span>
+<span class="fc" id="L260">                .append(&quot;&lt;div class=\&quot;muted\&quot;&gt;Laufzeit: &quot;).append(row.elapsedMillis())</span>
+<span class="fc" id="L261">                .append(&quot; ms · Speicher: &quot;).append(row.memoryBytes()).append(&quot; B&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;&quot;);</span>
+<span class="fc" id="L262">        }</span>
+<span class="fc" id="L263">        out.append(&quot;&lt;/tbody&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;&quot;);</span>
+<span class="fc" id="L264">        return out.toString();</span>
+    }
+
+    public String renderMarkdown(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+<span class="fc" id="L268">        return renderMarkdown(report, DiscoverySemanticReportView.fromReplayPaths(report));</span>
+    }
+
+    public String renderMarkdown(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView
+    ) {
+<span class="fc" id="L275">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L276">        out.append(&quot;# Regelsuche Discovery Report\n\n&quot;);</span>
+<span class="fc" id="L277">        out.append(&quot;- Seeds: &quot;).append(report.metrics().processedSeeds()).append('\n');</span>
+<span class="fc" id="L278">        out.append(&quot;- Erfolgreich: &quot;).append(report.metrics().successfulSeeds()).append('\n');</span>
+<span class="fc" id="L279">        out.append(&quot;- Hypothesen: &quot;).append(report.metrics().hypotheses()).append('\n');</span>
+<span class="fc" id="L280">        out.append(&quot;- Gegenbeispiele: &quot;).append(report.metrics().counterexamples()).append('\n');</span>
+<span class="fc" id="L281">        out.append(&quot;- Laufzeit Σ: &quot;).append(report.metrics().accumulatedRuntimeMillis()).append(&quot; ms\n&quot;);</span>
+<span class="fc" id="L282">        out.append(&quot;- Speicher Σ: &quot;).append(report.metrics().accumulatedMemoryBytes()).append(&quot; B\n\n&quot;);</span>
+<span class="fc" id="L283">        DiscoveryDashboardMetrics dashboard = dashboardMetrics(report);</span>
+<span class="fc" id="L284">        out.append(&quot;## Dashboard Metrics\n\n&quot;);</span>
+<span class="fc" id="L285">        out.append(&quot;- searchSpaceSize: &quot;).append(dashboard.searchSpaceSize()).append('\n');</span>
+<span class="fc" id="L286">        out.append(&quot;- matchStats: &quot;).append(dashboard.matchStats().matched()).append(&quot; matched / &quot;)</span>
+<span class="fc" id="L287">            .append(dashboard.matchStats().unmatched()).append(&quot; unmatched\n&quot;);</span>
+<span class="fc" id="L288">        out.append(&quot;- macroMoveUsage: &quot;).append(dashboard.macroMoveUsage().applied()).append(&quot; applied\n&quot;);</span>
+<span class="fc" id="L289">        out.append(&quot;- memoryUsage: &quot;).append(dashboard.memoryUsage()).append(&quot; B\n&quot;);</span>
+<span class="fc" id="L290">        out.append(&quot;- counterexampleStats: &quot;).append(dashboard.counterexampleStats().found()).append(&quot; / &quot;)</span>
+<span class="fc" id="L291">            .append(dashboard.counterexampleStats().checked()).append('\n');</span>
+<span class="fc" id="L292">        out.append(&quot;- proofSuccessRate: &quot;).append(String.format(java.util.Locale.ROOT, &quot;%.2f&quot;, dashboard.proofSuccessRate())).append('\n');</span>
+<span class="fc" id="L293">        out.append(&quot;- artifactCounts: &quot;).append(dashboard.artifactCounts()).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L294">        out.append(&quot;## Semantic Discovery View\n\n&quot;);</span>
+<span class="fc" id="L295">        out.append(&quot;- Renderer: &quot;).append(semanticView.renderer()).append('\n');</span>
+<span class="fc" id="L296">        out.append(&quot;- Raw graph nodes: &quot;).append(semanticView.rawNodeCount()).append('\n');</span>
+<span class="fc" id="L297">        out.append(&quot;- Raw graph edges: &quot;).append(semanticView.rawEdgeCount()).append('\n');</span>
+<span class="fc" id="L298">        out.append(&quot;- Main path nodes: &quot;).append(semanticView.semanticNodeCount()).append('\n');</span>
+<span class="fc" id="L299">        out.append(&quot;- Semantic edges: &quot;).append(semanticView.semanticEdgeCount()).append('\n');</span>
+<span class="fc" id="L300">        out.append(&quot;- Collapsed variants: &quot;).append(semanticView.collapsedVariantCount()).append('\n');</span>
+<span class="fc" id="L301">        out.append(&quot;- Collapsed low-signal steps: &quot;).append(semanticView.collapsedLowSignalCount()).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L302">        out.append(&quot;```mermaid\n&quot;).append(renderSemanticMermaid(semanticView)).append(&quot;```\n\n&quot;);</span>
+<span class="fc" id="L303">        out.append(renderGeneratedGallery(report, semanticView));</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {</span>
+<span class="fc" id="L305">            out.append(&quot;## &quot;).append(row.seed().stableKey()).append(&quot;\n\n&quot;);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            out.append(&quot;- Status: &quot;).append(row.success() ? &quot;OK&quot; : &quot;FAIL&quot;).append('\n');</span>
+<span class="fc" id="L307">            out.append(&quot;- resultKind: &quot;).append(row.resultKind().name()).append('\n');</span>
+<span class="fc" id="L308">            out.append(&quot;- Kategorie: &quot;).append(row.seed().category()).append('\n');</span>
+<span class="fc" id="L309">            out.append(&quot;- Annahmen: &quot;).append(joinOrDash(row.seed().assumptions())).append('\n');</span>
+<span class="fc" id="L310">            out.append(&quot;- Hypothesen: &quot;).append(joinOrDash(row.hypotheses())).append('\n');</span>
+<span class="fc" id="L311">            out.append(&quot;- counterexampleStatus: &quot;).append(row.counterexampleSearchStatus().name()).append('\n');</span>
+<span class="fc" id="L312">            out.append(&quot;- attempted sources: &quot;).append(joinOrDash(row.counterexampleAttemptedSources())).append('\n');</span>
+<span class="fc" id="L313">            out.append(&quot;- inferred assumptions: &quot;).append(joinOrDash(row.inferredAssumptions())).append('\n');</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            out.append(&quot;- explanation: &quot;).append(row.counterexampleExplanation().isBlank() ? &quot;–&quot; : row.counterexampleExplanation()).append('\n');</span>
+<span class="fc" id="L315">            out.append(&quot;- Gegenbeispiele: &quot;).append(joinOrDash(row.counterexamples())).append('\n');</span>
+<span class="fc" id="L316">            out.append(&quot;- Laufzeit: &quot;).append(row.elapsedMillis()).append(&quot; ms\n&quot;);</span>
+<span class="fc" id="L317">            out.append(&quot;- Speicher: &quot;).append(row.memoryBytes()).append(&quot; B\n&quot;);</span>
+<span class="fc" id="L318">            out.append(&quot;- Summary: &quot;).append(row.summary()).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L319">            out.append(&quot;### Discovery summary table\n\n&quot;);</span>
+<span class="fc" id="L320">            out.append(&quot;| expression | operator | resultKind | bridge? | simplified/factored? | learnedMacro? | macroReused? | proofStatus | rulePath | notes |\n&quot;);</span>
+<span class="fc" id="L321">            out.append(&quot;| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc" id="L322">            out.append(&quot;| &quot;).append(escapeMarkdown(row.seed().expression()))</span>
+<span class="fc" id="L323">                .append(&quot; | &quot;).append(escapeMarkdown(operatorLabel(row.rulePath())))</span>
+<span class="fc" id="L324">                .append(&quot; | &quot;).append(row.resultKind().name())</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">                .append(&quot; | &quot;).append(isBridgeKind(row) ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">                .append(&quot; | &quot;).append(hasSimplifiedOrFactoredEvidence(row) ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(isMacroLearnedKind(row) ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(hasMacroReuseEvidence(row) ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc" id="L329">                .append(&quot; | &quot;).append(row.counterexampleSearchStatus().name())</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                .append(&quot; | &quot;).append(escapeMarkdown(row.rulePath().isEmpty() ? &quot;—&quot; : String.join(&quot; -&gt; &quot;, row.rulePath())))</span>
+<span class="fc" id="L331">                .append(&quot; | &quot;).append(escapeMarkdown(row.summary()))</span>
+<span class="fc" id="L332">                .append(&quot; |\n\n&quot;);</span>
+<span class="fc" id="L333">            out.append(&quot;### Replay\n\n&quot;);</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">            if (row.replayPath().isEmpty()) {</span>
+<span class="nc" id="L335">                out.append(&quot;- Kein Replay vorhanden\n\n&quot;);</span>
+            } else {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                for (int i = 0; i &lt; row.replayPath().size(); i++) {</span>
+<span class="fc" id="L338">                    out.append(i + 1).append(&quot;. `&quot;).append(row.replayPath().get(i)).append(&quot;`\n&quot;);</span>
+                }
+<span class="fc" id="L340">                out.append('\n');</span>
+            }
+<span class="fc" id="L342">        }</span>
+<span class="fc" id="L343">        return out.toString();</span>
+    }
+
+    public String renderReplayExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+<span class="nc" id="L347">        return renderReplayExport(report, DiscoverySemanticReportView.fromReplayPaths(report));</span>
+    }
+
+    public String renderReplayExport(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView
+    ) {
+<span class="fc" id="L354">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L355">        writer.beginObject();</span>
+<span class="fc" id="L356">        writer.property(&quot;schema&quot;, &quot;regelsuche.discovery-replay/v1&quot;);</span>
+<span class="fc" id="L357">        DiscoveryDashboardMetrics dashboard = dashboardMetrics(report);</span>
+<span class="fc" id="L358">        writer.object(&quot;dashboardMetrics&quot;, metrics -&gt; {</span>
+<span class="fc" id="L359">            metrics.property(&quot;searchSpaceSize&quot;, dashboard.searchSpaceSize());</span>
+<span class="fc" id="L360">            metrics.object(&quot;matchStats&quot;, match -&gt; {</span>
+<span class="fc" id="L361">                match.property(&quot;matched&quot;, dashboard.matchStats().matched());</span>
+<span class="fc" id="L362">                match.property(&quot;unmatched&quot;, dashboard.matchStats().unmatched());</span>
+<span class="fc" id="L363">            });</span>
+<span class="fc" id="L364">            metrics.object(&quot;macroMoveUsage&quot;, macro -&gt; {</span>
+<span class="fc" id="L365">                macro.property(&quot;considered&quot;, dashboard.macroMoveUsage().considered());</span>
+<span class="fc" id="L366">                macro.property(&quot;applied&quot;, dashboard.macroMoveUsage().applied());</span>
+<span class="fc" id="L367">                macro.property(&quot;averageCostReduction&quot;, dashboard.macroMoveUsage().averageCostReduction());</span>
+<span class="fc" id="L368">            });</span>
+<span class="fc" id="L369">            metrics.property(&quot;memoryUsage&quot;, dashboard.memoryUsage());</span>
+<span class="fc" id="L370">            metrics.object(&quot;counterexampleStats&quot;, counterexamples -&gt; {</span>
+<span class="fc" id="L371">                counterexamples.property(&quot;checked&quot;, dashboard.counterexampleStats().checked());</span>
+<span class="fc" id="L372">                counterexamples.property(&quot;found&quot;, dashboard.counterexampleStats().found());</span>
+<span class="fc" id="L373">            });</span>
+<span class="fc" id="L374">            metrics.property(&quot;proofSuccessRate&quot;, dashboard.proofSuccessRate());</span>
+<span class="fc" id="L375">            metrics.object(&quot;artifactCounts&quot;, artifacts -&gt; dashboard.artifactCounts().forEach(artifacts::property));</span>
+<span class="fc" id="L376">        });</span>
+<span class="fc" id="L377">        writer.array(&quot;replays&quot;, arr -&gt; report.rows().forEach(row -&gt; arr.objectValue(object -&gt; {</span>
+<span class="fc" id="L378">            object.property(&quot;seedId&quot;, row.seed().id());</span>
+<span class="fc" id="L379">            object.property(&quot;seedStableKey&quot;, row.seed().stableKey());</span>
+<span class="fc" id="L380">            object.property(&quot;category&quot;, row.seed().category());</span>
+<span class="fc" id="L381">            object.property(&quot;resultKind&quot;, row.resultKind().name());</span>
+<span class="fc" id="L382">            object.array(&quot;assumptions&quot;, assumptions -&gt; row.seed().assumptions().forEach(assumptions::value));</span>
+<span class="fc" id="L383">            object.array(&quot;hypotheses&quot;, hypotheses -&gt; row.hypotheses().forEach(hypotheses::value));</span>
+<span class="fc" id="L384">            object.property(&quot;counterexampleStatus&quot;, row.counterexampleSearchStatus().name());</span>
+<span class="fc" id="L385">            object.array(&quot;counterexamples&quot;, counterexamples -&gt; row.counterexamples().forEach(counterexamples::value));</span>
+<span class="fc" id="L386">            object.array(&quot;attemptedSources&quot;, sources -&gt; row.counterexampleAttemptedSources().forEach(sources::value));</span>
+<span class="fc" id="L387">            object.array(&quot;inferredAssumptions&quot;, assumptions -&gt; row.inferredAssumptions().forEach(assumptions::value));</span>
+<span class="fc" id="L388">            object.property(&quot;explanation&quot;, row.counterexampleExplanation());</span>
+<span class="fc" id="L389">            object.array(&quot;replayPath&quot;, replay -&gt; row.replayPath().forEach(replay::value));</span>
+<span class="fc" id="L390">            object.array(&quot;rulePath&quot;, rules -&gt; row.rulePath().forEach(rules::value));</span>
+<span class="fc" id="L391">            object.array(&quot;evidence&quot;, evidence -&gt; row.evidence().stream().map(Enum::name).sorted().forEach(evidence::value));</span>
+<span class="fc" id="L392">        })));</span>
+<span class="fc" id="L393">        writer.object(&quot;semanticGraph&quot;, semantic -&gt; {</span>
+<span class="fc" id="L394">            semantic.property(&quot;renderer&quot;, semanticView.renderer());</span>
+<span class="fc" id="L395">            semantic.property(&quot;rawNodeCount&quot;, semanticView.rawNodeCount());</span>
+<span class="fc" id="L396">            semantic.property(&quot;rawEdgeCount&quot;, semanticView.rawEdgeCount());</span>
+<span class="fc" id="L397">            semantic.property(&quot;semanticNodeCount&quot;, semanticView.semanticNodeCount());</span>
+<span class="fc" id="L398">            semantic.property(&quot;semanticEdgeCount&quot;, semanticView.semanticEdgeCount());</span>
+<span class="fc" id="L399">            semantic.property(&quot;collapsedVariantCount&quot;, semanticView.collapsedVariantCount());</span>
+<span class="fc" id="L400">            semantic.property(&quot;collapsedLowSignalCount&quot;, semanticView.collapsedLowSignalCount());</span>
+<span class="fc" id="L401">            semantic.array(&quot;paths&quot;, paths -&gt; semanticView.paths().forEach(path -&gt; paths.objectValue(pathObject -&gt; {</span>
+<span class="fc" id="L402">                pathObject.property(&quot;seedId&quot;, path.seedId());</span>
+<span class="fc" id="L403">                pathObject.array(&quot;nodes&quot;, nodes -&gt; path.nodes().forEach(node -&gt; nodes.objectValue(nodeObject -&gt; {</span>
+<span class="fc" id="L404">                    nodeObject.property(&quot;id&quot;, node.id());</span>
+<span class="fc" id="L405">                    nodeObject.property(&quot;label&quot;, node.label());</span>
+<span class="fc" id="L406">                })));</span>
+<span class="fc" id="L407">                pathObject.array(&quot;edges&quot;, edges -&gt; path.edges().forEach(edge -&gt; edges.objectValue(edgeObject -&gt; {</span>
+<span class="fc" id="L408">                    edgeObject.property(&quot;from&quot;, edge.from());</span>
+<span class="fc" id="L409">                    edgeObject.property(&quot;to&quot;, edge.to());</span>
+<span class="fc" id="L410">                    edgeObject.property(&quot;label&quot;, edge.label());</span>
+<span class="fc" id="L411">                    edgeObject.property(&quot;kind&quot;, edge.kind());</span>
+<span class="fc" id="L412">                    edgeObject.property(&quot;collapsedCount&quot;, edge.collapsedCount());</span>
+<span class="fc" id="L413">                })));</span>
+<span class="fc" id="L414">            })));</span>
+<span class="fc" id="L415">        });</span>
+<span class="fc" id="L416">        writer.endObject();</span>
+<span class="fc" id="L417">        return writer.toString();</span>
+    }
+
+    public String renderHypothesesExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+<span class="fc" id="L421">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L422">        writer.beginObject();</span>
+<span class="fc" id="L423">        writer.property(&quot;schema&quot;, &quot;regelsuche.hypotheses/v1&quot;);</span>
+<span class="fc" id="L424">        writer.array(&quot;hypotheses&quot;, arr -&gt; report.rows().forEach(row -&gt; row.hypotheses().forEach(hypothesis -&gt;</span>
+<span class="fc" id="L425">            arr.objectValue(object -&gt; {</span>
+<span class="fc" id="L426">                object.property(&quot;id&quot;, stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L427">                object.property(&quot;seedId&quot;, row.seed().id());</span>
+<span class="fc" id="L428">                object.property(&quot;expression&quot;, hypothesis);</span>
+<span class="fc" id="L429">                object.property(&quot;counterexampleStatus&quot;, row.counterexampleSearchStatus().name());</span>
+<span class="fc" id="L430">                object.array(&quot;attemptedSources&quot;, sources -&gt; row.counterexampleAttemptedSources().forEach(sources::value));</span>
+<span class="fc" id="L431">                object.array(&quot;inferredAssumptions&quot;, assumptions -&gt; row.inferredAssumptions().forEach(assumptions::value));</span>
+<span class="fc" id="L432">                object.property(&quot;explanation&quot;, row.counterexampleExplanation());</span>
+<span class="fc" id="L433">                object.property(&quot;evidenceCount&quot;, row.replayPath().size());</span>
+<span class="fc" id="L434">                object.array(&quot;assumptions&quot;, assumptions -&gt; row.seed().assumptions().forEach(assumptions::value));</span>
+<span class="fc" id="L435">                object.array(&quot;interestingnessReasons&quot;, reasons -&gt; {</span>
+<span class="fc" id="L436">                    reasons.value(&quot;supported-by-replay-path&quot;);</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">                    if (!row.counterexamples().isEmpty()) {</span>
+<span class="fc" id="L438">                        reasons.value(&quot;counterexample-search-performed&quot;);</span>
+                    }
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">                    if (row.summary().toLowerCase(java.util.Locale.ROOT).contains(&quot;proof&quot;)) {</span>
+<span class="nc" id="L441">                        reasons.value(&quot;proof-mentioned-in-summary&quot;);</span>
+                    }
+<span class="fc" id="L443">                });</span>
+<span class="fc" id="L444">            }))));</span>
+<span class="fc" id="L445">        writer.endObject();</span>
+<span class="fc" id="L446">        return writer.toString();</span>
+    }
+
+    public String renderMacroRulesExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+<span class="fc" id="L450">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L451">        writer.beginObject();</span>
+<span class="fc" id="L452">        writer.property(&quot;schema&quot;, &quot;regelsuche.macro-rules/v1&quot;);</span>
+<span class="fc" id="L453">        writer.array(&quot;macroRules&quot;, arr -&gt; report.rows().forEach(row -&gt; {</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">            for (String step : row.replayPath()) {</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                if (step.toLowerCase(java.util.Locale.ROOT).contains(&quot;macro&quot;)) {</span>
+<span class="nc" id="L456">                    arr.objectValue(object -&gt; {</span>
+<span class="nc" id="L457">                        object.property(&quot;id&quot;, stableArtifactId(&quot;macro&quot;, row.seed().id(), step));</span>
+<span class="nc" id="L458">                        object.property(&quot;seedId&quot;, row.seed().id());</span>
+<span class="nc" id="L459">                        object.property(&quot;sourceStep&quot;, step);</span>
+<span class="nc" id="L460">                        object.property(&quot;usefulness&quot;, &quot;observed-in-replay&quot;);</span>
+<span class="nc" id="L461">                    });</span>
+                }
+<span class="fc" id="L463">            }</span>
+<span class="fc" id="L464">        }));</span>
+<span class="fc" id="L465">        writer.endObject();</span>
+<span class="fc" id="L466">        return writer.toString();</span>
+    }
+
+    public String renderCounterexamplesExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+<span class="fc" id="L470">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L471">        writer.beginObject();</span>
+<span class="fc" id="L472">        writer.property(&quot;schema&quot;, &quot;regelsuche.counterexamples/v1&quot;);</span>
+<span class="fc" id="L473">        writer.array(&quot;counterexamples&quot;, arr -&gt; report.rows().forEach(row -&gt; {</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">            if (row.counterexamples().isEmpty()) {</span>
+<span class="fc" id="L475">                arr.objectValue(object -&gt; {</span>
+<span class="fc" id="L476">                    object.property(&quot;id&quot;, stableArtifactId(&quot;counterexample-attempt&quot;, row.seed().id(), row.counterexampleSearchStatus().name()));</span>
+<span class="fc" id="L477">                    object.property(&quot;seedId&quot;, row.seed().id());</span>
+<span class="fc" id="L478">                    object.property(&quot;counterexampleStatus&quot;, row.counterexampleSearchStatus().name());</span>
+<span class="fc" id="L479">                    object.property(&quot;description&quot;, &quot;&quot;);</span>
+<span class="fc" id="L480">                    object.property(&quot;counterexample&quot;, &quot;&quot;);</span>
+<span class="fc" id="L481">                    object.property(&quot;refutesHypothesis&quot;, &quot;&quot;);</span>
+<span class="fc" id="L482">                    object.array(&quot;attemptedSources&quot;, sources -&gt; row.counterexampleAttemptedSources().forEach(sources::value));</span>
+<span class="fc" id="L483">                    object.array(&quot;inferredAssumptions&quot;, assumptions -&gt; row.inferredAssumptions().forEach(assumptions::value));</span>
+<span class="fc" id="L484">                    object.property(&quot;explanation&quot;, row.counterexampleExplanation());</span>
+<span class="fc" id="L485">                });</span>
+            }
+<span class="fc" id="L487">            row.counterexamples().forEach(counterexample -&gt; arr.objectValue(object -&gt; {</span>
+<span class="fc" id="L488">                object.property(&quot;id&quot;, stableArtifactId(&quot;counterexample&quot;, row.seed().id(), counterexample));</span>
+<span class="fc" id="L489">                object.property(&quot;seedId&quot;, row.seed().id());</span>
+<span class="fc" id="L490">                object.property(&quot;counterexampleStatus&quot;, row.counterexampleSearchStatus().name());</span>
+<span class="fc" id="L491">                object.property(&quot;description&quot;, counterexample);</span>
+<span class="fc" id="L492">                object.property(&quot;counterexample&quot;, counterexample);</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">                object.property(&quot;refutesHypothesis&quot;, row.hypotheses().isEmpty() ? &quot;&quot; : row.hypotheses().getFirst());</span>
+<span class="fc" id="L494">                object.array(&quot;attemptedSources&quot;, sources -&gt; row.counterexampleAttemptedSources().forEach(sources::value));</span>
+<span class="fc" id="L495">                object.array(&quot;inferredAssumptions&quot;, assumptions -&gt; row.inferredAssumptions().forEach(assumptions::value));</span>
+<span class="fc" id="L496">                object.property(&quot;explanation&quot;, row.counterexampleExplanation());</span>
+<span class="fc" id="L497">            }));</span>
+<span class="fc" id="L498">        }));</span>
+<span class="fc" id="L499">        writer.endObject();</span>
+<span class="fc" id="L500">        return writer.toString();</span>
+    }
+
+    public String renderProvenanceGraphExport(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+<span class="fc" id="L504">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L505">        writer.beginObject();</span>
+<span class="fc" id="L506">        writer.property(&quot;schema&quot;, &quot;regelsuche.provenance-graph/v1&quot;);</span>
+<span class="fc" id="L507">        writer.array(&quot;nodes&quot;, nodes -&gt; report.rows().forEach(row -&gt; {</span>
+<span class="fc" id="L508">            nodes.objectValue(node -&gt; {</span>
+<span class="fc" id="L509">                node.property(&quot;id&quot;, &quot;seed:&quot; + row.seed().id());</span>
+<span class="fc" id="L510">                node.property(&quot;type&quot;, &quot;Seed&quot;);</span>
+<span class="fc" id="L511">                node.property(&quot;label&quot;, row.seed().stableKey());</span>
+<span class="fc" id="L512">            });</span>
+<span class="fc" id="L513">            nodes.objectValue(node -&gt; {</span>
+<span class="fc" id="L514">                node.property(&quot;id&quot;, &quot;search-run:&quot; + row.seed().id());</span>
+<span class="fc" id="L515">                node.property(&quot;type&quot;, &quot;SearchRun&quot;);</span>
+<span class="fc" id="L516">                node.property(&quot;label&quot;, row.summary());</span>
+<span class="fc" id="L517">            });</span>
+<span class="fc" id="L518">            row.hypotheses().forEach(hypothesis -&gt; nodes.objectValue(node -&gt; {</span>
+<span class="fc" id="L519">                node.property(&quot;id&quot;, stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L520">                node.property(&quot;type&quot;, &quot;Hypothesis&quot;);</span>
+<span class="fc" id="L521">                node.property(&quot;label&quot;, hypothesis);</span>
+<span class="fc" id="L522">                node.property(&quot;counterexampleStatus&quot;, row.counterexampleSearchStatus().name());</span>
+<span class="fc" id="L523">            }));</span>
+<span class="fc" id="L524">            row.hypotheses().forEach(hypothesis -&gt; nodes.objectValue(node -&gt; {</span>
+<span class="fc" id="L525">                node.property(&quot;id&quot;, stableArtifactId(&quot;counterexample-attempt&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L526">                node.property(&quot;type&quot;, &quot;CounterexampleSearchAttempt&quot;);</span>
+<span class="fc" id="L527">                node.property(&quot;label&quot;, &quot;Counterexample search for &quot; + hypothesis);</span>
+<span class="fc" id="L528">                node.property(&quot;status&quot;, row.counterexampleSearchStatus().name());</span>
+<span class="fc" id="L529">                node.array(&quot;attemptedSources&quot;, sources -&gt; row.counterexampleAttemptedSources().forEach(sources::value));</span>
+<span class="fc" id="L530">                node.array(&quot;inferredAssumptions&quot;, assumptions -&gt; row.inferredAssumptions().forEach(assumptions::value));</span>
+<span class="fc" id="L531">                node.property(&quot;explanation&quot;, row.counterexampleExplanation());</span>
+<span class="fc" id="L532">            }));</span>
+<span class="fc" id="L533">            row.hypotheses().forEach(hypothesis -&gt; nodes.objectValue(node -&gt; {</span>
+<span class="fc" id="L534">                node.property(&quot;id&quot;, stableArtifactId(&quot;symreg&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L535">                node.property(&quot;type&quot;, &quot;SymbolicRegressionProposal&quot;);</span>
+<span class="fc" id="L536">                node.property(&quot;label&quot;, hypothesis);</span>
+<span class="fc" id="L537">            }));</span>
+<span class="fc" id="L538">            row.hypotheses().forEach(hypothesis -&gt; nodes.objectValue(node -&gt; {</span>
+<span class="fc" id="L539">                node.property(&quot;id&quot;, stableArtifactId(&quot;cas-attempt&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L540">                node.property(&quot;type&quot;, &quot;CASAttempt&quot;);</span>
+<span class="fc" id="L541">                node.property(&quot;label&quot;, &quot;CAS verification attempt for &quot; + hypothesis);</span>
+<span class="fc" id="L542">            }));</span>
+<span class="fc" id="L543">            row.counterexamples().forEach(counterexample -&gt; nodes.objectValue(node -&gt; {</span>
+<span class="fc" id="L544">                node.property(&quot;id&quot;, stableArtifactId(&quot;counterexample&quot;, row.seed().id(), counterexample));</span>
+<span class="fc" id="L545">                node.property(&quot;type&quot;, &quot;Counterexample&quot;);</span>
+<span class="fc" id="L546">                node.property(&quot;label&quot;, counterexample);</span>
+<span class="fc" id="L547">                node.property(&quot;status&quot;, row.counterexampleSearchStatus().name());</span>
+<span class="fc" id="L548">            }));</span>
+<span class="fc bfc" id="L549" title="All 2 branches covered.">            for (int i = 0; i &lt; row.replayPath().size(); i++) {</span>
+<span class="fc" id="L550">                int index = i;</span>
+<span class="fc" id="L551">                nodes.objectValue(node -&gt; {</span>
+<span class="fc" id="L552">                    node.property(&quot;id&quot;, &quot;replay:&quot; + row.seed().id() + &quot;:&quot; + index);</span>
+<span class="fc" id="L553">                    node.property(&quot;type&quot;, &quot;SupportingPath&quot;);</span>
+<span class="fc" id="L554">                    node.property(&quot;label&quot;, row.replayPath().get(index));</span>
+<span class="fc" id="L555">                });</span>
+            }
+<span class="fc" id="L557">        }));</span>
+<span class="fc" id="L558">        writer.array(&quot;edges&quot;, edges -&gt; report.rows().forEach(row -&gt; {</span>
+<span class="fc" id="L559">            edges.objectValue(edge -&gt; {</span>
+<span class="fc" id="L560">                edge.property(&quot;from&quot;, &quot;seed:&quot; + row.seed().id());</span>
+<span class="fc" id="L561">                edge.property(&quot;to&quot;, &quot;search-run:&quot; + row.seed().id());</span>
+<span class="fc" id="L562">                edge.property(&quot;type&quot;, &quot;SEEDED&quot;);</span>
+<span class="fc" id="L563">            });</span>
+<span class="fc" id="L564">            row.hypotheses().forEach(hypothesis -&gt; edges.objectValue(edge -&gt; {</span>
+<span class="fc" id="L565">                edge.property(&quot;from&quot;, stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L566">                edge.property(&quot;to&quot;, &quot;seed:&quot; + row.seed().id());</span>
+<span class="fc" id="L567">                edge.property(&quot;type&quot;, &quot;DERIVED_FROM&quot;);</span>
+<span class="fc" id="L568">            }));</span>
+<span class="fc" id="L569">            row.hypotheses().forEach(hypothesis -&gt; edges.objectValue(edge -&gt; {</span>
+<span class="fc" id="L570">                edge.property(&quot;from&quot;, stableArtifactId(&quot;symreg&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L571">                edge.property(&quot;to&quot;, stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L572">                edge.property(&quot;type&quot;, &quot;PROPOSES&quot;);</span>
+<span class="fc" id="L573">            }));</span>
+<span class="fc" id="L574">            row.hypotheses().forEach(hypothesis -&gt; edges.objectValue(edge -&gt; {</span>
+<span class="fc" id="L575">                edge.property(&quot;from&quot;, stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L576">                edge.property(&quot;to&quot;, stableArtifactId(&quot;cas-attempt&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L577">                edge.property(&quot;type&quot;, &quot;CHECKED_BY&quot;);</span>
+<span class="fc" id="L578">            }));</span>
+<span class="fc" id="L579">            row.hypotheses().forEach(hypothesis -&gt; edges.objectValue(edge -&gt; {</span>
+<span class="fc" id="L580">                edge.property(&quot;from&quot;, stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L581">                edge.property(&quot;to&quot;, stableArtifactId(&quot;counterexample-attempt&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L582">                edge.property(&quot;type&quot;, &quot;HYPOTHESIS_TESTED_BY&quot;);</span>
+<span class="fc" id="L583">                edge.property(&quot;status&quot;, row.counterexampleSearchStatus().name());</span>
+<span class="fc" id="L584">            }));</span>
+<span class="fc" id="L585">            row.hypotheses().forEach(hypothesis -&gt; edges.objectValue(edge -&gt; {</span>
+<span class="fc" id="L586">                edge.property(&quot;from&quot;, stableArtifactId(&quot;counterexample-attempt&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L587">                edge.property(&quot;to&quot;, stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc bfc" id="L588" title="All 3 branches covered.">                edge.property(&quot;type&quot;, switch (row.counterexampleSearchStatus()) {</span>
+<span class="fc" id="L589">                    case COUNTEREXAMPLE_FOUND -&gt; &quot;FOUND_COUNTEREXAMPLE&quot;;</span>
+<span class="fc" id="L590">                    case NO_COUNTEREXAMPLE_FOUND -&gt; &quot;NO_COUNTEREXAMPLE_WITHIN_BUDGET&quot;;</span>
+<span class="fc" id="L591">                    case INCONCLUSIVE -&gt; &quot;INCONCLUSIVE_DUE_TO&quot;;</span>
+                });
+<span class="fc" id="L593">            }));</span>
+<span class="fc" id="L594">            row.counterexamples().forEach(counterexample -&gt; edges.objectValue(edge -&gt; {</span>
+<span class="fc bfc" id="L595" title="All 2 branches covered.">                edge.property(&quot;from&quot;, row.hypotheses().isEmpty() ? &quot;search-run:&quot; + row.seed().id()</span>
+<span class="fc" id="L596">                    : stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), row.hypotheses().getFirst()));</span>
+<span class="fc" id="L597">                edge.property(&quot;to&quot;, stableArtifactId(&quot;counterexample&quot;, row.seed().id(), counterexample));</span>
+<span class="fc bfc" id="L598" title="All 2 branches covered.">                edge.property(&quot;type&quot;, row.hypotheses().isEmpty() ? &quot;GENERATED&quot; : &quot;HAS_COUNTEREXAMPLE&quot;);</span>
+<span class="fc" id="L599">            }));</span>
+<span class="fc bfc" id="L600" title="All 2 branches covered.">            if (!row.hypotheses().isEmpty()) {</span>
+<span class="fc" id="L601">                row.counterexamples().forEach(counterexample -&gt; edges.objectValue(edge -&gt; {</span>
+<span class="fc" id="L602">                    edge.property(&quot;from&quot;, stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), row.hypotheses().getFirst()));</span>
+<span class="fc" id="L603">                    edge.property(&quot;to&quot;, stableArtifactId(&quot;counterexample&quot;, row.seed().id(), counterexample));</span>
+<span class="fc" id="L604">                    edge.property(&quot;type&quot;, &quot;REFUTED_BY&quot;);</span>
+<span class="fc" id="L605">                }));</span>
+            }
+<span class="fc bfc" id="L607" title="All 2 branches covered.">            for (int i = 0; i &lt; row.replayPath().size(); i++) {</span>
+<span class="fc" id="L608">                int index = i;</span>
+<span class="fc" id="L609">                edges.objectValue(edge -&gt; {</span>
+<span class="fc" id="L610">                    edge.property(&quot;from&quot;, &quot;search-run:&quot; + row.seed().id());</span>
+<span class="fc" id="L611">                    edge.property(&quot;to&quot;, &quot;replay:&quot; + row.seed().id() + &quot;:&quot; + index);</span>
+<span class="fc" id="L612">                    edge.property(&quot;type&quot;, &quot;FOUND_PATH&quot;);</span>
+<span class="fc" id="L613">                });</span>
+<span class="fc" id="L614">                row.hypotheses().forEach(hypothesis -&gt; edges.objectValue(edge -&gt; {</span>
+<span class="fc" id="L615">                    edge.property(&quot;from&quot;, stableArtifactId(&quot;hypothesis&quot;, row.seed().id(), hypothesis));</span>
+<span class="fc" id="L616">                    edge.property(&quot;to&quot;, &quot;replay:&quot; + row.seed().id() + &quot;:&quot; + index);</span>
+<span class="fc" id="L617">                    edge.property(&quot;type&quot;, &quot;SUPPORTED_BY&quot;);</span>
+<span class="fc" id="L618">                }));</span>
+            }
+<span class="fc" id="L620">        }));</span>
+<span class="fc" id="L621">        writer.endObject();</span>
+<span class="fc" id="L622">        return writer.toString();</span>
+    }
+
+    public String renderReproducibilityPack(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        List&lt;Path&gt; artifacts,
+        Collection&lt;MathematicalAlgorithmRegistry.AlgorithmDescriptor&gt; algorithmSnapshot
+    ) {
+<span class="fc" id="L630">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L631">        writer.beginObject();</span>
+<span class="fc" id="L632">        writer.property(&quot;schema&quot;, &quot;regelsuche.reproducibility-pack/v1&quot;);</span>
+<span class="fc" id="L633">        writer.property(&quot;seedSetHash&quot;, sha256Utf8Lines(report.rows().stream()</span>
+<span class="fc" id="L634">            .map(row -&gt; row.seed().stableKey())</span>
+<span class="fc" id="L635">            .sorted()</span>
+<span class="fc" id="L636">            .toList()));</span>
+<span class="fc" id="L637">        writer.object(&quot;toolchain&quot;, toolchain -&gt; {</span>
+<span class="fc" id="L638">            toolchain.property(&quot;javaVersion&quot;, System.getProperty(&quot;java.version&quot;, &quot;&quot;));</span>
+<span class="fc" id="L639">            toolchain.property(&quot;javaVendor&quot;, System.getProperty(&quot;java.vendor&quot;, &quot;&quot;));</span>
+<span class="fc" id="L640">            toolchain.property(&quot;osName&quot;, System.getProperty(&quot;os.name&quot;, &quot;&quot;));</span>
+<span class="fc" id="L641">            toolchain.property(&quot;gradleVersion&quot;, System.getProperty(&quot;gradle.version&quot;, &quot;&quot;));</span>
+<span class="fc" id="L642">            toolchain.property(&quot;userLanguage&quot;, System.getProperty(&quot;user.language&quot;, &quot;&quot;));</span>
+<span class="fc" id="L643">        });</span>
+<span class="fc" id="L644">        writer.property(&quot;gitCommit&quot;, gitCommit());</span>
+<span class="fc" id="L645">        writer.array(&quot;dependencies&quot;, dependencies -&gt; classpathEntries().forEach(entry -&gt; dependencies.objectValue(object -&gt; {</span>
+<span class="fc" id="L646">            object.property(&quot;file&quot;, entry.getFileName().toString());</span>
+<span class="pc bpc" id="L647" title="1 of 2 branches missed.">            object.property(&quot;sha256&quot;, Files.isRegularFile(entry) ? checksum(entry) : &quot;&quot;);</span>
+<span class="fc" id="L648">        })));</span>
+<span class="fc" id="L649">        writer.object(&quot;command&quot;, command -&gt; {</span>
+<span class="fc" id="L650">            command.property(&quot;main&quot;, &quot;DiscoveryReplayArtifactWriter&quot;);</span>
+<span class="fc" id="L651">            command.property(&quot;processedSeeds&quot;, report.metrics().processedSeeds());</span>
+<span class="fc" id="L652">        });</span>
+<span class="fc" id="L653">        writer.object(&quot;discoveryState&quot;, state -&gt; {</span>
+<span class="fc" id="L654">            state.array(&quot;seedCategories&quot;, categories -&gt; report.rows().stream()</span>
+<span class="fc" id="L655">                .map(row -&gt; row.seed().category())</span>
+<span class="fc" id="L656">                .distinct()</span>
+<span class="fc" id="L657">                .sorted()</span>
+<span class="fc" id="L658">                .forEach(categories::value));</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">            state.array(&quot;activeAlgorithmIds&quot;, active -&gt; (algorithmSnapshot == null ? List</span>
+<span class="pc" id="L660">                .&lt;MathematicalAlgorithmRegistry.AlgorithmDescriptor&gt;of() : algorithmSnapshot.stream()</span>
+<span class="fc" id="L661">                .filter(MathematicalAlgorithmRegistry.AlgorithmDescriptor::enabled)</span>
+<span class="fc" id="L662">                .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id))</span>
+<span class="fc" id="L663">                .toList())</span>
+<span class="fc" id="L664">                .forEach(descriptor -&gt; active.value(descriptor.id())));</span>
+<span class="pc bpc" id="L665" title="1 of 2 branches missed.">            state.array(&quot;enabledBackends&quot;, active -&gt; (algorithmSnapshot == null ? List</span>
+<span class="pc" id="L666">                .&lt;MathematicalAlgorithmRegistry.AlgorithmDescriptor&gt;of() : algorithmSnapshot.stream()</span>
+<span class="fc" id="L667">                .filter(MathematicalAlgorithmRegistry.AlgorithmDescriptor::enabled)</span>
+<span class="fc" id="L668">                .filter(DiscoveryReplayArtifactWriter::isBackend)</span>
+<span class="fc" id="L669">                .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id))</span>
+<span class="fc" id="L670">                .toList())</span>
+<span class="fc" id="L671">                .forEach(descriptor -&gt; active.value(descriptor.id())));</span>
+<span class="fc" id="L672">        });</span>
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">        writer.array(&quot;algorithmRegistry&quot;, algorithms -&gt; (algorithmSnapshot == null ? List</span>
+<span class="pc" id="L674">            .&lt;MathematicalAlgorithmRegistry.AlgorithmDescriptor&gt;of() : algorithmSnapshot.stream()</span>
+<span class="fc" id="L675">            .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id)).toList())</span>
+<span class="fc" id="L676">            .forEach(descriptor -&gt; algorithms.objectValue(object -&gt; {</span>
+<span class="fc" id="L677">                object.property(&quot;id&quot;, descriptor.id());</span>
+<span class="fc" id="L678">                object.property(&quot;enabled&quot;, descriptor.enabled());</span>
+<span class="fc" id="L679">                object.property(&quot;proofSemantics&quot;, descriptor.proofSemantics().name());</span>
+<span class="fc" id="L680">                object.property(&quot;maxSteps&quot;, descriptor.budget().maxSteps());</span>
+<span class="fc" id="L681">                object.property(&quot;maxStates&quot;, descriptor.budget().maxStates());</span>
+<span class="fc" id="L682">                object.property(&quot;maxCoefficient&quot;, descriptor.budget().maxCoefficient());</span>
+<span class="fc" id="L683">                object.property(&quot;tolerance&quot;, descriptor.budget().tolerance());</span>
+<span class="fc" id="L684">                object.property(&quot;maxTerms&quot;, descriptor.budget().maxTerms());</span>
+<span class="fc" id="L685">                object.property(&quot;maxDegree&quot;, descriptor.budget().maxDegree());</span>
+<span class="fc" id="L686">                object.property(&quot;maxVariables&quot;, descriptor.budget().maxVariables());</span>
+<span class="fc" id="L687">            })));</span>
+<span class="fc" id="L688">        writer.array(&quot;proofHistory&quot;, history -&gt; report.rows().forEach(row -&gt; history.objectValue(object -&gt; {</span>
+<span class="fc" id="L689">            object.property(&quot;seedId&quot;, row.seed().id());</span>
+<span class="fc" id="L690">            object.property(&quot;success&quot;, row.success());</span>
+<span class="fc" id="L691">            object.array(&quot;hypotheses&quot;, hypotheses -&gt; row.hypotheses().forEach(hypotheses::value));</span>
+<span class="fc" id="L692">            object.array(&quot;counterexamples&quot;, counterexamples -&gt; row.counterexamples().forEach(counterexamples::value));</span>
+<span class="fc" id="L693">            object.property(&quot;summary&quot;, row.summary());</span>
+<span class="fc" id="L694">        })));</span>
+<span class="fc" id="L695">        writer.object(CONTAINER_SECTION_KEY, container -&gt; {</span>
+<span class="fc" id="L696">            Path containerFile = Path.of(CONTAINER_FILE_NAME);</span>
+<span class="fc" id="L697">            container.property(CONTAINER_FILE_KEY, containerFile.toString());</span>
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">            container.property(CONTAINER_FILE_SHA_KEY, Files.isRegularFile(containerFile) ? checksum(containerFile) : &quot;&quot;);</span>
+<span class="fc" id="L699">            container.property(&quot;image&quot;, System.getenv().getOrDefault(CONTAINER_IMAGE_ENV, &quot;&quot;));</span>
+<span class="fc" id="L700">        });</span>
+<span class="pc bpc" id="L701" title="1 of 2 branches missed.">        writer.array(&quot;artifacts&quot;, arr -&gt; (artifacts == null ? List.&lt;Path&gt;of() : artifacts).stream()</span>
+<span class="fc" id="L702">            .sorted(Comparator.comparing(path -&gt; path.getFileName().toString()))</span>
+<span class="fc" id="L703">            .forEach(path -&gt; arr.objectValue(object -&gt; {</span>
+<span class="fc" id="L704">                object.property(&quot;file&quot;, path.getFileName().toString());</span>
+<span class="fc" id="L705">                object.property(&quot;sha256&quot;, checksum(path));</span>
+<span class="fc" id="L706">            })));</span>
+<span class="fc" id="L707">        writer.endObject();</span>
+<span class="fc" id="L708">        return writer.toString();</span>
+    }
+
+    private static List&lt;Path&gt; classpathEntries() {
+<span class="fc" id="L712">        String classpath = System.getProperty(&quot;java.class.path&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L713" title="1 of 2 branches missed.">        if (classpath.isBlank()) {</span>
+<span class="nc" id="L714">            return List.of();</span>
+        }
+<span class="fc" id="L716">        return Arrays.stream(classpath.split(java.io.File.pathSeparator))</span>
+<span class="fc" id="L717">            .map(Path::of)</span>
+<span class="pc bpc" id="L718" title="1 of 4 branches missed.">            .filter(path -&gt; Files.isRegularFile(path) &amp;&amp; path.getFileName() != null)</span>
+<span class="fc" id="L719">            .sorted(Comparator.comparing(path -&gt; path.getFileName().toString()))</span>
+<span class="fc" id="L720">            .limit(200)</span>
+<span class="fc" id="L721">            .toList();</span>
+    }
+
+    private static boolean isBackend(MathematicalAlgorithmRegistry.AlgorithmDescriptor descriptor) {
+<span class="pc bpc" id="L725" title="1 of 2 branches missed.">        return descriptor.id().endsWith(&quot;Backend&quot;)</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">            || MathematicalAlgorithmRegistry.PSLQ.equals(descriptor.id())</span>
+<span class="pc bpc" id="L727" title="1 of 2 branches missed.">            || MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH.equals(descriptor.id());</span>
+    }
+
+    private static List&lt;String&gt; enabledBackends(Collection&lt;MathematicalAlgorithmRegistry.AlgorithmDescriptor&gt; algorithmSnapshot) {
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">        return (algorithmSnapshot == null ? List.&lt;MathematicalAlgorithmRegistry.AlgorithmDescriptor&gt;of() : algorithmSnapshot.stream()</span>
+<span class="fc" id="L732">            .filter(MathematicalAlgorithmRegistry.AlgorithmDescriptor::enabled)</span>
+<span class="fc" id="L733">            .filter(DiscoveryReplayArtifactWriter::isBackend)</span>
+<span class="fc" id="L734">            .sorted(Comparator.comparing(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id))</span>
+<span class="fc" id="L735">            .toList())</span>
+<span class="fc" id="L736">            .stream()</span>
+<span class="fc" id="L737">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::id)</span>
+<span class="fc" id="L738">            .toList();</span>
+    }
+
+    private static String gitCommit() {
+<span class="fc" id="L742">        String fromProperty = System.getProperty(&quot;regelsuche.git.commit&quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L743" title="All 2 branches covered.">        if (!fromProperty.isBlank()) {</span>
+<span class="fc" id="L744">            return fromProperty;</span>
+        }
+<span class="fc" id="L746">        String fromEnvironment = System.getenv().getOrDefault(&quot;GITHUB_SHA&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L747" title="1 of 2 branches missed.">        if (!fromEnvironment.isBlank()) {</span>
+<span class="fc" id="L748">            return fromEnvironment;</span>
+        }
+        try {
+<span class="nc" id="L751">            Process process = new ProcessBuilder(&quot;git&quot;, &quot;rev-parse&quot;, &quot;HEAD&quot;)</span>
+<span class="nc" id="L752">                .redirectErrorStream(true)</span>
+<span class="nc" id="L753">                .start();</span>
+<span class="nc" id="L754">            String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)</span>
+<span class="nc" id="L755">                .trim();</span>
+<span class="nc bnc" id="L756" title="All 4 branches missed.">            if (process.waitFor() == 0 &amp;&amp; !output.isBlank()) {</span>
+<span class="nc" id="L757">                return output;</span>
+            }
+<span class="nc" id="L759">        } catch (IOException exception) {</span>
+<span class="nc" id="L760">            return &quot;unknown&quot;;</span>
+<span class="nc" id="L761">        } catch (InterruptedException exception) {</span>
+<span class="nc" id="L762">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L763">            return &quot;unknown&quot;;</span>
+<span class="nc" id="L764">        }</span>
+<span class="nc" id="L765">        return &quot;unknown&quot;;</span>
+    }
+
+    private void writeScreenshot(Path path,
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView) throws IOException {
+<span class="pc bpc" id="L771" title="1 of 2 branches missed.">        if (!ImageIO.write(renderFrame(report, semanticView, 0), &quot;png&quot;, path.toFile())) {</span>
+<span class="nc" id="L772">            throw new IOException(&quot;No ImageIO writer for png&quot;);</span>
+        }
+<span class="fc" id="L774">    }</span>
+
+    private void writeReplayGif(Path path,
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView) throws IOException {
+<span class="pc bpc" id="L779" title="1 of 2 branches missed.">        ImageWriter writer = ImageIO.getImageWritersByFormatName(&quot;gif&quot;).hasNext()</span>
+<span class="fc" id="L780">            ? ImageIO.getImageWritersByFormatName(&quot;gif&quot;).next()</span>
+<span class="pc" id="L781">            : null;</span>
+<span class="pc bpc" id="L782" title="1 of 2 branches missed.">        if (writer == null) {</span>
+<span class="nc" id="L783">            throw new IOException(&quot;No ImageIO writer for gif&quot;);</span>
+        }
+<span class="fc" id="L785">        try (ImageOutputStream output = ImageIO.createImageOutputStream(path.toFile())) {</span>
+<span class="fc" id="L786">            writer.setOutput(output);</span>
+<span class="fc" id="L787">            ImageWriteParam params = writer.getDefaultWriteParam();</span>
+<span class="fc" id="L788">            writer.prepareWriteSequence(null);</span>
+<span class="fc" id="L789">            int frames = Math.max(2, semanticView.paths().stream().mapToInt(pathView -&gt; Math.max(1, pathView.nodes().size())).max().orElse(2));</span>
+<span class="fc bfc" id="L790" title="All 2 branches covered.">            for (int i = 0; i &lt; frames; i++) {</span>
+<span class="fc" id="L791">                writer.writeToSequence(new javax.imageio.IIOImage(renderFrame(report, semanticView, i), null, null), params);</span>
+            }
+<span class="fc" id="L793">            writer.endWriteSequence();</span>
+        } finally {
+<span class="fc" id="L795">            writer.dispose();</span>
+        }
+<span class="fc" id="L797">    }</span>
+
+    private BufferedImage renderFrame(DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView,
+        int frame) {
+<span class="fc" id="L802">        int width = 480;</span>
+<span class="fc" id="L803">        int height = 180;</span>
+<span class="fc" id="L804">        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);</span>
+<span class="fc" id="L805">        Graphics2D graphics = image.createGraphics();</span>
+        try {
+<span class="fc" id="L807">            graphics.setColor(Color.WHITE);</span>
+<span class="fc" id="L808">            graphics.fillRect(0, 0, width, height);</span>
+<span class="fc" id="L809">            graphics.setColor(new Color(35, 78, 112));</span>
+<span class="fc" id="L810">            graphics.fillRect(0, 0, width, 42);</span>
+<span class="fc" id="L811">            graphics.setColor(Color.WHITE);</span>
+<span class="fc" id="L812">            graphics.drawString(&quot;Regelsuche Semantic Discovery View&quot;, 20, 27);</span>
+<span class="fc" id="L813">            graphics.setColor(new Color(31, 41, 55));</span>
+<span class="fc" id="L814">            graphics.drawString(&quot;Main path: &quot; + semanticView.semanticNodeCount() + &quot; nodes&quot;, 20, 64);</span>
+<span class="fc" id="L815">            graphics.drawString(&quot;Collapsed low-signal: &quot; + semanticView.collapsedLowSignalCount(), 20, 82);</span>
+<span class="fc" id="L816">            graphics.drawString(&quot;Counterexample status: &quot; + aggregateCounterexampleStatus(report), 20, 100);</span>
+<span class="fc" id="L817">            drawSemanticMainPath(graphics, semanticView, frame);</span>
+        } finally {
+<span class="fc" id="L819">            graphics.dispose();</span>
+        }
+<span class="fc" id="L821">        return image;</span>
+    }
+
+    private void drawSemanticMainPath(Graphics2D graphics,
+        DiscoverySemanticReportView semanticView,
+        int frame) {
+<span class="fc" id="L827">        List&lt;DiscoverySemanticReportView.SemanticNode&gt; nodes = semanticView.paths().stream()</span>
+<span class="fc" id="L828">            .findFirst()</span>
+<span class="fc" id="L829">            .map(DiscoverySemanticReportView.SemanticPath::nodes)</span>
+<span class="fc" id="L830">            .orElse(List.of());</span>
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">        if (nodes.isEmpty()) {</span>
+<span class="nc" id="L832">            graphics.setColor(new Color(107, 114, 128));</span>
+<span class="nc" id="L833">            graphics.drawString(&quot;No semantic path available&quot;, 220, 106);</span>
+<span class="nc" id="L834">            return;</span>
+        }
+<span class="fc" id="L836">        int visible = Math.min(nodes.size(), Math.max(1, frame + 1));</span>
+<span class="fc" id="L837">        int left = 220;</span>
+<span class="fc" id="L838">        int right = 450;</span>
+<span class="fc" id="L839">        int y = 112;</span>
+<span class="fc bfc" id="L840" title="All 2 branches covered.">        int spacing = visible == 1 ? 0 : (right - left) / (visible - 1);</span>
+<span class="fc" id="L841">        graphics.setStroke(new BasicStroke(2.5f));</span>
+<span class="fc" id="L842">        graphics.setColor(new Color(124, 58, 237));</span>
+<span class="fc bfc" id="L843" title="All 2 branches covered.">        for (int i = 0; i &lt; visible - 1; i++) {</span>
+<span class="fc" id="L844">            int x1 = left + i * spacing;</span>
+<span class="fc" id="L845">            int x2 = left + (i + 1) * spacing;</span>
+<span class="fc" id="L846">            graphics.drawLine(x1 + 12, y, x2 - 12, y);</span>
+        }
+<span class="fc bfc" id="L848" title="All 2 branches covered.">        for (int i = 0; i &lt; visible; i++) {</span>
+<span class="fc" id="L849">            int x = left + i * spacing;</span>
+<span class="fc bfc" id="L850" title="All 2 branches covered.">            graphics.setColor(i == visible - 1 ? new Color(22, 163, 74) : new Color(59, 130, 246));</span>
+<span class="fc" id="L851">            graphics.fillOval(x - 12, y - 12, 24, 24);</span>
+<span class="fc" id="L852">            graphics.setColor(Color.WHITE);</span>
+<span class="fc" id="L853">            graphics.drawString(String.valueOf(i + 1), x - 4, y + 5);</span>
+<span class="fc" id="L854">            graphics.setColor(new Color(31, 41, 55));</span>
+<span class="fc" id="L855">            String label = nodes.get(i).label();</span>
+<span class="fc" id="L856">            graphics.drawString(label.substring(0, Math.min(16, label.length())), x - 24, y + 32);</span>
+        }
+<span class="fc" id="L858">    }</span>
+
+    private String renderGeneratedGallery(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        DiscoverySemanticReportView semanticView
+    ) {
+<span class="fc" id="L864">        StringBuilder out = new StringBuilder(&quot;## Generated Discovery Gallery\n\n&quot;);</span>
+<span class="fc" id="L865">        boolean emitted = false;</span>
+<span class="fc bfc" id="L866" title="All 2 branches covered.">        for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {</span>
+<span class="fc bfc" id="L867" title="All 2 branches covered.">            for (GalleryDiscoveryDescriptor descriptor : GALLERY_DESCRIPTORS) {</span>
+<span class="fc bfc" id="L868" title="All 2 branches covered.">                if (descriptor.matches(row)) {</span>
+<span class="fc" id="L869">                    emitted = true;</span>
+<span class="fc" id="L870">                    out.append(&quot;### &quot;).append(descriptor.title()).append(&quot;\n\n&quot;);</span>
+<span class="fc bfc" id="L871" title="All 2 branches covered.">                    for (String metadata : descriptor.renderMetadata().apply(row)) {</span>
+<span class="fc" id="L872">                        out.append(&quot;- &quot;).append(metadata).append('\n');</span>
+<span class="fc" id="L873">                    }</span>
+<span class="fc" id="L874">                    out.append('\n');</span>
+<span class="fc bfc" id="L875" title="All 2 branches covered.">                    if (descriptor.id().equals(&quot;sophie-germain-discovery&quot;)) {</span>
+<span class="fc" id="L876">                        out.append(&quot;```mermaid\n&quot;).append(renderSemanticMermaid(semanticView)).append(&quot;```\n\n&quot;);</span>
+                    }
+                }
+<span class="fc" id="L879">            }</span>
+<span class="fc" id="L880">        }</span>
+<span class="fc bfc" id="L881" title="All 2 branches covered.">        if (!emitted) {</span>
+<span class="fc" id="L882">            out.append(&quot;- No gallery entry emitted: no qualifying generated replay or macro-reuse artifact in this run.\n\n&quot;);</span>
+        }
+<span class="fc" id="L884">        return out.toString();</span>
+    }
+
+    private static String bridgeFromPath(List&lt;String&gt; replayPath) {
+<span class="fc" id="L888">        return replayPath.stream()</span>
+<span class="fc" id="L889">            .filter(PolynomialBridgeAstPredicate::containsBridge)</span>
+<span class="fc" id="L890">            .findFirst()</span>
+<span class="fc" id="L891">            .orElse(replayPath.getLast());</span>
+    }
+
+    private boolean isBridgeKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+<span class="pc bpc" id="L895" title="1 of 4 branches missed.">        return row.resultKind() == DiscoveryResultKind.BRIDGE_FOUND || row.resultKind() == DiscoveryResultKind.TRANSFORMED;</span>
+    }
+
+    private static boolean hasSimplifiedOrFactoredEvidence(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+<span class="fc bfc" id="L899" title="All 2 branches covered.">        return row.evidence().contains(DiscoveryEvidenceKind.SIMPLIFIED)</span>
+<span class="fc bfc" id="L900" title="All 2 branches covered.">            || row.evidence().contains(DiscoveryEvidenceKind.FACTORED);</span>
+    }
+
+    private boolean isMacroLearnedKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+<span class="fc" id="L904">        return row.evidence().contains(DiscoveryEvidenceKind.MACRO_LEARNED);</span>
+    }
+
+    private static boolean hasMacroReuseEvidence(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+<span class="fc" id="L908">        return row.evidence().contains(DiscoveryEvidenceKind.MACRO_REUSED);</span>
+    }
+
+    private String operatorLabel(List&lt;String&gt; rulePath) {
+<span class="fc" id="L912">        return rulePath.stream()</span>
+<span class="fc" id="L913">            .map(rule -&gt; OPERATOR_REGISTRY.byId(rule).map(descriptor -&gt; descriptor.displayName()).orElse(&quot;&quot;))</span>
+<span class="pc bpc" id="L914" title="1 of 2 branches missed.">            .filter(label -&gt; !label.isBlank())</span>
+<span class="fc" id="L915">            .findFirst()</span>
+<span class="fc" id="L916">            .orElse(&quot;—&quot;);</span>
+    }
+
+    private String renderSemanticMermaid(DiscoverySemanticReportView semanticView) {
+<span class="fc" id="L920">        StringBuilder builder = new StringBuilder(&quot;graph TD\n&quot;);</span>
+<span class="fc bfc" id="L921" title="All 2 branches covered.">        for (DiscoverySemanticReportView.SemanticPath path : semanticView.paths()) {</span>
+<span class="pc bpc" id="L922" title="1 of 2 branches missed.">            if (path.nodes().isEmpty()) {</span>
+<span class="nc" id="L923">                String seedId = mermaidId(&quot;seed&quot;, path.seedId());</span>
+<span class="nc" id="L924">                builder.append(&quot;  &quot;).append(seedId).append(&quot;[\&quot;&quot;).append(escapeMermaid(path.seedId())).append(&quot;\&quot;]\n&quot;);</span>
+<span class="nc" id="L925">                continue;</span>
+            }
+<span class="fc bfc" id="L927" title="All 2 branches covered.">            for (DiscoverySemanticReportView.SemanticNode node : path.nodes()) {</span>
+<span class="fc" id="L928">                builder.append(&quot;  &quot;).append(mermaidId(path.seedId(), node.id()))</span>
+<span class="fc" id="L929">                    .append(&quot;[\&quot;&quot;).append(escapeMermaid(node.label())).append(&quot;\&quot;]\n&quot;);</span>
+<span class="fc" id="L930">            }</span>
+<span class="fc bfc" id="L931" title="All 2 branches covered.">            for (DiscoverySemanticReportView.SemanticEdge edge : path.edges()) {</span>
+<span class="fc" id="L932">                builder.append(&quot;  &quot;).append(mermaidId(path.seedId(), edge.from()))</span>
+<span class="fc" id="L933">                    .append(&quot; --&gt;|&quot;).append(escapeMermaid(edge.label())).append(&quot;| &quot;)</span>
+<span class="fc" id="L934">                    .append(mermaidId(path.seedId(), edge.to())).append('\n');</span>
+<span class="fc" id="L935">            }</span>
+<span class="fc" id="L936">        }</span>
+<span class="fc" id="L937">        return builder.toString();</span>
+    }
+
+    private String mermaidId(String prefix, String value) {
+<span class="pc bpc" id="L941" title="2 of 4 branches missed.">        return &quot;semantic_&quot; + sha256Utf8Lines(List.of(prefix == null ? &quot;&quot; : prefix, value == null ? &quot;&quot; : value)).substring(0, 12);</span>
+    }
+
+    private String escapeMermaid(String value) {
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">        return (value == null ? &quot;&quot; : value).replace(&quot;\&quot;&quot;, &quot;'&quot;);</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L949" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L950">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L952">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
+<span class="fc" id="L953">            .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="fc" id="L954">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
+<span class="fc" id="L955">            .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;)</span>
+<span class="fc" id="L956">            .replace(&quot;'&quot;, &quot;&amp;#39;&quot;);</span>
+    }
+
+    private String escapeMarkdown(String value) {
+<span class="fc" id="L960">        return escapeMarkdownStatic(value);</span>
+    }
+
+    private static String escapeMarkdownStatic(String value) {
+<span class="pc bpc" id="L964" title="1 of 2 branches missed.">        return (value == null ? &quot;&quot; : value).replace(&quot;|&quot;, &quot;\\|&quot;);</span>
+    }
+
+    private String metricCard(String label, String value) {
+<span class="fc" id="L968">        return &quot;&lt;div class=\&quot;card\&quot;&gt;&lt;div class=\&quot;muted\&quot;&gt;&quot; + escape(label)</span>
+<span class="fc" id="L969">            + &quot;&lt;/div&gt;&lt;div class=\&quot;metric\&quot;&gt;&quot; + escape(value) + &quot;&lt;/div&gt;&lt;/div&gt;&quot;;</span>
+    }
+
+    private String renderHtmlDiscoveryDetails(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+<span class="fc" id="L973">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L974">        out.append(&quot;&lt;div&gt;&lt;strong&gt;Annahmen&lt;/strong&gt;: &quot;).append(renderPills(row.seed().assumptions())).append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="fc" id="L975">        out.append(&quot;&lt;div&gt;&lt;strong&gt;Hypothesen&lt;/strong&gt;: &quot;).append(renderPills(row.hypotheses())).append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="fc" id="L976">        out.append(&quot;&lt;div&gt;&lt;strong&gt;Counterexample Search&lt;/strong&gt;: &quot;).append(renderCounterexampleStatusLabel(row)).append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="fc" id="L977">        out.append(&quot;&lt;div&gt;&lt;strong&gt;Quellen&lt;/strong&gt;: &quot;).append(renderPills(row.counterexampleAttemptedSources())).append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="fc" id="L978">        out.append(&quot;&lt;div&gt;&lt;strong&gt;Abgeleitete Annahmen&lt;/strong&gt;: &quot;).append(renderPills(row.inferredAssumptions())).append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="fc" id="L979">        out.append(&quot;&lt;div&gt;&lt;strong&gt;Gegenbeispiele&lt;/strong&gt;: &quot;).append(renderPills(row.counterexamples())).append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="fc bfc" id="L980" title="All 2 branches covered.">        if (!row.counterexampleExplanation().isBlank()) {</span>
+<span class="fc" id="L981">            out.append(&quot;&lt;div class=\&quot;muted\&quot;&gt;&quot;).append(escape(row.counterexampleExplanation())).append(&quot;&lt;/div&gt;&quot;);</span>
+        }
+<span class="fc" id="L983">        return out.toString();</span>
+    }
+
+    private String renderCounterexampleStatusLabel(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+<span class="fc bfc" id="L987" title="All 3 branches covered.">        return switch (row.counterexampleSearchStatus()) {</span>
+<span class="fc" id="L988">            case COUNTEREXAMPLE_FOUND -&gt; &quot;&lt;span class=\&quot;fail\&quot;&gt;counterexampleStatus: COUNTEREXAMPLE_FOUND&lt;/span&gt;&quot;;</span>
+<span class="fc" id="L989">            case NO_COUNTEREXAMPLE_FOUND -&gt; &quot;&lt;span class=\&quot;neutral\&quot;&gt;counterexampleStatus: NO_COUNTEREXAMPLE_FOUND&lt;/span&gt;&quot;;</span>
+<span class="fc" id="L990">            case INCONCLUSIVE -&gt; &quot;&lt;span class=\&quot;unknown\&quot;&gt;counterexampleStatus: INCONCLUSIVE&lt;/span&gt;&quot;;</span>
+        };
+    }
+
+    private String aggregateCounterexampleStatus(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+<span class="fc bfc" id="L995" title="All 2 branches covered.">        if (report.rows().stream().anyMatch(row -&gt;</span>
+<span class="fc bfc" id="L996" title="All 2 branches covered.">            row.counterexampleSearchStatus() == de.regelsuche.validation.CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND)) {</span>
+<span class="fc" id="L997">            return &quot;COUNTEREXAMPLE_FOUND&quot;;</span>
+        }
+<span class="fc bfc" id="L999" title="All 2 branches covered.">        if (report.rows().stream().anyMatch(row -&gt;</span>
+<span class="fc bfc" id="L1000" title="All 2 branches covered.">            row.counterexampleSearchStatus() == de.regelsuche.validation.CounterexampleSearchService.Status.INCONCLUSIVE)) {</span>
+<span class="fc" id="L1001">            return &quot;INCONCLUSIVE&quot;;</span>
+        }
+<span class="fc" id="L1003">        return &quot;NO_COUNTEREXAMPLE_FOUND&quot;;</span>
+    }
+
+    private String renderPills(java.util.List&lt;String&gt; values) {
+<span class="pc bpc" id="L1007" title="1 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="fc" id="L1008">            return &quot;&lt;span class=\&quot;muted\&quot;&gt;–&lt;/span&gt;&quot;;</span>
+        }
+<span class="fc" id="L1010">        StringBuilder out = new StringBuilder();</span>
+<span class="fc bfc" id="L1011" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L1012">            out.append(&quot;&lt;span class=\&quot;pill\&quot;&gt;&quot;).append(escape(value)).append(&quot;&lt;/span&gt;&quot;);</span>
+<span class="fc" id="L1013">        }</span>
+<span class="fc" id="L1014">        return out.toString();</span>
+    }
+
+    private String joinOrDash(java.util.List&lt;String&gt; values) {
+<span class="pc bpc" id="L1018" title="1 of 4 branches missed.">        return values == null || values.isEmpty() ? &quot;–&quot; : String.join(&quot;, &quot;, values);</span>
+    }
+
+    private DiscoveryDashboardMetrics dashboardMetrics(DeterministicDiscoveryExperimentRunner.DiscoveryReport report) {
+<span class="fc" id="L1022">        return DiscoveryDashboardMetrics.from(report, Map.ofEntries(</span>
+<span class="fc" id="L1023">            Map.entry(&quot;json&quot;, 1),</span>
+<span class="fc" id="L1024">            Map.entry(&quot;html&quot;, 1),</span>
+<span class="fc" id="L1025">            Map.entry(&quot;markdown&quot;, 1),</span>
+<span class="fc" id="L1026">            Map.entry(&quot;replayJson&quot;, 1),</span>
+<span class="fc" id="L1027">            Map.entry(&quot;screenshotPng&quot;, 1),</span>
+<span class="fc" id="L1028">            Map.entry(&quot;replayGif&quot;, 1),</span>
+<span class="fc" id="L1029">            Map.entry(&quot;reproducibilityPack&quot;, 1),</span>
+<span class="fc" id="L1030">            Map.entry(&quot;hypotheses&quot;, 1),</span>
+<span class="fc" id="L1031">            Map.entry(&quot;macroRules&quot;, 1),</span>
+<span class="fc" id="L1032">            Map.entry(&quot;counterexamples&quot;, 1),</span>
+<span class="fc" id="L1033">            Map.entry(&quot;provenanceGraph&quot;, 1),</span>
+<span class="fc" id="L1034">            Map.entry(&quot;campaign&quot;, 1)</span>
+        ));
+    }
+
+<span class="fc" id="L1038">    public record ArtifactBundle(</span>
+        Path jsonReport,
+        Path htmlReport,
+        Path markdownReport,
+        Path replayJson,
+        Path screenshotPng,
+        Path replayGif,
+        Path reproducibilityPack,
+        Path hypothesesJson,
+        Path macroRulesJson,
+        Path counterexamplesJson,
+        Path provenanceGraphJson,
+        Path campaignJson
+    ) {
+    }
+
+    private static String stableArtifactId(String type, String seedId, String value) {
+<span class="pc bpc" id="L1055" title="2 of 4 branches missed.">        return type + &quot;:&quot; + sha256Utf8Lines(List.of(seedId == null ? &quot;&quot; : seedId, value == null ? &quot;&quot; : value)).substring(0, 16);</span>
+    }
+
+    private static String checksum(Path path) {
+        try {
+<span class="fc" id="L1060">            MessageDigest digest = newSha256Digest();</span>
+<span class="fc" id="L1061">            try (InputStream input = Files.newInputStream(path)) {</span>
+<span class="fc" id="L1062">                byte[] buffer = new byte[8192];</span>
+                int read;
+<span class="fc bfc" id="L1064" title="All 2 branches covered.">                while ((read = input.read(buffer)) &gt;= 0) {</span>
+<span class="fc" id="L1065">                    digest.update(buffer, 0, read);</span>
+                }
+            }
+<span class="fc" id="L1068">            return HexFormat.of().formatHex(digest.digest());</span>
+<span class="nc" id="L1069">        } catch (IOException | NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L1070">            throw new IllegalStateException(&quot;Could not checksum &quot; + path, exception);</span>
+        }
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+<span class="nc" id="L1076">            return HexFormat.of().formatHex(newSha256Digest().digest(bytes));</span>
+<span class="nc" id="L1077">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L1078">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static String sha256Utf8Lines(List&lt;String&gt; lines) {
+        try {
+<span class="fc" id="L1084">            MessageDigest digest = newSha256Digest();</span>
+<span class="fc bfc" id="L1085" title="All 2 branches covered.">            for (int i = 0; i &lt; lines.size(); i++) {</span>
+<span class="fc bfc" id="L1086" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L1087">                    digest.update((byte) '\n');</span>
+                }
+<span class="fc" id="L1089">                digest.update(lines.get(i).getBytes(StandardCharsets.UTF_8));</span>
+            }
+<span class="fc" id="L1091">            return HexFormat.of().formatHex(digest.digest());</span>
+<span class="nc" id="L1092">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L1093">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static MessageDigest newSha256Digest() throws NoSuchAlgorithmException {
+<span class="fc" id="L1098">        return MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

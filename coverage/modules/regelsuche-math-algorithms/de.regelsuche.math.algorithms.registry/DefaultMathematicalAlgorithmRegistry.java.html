@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultMathematicalAlgorithmRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.registry</a> &gt; <span class="el_source">DefaultMathematicalAlgorithmRegistry.java</span></div><h1>DefaultMathematicalAlgorithmRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.registry;
+
+import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+
+public class DefaultMathematicalAlgorithmRegistry implements MathematicalAlgorithmRegistry {
+    private final Map&lt;String, AlgorithmDescriptor&gt; algorithms;
+
+    public DefaultMathematicalAlgorithmRegistry() {
+<span class="fc" id="L14">        this(Map.of(), Map.of());</span>
+<span class="fc" id="L15">    }</span>
+
+    public DefaultMathematicalAlgorithmRegistry(Map&lt;String, Boolean&gt; enabledOverrides,
+<span class="fc" id="L18">                                                Map&lt;String, AlgorithmBudget&gt; budgetOverrides) {</span>
+<span class="fc" id="L19">        Map&lt;String, AlgorithmDescriptor&gt; defaults = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L20">        defaults.put(POLYNOMIAL_EQUIVALENCE, descriptor(</span>
+            POLYNOMIAL_EQUIVALENCE,
+            &quot;Deterministic polynomial normal form&quot;,
+            true,
+<span class="fc" id="L24">            AlgorithmBudget.bounded(200, 1_000, 0, 0.0),</span>
+            ProofSemantics.PROOF_FOR_SUPPORTED_DOMAIN,
+            ResultType.PROOF,
+            ResultType.REFUTATION
+        ));
+<span class="fc" id="L29">        defaults.put(GROEBNER_BASIS, descriptor(</span>
+            GROEBNER_BASIS,
+            &quot;Gröbner-basis reduction for polynomial ideals/systems&quot;,
+            false,
+<span class="fc" id="L33">            AlgorithmBudget.bounded(200, 2_000, 0, 0.0, 256, 20, 8),</span>
+            ProofSemantics.PROOF_FOR_SUPPORTED_DOMAIN,
+            ResultType.PROOF,
+            ResultType.REFUTATION
+        ));
+<span class="fc" id="L38">        defaults.put(JAS_BACKEND, descriptor(</span>
+            JAS_BACKEND,
+            &quot;Optional JAS backend adapter for Gröbner-basis computation&quot;,
+            false,
+<span class="fc" id="L42">            AlgorithmBudget.bounded(500, 5_000, 0, 0.0),</span>
+            ProofSemantics.PROOF_FOR_SUPPORTED_DOMAIN,
+            ResultType.PROOF,
+            ResultType.REFUTATION,
+            ResultType.DIAGNOSTIC
+        ));
+<span class="fc" id="L48">        defaults.put(SINGULAR_BACKEND, descriptor(</span>
+            SINGULAR_BACKEND,
+            &quot;External Singular backend adapter&quot;,
+            false,
+<span class="fc" id="L52">            AlgorithmBudget.bounded(500, 5_000, 0, 0.0),</span>
+            ProofSemantics.PROOF_FOR_SUPPORTED_DOMAIN,
+            ResultType.PROOF,
+            ResultType.REFUTATION,
+            ResultType.DIAGNOSTIC
+        ));
+<span class="fc" id="L58">        defaults.put(KNUTH_BENDIX, descriptor(</span>
+            KNUTH_BENDIX,
+            &quot;Knuth-Bendix completion candidates&quot;,
+            false,
+<span class="fc" id="L62">            AlgorithmBudget.bounded(12, 150, 0, 0.0),</span>
+            ProofSemantics.DIAGNOSTIC_ONLY,
+            ResultType.DIAGNOSTIC
+        ));
+<span class="fc" id="L66">        defaults.put(CRITICAL_PAIRS, descriptor(</span>
+            CRITICAL_PAIRS,
+            &quot;Critical pair analysis&quot;,
+            true,
+<span class="fc" id="L70">            AlgorithmBudget.bounded(8, 120, 0, 0.0),</span>
+            ProofSemantics.DIAGNOSTIC_ONLY,
+            ResultType.DIAGNOSTIC
+        ));
+<span class="fc" id="L74">        defaults.put(PSLQ, descriptor(</span>
+            PSLQ,
+            &quot;PSLQ-style integer relation search&quot;,
+            false,
+<span class="fc" id="L78">            AlgorithmBudget.bounded(0, 50_000, 8, 1e-8),</span>
+            ProofSemantics.HYPOTHESIS_ONLY,
+            ResultType.HYPOTHESIS,
+            ResultType.DIAGNOSTIC
+        ));
+<span class="fc" id="L83">        defaults.put(NUMERIC_RELATION_SEARCH, descriptor(</span>
+            NUMERIC_RELATION_SEARCH,
+            &quot;Generic numeric relation search&quot;,
+            false,
+<span class="fc" id="L87">            AlgorithmBudget.bounded(0, 50_000, 8, 1e-8),</span>
+            ProofSemantics.HYPOTHESIS_ONLY,
+            ResultType.HYPOTHESIS,
+            ResultType.DIAGNOSTIC
+        ));
+
+<span class="fc" id="L93">        enabledOverrides.forEach((id, enabled) -&gt; {</span>
+<span class="fc" id="L94">            AlgorithmDescriptor descriptor = defaults.get(id);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (descriptor != null) {</span>
+<span class="fc" id="L96">                defaults.put(id, new AlgorithmDescriptor(</span>
+<span class="fc" id="L97">                    descriptor.id(),</span>
+<span class="fc" id="L98">                    descriptor.capability(),</span>
+<span class="fc" id="L99">                    enabled,</span>
+<span class="fc" id="L100">                    descriptor.budget(),</span>
+<span class="fc" id="L101">                    descriptor.proofSemantics(),</span>
+<span class="fc" id="L102">                    descriptor.resultTypes()</span>
+                ));
+            }
+<span class="fc" id="L105">        });</span>
+
+<span class="fc" id="L107">        budgetOverrides.forEach((id, budget) -&gt; {</span>
+<span class="fc" id="L108">            AlgorithmDescriptor descriptor = defaults.get(id);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (descriptor != null) {</span>
+<span class="fc" id="L110">                defaults.put(id, new AlgorithmDescriptor(</span>
+<span class="fc" id="L111">                    descriptor.id(),</span>
+<span class="fc" id="L112">                    descriptor.capability(),</span>
+<span class="fc" id="L113">                    descriptor.enabled(),</span>
+                    budget,
+<span class="fc" id="L115">                    descriptor.proofSemantics(),</span>
+<span class="fc" id="L116">                    descriptor.resultTypes()</span>
+                ));
+            }
+<span class="fc" id="L119">        });</span>
+
+<span class="fc" id="L121">        this.algorithms = Map.copyOf(defaults);</span>
+<span class="fc" id="L122">    }</span>
+
+    private static AlgorithmDescriptor descriptor(String id,
+                                                  String capability,
+                                                  boolean enabled,
+                                                  AlgorithmBudget budget,
+                                                  ProofSemantics semantics,
+                                                  ResultType... resultTypes) {
+<span class="fc" id="L130">        return new AlgorithmDescriptor(id, capability, enabled, budget, semantics, EnumSet.of(resultTypes[0], resultTypes));</span>
+    }
+
+    @Override
+    public Collection&lt;AlgorithmDescriptor&gt; algorithms() {
+<span class="nc" id="L135">        return algorithms.values();</span>
+    }
+
+    @Override
+    public Optional&lt;AlgorithmDescriptor&gt; find(String algorithmId) {
+<span class="fc" id="L140">        return Optional.ofNullable(algorithms.get(algorithmId));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

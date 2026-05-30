@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.json</a> &gt; <span class="el_source">JsonWriter.java</span></div><h1>JsonWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.json;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+import java.util.function.Consumer;
+
+/**
+ * Tiny fluent JSON writer used as central rendering primitive.
+ *
+ * &lt;p&gt;Replaces the previous string-concatenation approach to keep the JSON
+ * export consistent (escaping, comma handling, ordering) without pulling in a
+ * large external dependency.&lt;/p&gt;
+ */
+<span class="nc" id="L15">public final class JsonWriter {</span>
+<span class="nc" id="L16">    private final StringBuilder builder = new StringBuilder();</span>
+<span class="nc" id="L17">    private final Deque&lt;Boolean&gt; firstEntry = new ArrayDeque&lt;&gt;();</span>
+
+    public JsonWriter beginObject() {
+<span class="nc" id="L20">        builder.append('{');</span>
+<span class="nc" id="L21">        firstEntry.push(true);</span>
+<span class="nc" id="L22">        return this;</span>
+    }
+
+    public JsonWriter endObject() {
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
+<span class="nc" id="L27">            throw new IllegalStateException(&quot;No open object&quot;);</span>
+        }
+<span class="nc" id="L29">        firstEntry.pop();</span>
+<span class="nc" id="L30">        builder.append('}');</span>
+<span class="nc" id="L31">        return this;</span>
+    }
+
+    public JsonWriter beginArray() {
+<span class="nc" id="L35">        builder.append('[');</span>
+<span class="nc" id="L36">        firstEntry.push(true);</span>
+<span class="nc" id="L37">        return this;</span>
+    }
+
+    public JsonWriter endArray() {
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
+<span class="nc" id="L42">            throw new IllegalStateException(&quot;No open array&quot;);</span>
+        }
+<span class="nc" id="L44">        firstEntry.pop();</span>
+<span class="nc" id="L45">        builder.append(']');</span>
+<span class="nc" id="L46">        return this;</span>
+    }
+
+    public JsonWriter object(String key, Consumer&lt;JsonWriter&gt; body) {
+<span class="nc" id="L50">        comma();</span>
+<span class="nc" id="L51">        appendKey(key);</span>
+<span class="nc" id="L52">        beginObject();</span>
+<span class="nc" id="L53">        body.accept(this);</span>
+<span class="nc" id="L54">        return endObject();</span>
+    }
+
+    public JsonWriter array(String key, Consumer&lt;JsonWriter&gt; body) {
+<span class="nc" id="L58">        comma();</span>
+<span class="nc" id="L59">        appendKey(key);</span>
+<span class="nc" id="L60">        beginArray();</span>
+<span class="nc" id="L61">        body.accept(this);</span>
+<span class="nc" id="L62">        return endArray();</span>
+    }
+
+    public JsonWriter property(String key, String value) {
+<span class="nc" id="L66">        comma();</span>
+<span class="nc" id="L67">        appendKey(key);</span>
+<span class="nc" id="L68">        appendString(value);</span>
+<span class="nc" id="L69">        return this;</span>
+    }
+
+    public JsonWriter property(String key, int value) {
+<span class="nc" id="L73">        comma();</span>
+<span class="nc" id="L74">        appendKey(key);</span>
+<span class="nc" id="L75">        builder.append(value);</span>
+<span class="nc" id="L76">        return this;</span>
+    }
+
+    public JsonWriter property(String key, long value) {
+<span class="nc" id="L80">        comma();</span>
+<span class="nc" id="L81">        appendKey(key);</span>
+<span class="nc" id="L82">        builder.append(value);</span>
+<span class="nc" id="L83">        return this;</span>
+    }
+
+    public JsonWriter property(String key, double value) {
+<span class="nc" id="L87">        comma();</span>
+<span class="nc" id="L88">        appendKey(key);</span>
+<span class="nc" id="L89">        builder.append(value);</span>
+<span class="nc" id="L90">        return this;</span>
+    }
+
+    public JsonWriter property(String key, boolean value) {
+<span class="nc" id="L94">        comma();</span>
+<span class="nc" id="L95">        appendKey(key);</span>
+<span class="nc" id="L96">        builder.append(value);</span>
+<span class="nc" id="L97">        return this;</span>
+    }
+
+    public JsonWriter nullProperty(String key) {
+<span class="nc" id="L101">        comma();</span>
+<span class="nc" id="L102">        appendKey(key);</span>
+<span class="nc" id="L103">        builder.append(&quot;null&quot;);</span>
+<span class="nc" id="L104">        return this;</span>
+    }
+
+    public JsonWriter stringArray(String key, List&lt;String&gt; values) {
+<span class="nc" id="L108">        return array(key, writer -&gt; values.forEach(writer::value));</span>
+    }
+
+    public JsonWriter value(String value) {
+<span class="nc" id="L112">        comma();</span>
+<span class="nc" id="L113">        appendString(value);</span>
+<span class="nc" id="L114">        return this;</span>
+    }
+
+    public JsonWriter value(int value) {
+<span class="nc" id="L118">        comma();</span>
+<span class="nc" id="L119">        builder.append(value);</span>
+<span class="nc" id="L120">        return this;</span>
+    }
+
+    public JsonWriter objectValue(Consumer&lt;JsonWriter&gt; body) {
+<span class="nc" id="L124">        comma();</span>
+<span class="nc" id="L125">        beginObject();</span>
+<span class="nc" id="L126">        body.accept(this);</span>
+<span class="nc" id="L127">        return endObject();</span>
+    }
+
+    /** Emit a nested array value inside an array context. */
+    public JsonWriter arrayValue(Consumer&lt;JsonWriter&gt; body) {
+<span class="nc" id="L132">        comma();</span>
+<span class="nc" id="L133">        beginArray();</span>
+<span class="nc" id="L134">        body.accept(this);</span>
+<span class="nc" id="L135">        return endArray();</span>
+    }
+
+    private void comma() {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
+<span class="nc" id="L140">            return;</span>
+        }
+<span class="nc" id="L142">        boolean first = firstEntry.pop();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (!first) {</span>
+<span class="nc" id="L144">            builder.append(',');</span>
+        }
+<span class="nc" id="L146">        firstEntry.push(false);</span>
+<span class="nc" id="L147">    }</span>
+
+    private void appendKey(String key) {
+<span class="nc" id="L150">        appendString(key);</span>
+<span class="nc" id="L151">        builder.append(':');</span>
+<span class="nc" id="L152">    }</span>
+
+    private void appendString(String value) {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L156">            builder.append(&quot;null&quot;);</span>
+<span class="nc" id="L157">            return;</span>
+        }
+<span class="nc" id="L159">        builder.append('&quot;');</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="nc" id="L161">            char current = value.charAt(i);</span>
+<span class="nc bnc" id="L162" title="All 8 branches missed.">            switch (current) {</span>
+<span class="nc" id="L163">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L164">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L165">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L166">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L167">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L168">                case '\b' -&gt; builder.append(&quot;\\b&quot;);</span>
+<span class="nc" id="L169">                case '\f' -&gt; builder.append(&quot;\\f&quot;);</span>
+                default -&gt; {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                    if (current &lt; 0x20) {</span>
+<span class="nc" id="L172">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) current));</span>
+                    } else {
+<span class="nc" id="L174">                        builder.append(current);</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L179">        builder.append('&quot;');</span>
+<span class="nc" id="L180">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L184">        return builder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

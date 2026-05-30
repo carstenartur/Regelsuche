@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RootSymbolTermRuleIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.index</a> &gt; <span class="el_source">RootSymbolTermRuleIndex.java</span></div><h1>RootSymbolTermRuleIndex.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.index;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/** Root-symbol implementation with extension points for richer feature-vector/discrimination-tree indexes. */
+public class RootSymbolTermRuleIndex implements TermRuleIndex, RuleCandidateIndex {
+<span class="fc" id="L17">    private final Map&lt;String, List&lt;RewriteRule&gt;&gt; atomicByRoot = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L18">    private final Map&lt;String, List&lt;MacroEntry&gt;&gt; macroByRoot = new LinkedHashMap&lt;&gt;();</span>
+    private final boolean multiStageFiltersEnabled;
+
+    public RootSymbolTermRuleIndex() {
+<span class="fc" id="L22">        this(true);</span>
+<span class="fc" id="L23">    }</span>
+
+<span class="fc" id="L25">    public RootSymbolTermRuleIndex(boolean multiStageFiltersEnabled) {</span>
+<span class="fc" id="L26">        this.multiStageFiltersEnabled = multiStageFiltersEnabled;</span>
+<span class="fc" id="L27">    }</span>
+
+    @Override
+    public void addAtomicRule(String rootSymbol, RewriteRule rule) {
+<span class="fc" id="L31">        atomicByRoot.computeIfAbsent(normalizeRoot(rootSymbol), ignored -&gt; new ArrayList&lt;&gt;()).add(rule);</span>
+<span class="fc" id="L32">    }</span>
+
+    @Override
+    public void addMacroMove(IndexedMacroMove rule) {
+<span class="fc" id="L36">        macroByRoot.computeIfAbsent(rootSymbol(rule.leftPattern()), ignored -&gt; new ArrayList&lt;&gt;()).add(MacroEntry.from(rule));</span>
+<span class="fc" id="L37">    }</span>
+
+    @Override
+    public boolean removeAtomicRule(String rootSymbol, RewriteRule rule) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (rule == null) {</span>
+<span class="nc" id="L42">            return false;</span>
+        }
+<span class="fc" id="L44">        List&lt;RewriteRule&gt; rules = atomicByRoot.get(normalizeRoot(rootSymbol));</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (rules == null) {</span>
+<span class="nc" id="L46">            return false;</span>
+        }
+<span class="fc" id="L48">        boolean removed = rules.remove(rule);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (rules.isEmpty()) {</span>
+<span class="fc" id="L50">            atomicByRoot.remove(normalizeRoot(rootSymbol));</span>
+        }
+<span class="fc" id="L52">        return removed;</span>
+    }
+
+    @Override
+    public boolean removeMacroMove(String id) {
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L58">            return false;</span>
+        }
+<span class="fc" id="L60">        boolean removed = false;</span>
+<span class="fc" id="L61">        List&lt;String&gt; emptyRoots = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;MacroEntry&gt;&gt; entry : macroByRoot.entrySet()) {</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (entry.getValue().removeIf(macro -&gt; macro.rule().id().equals(id))) {</span>
+<span class="fc" id="L64">                removed = true;</span>
+            }
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (entry.getValue().isEmpty()) {</span>
+<span class="fc" id="L67">                emptyRoots.add(entry.getKey());</span>
+            }
+<span class="fc" id="L69">        }</span>
+<span class="fc" id="L70">        emptyRoots.forEach(macroByRoot::remove);</span>
+<span class="fc" id="L71">        return removed;</span>
+    }
+
+    @Override
+    public boolean updateMacroMove(IndexedMacroMove rule) {
+<span class="fc" id="L76">        boolean removed = removeMacroMove(rule.id());</span>
+<span class="fc" id="L77">        addMacroMove(rule);</span>
+<span class="fc" id="L78">        return removed;</span>
+    }
+
+    @Override
+    public void rebuild(Collection&lt;AtomicRuleEntry&gt; atomicRules, Collection&lt;IndexedMacroMove&gt; macroMoves) {
+<span class="fc" id="L83">        atomicByRoot.clear();</span>
+<span class="fc" id="L84">        macroByRoot.clear();</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (atomicRules != null) {</span>
+<span class="fc" id="L86">            atomicRules.forEach(entry -&gt; addAtomicRule(entry.rootSymbol(), entry.rule()));</span>
+        }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (macroMoves != null) {</span>
+<span class="fc" id="L89">            macroMoves.forEach(this::addMacroMove);</span>
+        }
+<span class="fc" id="L91">    }</span>
+
+    @Override
+    public QueryResult query(String expression, Query query) {
+<span class="fc" id="L95">        CandidateSet candidates = candidateSetForExpression(</span>
+            expression,
+<span class="fc" id="L97">            SearchContext.from(query),</span>
+<span class="fc" id="L98">            CandidateBudget.unbounded()</span>
+        );
+<span class="fc" id="L100">        return new QueryResult(candidates.atomicRules(), candidates.macroMoves(), candidates.metrics().asTermRuleMetrics());</span>
+    }
+
+    @Override
+    public CandidateSet candidatesFor(Expr subtree, SearchContext context, CandidateBudget budget) {
+<span class="fc" id="L105">        return candidateSetForExpression(</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            subtree == null ? &quot;&quot; : ExpressionFormatter.format(subtree),</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            context == null ? SearchContext.all() : context,</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            budget == null ? CandidateBudget.unbounded() : budget</span>
+        );
+    }
+
+    public CandidateSet candidateSetForExpression(String expression, SearchContext context, CandidateBudget budget) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        SearchContext effectiveQuery = context == null ? SearchContext.all() : context;</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        CandidateBudget effectiveBudget = budget == null ? CandidateBudget.unbounded() : budget;</span>
+<span class="fc" id="L115">        String root = rootSymbol(expression);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        List&lt;RewriteRule&gt; atomicCandidates = effectiveQuery.includeAtomicRules()</span>
+<span class="fc" id="L117">            ? atomicByRoot.getOrDefault(root, List.of())</span>
+<span class="fc" id="L118">            : List.of();</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        List&lt;MacroEntry&gt; macroCandidates = effectiveQuery.includeMacroMoves()</span>
+<span class="fc" id="L120">            ? macroByRoot.getOrDefault(root, List.of())</span>
+<span class="pc" id="L121">            : List.of();</span>
+<span class="fc" id="L122">        OperatorSignature querySignature = null;</span>
+<span class="fc" id="L123">        ExpressionFeatureVector queryFeatures = null;</span>
+<span class="fc" id="L124">        DiscriminationTreeKey queryDiscriminationKey = null;</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">        if (multiStageFiltersEnabled &amp;&amp; !macroCandidates.isEmpty()) {</span>
+<span class="fc" id="L126">            querySignature = OperatorSignature.parse(expression);</span>
+<span class="fc" id="L127">            queryFeatures = ExpressionFeatureVector.parse(expression);</span>
+<span class="fc" id="L128">            queryDiscriminationKey = DiscriminationTreeKey.parse(expression);</span>
+        }
+<span class="fc" id="L130">        int totalAtomic = atomicByRoot.values().stream().mapToInt(List::size).sum();</span>
+<span class="fc" id="L131">        int totalMacros = macroByRoot.values().stream().mapToInt(List::size).sum();</span>
+<span class="fc" id="L132">        int considered = totalAtomic</span>
+<span class="fc" id="L133">            + macroByRoot.values().stream().mapToInt(List::size).sum();</span>
+<span class="fc" id="L134">        int skippedByRoot = Math.max(0, totalAtomic - atomicCandidates.size())</span>
+<span class="fc" id="L135">            + Math.max(0, totalMacros - macroCandidates.size());</span>
+<span class="fc" id="L136">        List&lt;RewriteRule&gt; budgetedAtomic = atomicCandidates.stream()</span>
+<span class="fc" id="L137">            .limit(effectiveBudget.maxAtomicRules())</span>
+<span class="fc" id="L138">            .toList();</span>
+<span class="fc" id="L139">        int skippedByBudget = Math.max(0, atomicCandidates.size() - budgetedAtomic.size());</span>
+<span class="fc" id="L140">        List&lt;IndexedMacroMove&gt; macros = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L141">        int skippedByGoal = 0;</span>
+<span class="fc" id="L142">        int skippedBySignature = 0;</span>
+<span class="fc" id="L143">        int skippedByFeature = 0;</span>
+<span class="fc" id="L144">        int skippedByDiscrimination = 0;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (MacroEntry entry : macroCandidates) {</span>
+<span class="fc" id="L146">            IndexedMacroMove rule = entry.rule();</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (rule.proofStatus().ordinal() &lt; effectiveQuery.minimumProofStatus().ordinal()</span>
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">                    || (!effectiveQuery.domain().isBlank() &amp;&amp; !domainMatches(rule, effectiveQuery.domain()))</span>
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">                    || (!effectiveQuery.goalExpression().isBlank() &amp;&amp; !goalAware(rule, effectiveQuery.goalExpression()))) {</span>
+<span class="nc" id="L150">                skippedByGoal++;</span>
+<span class="nc" id="L151">                continue;</span>
+            }
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">            if (multiStageFiltersEnabled &amp;&amp; !entry.signature().compatibleWith(querySignature)) {</span>
+<span class="nc" id="L154">                skippedBySignature++;</span>
+<span class="nc" id="L155">                continue;</span>
+            }
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">            if (multiStageFiltersEnabled &amp;&amp; !entry.features().canMatch(queryFeatures)) {</span>
+<span class="fc" id="L158">                skippedByFeature++;</span>
+<span class="fc" id="L159">                continue;</span>
+            }
+<span class="pc bpc" id="L161" title="1 of 4 branches missed.">            if (multiStageFiltersEnabled &amp;&amp; !entry.discriminationKey().compatibleWith(queryDiscriminationKey)) {</span>
+<span class="fc" id="L162">                skippedByDiscrimination++;</span>
+<span class="fc" id="L163">                continue;</span>
+            }
+<span class="fc" id="L165">            macros.add(rule);</span>
+<span class="fc" id="L166">        }</span>
+<span class="fc" id="L167">        List&lt;IndexedMacroMove&gt; budgetedMacros = macros.stream()</span>
+<span class="fc" id="L168">            .sorted(goalRanking(effectiveQuery.goalExpression()))</span>
+<span class="fc" id="L169">            .limit(effectiveBudget.maxMacroMoves())</span>
+<span class="fc" id="L170">            .toList();</span>
+<span class="fc" id="L171">        skippedByBudget += Math.max(0, macros.size() - budgetedMacros.size());</span>
+<span class="fc" id="L172">        int matched = budgetedAtomic.size() + budgetedMacros.size();</span>
+<span class="fc" id="L173">        return new CandidateSet(</span>
+            budgetedAtomic,
+            budgetedMacros,
+            new IndexMetrics(
+                considered,
+                skippedByRoot,
+                skippedBySignature,
+                skippedByFeature,
+                skippedByDiscrimination,
+                skippedByGoal,
+                skippedByBudget,
+                matched,
+                matched
+            )
+        );
+    }
+
+    /** Extension point: feature-vector indexes can override the coarse root symbol with richer signatures. */
+    protected String featureVector(String expression) {
+<span class="nc" id="L192">        return rootSymbol(expression);</span>
+    }
+
+    /** Extension point: discrimination-tree implementations can route by the normalized pattern tree. */
+    protected String discriminationTreeKey(String expression) {
+<span class="nc" id="L197">        return DiscriminationTreeKey.parse(expression).requiredPaths().toString();</span>
+    }
+
+    static String rootSymbol(String expression) {
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L202">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L204">        String trimmed = stripOuterParentheses(expression.trim());</span>
+<span class="fc" id="L205">        int depth = 0;</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (int i = 0; i &lt; trimmed.length(); i++) {</span>
+<span class="fc" id="L207">            char ch = trimmed.charAt(i);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (ch == '(') depth++;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (ch == ')') depth--;</span>
+<span class="pc bpc" id="L210" title="1 of 6 branches missed.">            if (depth == 0 &amp;&amp; &quot;+-&quot;.indexOf(ch) &gt;= 0 &amp;&amp; i &gt; 0) return String.valueOf(ch);</span>
+        }
+<span class="fc" id="L212">        depth = 0;</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        for (int i = 0; i &lt; trimmed.length(); i++) {</span>
+<span class="fc" id="L214">            char ch = trimmed.charAt(i);</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            if (ch == '(') depth++;</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            if (ch == ')') depth--;</span>
+<span class="fc bfc" id="L217" title="All 4 branches covered.">            if (depth == 0 &amp;&amp; &quot;*/&quot;.indexOf(ch) &gt;= 0) return String.valueOf(ch);</span>
+        }
+<span class="fc" id="L219">        depth = 0;</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        for (int i = 0; i &lt; trimmed.length(); i++) {</span>
+<span class="fc" id="L221">            char ch = trimmed.charAt(i);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (ch == '(') depth++;</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (ch == ')') depth--;</span>
+<span class="fc bfc" id="L224" title="All 4 branches covered.">            if (depth == 0 &amp;&amp; ch == '^') return &quot;^&quot;;</span>
+        }
+<span class="nc" id="L226">        int open = trimmed.indexOf('(');</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (open &gt; 0) return normalizeRoot(trimmed.substring(0, open));</span>
+<span class="nc" id="L228">        return normalizeRoot(trimmed.replaceAll(&quot;[^A-Za-z0-9_].*$&quot;, &quot;&quot;));</span>
+    }
+
+    private static boolean domainMatches(IndexedMacroMove rule, String domain) {
+<span class="fc" id="L232">        String haystack = (rule.domain() + &quot; &quot; + rule.id() + &quot; &quot; + rule.leftPattern() + &quot; &quot; + rule.rightPattern())</span>
+<span class="fc" id="L233">            .toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L234">        return haystack.contains(domain.toLowerCase(Locale.ROOT));</span>
+    }
+
+    private static boolean goalAware(IndexedMacroMove rule, String goalExpression) {
+<span class="fc" id="L238">        String root = rootSymbol(goalExpression);</span>
+<span class="pc bpc" id="L239" title="4 of 6 branches missed.">        return root.isBlank() || root.equals(rootSymbol(rule.rightPattern())) || goalExpression.contains(rule.rightPattern());</span>
+    }
+
+    private static Comparator&lt;IndexedMacroMove&gt; goalRanking(String goalExpression) {
+<span class="fc" id="L243">        String goalRoot = rootSymbol(goalExpression);</span>
+<span class="fc" id="L244">        return Comparator</span>
+<span class="pc bpc" id="L245" title="3 of 4 branches missed.">            .comparing((IndexedMacroMove rule) -&gt; !goalRoot.isBlank() &amp;&amp; goalRoot.equals(rootSymbol(rule.rightPattern())) ? 0 : 1)</span>
+<span class="fc" id="L246">            .thenComparing(IndexedMacroMove::id);</span>
+    }
+
+    private static String normalizeRoot(String root) {
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        return root == null ? &quot;&quot; : root.trim().toLowerCase(Locale.ROOT);</span>
+    }
+
+    private static String stripOuterParentheses(String value) {
+<span class="pc bpc" id="L254" title="3 of 6 branches missed.">        while (value.startsWith(&quot;(&quot;) &amp;&amp; value.endsWith(&quot;)&quot;) &amp;&amp; enclosesWholeExpression(value)) {</span>
+<span class="nc" id="L255">            value = value.substring(1, value.length() - 1).trim();</span>
+        }
+<span class="fc" id="L257">        return value;</span>
+    }
+
+    private static boolean enclosesWholeExpression(String value) {
+<span class="nc" id="L261">        int depth = 0;</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="nc" id="L263">            char ch = value.charAt(i);</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (ch == '(') depth++;</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            if (ch == ')') depth--;</span>
+<span class="nc bnc" id="L266" title="All 4 branches missed.">            if (depth == 0 &amp;&amp; i &lt; value.length() - 1) {</span>
+<span class="nc" id="L267">                return false;</span>
+            }
+        }
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        return depth == 0;</span>
+    }
+
+<span class="fc" id="L273">    private record MacroEntry(</span>
+        IndexedMacroMove rule,
+        OperatorSignature signature,
+        ExpressionFeatureVector features,
+        DiscriminationTreeKey discriminationKey
+    ) {
+        private static MacroEntry from(IndexedMacroMove rule) {
+<span class="fc" id="L280">            String left = rule.leftPattern();</span>
+<span class="fc" id="L281">            Expr parsed = parse(left);</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">            if (parsed != null) {</span>
+<span class="fc" id="L283">                return new MacroEntry(</span>
+                    rule,
+<span class="fc" id="L285">                    OperatorSignature.of(parsed),</span>
+<span class="fc" id="L286">                    ExpressionFeatureVector.of(parsed),</span>
+<span class="fc" id="L287">                    DiscriminationTreeKey.of(parsed)</span>
+                );
+            }
+<span class="nc" id="L290">            return new MacroEntry(</span>
+                rule,
+<span class="nc" id="L292">                OperatorSignature.parse(left),</span>
+<span class="nc" id="L293">                ExpressionFeatureVector.parse(left),</span>
+<span class="nc" id="L294">                DiscriminationTreeKey.parse(left)</span>
+            );
+        }
+
+        private static Expr parse(String expression) {
+            try {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                return new ExpressionParser().parseTerm(expression == null ? &quot;&quot; : expression);</span>
+<span class="nc" id="L301">            } catch (RuntimeException ignored) {</span>
+<span class="nc" id="L302">                return null;</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

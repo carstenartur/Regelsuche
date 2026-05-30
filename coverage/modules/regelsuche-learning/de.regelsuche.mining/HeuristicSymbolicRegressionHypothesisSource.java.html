@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HeuristicSymbolicRegressionHypothesisSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">HeuristicSymbolicRegressionHypothesisSource.java</span></div><h1>HeuristicSymbolicRegressionHypothesisSource.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.validation.CandidateProofStatus;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+
+/** Heuristic evidence-only source that proposes repeated input/output shapes as hypotheses only. */
+public final class HeuristicSymbolicRegressionHypothesisSource implements SymbolicRegressionHypothesisSource {
+    private final boolean enabled;
+    private final int minimumSupport;
+
+<span class="nc" id="L14">    public HeuristicSymbolicRegressionHypothesisSource(boolean enabled, int minimumSupport) {</span>
+<span class="nc" id="L15">        this.enabled = enabled;</span>
+<span class="nc" id="L16">        this.minimumSupport = Math.max(2, minimumSupport);</span>
+<span class="nc" id="L17">    }</span>
+
+    @Override
+    public boolean enabled() {
+<span class="nc" id="L21">        return enabled;</span>
+    }
+
+    @Override
+    public List&lt;HypothesisCandidate&gt; propose(List&lt;SuccessfulTransformationPath&gt; paths) {
+<span class="nc bnc" id="L26" title="All 6 branches missed.">        if (!enabled || paths == null || paths.size() &lt; minimumSupport) {</span>
+<span class="nc" id="L27">            return List.of();</span>
+        }
+<span class="nc" id="L29">        Map&lt;String, List&lt;SuccessfulTransformationPath&gt;&gt; grouped = paths.stream()</span>
+<span class="nc bnc" id="L30" title="All 6 branches missed.">            .filter(path -&gt; path != null &amp;&amp; path.originalExpression() != null &amp;&amp; path.targetExpression() != null)</span>
+<span class="nc" id="L31">            .collect(java.util.stream.Collectors.groupingBy(path -&gt;</span>
+<span class="nc" id="L32">                shape(path.originalExpression()) + &quot; -&gt; &quot; + shape(path.targetExpression())));</span>
+<span class="nc" id="L33">        return grouped.entrySet().stream()</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">            .filter(entry -&gt; entry.getValue().size() &gt;= minimumSupport)</span>
+<span class="nc" id="L35">            .sorted(Comparator.comparing(Map.Entry::getKey))</span>
+<span class="nc" id="L36">            .map(entry -&gt; hypothesis(entry.getKey(), entry.getValue()))</span>
+<span class="nc" id="L37">            .toList();</span>
+    }
+
+    private HypothesisCandidate hypothesis(String shape, List&lt;SuccessfulTransformationPath&gt; paths) {
+<span class="nc" id="L41">        String id = &quot;symreg-&quot; + Integer.toHexString(shape.hashCode());</span>
+<span class="nc" id="L42">        List&lt;String&gt; supportingIds = paths.stream().map(SuccessfulTransformationPath::id).sorted().toList();</span>
+<span class="nc" id="L43">        List&lt;HypothesisCandidate.ExpressionPair&gt; witnesses = paths.stream()</span>
+<span class="nc" id="L44">            .map(path -&gt; new HypothesisCandidate.ExpressionPair(path.originalExpression(), path.targetExpression()))</span>
+<span class="nc" id="L45">            .toList();</span>
+<span class="nc" id="L46">        return new HypothesisCandidate(</span>
+            id,
+<span class="nc" id="L48">            shape.substring(0, shape.indexOf(&quot; -&gt; &quot;)),</span>
+<span class="nc" id="L49">            shape.substring(shape.indexOf(&quot; -&gt; &quot;) + 4),</span>
+            supportingIds,
+            witnesses,
+<span class="nc" id="L52">            List.of(&quot;symbolic-regression-evidence-only&quot;),</span>
+            0.0,
+            CandidateProofStatus.OBSERVED,
+            null,
+<span class="nc" id="L56">            List.of(),</span>
+<span class="nc" id="L57">            Map.of(&quot;source&quot;, List.of(&quot;heuristic-symbolic-regression&quot;)),</span>
+<span class="nc" id="L58">            Instant.now()</span>
+        );
+    }
+
+    private static String shape(String expression) {
+<span class="nc" id="L63">        return expression.replaceAll(&quot;\\d+(?:\\.\\d+)?&quot;, &quot;N&quot;)</span>
+<span class="nc" id="L64">            .replaceAll(&quot;[a-zA-Z][a-zA-Z0-9_]*&quot;, &quot;v&quot;)</span>
+<span class="nc" id="L65">            .replaceAll(&quot;\\s+&quot;, &quot; &quot;)</span>
+<span class="nc" id="L66">            .trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

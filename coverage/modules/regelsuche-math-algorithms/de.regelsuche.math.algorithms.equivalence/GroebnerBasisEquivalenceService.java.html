@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroebnerBasisEquivalenceService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">GroebnerBasisEquivalenceService.java</span></div><h1>GroebnerBasisEquivalenceService.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.equivalence.PolynomialEquivalenceService;
+import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Gröbner-basis service for small polynomial ideals/systems over exact rational coefficients.
+ *
+ * &lt;p&gt;This class is intentionally separate from {@link PolynomialNormalFormEquivalenceService}: normal forms prove
+ * direct polynomial identities, while this service computes a basis for generators and reduces a polynomial modulo
+ * the generated ideal. If a concrete external backend such as JAS is requested but unavailable, the service reports
+ * {@code UNAVAILABLE} instead of falling back to normal-form equivalence.
+ */
+public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceService {
+<span class="fc" id="L22">    private static final MathematicalAlgorithmRegistry.AlgorithmBudget SAFE_DEFAULT_BUDGET =</span>
+<span class="fc" id="L23">        MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(200, 1_000, 0, 0.0, 256, 20, 8);</span>
+<span class="fc" id="L24">    private final PolynomialArithmetic arithmetic = new PolynomialArithmetic();</span>
+    private final MathematicalAlgorithmRegistry registry;
+    private final boolean jasBackendAvailable;
+    private final MonomialOrder monomialOrder;
+<span class="fc" id="L28">    private MathematicalAlgorithmRegistry.AlgorithmExecutionResult lastResult =</span>
+<span class="fc" id="L29">        MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(&quot;not executed&quot;);</span>
+
+    public GroebnerBasisEquivalenceService(MathematicalAlgorithmRegistry registry) {
+<span class="fc" id="L32">        this(registry, false);</span>
+<span class="fc" id="L33">    }</span>
+
+    public GroebnerBasisEquivalenceService(MathematicalAlgorithmRegistry registry, boolean jasBackendAvailable) {
+<span class="fc" id="L36">        this(registry, jasBackendAvailable, new GradedReverseLexOrder());</span>
+<span class="fc" id="L37">    }</span>
+
+    public GroebnerBasisEquivalenceService(
+        MathematicalAlgorithmRegistry registry,
+        boolean jasBackendAvailable,
+        MonomialOrder monomialOrder
+<span class="fc" id="L43">    ) {</span>
+<span class="fc" id="L44">        this.registry = registry;</span>
+<span class="fc" id="L45">        this.jasBackendAvailable = jasBackendAvailable;</span>
+<span class="fc" id="L46">        this.monomialOrder = monomialOrder;</span>
+<span class="fc" id="L47">    }</span>
+
+    public MathematicalAlgorithmRegistry.AlgorithmExecutionResult lastResult() {
+<span class="fc" id="L50">        return lastResult;</span>
+    }
+
+    @Override
+    public boolean arePolynomiallyEquivalent(String leftPolynomial, String rightPolynomial) {
+<span class="nc" id="L55">        lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(</span>
+            &quot;Gröbner equivalence requires explicit ideal generators; use reducesToZeroModuloIdeal&quot;);
+<span class="nc" id="L57">        return false;</span>
+    }
+
+    @Override
+    public String evidence(String leftExpression, String rightExpression) {
+<span class="nc" id="L62">        arePolynomiallyEquivalent(leftExpression, rightExpression);</span>
+<span class="nc" id="L63">        return lastResult.detail();</span>
+    }
+
+    public boolean reducesToZeroModuloIdeal(String polynomialExpression, List&lt;String&gt; generatorExpressions) {
+<span class="fc" id="L67">        Optional&lt;String&gt; remainder = normalFormModuloIdeal(polynomialExpression, generatorExpressions);</span>
+<span class="fc bfc" id="L68" title="All 4 branches covered.">        return remainder.isPresent() &amp;&amp; &quot;0&quot;.equals(remainder.orElseThrow());</span>
+    }
+
+    public Optional&lt;String&gt; normalFormModuloIdeal(String polynomialExpression, List&lt;String&gt; generatorExpressions) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (!registry.isEnabled(MathematicalAlgorithmRegistry.GROEBNER_BASIS)) {</span>
+<span class="fc" id="L73">            lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.disabled(</span>
+                &quot;groebnerBasis must be enabled for ideal reduction&quot;);
+<span class="fc" id="L75">            return Optional.empty();</span>
+        }
+<span class="fc bfc" id="L77" title="All 4 branches covered.">        if (registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND) &amp;&amp; !jasBackendAvailable) {</span>
+<span class="fc" id="L78">            lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unavailable(</span>
+                &quot;jasBackend is enabled, but no JAS Gröbner adapter is available&quot;);
+<span class="fc" id="L80">            return Optional.empty();</span>
+        }
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">        if (generatorExpressions == null || generatorExpressions.isEmpty()) {</span>
+<span class="nc" id="L83">            lastResult = unsupported(&quot;ideal reduction requires at least one generator&quot;, &quot;missing-generators&quot;);</span>
+<span class="nc" id="L84">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L87">        Optional&lt;Polynomial&gt; polynomial = arithmetic.parse(polynomialExpression);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (polynomial.isEmpty()) {</span>
+<span class="fc" id="L89">            lastResult = unsupported(&quot;unsupported polynomial expression&quot;, &quot;unsupported-polynomial-syntax&quot;);</span>
+<span class="fc" id="L90">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L93">        List&lt;Polynomial&gt; generators = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (String generatorExpression : generatorExpressions) {</span>
+<span class="fc" id="L95">            Optional&lt;Polynomial&gt; generator = arithmetic.parse(generatorExpression);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (generator.isEmpty()) {</span>
+<span class="nc" id="L97">                lastResult = unsupported(&quot;unsupported ideal generator&quot;, &quot;unsupported-generator-syntax&quot;);</span>
+<span class="nc" id="L98">                return Optional.empty();</span>
+            }
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            if (!generator.orElseThrow().isZero()) {</span>
+<span class="fc" id="L101">                generators.add(generator.orElseThrow());</span>
+            }
+<span class="fc" id="L103">        }</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (generators.isEmpty()) {</span>
+<span class="nc" id="L105">            lastResult = unsupported(&quot;ideal generators reduce to zero&quot;, &quot;zero-generators&quot;);</span>
+<span class="nc" id="L106">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L109">        MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
+<span class="fc" id="L110">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L111">            .orElse(SAFE_DEFAULT_BUDGET);</span>
+<span class="fc" id="L112">        Optional&lt;String&gt; unsupportedReason = unsupportedByHardLimits(polynomial.orElseThrow(), generators, budget);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (unsupportedReason.isPresent()) {</span>
+<span class="fc" id="L114">            lastResult = unsupported(&quot;polynomial outside configured Gröbner limits&quot;, unsupportedReason.orElseThrow());</span>
+<span class="fc" id="L115">            return Optional.empty();</span>
+        }
+<span class="fc" id="L117">        GroebnerBasisEngine engine = new GroebnerBasisEngine(monomialOrder);</span>
+<span class="fc" id="L118">        GroebnerBasisEngine.EngineResult result = engine.normalFormModuloIdeal(</span>
+<span class="fc" id="L119">            polynomial.orElseThrow(),</span>
+            generators,
+<span class="fc" id="L121">            budget.maxSteps(),</span>
+<span class="fc" id="L122">            budget.maxStates()</span>
+        );
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (result.budgetExhausted()) {</span>
+<span class="fc" id="L125">            lastResult = new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(</span>
+                MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED,
+                MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC,
+                &quot;Gröbner basis computation exceeded budget&quot;,
+<span class="fc" id="L129">                resultPayload(result)</span>
+            );
+<span class="fc" id="L131">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L134">        boolean zero = result.remainder().isZero();</span>
+<span class="fc" id="L135">        lastResult = new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(</span>
+            MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS,
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            zero ? MathematicalAlgorithmRegistry.ResultType.PROOF : MathematicalAlgorithmRegistry.ResultType.REFUTATION,</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            zero ? &quot;polynomial reduces to 0 modulo Gröbner basis&quot; : &quot;non-zero remainder modulo Gröbner basis&quot;,</span>
+<span class="fc" id="L139">            resultPayload(result)</span>
+        );
+<span class="fc" id="L141">        return Optional.of(result.remainder().toCanonicalString(monomialOrder));</span>
+    }
+
+    private Map&lt;String, Object&gt; resultPayload(GroebnerBasisEngine.EngineResult result) {
+<span class="fc" id="L145">        Map&lt;String, Object&gt; payload = basePayload(&quot;&quot;);</span>
+<span class="fc" id="L146">        payload.put(&quot;basis&quot;, result.basis().stream().map(polynomial -&gt; polynomial.toCanonicalString(monomialOrder)).toList());</span>
+<span class="fc" id="L147">        payload.put(&quot;reducedBasis&quot;, result.reducedBasis().stream()</span>
+<span class="fc" id="L148">            .map(polynomial -&gt; polynomial.toCanonicalString(monomialOrder))</span>
+<span class="fc" id="L149">            .toList());</span>
+<span class="fc" id="L150">        payload.put(&quot;remainder&quot;, result.remainder().toCanonicalString(monomialOrder));</span>
+<span class="fc" id="L151">        payload.put(&quot;monomialOrder&quot;, result.monomialOrder());</span>
+<span class="fc" id="L152">        payload.put(&quot;steps&quot;, result.steps());</span>
+<span class="fc" id="L153">        payload.put(&quot;budgetStatus&quot;, result.budgetStatus());</span>
+<span class="fc" id="L154">        return Map.copyOf(payload);</span>
+    }
+
+    private Optional&lt;String&gt; unsupportedByHardLimits(
+        Polynomial polynomial,
+        List&lt;Polynomial&gt; generators,
+        MathematicalAlgorithmRegistry.AlgorithmBudget budget
+    ) {
+<span class="fc" id="L162">        List&lt;Polynomial&gt; all = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L163">        all.add(polynomial);</span>
+<span class="fc" id="L164">        all.addAll(generators);</span>
+<span class="fc" id="L165">        int termCount = all.stream().mapToInt(Polynomial::termCount).sum();</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (termCount &gt; budget.maxTerms()) {</span>
+<span class="nc" id="L167">            return Optional.of(&quot;maxTerms&quot;);</span>
+        }
+<span class="fc" id="L169">        int degree = all.stream().mapToInt(Polynomial::totalDegree).max().orElse(0);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (degree &gt; budget.maxDegree()) {</span>
+<span class="fc" id="L171">            return Optional.of(&quot;maxDegree&quot;);</span>
+        }
+<span class="fc" id="L173">        Set&lt;String&gt; variables = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L174">        all.forEach(value -&gt; variables.addAll(value.variables()));</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (variables.size() &gt; budget.maxVariables()) {</span>
+<span class="fc" id="L176">            return Optional.of(&quot;maxVariables&quot;);</span>
+        }
+<span class="pc bpc" id="L178" title="3 of 4 branches missed.">        if (budget.maxCoefficient() &gt; 0 &amp;&amp; all.stream().anyMatch(value -&gt; value.coefficientMagnitudeExceeds(budget.maxCoefficient()))) {</span>
+<span class="nc" id="L179">            return Optional.of(&quot;maxCoefficient&quot;);</span>
+        }
+<span class="fc" id="L181">        return Optional.empty();</span>
+    }
+
+    private MathematicalAlgorithmRegistry.AlgorithmExecutionResult unsupported(String detail, String reason) {
+<span class="fc" id="L185">        return new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(</span>
+            MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN,
+            MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC,
+            detail,
+<span class="fc" id="L189">            basePayload(reason)</span>
+        );
+    }
+
+    private Map&lt;String, Object&gt; basePayload(String unsupportedReason) {
+<span class="fc" id="L194">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L195">        payload.put(&quot;capability&quot;, MathematicalAlgorithmRegistry.GROEBNER_BASIS);</span>
+<span class="fc" id="L196">        boolean jasRequested = registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        payload.put(&quot;requestedBackend&quot;, jasRequested ? &quot;jas&quot; : &quot;pureJavaSmallGroebner&quot;);</span>
+<span class="fc" id="L198">        payload.put(&quot;backend&quot;, &quot;pureJavaSmallGroebner&quot;);</span>
+<span class="fc" id="L199">        MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
+<span class="fc" id="L200">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L201">            .orElse(SAFE_DEFAULT_BUDGET);</span>
+<span class="fc" id="L202">        payload.put(&quot;maxTerms&quot;, budget.maxTerms());</span>
+<span class="fc" id="L203">        payload.put(&quot;maxDegree&quot;, budget.maxDegree());</span>
+<span class="fc" id="L204">        payload.put(&quot;maxVariables&quot;, budget.maxVariables());</span>
+<span class="fc" id="L205">        payload.put(&quot;maxPairs&quot;, registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
+<span class="fc" id="L206">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L207">            .map(MathematicalAlgorithmRegistry.AlgorithmBudget::maxStates)</span>
+<span class="fc" id="L208">            .orElse(SAFE_DEFAULT_BUDGET.maxStates()));</span>
+<span class="fc" id="L209">        payload.put(&quot;timeoutMillis&quot;, 0);</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        payload.put(&quot;unsupportedReason&quot;, unsupportedReason == null ? &quot;&quot; : unsupportedReason);</span>
+<span class="fc" id="L211">        return payload;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

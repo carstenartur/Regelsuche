@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemanticGraphViewMode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph.semantic</a> &gt; <span class="el_source">SemanticGraphViewMode.java</span></div><h1>SemanticGraphViewMode.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph.semantic;
+
+<span class="fc" id="L3">public enum SemanticGraphViewMode {</span>
+<span class="fc" id="L4">    SEMANTIC,</span>
+<span class="fc" id="L5">    MAIN_PATH,</span>
+<span class="fc" id="L6">    COMPLEXITY,</span>
+<span class="fc" id="L7">    RAW;</span>
+
+    public static SemanticGraphViewMode parse(String value) {
+<span class="pc bpc" id="L10" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L11">            return SEMANTIC;</span>
+        }
+<span class="pc bpc" id="L13" title="4 of 5 branches missed.">        return switch (value.trim().toLowerCase(java.util.Locale.ROOT)) {</span>
+<span class="fc" id="L14">            case &quot;semantic&quot; -&gt; SEMANTIC;</span>
+<span class="nc" id="L15">            case &quot;mainpath&quot;, &quot;main_path&quot;, &quot;main-path&quot; -&gt; MAIN_PATH;</span>
+<span class="nc" id="L16">            case &quot;complexity&quot;, &quot;complexity_map&quot; -&gt; COMPLEXITY;</span>
+<span class="nc" id="L17">            case &quot;raw&quot; -&gt; RAW;</span>
+<span class="nc" id="L18">            default -&gt; SEMANTIC;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

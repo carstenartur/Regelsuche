@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompactInMemorySearchTraceStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.memory</a> &gt; <span class="el_source">CompactInMemorySearchTraceStore.java</span></div><h1>CompactInMemorySearchTraceStore.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.memory;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.search.SearchTraceStore;
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Compact in-memory {@link SearchTraceStore} optimized for large discovery runs.
+ *
+ * &lt;p&gt;Expressions/rules/assumptions are hash-consed and addressed by numeric ids.
+ * Paths are stored as edge-id sequences. The first {@code topKFullPaths} paths
+ * are kept fully for hot replay access; remaining paths are delta+varint encoded.
+ */
+public final class CompactInMemorySearchTraceStore implements SearchTraceStore {
+    private static final int DEFAULT_TOP_K_FULL_PATHS = 16;
+
+    private final int topKFullPaths;
+
+<span class="fc" id="L26">    private final Map&lt;ExpressionKey, Long&gt; expressionIntern = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L27">    private final List&lt;ExpressionRecord&gt; expressionsById = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L29">    private final Map&lt;String, Long&gt; ruleIntern = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L30">    private final List&lt;String&gt; rulesById = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L32">    private final Map&lt;AssumptionKey, Long&gt; assumptionsIntern = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L33">    private final List&lt;AssumptionSignature&gt; assumptionsById = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L35">    private final List&lt;EdgeRecord&gt; edgesById = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L37">    private final Map&lt;Long, long[]&gt; fullPaths = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L38">    private final Map&lt;Long, byte[]&gt; compactPaths = new HashMap&lt;&gt;();</span>
+    private long pathCount;
+
+    public CompactInMemorySearchTraceStore() {
+<span class="fc" id="L42">        this(DEFAULT_TOP_K_FULL_PATHS);</span>
+<span class="fc" id="L43">    }</span>
+
+<span class="fc" id="L45">    public CompactInMemorySearchTraceStore(int topKFullPaths) {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (topKFullPaths &lt; 0) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;topKFullPaths must be &gt;= 0&quot;);</span>
+        }
+<span class="fc" id="L49">        this.topKFullPaths = topKFullPaths;</span>
+<span class="fc" id="L50">    }</span>
+
+    @Override
+    public synchronized long internExpression(String canonicalHash, String canonicalForm) {
+<span class="fc" id="L54">        String hash = requireNonBlank(canonicalHash, &quot;canonicalHash&quot;);</span>
+<span class="fc" id="L55">        String form = requireNonBlank(canonicalForm, &quot;canonicalForm&quot;);</span>
+<span class="fc" id="L56">        ExpressionKey key = new ExpressionKey(hash, form);</span>
+<span class="fc" id="L57">        Long existing = expressionIntern.get(key);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L59">            return existing;</span>
+        }
+<span class="fc" id="L61">        long id = expressionsById.size() + 1L;</span>
+<span class="fc" id="L62">        expressionIntern.put(key, id);</span>
+<span class="fc" id="L63">        expressionsById.add(new ExpressionRecord(id, hash, form));</span>
+<span class="fc" id="L64">        return id;</span>
+    }
+
+    @Override
+    public synchronized long internRule(String ruleId) {
+<span class="fc" id="L69">        String rule = requireNonBlank(ruleId, &quot;ruleId&quot;);</span>
+<span class="fc" id="L70">        Long existing = ruleIntern.get(rule);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L72">            return existing;</span>
+        }
+<span class="fc" id="L74">        long id = rulesById.size() + 1L;</span>
+<span class="fc" id="L75">        ruleIntern.put(rule, id);</span>
+<span class="fc" id="L76">        rulesById.add(rule);</span>
+<span class="fc" id="L77">        return id;</span>
+    }
+
+    @Override
+    public synchronized long internAssumptions(AssumptionSignature assumptions) {
+<span class="fc" id="L82">        Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L83">        AssumptionSignature normalized = AssumptionSignature.ofExpressions(assumptions.normalizedAssumptions());</span>
+<span class="fc" id="L84">        AssumptionKey key = new AssumptionKey(</span>
+<span class="fc" id="L85">            normalized.fingerprint(),</span>
+<span class="fc" id="L86">            normalized.normalizedAssumptions()</span>
+        );
+<span class="fc" id="L88">        Long existing = assumptionsIntern.get(key);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L90">            return existing;</span>
+        }
+<span class="fc" id="L92">        long id = assumptionsById.size() + 1L;</span>
+<span class="fc" id="L93">        assumptionsIntern.put(key, id);</span>
+<span class="fc" id="L94">        assumptionsById.add(normalized);</span>
+<span class="fc" id="L95">        return id;</span>
+    }
+
+    @Override
+    public synchronized long addEdge(long fromExprId, long toExprId, int ruleId, long assumptionsId) {
+<span class="fc" id="L100">        requireExistingExpression(fromExprId, &quot;fromExprId&quot;);</span>
+<span class="fc" id="L101">        requireExistingExpression(toExprId, &quot;toExprId&quot;);</span>
+<span class="fc" id="L102">        long normalizedRuleId = normalizeRuleId(ruleId);</span>
+<span class="fc" id="L103">        requireExistingAssumptions(assumptionsId);</span>
+<span class="fc" id="L104">        long id = edgesById.size() + 1L;</span>
+<span class="fc" id="L105">        edgesById.add(new EdgeRecord(id, fromExprId, toExprId, (int) normalizedRuleId, assumptionsId));</span>
+<span class="fc" id="L106">        return id;</span>
+    }
+
+    @Override
+    public synchronized long addPath(long[] edgeIds) {
+<span class="fc" id="L111">        Objects.requireNonNull(edgeIds, &quot;edgeIds&quot;);</span>
+<span class="fc" id="L112">        long[] copy = Arrays.copyOf(edgeIds, edgeIds.length);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (long edgeId : copy) {</span>
+<span class="fc" id="L114">            requireExistingEdge(edgeId);</span>
+        }
+
+<span class="fc" id="L117">        long id = ++pathCount;</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (id &lt;= topKFullPaths) {</span>
+<span class="nc" id="L119">            fullPaths.put(id, copy);</span>
+        } else {
+<span class="fc" id="L121">            compactPaths.put(id, encodePath(copy));</span>
+        }
+<span class="fc" id="L123">        return id;</span>
+    }
+
+    public synchronized long[] expandPath(long pathId) {
+<span class="fc" id="L127">        long[] full = fullPaths.get(pathId);</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (full != null) {</span>
+<span class="nc" id="L129">            return Arrays.copyOf(full, full.length);</span>
+        }
+<span class="fc" id="L131">        byte[] compact = compactPaths.get(pathId);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (compact == null) {</span>
+<span class="nc" id="L133">            throw new IllegalArgumentException(&quot;Unknown path id: &quot; + pathId);</span>
+        }
+<span class="fc" id="L135">        return decodePath(compact);</span>
+    }
+
+    public synchronized List&lt;ReplayStep&gt; replay(long pathId) {
+<span class="fc" id="L139">        long[] edgeIds = expandPath(pathId);</span>
+<span class="fc" id="L140">        List&lt;ReplayStep&gt; steps = new ArrayList&lt;&gt;(edgeIds.length);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (long edgeId : edgeIds) {</span>
+<span class="fc" id="L142">            EdgeRecord edge = edgeById(edgeId);</span>
+<span class="fc" id="L143">            ExpressionRecord from = expressionById(edge.fromExprId());</span>
+<span class="fc" id="L144">            ExpressionRecord to = expressionById(edge.toExprId());</span>
+<span class="fc" id="L145">            String rule = ruleById(Integer.toUnsignedLong(edge.ruleId()));</span>
+<span class="fc" id="L146">            AssumptionSignature assumptions = assumptionsById(edge.assumptionsId());</span>
+<span class="fc" id="L147">            steps.add(new ReplayStep(</span>
+<span class="fc" id="L148">                edge.id(),</span>
+<span class="fc" id="L149">                from.canonicalForm(),</span>
+<span class="fc" id="L150">                to.canonicalForm(),</span>
+                rule,
+                assumptions
+            ));
+        }
+<span class="fc" id="L155">        return List.copyOf(steps);</span>
+    }
+
+    public synchronized long expressionCount() {
+<span class="fc" id="L159">        return expressionsById.size();</span>
+    }
+
+    public synchronized long ruleCount() {
+<span class="fc" id="L163">        return rulesById.size();</span>
+    }
+
+    public synchronized long assumptionsCount() {
+<span class="fc" id="L167">        return assumptionsById.size();</span>
+    }
+
+    public synchronized long edgeCount() {
+<span class="fc" id="L171">        return edgesById.size();</span>
+    }
+
+    public synchronized long fullPathCount() {
+<span class="nc" id="L175">        return fullPaths.size();</span>
+    }
+
+    public synchronized long compactPathCount() {
+<span class="fc" id="L179">        return compactPaths.size();</span>
+    }
+
+    public synchronized int pathStorageBytes(long pathId) {
+<span class="fc" id="L183">        long[] full = fullPaths.get(pathId);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (full != null) {</span>
+<span class="nc" id="L185">            return Math.multiplyExact(full.length, Long.BYTES);</span>
+        }
+<span class="fc" id="L187">        byte[] compact = compactPaths.get(pathId);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (compact == null) {</span>
+<span class="nc" id="L189">            throw new IllegalArgumentException(&quot;Unknown path id: &quot; + pathId);</span>
+        }
+<span class="fc" id="L191">        return compact.length;</span>
+    }
+
+    public synchronized Optional&lt;EdgeRecord&gt; findEdge(long edgeId) {
+<span class="nc bnc" id="L195" title="All 4 branches missed.">        if (edgeId &lt;= 0 || edgeId &gt; edgesById.size()) {</span>
+<span class="nc" id="L196">            return Optional.empty();</span>
+        }
+<span class="nc" id="L198">        return Optional.of(edgesById.get((int) edgeId - 1));</span>
+    }
+
+    private static String requireNonBlank(String value, String fieldName) {
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L203">            throw new IllegalArgumentException(fieldName + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L205">        return value;</span>
+    }
+
+    private void requireExistingExpression(long expressionId, String fieldName) {
+<span class="pc bpc" id="L209" title="2 of 4 branches missed.">        if (expressionId &lt;= 0 || expressionId &gt; expressionsById.size()) {</span>
+<span class="nc" id="L210">            throw new IllegalArgumentException(fieldName + &quot; does not exist: &quot; + expressionId);</span>
+        }
+<span class="fc" id="L212">    }</span>
+
+    private long normalizeRuleId(int ruleId) {
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (ruleId &lt;= 0) {</span>
+<span class="nc" id="L216">            throw new IllegalArgumentException(&quot;ruleId must be positive&quot;);</span>
+        }
+<span class="fc" id="L218">        long normalized = Integer.toUnsignedLong(ruleId);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (normalized &gt; rulesById.size()) {</span>
+<span class="nc" id="L220">            throw new IllegalArgumentException(&quot;ruleId does not exist: &quot; + ruleId);</span>
+        }
+<span class="fc" id="L222">        return normalized;</span>
+    }
+
+    private void requireExistingAssumptions(long assumptionsId) {
+<span class="pc bpc" id="L226" title="2 of 4 branches missed.">        if (assumptionsId &lt;= 0 || assumptionsId &gt; assumptionsById.size()) {</span>
+<span class="nc" id="L227">            throw new IllegalArgumentException(&quot;assumptionsId does not exist: &quot; + assumptionsId);</span>
+        }
+<span class="fc" id="L229">    }</span>
+
+    private void requireExistingEdge(long edgeId) {
+<span class="pc bpc" id="L232" title="2 of 4 branches missed.">        if (edgeId &lt;= 0 || edgeId &gt; edgesById.size()) {</span>
+<span class="nc" id="L233">            throw new IllegalArgumentException(&quot;edgeId does not exist: &quot; + edgeId);</span>
+        }
+<span class="fc" id="L235">    }</span>
+
+    private ExpressionRecord expressionById(long expressionId) {
+<span class="fc" id="L238">        return expressionsById.get((int) expressionId - 1);</span>
+    }
+
+    private String ruleById(long ruleId) {
+<span class="fc" id="L242">        return rulesById.get((int) ruleId - 1);</span>
+    }
+
+    private AssumptionSignature assumptionsById(long assumptionsId) {
+<span class="fc" id="L246">        return assumptionsById.get((int) assumptionsId - 1);</span>
+    }
+
+    private EdgeRecord edgeById(long edgeId) {
+<span class="fc" id="L250">        return edgesById.get((int) edgeId - 1);</span>
+    }
+
+    private static byte[] encodePath(long[] edgeIds) {
+<span class="fc" id="L254">        ByteArrayOutputStream out = new ByteArrayOutputStream(Math.max(8, edgeIds.length));</span>
+<span class="fc" id="L255">        long previous = 0L;</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        for (long edgeId : edgeIds) {</span>
+<span class="fc" id="L257">            long delta = edgeId - previous;</span>
+<span class="fc" id="L258">            writeVarLong(zigZagEncode(delta), out);</span>
+<span class="fc" id="L259">            previous = edgeId;</span>
+        }
+<span class="fc" id="L261">        return out.toByteArray();</span>
+    }
+
+    private static long[] decodePath(byte[] encoded) {
+<span class="fc" id="L265">        long[] tmp = new long[Math.max(8, encoded.length)];</span>
+<span class="fc" id="L266">        int size = 0;</span>
+<span class="fc" id="L267">        long previous = 0L;</span>
+<span class="fc" id="L268">        int index = 0;</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        while (index &lt; encoded.length) {</span>
+<span class="fc" id="L270">            VarLong value = readVarLong(encoded, index);</span>
+<span class="fc" id="L271">            long delta = zigZagDecode(value.value());</span>
+<span class="fc" id="L272">            long edgeId = previous + delta;</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">            if (size == tmp.length) {</span>
+<span class="nc" id="L274">                tmp = Arrays.copyOf(tmp, tmp.length * 2);</span>
+            }
+<span class="fc" id="L276">            tmp[size++] = edgeId;</span>
+<span class="fc" id="L277">            previous = edgeId;</span>
+<span class="fc" id="L278">            index = value.nextIndex();</span>
+<span class="fc" id="L279">        }</span>
+<span class="fc" id="L280">        return Arrays.copyOf(tmp, size);</span>
+    }
+
+    private static long zigZagEncode(long value) {
+<span class="fc" id="L284">        return (value &lt;&lt; 1) ^ (value &gt;&gt; 63);</span>
+    }
+
+    private static long zigZagDecode(long value) {
+<span class="fc" id="L288">        return (value &gt;&gt;&gt; 1) ^ -(value &amp; 1L);</span>
+    }
+
+    private static void writeVarLong(long value, ByteArrayOutputStream out) {
+<span class="fc" id="L292">        long remaining = value;</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        while ((remaining &amp; ~0x7FL) != 0) {</span>
+<span class="fc" id="L294">            out.write((int) ((remaining &amp; 0x7F) | 0x80));</span>
+<span class="fc" id="L295">            remaining &gt;&gt;&gt;= 7;</span>
+        }
+<span class="fc" id="L297">        out.write((int) remaining);</span>
+<span class="fc" id="L298">    }</span>
+
+    private static VarLong readVarLong(byte[] bytes, int index) {
+<span class="fc" id="L301">        long value = 0L;</span>
+<span class="fc" id="L302">        int shift = 0;</span>
+<span class="fc" id="L303">        int cursor = index;</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        while (cursor &lt; bytes.length) {</span>
+<span class="fc" id="L305">            int b = bytes[cursor++] &amp; 0xFF;</span>
+<span class="fc" id="L306">            value |= (long) (b &amp; 0x7F) &lt;&lt; shift;</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if ((b &amp; 0x80) == 0) {</span>
+<span class="fc" id="L308">                return new VarLong(value, cursor);</span>
+            }
+<span class="fc" id="L310">            shift += 7;</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            if (shift &gt; 63) {</span>
+<span class="nc" id="L312">                throw new IllegalArgumentException(&quot;Malformed varint path payload&quot;);</span>
+            }
+<span class="fc" id="L314">        }</span>
+<span class="nc" id="L315">        throw new IllegalArgumentException(&quot;Malformed varint path payload&quot;);</span>
+    }
+
+<span class="fc" id="L318">    private record ExpressionKey(String canonicalHash, String canonicalForm) {</span>
+    }
+
+<span class="fc" id="L321">    private record AssumptionKey(String fingerprint, List&lt;String&gt; normalizedAssumptions) {</span>
+    }
+
+<span class="fc" id="L324">    private record VarLong(long value, int nextIndex) {</span>
+    }
+
+<span class="fc" id="L327">    public record ExpressionRecord(long id, String canonicalHash, String canonicalForm) {</span>
+    }
+
+<span class="fc" id="L330">    public record EdgeRecord(long id, long fromExprId, long toExprId, int ruleId, long assumptionsId) {</span>
+    }
+
+<span class="fc" id="L333">    public record ReplayStep(</span>
+        long edgeId,
+        String fromCanonicalForm,
+        String toCanonicalForm,
+        String ruleId,
+        AssumptionSignature assumptions
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

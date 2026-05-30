@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QuadraticAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.algebra</a> &gt; <span class="el_source">QuadraticAnalyzer.java</span></div><h1>QuadraticAnalyzer.java</h1><pre class="source lang-java linenums">package de.regelsuche.algebra;
+
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public final class QuadraticAnalyzer {
+<span class="nc" id="L8">    private static final Pattern SQUARE = Pattern.compile(&quot;^([a-zA-Z][a-zA-Z0-9_]*)\\^2$&quot;);</span>
+<span class="nc" id="L9">    private static final Pattern COEFFICIENT_SQUARE = Pattern.compile(&quot;^([+-]?\\d+)\\*([a-zA-Z][a-zA-Z0-9_]*)\\^2$&quot;);</span>
+<span class="nc" id="L10">    private static final Pattern LINEAR = Pattern.compile(&quot;^([+-]?\\d+)\\*([a-zA-Z][a-zA-Z0-9_]*)$&quot;);</span>
+<span class="nc" id="L11">    private static final Pattern VARIABLE = Pattern.compile(&quot;^([a-zA-Z][a-zA-Z0-9_]*)$&quot;);</span>
+<span class="nc" id="L12">    private static final Pattern PERFECT_SQUARE = Pattern.compile(&quot;^\\(([a-zA-Z][a-zA-Z0-9_]*)([+-]\\d+)\\)\\^2$&quot;);</span>
+<span class="nc" id="L13">    private static final Pattern COMPLETION = Pattern.compile(&quot;^\\(([a-zA-Z][a-zA-Z0-9_]*)([+-]\\d+)\\)\\^2([+-]\\d+)$&quot;);</span>
+<span class="nc" id="L14">    private static final Pattern DIFFERENCE_PRODUCT = Pattern.compile(</span>
+        &quot;^\\(([a-zA-Z][a-zA-Z0-9_]*)([+-]\\d+)\\)\\*\\(\\1([+-]\\d+)\\)$&quot;
+    );
+
+    private QuadraticAnalyzer() {
+    }
+
+    public static Optional&lt;QuadraticCoefficients&gt; analyze(String expression) {
+<span class="nc" id="L22">        String compact = canonicalInput(expression);</span>
+<span class="nc" id="L23">        Optional&lt;QuadraticCoefficients&gt; square = analyzePerfectSquare(compact);</span>
+<span class="nc bnc" id="L24" title="All 2 branches missed.">        if (square.isPresent()) {</span>
+<span class="nc" id="L25">            return square;</span>
+        }
+<span class="nc" id="L27">        Optional&lt;QuadraticCoefficients&gt; completion = analyzeCompletion(compact);</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">        if (completion.isPresent()) {</span>
+<span class="nc" id="L29">            return completion;</span>
+        }
+<span class="nc" id="L31">        Optional&lt;QuadraticCoefficients&gt; product = analyzeDifferenceProduct(compact);</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        if (product.isPresent()) {</span>
+<span class="nc" id="L33">            return product;</span>
+        }
+<span class="nc" id="L35">        return analyzePolynomial(compact);</span>
+    }
+
+    public static Optional&lt;QuadraticCoefficients&gt; analyzePolynomial(String expression) {
+<span class="nc" id="L39">        String compact = canonicalInput(expression);</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (compact.isBlank()) {</span>
+<span class="nc" id="L41">            return Optional.empty();</span>
+        }
+
+<span class="nc" id="L44">        int quadratic = 0;</span>
+<span class="nc" id="L45">        int linear = 0;</span>
+<span class="nc" id="L46">        int constant = 0;</span>
+<span class="nc" id="L47">        String variable = null;</span>
+        try {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">            for (String term : splitTerms(compact)) {</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">                if (term.isBlank()) {</span>
+<span class="nc" id="L51">                    continue;</span>
+                }
+<span class="nc" id="L53">                Matcher coefficientSquare = COEFFICIENT_SQUARE.matcher(term);</span>
+<span class="nc" id="L54">                Matcher square = SQUARE.matcher(term);</span>
+<span class="nc" id="L55">                Matcher linearTerm = LINEAR.matcher(term);</span>
+<span class="nc" id="L56">                Matcher variableTerm = VARIABLE.matcher(term);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">                if (coefficientSquare.matches()) {</span>
+<span class="nc" id="L58">                    quadratic += Integer.parseInt(coefficientSquare.group(1));</span>
+<span class="nc" id="L59">                    variable = compatible(variable, coefficientSquare.group(2));</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">                } else if (square.matches()) {</span>
+<span class="nc" id="L61">                    quadratic += 1;</span>
+<span class="nc" id="L62">                    variable = compatible(variable, square.group(1));</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">                } else if (linearTerm.matches()) {</span>
+<span class="nc" id="L64">                    linear += Integer.parseInt(linearTerm.group(1));</span>
+<span class="nc" id="L65">                    variable = compatible(variable, linearTerm.group(2));</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                } else if (variableTerm.matches()) {</span>
+<span class="nc" id="L67">                    linear += 1;</span>
+<span class="nc" id="L68">                    variable = compatible(variable, variableTerm.group(1));</span>
+                } else {
+<span class="nc" id="L70">                    constant += Integer.parseInt(term);</span>
+                }
+            }
+<span class="nc" id="L73">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L74">            return Optional.empty();</span>
+<span class="nc" id="L75">        }</span>
+<span class="nc bnc" id="L76" title="All 4 branches missed.">        if (variable == null || quadratic == 0) {</span>
+<span class="nc" id="L77">            return Optional.empty();</span>
+        }
+<span class="nc" id="L79">        return Optional.of(new QuadraticCoefficients(quadratic, linear, constant, variable));</span>
+    }
+
+    public static Optional&lt;QuadraticCoefficients&gt; analyzePerfectSquare(String expression) {
+<span class="nc" id="L83">        Matcher matcher = PERFECT_SQUARE.matcher(canonicalInput(expression));</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (!matcher.matches()) {</span>
+<span class="nc" id="L85">            return Optional.empty();</span>
+        }
+<span class="nc" id="L87">        int value = Integer.parseInt(matcher.group(2));</span>
+<span class="nc" id="L88">        return Optional.of(new QuadraticCoefficients(1, 2 * value, value * value, matcher.group(1)));</span>
+    }
+
+    public static Optional&lt;QuadraticCoefficients&gt; analyzeDifferenceProduct(String expression) {
+<span class="nc" id="L92">        Matcher matcher = DIFFERENCE_PRODUCT.matcher(canonicalInput(expression));</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (!matcher.matches()) {</span>
+<span class="nc" id="L94">            return Optional.empty();</span>
+        }
+<span class="nc" id="L96">        int left = Integer.parseInt(matcher.group(2));</span>
+<span class="nc" id="L97">        int right = Integer.parseInt(matcher.group(3));</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (left + right != 0) {</span>
+<span class="nc" id="L99">            return Optional.empty();</span>
+        }
+<span class="nc" id="L101">        return Optional.of(new QuadraticCoefficients(1, 0, left * right, matcher.group(1)));</span>
+    }
+
+    public static Optional&lt;QuadraticCoefficients&gt; analyzeCompletion(String expression) {
+<span class="nc" id="L105">        Matcher matcher = COMPLETION.matcher(canonicalInput(expression));</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (!matcher.matches()) {</span>
+<span class="nc" id="L107">            return Optional.empty();</span>
+        }
+<span class="nc" id="L109">        int value = Integer.parseInt(matcher.group(2));</span>
+<span class="nc" id="L110">        int adjustment = Integer.parseInt(matcher.group(3));</span>
+<span class="nc" id="L111">        return Optional.of(new QuadraticCoefficients(1, 2 * value, value * value + adjustment, matcher.group(1)));</span>
+    }
+
+    public static String formatPolynomial(QuadraticCoefficients coefficients) {
+<span class="nc" id="L115">        String x = coefficients.variable();</span>
+<span class="nc" id="L116">        StringBuilder builder = new StringBuilder();</span>
+<span class="nc" id="L117">        appendTerm(builder, coefficients.quadratic(), x + &quot;^2&quot;);</span>
+<span class="nc" id="L118">        appendTerm(builder, coefficients.linear(), x);</span>
+<span class="nc" id="L119">        appendTerm(builder, coefficients.constant(), &quot;&quot;);</span>
+<span class="nc" id="L120">        return builder.toString().trim();</span>
+    }
+
+    public static String formatPerfectSquare(String variable, int value) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (value &gt;= 0) {</span>
+<span class="nc" id="L125">            return &quot;(&quot; + variable + &quot; + &quot; + value + &quot;)^2&quot;;</span>
+        }
+<span class="nc" id="L127">        return &quot;(&quot; + variable + &quot; - &quot; + Math.abs(value) + &quot;)^2&quot;;</span>
+    }
+
+    public static String formatCompletion(String variable, int value) {
+<span class="nc" id="L131">        return formatPerfectSquare(variable, value) + &quot; - &quot; + (value * value);</span>
+    }
+
+    public static String canonicalInput(String expression) {
+<span class="nc" id="L135">        return expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;)</span>
+<span class="nc" id="L136">            .replace(&quot;**&quot;, &quot;^&quot;)</span>
+<span class="nc" id="L137">            .replace(&quot;)(&quot;, &quot;)*(&quot;)</span>
+<span class="nc" id="L138">            .replaceAll(&quot;(?&lt;=[0-9])(?=[a-zA-Z])&quot;, &quot;*&quot;)</span>
+<span class="nc" id="L139">            .replaceAll(&quot;(?&lt;=[a-zA-Z0-9_])(?=\\()&quot;, &quot;*&quot;);</span>
+    }
+
+    private static String compatible(String current, String next) {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (current == null) {</span>
+<span class="nc" id="L144">            return next;</span>
+        }
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (!current.equals(next)) {</span>
+<span class="nc" id="L147">            throw new IllegalArgumentException(&quot;Only one variable is supported per quadratic expression&quot;);</span>
+        }
+<span class="nc" id="L149">        return current;</span>
+    }
+
+    private static String[] splitTerms(String compact) {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        String normalized = compact.charAt(0) == '-' ? compact : &quot;+&quot; + compact;</span>
+<span class="nc" id="L154">        return normalized.replace(&quot;-&quot;, &quot;+-&quot;).split(&quot;\\+&quot;);</span>
+    }
+
+    private static void appendTerm(StringBuilder builder, int coefficient, String base) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (coefficient == 0) {</span>
+<span class="nc" id="L159">            return;</span>
+        }
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (!builder.isEmpty()) {</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            builder.append(coefficient &gt; 0 ? &quot; + &quot; : &quot; - &quot;);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        } else if (coefficient &lt; 0) {</span>
+<span class="nc" id="L164">            builder.append(&quot;-&quot;);</span>
+        }
+
+<span class="nc" id="L167">        int abs = Math.abs(coefficient);</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (base.isBlank()) {</span>
+<span class="nc" id="L169">            builder.append(abs);</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        } else if (abs == 1) {</span>
+<span class="nc" id="L171">            builder.append(base);</span>
+        } else {
+<span class="nc" id="L173">            builder.append(abs).append(&quot;*&quot;).append(base);</span>
+        }
+<span class="nc" id="L175">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

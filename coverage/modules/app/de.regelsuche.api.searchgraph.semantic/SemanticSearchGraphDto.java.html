@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemanticSearchGraphDto.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph.semantic</a> &gt; <span class="el_source">SemanticSearchGraphDto.java</span></div><h1>SemanticSearchGraphDto.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph.semantic;
+
+import java.util.List;
+
+public record SemanticSearchGraphDto(
+    List&lt;SemanticGraphNodeDto&gt; nodes,
+    List&lt;SemanticGraphEdgeDto&gt; edges,
+    List&lt;SemanticGraphClusterDto&gt; clusters,
+    SemanticGraphStatsDto stats,
+    SemanticGraphViewConfigDto view
+) {
+<span class="fc" id="L12">    public SemanticSearchGraphDto {</span>
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">        nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">        edges = edges == null ? List.of() : List.copyOf(edges);</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        clusters = clusters == null ? List.of() : List.copyOf(clusters);</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        stats = stats == null ? new SemanticGraphStatsDto(0, 0, 0, 0, 0, 0, 0, 0) : stats;</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        view = view == null ? new SemanticGraphViewConfigDto(</span>
+            SemanticGraphViewMode.SEMANTIC,
+            SemanticMacroStepDisplay.COMPACT,
+            false,
+            true,
+            false,
+            12,
+            8,
+<span class="nc" id="L25">            new SemanticLayoutDto(java.util.Map.of(), java.util.List.of(), SemanticLayoutKind.MAIN_PATH_LAYERED)</span>
+<span class="fc" id="L26">        ) : view;</span>
+<span class="fc" id="L27">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

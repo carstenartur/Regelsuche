@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnownRuleSimilarityService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">KnownRuleSimilarityService.java</span></div><h1>KnownRuleSimilarityService.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+/** Similarity model used to demote trivial rediscoveries of known rules. */
+<span class="fc" id="L9">public final class KnownRuleSimilarityService {</span>
+<span class="fc" id="L10">    private static final Pattern TOKEN = Pattern.compile(&quot;[A-Za-z][A-Za-z0-9_]*|\\d+(?:\\.\\d+)?|\\S&quot;);</span>
+
+    public double similarityToKnownRules(String leftPattern, String rightPattern, KnownRuleRepository repository) {
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">        return similarityToKnownRules(leftPattern, rightPattern, repository == null ? java.util.List.of() : repository.all());</span>
+    }
+
+    public double similarityToKnownRules(String leftPattern, String rightPattern, Iterable&lt;KnownRule&gt; knownRules) {
+<span class="fc" id="L17">        double best = 0.0;</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        if (knownRules == null) {</span>
+<span class="nc" id="L19">            return best;</span>
+        }
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        for (KnownRule rule : knownRules) {</span>
+<span class="fc" id="L22">            best = Math.max(best, similarity(leftPattern, rightPattern, rule.leftPattern(), rule.rightPattern()));</span>
+<span class="fc" id="L23">            best = Math.max(best, similarity(leftPattern, rightPattern, rule.rightPattern(), rule.leftPattern()));</span>
+<span class="fc" id="L24">        }</span>
+<span class="fc" id="L25">        return best;</span>
+    }
+
+    public double similarity(String leftA, String rightA, String leftB, String rightB) {
+<span class="fc" id="L29">        String canonicalA = canonicalRule(leftA, rightA);</span>
+<span class="fc" id="L30">        String canonicalB = canonicalRule(leftB, rightB);</span>
+<span class="fc" id="L31">        double edit = normalizedEditSimilarity(canonicalA, canonicalB);</span>
+<span class="fc" id="L32">        double operators = operatorFingerprintSimilarity(leftA + &quot; &quot; + rightA, leftB + &quot; &quot; + rightB);</span>
+<span class="fc" id="L33">        double placeholders = placeholderAwareSimilarity(leftA, rightA, leftB, rightB);</span>
+<span class="fc" id="L34">        return clamp(0.50 * edit + 0.25 * operators + 0.25 * placeholders);</span>
+    }
+
+    private static String canonicalRule(String left, String right) {
+<span class="fc" id="L38">        return RulePatternCanonicalizer.hash(normalizeFunctions(left), normalizeFunctions(right));</span>
+    }
+
+    private static String normalizeFunctions(String expression) {
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.toLowerCase(Locale.ROOT).replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+    }
+
+    private static double placeholderAwareSimilarity(String leftA, String rightA, String leftB, String rightB) {
+<span class="fc" id="L46">        String normalizedA = placeholderShape(leftA) + &quot;-&gt;&quot; + placeholderShape(rightA);</span>
+<span class="fc" id="L47">        String normalizedB = placeholderShape(leftB) + &quot;-&gt;&quot; + placeholderShape(rightB);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (normalizedA.equals(normalizedB)) {</span>
+<span class="fc" id="L49">            return 1.0;</span>
+        }
+<span class="fc" id="L51">        return normalizedEditSimilarity(normalizedA, normalizedB);</span>
+    }
+
+    private static String placeholderShape(String expression) {
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        String normalized = RulePatternCanonicalizer.canonicalize(expression == null ? &quot;&quot; : expression);</span>
+<span class="fc" id="L56">        return TOKEN.matcher(normalized)</span>
+<span class="fc" id="L57">            .results()</span>
+<span class="fc" id="L58">            .map(match -&gt; tokenShape(match.group()))</span>
+<span class="fc" id="L59">            .reduce(&quot;&quot;, (left, right) -&gt; left + right);</span>
+    }
+
+    private static String tokenShape(String token) {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (token.matches(&quot;p\\d+&quot;)) {</span>
+<span class="fc" id="L64">            return &quot;P&quot;;</span>
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (token.matches(&quot;\\d+(?:\\.\\d+)?&quot;)) {</span>
+<span class="fc" id="L67">            return &quot;N&quot;;</span>
+        }
+<span class="fc" id="L69">        return token;</span>
+    }
+
+    private static double operatorFingerprintSimilarity(String left, String right) {
+<span class="fc" id="L73">        Map&lt;String, Integer&gt; a = operatorFingerprint(left);</span>
+<span class="fc" id="L74">        Map&lt;String, Integer&gt; b = operatorFingerprint(right);</span>
+<span class="fc" id="L75">        int intersection = 0;</span>
+<span class="fc" id="L76">        int union = 0;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (String key : unionKeys(a, b).keySet()) {</span>
+<span class="fc" id="L78">            int leftCount = a.getOrDefault(key, 0);</span>
+<span class="fc" id="L79">            int rightCount = b.getOrDefault(key, 0);</span>
+<span class="fc" id="L80">            intersection += Math.min(leftCount, rightCount);</span>
+<span class="fc" id="L81">            union += Math.max(leftCount, rightCount);</span>
+<span class="fc" id="L82">        }</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        return union == 0 ? 1.0 : intersection / (double) union;</span>
+    }
+
+    private static Map&lt;String, Integer&gt; operatorFingerprint(String expression) {
+<span class="fc" id="L87">        Map&lt;String, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        String value = expression == null ? &quot;&quot; : expression.toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L90">            char ch = value.charAt(i);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (&quot;+-*/^&quot;.indexOf(ch) &gt;= 0) {</span>
+<span class="fc" id="L92">                counts.merge(String.valueOf(ch), 1, Integer::sum);</span>
+            }
+        }
+<span class="fc" id="L95">        java.util.regex.Matcher functions = Pattern.compile(&quot;\\b([a-z][a-z0-9_]*)\\s*\\(&quot;).matcher(value);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        while (functions.find()) {</span>
+<span class="fc" id="L97">            counts.merge(&quot;fn:&quot; + functions.group(1), 1, Integer::sum);</span>
+        }
+<span class="fc" id="L99">        return counts;</span>
+    }
+
+    private static Map&lt;String, Integer&gt; unionKeys(Map&lt;String, Integer&gt; a, Map&lt;String, Integer&gt; b) {
+<span class="fc" id="L103">        Map&lt;String, Integer&gt; keys = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L104">        a.keySet().forEach(key -&gt; keys.put(key, 1));</span>
+<span class="fc" id="L105">        b.keySet().forEach(key -&gt; keys.put(key, 1));</span>
+<span class="fc" id="L106">        return keys;</span>
+    }
+
+    private static double normalizedEditSimilarity(String left, String right) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (left.equals(right)) {</span>
+<span class="fc" id="L111">            return 1.0;</span>
+        }
+<span class="fc" id="L113">        int max = Math.max(left.length(), right.length());</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (max == 0) {</span>
+<span class="nc" id="L115">            return 1.0;</span>
+        }
+<span class="fc" id="L117">        return clamp(1.0 - levenshtein(left, right) / (double) max);</span>
+    }
+
+    private static int levenshtein(String left, String right) {
+<span class="fc" id="L121">        int[] previous = new int[right.length() + 1];</span>
+<span class="fc" id="L122">        int[] current = new int[right.length() + 1];</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (int j = 0; j &lt;= right.length(); j++) {</span>
+<span class="fc" id="L124">            previous[j] = j;</span>
+        }
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (int i = 1; i &lt;= left.length(); i++) {</span>
+<span class="fc" id="L127">            current[0] = i;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            for (int j = 1; j &lt;= right.length(); j++) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                int cost = left.charAt(i - 1) == right.charAt(j - 1) ? 0 : 1;</span>
+<span class="fc" id="L130">                current[j] = Math.min(</span>
+<span class="fc" id="L131">                    Math.min(current[j - 1] + 1, previous[j] + 1),</span>
+                    previous[j - 1] + cost
+                );
+            }
+<span class="fc" id="L135">            int[] tmp = previous;</span>
+<span class="fc" id="L136">            previous = current;</span>
+<span class="fc" id="L137">            current = tmp;</span>
+        }
+<span class="fc" id="L139">        return previous[right.length()];</span>
+    }
+
+    private static double clamp(double value) {
+<span class="fc" id="L143">        return Math.max(0.0, Math.min(1.0, value));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TemplateSymbolicRegressionHypothesisSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">TemplateSymbolicRegressionHypothesisSource.java</span></div><h1>TemplateSymbolicRegressionHypothesisSource.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.validation.CandidateProofStatus;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+/** Small internal template-based symbolic-regression source; outputs evidence-only hypotheses. */
+public final class TemplateSymbolicRegressionHypothesisSource implements SymbolicRegressionHypothesisSource {
+    private final boolean enabled;
+    private final int minimumSupport;
+    private final SymbolicRegressionBackend backend;
+
+    public TemplateSymbolicRegressionHypothesisSource(boolean enabled, int minimumSupport) {
+<span class="fc" id="L15">        this(enabled, minimumSupport, new DefaultTemplateSymbolicRegressionBackend());</span>
+<span class="fc" id="L16">    }</span>
+
+    public TemplateSymbolicRegressionHypothesisSource(
+        boolean enabled,
+        int minimumSupport,
+        SymbolicRegressionBackend backend
+<span class="fc" id="L22">    ) {</span>
+<span class="fc" id="L23">        this.enabled = enabled;</span>
+<span class="fc" id="L24">        this.minimumSupport = Math.max(2, minimumSupport);</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        this.backend = backend == null ? new DefaultTemplateSymbolicRegressionBackend() : backend;</span>
+<span class="fc" id="L26">    }</span>
+
+    @Override
+    public boolean enabled() {
+<span class="nc" id="L30">        return enabled;</span>
+    }
+
+    @Override
+    public List&lt;HypothesisCandidate&gt; propose(List&lt;SuccessfulTransformationPath&gt; paths) {
+<span class="pc bpc" id="L35" title="2 of 6 branches missed.">        if (!enabled || paths == null || paths.size() &lt; minimumSupport) {</span>
+<span class="fc" id="L36">            return List.of();</span>
+        }
+<span class="fc" id="L38">        List&lt;SymbolicRegressionSample&gt; samples = backend.extractSamples(paths, minimumSupport);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (samples.size() &lt; minimumSupport) {</span>
+<span class="nc" id="L40">            return List.of();</span>
+        }
+<span class="fc" id="L42">        return backend.fit(samples, minimumSupport).stream()</span>
+<span class="fc" id="L43">            .map(this::hypothesis)</span>
+<span class="fc" id="L44">            .toList();</span>
+    }
+
+    private HypothesisCandidate hypothesis(SymbolicRegressionFittedResult fitted) {
+<span class="fc" id="L48">        List&lt;String&gt; support = fitted.supportingSamples().stream().map(SymbolicRegressionSample::pathId).toList();</span>
+<span class="fc" id="L49">        List&lt;HypothesisCandidate.ExpressionPair&gt; witnesses = fitted.supportingSamples().stream()</span>
+<span class="fc" id="L50">            .map(sample -&gt; new HypothesisCandidate.ExpressionPair(</span>
+<span class="fc" id="L51">                DefaultTemplateSymbolicRegressionBackend.format(sample.x()),</span>
+<span class="fc" id="L52">                DefaultTemplateSymbolicRegressionBackend.format(sample.y())))</span>
+<span class="fc" id="L53">            .toList();</span>
+<span class="fc" id="L54">        return new HypothesisCandidate(</span>
+<span class="fc" id="L55">            &quot;template-symreg-&quot; + Integer.toHexString((fitted.templateName() + fitted.expression()).hashCode()),</span>
+            &quot;x&quot;,
+<span class="fc" id="L57">            fitted.expression(),</span>
+            support,
+            witnesses,
+<span class="fc" id="L60">            List.of(&quot;symbolic-regression-evidence-only&quot;, &quot;template:&quot; + fitted.templateName()),</span>
+            0.0,
+            CandidateProofStatus.OBSERVED,
+            null,
+<span class="fc" id="L64">            List.of(</span>
+                &quot;fitted-by-template-library&quot;,
+<span class="fc" id="L66">                &quot;sample-count=&quot; + fitted.supportingSamples().size(),</span>
+<span class="fc" id="L67">                &quot;max-residual=&quot; + DefaultTemplateSymbolicRegressionBackend.format(fitted.maxResidual()),</span>
+<span class="fc" id="L68">                &quot;confidence=&quot; + DefaultTemplateSymbolicRegressionBackend.format(fitted.confidence())</span>
+            ),
+<span class="fc" id="L70">            Map.of(&quot;symbolicRegression&quot;, List.of(</span>
+                &quot;internal-template&quot;,
+                &quot;evidence-only&quot;,
+<span class="fc" id="L73">                &quot;template=&quot; + fitted.templateName(),</span>
+<span class="fc" id="L74">                &quot;confidence=&quot; + DefaultTemplateSymbolicRegressionBackend.format(fitted.confidence())</span>
+            )),
+            Instant.EPOCH
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

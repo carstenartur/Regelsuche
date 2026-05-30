@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StructuralExpressionClusterer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph</a> &gt; <span class="el_source">StructuralExpressionClusterer.java</span></div><h1>StructuralExpressionClusterer.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Groups expressions whose canonical AST skeleton is identical.
+ *
+ * &lt;p&gt;A &quot;skeleton&quot; replaces every concrete leaf (numbers, variables) with a
+ * placeholder and folds n-ary structures so that, e.g.
+ * {@code (x+1)*(x+1)} and {@code (y+2)*(y+2)} share the skeleton
+ * {@code (V+N)*(V+N)} and end up in the same {@link
+ * ClusterType#STRUCTURAL_PATTERN} cluster.&lt;/p&gt;
+ *
+ * &lt;p&gt;Cohesion is {@code count / total} for the node set surfaced.&lt;/p&gt;
+ */
+public final class StructuralExpressionClusterer {
+
+<span class="fc" id="L32">    private final ExpressionParser parser = new ExpressionParser();</span>
+    private final int minSize;
+
+    public StructuralExpressionClusterer() {
+<span class="fc" id="L36">        this(2);</span>
+<span class="fc" id="L37">    }</span>
+
+<span class="fc" id="L39">    public StructuralExpressionClusterer(int minSize) {</span>
+<span class="fc" id="L40">        this.minSize = Math.max(2, minSize);</span>
+<span class="fc" id="L41">    }</span>
+
+    public List&lt;SearchGraphClusterDto&gt; cluster(Collection&lt;String&gt; expressions) {
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">        if (expressions == null || expressions.isEmpty()) {</span>
+<span class="fc" id="L45">            return List.of();</span>
+        }
+<span class="fc" id="L47">        Map&lt;String, List&lt;String&gt;&gt; bySkeleton = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L48">        Set&lt;String&gt; seen = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (String expr : expressions) {</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (!seen.add(expr)) {</span>
+<span class="nc" id="L51">                continue;</span>
+            }
+<span class="fc" id="L53">            String skeleton = skeleton(expr);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (skeleton.isEmpty()) {</span>
+<span class="fc" id="L55">                continue;</span>
+            }
+<span class="fc" id="L57">            bySkeleton.computeIfAbsent(skeleton, k -&gt; new ArrayList&lt;&gt;()).add(expr);</span>
+<span class="fc" id="L58">        }</span>
+<span class="fc" id="L59">        List&lt;SearchGraphClusterDto&gt; clusters = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L60">        int counter = 0;</span>
+<span class="fc" id="L61">        int total = (int) expressions.stream().distinct().count();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : bySkeleton.entrySet()) {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (entry.getValue().size() &lt; minSize) {</span>
+<span class="fc" id="L64">                continue;</span>
+            }
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            double cohesion = total == 0 ? 0.0 : (double) entry.getValue().size() / total;</span>
+<span class="fc" id="L67">            clusters.add(new SearchGraphClusterDto(</span>
+                &quot;struct-&quot; + (counter++),
+<span class="fc" id="L69">                &quot;skeleton:&quot; + entry.getKey(),</span>
+                ClusterType.STRUCTURAL_PATTERN,
+<span class="fc" id="L71">                entry.getValue(),</span>
+<span class="fc" id="L72">                List.of(),</span>
+<span class="fc" id="L73">                Math.min(1.0, cohesion)</span>
+            ));
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        return clusters;</span>
+    }
+
+    String skeleton(String expression) {
+        try {
+<span class="fc" id="L81">            Expr expr = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="fc" id="L82">            return render(expr);</span>
+<span class="fc" id="L83">        } catch (RuntimeException ex) {</span>
+<span class="fc" id="L84">            return &quot;&quot;;</span>
+        }
+    }
+
+    private static String render(Expr expr) {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (expr instanceof NumberExpr) {</span>
+<span class="fc" id="L90">            return &quot;N&quot;;</span>
+        }
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (expr instanceof VariableExpr) {</span>
+<span class="fc" id="L93">            return &quot;V&quot;;</span>
+        }
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L96">            return &quot;(&quot; + render(binary.left()) + binary.operator().symbol() + render(binary.right()) + &quot;)&quot;;</span>
+        }
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (expr instanceof FunctionExpr fn) {</span>
+<span class="fc" id="L99">            StringBuilder sb = new StringBuilder(fn.name()).append('(');</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            for (int i = 0; i &lt; fn.arguments().size(); i++) {</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="nc" id="L102">                    sb.append(',');</span>
+                }
+<span class="fc" id="L104">                sb.append(render(fn.arguments().get(i)));</span>
+            }
+<span class="fc" id="L106">            return sb.append(')').toString();</span>
+        }
+<span class="nc" id="L108">        return &quot;?&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

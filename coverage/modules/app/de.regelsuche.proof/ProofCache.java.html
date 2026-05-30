@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofCache.java</span></div><h1>ProofCache.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import de.regelsuche.validation.CandidateProofStatus;
+import java.util.Optional;
+
+/**
+ * Cache that avoids re-running the same proof obligation.
+ *
+ * &lt;p&gt;The cache operates on {@link ProofCacheKey}s, which embed the prover
+ * version; different prover versions produce different keys and never share
+ * cached results.&lt;/p&gt;
+ */
+public interface ProofCache {
+
+    /** @return the cached status if a previous proof attempt succeeded. */
+    Optional&lt;CandidateProofStatus&gt; get(ProofCacheKey key);
+
+    /**
+     * Store a result.  Implementations may choose to only cache positive
+     * results (e.g. {@code status &gt;= FORMALLY_PROVABLE}) and ignore
+     * lower-quality hits.
+     */
+    void put(ProofCacheKey key, CandidateProofStatus status);
+
+    /**
+     * @return the full {@link ProofCacheEntry} if cached. Default delegates to
+     *         {@link #get(ProofCacheKey)} so legacy in-memory implementations
+     *         keep working with status-only semantics.
+     */
+    default Optional&lt;ProofCacheEntry&gt; getEntry(ProofCacheKey key) {
+<span class="nc" id="L31">        return get(key).map(ProofCacheEntry::ofStatus);</span>
+    }
+
+    /**
+     * Store the full entry. Default implementation discards the extra metadata
+     * by delegating to {@link #put(ProofCacheKey, CandidateProofStatus)}.
+     */
+    default void putEntry(ProofCacheKey key, ProofCacheEntry entry) {
+<span class="nc" id="L39">        put(key, entry.status());</span>
+<span class="nc" id="L40">    }</span>
+
+    /** @return the current number of cache entries. */
+    int size();
+
+    /** Remove all cached entries. */
+    void clear();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

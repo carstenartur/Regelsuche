@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExplanationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.explain</a> &gt; <span class="el_source">ExplanationService.java</span></div><h1>ExplanationService.java</h1><pre class="source lang-java linenums">package de.regelsuche.explain;
+
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.json.JsonWriter;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Produces multi-form, didactically usable explanations for individual
+ * {@link TransformationStep transformation steps} and whole
+ * {@link DiscoveredTransformation transformation paths}.
+ *
+ * &lt;p&gt;Supported {@link Form forms}: {@code SHORT}, {@code SCHOOL},
+ * {@code EXPERT}, {@code LATEX}, {@code JSON}.&lt;/p&gt;
+ *
+ * &lt;p&gt;{@code SCHOOL} output and path headings are locale-aware. The overloads
+ * without a {@link Locale} parameter default to {@link Locale#GERMAN} for
+ * backward compatibility. Pass {@link Locale#ENGLISH} (or any other locale,
+ * which falls back to English) to obtain English output.&lt;/p&gt;
+ */
+<span class="fc" id="L24">public class ExplanationService {</span>
+
+    /** Rendering form requested by the caller. */
+<span class="fc" id="L27">    public enum Form {</span>
+        /** One short line per step (e.g. {@code a*(b+c) = a*b + a*c}). */
+<span class="fc" id="L29">        SHORT,</span>
+        /** Numbered step-by-step rendering. Alias of {@link #SHORT} kept for UI clarity. */
+<span class="fc" id="L31">        STEPS,</span>
+        /** Verbose, classroom-style explanation (localised). */
+<span class="fc" id="L33">        SCHOOL,</span>
+        /** Technical: lists rule id, kind and cost delta. */
+<span class="fc" id="L35">        EXPERT,</span>
+        /** LaTeX-ready string (no surrounding environment). */
+<span class="fc" id="L37">        LATEX,</span>
+        /** Strict JSON representation of all metadata. */
+<span class="fc" id="L39">        JSON</span>
+    }
+
+    // ── Locale-unaware entry points (kept for backward compatibility) ───────
+
+    public String renderStep(TransformationStep step, Form form) {
+<span class="fc" id="L45">        return renderStep(step, form, Locale.GERMAN);</span>
+    }
+
+    public String renderPath(DiscoveredTransformation path, Form form) {
+<span class="fc" id="L49">        return renderPath(path, form, Locale.GERMAN);</span>
+    }
+
+    // ── Locale-aware entry points ────────────────────────────────────────────
+
+    /**
+     * Renders a single transformation step in the requested form and
+     * language.
+     *
+     * @param step   the transformation step to render
+     * @param form   output format
+     * @param locale target locale; German and English are fully
+     *               supported, all other locales fall back to English
+     */
+    public String renderStep(TransformationStep step, Form form, Locale locale) {
+<span class="pc bpc" id="L64" title="2 of 5 branches missed.">        return switch (form) {</span>
+<span class="fc" id="L65">            case SHORT, STEPS -&gt; step.beforeExpression() + &quot; = &quot; + step.afterExpression();</span>
+<span class="fc" id="L66">            case SCHOOL -&gt; renderSchool(step, locale);</span>
+<span class="nc" id="L67">            case EXPERT -&gt; renderExpert(step);</span>
+<span class="fc" id="L68">            case LATEX -&gt; toLatex(step.beforeExpression()) + &quot; \\;\\rightarrow\\; &quot; + toLatex(step.afterExpression());</span>
+<span class="nc" id="L69">            case JSON -&gt; renderStepJson(step);</span>
+        };
+    }
+
+    /**
+     * Renders a whole transformation path in the requested form and
+     * language.
+     *
+     * @param path   the transformation path to render
+     * @param form   output format
+     * @param locale target locale; German and English are fully
+     *               supported, all other locales fall back to English
+     */
+    public String renderPath(DiscoveredTransformation path, Form form, Locale locale) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (form == Form.JSON) {</span>
+<span class="fc" id="L84">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L85">            writer.beginObject();</span>
+<span class="fc" id="L86">            writer.property(&quot;id&quot;, path.id());</span>
+<span class="fc" id="L87">            writer.property(&quot;originalExpression&quot;, path.originalExpression());</span>
+<span class="fc" id="L88">            writer.property(&quot;improvedExpression&quot;, path.improvedExpression());</span>
+<span class="fc" id="L89">            writer.property(&quot;validationStatus&quot;, path.validationStatus().name());</span>
+<span class="fc" id="L90">            writer.array(&quot;steps&quot;, w -&gt; path.steps().forEach(step -&gt;</span>
+<span class="fc" id="L91">                w.objectValue(inner -&gt; writeStepFields(inner, step))));</span>
+<span class="fc" id="L92">            writer.endObject();</span>
+<span class="fc" id="L93">            return writer.toString();</span>
+        }
+<span class="fc" id="L95">        boolean german = isGerman(locale);</span>
+<span class="fc" id="L96">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L97">        List&lt;TransformationStep&gt; steps = path.steps();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (int i = 0; i &lt; steps.size(); i++) {</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (form == Form.SCHOOL) {</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                builder.append(german ? &quot;Schritt &quot; : &quot;Step &quot;).append(i + 1).append(&quot;: &quot;);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            } else if (form == Form.EXPERT) {</span>
+<span class="nc" id="L102">                builder.append(&quot;[&quot;).append(i + 1).append(&quot;] &quot;);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            } else if (form == Form.LATEX) {</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                builder.append(german ? &quot;% Schritt &quot; : &quot;% Step &quot;).append(i + 1).append('\n');</span>
+            } else {
+<span class="fc" id="L106">                builder.append(i + 1).append(&quot;. &quot;);</span>
+            }
+<span class="fc" id="L108">            builder.append(renderStep(steps.get(i), form, locale));</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (i &lt; steps.size() - 1) {</span>
+<span class="nc" id="L110">                builder.append('\n');</span>
+            }
+        }
+<span class="fc" id="L113">        return builder.toString();</span>
+    }
+
+    /**
+     * Returns the localized, human-readable title for a rewrite rule without
+     * any surrounding {@code Regel:}/{@code Rule:} label.
+     *
+     * @param ruleId the transformation rule id
+     * @param locale target locale; German is used for {@code de}, all other
+     *               locales fall back to English
+     * @return localized rule title
+     */
+    public String ruleTitle(String ruleId, Locale locale) {
+<span class="fc" id="L126">        return humanRuleName(ruleId, locale);</span>
+    }
+
+    // ── Private rendering helpers ────────────────────────────────────────────
+
+    private String renderSchool(TransformationStep step, Locale locale) {
+<span class="fc" id="L132">        boolean german = isGerman(locale);</span>
+<span class="fc" id="L133">        String ruleName = humanRuleName(step.ruleId(), locale);</span>
+        String preserving;
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (step.equivalencePreserving()) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            preserving = german ? &quot;Äquivalenz erhaltend.&quot; : &quot;Equivalence-preserving.&quot;;</span>
+        } else {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            preserving = german</span>
+<span class="nc" id="L139">                ? &quot;Achtung: nicht garantiert äquivalent.&quot;</span>
+<span class="nc" id="L140">                : &quot;Warning: not guaranteed to be equivalent.&quot;;</span>
+        }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (german) {</span>
+<span class="fc" id="L143">            return &quot;Regel: &quot; + ruleName + &quot;\n&quot;</span>
+<span class="fc" id="L144">                + &quot;Vorher: &quot; + step.beforeExpression() + &quot;\n&quot;</span>
+<span class="fc" id="L145">                + &quot;Nachher: &quot; + step.afterExpression() + &quot;\n&quot;</span>
+<span class="fc" id="L146">                + &quot;Begründung: &quot; + ruleExplanation(step.ruleId(), locale) + &quot;\n&quot;</span>
+                + &quot;Status: &quot; + preserving;
+        } else {
+<span class="fc" id="L149">            return &quot;Rule: &quot; + ruleName + &quot;\n&quot;</span>
+<span class="fc" id="L150">                + &quot;Before: &quot; + step.beforeExpression() + &quot;\n&quot;</span>
+<span class="fc" id="L151">                + &quot;After: &quot; + step.afterExpression() + &quot;\n&quot;</span>
+<span class="fc" id="L152">                + &quot;Reason: &quot; + ruleExplanation(step.ruleId(), locale) + &quot;\n&quot;</span>
+                + &quot;Status: &quot; + preserving;
+        }
+    }
+
+    private String renderExpert(TransformationStep step) {
+<span class="nc" id="L158">        return String.format(Locale.ROOT,</span>
+            &quot;rule=%s kind=%s scoreΔ=%d equiv=%s : %s -&gt; %s&quot;,
+<span class="nc" id="L160">            step.ruleId(),</span>
+<span class="nc" id="L161">            step.ruleKind().name(),</span>
+<span class="nc" id="L162">            step.scoreAfter() - step.scoreBefore(),</span>
+<span class="nc" id="L163">            step.equivalencePreserving(),</span>
+<span class="nc" id="L164">            step.beforeExpression(),</span>
+<span class="nc" id="L165">            step.afterExpression()</span>
+        );
+    }
+
+    private String renderStepJson(TransformationStep step) {
+<span class="nc" id="L170">        JsonWriter writer = new JsonWriter();</span>
+<span class="nc" id="L171">        writer.beginObject();</span>
+<span class="nc" id="L172">        writeStepFields(writer, step);</span>
+<span class="nc" id="L173">        writer.endObject();</span>
+<span class="nc" id="L174">        return writer.toString();</span>
+    }
+
+    private void writeStepFields(JsonWriter writer, TransformationStep step) {
+<span class="fc" id="L178">        writer.property(&quot;index&quot;, step.index());</span>
+<span class="fc" id="L179">        writer.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
+<span class="fc" id="L180">        writer.property(&quot;afterExpression&quot;, step.afterExpression());</span>
+<span class="fc" id="L181">        writer.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L182">        writer.property(&quot;ruleKind&quot;, step.ruleKind().name());</span>
+<span class="fc" id="L183">        writer.property(&quot;scoreBefore&quot;, step.scoreBefore());</span>
+<span class="fc" id="L184">        writer.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
+<span class="fc" id="L185">        writer.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="fc" id="L186">        writer.property(&quot;explanation&quot;, step.explanation());</span>
+<span class="fc" id="L187">    }</span>
+
+<span class="fc" id="L189">    private static final de.regelsuche.export.MathPresentation MATH =</span>
+        de.regelsuche.export.MathPresentation.DEFAULT;
+
+    private String toLatex(String expression) {
+<span class="fc" id="L193">        return MATH.latex(expression);</span>
+    }
+
+    private static boolean isGerman(Locale locale) {
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (locale == null) {</span>
+<span class="nc" id="L198">            return false;</span>
+        }
+<span class="fc" id="L200">        return &quot;de&quot;.equalsIgnoreCase(locale.getLanguage());</span>
+    }
+
+    private String humanRuleName(String ruleId, Locale locale) {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (isGerman(locale)) {</span>
+<span class="fc" id="L205">            String mapped = RULE_NAMES_DE.get(ruleId);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            if (mapped != null) {</span>
+<span class="fc" id="L207">                return mapped;</span>
+            }
+<span class="fc" id="L209">            return ruleId</span>
+<span class="fc" id="L210">                .replace(&quot;ast_&quot;, &quot;&quot;)</span>
+<span class="fc" id="L211">                .replace(&quot;polynomial_&quot;, &quot;Polynom: &quot;)</span>
+<span class="fc" id="L212">                .replace(&quot;rational_&quot;, &quot;Bruch: &quot;)</span>
+<span class="fc" id="L213">                .replace(&quot;_&quot;, &quot; &quot;);</span>
+        } else {
+<span class="fc" id="L215">            String mapped = RULE_NAMES_EN.get(ruleId);</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            if (mapped != null) {</span>
+<span class="fc" id="L217">                return mapped;</span>
+            }
+<span class="nc" id="L219">            return ruleId</span>
+<span class="nc" id="L220">                .replace(&quot;ast_&quot;, &quot;&quot;)</span>
+<span class="nc" id="L221">                .replace(&quot;polynomial_&quot;, &quot;Polynomial: &quot;)</span>
+<span class="nc" id="L222">                .replace(&quot;rational_&quot;, &quot;Fraction: &quot;)</span>
+<span class="nc" id="L223">                .replace(&quot;_&quot;, &quot; &quot;);</span>
+        }
+    }
+
+    private String ruleExplanation(String ruleId, Locale locale) {
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (isGerman(locale)) {</span>
+<span class="fc" id="L229">            String mapped = RULE_EXPLANATIONS_DE.get(ruleId);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            return mapped != null ? mapped : &quot;Atomare Umformungsregel.&quot;;</span>
+        } else {
+<span class="fc" id="L232">            String mapped = RULE_EXPLANATIONS_EN.get(ruleId);</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            return mapped != null ? mapped : &quot;Atomic rewrite rule.&quot;;</span>
+        }
+    }
+
+    // ── German rule catalogue ────────────────────────────────────────────────
+
+<span class="fc" id="L239">    private static final Map&lt;String, String&gt; RULE_NAMES_DE = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L240">    private static final Map&lt;String, String&gt; RULE_EXPLANATIONS_DE = new LinkedHashMap&lt;&gt;();</span>
+
+    // ── English rule catalogue ───────────────────────────────────────────────
+
+<span class="fc" id="L244">    private static final Map&lt;String, String&gt; RULE_NAMES_EN = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L245">    private static final Map&lt;String, String&gt; RULE_EXPLANATIONS_EN = new LinkedHashMap&lt;&gt;();</span>
+
+    static {
+        // ── German names ────────────────────────────────────────────────────
+<span class="fc" id="L249">        RULE_NAMES_DE.put(&quot;ast_add_zero_right&quot;, &quot;Neutrales Element der Addition (rechts)&quot;);</span>
+<span class="fc" id="L250">        RULE_NAMES_DE.put(&quot;ast_add_zero_left&quot;, &quot;Neutrales Element der Addition (links)&quot;);</span>
+<span class="fc" id="L251">        RULE_NAMES_DE.put(&quot;ast_multiply_one_right&quot;, &quot;Neutrales Element der Multiplikation (rechts)&quot;);</span>
+<span class="fc" id="L252">        RULE_NAMES_DE.put(&quot;ast_multiply_one_left&quot;, &quot;Neutrales Element der Multiplikation (links)&quot;);</span>
+<span class="fc" id="L253">        RULE_NAMES_DE.put(&quot;ast_multiply_zero_right&quot;, &quot;Absorbierendes Element 0 (rechts)&quot;);</span>
+<span class="fc" id="L254">        RULE_NAMES_DE.put(&quot;ast_multiply_zero_left&quot;, &quot;Absorbierendes Element 0 (links)&quot;);</span>
+<span class="fc" id="L255">        RULE_NAMES_DE.put(&quot;ast_distribute_left_add&quot;, &quot;Distributivgesetz (Addition, links)&quot;);</span>
+<span class="fc" id="L256">        RULE_NAMES_DE.put(&quot;ast_distribute_right_add&quot;, &quot;Distributivgesetz (Addition, rechts)&quot;);</span>
+<span class="fc" id="L257">        RULE_NAMES_DE.put(&quot;ast_distribute_left_subtract&quot;, &quot;Distributivgesetz (Subtraktion, links)&quot;);</span>
+<span class="fc" id="L258">        RULE_NAMES_DE.put(&quot;ast_distribute_right_subtract&quot;, &quot;Distributivgesetz (Subtraktion, rechts)&quot;);</span>
+<span class="fc" id="L259">        RULE_NAMES_DE.put(&quot;ast_double_term&quot;, &quot;Gleiche Summanden zusammenfassen&quot;);</span>
+<span class="fc" id="L260">        RULE_NAMES_DE.put(&quot;ast_product_to_power_two&quot;, &quot;Produkt zweier gleicher Faktoren als Quadrat&quot;);</span>
+<span class="fc" id="L261">        RULE_NAMES_DE.put(&quot;ast_power_two_to_product&quot;, &quot;Quadrat als Produkt zweier Faktoren&quot;);</span>
+<span class="fc" id="L262">        RULE_NAMES_DE.put(&quot;ast_combine_powers&quot;, &quot;Potenzgesetz: gleiche Basis, Exponenten addieren&quot;);</span>
+<span class="fc" id="L263">        RULE_NAMES_DE.put(&quot;ast_power_of_power&quot;, &quot;Potenzgesetz: Potenz einer Potenz&quot;);</span>
+<span class="fc" id="L264">        RULE_NAMES_DE.put(&quot;ast_factor_common_left&quot;, &quot;Gemeinsamen Faktor links ausklammern&quot;);</span>
+<span class="fc" id="L265">        RULE_NAMES_DE.put(&quot;ast_factor_common_right&quot;, &quot;Gemeinsamen Faktor rechts ausklammern&quot;);</span>
+<span class="fc" id="L266">        RULE_NAMES_DE.put(&quot;ast_canonical_normalize&quot;, &quot;Kanonische Normalform&quot;);</span>
+<span class="fc" id="L267">        RULE_NAMES_DE.put(&quot;polynomial_combine_like_terms&quot;, &quot;Gleichartige Terme zusammenfassen&quot;);</span>
+<span class="fc" id="L268">        RULE_NAMES_DE.put(&quot;polynomial_collect_like_terms&quot;, &quot;Gleichartige Terme sammeln&quot;);</span>
+<span class="fc" id="L269">        RULE_NAMES_DE.put(&quot;rational_cancel_common_factor&quot;, &quot;Bruch kürzen (gemeinsamer Faktor)&quot;);</span>
+<span class="fc" id="L270">        RULE_NAMES_DE.put(&quot;rational_multiply_fractions&quot;, &quot;Brüche multiplizieren&quot;);</span>
+<span class="fc" id="L271">        RULE_NAMES_DE.put(&quot;rational_divide_by_fraction&quot;, &quot;Durch einen Bruch dividieren&quot;);</span>
+
+        // ── German explanations ──────────────────────────────────────────────
+<span class="fc" id="L274">        RULE_EXPLANATIONS_DE.put(&quot;ast_add_zero_right&quot;, &quot;Addition mit 0 verändert den Wert nicht.&quot;);</span>
+<span class="fc" id="L275">        RULE_EXPLANATIONS_DE.put(&quot;ast_add_zero_left&quot;, &quot;Addition mit 0 verändert den Wert nicht.&quot;);</span>
+<span class="fc" id="L276">        RULE_EXPLANATIONS_DE.put(&quot;ast_multiply_one_right&quot;, &quot;Multiplikation mit 1 verändert den Wert nicht.&quot;);</span>
+<span class="fc" id="L277">        RULE_EXPLANATIONS_DE.put(&quot;ast_multiply_one_left&quot;, &quot;Multiplikation mit 1 verändert den Wert nicht.&quot;);</span>
+<span class="fc" id="L278">        RULE_EXPLANATIONS_DE.put(&quot;ast_multiply_zero_right&quot;, &quot;Multiplikation mit 0 ergibt 0.&quot;);</span>
+<span class="fc" id="L279">        RULE_EXPLANATIONS_DE.put(&quot;ast_multiply_zero_left&quot;, &quot;Multiplikation mit 0 ergibt 0.&quot;);</span>
+<span class="fc" id="L280">        RULE_EXPLANATIONS_DE.put(&quot;ast_distribute_left_add&quot;,</span>
+            &quot;Multiplikation wird über die Addition verteilt.&quot;);
+<span class="fc" id="L282">        RULE_EXPLANATIONS_DE.put(&quot;ast_distribute_right_add&quot;,</span>
+            &quot;Multiplikation wird über die Addition verteilt.&quot;);
+<span class="fc" id="L284">        RULE_EXPLANATIONS_DE.put(&quot;ast_distribute_left_subtract&quot;,</span>
+            &quot;Multiplikation wird über die Subtraktion verteilt.&quot;);
+<span class="fc" id="L286">        RULE_EXPLANATIONS_DE.put(&quot;ast_distribute_right_subtract&quot;,</span>
+            &quot;Multiplikation wird über die Subtraktion verteilt.&quot;);
+<span class="fc" id="L288">        RULE_EXPLANATIONS_DE.put(&quot;ast_double_term&quot;, &quot;Zwei gleiche Summanden ergeben das Doppelte.&quot;);</span>
+<span class="fc" id="L289">        RULE_EXPLANATIONS_DE.put(&quot;ast_product_to_power_two&quot;, &quot;a·a entspricht a².&quot;);</span>
+<span class="fc" id="L290">        RULE_EXPLANATIONS_DE.put(&quot;ast_power_two_to_product&quot;, &quot;a² ist das Produkt aus a und a.&quot;);</span>
+<span class="fc" id="L291">        RULE_EXPLANATIONS_DE.put(&quot;ast_combine_powers&quot;,</span>
+            &quot;Gleiche Basis: Potenzen werden multipliziert, indem die Exponenten addiert werden.&quot;);
+<span class="fc" id="L293">        RULE_EXPLANATIONS_DE.put(&quot;ast_power_of_power&quot;,</span>
+            &quot;Potenz einer Potenz: Exponenten werden multipliziert.&quot;);
+<span class="fc" id="L295">        RULE_EXPLANATIONS_DE.put(&quot;ast_factor_common_left&quot;,</span>
+            &quot;Gemeinsamer Faktor steht in beiden Summanden links und wird ausgeklammert.&quot;);
+<span class="fc" id="L297">        RULE_EXPLANATIONS_DE.put(&quot;ast_factor_common_right&quot;,</span>
+            &quot;Gemeinsamer Faktor steht in beiden Summanden rechts und wird ausgeklammert.&quot;);
+<span class="fc" id="L299">        RULE_EXPLANATIONS_DE.put(&quot;ast_canonical_normalize&quot;,</span>
+            &quot;Strukturelle Normalisierung (Reihenfolge, neutrale Elemente).&quot;);
+<span class="fc" id="L301">        RULE_EXPLANATIONS_DE.put(&quot;polynomial_combine_like_terms&quot;,</span>
+            &quot;Zwei Vielfache desselben Terms werden zu einem Term mit summierter Koeffizientensumme.&quot;);
+<span class="fc" id="L303">        RULE_EXPLANATIONS_DE.put(&quot;polynomial_collect_like_terms&quot;,</span>
+            &quot;Alle gleichartigen Polynomterme werden in einem sichtbaren Schritt gesammelt.&quot;);
+<span class="fc" id="L305">        RULE_EXPLANATIONS_DE.put(&quot;rational_cancel_common_factor&quot;,</span>
+            &quot;Gemeinsamer Faktor von Zähler und Nenner kann gekürzt werden.&quot;);
+<span class="fc" id="L307">        RULE_EXPLANATIONS_DE.put(&quot;rational_multiply_fractions&quot;,</span>
+            &quot;Brüche werden multipliziert, indem Zähler mal Zähler und Nenner mal Nenner gerechnet wird.&quot;);
+<span class="fc" id="L309">        RULE_EXPLANATIONS_DE.put(&quot;rational_divide_by_fraction&quot;,</span>
+            &quot;Durch einen Bruch dividieren entspricht der Multiplikation mit dem Kehrwert.&quot;);
+
+        // ── English names ────────────────────────────────────────────────────
+<span class="fc" id="L313">        RULE_NAMES_EN.put(&quot;ast_add_zero_right&quot;, &quot;Identity element of addition (right)&quot;);</span>
+<span class="fc" id="L314">        RULE_NAMES_EN.put(&quot;ast_add_zero_left&quot;, &quot;Identity element of addition (left)&quot;);</span>
+<span class="fc" id="L315">        RULE_NAMES_EN.put(&quot;ast_multiply_one_right&quot;, &quot;Identity element of multiplication (right)&quot;);</span>
+<span class="fc" id="L316">        RULE_NAMES_EN.put(&quot;ast_multiply_one_left&quot;, &quot;Identity element of multiplication (left)&quot;);</span>
+<span class="fc" id="L317">        RULE_NAMES_EN.put(&quot;ast_multiply_zero_right&quot;, &quot;Absorbing element 0 (right)&quot;);</span>
+<span class="fc" id="L318">        RULE_NAMES_EN.put(&quot;ast_multiply_zero_left&quot;, &quot;Absorbing element 0 (left)&quot;);</span>
+<span class="fc" id="L319">        RULE_NAMES_EN.put(&quot;ast_distribute_left_add&quot;, &quot;Distributive law (addition, left)&quot;);</span>
+<span class="fc" id="L320">        RULE_NAMES_EN.put(&quot;ast_distribute_right_add&quot;, &quot;Distributive law (addition, right)&quot;);</span>
+<span class="fc" id="L321">        RULE_NAMES_EN.put(&quot;ast_distribute_left_subtract&quot;, &quot;Distributive law (subtraction, left)&quot;);</span>
+<span class="fc" id="L322">        RULE_NAMES_EN.put(&quot;ast_distribute_right_subtract&quot;, &quot;Distributive law (subtraction, right)&quot;);</span>
+<span class="fc" id="L323">        RULE_NAMES_EN.put(&quot;ast_double_term&quot;, &quot;Combine equal summands&quot;);</span>
+<span class="fc" id="L324">        RULE_NAMES_EN.put(&quot;ast_product_to_power_two&quot;, &quot;Product of two equal factors as a square&quot;);</span>
+<span class="fc" id="L325">        RULE_NAMES_EN.put(&quot;ast_power_two_to_product&quot;, &quot;Square as product of two factors&quot;);</span>
+<span class="fc" id="L326">        RULE_NAMES_EN.put(&quot;ast_combine_powers&quot;, &quot;Power law: same base, add exponents&quot;);</span>
+<span class="fc" id="L327">        RULE_NAMES_EN.put(&quot;ast_power_of_power&quot;, &quot;Power law: power of a power&quot;);</span>
+<span class="fc" id="L328">        RULE_NAMES_EN.put(&quot;ast_factor_common_left&quot;, &quot;Factor out common factor on the left&quot;);</span>
+<span class="fc" id="L329">        RULE_NAMES_EN.put(&quot;ast_factor_common_right&quot;, &quot;Factor out common factor on the right&quot;);</span>
+<span class="fc" id="L330">        RULE_NAMES_EN.put(&quot;ast_canonical_normalize&quot;, &quot;Canonical normal form&quot;);</span>
+<span class="fc" id="L331">        RULE_NAMES_EN.put(&quot;polynomial_combine_like_terms&quot;, &quot;Combine like terms&quot;);</span>
+<span class="fc" id="L332">        RULE_NAMES_EN.put(&quot;polynomial_collect_like_terms&quot;, &quot;Collect like terms&quot;);</span>
+<span class="fc" id="L333">        RULE_NAMES_EN.put(&quot;rational_cancel_common_factor&quot;, &quot;Cancel common factor&quot;);</span>
+<span class="fc" id="L334">        RULE_NAMES_EN.put(&quot;rational_multiply_fractions&quot;, &quot;Multiply fractions&quot;);</span>
+<span class="fc" id="L335">        RULE_NAMES_EN.put(&quot;rational_divide_by_fraction&quot;, &quot;Divide by a fraction&quot;);</span>
+
+        // ── English explanations ─────────────────────────────────────────────
+<span class="fc" id="L338">        RULE_EXPLANATIONS_EN.put(&quot;ast_add_zero_right&quot;, &quot;Adding 0 does not change the value.&quot;);</span>
+<span class="fc" id="L339">        RULE_EXPLANATIONS_EN.put(&quot;ast_add_zero_left&quot;, &quot;Adding 0 does not change the value.&quot;);</span>
+<span class="fc" id="L340">        RULE_EXPLANATIONS_EN.put(&quot;ast_multiply_one_right&quot;, &quot;Multiplying by 1 does not change the value.&quot;);</span>
+<span class="fc" id="L341">        RULE_EXPLANATIONS_EN.put(&quot;ast_multiply_one_left&quot;, &quot;Multiplying by 1 does not change the value.&quot;);</span>
+<span class="fc" id="L342">        RULE_EXPLANATIONS_EN.put(&quot;ast_multiply_zero_right&quot;, &quot;Multiplying by 0 yields 0.&quot;);</span>
+<span class="fc" id="L343">        RULE_EXPLANATIONS_EN.put(&quot;ast_multiply_zero_left&quot;, &quot;Multiplying by 0 yields 0.&quot;);</span>
+<span class="fc" id="L344">        RULE_EXPLANATIONS_EN.put(&quot;ast_distribute_left_add&quot;,</span>
+            &quot;Multiplication is distributed over addition.&quot;);
+<span class="fc" id="L346">        RULE_EXPLANATIONS_EN.put(&quot;ast_distribute_right_add&quot;,</span>
+            &quot;Multiplication is distributed over addition.&quot;);
+<span class="fc" id="L348">        RULE_EXPLANATIONS_EN.put(&quot;ast_distribute_left_subtract&quot;,</span>
+            &quot;Multiplication is distributed over subtraction.&quot;);
+<span class="fc" id="L350">        RULE_EXPLANATIONS_EN.put(&quot;ast_distribute_right_subtract&quot;,</span>
+            &quot;Multiplication is distributed over subtraction.&quot;);
+<span class="fc" id="L352">        RULE_EXPLANATIONS_EN.put(&quot;ast_double_term&quot;, &quot;Two equal summands yield twice the value.&quot;);</span>
+<span class="fc" id="L353">        RULE_EXPLANATIONS_EN.put(&quot;ast_product_to_power_two&quot;, &quot;a·a equals a².&quot;);</span>
+<span class="fc" id="L354">        RULE_EXPLANATIONS_EN.put(&quot;ast_power_two_to_product&quot;, &quot;a² is the product of a and a.&quot;);</span>
+<span class="fc" id="L355">        RULE_EXPLANATIONS_EN.put(&quot;ast_combine_powers&quot;,</span>
+            &quot;Same base: powers are multiplied by adding the exponents.&quot;);
+<span class="fc" id="L357">        RULE_EXPLANATIONS_EN.put(&quot;ast_power_of_power&quot;,</span>
+            &quot;Power of a power: exponents are multiplied.&quot;);
+<span class="fc" id="L359">        RULE_EXPLANATIONS_EN.put(&quot;ast_factor_common_left&quot;,</span>
+            &quot;A common factor appears on the left in both summands and is factored out.&quot;);
+<span class="fc" id="L361">        RULE_EXPLANATIONS_EN.put(&quot;ast_factor_common_right&quot;,</span>
+            &quot;A common factor appears on the right in both summands and is factored out.&quot;);
+<span class="fc" id="L363">        RULE_EXPLANATIONS_EN.put(&quot;ast_canonical_normalize&quot;,</span>
+            &quot;Structural normalisation (ordering, neutral elements).&quot;);
+<span class="fc" id="L365">        RULE_EXPLANATIONS_EN.put(&quot;polynomial_combine_like_terms&quot;,</span>
+            &quot;Two multiples of the same term are combined into one term with the summed coefficient.&quot;);
+<span class="fc" id="L367">        RULE_EXPLANATIONS_EN.put(&quot;polynomial_collect_like_terms&quot;,</span>
+            &quot;All like polynomial terms are collected in one visible step.&quot;);
+<span class="fc" id="L369">        RULE_EXPLANATIONS_EN.put(&quot;rational_cancel_common_factor&quot;,</span>
+            &quot;A common factor of numerator and denominator can be cancelled.&quot;);
+<span class="fc" id="L371">        RULE_EXPLANATIONS_EN.put(&quot;rational_multiply_fractions&quot;,</span>
+            &quot;Fractions are multiplied by multiplying numerators together and denominators together.&quot;);
+<span class="fc" id="L373">        RULE_EXPLANATIONS_EN.put(&quot;rational_divide_by_fraction&quot;,</span>
+            &quot;Dividing by a fraction equals multiplying by its reciprocal.&quot;);
+<span class="fc" id="L375">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

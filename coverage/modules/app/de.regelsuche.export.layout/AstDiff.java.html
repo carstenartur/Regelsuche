@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstDiff.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.export.layout</a> &gt; <span class="el_source">AstDiff.java</span></div><h1>AstDiff.java</h1><pre class="source lang-java linenums">package de.regelsuche.export.layout;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.export.AstLatexRenderer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Heuristic AST diff for layout rendering.
+ *
+ * &lt;p&gt;Instead of diffing the rendered LaTeX string, this compares raw
+ * expression trees and keeps any subtree that still appears somewhere in the
+ * opposite tree unmarked. Changed structure is surfaced as CSS classes on the
+ * emitted {@link MathLayoutNode} fragments.&lt;/p&gt;
+ */
+public final class AstDiff {
+
+    private AstDiff() {
+    }
+
+    public record Result(List&lt;MathLayoutNode&gt; fromNodes, List&lt;MathLayoutNode&gt; toNodes) {
+<span class="fc" id="L26">        public Result {</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            fromNodes = fromNodes == null ? List.of() : List.copyOf(fromNodes);</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">            toNodes = toNodes == null ? List.of() : List.copyOf(toNodes);</span>
+<span class="fc" id="L29">        }</span>
+    }
+
+    public static Result diff(Expr from, Expr to, AstLatexRenderer renderer) {
+<span class="fc" id="L33">        Objects.requireNonNull(renderer, &quot;renderer&quot;);</span>
+<span class="fc" id="L34">        return new Result(</span>
+<span class="fc" id="L35">            nodesFor(from, to, renderer, 0, &quot;diff-old&quot;),</span>
+<span class="fc" id="L36">            nodesFor(to, from, renderer, 0, &quot;diff-new&quot;)</span>
+        );
+    }
+
+    private static List&lt;MathLayoutNode&gt; nodesFor(
+        Expr expr,
+        Expr oppositeRoot,
+        AstLatexRenderer renderer,
+        int parentPrecedence,
+        String cssClass
+    ) {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (expr == null) {</span>
+<span class="nc" id="L48">            return List.of();</span>
+        }
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (subtreeContains(oppositeRoot, expr)) {</span>
+<span class="fc" id="L51">            return List.of(MathLayoutNode.fragment(renderer.render(expr, parentPrecedence)));</span>
+        }
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            &amp;&amp; binary.operator() != BinaryOperator.DIV</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            &amp;&amp; binary.operator() != BinaryOperator.POW</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            &amp;&amp; binary.operator().precedence() &gt;= parentPrecedence) {</span>
+<span class="fc" id="L57">            List&lt;MathLayoutNode&gt; out = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L58">            int leftParent = binary.operator().precedence();</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            int rightParent = binary.operator() == BinaryOperator.SUB</span>
+<span class="nc" id="L60">                ? binary.operator().precedence() + 1</span>
+<span class="fc" id="L61">                : binary.operator().precedence();</span>
+<span class="fc" id="L62">            out.addAll(nodesFor(binary.left(), oppositeRoot, renderer, leftParent, cssClass));</span>
+<span class="fc" id="L63">            out.add(MathLayoutNode.fragment(operatorLatex(binary.operator()), cssClass));</span>
+<span class="fc" id="L64">            out.addAll(nodesFor(binary.right(), oppositeRoot, renderer, rightParent, cssClass));</span>
+<span class="fc" id="L65">            return out;</span>
+        }
+<span class="fc" id="L67">        return List.of(MathLayoutNode.fragment(renderer.render(expr, parentPrecedence), cssClass));</span>
+    }
+
+    private static boolean subtreeContains(Expr root, Expr target) {
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        if (root == null || target == null) {</span>
+<span class="nc" id="L72">            return false;</span>
+        }
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (root.equals(target)) {</span>
+<span class="fc" id="L75">            return true;</span>
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (root instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">            return subtreeContains(binary.left(), target) || subtreeContains(binary.right(), target);</span>
+        }
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (root instanceof FunctionExpr fn) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            for (Expr argument : fn.arguments()) {</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                if (subtreeContains(argument, target)) {</span>
+<span class="nc" id="L83">                    return true;</span>
+                }
+<span class="nc" id="L85">            }</span>
+        }
+<span class="fc" id="L87">        return false;</span>
+    }
+
+    private static String operatorLatex(BinaryOperator operator) {
+<span class="pc bpc" id="L91" title="3 of 5 branches missed.">        return switch (operator) {</span>
+<span class="fc" id="L92">            case ADD -&gt; &quot; + &quot;;</span>
+<span class="nc" id="L93">            case SUB -&gt; &quot; - &quot;;</span>
+<span class="fc" id="L94">            case MUL -&gt; &quot; \\cdot &quot;;</span>
+<span class="nc" id="L95">            case DIV -&gt; &quot; / &quot;;</span>
+<span class="nc" id="L96">            case POW -&gt; &quot;^&quot;;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

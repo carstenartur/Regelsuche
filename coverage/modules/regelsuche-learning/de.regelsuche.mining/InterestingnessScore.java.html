@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessScore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessScore.java</span></div><h1>InterestingnessScore.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.List;
+import java.util.Set;
+
+/** Composite ranking for deciding which hypotheses deserve report/inventory attention first. */
+<span class="fc" id="L7">public record InterestingnessScore(</span>
+    double compressionGain,
+    double generality,
+    double independentEvidenceCount,
+    double macroReusability,
+    double proofStatus,
+    double counterexampleStatus,
+    double similarityToKnownRules,
+    double crossDomainRecurrence,
+    double minimalAssumptions,
+    double total
+) implements Comparable&lt;InterestingnessScore&gt; {
+<span class="fc" id="L19">    private static final CompressionScore COMPRESSION = new CompressionScore();</span>
+<span class="fc" id="L20">    private static final GeneralizationScore GENERALIZATION = new GeneralizationScore();</span>
+<span class="fc" id="L21">    private static final ReusabilityScore REUSABILITY = new ReusabilityScore();</span>
+<span class="fc" id="L22">    private static final SurpriseScore SURPRISE = new SurpriseScore();</span>
+<span class="fc" id="L23">    private static final CrossDomainScore CROSS_DOMAIN = new CrossDomainScore();</span>
+<span class="fc" id="L24">    private static final AssumptionComplexityScore ASSUMPTIONS = new AssumptionComplexityScore();</span>
+<span class="fc" id="L25">    private static final ProofConfidenceScore PROOF = new ProofConfidenceScore();</span>
+<span class="fc" id="L26">    private static final CounterexampleRobustnessScore COUNTEREXAMPLES = new CounterexampleRobustnessScore();</span>
+<span class="fc" id="L27">    private static final List&lt;InterestingnessScoringModule&gt; DEFAULT_MODULES = List.of(</span>
+        COMPRESSION,
+        GENERALIZATION,
+        REUSABILITY,
+        SURPRISE,
+        CROSS_DOMAIN,
+        ASSUMPTIONS,
+        PROOF,
+        COUNTEREXAMPLES
+    );
+
+    @Override
+    public int compareTo(InterestingnessScore other) {
+<span class="fc" id="L40">        return Double.compare(other.total, total);</span>
+    }
+
+    public static InterestingnessScore from(HypothesisCandidate candidate, KnownRuleRepository knownRules) {
+<span class="fc" id="L44">        double similarity = new KnownRuleSimilarityService()</span>
+<span class="fc" id="L45">            .similarityToKnownRules(candidate.leftPattern(), candidate.rightPattern(), knownRules);</span>
+<span class="fc" id="L46">        return from(candidate, similarity);</span>
+    }
+
+    public static InterestingnessScore from(HypothesisCandidate candidate, double similarityToKnownRules) {
+<span class="fc" id="L50">        return from(candidate, similarityToKnownRules, Set.of());</span>
+    }
+
+    public static InterestingnessScore from(
+        HypothesisCandidate candidate,
+        double similarityToKnownRules,
+        Set&lt;String&gt; domainTags
+    ) {
+<span class="fc" id="L58">        InterestingnessScoringContext context =</span>
+            new InterestingnessScoringContext(candidate, similarityToKnownRules, domainTags);
+<span class="fc" id="L60">        double evidence = distinctEvidence(candidate);</span>
+<span class="fc" id="L61">        double compression = COMPRESSION.score(context);</span>
+<span class="fc" id="L62">        double generality = GENERALIZATION.score(context);</span>
+<span class="fc" id="L63">        double reusability = REUSABILITY.score(context);</span>
+<span class="fc" id="L64">        double proof = PROOF.score(context);</span>
+<span class="fc" id="L65">        double counterexample = COUNTEREXAMPLES.score(context);</span>
+<span class="fc" id="L66">        double crossDomain = CROSS_DOMAIN.score(context);</span>
+<span class="fc" id="L67">        double assumptions = ASSUMPTIONS.score(context);</span>
+<span class="fc" id="L68">        double surprise = SURPRISE.score(context);</span>
+<span class="fc" id="L69">        double knownPenalty = Math.max(0.0, Math.min(1.0, similarityToKnownRules));</span>
+<span class="fc" id="L70">        double total = weightedTotal(</span>
+            compression,
+            generality,
+            evidence,
+            reusability,
+            surprise,
+            crossDomain,
+            assumptions,
+            proof,
+            counterexample
+        ) - knownPenalty;
+<span class="fc" id="L81">        return new InterestingnessScore(compression, generality, evidence, reusability, proof,</span>
+            counterexample, knownPenalty, crossDomain, assumptions, total);
+    }
+
+    public static List&lt;InterestingnessScoringModule&gt; defaultModules() {
+<span class="fc" id="L86">        return DEFAULT_MODULES;</span>
+    }
+
+    private static double weightedTotal(
+        double compression,
+        double generality,
+        double evidence,
+        double reusability,
+        double surprise,
+        double crossDomain,
+        double assumptions,
+        double proof,
+        double counterexample
+    ) {
+<span class="fc" id="L100">        return 1.25 * compression</span>
+            + 1.10 * generality
+            + 0.75 * evidence
+            + 1.20 * reusability
+            + 1.00 * surprise
+            + 1.10 * crossDomain
+            + 0.80 * assumptions
+            + 1.00 * proof
+            + 1.50 * counterexample;
+    }
+
+    private static double distinctEvidence(HypothesisCandidate candidate) {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        return candidate.supportingExpressions().isEmpty()</span>
+<span class="fc" id="L113">            ? candidate.supportingPaths().size()</span>
+<span class="fc" id="L114">            : candidate.supportingExpressions().stream().distinct().count();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EquationTransformationRuleAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.equation</a> &gt; <span class="el_source">EquationTransformationRuleAdapter.java</span></div><h1>EquationTransformationRuleAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.equation;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.graph.GraphEdge;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.RewriteKind;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Adapter that lifts the dedicated {@link LinearEquationSolver} pipeline into
+ * the same &quot;first-class transformation step&quot; representation the rest of the
+ * Regelsuche workbench uses (search graph, replay, path comparison,
+ * macro-rule learning, equality saturation).
+ *
+ * &lt;p&gt;Each {@link EquationStep} emitted by the solver becomes:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;a {@link Step} with {@code ruleId}, {@code assumptions},
+ *       {@code explanation}, {@code scoreDelta} and
+ *       {@code proofStatus};&lt;/li&gt;
+ *   &lt;li&gt;a {@link TransformationStep} compatible with
+ *       {@link de.regelsuche.discovery.DiscoveredTransformation};&lt;/li&gt;
+ *   &lt;li&gt;a {@link GraphEdge} that can be persisted into any
+ *       {@link de.regelsuche.graph.ExpressionGraphStore} so the rendered
+ *       search graph contains the equation chain rather than treating it as
+ *       a special-case side channel.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;The adapter is intentionally side-effect free: it produces the data,
+ * the caller decides where to persist it.&lt;/p&gt;
+ */
+public final class EquationTransformationRuleAdapter {
+
+    private final LinearEquationSolver solver;
+    private final ExpressionScorer scorer;
+
+    public EquationTransformationRuleAdapter() {
+<span class="nc" id="L44">        this(new LinearEquationSolver(), new ExpressionScorer());</span>
+<span class="nc" id="L45">    }</span>
+
+<span class="fc" id="L47">    public EquationTransformationRuleAdapter(LinearEquationSolver solver, ExpressionScorer scorer) {</span>
+<span class="fc" id="L48">        this.solver = Objects.requireNonNull(solver, &quot;solver&quot;);</span>
+<span class="fc" id="L49">        this.scorer = Objects.requireNonNull(scorer, &quot;scorer&quot;);</span>
+<span class="fc" id="L50">    }</span>
+
+    /**
+     * Solve {@code equation} for {@code variable} and emit a fully-formed
+     * trace ({@link Trace}) of first-class transformation steps.
+     *
+     * @return {@link Optional#empty()} when the equation is not linear in
+     *         the requested variable (so the solver cannot honestly produce
+     *         a sound rewrite chain).
+     */
+    public Optional&lt;Trace&gt; trace(Equation equation, String variable) {
+<span class="fc" id="L61">        Objects.requireNonNull(equation, &quot;equation&quot;);</span>
+<span class="fc" id="L62">        Objects.requireNonNull(variable, &quot;variable&quot;);</span>
+<span class="fc" id="L63">        Optional&lt;LinearEquationSolver.Solution&gt; solution = solver.solve(equation, variable);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (solution.isEmpty()) {</span>
+<span class="nc" id="L65">            return Optional.empty();</span>
+        }
+<span class="fc" id="L67">        return Optional.of(toTrace(equation, solution.get()));</span>
+    }
+
+    private Trace toTrace(Equation original, LinearEquationSolver.Solution solution) {
+<span class="fc" id="L71">        String originalFormatted = ExpressionFormatter.format(original);</span>
+<span class="fc" id="L72">        String previous = originalFormatted;</span>
+<span class="fc" id="L73">        int previousScore = scorer.score(previous).weightedTotal();</span>
+
+<span class="fc" id="L75">        List&lt;Step&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L76">        List&lt;GraphEdge&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L77">        List&lt;TransformationStep&gt; discoverySteps = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (int i = 0; i &lt; solution.steps().size(); i++) {</span>
+<span class="fc" id="L80">            EquationStep raw = solution.steps().get(i);</span>
+<span class="fc" id="L81">            String after = ExpressionFormatter.format(raw.equation());</span>
+<span class="fc" id="L82">            int scoreAfter = scorer.score(after).weightedTotal();</span>
+<span class="fc" id="L83">            int delta = scoreAfter - previousScore;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            CandidateProofStatus proofStatus = raw.assumptions().isEmpty()</span>
+<span class="fc" id="L85">                ? CandidateProofStatus.SYMBOLICALLY_VERIFIED</span>
+<span class="fc" id="L86">                : CandidateProofStatus.OBSERVED;</span>
+<span class="fc" id="L87">            Step step = new Step(</span>
+<span class="fc" id="L88">                raw.ruleId(),</span>
+<span class="fc" id="L89">                raw.description(),</span>
+<span class="fc" id="L90">                raw.assumptions(),</span>
+                delta,
+                proofStatus,
+                previous,
+                after,
+<span class="fc" id="L95">                raw.equation()</span>
+            );
+<span class="fc" id="L97">            steps.add(step);</span>
+<span class="fc" id="L98">            discoverySteps.add(new TransformationStep(</span>
+                i,
+                previous,
+                after,
+<span class="fc" id="L102">                raw.ruleId(),</span>
+                RewriteKind.SIMPLIFY,
+                previousScore,
+                scoreAfter,
+                /* equivalencePreservingByConstruction = */ true,
+<span class="fc" id="L107">                raw.ruleId()</span>
+            ));
+<span class="fc" id="L109">            edges.add(new GraphEdge(</span>
+                previous,
+                after,
+<span class="fc" id="L112">                raw.ruleId(),</span>
+                i + 1,
+                previousScore - scoreAfter,
+                &quot;equation:&quot; + originalFormatted + &quot;#&quot; + (i + 1),
+<span class="fc" id="L116">                Integer.toHexString(after.hashCode()),</span>
+                previousScore,
+                scoreAfter,
+                RewriteKind.SIMPLIFY,
+                /* mayIncreaseComplexity = */ false,
+                /* estimatedCostDelta = */ delta,
+                /* equivalencePreservingByConstruction = */ true,
+                proofStatus
+            ));
+<span class="fc" id="L125">            previous = after;</span>
+<span class="fc" id="L126">            previousScore = scoreAfter;</span>
+        }
+
+<span class="fc" id="L129">        return new Trace(</span>
+<span class="fc" id="L130">            solution.status(),</span>
+            original,
+<span class="fc" id="L132">            solution.solved(),</span>
+            originalFormatted,
+            previous,
+            steps,
+            discoverySteps,
+            edges,
+<span class="fc" id="L138">            collectAssumptions(steps)</span>
+        );
+    }
+
+    private static List&lt;Assumption&gt; collectAssumptions(List&lt;Step&gt; steps) {
+<span class="fc" id="L143">        List&lt;Assumption&gt; all = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        for (Step step : steps) {</span>
+<span class="fc" id="L145">            all.addAll(step.assumptions());</span>
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">        return List.copyOf(all);</span>
+    }
+
+    /**
+     * First-class representation of one equation rewrite — equivalent to a
+     * normal {@code RewriteRule} application but with the
+     * symmetry-preserving &quot;do the same on both sides&quot; semantics baked in.
+     */
+    public record Step(
+        String ruleId,
+        String explanation,
+        List&lt;Assumption&gt; assumptions,
+        int scoreDelta,
+        CandidateProofStatus proofStatus,
+        String beforeExpression,
+        String afterExpression,
+        Equation equation
+    ) {
+<span class="fc" id="L165">        public Step {</span>
+<span class="fc" id="L166">            Objects.requireNonNull(ruleId, &quot;ruleId&quot;);</span>
+<span class="fc" id="L167">            Objects.requireNonNull(explanation, &quot;explanation&quot;);</span>
+<span class="fc" id="L168">            Objects.requireNonNull(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L169">            Objects.requireNonNull(beforeExpression, &quot;beforeExpression&quot;);</span>
+<span class="fc" id="L170">            Objects.requireNonNull(afterExpression, &quot;afterExpression&quot;);</span>
+<span class="fc" id="L171">            Objects.requireNonNull(equation, &quot;equation&quot;);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            assumptions = List.copyOf(assumptions == null ? List.of() : assumptions);</span>
+<span class="fc" id="L173">        }</span>
+    }
+
+    /** End-to-end trace produced by {@link #trace(Equation, String)}. */
+    public record Trace(
+        LinearEquationSolver.Status status,
+        Equation originalEquation,
+        Equation solvedEquation,
+        String originalExpression,
+        String solvedExpression,
+        List&lt;Step&gt; steps,
+        List&lt;TransformationStep&gt; discoverySteps,
+        List&lt;GraphEdge&gt; edges,
+        List&lt;Assumption&gt; assumptions
+    ) {
+<span class="fc" id="L188">        public Trace {</span>
+<span class="fc" id="L189">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L190">            Objects.requireNonNull(originalEquation, &quot;originalEquation&quot;);</span>
+<span class="fc" id="L191">            Objects.requireNonNull(solvedEquation, &quot;solvedEquation&quot;);</span>
+<span class="fc" id="L192">            Objects.requireNonNull(originalExpression, &quot;originalExpression&quot;);</span>
+<span class="fc" id="L193">            Objects.requireNonNull(solvedExpression, &quot;solvedExpression&quot;);</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            steps = List.copyOf(steps == null ? List.of() : steps);</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">            discoverySteps = List.copyOf(discoverySteps == null ? List.of() : discoverySteps);</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            edges = List.copyOf(edges == null ? List.of() : edges);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            assumptions = List.copyOf(assumptions == null ? List.of() : assumptions);</span>
+<span class="fc" id="L198">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScientificSeedCorpora.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.example</a> &gt; <span class="el_source">ScientificSeedCorpora.java</span></div><h1>ScientificSeedCorpora.java</h1><pre class="source lang-java linenums">package de.regelsuche.example;
+
+import de.regelsuche.json.JsonReader;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/** Curated + file-backed scientific seed corpus helpers. */
+public final class ScientificSeedCorpora {
+    private ScientificSeedCorpora() {
+    }
+
+    public static List&lt;SeedExpression&gt; curated() {
+<span class="fc" id="L20">        return normalize(List.of(</span>
+<span class="fc" id="L21">            new SeedExpression(&quot;identity-binomial-1&quot;, &quot;(x + a)^2&quot;, &quot;known-identity&quot;, &quot;binomial&quot;, List.of(&quot;scientific&quot;), List.of()),</span>
+<span class="fc" id="L22">            new SeedExpression(&quot;identity-geometric-series-1&quot;, &quot;1 + x + x^2 + x^3&quot;, &quot;known-identity&quot;, &quot;geometric-series&quot;, List.of(&quot;scientific&quot;), List.of()),</span>
+<span class="fc" id="L23">            new SeedExpression(&quot;identity-factorization-1&quot;, &quot;x^2 - a^2&quot;, &quot;known-identity&quot;, &quot;factorization&quot;, List.of(&quot;scientific&quot;), List.of()),</span>
+<span class="fc" id="L24">            new SeedExpression(&quot;hidden-structure-1&quot;, &quot;x^4 + 4&quot;, &quot;scientific-experiment&quot;, &quot;hidden-structure&quot;, List.of(&quot;scientific&quot;, &quot;hidden-structure&quot;), List.of()),</span>
+<span class="fc" id="L25">            new SeedExpression(&quot;dlmf-trigonometric-1&quot;, &quot;sin(x)^2 + cos(x)^2&quot;, &quot;DLMF&quot;, &quot;trigonometric&quot;, List.of(&quot;DLMF&quot;, &quot;scientific&quot;), List.of()),</span>
+<span class="fc" id="L26">            new SeedExpression(&quot;matrix-identity-1&quot;, &quot;A * (B + C)&quot;, &quot;known-identity&quot;, &quot;matrix&quot;, List.of(&quot;matrix&quot;, &quot;scientific&quot;), List.of()),</span>
+<span class="fc" id="L27">            new SeedExpression(&quot;rational-simplification-1&quot;, &quot;(a * b) / b&quot;, &quot;known-identity&quot;, &quot;rational&quot;, List.of(&quot;scientific&quot;), List.of(&quot;b != 0&quot;)),</span>
+<span class="fc" id="L28">            new SeedExpression(&quot;oeis-formula-A000217&quot;, &quot;n * (n + 1) / 2&quot;, &quot;OEIS&quot;, &quot;oeis-formula&quot;, List.of(&quot;OEIS&quot;, &quot;scientific&quot;), List.of(&quot;n &gt;= 0&quot;)),</span>
+<span class="fc" id="L29">            new SeedExpression(&quot;counterexample-trap-1&quot;, &quot;(a + b) / b&quot;, &quot;counterexample-trap&quot;, &quot;counterexample&quot;, List.of(&quot;trap&quot;, &quot;scientific&quot;), List.of(&quot;b != 0&quot;))</span>
+        ));
+    }
+
+    public static List&lt;SeedExpression&gt; fromCatalogs(List&lt;Path&gt; catalogPaths) {
+<span class="fc" id="L34">        List&lt;SeedExpression&gt; merged = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L35" title="1 of 4 branches missed.">        for (Path path : catalogPaths == null ? List.&lt;Path&gt;of() : catalogPaths) {</span>
+<span class="fc" id="L36">            merged.addAll(loadCatalog(path));</span>
+<span class="fc" id="L37">        }</span>
+<span class="fc" id="L38">        return normalize(merged);</span>
+    }
+
+    static List&lt;SeedExpression&gt; loadCatalog(Path path) {
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L43">            return List.of();</span>
+        }
+<span class="fc" id="L45">        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);</span>
+        try {
+<span class="fc" id="L47">            String content = Files.readString(path);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (name.endsWith(&quot;.json&quot;)) {</span>
+<span class="fc" id="L49">                return parseJson(content);</span>
+            }
+<span class="pc bpc" id="L51" title="3 of 4 branches missed.">            if (name.endsWith(&quot;.yaml&quot;) || name.endsWith(&quot;.yml&quot;)) {</span>
+<span class="fc" id="L52">                return parseYaml(content);</span>
+            }
+<span class="nc" id="L54">            return List.of();</span>
+<span class="nc" id="L55">        } catch (IOException exception) {</span>
+<span class="nc" id="L56">            throw new IllegalStateException(&quot;Could not read seed catalog &quot; + path, exception);</span>
+        }
+    }
+
+    private static List&lt;SeedExpression&gt; parseJson(String content) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        List&lt;Object&gt; values = new JsonReader(content == null ? &quot;[]&quot; : content).readArray();</span>
+<span class="fc" id="L62">        List&lt;SeedExpression&gt; seeds = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (Object value : values) {</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            if (!(value instanceof Map&lt;?, ?&gt; object)) {</span>
+                continue;
+            }
+<span class="fc" id="L67">            String id = stringValue(object, &quot;id&quot;);</span>
+<span class="fc" id="L68">            String expression = stringValue(object, &quot;expression&quot;);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (expression.isBlank()) {</span>
+<span class="nc" id="L70">                continue;</span>
+            }
+<span class="fc" id="L72">            String source = stringValue(object, &quot;source&quot;);</span>
+<span class="fc" id="L73">            String category = stringValue(object, &quot;category&quot;);</span>
+<span class="fc" id="L74">            List&lt;String&gt; tags = stringList(object.get(&quot;tags&quot;));</span>
+<span class="fc" id="L75">            List&lt;String&gt; assumptions = stringList(object.get(&quot;assumptions&quot;));</span>
+<span class="fc" id="L76">            seeds.add(new SeedExpression(id, expression, source, category, tags, assumptions));</span>
+<span class="fc" id="L77">        }</span>
+<span class="fc" id="L78">        return normalize(seeds);</span>
+    }
+
+    private static List&lt;SeedExpression&gt; parseYaml(String content) {
+<span class="fc" id="L82">        List&lt;SeedExpression&gt; seeds = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        List&lt;String&gt; lines = (content == null ? &quot;&quot; : content).lines().toList();</span>
+<span class="fc" id="L84">        String id = &quot;&quot;;</span>
+<span class="fc" id="L85">        String expression = &quot;&quot;;</span>
+<span class="fc" id="L86">        String source = &quot;local&quot;;</span>
+<span class="fc" id="L87">        String category = &quot;general&quot;;</span>
+<span class="fc" id="L88">        List&lt;String&gt; tags = List.of();</span>
+<span class="fc" id="L89">        List&lt;String&gt; assumptions = List.of();</span>
+<span class="fc" id="L90">        boolean active = false;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (String raw : lines) {</span>
+<span class="fc" id="L92">            String line = raw.trim();</span>
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">            if (line.isEmpty() || line.startsWith(&quot;#&quot;)) {</span>
+<span class="nc" id="L94">                continue;</span>
+            }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (line.startsWith(&quot;- &quot;)) {</span>
+<span class="pc bpc" id="L97" title="3 of 4 branches missed.">                if (active &amp;&amp; !expression.isBlank()) {</span>
+<span class="nc" id="L98">                    seeds.add(new SeedExpression(id, expression, source, category, tags, assumptions));</span>
+                }
+<span class="fc" id="L100">                id = &quot;&quot;;</span>
+<span class="fc" id="L101">                expression = &quot;&quot;;</span>
+<span class="fc" id="L102">                source = &quot;local&quot;;</span>
+<span class="fc" id="L103">                category = &quot;general&quot;;</span>
+<span class="fc" id="L104">                tags = List.of();</span>
+<span class="fc" id="L105">                assumptions = List.of();</span>
+<span class="fc" id="L106">                active = true;</span>
+<span class="fc" id="L107">                line = line.substring(2).trim();</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                if (!line.isEmpty()) {</span>
+<span class="fc" id="L109">                    int split = line.indexOf(':');</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                    if (split &gt; 0) {</span>
+<span class="fc" id="L111">                        String key = line.substring(0, split).trim();</span>
+<span class="fc" id="L112">                        String value = line.substring(split + 1).trim();</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                        if (&quot;id&quot;.equals(key)) id = stripYamlScalar(value);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                        if (&quot;expression&quot;.equals(key)) expression = stripYamlScalar(value);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                        if (&quot;source&quot;.equals(key)) source = stripYamlScalar(value);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                        if (&quot;category&quot;.equals(key)) category = stripYamlScalar(value);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                        if (&quot;tags&quot;.equals(key)) tags = parseInlineYamlArray(value);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                        if (&quot;assumptions&quot;.equals(key)) assumptions = parseInlineYamlArray(value);</span>
+                    }
+<span class="fc" id="L120">                }</span>
+                continue;
+            }
+<span class="fc" id="L123">            int split = line.indexOf(':');</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (split &lt;= 0) {</span>
+<span class="nc" id="L125">                continue;</span>
+            }
+<span class="fc" id="L127">            String key = line.substring(0, split).trim();</span>
+<span class="fc" id="L128">            String value = line.substring(split + 1).trim();</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (&quot;id&quot;.equals(key)) id = stripYamlScalar(value);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (&quot;expression&quot;.equals(key)) expression = stripYamlScalar(value);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (&quot;source&quot;.equals(key)) source = stripYamlScalar(value);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (&quot;category&quot;.equals(key)) category = stripYamlScalar(value);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (&quot;tags&quot;.equals(key)) tags = parseInlineYamlArray(value);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (&quot;assumptions&quot;.equals(key)) assumptions = parseInlineYamlArray(value);</span>
+<span class="fc" id="L135">        }</span>
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">        if (active &amp;&amp; !expression.isBlank()) {</span>
+<span class="fc" id="L137">            seeds.add(new SeedExpression(id, expression, source, category, tags, assumptions));</span>
+        }
+<span class="fc" id="L139">        return normalize(seeds);</span>
+    }
+
+    private static String stringValue(Map&lt;?, ?&gt; object, String key) {
+<span class="fc" id="L143">        Object value = object.get(key);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (value instanceof String text) {</span>
+<span class="fc" id="L145">            return text.trim();</span>
+        }
+<span class="nc" id="L147">        return &quot;&quot;;</span>
+    }
+
+    private static List&lt;String&gt; stringList(Object value) {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (!(value instanceof List&lt;?&gt; values)) {</span>
+<span class="nc" id="L152">            return List.of();</span>
+        }
+<span class="fc" id="L154">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (Object element : values) {</span>
+<span class="pc bpc" id="L156" title="2 of 4 branches missed.">            if (element instanceof String text &amp;&amp; !text.isBlank()) {</span>
+<span class="fc" id="L157">                result.add(text);</span>
+            }
+<span class="fc" id="L159">        }</span>
+<span class="fc" id="L160">        return List.copyOf(result);</span>
+    }
+
+    private static String stripYamlScalar(String value) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        String v = value == null ? &quot;&quot; : value.trim();</span>
+<span class="pc bpc" id="L165" title="4 of 8 branches missed.">        if ((v.startsWith(&quot;\&quot;&quot;) &amp;&amp; v.endsWith(&quot;\&quot;&quot;)) || (v.startsWith(&quot;'&quot;) &amp;&amp; v.endsWith(&quot;'&quot;))) {</span>
+<span class="fc" id="L166">            return v.substring(1, v.length() - 1).trim();</span>
+        }
+<span class="fc" id="L168">        return v;</span>
+    }
+
+    private static List&lt;String&gt; parseInlineYamlArray(String value) {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        String v = value == null ? &quot;&quot; : value.trim();</span>
+<span class="pc bpc" id="L173" title="2 of 4 branches missed.">        if (!v.startsWith(&quot;[&quot;) || !v.endsWith(&quot;]&quot;)) {</span>
+<span class="nc" id="L174">            return List.of();</span>
+        }
+<span class="fc" id="L176">        String inner = v.substring(1, v.length() - 1).trim();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (inner.isEmpty()) {</span>
+<span class="nc" id="L178">            return List.of();</span>
+        }
+<span class="fc" id="L180">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        for (String token : inner.split(&quot;,&quot;)) {</span>
+<span class="fc" id="L182">            String stripped = stripYamlScalar(token);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">            if (!stripped.isBlank()) {</span>
+<span class="fc" id="L184">                result.add(stripped);</span>
+            }
+        }
+<span class="fc" id="L187">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;SeedExpression&gt; normalize(List&lt;SeedExpression&gt; seeds) {
+<span class="fc" id="L191">        Map&lt;String, SeedExpression&gt; deduplicated = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L192" title="1 of 4 branches missed.">        for (SeedExpression seed : seeds == null ? List.&lt;SeedExpression&gt;of() : seeds) {</span>
+<span class="pc bpc" id="L193" title="2 of 4 branches missed.">            if (seed == null || seed.expression().isBlank()) {</span>
+<span class="nc" id="L194">                continue;</span>
+            }
+<span class="fc" id="L196">            deduplicated.putIfAbsent(seed.stableKey(), seed);</span>
+<span class="fc" id="L197">        }</span>
+<span class="fc" id="L198">        return deduplicated.values().stream()</span>
+<span class="fc" id="L199">            .sorted(Comparator.comparing(SeedExpression::stableKey))</span>
+<span class="fc" id="L200">            .toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

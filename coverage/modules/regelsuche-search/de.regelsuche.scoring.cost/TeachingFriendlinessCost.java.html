@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TeachingFriendlinessCost.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scoring.cost</a> &gt; <span class="el_source">TeachingFriendlinessCost.java</span></div><h1>TeachingFriendlinessCost.java</h1><pre class="source lang-java linenums">package de.regelsuche.scoring.cost;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.scoring.ExpressionScore;
+
+/**
+ * Rewards expressions that resemble standard school-book notation:
+ * shallow nesting, small integer coefficients, no unnecessary parentheses
+ * (approximated via nesting depth), no advanced functions in the result.
+ *
+ * &lt;p&gt;Used by {@link TransformationGoal#TEACHING_FRIENDLY TEACHING_FRIENDLY}
+ * — the search ends up preferring {@code (x + 1)^2} over the algebraically
+ * equivalent but didactically denser {@code x^2 + 2*x + 1} when both are
+ * reachable, and avoids exotic numerator/denominator constructs whenever a
+ * polynomial form exists.&lt;/p&gt;
+ */
+<span class="fc" id="L21">public final class TeachingFriendlinessCost implements CostModel {</span>
+
+    private static final int LARGE_COEFFICIENT_THRESHOLD = 20;
+
+    @Override
+    public int cost(String expression, Expr parsedAst, ExpressionScore score) {
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (parsedAst == null) {</span>
+<span class="nc" id="L28">            return Math.max(0, score.operatorCount() + score.nestingDepth());</span>
+        }
+<span class="fc" id="L30">        int base = baseCost(parsedAst);</span>
+<span class="fc" id="L31">        int depth = depth(parsedAst);</span>
+<span class="fc" id="L32">        int largeCoefficients = largeCoefficientPenalty(parsedAst);</span>
+<span class="fc" id="L33">        int divisionPenalty = divisionPenalty(parsedAst);</span>
+<span class="fc" id="L34">        int advancedFunctionPenalty = advancedFunctionPenalty(parsedAst);</span>
+        // depth is squared-ish so small step from 2 → 5 hurts a lot
+<span class="fc" id="L36">        return base + depth * 2 + largeCoefficients + divisionPenalty + advancedFunctionPenalty;</span>
+    }
+
+    @Override
+    public String id() {
+<span class="fc" id="L41">        return &quot;teaching-friendly&quot;;</span>
+    }
+
+    private int baseCost(Expr expression) {
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L46">            return 1 + baseCost(binary.left()) + baseCost(binary.right());</span>
+        }
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L49">            int total = 1;</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L51">                total += baseCost(argument);</span>
+<span class="nc" id="L52">            }</span>
+<span class="nc" id="L53">            return total;</span>
+        }
+<span class="fc" id="L55">        return 0;</span>
+    }
+
+    private int depth(Expr expression) {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L60">            return 1 + Math.max(depth(binary.left()), depth(binary.right()));</span>
+        }
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L63">            int max = 0;</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L65">                max = Math.max(max, depth(argument));</span>
+<span class="nc" id="L66">            }</span>
+<span class="nc" id="L67">            return 1 + max;</span>
+        }
+<span class="fc" id="L69">        return 0;</span>
+    }
+
+    private int largeCoefficientPenalty(Expr expression) {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L74">            double absValue = Math.abs(number.value());</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            return absValue &gt; LARGE_COEFFICIENT_THRESHOLD ? 2 : 0;</span>
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L78">            return largeCoefficientPenalty(binary.left()) + largeCoefficientPenalty(binary.right());</span>
+        }
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L81">            int total = 0;</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L83">                total += largeCoefficientPenalty(argument);</span>
+<span class="nc" id="L84">            }</span>
+<span class="nc" id="L85">            return total;</span>
+        }
+<span class="fc" id="L87">        return 0;</span>
+    }
+
+    private int divisionPenalty(Expr expression) {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            int self = binary.operator() == BinaryOperator.DIV ? 3 : 0;</span>
+<span class="fc" id="L93">            return self + divisionPenalty(binary.left()) + divisionPenalty(binary.right());</span>
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L96">            int total = 0;</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L98">                total += divisionPenalty(argument);</span>
+<span class="nc" id="L99">            }</span>
+<span class="nc" id="L100">            return total;</span>
+        }
+<span class="fc" id="L102">        return 0;</span>
+    }
+
+    private int advancedFunctionPenalty(Expr expression) {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            int self = switch (function.name()) {</span>
+<span class="nc" id="L108">                case &quot;log&quot;, &quot;ln&quot;, &quot;exp&quot;, &quot;sin&quot;, &quot;cos&quot;, &quot;tan&quot; -&gt; 2;</span>
+<span class="nc" id="L109">                default -&gt; 0;</span>
+            };
+<span class="nc" id="L111">            int total = self;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L113">                total += advancedFunctionPenalty(argument);</span>
+<span class="nc" id="L114">            }</span>
+<span class="nc" id="L115">            return total;</span>
+        }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L118">            return advancedFunctionPenalty(binary.left()) + advancedFunctionPenalty(binary.right());</span>
+        }
+<span class="fc" id="L120">        return 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

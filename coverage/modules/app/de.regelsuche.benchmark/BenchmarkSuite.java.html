@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BenchmarkSuite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">BenchmarkSuite.java</span></div><h1>BenchmarkSuite.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.SearchProfile;
+import de.regelsuche.search.strategy.AStarSearchStrategy;
+import de.regelsuche.search.strategy.BeamSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.HybridSearchStrategy;
+import de.regelsuche.search.strategy.MonteCarloTreeSearchStrategy;
+import de.regelsuche.search.strategy.RandomMonteCarloSearchStrategy;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Collection of opinionated benchmark scenarios.
+ *
+ * &lt;p&gt;Each scenario exercises {@link SearchBenchmark} with a representative set
+ * of expressions and a fixed list of {@link de.regelsuche.search.strategy.SearchStrategy}
+ * implementations so different runs are comparable. Scenarios are intentionally
+ * small enough to finish in a few seconds.&lt;/p&gt;
+ */
+<span class="fc" id="L23">public final class BenchmarkSuite {</span>
+
+    public List&lt;BenchmarkScenarioResult&gt; runAll() {
+<span class="fc" id="L26">        List&lt;BenchmarkScenarioResult&gt; all = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L27">        all.add(run(&quot;known-identities&quot;, List.of(</span>
+            &quot;x + 0&quot;,
+            &quot;x * 1&quot;,
+            &quot;x * 0&quot;,
+            &quot;a + a&quot;
+<span class="fc" id="L32">        ), SearchProfile.FAST_SIMPLIFY.heuristic()));</span>
+<span class="fc" id="L33">        all.add(run(&quot;polynomial-simplification&quot;, List.of(</span>
+            &quot;(x + 1)*(x + 1)&quot;,
+            &quot;x*x + x*x&quot;,
+            &quot;(x + 2)*(x + 3)&quot;,
+            &quot;(x + a)^2&quot;
+<span class="fc" id="L38">        ), SearchProfile.DISCOVERY.heuristic()));</span>
+<span class="fc" id="L39">        all.add(run(&quot;rational-simplification&quot;, List.of(</span>
+            &quot;(x*y)/(x*z)&quot;,
+            &quot;(a/b)*(c/d)&quot;,
+            &quot;a/(b/c)&quot;
+<span class="fc" id="L43">        ), SearchProfile.TEACHING.heuristic()));</span>
+<span class="fc" id="L44">        all.add(run(&quot;search-explosion&quot;, List.of(</span>
+            &quot;(x + a)*(x + b)*(x + c)&quot;
+<span class="fc" id="L46">        ), SearchProfile.EXHAUSTIVE_SMALL.heuristic()));</span>
+        // Math-domain categories (PR #13 follow-up): each is a single
+        // representative run through `UnifiedMathDomainWorkbench`, surfaced as
+        // a benchmark row so the dashboard shows it next to the algebraic
+        // scenarios. The result carries `found`, `elapsedMillis`,
+        // `exploredStates`, `expandedSteps` (= solver steps), `proofStatus`,
+        // and assumptions/equalitySaturationSavings via the dedicated row.
+<span class="fc" id="L53">        all.add(runMathDomain(&quot;equations&quot;,</span>
+            de.regelsuche.demo.UnifiedMathDomainWorkbench::runLinearEquation));
+<span class="fc" id="L55">        all.add(runMathDomain(&quot;inequalities&quot;,</span>
+            de.regelsuche.demo.UnifiedMathDomainWorkbench::runInequalitySignFlip));
+<span class="fc" id="L57">        all.add(runMathDomain(&quot;calculus&quot;,</span>
+            de.regelsuche.demo.UnifiedMathDomainWorkbench::runDerivativePowerRule));
+<span class="fc" id="L59">        all.add(runMathDomain(&quot;linear-algebra&quot;,</span>
+            de.regelsuche.demo.UnifiedMathDomainWorkbench::runMatrixDistributivity));
+<span class="fc" id="L61">        return all;</span>
+    }
+
+    private BenchmarkScenarioResult runMathDomain(
+        String name,
+        java.util.function.Function&lt;de.regelsuche.demo.UnifiedMathDomainWorkbench,
+            de.regelsuche.demo.UnifiedMathDomainWorkbench.DemoExecution&gt; runner
+    ) {
+<span class="fc" id="L69">        long started = System.nanoTime();</span>
+<span class="fc" id="L70">        de.regelsuche.demo.UnifiedMathDomainWorkbench workbench =</span>
+            new de.regelsuche.demo.UnifiedMathDomainWorkbench();
+<span class="fc" id="L72">        de.regelsuche.demo.UnifiedMathDomainWorkbench.DemoExecution exec = runner.apply(workbench);</span>
+<span class="fc" id="L73">        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;</span>
+<span class="fc" id="L74">        SearchBenchmarkResult row = new SearchBenchmarkResult(</span>
+            /* strategyName     */ &quot;math-domain&quot;,
+<span class="fc" id="L76">            /* expression       */ exec.inputExpression(),</span>
+<span class="fc" id="L77">            /* exploredStates   */ exec.edges().size() + 1,</span>
+<span class="fc" id="L78">            /* bestImprovement  */ Math.max(1, exec.steps().size()),</span>
+<span class="fc" id="L79">            /* shortestImprovingDepth */ exec.steps().size(),</span>
+<span class="fc" id="L80">            /* expandedSteps    */ exec.steps().size(),</span>
+<span class="fc" id="L81">            /* distinctRules    */ (int) exec.steps().stream()</span>
+<span class="fc" id="L82">                .map(de.regelsuche.discovery.TransformationStep::ruleId).distinct().count(),</span>
+            /* elapsedMillis    */ elapsedMillis,
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            /* proofStatus      */ exec.proofStatus() == null</span>
+<span class="nc" id="L85">                ? de.regelsuche.validation.CandidateProofStatus.SYMBOLICALLY_VERIFIED</span>
+<span class="fc" id="L86">                : exec.proofStatus()</span>
+        );
+<span class="fc" id="L88">        return new BenchmarkScenarioResult(name, List.of(row));</span>
+    }
+
+    public BenchmarkScenarioResult run(String name, List&lt;String&gt; expressions, SearchHeuristic heuristic) {
+<span class="fc" id="L92">        SearchBenchmark benchmark = new SearchBenchmark(new AstRewriteTransformationEngine(), heuristic);</span>
+<span class="fc" id="L93">        List&lt;SearchBenchmark.NamedSearchStrategy&gt; strategies = List.of(</span>
+            new SearchBenchmark.NamedSearchStrategy(&quot;best-first&quot;, new BestFirstSearchStrategy()),
+            new SearchBenchmark.NamedSearchStrategy(&quot;beam&quot;, new BeamSearchStrategy()),
+            new SearchBenchmark.NamedSearchStrategy(&quot;a-star&quot;, new AStarSearchStrategy()),
+            new SearchBenchmark.NamedSearchStrategy(&quot;random-mc&quot;, new RandomMonteCarloSearchStrategy(7L)),
+            new SearchBenchmark.NamedSearchStrategy(&quot;mcts&quot;, new MonteCarloTreeSearchStrategy(7L)),
+            new SearchBenchmark.NamedSearchStrategy(&quot;hybrid&quot;, new HybridSearchStrategy())
+        );
+<span class="fc" id="L101">        return new BenchmarkScenarioResult(name, benchmark.run(expressions, strategies));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

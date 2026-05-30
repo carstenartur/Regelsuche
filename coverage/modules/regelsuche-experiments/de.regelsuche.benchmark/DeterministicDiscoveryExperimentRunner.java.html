@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeterministicDiscoveryExperimentRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">DeterministicDiscoveryExperimentRunner.java</span></div><h1>DeterministicDiscoveryExperimentRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.example.SeedExpression;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.DiscoveryEvidenceKind;
+import de.regelsuche.validation.DiscoveryResultKind;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.function.Function;
+
+/**
+ * Reproducible experiment runner with deterministic ordering, global budget
+ * and optional parallel execution.
+ */
+public final class DeterministicDiscoveryExperimentRunner implements DiscoveryExperimentRunner {
+
+    private final int globalBudget;
+    private final int parallelism;
+    private final Function&lt;SeedExpression, SeedRunOutcome&gt; evaluator;
+
+    public DeterministicDiscoveryExperimentRunner(
+        int globalBudget,
+        int parallelism,
+        Function&lt;SeedExpression, SeedRunOutcome&gt; evaluator
+<span class="fc" id="L33">    ) {</span>
+<span class="fc" id="L34">        this.globalBudget = Math.max(0, globalBudget);</span>
+<span class="fc" id="L35">        this.parallelism = Math.max(1, parallelism);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        this.evaluator = evaluator == null ? seed -&gt; SeedRunOutcome.fail(&quot;no evaluator&quot;) : evaluator;</span>
+<span class="fc" id="L37">    }</span>
+
+    @Override
+    public List&lt;ExperimentResult&gt; run(List&lt;String&gt; seedExpressions) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        List&lt;SeedExpression&gt; seeds = (seedExpressions == null ? List.&lt;String&gt;of() : seedExpressions).stream()</span>
+<span class="fc" id="L42">            .map(expression -&gt; new SeedExpression(expression, expression, &quot;inline&quot;, &quot;general&quot;, List.of(), List.of()))</span>
+<span class="fc" id="L43">            .toList();</span>
+<span class="fc" id="L44">        return execute(seeds, false).stream()</span>
+<span class="fc" id="L45">            .map(row -&gt; new ExperimentResult(row.seed().expression(), row.success(), row.summary()))</span>
+<span class="fc" id="L46">            .toList();</span>
+    }
+
+    public DiscoveryReport runDetailed(List&lt;SeedExpression&gt; seedExpressions) {
+<span class="fc" id="L50">        long started = System.nanoTime();</span>
+<span class="fc" id="L51">        List&lt;SeedRunReport&gt; rows = execute(seedExpressions, true);</span>
+<span class="fc" id="L52">        long runtimeMillis = (System.nanoTime() - started) / 1_000_000L;</span>
+<span class="fc" id="L53">        long successful = rows.stream().filter(SeedRunReport::success).count();</span>
+<span class="fc" id="L54">        long hypotheses = rows.stream().mapToLong(row -&gt; row.hypotheses().size()).sum();</span>
+<span class="fc" id="L55">        long counterexamples = rows.stream().mapToLong(row -&gt; row.counterexamples().size()).sum();</span>
+<span class="fc" id="L56">        long rowRuntime = rows.stream().mapToLong(SeedRunReport::elapsedMillis).sum();</span>
+<span class="fc" id="L57">        long rowMemory = rows.stream().mapToLong(SeedRunReport::memoryBytes).sum();</span>
+<span class="fc" id="L58">        return new DiscoveryReport(</span>
+            rows,
+<span class="fc" id="L60">            new DiscoveryMetrics(rows.size(), (int) successful, (int) hypotheses, (int) counterexamples, rowRuntime, rowMemory),</span>
+            runtimeMillis
+        );
+    }
+
+    private List&lt;SeedRunReport&gt; execute(List&lt;SeedExpression&gt; seedExpressions, boolean stableOrder) {
+<span class="fc" id="L66">        List&lt;SeedExpression&gt; candidates = usable(seedExpressions);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (stableOrder) {</span>
+<span class="fc" id="L68">            candidates = candidates.stream().sorted(Comparator.comparing(SeedExpression::stableKey)).toList();</span>
+        }
+<span class="fc" id="L70">        List&lt;SeedExpression&gt; budgeted = candidates.stream().limit(globalBudget).toList();</span>
+<span class="fc" id="L71">        ExecutorService pool = Executors.newFixedThreadPool(parallelism);</span>
+        try {
+<span class="fc" id="L73">            List&lt;Callable&lt;IndexedResult&gt;&gt; tasks = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            for (int i = 0; i &lt; budgeted.size(); i++) {</span>
+<span class="fc" id="L75">                final int index = i;</span>
+<span class="fc" id="L76">                final SeedExpression seed = budgeted.get(i);</span>
+<span class="fc" id="L77">                tasks.add(() -&gt; new IndexedResult(index, seed, evaluator.apply(seed)));</span>
+            }
+<span class="fc" id="L79">            List&lt;Future&lt;IndexedResult&gt;&gt; futures = pool.invokeAll(tasks);</span>
+<span class="fc" id="L80">            List&lt;SeedRunReport&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            for (Future&lt;IndexedResult&gt; future : futures) {</span>
+<span class="fc" id="L82">                IndexedResult value = future.get();</span>
+<span class="fc" id="L83">                SeedRunOutcome outcome = value.outcome();</span>
+<span class="fc" id="L84">                rows.add(new SeedRunReport(</span>
+<span class="fc" id="L85">                    value.seed(),</span>
+<span class="fc" id="L86">                    outcome.success(),</span>
+<span class="fc" id="L87">                    outcome.summary(),</span>
+<span class="fc" id="L88">                    outcome.hypotheses(),</span>
+<span class="fc" id="L89">                    outcome.counterexamples(),</span>
+<span class="fc" id="L90">                    outcome.counterexampleSearchStatus(),</span>
+<span class="fc" id="L91">                    outcome.counterexampleAttemptedSources(),</span>
+<span class="fc" id="L92">                    outcome.inferredAssumptions(),</span>
+<span class="fc" id="L93">                    outcome.counterexampleExplanation(),</span>
+<span class="fc" id="L94">                    outcome.replayPath(),</span>
+<span class="fc" id="L95">                    outcome.resultKind(),</span>
+<span class="fc" id="L96">                    outcome.rulePath(),</span>
+<span class="fc" id="L97">                    outcome.elapsedMillis(),</span>
+<span class="fc" id="L98">                    outcome.memoryBytes(),</span>
+<span class="fc" id="L99">                    outcome.evidence()</span>
+                ));
+<span class="fc" id="L101">            }</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (!stableOrder) {</span>
+<span class="fc" id="L103">                return List.copyOf(rows);</span>
+            }
+<span class="fc" id="L105">            return rows.stream().sorted(Comparator.comparing(row -&gt; row.seed().stableKey())).toList();</span>
+<span class="nc" id="L106">        } catch (Exception exception) {</span>
+<span class="nc" id="L107">            throw new IllegalStateException(&quot;Experiment run failed&quot;, exception);</span>
+        } finally {
+<span class="fc" id="L109">            pool.shutdownNow();</span>
+        }
+    }
+
+    private static List&lt;SeedExpression&gt; usable(List&lt;SeedExpression&gt; input) {
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        return (input == null ? List.&lt;SeedExpression&gt;of() : input).stream()</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">            .filter(seed -&gt; seed != null &amp;&amp; !seed.expression().isBlank())</span>
+<span class="fc" id="L116">            .toList();</span>
+    }
+
+<span class="fc" id="L119">    private record IndexedResult(int index, SeedExpression seed, SeedRunOutcome outcome) {</span>
+    }
+
+    public record SeedRunOutcome(
+        boolean success,
+        String summary,
+        List&lt;String&gt; hypotheses,
+        List&lt;String&gt; counterexamples,
+        CounterexampleSearchService.Status counterexampleSearchStatus,
+        List&lt;String&gt; counterexampleAttemptedSources,
+        List&lt;String&gt; inferredAssumptions,
+        String counterexampleExplanation,
+        List&lt;String&gt; replayPath,
+        DiscoveryResultKind resultKind,
+        List&lt;String&gt; rulePath,
+        long elapsedMillis,
+        long memoryBytes,
+        Set&lt;DiscoveryEvidenceKind&gt; evidence
+    ) {
+        public SeedRunOutcome(
+            boolean success,
+            String summary,
+            List&lt;String&gt; hypotheses,
+            List&lt;String&gt; counterexamples,
+            List&lt;String&gt; replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+<span class="fc" id="L147">            this(success, summary, hypotheses, counterexamples, deriveStatus(counterexamples, null),</span>
+<span class="fc" id="L148">                List.of(), List.of(), &quot;&quot;, replayPath, defaultResultKind(success, hypotheses, replayPath), List.of(),</span>
+                elapsedMillis, memoryBytes, null);
+<span class="fc" id="L150">        }</span>
+
+        public SeedRunOutcome(
+            boolean success,
+            String summary,
+            List&lt;String&gt; hypotheses,
+            CounterexampleSearchService.CounterexampleSearchResult counterexampleResult,
+            List&lt;String&gt; replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+<span class="nc" id="L161">            this(success, summary, hypotheses,</span>
+<span class="nc" id="L162">                counterexampleResult.counterexample().map(counterexample -&gt; List.of(counterexample.toString())).orElse(List.of()),</span>
+<span class="nc" id="L163">                counterexampleResult.status(),</span>
+<span class="nc" id="L164">                counterexampleResult.attemptedSources(),</span>
+<span class="nc" id="L165">                counterexampleResult.inferredAssumptions(),</span>
+<span class="nc" id="L166">                counterexampleResult.explanation(),</span>
+<span class="nc" id="L167">                replayPath, defaultResultKind(success, hypotheses, replayPath), List.of(), elapsedMillis, memoryBytes, null);</span>
+<span class="nc" id="L168">        }</span>
+
+        public SeedRunOutcome(
+            boolean success,
+            String summary,
+            List&lt;String&gt; hypotheses,
+            List&lt;String&gt; counterexamples,
+            CounterexampleSearchService.Status counterexampleSearchStatus,
+            List&lt;String&gt; counterexampleAttemptedSources,
+            List&lt;String&gt; inferredAssumptions,
+            String counterexampleExplanation,
+            List&lt;String&gt; replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+<span class="nc" id="L183">            this(success, summary, hypotheses, counterexamples, counterexampleSearchStatus,</span>
+                counterexampleAttemptedSources, inferredAssumptions, counterexampleExplanation, replayPath,
+<span class="nc" id="L185">                defaultResultKind(success, hypotheses, replayPath), List.of(), elapsedMillis, memoryBytes, null);</span>
+<span class="nc" id="L186">        }</span>
+
+        public SeedRunOutcome(
+            boolean success,
+            String summary,
+            List&lt;String&gt; hypotheses,
+            List&lt;String&gt; counterexamples,
+            CounterexampleSearchService.Status counterexampleSearchStatus,
+            List&lt;String&gt; counterexampleAttemptedSources,
+            List&lt;String&gt; inferredAssumptions,
+            String counterexampleExplanation,
+            List&lt;String&gt; replayPath,
+            DiscoveryResultKind resultKind,
+            List&lt;String&gt; rulePath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+<span class="nc" id="L203">            this(success, summary, hypotheses, counterexamples, counterexampleSearchStatus,</span>
+                counterexampleAttemptedSources, inferredAssumptions, counterexampleExplanation, replayPath,
+                resultKind, rulePath, elapsedMillis, memoryBytes, null);
+<span class="nc" id="L206">        }</span>
+
+<span class="fc" id="L208">        public SeedRunOutcome {</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            summary = summary == null ? &quot;&quot; : summary;</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            hypotheses = hypotheses == null ? List.of() : List.copyOf(hypotheses);</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            counterexamples = counterexamples == null ? List.of() : List.copyOf(counterexamples);</span>
+<span class="fc" id="L212">            counterexampleSearchStatus = deriveStatus(counterexamples, counterexampleSearchStatus);</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            counterexampleAttemptedSources = counterexampleAttemptedSources == null</span>
+<span class="nc" id="L214">                ? List.of()</span>
+<span class="fc" id="L215">                : List.copyOf(counterexampleAttemptedSources);</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            inferredAssumptions = inferredAssumptions == null ? List.of() : List.copyOf(inferredAssumptions);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">            counterexampleExplanation = counterexampleExplanation == null ? &quot;&quot; : counterexampleExplanation;</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            replayPath = replayPath == null ? List.of() : List.copyOf(replayPath);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            resultKind = resultKind == null ? defaultResultKind(success, hypotheses, replayPath) : resultKind;</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">            evidence = evidence == null</span>
+<span class="fc" id="L222">                ? inferEvidence(resultKind, rulePath, counterexampleSearchStatus, replayPath)</span>
+<span class="pc" id="L223">                : Set.copyOf(evidence);</span>
+<span class="fc" id="L224">        }</span>
+
+        public static SeedRunOutcome fail(String summary) {
+<span class="nc" id="L227">            return new SeedRunOutcome(false, summary, List.of(), List.of(), List.of(), 0L, 0L);</span>
+        }
+
+        private static CounterexampleSearchService.Status deriveStatus(
+            List&lt;String&gt; counterexamples,
+            CounterexampleSearchService.Status explicitStatus
+        ) {
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (explicitStatus != null) {</span>
+<span class="fc" id="L235">                return explicitStatus;</span>
+            }
+<span class="pc bpc" id="L237" title="2 of 4 branches missed.">            return counterexamples == null || counterexamples.isEmpty()</span>
+<span class="fc" id="L238">                ? CounterexampleSearchService.Status.INCONCLUSIVE</span>
+<span class="nc" id="L239">                : CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND;</span>
+        }
+
+        private static DiscoveryResultKind defaultResultKind(boolean success, List&lt;String&gt; hypotheses, List&lt;String&gt; replayPath) {
+<span class="pc bpc" id="L243" title="2 of 6 branches missed.">            if (!success &amp;&amp; (hypotheses == null || hypotheses.isEmpty())) {</span>
+<span class="fc" id="L244">                return DiscoveryResultKind.NO_CANDIDATE;</span>
+            }
+<span class="pc bpc" id="L246" title="2 of 6 branches missed.">            if (success &amp;&amp; replayPath != null &amp;&amp; replayPath.size() &gt; 1) {</span>
+<span class="fc" id="L247">                return DiscoveryResultKind.TRANSFORMED;</span>
+            }
+<span class="pc bpc" id="L249" title="2 of 4 branches missed.">            return hypotheses == null || hypotheses.isEmpty()</span>
+<span class="fc" id="L250">                ? DiscoveryResultKind.NO_CANDIDATE</span>
+<span class="nc" id="L251">                : DiscoveryResultKind.HYPOTHESIS_ONLY;</span>
+        }
+
+        static Set&lt;DiscoveryEvidenceKind&gt; inferEvidence(
+            DiscoveryResultKind resultKind,
+            List&lt;String&gt; rulePath,
+            CounterexampleSearchService.Status counterexampleSearchStatus,
+            List&lt;String&gt; replayPath
+        ) {
+<span class="fc" id="L260">            EnumSet&lt;DiscoveryEvidenceKind&gt; kinds = EnumSet.noneOf(DiscoveryEvidenceKind.class);</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            DiscoveryResultKind effectiveKind = resultKind == null ? DiscoveryResultKind.NO_CANDIDATE : resultKind;</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            List&lt;String&gt; effectiveRules = rulePath == null ? List.of() : rulePath;</span>
+<span class="pc bpc" id="L263" title="2 of 6 branches missed.">            if (effectiveKind == DiscoveryResultKind.TRANSFORMED &amp;&amp; replayPath != null &amp;&amp; replayPath.size() &gt; 1) {</span>
+<span class="fc" id="L264">                kinds.add(DiscoveryEvidenceKind.SIMPLIFIED);</span>
+            }
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">            if (effectiveRules.stream().anyMatch(rule -&gt; rule.contains(&quot;factor&quot;))) {</span>
+<span class="nc" id="L267">                kinds.add(DiscoveryEvidenceKind.FACTORED);</span>
+            }
+<span class="pc bpc" id="L269" title="5 of 6 branches missed.">            if (effectiveRules.stream().anyMatch(rule -&gt; rule.contains(&quot;macro&quot;) &amp;&amp; rule.contains(&quot;learn&quot;))) {</span>
+<span class="nc" id="L270">                kinds.add(DiscoveryEvidenceKind.MACRO_LEARNED);</span>
+            }
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">            if (effectiveRules.stream().anyMatch(rule -&gt; rule.contains(&quot;macro&quot;))) {</span>
+<span class="nc" id="L273">                kinds.add(DiscoveryEvidenceKind.MACRO_REUSED);</span>
+            }
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            if (counterexampleSearchStatus == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND) {</span>
+<span class="nc" id="L276">                kinds.add(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED);</span>
+            }
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            return kinds.isEmpty() ? Set.of() : Set.copyOf(kinds);</span>
+        }
+    }
+
+    public record SeedRunReport(
+        SeedExpression seed,
+        boolean success,
+        String summary,
+        List&lt;String&gt; hypotheses,
+        List&lt;String&gt; counterexamples,
+        CounterexampleSearchService.Status counterexampleSearchStatus,
+        List&lt;String&gt; counterexampleAttemptedSources,
+        List&lt;String&gt; inferredAssumptions,
+        String counterexampleExplanation,
+        List&lt;String&gt; replayPath,
+        DiscoveryResultKind resultKind,
+        List&lt;String&gt; rulePath,
+        long elapsedMillis,
+        long memoryBytes,
+        Set&lt;DiscoveryEvidenceKind&gt; evidence
+    ) {
+        public SeedRunReport(
+            SeedExpression seed,
+            boolean success,
+            String summary,
+            List&lt;String&gt; hypotheses,
+            List&lt;String&gt; counterexamples,
+            List&lt;String&gt; replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+<span class="fc" id="L309">            this(seed, success, summary, hypotheses, counterexamples,</span>
+<span class="pc bpc" id="L310" title="1 of 4 branches missed.">                counterexamples == null || counterexamples.isEmpty()</span>
+<span class="fc" id="L311">                    ? CounterexampleSearchService.Status.INCONCLUSIVE</span>
+<span class="fc" id="L312">                    : CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND,</span>
+<span class="fc" id="L313">                List.of(), List.of(), &quot;&quot;, replayPath,</span>
+<span class="fc" id="L314">                SeedRunOutcome.defaultResultKind(success, hypotheses, replayPath), List.of(), elapsedMillis, memoryBytes, null);</span>
+<span class="fc" id="L315">        }</span>
+
+        public SeedRunReport(
+            SeedExpression seed,
+            boolean success,
+            String summary,
+            List&lt;String&gt; hypotheses,
+            List&lt;String&gt; counterexamples,
+            CounterexampleSearchService.Status counterexampleSearchStatus,
+            List&lt;String&gt; counterexampleAttemptedSources,
+            List&lt;String&gt; inferredAssumptions,
+            String counterexampleExplanation,
+            List&lt;String&gt; replayPath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+<span class="fc" id="L331">            this(seed, success, summary, hypotheses, counterexamples, counterexampleSearchStatus,</span>
+                counterexampleAttemptedSources, inferredAssumptions, counterexampleExplanation, replayPath,
+<span class="fc" id="L333">                SeedRunOutcome.defaultResultKind(success, hypotheses, replayPath), List.of(), elapsedMillis, memoryBytes, null);</span>
+<span class="fc" id="L334">        }</span>
+
+        public SeedRunReport(
+            SeedExpression seed,
+            boolean success,
+            String summary,
+            List&lt;String&gt; hypotheses,
+            List&lt;String&gt; counterexamples,
+            CounterexampleSearchService.Status counterexampleSearchStatus,
+            List&lt;String&gt; counterexampleAttemptedSources,
+            List&lt;String&gt; inferredAssumptions,
+            String counterexampleExplanation,
+            List&lt;String&gt; replayPath,
+            DiscoveryResultKind resultKind,
+            List&lt;String&gt; rulePath,
+            long elapsedMillis,
+            long memoryBytes
+        ) {
+<span class="nc" id="L352">            this(seed, success, summary, hypotheses, counterexamples, counterexampleSearchStatus,</span>
+                counterexampleAttemptedSources, inferredAssumptions, counterexampleExplanation, replayPath,
+                resultKind, rulePath, elapsedMillis, memoryBytes, null);
+<span class="nc" id="L355">        }</span>
+
+<span class="fc" id="L357">        public SeedRunReport {</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            resultKind = resultKind == null ? SeedRunOutcome.defaultResultKind(success, hypotheses, replayPath) : resultKind;</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">            evidence = evidence == null</span>
+<span class="fc" id="L361">                ? SeedRunOutcome.inferEvidence(resultKind, rulePath, counterexampleSearchStatus, replayPath)</span>
+<span class="fc" id="L362">                : Set.copyOf(evidence);</span>
+<span class="fc" id="L363">        }</span>
+    }
+
+<span class="fc" id="L366">    public record DiscoveryMetrics(</span>
+        int processedSeeds,
+        int successfulSeeds,
+        int hypotheses,
+        int counterexamples,
+        long accumulatedRuntimeMillis,
+        long accumulatedMemoryBytes
+    ) {
+    }
+
+    public record DiscoveryReport(
+        List&lt;SeedRunReport&gt; rows,
+        DiscoveryMetrics metrics,
+        long wallClockRuntimeMillis
+    ) {
+<span class="fc" id="L381">        public DiscoveryReport {</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">            rows = rows == null ? List.of() : List.copyOf(rows);</span>
+<span class="fc" id="L383">        }</span>
+
+        public String renderDeterministicJson() {
+<span class="fc" id="L386">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L387">            writer.beginObject();</span>
+<span class="fc" id="L388">            writer.property(&quot;schema&quot;, &quot;regelsuche.discovery-report/v1&quot;);</span>
+<span class="fc" id="L389">            writer.array(&quot;volatileFields&quot;, volatileFields -&gt; {</span>
+<span class="fc" id="L390">                volatileFields.value(&quot;wallClockRuntimeMillis&quot;);</span>
+<span class="fc" id="L391">                volatileFields.value(&quot;rows[].elapsedMillis&quot;);</span>
+<span class="fc" id="L392">                volatileFields.value(&quot;rows[].memoryBytes&quot;);</span>
+<span class="fc" id="L393">                volatileFields.value(&quot;metrics.accumulatedRuntimeMillis&quot;);</span>
+<span class="fc" id="L394">                volatileFields.value(&quot;metrics.accumulatedMemoryBytes&quot;);</span>
+<span class="fc" id="L395">            });</span>
+<span class="fc" id="L396">            writer.property(&quot;wallClockRuntimeMillis&quot;, 0L);</span>
+<span class="fc" id="L397">            writer.object(&quot;metrics&quot;, metricsObject -&gt; {</span>
+<span class="fc" id="L398">                metricsObject.property(&quot;processedSeeds&quot;, metrics.processedSeeds());</span>
+<span class="fc" id="L399">                metricsObject.property(&quot;successfulSeeds&quot;, metrics.successfulSeeds());</span>
+<span class="fc" id="L400">                metricsObject.property(&quot;hypotheses&quot;, metrics.hypotheses());</span>
+<span class="fc" id="L401">                metricsObject.property(&quot;counterexamples&quot;, metrics.counterexamples());</span>
+<span class="fc" id="L402">                metricsObject.property(&quot;accumulatedRuntimeMillis&quot;, 0L);</span>
+<span class="fc" id="L403">                metricsObject.property(&quot;accumulatedMemoryBytes&quot;, 0L);</span>
+<span class="fc" id="L404">            });</span>
+<span class="fc" id="L405">            writer.array(&quot;rows&quot;, rowsArray -&gt; rows.forEach(row -&gt; rowsArray.objectValue(object -&gt; {</span>
+<span class="fc" id="L406">                object.property(&quot;seedId&quot;, row.seed().id());</span>
+<span class="fc" id="L407">                object.property(&quot;expression&quot;, row.seed().expression());</span>
+<span class="fc" id="L408">                object.property(&quot;success&quot;, row.success());</span>
+<span class="fc" id="L409">                object.property(&quot;resultKind&quot;, row.resultKind().name());</span>
+<span class="fc" id="L410">                object.property(&quot;summary&quot;, row.summary());</span>
+<span class="fc" id="L411">                object.array(&quot;hypotheses&quot;, h -&gt; row.hypotheses().forEach(h::value));</span>
+<span class="fc" id="L412">                object.property(&quot;counterexampleStatus&quot;, row.counterexampleSearchStatus().name());</span>
+<span class="fc" id="L413">                object.array(&quot;counterexamples&quot;, c -&gt; row.counterexamples().forEach(c::value));</span>
+<span class="fc" id="L414">                object.array(&quot;attemptedSources&quot;, c -&gt; row.counterexampleAttemptedSources().forEach(c::value));</span>
+<span class="fc" id="L415">                object.array(&quot;inferredAssumptions&quot;, c -&gt; row.inferredAssumptions().forEach(c::value));</span>
+<span class="fc" id="L416">                object.property(&quot;explanation&quot;, row.counterexampleExplanation());</span>
+<span class="fc" id="L417">                object.array(&quot;replayPath&quot;, r -&gt; row.replayPath().forEach(r::value));</span>
+<span class="fc" id="L418">                object.array(&quot;rulePath&quot;, r -&gt; row.rulePath().forEach(r::value));</span>
+<span class="fc" id="L419">                object.array(&quot;evidence&quot;, e -&gt; row.evidence().stream().map(Enum::name).sorted().forEach(e::value));</span>
+<span class="fc" id="L420">                object.property(&quot;elapsedMillis&quot;, 0L);</span>
+<span class="fc" id="L421">                object.property(&quot;memoryBytes&quot;, 0L);</span>
+<span class="fc" id="L422">            })));</span>
+<span class="fc" id="L423">            writer.endObject();</span>
+<span class="fc" id="L424">            return writer.toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

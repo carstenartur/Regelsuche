@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CostModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scoring.cost</a> &gt; <span class="el_source">CostModel.java</span></div><h1>CostModel.java</h1><pre class="source lang-java linenums">package de.regelsuche.scoring.cost;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScore;
+
+/**
+ * Pluggable cost function used by goal-directed search strategies.
+ *
+ * &lt;p&gt;A {@link CostModel} maps a candidate result (its canonical AST,
+ * canonical string and pre-computed {@link ExpressionScore}) onto a single
+ * non-negative integer cost: lower is better. The score-driven
+ * {@code priority(...)} computations in {@link
+ * de.regelsuche.search.strategy.BestFirstSearchStrategy} and
+ * {@link de.regelsuche.search.strategy.AStarSearchStrategy} consult the
+ * model attached to the {@link de.regelsuche.search.strategy.SearchProblem}
+ * to obtain the &quot;g(n)&quot; term, so different {@link TransformationGoal}s end
+ * up steering the same search machinery toward different mathematical
+ * targets — factored form, numerically stable form, teaching-friendly form,
+ * and so on.&lt;/p&gt;
+ *
+ * &lt;p&gt;Implementations must be pure (no side effects, no per-instance state
+ * that depends on call order) so that cost values are reproducible across
+ * runs and so that the search remains deterministic.&lt;/p&gt;
+ */
+public interface CostModel {
+
+    /**
+     * Cost of {@code expression}. Smaller is better. The {@code parsedAst}
+     * argument is supplied as a convenience so implementations do not have
+     * to re-parse the input — if a model only needs the score, it can
+     * ignore {@code parsedAst}.
+     */
+    int cost(String expression, Expr parsedAst, ExpressionScore score);
+
+    /**
+     * Stable, human-readable identifier of this cost model, e.g.
+     * {@code &quot;operator-count&quot;}. Used in JSON exports and the UI dropdown.
+     */
+    String id();
+
+    /**
+     * Convenience: parse {@code expression} once and delegate to
+     * {@link #cost(String, Expr, ExpressionScore)}. Returns {@link
+     * Integer#MAX_VALUE} for syntactically invalid input so the caller's
+     * comparator treats the broken state as the worst possible candidate
+     * without throwing.
+     */
+    default int cost(String expression, ExpressionCanonicalizer canonicalizer, ExpressionScore score) {
+        try {
+<span class="fc" id="L54">            Expr ast = new ExpressionParser()</span>
+<span class="fc" id="L55">                .parse(new InputRequest(InputType.TERM, expression))</span>
+<span class="fc" id="L56">                .terms()</span>
+<span class="fc" id="L57">                .getFirst();</span>
+<span class="fc" id="L58">            return cost(expression, ast, score);</span>
+<span class="nc" id="L59">        } catch (RuntimeException ex) {</span>
+<span class="nc" id="L60">            return Integer.MAX_VALUE;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

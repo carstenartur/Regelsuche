@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MacroRuleLearningService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.learning</a> &gt; <span class="el_source">MacroRuleLearningService.java</span></div><h1>MacroRuleLearningService.java</h1><pre class="source lang-java linenums">package de.regelsuche.learning;
+
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.mining.DiscoverySettings;
+import de.regelsuche.mining.KnownRuleRepository;
+import de.regelsuche.mining.RuleCandidate;
+import de.regelsuche.mining.RuleCandidateMiner;
+import de.regelsuche.mining.SuccessfulTransformationPath;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Learns reusable macro rules by anti-unifying recurring
+ * {@link SuccessfulTransformationPath transformation paths}, accumulates
+ * statistics across runs (occurrenceCount, averageImprovement,
+ * supportingPathIds, confidenceScore) and promotes rules above a configurable
+ * threshold into the {@link RuleInventoryRepository inventory}.
+ *
+ * &lt;p&gt;The learning loop intentionally reuses the existing
+ * {@link RuleCandidateMiner} so anti-unification, parameter relation mining
+ * and fresh-example validation are not duplicated. A rule is enabled in the
+ * inventory when both {@code occurrenceCount &amp;gt;= minOccurrences} and
+ * {@code confidenceScore &amp;gt;= minConfidence} are satisfied; otherwise it
+ * stays disabled so {@link de.regelsuche.inventory.InventoryBackedRewriteRuleProvider}
+ * does not surface it as a live rewrite rule yet.&lt;/p&gt;
+ */
+public class MacroRuleLearningService {
+
+    public static final int DEFAULT_MIN_OCCURRENCES = 3;
+    public static final double DEFAULT_MIN_CONFIDENCE = 0.8;
+
+    private final RuleInventoryRepository inventory;
+    private final RuleCandidateMiner miner;
+    private final KnownRuleRepository knownRules;
+    private final int minOccurrences;
+    private final double minConfidence;
+
+    public MacroRuleLearningService(RuleInventoryRepository inventory) {
+<span class="fc" id="L46">        this(inventory, new RuleCandidateMiner(new KnownRuleRepository()),</span>
+            new KnownRuleRepository(), DEFAULT_MIN_OCCURRENCES, DEFAULT_MIN_CONFIDENCE);
+<span class="fc" id="L48">    }</span>
+
+    public MacroRuleLearningService(
+        RuleInventoryRepository inventory,
+        RuleCandidateMiner miner,
+        KnownRuleRepository knownRules,
+        int minOccurrences,
+        double minConfidence
+<span class="fc" id="L56">    ) {</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        if (inventory == null || miner == null) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(&quot;inventory and miner must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (minOccurrences &lt; 1) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(&quot;minOccurrences must be &gt;= 1&quot;);</span>
+        }
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (minConfidence &lt; 0.0 || minConfidence &gt; 1.0) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(&quot;minConfidence must be in [0,1]&quot;);</span>
+        }
+<span class="fc" id="L66">        this.inventory = inventory;</span>
+<span class="fc" id="L67">        this.miner = miner;</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        this.knownRules = knownRules == null ? new KnownRuleRepository() : knownRules;</span>
+<span class="fc" id="L69">        this.minOccurrences = minOccurrences;</span>
+<span class="fc" id="L70">        this.minConfidence = minConfidence;</span>
+<span class="fc" id="L71">    }</span>
+
+    /**
+     * Learn from the cumulative {@code paths} observed across one or more
+     * search runs. Returns the rules touched by this learning step.
+     */
+    public MacroLearningResult learn(List&lt;SuccessfulTransformationPath&gt; paths) {
+<span class="pc bpc" id="L78" title="2 of 4 branches missed.">        if (paths == null || paths.isEmpty()) {</span>
+<span class="nc" id="L79">            return new MacroLearningResult(List.of(), List.of());</span>
+        }
+        // Make the discovery threshold match this service's so a macro can be
+        // mined as soon as we have enough paths (default 3).
+<span class="fc" id="L83">        DiscoverySettings settings = new DiscoverySettings(</span>
+            true,
+<span class="fc" id="L85">            DiscoverySettings.defaults().maxPathLengthForCandidateMining(),</span>
+<span class="fc" id="L86">            Math.max(1, minOccurrences),</span>
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES
+        );
+<span class="fc" id="L89">        List&lt;RuleCandidate&gt; candidates = miner.mine(paths, settings);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (minOccurrences == 1) {</span>
+<span class="fc" id="L91">            Set&lt;String&gt; existingHashes = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            for (RuleCandidate candidate : candidates) {</span>
+<span class="nc" id="L93">                existingHashes.add(candidate.canonicalHash());</span>
+<span class="nc" id="L94">            }</span>
+<span class="fc" id="L95">            List&lt;RuleCandidate&gt; extended = new ArrayList&lt;&gt;(candidates);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            for (RuleCandidate candidate : miner.mineFromSinglePathForValidatedSchema(paths)) {</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                if (existingHashes.add(candidate.canonicalHash())) {</span>
+<span class="fc" id="L98">                    extended.add(candidate);</span>
+                }
+<span class="fc" id="L100">            }</span>
+<span class="fc" id="L101">            candidates = extended;</span>
+        }
+        // Index paths by id so we can recover the atomic rule-id sequence for
+        // each candidate and tag the resulting reusable rule with its domain
+        // (equations / inequalities / calculus / linear-algebra / algebra).
+<span class="fc" id="L106">        java.util.Map&lt;String, List&lt;String&gt;&gt; rulesByPathId = new java.util.HashMap&lt;&gt;();</span>
+<span class="fc" id="L107">        java.util.Map&lt;String, List&lt;String&gt;&gt; assumptionsByPathId = new java.util.HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (SuccessfulTransformationPath p : paths) {</span>
+<span class="fc" id="L109">            rulesByPathId.put(p.id(), p.rules());</span>
+<span class="fc" id="L110">            assumptionsByPathId.put(p.id(), p.assumptions());</span>
+<span class="fc" id="L111">        }</span>
+<span class="fc" id="L112">        de.regelsuche.mining.MacroDomainInferrer inferrer =</span>
+            new de.regelsuche.mining.MacroDomainInferrer();
+<span class="fc" id="L114">        List&lt;ReusableRule&gt; updated = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L115">        List&lt;ReusableRule&gt; activated = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (RuleCandidate candidate : candidates) {</span>
+<span class="fc" id="L117">            ReusableRule ruleBefore = findById(candidate.canonicalHash())</span>
+<span class="fc" id="L118">                .orElse(null);</span>
+<span class="fc" id="L119">            ReusableRule rule = buildOrUpdate(candidate, ruleBefore, assumptionsFor(candidate, assumptionsByPathId));</span>
+<span class="fc" id="L120">            inventory.save(rule);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            boolean shouldEnable = rule.occurrenceCount() &gt;= minOccurrences</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                &amp;&amp; rule.confidenceScore() &gt;= minConfidence;</span>
+            // Look up the stored rule (save() may have folded duplicates by hash).
+<span class="fc" id="L124">            ReusableRule effective = inventory.findAll().stream()</span>
+<span class="fc" id="L125">                .filter(r -&gt; r.canonicalHash().equals(rule.canonicalHash()))</span>
+<span class="fc" id="L126">                .findFirst()</span>
+<span class="fc" id="L127">                .orElse(rule);</span>
+<span class="fc" id="L128">            inventory.setEnabled(effective.id(), shouldEnable);</span>
+            // Domain tag (Discovery+): infer once from the atomic rule-ids of
+            // the supporting paths. Stored as a free-form inventory tag so the
+            // UI / inventory queries can filter by domain.
+<span class="fc" id="L132">            List&lt;String&gt; mergedRuleIds = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            for (String supportingId : candidate.supportingTransformationIds()) {</span>
+<span class="fc" id="L134">                List&lt;String&gt; rules = rulesByPathId.get(supportingId);</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                if (rules != null) {</span>
+<span class="fc" id="L136">                    mergedRuleIds.addAll(rules);</span>
+                }
+<span class="fc" id="L138">            }</span>
+<span class="fc" id="L139">            String domain = inferrer.inferFromRuleIds(mergedRuleIds);</span>
+<span class="fc" id="L140">            inventory.addTag(effective.id(), domain);</span>
+<span class="fc" id="L141">            updated.add(effective);</span>
+<span class="pc bpc" id="L142" title="2 of 6 branches missed.">            if (shouldEnable &amp;&amp; (ruleBefore == null || !inventory.isEnabled(ruleBefore.id())</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                || ruleBefore.occurrenceCount() &lt; minOccurrences)) {</span>
+<span class="fc" id="L144">                activated.add(effective);</span>
+            }
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">        return new MacroLearningResult(updated, activated);</span>
+    }
+
+    private Optional&lt;ReusableRule&gt; findById(String canonicalHash) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (ReusableRule rule : inventory.findAll()) {</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">            if (canonicalHash != null &amp;&amp; canonicalHash.equals(rule.canonicalHash())) {</span>
+<span class="fc" id="L153">                return Optional.of(rule);</span>
+            }
+<span class="fc" id="L155">        }</span>
+<span class="fc" id="L156">        return Optional.empty();</span>
+    }
+
+    private List&lt;String&gt; assumptionsFor(
+        RuleCandidate candidate,
+        java.util.Map&lt;String, List&lt;String&gt;&gt; assumptionsByPathId
+    ) {
+<span class="fc" id="L163">        List&lt;String&gt; merged = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (String supportingId : candidate.supportingTransformationIds()) {</span>
+<span class="fc" id="L165">            merged.addAll(assumptionsByPathId.getOrDefault(supportingId, List.of()));</span>
+<span class="fc" id="L166">        }</span>
+<span class="fc" id="L167">        return AssumptionSignature.ofExpressions(merged).normalizedAssumptions();</span>
+    }
+
+    private ReusableRule buildOrUpdate(RuleCandidate candidate, ReusableRule existing, List&lt;String&gt; assumptions) {
+<span class="fc" id="L171">        Set&lt;String&gt; supportingPathIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L173">            supportingPathIds.addAll(existing.supportingPathIds());</span>
+        }
+<span class="fc" id="L175">        supportingPathIds.addAll(candidate.supportingTransformationIds());</span>
+<span class="fc" id="L176">        int occurrenceCount = supportingPathIds.size();</span>
+        // Confidence: VALIDATED_BY_EXAMPLES = 0.6 baseline + 0.1 per supporting path,
+        // capped at 1.0. SYMBOLICALLY_VERIFIED bumps to 0.9 minimum.
+<span class="pc bpc" id="L179" title="3 of 4 branches missed.">        double base = switch (candidate.proofStatus()) {</span>
+<span class="nc" id="L180">            case SYMBOLICALLY_VERIFIED, FORMALLY_PROVABLE, FORMALLY_PROVED -&gt; 0.9;</span>
+<span class="fc" id="L181">            case VALIDATED_BY_EXAMPLES -&gt; 0.6;</span>
+<span class="nc" id="L182">            case OBSERVED -&gt; 0.3;</span>
+<span class="pc" id="L183">            case REJECTED -&gt; 0.0;</span>
+        };
+<span class="fc" id="L185">        double confidence = Math.min(1.0, base + 0.1 * Math.max(0, occurrenceCount - 1));</span>
+<span class="fc" id="L186">        double averageImprovement = candidate.averageScoreImprovement();</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        String id = existing != null ? existing.id() : &quot;macro_&quot; + candidate.canonicalHash();</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        Instant createdAt = existing != null ? existing.createdAt() : Instant.now();</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        Instant lastUsedAt = existing != null ? existing.lastUsedAt() : null;</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        int usageCount = existing != null ? existing.usageCount() : 0;</span>
+<span class="fc" id="L191">        return new ReusableRule(</span>
+            id,
+<span class="fc" id="L193">            candidate.leftPattern(),</span>
+<span class="fc" id="L194">            candidate.rightPattern(),</span>
+<span class="fc" id="L195">            candidate.parameterRelations(),</span>
+<span class="fc" id="L196">            candidate.proofStatus(),</span>
+<span class="fc" id="L197">            knownRules.statusFor(candidate.leftPattern(), candidate.rightPattern()),</span>
+<span class="fc" id="L198">            candidate.examplesCount(),</span>
+            averageImprovement,
+            createdAt,
+<span class="fc" id="L201">            candidate.canonicalHash(),</span>
+            lastUsedAt,
+            usageCount,
+            occurrenceCount,
+            new ArrayList&lt;&gt;(supportingPathIds),
+            confidence,
+            assumptions
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

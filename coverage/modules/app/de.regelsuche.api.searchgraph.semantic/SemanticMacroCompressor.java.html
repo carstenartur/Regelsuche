@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemanticMacroCompressor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph.semantic</a> &gt; <span class="el_source">SemanticMacroCompressor.java</span></div><h1>SemanticMacroCompressor.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph.semantic;
+
+import de.regelsuche.api.searchgraph.SearchGraphEdgeDto;
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.mining.MacroMoveExpansion;
+import de.regelsuche.mining.MacroRuleCandidate;
+import java.util.ArrayList;
+import java.util.List;
+
+<span class="fc" id="L10">public final class SemanticMacroCompressor {</span>
+
+    public List&lt;SemanticGraphEdgeDto&gt; compress(
+        List&lt;SearchGraphEdgeDto&gt; rawEdges,
+        List&lt;DiscoveredTransformation&gt; paths,
+        List&lt;MacroRuleCandidate&gt; macroRules
+    ) {
+<span class="fc" id="L17">        List&lt;SemanticGraphEdgeDto&gt; out = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        if (rawEdges == null) {</span>
+<span class="nc" id="L19">            return out;</span>
+        }
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        for (SearchGraphEdgeDto edge : rawEdges) {</span>
+<span class="fc" id="L22">            MacroMoveExpansion expansion = edge.macroMoveExpansion();</span>
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">            boolean macro = expansion != null || isKnownMacro(edge.ruleId(), macroRules);</span>
+<span class="fc" id="L24">            out.add(new SemanticGraphEdgeDto(</span>
+<span class="fc" id="L25">                edge.from(),</span>
+<span class="fc" id="L26">                edge.to(),</span>
+<span class="fc" id="L27">                edge.ruleId(),</span>
+<span class="fc" id="L28">                edge.ruleLatex(),</span>
+<span class="fc" id="L29">                edge.layout(),</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">                macro ? SemanticEdgeKind.MACRO_MOVE : SemanticEdgeKind.ALTERNATIVE,</span>
+<span class="pc bpc" id="L31" title="3 of 4 branches missed.">                macro &amp;&amp; expansion != null ? expansion.atomicSteps().size() : 1,</span>
+                0,
+                false,
+                macro,
+                expansion,
+<span class="fc" id="L36">                List.of(rawEdgeId(edge)),</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                Math.abs(edge.scoreDelta()) + (macro ? 1.0 : 0.0)</span>
+            ));
+<span class="fc" id="L39">        }</span>
+<span class="fc" id="L40">        return out;</span>
+    }
+
+    private boolean isKnownMacro(String ruleId, List&lt;MacroRuleCandidate&gt; macroRules) {
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (ruleId == null || macroRules == null) {</span>
+<span class="nc" id="L45">            return false;</span>
+        }
+<span class="fc" id="L47">        return macroRules.stream().anyMatch(m -&gt; ruleId.equals(m.id()));</span>
+    }
+
+    private static String rawEdgeId(SearchGraphEdgeDto edge) {
+<span class="fc" id="L51">        return edge.from() + &quot;-&gt;&quot; + edge.to() + &quot;:&quot; + edge.ruleId();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

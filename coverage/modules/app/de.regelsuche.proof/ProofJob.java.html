@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofJob.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofJob.java</span></div><h1>ProofJob.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.validation.CandidateProofStatus;
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Persistent snapshot of a single proof request, managed by
+ * {@link ProofJobRepository} and executed by {@link ProofJobScheduler}.
+ *
+ * &lt;p&gt;Jobs are value objects — every state transition creates a new instance via
+ * one of the {@code with*()} helpers.  The {@link #priority()} field is
+ * intentionally an {@code int}: lower values mean higher priority (0 = most
+ * urgent), matching the convention used by
+ * {@link java.util.concurrent.PriorityQueue}.&lt;/p&gt;
+ */
+public record ProofJob(
+    String id,
+    String leftPattern,
+    String rightPattern,
+    List&lt;Assumption&gt; assumptions,
+    ProofJobStatus status,
+    int priority,
+    int retryCount,
+    int maxRetries,
+    String workerType,
+    Instant createdAt,
+    Instant updatedAt,
+    CandidateProofStatus resultStatus,
+    String errorMessage
+) {
+<span class="fc" id="L34">    public ProofJob {</span>
+<span class="fc" id="L35">        Objects.requireNonNull(id, &quot;id&quot;);</span>
+<span class="fc" id="L36">        Objects.requireNonNull(leftPattern, &quot;leftPattern&quot;);</span>
+<span class="fc" id="L37">        Objects.requireNonNull(rightPattern, &quot;rightPattern&quot;);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        status = status == null ? ProofJobStatus.QUEUED : status;</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (priority &lt; 0) {</span>
+<span class="nc" id="L41">            throw new IllegalArgumentException(&quot;priority must be &gt;= 0&quot;);</span>
+        }
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (maxRetries &lt; 0) {</span>
+<span class="nc" id="L44">            throw new IllegalArgumentException(&quot;maxRetries must be &gt;= 0&quot;);</span>
+        }
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        workerType = workerType == null ? &quot;lean4&quot; : workerType;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        updatedAt = updatedAt == null ? createdAt : updatedAt;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        errorMessage = errorMessage == null ? &quot;&quot; : errorMessage;</span>
+<span class="fc" id="L50">    }</span>
+
+    /** Convenience constructor with defaults for optional fields. */
+    public ProofJob(String id, String leftPattern, String rightPattern,
+                    List&lt;Assumption&gt; assumptions, int priority, String workerType) {
+<span class="fc" id="L55">        this(id, leftPattern, rightPattern, assumptions,</span>
+            ProofJobStatus.QUEUED, priority, 0, 3, workerType,
+            null, null, null, null);
+<span class="fc" id="L58">    }</span>
+
+    public ProofJob withStatus(ProofJobStatus newStatus) {
+<span class="fc" id="L61">        return new ProofJob(id, leftPattern, rightPattern, assumptions,</span>
+            newStatus, priority, retryCount, maxRetries, workerType,
+<span class="fc" id="L63">            createdAt, Instant.now(), resultStatus, errorMessage);</span>
+    }
+
+    public ProofJob withRetry() {
+<span class="fc" id="L67">        return new ProofJob(id, leftPattern, rightPattern, assumptions,</span>
+            ProofJobStatus.RETRYING, priority, retryCount + 1, maxRetries, workerType,
+<span class="fc" id="L69">            createdAt, Instant.now(), resultStatus, errorMessage);</span>
+    }
+
+    public ProofJob withDone(CandidateProofStatus result) {
+<span class="fc" id="L73">        return new ProofJob(id, leftPattern, rightPattern, assumptions,</span>
+            ProofJobStatus.DONE, priority, retryCount, maxRetries, workerType,
+<span class="fc" id="L75">            createdAt, Instant.now(), result, &quot;&quot;);</span>
+    }
+
+    public ProofJob withFailed(String reason) {
+<span class="fc" id="L79">        return new ProofJob(id, leftPattern, rightPattern, assumptions,</span>
+            ProofJobStatus.FAILED, priority, retryCount, maxRetries, workerType,
+<span class="fc" id="L81">            createdAt, Instant.now(), resultStatus, reason);</span>
+    }
+
+    /** @return {@code true} if this job may still be retried. */
+    public boolean canRetry() {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        return retryCount &lt; maxRetries;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

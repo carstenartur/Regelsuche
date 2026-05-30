@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymmetryCost.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scoring.cost</a> &gt; <span class="el_source">SymmetryCost.java</span></div><h1>SymmetryCost.java</h1><pre class="source lang-java linenums">package de.regelsuche.scoring.cost;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.scoring.ExpressionScore;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Rewards structurally symmetric expressions over asymmetric ones.
+ *
+ * &lt;p&gt;A sum {@code a + b} or product {@code a * b} is considered symmetric
+ * when its canonical operands sort identically once viewed as a multiset —
+ * which is automatically the case after PR 1 canonicalization. The cost
+ * model goes one step further and rewards &quot;palindromic&quot; polynomial
+ * coefficient sequences (e.g. {@code 1 + 3*x + 3*x^2 + x^3}) which the
+ * search would otherwise treat as a long sum.&lt;/p&gt;
+ *
+ * &lt;p&gt;Used by {@link TransformationGoal#PROOF_FRIENDLY PROOF_FRIENDLY},
+ * where symmetric structures simplify case-splits in subsequent proof
+ * steps.&lt;/p&gt;
+ */
+<span class="fc" id="L27">public final class SymmetryCost implements CostModel {</span>
+
+    @Override
+    public int cost(String expression, Expr parsedAst, ExpressionScore score) {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (parsedAst == null) {</span>
+<span class="nc" id="L32">            return Math.max(0, score.operatorCount());</span>
+        }
+<span class="fc" id="L34">        int operators = countOperators(parsedAst);</span>
+<span class="fc" id="L35">        int symmetryBonus = symmetryBonus(parsedAst);</span>
+<span class="fc" id="L36">        return operators - symmetryBonus;</span>
+    }
+
+    @Override
+    public String id() {
+<span class="fc" id="L41">        return &quot;symmetry&quot;;</span>
+    }
+
+    private int countOperators(Expr expression) {
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L46">            return 1 + countOperators(binary.left()) + countOperators(binary.right());</span>
+        }
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L49">            int total = 1;</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L51">                total += countOperators(argument);</span>
+<span class="nc" id="L52">            }</span>
+<span class="nc" id="L53">            return total;</span>
+        }
+<span class="fc" id="L55">        return 0;</span>
+    }
+
+    private int symmetryBonus(Expr expression) {
+<span class="fc" id="L59">        int bonus = 0;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L61" title="3 of 4 branches missed.">            if (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L62">                List&lt;String&gt; operands = collect(binary, binary.operator());</span>
+<span class="fc" id="L63">                bonus += commutativeBonus(operands);</span>
+<span class="fc" id="L64">                bonus += palindromeBonus(operands);</span>
+            }
+<span class="fc" id="L66">            bonus += symmetryBonus(binary.left());</span>
+<span class="fc" id="L67">            bonus += symmetryBonus(binary.right());</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L70">                bonus += symmetryBonus(argument);</span>
+<span class="nc" id="L71">            }</span>
+        }
+<span class="fc" id="L73">        return bonus;</span>
+    }
+
+    private List&lt;String&gt; collect(Expr expression, BinaryOperator operator) {
+<span class="fc" id="L77">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == operator) {</span>
+<span class="fc" id="L79">            result.addAll(collect(binary.left(), operator));</span>
+<span class="fc" id="L80">            result.addAll(collect(binary.right(), operator));</span>
+        } else {
+<span class="fc" id="L82">            result.add(ExpressionFormatter.format(expression));</span>
+        }
+<span class="fc" id="L84">        return result;</span>
+    }
+
+    /**
+     * Sums or products with three or more operands whose canonical strings
+     * sort into a multiset of equal-length tokens get a small bonus. The
+     * post-PR-1 canonicalizer already produces a sorted representation, so
+     * any large sum that looks &quot;rectangular&quot; is rewarded.
+     */
+    private int commutativeBonus(List&lt;String&gt; operands) {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (operands.size() &lt; 3) {</span>
+<span class="fc" id="L95">            return 0;</span>
+        }
+<span class="fc" id="L97">        List&lt;Integer&gt; lengths = operands.stream().map(String::length).toList();</span>
+<span class="fc" id="L98">        int min = Collections.min(lengths);</span>
+<span class="fc" id="L99">        int max = Collections.max(lengths);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (max - min &lt;= 1) {</span>
+<span class="fc" id="L101">            return 2;</span>
+        }
+<span class="nc" id="L103">        return 0;</span>
+    }
+
+    /**
+     * Reward palindromic operand sequences (e.g. {@code a + b + a},
+     * {@code (x+1) + 2*x + (x+1)}) — exact operand match forward/backward.
+     */
+    private int palindromeBonus(List&lt;String&gt; operands) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (operands.size() &lt; 3) {</span>
+<span class="fc" id="L112">            return 0;</span>
+        }
+<span class="fc" id="L114">        int left = 0;</span>
+<span class="fc" id="L115">        int right = operands.size() - 1;</span>
+<span class="fc" id="L116">        boolean anyMirrored = false;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        while (left &lt; right) {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (!operands.get(left).equals(operands.get(right))) {</span>
+<span class="fc" id="L119">                return 0;</span>
+            }
+<span class="fc" id="L121">            anyMirrored = true;</span>
+<span class="fc" id="L122">            left++;</span>
+<span class="fc" id="L123">            right--;</span>
+        }
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        return anyMirrored ? 3 : 0;</span>
+    }
+
+    /** Two operands have the same &quot;shape&quot; — unused after the palindrome
+     * tightening above, kept for binary compatibility within the package. */
+    @SuppressWarnings(&quot;unused&quot;)
+    private boolean sameShape(String left, String right) {
+<span class="nc" id="L132">        return skeleton(left).equals(skeleton(right));</span>
+    }
+
+    private String skeleton(String operand) {
+<span class="nc" id="L136">        StringBuilder builder = new StringBuilder(operand.length());</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        for (int i = 0; i &lt; operand.length(); i++) {</span>
+<span class="nc" id="L138">            char character = operand.charAt(i);</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (Character.isDigit(character)) {</span>
+<span class="nc" id="L140">                builder.append('n');</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            } else if (Character.isLetter(character)) {</span>
+<span class="nc" id="L142">                builder.append('v');</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            } else if (!Character.isWhitespace(character)) {</span>
+<span class="nc" id="L144">                builder.append(character);</span>
+            }
+        }
+<span class="nc" id="L147">        return builder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

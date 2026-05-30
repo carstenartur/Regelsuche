@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryWorkflowConfiguration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery</a> &gt; <span class="el_source">DiscoveryWorkflowConfiguration.java</span></div><h1>DiscoveryWorkflowConfiguration.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery;
+
+import de.regelsuche.mining.GoalAwareMacroMoveSelector;
+import java.util.Optional;
+
+/** Explicit app-level wiring for scientific discovery orchestration. */
+public record DiscoveryWorkflowConfiguration(
+    DiscoveryOptions options,
+    HypothesisOperatorRegistry operatorRegistry,
+    Optional&lt;GoalAwareMacroMoveSelector&gt; macroMoveSelector,
+    Optional&lt;MacroLearningService&gt; macroLearningService
+) {
+<span class="fc" id="L13">    public DiscoveryWorkflowConfiguration {</span>
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">        options = options == null ? DiscoveryOptions.forProfile(DiscoveryProfile.RESEARCH_DISCOVERY_PIPELINE) : options;</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        operatorRegistry = operatorRegistry == null ? new HypothesisOperatorRegistry() : operatorRegistry;</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        macroMoveSelector = macroMoveSelector == null ? Optional.empty() : macroMoveSelector;</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        macroLearningService = macroLearningService == null ? Optional.empty() : macroLearningService;</span>
+<span class="fc" id="L18">    }</span>
+
+    public static DiscoveryWorkflowConfiguration defaults() {
+<span class="fc" id="L21">        return new DiscoveryWorkflowConfiguration(</span>
+<span class="fc" id="L22">            DiscoveryOptions.forProfile(DiscoveryProfile.RESEARCH_DISCOVERY_PIPELINE),</span>
+            new HypothesisOperatorRegistry(),
+<span class="fc" id="L24">            Optional.empty(),</span>
+<span class="fc" id="L25">            Optional.empty()</span>
+        );
+    }
+
+    public boolean macroLearningEnabled() {
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">        return options.learning().enableMacroLearning() &amp;&amp; macroLearningService.isPresent();</span>
+    }
+
+    public DiscoveryLearningOptions effectiveLearningOptions() {
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        return macroLearningEnabled() ? options.learning() : DiscoveryLearningOptions.disabled();</span>
+    }
+
+    public DiscoveryOptions effectiveOptions() {
+<span class="fc" id="L38">        DiscoveryLearningOptions learning = effectiveLearningOptions();</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        return learning == options.learning()</span>
+<span class="nc" id="L40">            ? options</span>
+<span class="fc" id="L41">            : new DiscoveryOptions(options.profile(), options.engine(), learning, options.enableGeneratedGallery());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

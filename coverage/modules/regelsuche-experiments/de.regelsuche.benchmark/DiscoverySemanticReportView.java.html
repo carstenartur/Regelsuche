@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoverySemanticReportView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">DiscoverySemanticReportView.java</span></div><h1>DiscoverySemanticReportView.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import java.util.List;
+
+/** Semantic graph projection used by discovery report artifacts. */
+public record DiscoverySemanticReportView(
+    String renderer,
+    int rawNodeCount,
+    int rawEdgeCount,
+    int semanticNodeCount,
+    int semanticEdgeCount,
+    int collapsedVariantCount,
+    int collapsedLowSignalCount,
+    List&lt;SemanticPath&gt; paths
+) {
+<span class="fc" id="L16">    public DiscoverySemanticReportView {</span>
+<span class="pc bpc" id="L17" title="2 of 4 branches missed.">        renderer = renderer == null || renderer.isBlank() ? &quot;semantic-main-path&quot; : renderer;</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        paths = paths == null ? List.of() : List.copyOf(paths);</span>
+<span class="fc" id="L19">    }</span>
+
+    public static DiscoverySemanticReportView fromReplayPaths(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report
+    ) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        List&lt;SemanticPath&gt; paths = (report == null ? List.&lt;DeterministicDiscoveryExperimentRunner.SeedRunReport&gt;of() : report.rows())</span>
+<span class="fc" id="L25">            .stream()</span>
+<span class="fc" id="L26">            .map(row -&gt; {</span>
+<span class="fc" id="L27">                List&lt;SemanticNode&gt; nodes = row.replayPath().stream()</span>
+<span class="fc" id="L28">                    .map(step -&gt; new SemanticNode(&quot;replay:&quot; + row.seed().id() + &quot;:&quot; + Integer.toHexString(step.hashCode()), step))</span>
+<span class="fc" id="L29">                    .toList();</span>
+<span class="fc" id="L30">                return new SemanticPath(row.seed().id(), nodes, chainEdges(nodes));</span>
+            })
+<span class="fc" id="L32">            .toList();</span>
+<span class="fc" id="L33">        int nodes = paths.stream().mapToInt(path -&gt; path.nodes().size()).sum();</span>
+<span class="fc" id="L34">        int edges = paths.stream().mapToInt(path -&gt; path.edges().size()).sum();</span>
+<span class="fc" id="L35">        return new DiscoverySemanticReportView(&quot;replay-main-path&quot;, nodes, edges, nodes, edges, 0, 0, paths);</span>
+    }
+
+    private static List&lt;SemanticEdge&gt; chainEdges(List&lt;SemanticNode&gt; nodes) {
+<span class="fc" id="L39">        java.util.ArrayList&lt;SemanticEdge&gt; edges = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (int i = 1; i &lt; nodes.size(); i++) {</span>
+<span class="fc" id="L41">            edges.add(new SemanticEdge(nodes.get(i - 1).id(), nodes.get(i).id(), &quot;replay step&quot;, &quot;MAIN_STEP&quot;, 0));</span>
+        }
+<span class="fc" id="L43">        return edges;</span>
+    }
+
+    public record SemanticPath(String seedId, List&lt;SemanticNode&gt; nodes, List&lt;SemanticEdge&gt; edges) {
+<span class="fc" id="L47">        public SemanticPath {</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            seedId = seedId == null ? &quot;&quot; : seedId;</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            edges = edges == null ? List.of() : List.copyOf(edges);</span>
+<span class="fc" id="L51">        }</span>
+    }
+
+    public record SemanticNode(String id, String label) {
+<span class="fc" id="L55">        public SemanticNode {</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            id = id == null ? &quot;&quot; : id;</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            label = label == null ? &quot;&quot; : label;</span>
+<span class="fc" id="L58">        }</span>
+    }
+
+    public record SemanticEdge(String from, String to, String label, String kind, int collapsedCount) {
+<span class="fc" id="L62">        public SemanticEdge {</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            from = from == null ? &quot;&quot; : from;</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            to = to == null ? &quot;&quot; : to;</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            label = label == null ? &quot;&quot; : label;</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            kind = kind == null ? &quot;&quot; : kind;</span>
+<span class="fc" id="L67">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

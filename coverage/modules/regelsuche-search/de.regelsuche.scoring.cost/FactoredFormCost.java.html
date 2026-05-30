@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FactoredFormCost.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scoring.cost</a> &gt; <span class="el_source">FactoredFormCost.java</span></div><h1>FactoredFormCost.java</h1><pre class="source lang-java linenums">package de.regelsuche.scoring.cost;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.scoring.ExpressionScore;
+
+/**
+ * Rewards factored forms over expanded polynomials.
+ *
+ * &lt;p&gt;Every multiplication of two non-trivial sub-expressions counts as a
+ * factorization win (small bonus), every top-level addition counts as a
+ * penalty. So {@code (x+1)*(x+2)} beats {@code x^2 + 3*x + 2}, and a
+ * single-term power like {@code x^2} is cheaper still.&lt;/p&gt;
+ */
+<span class="fc" id="L19">public final class FactoredFormCost implements CostModel {</span>
+
+    @Override
+    public int cost(String expression, Expr parsedAst, ExpressionScore score) {
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        if (parsedAst == null) {</span>
+            // Fall back to operator count without structural knowledge.
+<span class="nc" id="L25">            return Math.max(0, score.operatorCount());</span>
+        }
+<span class="fc" id="L27">        return baseCost(parsedAst) + topLevelAdditionPenalty(parsedAst) - factorizationBonus(parsedAst);</span>
+    }
+
+    @Override
+    public String id() {
+<span class="fc" id="L32">        return &quot;factored-form&quot;;</span>
+    }
+
+    private int baseCost(Expr expression) {
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L37">            return 1 + baseCost(binary.left()) + baseCost(binary.right());</span>
+        }
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L40">            int total = 1;</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L42">                total += baseCost(argument);</span>
+<span class="nc" id="L43">            }</span>
+<span class="nc" id="L44">            return total;</span>
+        }
+<span class="fc" id="L46">        return 0;</span>
+    }
+
+    /** Each top-level summand beyond the first adds friction. */
+    private int topLevelAdditionPenalty(Expr expression) {
+<span class="fc" id="L51">        int summands = countTopLevelSummands(expression);</span>
+<span class="fc" id="L52">        return Math.max(0, summands - 1) * 2;</span>
+    }
+
+    private int countTopLevelSummands(Expr expression) {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">            &amp;&amp; (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB)) {</span>
+<span class="fc" id="L58">            return countTopLevelSummands(binary.left()) + countTopLevelSummands(binary.right());</span>
+        }
+<span class="fc" id="L60">        return 1;</span>
+    }
+
+    /**
+     * Reward multiplications and powers between non-trivial sub-expressions
+     * (i.e. structures that look like factors, not bare variables or
+     * coefficients).
+     */
+    private int factorizationBonus(Expr expression) {
+<span class="fc" id="L69">        int bonus = 0;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.MUL</span>
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">                &amp;&amp; isNonTrivial(binary.left()) &amp;&amp; isNonTrivial(binary.right())) {</span>
+<span class="fc" id="L73">                bonus += 3;</span>
+            }
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                &amp;&amp; isNonTrivial(binary.left())</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                &amp;&amp; binary.right() instanceof NumberExpr number</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                &amp;&amp; number.value() &gt;= 2) {</span>
+<span class="fc" id="L79">                bonus += 2;</span>
+            }
+<span class="fc" id="L81">            bonus += factorizationBonus(binary.left());</span>
+<span class="fc" id="L82">            bonus += factorizationBonus(binary.right());</span>
+        }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L86">                bonus += factorizationBonus(argument);</span>
+<span class="nc" id="L87">            }</span>
+        }
+<span class="fc" id="L89">        return bonus;</span>
+    }
+
+    private boolean isNonTrivial(Expr expression) {
+<span class="fc bfc" id="L93" title="All 4 branches covered.">        if (expression instanceof NumberExpr || expression instanceof VariableExpr) {</span>
+<span class="fc" id="L94">            return false;</span>
+        }
+<span class="fc" id="L96">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

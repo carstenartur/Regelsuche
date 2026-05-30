@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NormalizedNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">NormalizedNode.java</span></div><h1>NormalizedNode.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.OptionalInt;
+import java.util.stream.Collectors;
+
+final class NormalizedNode {
+<span class="fc" id="L11">    enum Kind {</span>
+<span class="fc" id="L12">        NUMBER,</span>
+<span class="fc" id="L13">        VARIABLE,</span>
+<span class="fc" id="L14">        ADD,</span>
+<span class="fc" id="L15">        MUL,</span>
+<span class="fc" id="L16">        POW,</span>
+<span class="fc" id="L17">        FUNCTION,</span>
+<span class="fc" id="L18">        PLACEHOLDER</span>
+    }
+
+    private final Kind kind;
+    private final Integer number;
+    private final String name;
+    private final List&lt;NormalizedNode&gt; children;
+
+<span class="fc" id="L26">    private NormalizedNode(Kind kind, Integer number, String name, List&lt;NormalizedNode&gt; children) {</span>
+<span class="fc" id="L27">        this.kind = kind;</span>
+<span class="fc" id="L28">        this.number = number;</span>
+<span class="fc" id="L29">        this.name = name;</span>
+<span class="fc" id="L30">        this.children = List.copyOf(children);</span>
+<span class="fc" id="L31">    }</span>
+
+    static NormalizedNode number(int value) {
+<span class="fc" id="L34">        return new NormalizedNode(Kind.NUMBER, value, null, List.of());</span>
+    }
+
+    static NormalizedNode variable(String name) {
+<span class="fc" id="L38">        return new NormalizedNode(Kind.VARIABLE, null, name, List.of());</span>
+    }
+
+    static NormalizedNode placeholder(String name) {
+<span class="fc" id="L42">        return new NormalizedNode(Kind.PLACEHOLDER, null, name, List.of());</span>
+    }
+
+    static NormalizedNode pow(NormalizedNode base, NormalizedNode exponent) {
+<span class="fc" id="L46">        return new NormalizedNode(Kind.POW, null, null, List.of(base, exponent));</span>
+    }
+
+    static NormalizedNode function(String name, List&lt;NormalizedNode&gt; arguments) {
+<span class="nc" id="L50">        return new NormalizedNode(Kind.FUNCTION, null, name, arguments);</span>
+    }
+
+    static NormalizedNode add(List&lt;NormalizedNode&gt; terms) {
+<span class="fc" id="L54">        List&lt;NormalizedNode&gt; flattened = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L55">        int numeric = 0;</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (NormalizedNode term : terms) {</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (term.kind == Kind.ADD) {</span>
+<span class="fc" id="L58">                flattened.addAll(term.children);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            } else if (term.kind == Kind.NUMBER) {</span>
+<span class="fc" id="L60">                numeric += term.number;</span>
+            } else {
+<span class="fc" id="L62">                flattened.add(term);</span>
+            }
+<span class="fc" id="L64">        }</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (numeric != 0) {</span>
+<span class="fc" id="L66">            flattened.add(number(numeric));</span>
+        }
+<span class="fc" id="L68">        List&lt;NormalizedNode&gt; normalized = flattened.stream()</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">            .filter(term -&gt; term.kind != Kind.NUMBER || term.number != 0)</span>
+<span class="fc" id="L70">            .sorted(Comparator.comparing(NormalizedNode::sortKey))</span>
+<span class="fc" id="L71">            .toList();</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (normalized.isEmpty()) {</span>
+<span class="nc" id="L73">            return number(0);</span>
+        }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (normalized.size() == 1) {</span>
+<span class="nc" id="L76">            return normalized.getFirst();</span>
+        }
+<span class="fc" id="L78">        return new NormalizedNode(Kind.ADD, null, null, normalized);</span>
+    }
+
+    static NormalizedNode multiply(List&lt;NormalizedNode&gt; factors) {
+<span class="fc" id="L82">        List&lt;NormalizedNode&gt; flattened = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L83">        int numeric = 1;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (NormalizedNode factor : factors) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (factor.kind == Kind.MUL) {</span>
+<span class="fc" id="L86">                flattened.addAll(factor.children);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            } else if (factor.kind == Kind.NUMBER) {</span>
+<span class="fc" id="L88">                numeric *= factor.number;</span>
+            } else {
+<span class="fc" id="L90">                flattened.add(factor);</span>
+            }
+<span class="fc" id="L92">        }</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (numeric == 0) {</span>
+<span class="nc" id="L94">            return number(0);</span>
+        }
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        if (numeric != 1 || flattened.isEmpty()) {</span>
+<span class="fc" id="L97">            flattened.add(number(numeric));</span>
+        }
+<span class="fc" id="L99">        List&lt;NormalizedNode&gt; normalized = flattened.stream()</span>
+<span class="pc bpc" id="L100" title="3 of 6 branches missed.">            .filter(factor -&gt; factor.kind != Kind.NUMBER || factor.number != 1 || flattened.size() == 1)</span>
+<span class="fc" id="L101">            .sorted(Comparator.comparing(NormalizedNode::factorSortKey))</span>
+<span class="fc" id="L102">            .toList();</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (normalized.size() == 1) {</span>
+<span class="nc" id="L104">            return normalized.getFirst();</span>
+        }
+<span class="fc" id="L106">        return new NormalizedNode(Kind.MUL, null, null, normalized);</span>
+    }
+
+    Kind kind() {
+<span class="fc" id="L110">        return kind;</span>
+    }
+
+    Integer number() {
+<span class="fc" id="L114">        return number;</span>
+    }
+
+    String name() {
+<span class="fc" id="L118">        return name;</span>
+    }
+
+    List&lt;NormalizedNode&gt; children() {
+<span class="fc" id="L122">        return children;</span>
+    }
+
+    OptionalInt integerValue() {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        return kind == Kind.NUMBER ? OptionalInt.of(number) : OptionalInt.empty();</span>
+    }
+
+    String canonicalString() {
+<span class="pc bpc" id="L130" title="1 of 6 branches missed.">        return switch (kind) {</span>
+<span class="fc" id="L131">            case NUMBER -&gt; Integer.toString(number);</span>
+<span class="fc" id="L132">            case VARIABLE, PLACEHOLDER -&gt; name;</span>
+<span class="fc" id="L133">            case ADD -&gt; formatAdd();</span>
+<span class="fc" id="L134">            case MUL -&gt; formatMul();</span>
+<span class="fc" id="L135">            case POW -&gt; parenthesize(children.get(0), Kind.POW) + &quot;^&quot; + parenthesize(children.get(1), Kind.POW);</span>
+<span class="nc" id="L136">            case FUNCTION -&gt; name + &quot;(&quot; + children.stream()</span>
+<span class="nc" id="L137">                .map(NormalizedNode::canonicalString)</span>
+<span class="nc" id="L138">                .collect(Collectors.joining(&quot;,&quot;)) + &quot;)&quot;;</span>
+        };
+    }
+
+    String skeletonString() {
+<span class="nc" id="L143">        return skeletonString(false);</span>
+    }
+
+    private String skeletonString(boolean exponentPosition) {
+<span class="nc bnc" id="L147" title="All 7 branches missed.">        return switch (kind) {</span>
+<span class="nc bnc" id="L148" title="All 4 branches missed.">            case NUMBER -&gt; exponentPosition ? Integer.toString(number) : (number &lt; 0 ? &quot;-#&quot; : &quot;#&quot;);</span>
+<span class="nc" id="L149">            case VARIABLE -&gt; name;</span>
+<span class="nc" id="L150">            case PLACEHOLDER -&gt; &quot;#&quot;;</span>
+<span class="nc" id="L151">            case ADD -&gt; children.stream().map(child -&gt; child.skeletonString(false)).collect(Collectors.joining(&quot;+&quot;, &quot;add(&quot;, &quot;)&quot;));</span>
+<span class="nc" id="L152">            case MUL -&gt; children.stream().map(child -&gt; child.skeletonString(false)).collect(Collectors.joining(&quot;*&quot;, &quot;mul(&quot;, &quot;)&quot;));</span>
+<span class="nc" id="L153">            case POW -&gt; &quot;pow(&quot; + children.get(0).skeletonString(false) + &quot;,&quot; + children.get(1).skeletonString(true) + &quot;)&quot;;</span>
+<span class="nc" id="L154">            case FUNCTION -&gt; name + &quot;(&quot; + children.stream()</span>
+<span class="nc" id="L155">                .map(child -&gt; child.skeletonString(false))</span>
+<span class="nc" id="L156">                .collect(Collectors.joining(&quot;,&quot;)) + &quot;)&quot;;</span>
+        };
+    }
+
+    boolean sameShape(NormalizedNode other) {
+<span class="pc bpc" id="L161" title="1 of 4 branches missed.">        if (kind != other.kind || children.size() != other.children.size()) {</span>
+<span class="fc" id="L162">            return false;</span>
+        }
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (kind == Kind.VARIABLE) {</span>
+<span class="fc" id="L165">            return name.equals(other.name);</span>
+        }
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (kind == Kind.FUNCTION) {</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            if (!name.equals(other.name)) {</span>
+<span class="nc" id="L169">                return false;</span>
+            }
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            for (int i = 0; i &lt; children.size(); i++) {</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">                if (!children.get(i).sameShape(other.children.get(i))) {</span>
+<span class="nc" id="L173">                    return false;</span>
+                }
+            }
+<span class="nc" id="L176">            return true;</span>
+        }
+<span class="pc bpc" id="L178" title="1 of 4 branches missed.">        if (kind == Kind.NUMBER || kind == Kind.PLACEHOLDER) {</span>
+<span class="fc" id="L179">            return true;</span>
+        }
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        for (int i = 0; i &lt; children.size(); i++) {</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (!children.get(i).sameShape(other.children.get(i))) {</span>
+<span class="fc" id="L183">                return false;</span>
+            }
+        }
+<span class="fc" id="L186">        return true;</span>
+    }
+
+    private String formatAdd() {
+<span class="fc" id="L190">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (NormalizedNode child : children) {</span>
+<span class="fc" id="L192">            String value = child.canonicalString();</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (builder.isEmpty()) {</span>
+<span class="fc" id="L194">                builder.append(value);</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            } else if (value.startsWith(&quot;-&quot;)) {</span>
+<span class="fc" id="L196">                builder.append(&quot; - &quot;).append(value.substring(1));</span>
+            } else {
+<span class="fc" id="L198">                builder.append(&quot; + &quot;).append(value);</span>
+            }
+<span class="fc" id="L200">        }</span>
+<span class="fc" id="L201">        return builder.toString();</span>
+    }
+
+    private String formatMul() {
+<span class="fc bfc" id="L205" title="All 4 branches covered.">        if (children.getFirst().kind == Kind.NUMBER &amp;&amp; children.getFirst().number == -1) {</span>
+<span class="fc" id="L206">            return &quot;-&quot; + children.subList(1, children.size()).stream()</span>
+<span class="fc" id="L207">                .map(child -&gt; parenthesize(child, Kind.MUL))</span>
+<span class="fc" id="L208">                .collect(Collectors.joining(&quot;*&quot;));</span>
+        }
+<span class="fc" id="L210">        return children.stream()</span>
+<span class="fc" id="L211">            .map(child -&gt; parenthesize(child, Kind.MUL))</span>
+<span class="fc" id="L212">            .collect(Collectors.joining(&quot;*&quot;));</span>
+    }
+
+    private static String parenthesize(NormalizedNode node, Kind parent) {
+<span class="pc bpc" id="L216" title="1 of 6 branches missed.">        if ((parent == Kind.MUL || parent == Kind.POW) &amp;&amp; node.kind == Kind.ADD) {</span>
+<span class="fc" id="L217">            return &quot;(&quot; + node.canonicalString() + &quot;)&quot;;</span>
+        }
+<span class="fc" id="L219">        return node.canonicalString();</span>
+    }
+
+    private String sortKey() {
+<span class="fc" id="L223">        String canonical = canonicalString();</span>
+<span class="fc bfc" id="L224" title="All 4 branches covered.">        if (canonical.equals(&quot;x&quot;) || canonical.matches(&quot;x\\^\\d+&quot;)) {</span>
+<span class="fc" id="L225">            return &quot;0:&quot; + canonical;</span>
+        }
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (canonical.contains(&quot;x&quot;)) {</span>
+<span class="fc" id="L228">            return &quot;1:&quot; + canonical.replaceFirst(&quot;^-&quot;, &quot;&quot;);</span>
+        }
+<span class="pc bpc" id="L230" title="2 of 6 branches missed.">        return switch (kind) {</span>
+<span class="fc" id="L231">            case POW -&gt; &quot;3:&quot; + canonical;</span>
+<span class="fc" id="L232">            case MUL -&gt; &quot;4:&quot; + canonical.replaceFirst(&quot;^-&quot;, &quot;&quot;);</span>
+<span class="fc" id="L233">            case VARIABLE, PLACEHOLDER -&gt; &quot;2:&quot; + canonical;</span>
+<span class="fc" id="L234">            case NUMBER -&gt; &quot;9:&quot; + Math.abs(number);</span>
+<span class="nc" id="L235">            case ADD -&gt; &quot;5:&quot; + canonical;</span>
+<span class="nc" id="L236">            case FUNCTION -&gt; &quot;6:&quot; + canonical;</span>
+        };
+    }
+
+    private String factorSortKey() {
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        return kind == Kind.NUMBER ? &quot;0:&quot; + Math.abs(number) : &quot;1:&quot; + canonicalString();</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (this == other) {</span>
+<span class="fc" id="L247">            return true;</span>
+        }
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (!(other instanceof NormalizedNode node)) {</span>
+<span class="nc" id="L250">            return false;</span>
+        }
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        return kind == node.kind</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            &amp;&amp; Objects.equals(number, node.number)</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            &amp;&amp; Objects.equals(name, node.name)</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            &amp;&amp; Objects.equals(children, node.children);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L260">        return Objects.hash(kind, number, name, children);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

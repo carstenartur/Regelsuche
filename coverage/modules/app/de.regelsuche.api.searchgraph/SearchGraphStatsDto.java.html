@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchGraphStatsDto.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph</a> &gt; <span class="el_source">SearchGraphStatsDto.java</span></div><h1>SearchGraphStatsDto.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Aggregate statistics describing the search graph as a whole.
+ *
+ * &lt;p&gt;Powers the dashboard tile view defined in {@code docs/visual-search-graph.md}.
+ */
+public record SearchGraphStatsDto(
+    int nodesVisited,
+    int edgesGenerated,
+    int deadEnds,
+    int bestScore,
+    double averageBranchingFactor,
+    int maxDepthReached,
+    Map&lt;String, Integer&gt; ruleUsageFrequency,
+    List&lt;String&gt; mostUsefulRules,
+    int candidateCount,
+    int macroRuleCount,
+    int searchSpaceSize,
+    Map&lt;String, Integer&gt; matchStats,
+    MacroMoveUsage macroMoveUsage,
+    long memoryUsage,
+    CounterexampleStats counterexampleStats,
+    double proofSuccessRate,
+    Map&lt;String, Integer&gt; artifactCounts
+) {
+<span class="fc" id="L30">    public SearchGraphStatsDto {</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        ruleUsageFrequency = ruleUsageFrequency == null ? Map.of() : Map.copyOf(ruleUsageFrequency);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        mostUsefulRules = mostUsefulRules == null ? List.of() : List.copyOf(mostUsefulRules);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        matchStats = matchStats == null ? Map.of() : Map.copyOf(matchStats);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        macroMoveUsage = macroMoveUsage == null ? new MacroMoveUsage(0, 0, 0, 0.0, List.of()) : macroMoveUsage;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        counterexampleStats = counterexampleStats == null ? new CounterexampleStats(0, 0) : counterexampleStats;</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        artifactCounts = artifactCounts == null ? Map.of() : Map.copyOf(artifactCounts);</span>
+<span class="fc" id="L37">    }</span>
+
+    public SearchGraphStatsDto(
+        int nodesVisited,
+        int edgesGenerated,
+        int deadEnds,
+        int bestScore,
+        double averageBranchingFactor,
+        int maxDepthReached,
+        Map&lt;String, Integer&gt; ruleUsageFrequency,
+        List&lt;String&gt; mostUsefulRules,
+        int candidateCount,
+        int macroRuleCount
+    ) {
+<span class="fc" id="L51">        this(</span>
+            nodesVisited,
+            edgesGenerated,
+            deadEnds,
+            bestScore,
+            averageBranchingFactor,
+            maxDepthReached,
+            ruleUsageFrequency,
+            mostUsefulRules,
+            candidateCount,
+            macroRuleCount,
+            nodesVisited + edgesGenerated,
+<span class="fc" id="L63">            Map.of(),</span>
+<span class="fc" id="L64">            new MacroMoveUsage(0, 0, 0, 0.0, List.of()),</span>
+<span class="fc" id="L65">            Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory(),</span>
+            new CounterexampleStats(candidateCount, 0),
+            0.0,
+<span class="fc" id="L68">            Map.of()</span>
+        );
+<span class="fc" id="L70">    }</span>
+
+    public record MacroMoveUsage(
+        int timesConsidered,
+        int timesApplied,
+        int timesImprovedScore,
+        double averageCostReduction,
+        List&lt;String&gt; usefulForGoals
+    ) {
+<span class="fc" id="L79">        public MacroMoveUsage {</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            usefulForGoals = usefulForGoals == null ? List.of() : List.copyOf(usefulForGoals);</span>
+<span class="fc" id="L81">        }</span>
+    }
+
+<span class="fc" id="L84">    public record CounterexampleStats(int checked, int found) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RelationalJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence-hibernate</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence.relational</a> &gt; <span class="el_source">RelationalJson.java</span></div><h1>RelationalJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence.relational;
+
+import de.regelsuche.json.MiniJson;
+import de.regelsuche.mining.HypothesisCandidate;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+final class RelationalJson {
+    private RelationalJson() {
+    }
+
+    static String array(List&lt;String&gt; values) {
+<span class="nc bnc" id="L15" title="All 2 branches missed.">        List&lt;String&gt; safe = values == null ? List.of() : values;</span>
+<span class="nc" id="L16">        return safe.stream().map(RelationalJson::quote).collect(Collectors.joining(&quot;,&quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    static List&lt;String&gt; arrayValues(String json) {
+<span class="nc bnc" id="L20" title="All 4 branches missed.">        return MiniJson.parseStringArray(json == null || json.isBlank() ? &quot;[]&quot; : json);</span>
+    }
+
+    static String object(List&lt;SearchFacet&gt; facets) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        List&lt;SearchFacet&gt; safe = facets == null ? List.of() : facets;</span>
+<span class="fc" id="L25">        return safe.stream()</span>
+<span class="pc" id="L26">            .collect(Collectors.toMap(SearchFacet::key, SearchFacet::value, (left, right) -&gt; right, java.util.TreeMap::new))</span>
+<span class="fc" id="L27">            .entrySet().stream()</span>
+<span class="fc" id="L28">            .map(entry -&gt; quote(entry.getKey()) + &quot;:&quot; + quote(entry.getValue()))</span>
+<span class="fc" id="L29">            .collect(Collectors.joining(&quot;,&quot;, &quot;{&quot;, &quot;}&quot;));</span>
+    }
+
+    static List&lt;SearchFacet&gt; facets(String json) {
+<span class="pc bpc" id="L33" title="3 of 6 branches missed.">        if (json == null || json.isBlank() || json.equals(&quot;{}&quot;)) {</span>
+<span class="nc" id="L34">            return List.of();</span>
+        }
+<span class="fc" id="L36">        String wrapped = &quot;{\&quot;facets\&quot;:[&quot; + json + &quot;]}&quot;;</span>
+<span class="fc" id="L37">        List&lt;Map&lt;String, String&gt;&gt; objects = MiniJson.parseObjectArray(wrapped, &quot;facets&quot;);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (objects.isEmpty()) {</span>
+<span class="nc" id="L39">            return List.of();</span>
+        }
+<span class="fc" id="L41">        return objects.getFirst().entrySet().stream()</span>
+<span class="fc" id="L42">            .map(entry -&gt; new SearchFacet(entry.getKey(), entry.getValue()))</span>
+<span class="fc" id="L43">            .toList();</span>
+    }
+
+    static String join(List&lt;String&gt; values) {
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        return values == null ? &quot;&quot; : String.join(&quot; &quot;, values);</span>
+    }
+
+    static String joinFacets(List&lt;SearchFacet&gt; facets) {
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        return facets == null ? &quot;&quot; : facets.stream()</span>
+<span class="fc" id="L52">            .map(facet -&gt; facet.key() + &quot;:&quot; + facet.value())</span>
+<span class="fc" id="L53">            .collect(Collectors.joining(&quot; &quot;));</span>
+    }
+
+    static String expressionPairs(List&lt;HypothesisCandidate.ExpressionPair&gt; pairs) {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        List&lt;HypothesisCandidate.ExpressionPair&gt; safe = pairs == null ? List.of() : pairs;</span>
+<span class="nc" id="L58">        return safe.stream()</span>
+<span class="nc" id="L59">            .map(pair -&gt; &quot;{&quot;</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">                + quote(&quot;left&quot;) + &quot;:&quot; + quote(pair.left() == null ? &quot;&quot; : pair.left()) + &quot;,&quot;</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                + quote(&quot;right&quot;) + &quot;:&quot; + quote(pair.right() == null ? &quot;&quot; : pair.right())</span>
+                + &quot;}&quot;)
+<span class="nc" id="L63">            .collect(Collectors.joining(&quot;,&quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    static List&lt;HypothesisCandidate.ExpressionPair&gt; expressionPairsValues(String json) {
+<span class="nc bnc" id="L67" title="All 4 branches missed.">        String safeJson = json == null || json.isBlank() ? &quot;[]&quot; : json;</span>
+<span class="nc" id="L68">        List&lt;Map&lt;String, String&gt;&gt; objects = MiniJson.parseObjectArray(&quot;{\&quot;pairs\&quot;:&quot; + safeJson + &quot;}&quot;, &quot;pairs&quot;);</span>
+<span class="nc" id="L69">        return objects.stream()</span>
+<span class="nc" id="L70">            .map(object -&gt; new HypothesisCandidate.ExpressionPair(</span>
+<span class="nc" id="L71">                object.getOrDefault(&quot;left&quot;, &quot;&quot;),</span>
+<span class="nc" id="L72">                object.getOrDefault(&quot;right&quot;, &quot;&quot;)))</span>
+<span class="nc" id="L73">            .toList();</span>
+    }
+
+    static String placeholderEntries(Map&lt;String, List&lt;String&gt;&gt; values) {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        Map&lt;String, List&lt;String&gt;&gt; safe = values == null ? Map.of() : values;</span>
+<span class="nc" id="L78">        return safe.entrySet().stream()</span>
+<span class="nc" id="L79">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="nc" id="L80">            .map(entry -&gt; &quot;{&quot;</span>
+<span class="nc" id="L81">                + quote(&quot;key&quot;) + &quot;:&quot; + quote(entry.getKey()) + &quot;,&quot;</span>
+<span class="nc" id="L82">                + quote(&quot;values&quot;) + &quot;:&quot; + array(entry.getValue())</span>
+                + &quot;}&quot;)
+<span class="nc" id="L84">            .collect(Collectors.joining(&quot;,&quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    static Map&lt;String, List&lt;String&gt;&gt; placeholderEntriesValues(String json) {
+<span class="nc bnc" id="L88" title="All 4 branches missed.">        String safeJson = json == null || json.isBlank() ? &quot;[]&quot; : json;</span>
+<span class="nc" id="L89">        List&lt;Map&lt;String, String&gt;&gt; objects = MiniJson.parseObjectArray(&quot;{\&quot;entries\&quot;:&quot; + safeJson + &quot;}&quot;, &quot;entries&quot;);</span>
+<span class="nc" id="L90">        Map&lt;String, List&lt;String&gt;&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        for (Map&lt;String, String&gt; object : objects) {</span>
+<span class="nc" id="L92">            String key = object.get(&quot;key&quot;);</span>
+<span class="nc bnc" id="L93" title="All 4 branches missed.">            if (key == null || key.isBlank()) {</span>
+<span class="nc" id="L94">                continue;</span>
+            }
+<span class="nc" id="L96">            values.put(key, arrayValues(object.get(&quot;values&quot;)));</span>
+<span class="nc" id="L97">        }</span>
+<span class="nc" id="L98">        return Map.copyOf(values);</span>
+    }
+
+    static String quote(String value) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L103">            return &quot;null&quot;;</span>
+        }
+<span class="fc" id="L105">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L107">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L108" title="5 of 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L109">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L110">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L111">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L112">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L113">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+                default -&gt; {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L116">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+                    } else {
+<span class="fc" id="L118">                        builder.append(c);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L123">        return builder.append('&quot;').toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymbolicRegressionFittedResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">SymbolicRegressionFittedResult.java</span></div><h1>SymbolicRegressionFittedResult.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.List;
+
+/** Evidence-only result fitted by a symbolic-regression backend. */
+public record SymbolicRegressionFittedResult(
+    String templateName,
+    String expression,
+    List&lt;SymbolicRegressionSample&gt; supportingSamples,
+    double maxResidual,
+    double confidence
+) {
+    public SymbolicRegressionFittedResult(
+        String templateName,
+        String expression,
+        List&lt;SymbolicRegressionSample&gt; supportingSamples
+    ) {
+<span class="fc" id="L18">        this(templateName, expression, supportingSamples, 0.0, 1.0);</span>
+<span class="fc" id="L19">    }</span>
+
+<span class="fc" id="L21">    public SymbolicRegressionFittedResult {</span>
+<span class="pc bpc" id="L22" title="2 of 4 branches missed.">        if (templateName == null || templateName.isBlank()) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(&quot;templateName must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L25" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L26">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        supportingSamples = supportingSamples == null ? List.of() : List.copyOf(supportingSamples);</span>
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">        if (!Double.isFinite(maxResidual) || maxResidual &lt; 0.0) {</span>
+<span class="nc" id="L30">            maxResidual = Double.POSITIVE_INFINITY;</span>
+        }
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (!Double.isFinite(confidence)) {</span>
+<span class="nc" id="L33">            confidence = 0.0;</span>
+        }
+<span class="fc" id="L35">        confidence = Math.max(0.0, Math.min(1.0, confidence));</span>
+<span class="fc" id="L36">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

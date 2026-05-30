@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CounterexampleRobustnessScore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">CounterexampleRobustnessScore.java</span></div><h1>CounterexampleRobustnessScore.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+/** Rewards candidates that survived counterexample search and penalizes refutations. */
+<span class="fc" id="L4">public final class CounterexampleRobustnessScore implements InterestingnessScoringModule {</span>
+    @Override
+    public String name() {
+<span class="fc" id="L7">        return &quot;counterexampleRobustness&quot;;</span>
+    }
+
+    @Override
+    public double score(InterestingnessScoringContext context) {
+<span class="pc bpc" id="L12" title="1 of 2 branches missed.">        if (context.candidate().counterexampleSearchStatus() != null) {</span>
+<span class="pc bpc" id="L13" title="2 of 3 branches missed.">            return switch (context.candidate().counterexampleSearchStatus()) {</span>
+<span class="nc" id="L14">                case COUNTEREXAMPLE_FOUND -&gt; -2.0;</span>
+<span class="fc" id="L15">                case NO_COUNTEREXAMPLE_FOUND -&gt; 1.0;</span>
+<span class="nc" id="L16">                case INCONCLUSIVE -&gt; 0.0;</span>
+            };
+        }
+<span class="nc" id="L19">        Boolean found = context.candidate().counterexampleStatus();</span>
+<span class="nc bnc" id="L20" title="All 2 branches missed.">        if (Boolean.TRUE.equals(found)) {</span>
+<span class="nc" id="L21">            return -2.0;</span>
+        }
+<span class="nc bnc" id="L23" title="All 2 branches missed.">        if (Boolean.FALSE.equals(found)) {</span>
+<span class="nc" id="L24">            return 1.0;</span>
+        }
+<span class="nc" id="L26">        return 0.25;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

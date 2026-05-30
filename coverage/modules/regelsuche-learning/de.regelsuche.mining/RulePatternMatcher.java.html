@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RulePatternMatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">RulePatternMatcher.java</span></div><h1>RulePatternMatcher.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+/** Structural matcher for learned macro-rule source patterns. */
+<span class="fc" id="L15">public class RulePatternMatcher {</span>
+<span class="fc" id="L16">    private final RulePatternParser patternParser = new RulePatternParser();</span>
+<span class="fc" id="L17">    private final ExpressionParser expressionParser = new ExpressionParser();</span>
+
+    public Optional&lt;Map&lt;String, Expr&gt;&gt; match(String pattern, String expression) {
+        try {
+<span class="fc" id="L21">            RulePatternNode patternNode = patternParser.parse(pattern);</span>
+<span class="fc" id="L22">            Expr expressionNode = expressionParser.parseTerm(expression);</span>
+<span class="fc" id="L23">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            if (!match(patternNode, expressionNode, bindings)) {</span>
+<span class="fc" id="L25">                return Optional.empty();</span>
+            }
+<span class="fc" id="L27">            return Optional.of(Map.copyOf(bindings));</span>
+<span class="nc" id="L28">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L29">            return Optional.empty();</span>
+        }
+    }
+
+    private boolean match(RulePatternNode pattern, Expr expression, Map&lt;String, Expr&gt; bindings) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (pattern instanceof PatternVariable variable) {</span>
+<span class="fc" id="L35">            Expr existing = bindings.get(variable.name());</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (existing == null) {</span>
+<span class="fc" id="L37">                bindings.put(variable.name(), expression);</span>
+<span class="fc" id="L38">                return true;</span>
+            }
+<span class="nc" id="L40">            return existing.equals(expression);</span>
+        }
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (pattern instanceof PatternNumber number) {</span>
+<span class="fc bfc" id="L43" title="All 4 branches covered.">            return expression instanceof NumberExpr value &amp;&amp; Double.compare(value.value(), number.value()) == 0;</span>
+        }
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (pattern instanceof PatternFunction function) {</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">            if (!(expression instanceof FunctionExpr value)</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">                || !function.name().equals(value.name())</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">                || function.arguments().size() != value.arguments().size()) {</span>
+<span class="nc" id="L49">                return false;</span>
+            }
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            for (int index = 0; index &lt; function.arguments().size(); index++) {</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">                if (!match(function.arguments().get(index), value.arguments().get(index), bindings)) {</span>
+<span class="nc" id="L53">                    return false;</span>
+                }
+            }
+<span class="nc" id="L56">            return true;</span>
+        }
+<span class="fc" id="L58">        PatternBinary binary = (PatternBinary) pattern;</span>
+<span class="pc bpc" id="L59" title="1 of 4 branches missed.">        if (!(expression instanceof BinaryExpr value) || binary.op() != value.operator()) {</span>
+<span class="fc" id="L60">            return false;</span>
+        }
+<span class="fc" id="L62">        Map&lt;String, Expr&gt; direct = new HashMap&lt;&gt;(bindings);</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        if (match(binary.left(), value.left(), direct) &amp;&amp; match(binary.right(), value.right(), direct)) {</span>
+<span class="fc" id="L64">            bindings.clear();</span>
+<span class="fc" id="L65">            bindings.putAll(direct);</span>
+<span class="fc" id="L66">            return true;</span>
+        }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (isCommutative(binary.op())) {</span>
+<span class="fc" id="L69">            Map&lt;String, Expr&gt; swapped = new HashMap&lt;&gt;(bindings);</span>
+<span class="pc bpc" id="L70" title="3 of 4 branches missed.">            if (match(binary.left(), value.right(), swapped) &amp;&amp; match(binary.right(), value.left(), swapped)) {</span>
+<span class="nc" id="L71">                bindings.clear();</span>
+<span class="nc" id="L72">                bindings.putAll(swapped);</span>
+<span class="nc" id="L73">                return true;</span>
+            }
+        }
+<span class="fc" id="L76">        return false;</span>
+    }
+
+    private boolean isCommutative(BinaryOperator operator) {
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">        return operator == BinaryOperator.ADD || operator == BinaryOperator.MUL;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

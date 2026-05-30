@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Neo4jProvenanceRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.provenance</a> &gt; <span class="el_source">Neo4jProvenanceRepository.java</span></div><h1>Neo4jProvenanceRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.provenance;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.neo4j.driver.Driver;
+import org.neo4j.driver.Session;
+
+public final class Neo4jProvenanceRepository implements ProvenanceRepository, AutoCloseable {
+    private final Driver driver;
+
+<span class="nc" id="L14">    public Neo4jProvenanceRepository(Driver driver) {</span>
+<span class="nc" id="L15">        this.driver = java.util.Objects.requireNonNull(driver);</span>
+<span class="nc" id="L16">    }</span>
+
+    @Override
+    public void save(String runId, ProvenanceGraph graph) {
+<span class="nc" id="L20">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L21">            session.run(&quot;MERGE (r:SearchRun {id: $runId})&quot;, Map.of(&quot;runId&quot;, runId));</span>
+<span class="nc" id="L22">            session.run(</span>
+                &quot;MATCH (r:SearchRun {id: $runId})-[:HAS_PROVENANCE]-&gt;(x) DETACH DELETE x&quot;,
+<span class="nc" id="L24">                Map.of(&quot;runId&quot;, runId)</span>
+            );
+<span class="nc bnc" id="L26" title="All 2 branches missed.">            for (ProvenanceNode node : graph.nodes()) {</span>
+<span class="nc" id="L27">                Map&lt;String, Object&gt; parameters = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L28">                parameters.put(&quot;runId&quot;, runId);</span>
+<span class="nc" id="L29">                parameters.put(&quot;id&quot;, node.id());</span>
+<span class="nc" id="L30">                parameters.put(&quot;type&quot;, node.type().name());</span>
+<span class="nc" id="L31">                parameters.put(&quot;label&quot;, node.label());</span>
+<span class="nc" id="L32">                parameters.put(&quot;propertyKeys&quot;, new ArrayList&lt;&gt;(node.properties().keySet()));</span>
+<span class="nc" id="L33">                parameters.put(&quot;propertyValues&quot;, new ArrayList&lt;&gt;(node.properties().values()));</span>
+<span class="nc" id="L34">                session.run(</span>
+                    &quot;MATCH (r:SearchRun {id: $runId}) &quot;
+                        + &quot;MERGE (p:ProvenanceEntity {runId: $runId, id: $id}) &quot;
+                        + &quot;SET p.type = $type, p.label = $label, p.propertyKeys = $propertyKeys, &quot;
+                        + &quot;p.propertyValues = $propertyValues &quot;
+                        + &quot;MERGE (r)-[:HAS_PROVENANCE]-&gt;(p)&quot;,
+                    parameters
+                );
+<span class="nc" id="L42">            }</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            for (ProvenanceEdge edge : graph.edges()) {</span>
+<span class="nc" id="L44">                Map&lt;String, Object&gt; parameters = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L45">                parameters.put(&quot;runId&quot;, runId);</span>
+<span class="nc" id="L46">                parameters.put(&quot;fromId&quot;, edge.fromId());</span>
+<span class="nc" id="L47">                parameters.put(&quot;toId&quot;, edge.toId());</span>
+<span class="nc" id="L48">                parameters.put(&quot;type&quot;, edge.type().name());</span>
+<span class="nc" id="L49">                parameters.put(&quot;propertyKeys&quot;, new ArrayList&lt;&gt;(edge.properties().keySet()));</span>
+<span class="nc" id="L50">                parameters.put(&quot;propertyValues&quot;, new ArrayList&lt;&gt;(edge.properties().values()));</span>
+<span class="nc" id="L51">                session.run(</span>
+                    &quot;MATCH (from:ProvenanceEntity {runId: $runId, id: $fromId}) &quot;
+                        + &quot;MATCH (to:ProvenanceEntity {runId: $runId, id: $toId}) &quot;
+<span class="nc" id="L54">                        + &quot;MERGE (from)-[e:&quot; + edge.type().name() + &quot;]-&gt;(to) &quot;</span>
+                        + &quot;SET e.type = $type, e.propertyKeys = $propertyKeys, e.propertyValues = $propertyValues&quot;,
+                    parameters
+                );
+<span class="nc" id="L58">            }</span>
+        }
+<span class="nc" id="L60">    }</span>
+
+    @Override
+    public Optional&lt;ProvenanceGraph&gt; findByRunId(String runId) {
+<span class="nc" id="L64">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L65">            var nodeRows = session.run(</span>
+                &quot;MATCH (:SearchRun {id: $runId})-[:HAS_PROVENANCE]-&gt;(p:ProvenanceEntity) &quot;
+                    + &quot;RETURN p.id AS id, p.type AS type, p.label AS label, &quot;
+                    + &quot;p.propertyKeys AS propertyKeys, p.propertyValues AS propertyValues ORDER BY p.id&quot;,
+<span class="nc" id="L69">                Map.of(&quot;runId&quot;, runId)</span>
+            );
+<span class="nc" id="L71">            List&lt;ProvenanceNode&gt; nodes = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            while (nodeRows.hasNext()) {</span>
+<span class="nc" id="L73">                var row = nodeRows.next();</span>
+<span class="nc" id="L74">                nodes.add(new ProvenanceNode(</span>
+<span class="nc" id="L75">                    row.get(&quot;id&quot;).asString(),</span>
+<span class="nc" id="L76">                    ProvenanceNodeType.valueOf(row.get(&quot;type&quot;).asString()),</span>
+<span class="nc" id="L77">                    row.get(&quot;label&quot;).asString(),</span>
+<span class="nc" id="L78">                    stringMap(row.get(&quot;propertyKeys&quot;).asList(), row.get(&quot;propertyValues&quot;).asList())</span>
+                ));
+<span class="nc" id="L80">            }</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if (nodes.isEmpty()) {</span>
+<span class="nc" id="L82">                return Optional.empty();</span>
+            }
+<span class="nc" id="L84">            var edgeRows = session.run(</span>
+                &quot;MATCH (from:ProvenanceEntity {runId: $runId})-[e]-&gt;(to:ProvenanceEntity {runId: $runId}) &quot;
+                    + &quot;WHERE e.type IS NOT NULL &quot;
+                    + &quot;RETURN from.id AS fromId, to.id AS toId, e.type AS type, &quot;
+                    + &quot;e.propertyKeys AS propertyKeys, e.propertyValues AS propertyValues &quot;
+                    + &quot;ORDER BY from.id, to.id, e.type&quot;,
+<span class="nc" id="L90">                Map.of(&quot;runId&quot;, runId)</span>
+            );
+<span class="nc" id="L92">            List&lt;ProvenanceEdge&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            while (edgeRows.hasNext()) {</span>
+<span class="nc" id="L94">                var row = edgeRows.next();</span>
+<span class="nc" id="L95">                edges.add(new ProvenanceEdge(</span>
+<span class="nc" id="L96">                    row.get(&quot;fromId&quot;).asString(),</span>
+<span class="nc" id="L97">                    row.get(&quot;toId&quot;).asString(),</span>
+<span class="nc" id="L98">                    ProvenanceEdgeType.valueOf(row.get(&quot;type&quot;).asString()),</span>
+<span class="nc" id="L99">                    stringMap(row.get(&quot;propertyKeys&quot;).asList(), row.get(&quot;propertyValues&quot;).asList())</span>
+                ));
+<span class="nc" id="L101">            }</span>
+<span class="nc" id="L102">            return Optional.of(new ProvenanceGraph(nodes, edges));</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        }</span>
+    }
+
+    @Override
+    public void close() {
+<span class="nc" id="L108">        driver.close();</span>
+<span class="nc" id="L109">    }</span>
+
+    private static Map&lt;String, String&gt; stringMap(List&lt;Object&gt; keys, List&lt;Object&gt; values) {
+<span class="nc bnc" id="L112" title="All 6 branches missed.">        if (keys == null || values == null || keys.isEmpty()) {</span>
+<span class="nc" id="L113">            return Map.of();</span>
+        }
+<span class="nc" id="L115">        Map&lt;String, String&gt; result = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        for (int i = 0; i &lt; Math.min(keys.size(), values.size()); i++) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            result.put(String.valueOf(keys.get(i)), values.get(i) == null ? &quot;&quot; : values.get(i).toString());</span>
+        }
+<span class="nc" id="L119">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HibernateSearchFacetedSearchIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence-hibernate</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence.relational</a> &gt; <span class="el_source">HibernateSearchFacetedSearchIndex.java</span></div><h1>HibernateSearchFacetedSearchIndex.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence.relational;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import java.util.List;
+import org.hibernate.search.mapper.orm.Search;
+
+public final class HibernateSearchFacetedSearchIndex extends HibernateEntityRepository&lt;SearchIndexDocument&gt;
+    implements FacetedSearchIndex {
+
+    private final EntityManagerFactory entityManagerFactory;
+
+    public HibernateSearchFacetedSearchIndex(EntityManagerFactory entityManagerFactory) {
+<span class="nc" id="L14">        super(entityManagerFactory, SearchIndexDocument.class);</span>
+<span class="nc" id="L15">        this.entityManagerFactory = entityManagerFactory;</span>
+<span class="nc" id="L16">    }</span>
+
+    @Override
+    public void index(SearchIndexDocument document) {
+<span class="nc" id="L20">        save(document);</span>
+<span class="nc" id="L21">    }</span>
+
+    @Override
+    public List&lt;SearchResult&gt; search(SearchQuery query) {
+<span class="nc" id="L25">        EntityManager entityManager = entityManagerFactory.createEntityManager();</span>
+        try {
+<span class="nc" id="L27">            int pageSize = Math.max(query.limit() * 4, 20);</span>
+<span class="nc" id="L28">            int offset = 0;</span>
+<span class="nc" id="L29">            java.util.ArrayList&lt;SearchResult&gt; results = new java.util.ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">            while (results.size() &lt; query.limit()) {</span>
+<span class="nc" id="L31">                List&lt;SearchIndexDocument&gt; hits = Search.session(entityManager)</span>
+<span class="nc" id="L32">                    .search(SearchIndexDocument.class)</span>
+<span class="nc" id="L33">                    .where(f -&gt; f.bool(b -&gt; {</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">                        if (!query.text().isBlank()) {</span>
+<span class="nc" id="L35">                            b.must(f.match().fields(&quot;title&quot;, &quot;body&quot;, &quot;facets&quot;).matching(query.text()));</span>
+                        }
+<span class="nc" id="L37">                    }))</span>
+<span class="nc" id="L38">                    .fetchHits(offset, pageSize);</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">                if (hits.isEmpty()) {</span>
+<span class="nc" id="L40">                    break;</span>
+                }
+<span class="nc bnc" id="L42" title="All 2 branches missed.">                for (SearchIndexDocument hit : hits) {</span>
+<span class="nc bnc" id="L43" title="All 4 branches missed.">                    if (!query.types().isEmpty() &amp;&amp; !query.types().contains(hit.type())) {</span>
+<span class="nc" id="L44">                        continue;</span>
+                    }
+<span class="nc bnc" id="L46" title="All 2 branches missed.">                    if (!query.requiredFacets().stream().allMatch(hit::hasFacet)) {</span>
+<span class="nc" id="L47">                        continue;</span>
+                    }
+<span class="nc" id="L49">                    results.add(new SearchResult(hit, 1.0));</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">                    if (results.size() &gt;= query.limit()) {</span>
+<span class="nc" id="L51">                        break;</span>
+                    }
+<span class="nc" id="L53">                }</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                if (hits.size() &lt; pageSize) {</span>
+<span class="nc" id="L55">                    break;</span>
+                }
+<span class="nc" id="L57">                offset += pageSize;</span>
+<span class="nc" id="L58">            }</span>
+<span class="nc" id="L59">            return List.copyOf(results);</span>
+        } finally {
+<span class="nc" id="L61">            entityManager.close();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

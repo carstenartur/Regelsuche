@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParameterRelation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">ParameterRelation.java</span></div><h1>ParameterRelation.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.Locale;
+import java.util.Optional;
+
+/** Structured parameter relation used by learned macro guards and validators. */
+public record ParameterRelation(
+    String left,
+    Operator operator,
+    String right,
+    RelationType relationType
+) {
+<span class="nc" id="L13">    public ParameterRelation {</span>
+<span class="nc bnc" id="L14" title="All 4 branches missed.">        if (left == null || left.isBlank()) {</span>
+<span class="nc" id="L15">            throw new IllegalArgumentException(&quot;left must not be blank&quot;);</span>
+        }
+<span class="nc bnc" id="L17" title="All 4 branches missed.">        if (right == null || right.isBlank()) {</span>
+<span class="nc" id="L18">            throw new IllegalArgumentException(&quot;right must not be blank&quot;);</span>
+        }
+<span class="nc bnc" id="L20" title="All 2 branches missed.">        operator = operator == null ? Operator.EQUALS : operator;</span>
+<span class="nc bnc" id="L21" title="All 2 branches missed.">        relationType = relationType == null ? infer(left, operator, right) : relationType;</span>
+<span class="nc" id="L22">        left = left.trim();</span>
+<span class="nc" id="L23">        right = right.trim();</span>
+<span class="nc" id="L24">    }</span>
+
+    public String display() {
+<span class="nc" id="L27">        return left + &quot; &quot; + operator.symbol() + &quot; &quot; + right;</span>
+    }
+
+    public static Optional&lt;ParameterRelation&gt; parse(String relation) {
+<span class="nc bnc" id="L31" title="All 4 branches missed.">        if (relation == null || relation.isBlank()) {</span>
+<span class="nc" id="L32">            return Optional.empty();</span>
+        }
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        for (Operator operator : Operator.values()) {</span>
+<span class="nc" id="L35">            int separator = relation.indexOf(operator.symbol());</span>
+<span class="nc bnc" id="L36" title="All 4 branches missed.">            if (separator &gt; 0 &amp;&amp; separator &lt; relation.length() - operator.symbol().length()) {</span>
+<span class="nc" id="L37">                String left = relation.substring(0, separator).trim();</span>
+<span class="nc" id="L38">                String right = relation.substring(separator + operator.symbol().length()).trim();</span>
+<span class="nc" id="L39">                return Optional.of(new ParameterRelation(left, operator, right, infer(left, operator, right)));</span>
+            }
+        }
+<span class="nc" id="L42">        return Optional.empty();</span>
+    }
+
+    private static RelationType infer(String left, Operator operator, String right) {
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (operator == Operator.NOT_EQUALS) {</span>
+<span class="nc" id="L47">            return RelationType.NON_ZERO_ASSUMPTION;</span>
+        }
+<span class="nc" id="L49">        String compact = right.replace(&quot; &quot;, &quot;&quot;).toUpperCase(Locale.ROOT);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (compact.matches(&quot;[A-Z]\\+1&quot;)) {</span>
+<span class="nc" id="L51">            return RelationType.UNIT_STEP;</span>
+        }
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (compact.matches(&quot;[A-Z][+-]\\d+&quot;)) {</span>
+<span class="nc" id="L54">            return RelationType.AFFINE_OFFSET;</span>
+        }
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (compact.matches(&quot;[A-Z]\\^2&quot;)) {</span>
+<span class="nc" id="L57">            return RelationType.POWER;</span>
+        }
+<span class="nc" id="L59">        return RelationType.EXPRESSION;</span>
+    }
+
+<span class="nc" id="L62">    public enum Operator {</span>
+<span class="nc" id="L63">        NOT_EQUALS(&quot;!=&quot;),</span>
+<span class="nc" id="L64">        EQUALS(&quot;=&quot;);</span>
+
+        private final String symbol;
+
+<span class="nc" id="L68">        Operator(String symbol) {</span>
+<span class="nc" id="L69">            this.symbol = symbol;</span>
+<span class="nc" id="L70">        }</span>
+
+        public String symbol() {
+<span class="nc" id="L73">            return symbol;</span>
+        }
+    }
+
+<span class="nc" id="L77">    public enum RelationType {</span>
+<span class="nc" id="L78">        UNIT_STEP,</span>
+<span class="nc" id="L79">        AFFINE_OFFSET,</span>
+<span class="nc" id="L80">        POWER,</span>
+<span class="nc" id="L81">        NON_ZERO_ASSUMPTION,</span>
+<span class="nc" id="L82">        EXPRESSION</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeedExpressionEntity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence-hibernate</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence.relational</a> &gt; <span class="el_source">SeedExpressionEntity.java</span></div><h1>SeedExpressionEntity.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence.relational;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.List;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.KeywordField;
+import org.hibernate.type.SqlTypes;
+
+@Entity
+@Indexed
+@Table(name = &quot;seed_expressions&quot;, indexes = @Index(name = &quot;idx_seed_expressions_domain&quot;, columnList = &quot;domain&quot;))
+public class SeedExpressionEntity {
+    @Id
+    private String id;
+    @FullTextField
+    @Column(name = &quot;expression&quot;, nullable = false, columnDefinition = &quot;text&quot;)
+    private String expression;
+    @KeywordField
+    @Column(name = &quot;domain&quot;, nullable = false)
+    private String domain;
+    @KeywordField
+    @Column(name = &quot;difficulty&quot;, nullable = false)
+    private String difficulty;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;tags&quot;, nullable = false, columnDefinition = &quot;jsonb&quot;)
+    private String tagsJson;
+    @FullTextField(name = &quot;tags&quot;)
+    @Column(name = &quot;tags_text&quot;, nullable = false, columnDefinition = &quot;text&quot;)
+    private String tagsText;
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private Instant createdAt;
+
+<span class="nc" id="L40">    protected SeedExpressionEntity() {</span>
+<span class="nc" id="L41">    }</span>
+
+<span class="nc" id="L43">    public SeedExpressionEntity(String id, String expression, String domain, String difficulty, List&lt;String&gt; tags, Instant createdAt) {</span>
+<span class="nc" id="L44">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
+<span class="nc" id="L45">        this.expression = SearchRunEntity.requireId(expression, &quot;expression&quot;);</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        this.domain = domain == null ? &quot;general&quot; : domain;</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        this.difficulty = difficulty == null ? &quot;unknown&quot; : difficulty;</span>
+<span class="nc" id="L48">        this.tagsJson = RelationalJson.array(tags);</span>
+<span class="nc" id="L49">        this.tagsText = RelationalJson.join(tags);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        this.createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="nc" id="L51">    }</span>
+
+<span class="nc" id="L53">    public String id() { return id; }</span>
+<span class="nc" id="L54">    public String expression() { return expression; }</span>
+<span class="nc" id="L55">    public String domain() { return domain; }</span>
+<span class="nc" id="L56">    public String difficulty() { return difficulty; }</span>
+<span class="nc" id="L57">    public List&lt;String&gt; tags() { return RelationalJson.arrayValues(tagsJson); }</span>
+<span class="nc" id="L58">    public Instant createdAt() { return createdAt; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

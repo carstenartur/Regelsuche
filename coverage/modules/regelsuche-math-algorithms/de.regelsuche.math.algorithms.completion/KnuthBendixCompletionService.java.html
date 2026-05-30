@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnuthBendixCompletionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.completion</a> &gt; <span class="el_source">KnuthBendixCompletionService.java</span></div><h1>KnuthBendixCompletionService.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.completion;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.validation.CompletionService;
+import de.regelsuche.validation.CriticalPairService;
+import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+public class KnuthBendixCompletionService implements CompletionService, CriticalPairService {
+    private final MathematicalAlgorithmRegistry registry;
+
+<span class="fc" id="L29">    public KnuthBendixCompletionService(MathematicalAlgorithmRegistry registry) {</span>
+<span class="fc" id="L30">        this.registry = registry;</span>
+<span class="fc" id="L31">    }</span>
+
+    @Override
+    public CriticalPairReport analyzeCriticalPairs(List&lt;PatternRewriteRule&gt; rules) {
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (!registry.isEnabled(MathematicalAlgorithmRegistry.CRITICAL_PAIRS)) {</span>
+<span class="nc" id="L36">            return new CriticalPairReport(List.of(), MathematicalAlgorithmRegistry.AlgorithmExecutionResult.disabled(</span>
+                &quot;criticalPairs is disabled&quot;));
+        }
+
+<span class="fc" id="L40">        int maxPairs = registry.find(MathematicalAlgorithmRegistry.CRITICAL_PAIRS)</span>
+<span class="fc" id="L41">            .map(descriptor -&gt; descriptor.budget().maxStates())</span>
+<span class="fc" id="L42">            .orElse(Integer.MAX_VALUE);</span>
+<span class="fc" id="L43">        List&lt;CriticalPair&gt; criticalPairs = computeCriticalPairs(rules, maxPairs);</span>
+<span class="fc" id="L44">        return new CriticalPairReport(</span>
+            criticalPairs,
+            new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
+                MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS,
+                MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC,
+                &quot;critical pair analysis complete&quot;,
+<span class="fc" id="L50">                Map.of(&quot;criticalPairCount&quot;, criticalPairs.size())</span>
+            )
+        );
+    }
+
+    @Override
+    public CompletionReport analyzeCompletion(List&lt;PatternRewriteRule&gt; rules) {
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (!registry.isEnabled(MathematicalAlgorithmRegistry.KNUTH_BENDIX)) {</span>
+<span class="nc" id="L58">            return new CompletionReport(false, List.of(), List.of(),</span>
+<span class="nc" id="L59">                MathematicalAlgorithmRegistry.AlgorithmExecutionResult.disabled(&quot;knuthBendix is disabled&quot;));</span>
+        }
+
+<span class="fc" id="L62">        MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.KNUTH_BENDIX)</span>
+<span class="fc" id="L63">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L64">            .orElse(MathematicalAlgorithmRegistry.AlgorithmBudget.unbounded());</span>
+
+<span class="fc" id="L66">        List&lt;CriticalPair&gt; criticalPairs = computeCriticalPairs(rules, budget.maxStates());</span>
+<span class="fc" id="L67">        List&lt;CompletionCandidate&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L68">        boolean confluent = true;</span>
+
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (CriticalPair criticalPair : criticalPairs) {</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if (!joinable(criticalPair.leftBranch(), criticalPair.rightBranch(), rules, budget.maxSteps(), budget.maxStates())) {</span>
+<span class="fc" id="L72">                confluent = false;</span>
+<span class="fc" id="L73">                String from = criticalPair.leftBranch();</span>
+<span class="fc" id="L74">                String to = criticalPair.rightBranch();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                if (from.compareTo(to) &gt; 0) {</span>
+<span class="fc" id="L76">                    String swap = from;</span>
+<span class="fc" id="L77">                    from = to;</span>
+<span class="fc" id="L78">                    to = swap;</span>
+                }
+<span class="fc" id="L80">                candidates.add(new CompletionCandidate(from, to,</span>
+<span class="fc" id="L81">                    &quot;non-joinable critical pair &quot; + criticalPair.leftRuleId() + &quot; vs &quot; + criticalPair.rightRuleId()));</span>
+            }
+<span class="fc" id="L83">        }</span>
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        MathematicalAlgorithmRegistry.ExecutionStatus status = candidates.size() &gt;= budget.maxStates()</span>
+<span class="fc" id="L86">            ? MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED</span>
+<span class="fc" id="L87">            : MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS;</span>
+
+<span class="fc" id="L89">        return new CompletionReport(</span>
+            confluent,
+            criticalPairs,
+            candidates,
+            new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
+                status,
+                MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC,
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                confluent ? &quot;confluent for analyzed overlaps&quot; : &quot;completion candidates produced&quot;,</span>
+<span class="fc" id="L97">                Map.of(&quot;criticalPairCount&quot;, criticalPairs.size(), &quot;candidateCount&quot;, candidates.size())</span>
+            )
+        );
+    }
+
+    private List&lt;CriticalPair&gt; computeCriticalPairs(List&lt;PatternRewriteRule&gt; rules, int maxPairs) {
+<span class="fc" id="L103">        Map&lt;String, CriticalPair&gt; unique = new LinkedHashMap&lt;&gt;();</span>
+        outer:
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (PatternRewriteRule leftRule : rules) {</span>
+<span class="fc" id="L106">            Expr leftSource = toExpr(leftRule.source());</span>
+            Expr leftReduced;
+            try {
+<span class="fc" id="L109">                leftReduced = leftRule.apply(leftSource);</span>
+<span class="nc" id="L110">            } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L111">                continue;</span>
+<span class="fc" id="L112">            }</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            for (PatternRewriteRule rightRule : rules) {</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                for (PathAndExpr occurrence : positions(leftSource)) {</span>
+<span class="fc" id="L115">                    Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                    if (!rightRule.source().match(occurrence.expression(), bindings)) {</span>
+<span class="fc" id="L117">                        continue;</span>
+                    }
+<span class="fc" id="L119">                    Expr replaced = replaceAtPath(leftSource, occurrence.path(), rightRule.target().instantiate(bindings));</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                    if (leftReduced.equals(replaced)) {</span>
+<span class="fc" id="L121">                        continue;</span>
+                    }
+<span class="fc" id="L123">                    String key = leftRule.id() + &quot;|&quot; + rightRule.id() + &quot;|&quot; + occurrence.path() + &quot;|&quot;</span>
+<span class="fc" id="L124">                        + ExpressionFormatter.format(leftReduced) + &quot;|&quot; + ExpressionFormatter.format(replaced);</span>
+<span class="fc" id="L125">                    unique.putIfAbsent(key, new CriticalPair(</span>
+<span class="fc" id="L126">                        ExpressionFormatter.format(leftSource),</span>
+<span class="fc" id="L127">                        ExpressionFormatter.format(leftReduced),</span>
+<span class="fc" id="L128">                        ExpressionFormatter.format(replaced),</span>
+<span class="fc" id="L129">                        leftRule.id(),</span>
+<span class="fc" id="L130">                        rightRule.id(),</span>
+<span class="fc" id="L131">                        occurrence.path()</span>
+                    ));
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                    if (unique.size() &gt;= maxPairs) {</span>
+<span class="fc" id="L134">                        break outer;</span>
+                    }
+<span class="fc" id="L136">                }</span>
+<span class="fc" id="L137">            }</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        return List.copyOf(unique.values());</span>
+    }
+
+    private boolean joinable(String left,
+                             String right,
+                             List&lt;PatternRewriteRule&gt; rules,
+                             int maxSteps,
+                             int maxStates) {
+<span class="fc" id="L147">        Set&lt;String&gt; leftReachable = reachable(left, rules, maxSteps, maxStates);</span>
+<span class="fc" id="L148">        Set&lt;String&gt; rightReachable = reachable(right, rules, maxSteps, maxStates);</span>
+<span class="fc" id="L149">        leftReachable.retainAll(rightReachable);</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        return !leftReachable.isEmpty();</span>
+    }
+
+    private Set&lt;String&gt; reachable(String start,
+                                  List&lt;PatternRewriteRule&gt; rules,
+                                  int maxSteps,
+                                  int maxStates) {
+<span class="fc" id="L157">        AstRewriteTransformationEngine engine = new AstRewriteTransformationEngine(List.copyOf(rules));</span>
+<span class="fc" id="L158">        Set&lt;String&gt; visited = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L159">        ArrayDeque&lt;State&gt; queue = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L160">        queue.add(new State(start, 0));</span>
+<span class="fc" id="L161">        visited.add(start);</span>
+
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        while (!queue.isEmpty()) {</span>
+<span class="fc" id="L164">            State state = queue.removeFirst();</span>
+<span class="pc bpc" id="L165" title="1 of 4 branches missed.">            if (state.depth() &gt;= maxSteps || visited.size() &gt;= maxStates) {</span>
+<span class="fc" id="L166">                continue;</span>
+            }
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            for (Transformation transformation : engine.transform(state.expression())) {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                if (visited.add(transformation.transformedExpression())) {</span>
+<span class="nc" id="L170">                    queue.addLast(new State(transformation.transformedExpression(), state.depth() + 1));</span>
+                }
+<span class="nc" id="L172">            }</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        return visited;</span>
+    }
+
+    private List&lt;PathAndExpr&gt; positions(Expr expression) {
+<span class="fc" id="L178">        List&lt;PathAndExpr&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L179">        collectPositions(expression, &quot;root&quot;, results);</span>
+<span class="fc" id="L180">        return results;</span>
+    }
+
+    private void collectPositions(Expr expression, String path, List&lt;PathAndExpr&gt; positions) {
+<span class="fc" id="L184">        positions.add(new PathAndExpr(path, expression));</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="nc" id="L186">            collectPositions(binaryExpr.left(), path + &quot;/L&quot;, positions);</span>
+<span class="nc" id="L187">            collectPositions(binaryExpr.right(), path + &quot;/R&quot;, positions);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            for (int i = 0; i &lt; functionExpr.arguments().size(); i++) {</span>
+<span class="fc" id="L190">                collectPositions(functionExpr.arguments().get(i), path + &quot;/A&quot; + i, positions);</span>
+            }
+        }
+<span class="fc" id="L193">    }</span>
+
+    private Expr replaceAtPath(Expr root, String path, Expr replacement) {
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (&quot;root&quot;.equals(path)) {</span>
+<span class="fc" id="L197">            return replacement;</span>
+        }
+<span class="nc" id="L199">        String[] tokens = path.split(&quot;/&quot;);</span>
+<span class="nc" id="L200">        return replace(root, tokens, 1, replacement);</span>
+    }
+
+    private Expr replace(Expr expression, String[] path, int index, Expr replacement) {
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        if (index &gt;= path.length) {</span>
+<span class="nc" id="L205">            return replacement;</span>
+        }
+<span class="nc" id="L207">        String token = path[index];</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            if (&quot;L&quot;.equals(token)) {</span>
+<span class="nc" id="L210">                return new BinaryExpr(replace(binaryExpr.left(), path, index + 1, replacement), binaryExpr.operator(), binaryExpr.right());</span>
+            }
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            if (&quot;R&quot;.equals(token)) {</span>
+<span class="nc" id="L213">                return new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), replace(binaryExpr.right(), path, index + 1, replacement));</span>
+            }
+        }
+<span class="nc bnc" id="L216" title="All 4 branches missed.">        if (expression instanceof FunctionExpr functionExpr &amp;&amp; token.startsWith(&quot;A&quot;)) {</span>
+<span class="nc" id="L217">            int arg = Integer.parseInt(token.substring(1));</span>
+<span class="nc" id="L218">            List&lt;Expr&gt; args = new ArrayList&lt;&gt;(functionExpr.arguments());</span>
+<span class="nc" id="L219">            args.set(arg, replace(args.get(arg), path, index + 1, replacement));</span>
+<span class="nc" id="L220">            return new FunctionExpr(functionExpr.name(), args);</span>
+        }
+<span class="nc" id="L222">        return expression;</span>
+    }
+
+    private Expr toExpr(PatternExpr expression) {
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L227">            return new VariableExpr(placeholder.name());</span>
+        }
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.LiteralNumber literalNumber) {</span>
+<span class="nc" id="L230">            return new NumberExpr(literalNumber.value());</span>
+        }
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.Operation operation) {</span>
+<span class="nc" id="L233">            return new BinaryExpr(toExpr(operation.left()), operation.operator(), toExpr(operation.right()));</span>
+        }
+<span class="fc" id="L235">        PatternExpr.Function function = (PatternExpr.Function) expression;</span>
+<span class="fc" id="L236">        List&lt;Expr&gt; args = function.arguments().stream().map(this::toExpr).toList();</span>
+<span class="fc" id="L237">        return new FunctionExpr(function.name(), args);</span>
+    }
+
+<span class="fc" id="L240">    private record State(String expression, int depth) {</span>
+    }
+
+<span class="fc" id="L243">    private record PathAndExpr(String path, Expr expression) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

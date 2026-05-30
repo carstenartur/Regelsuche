@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchExpression.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph</a> &gt; <span class="el_source">SearchExpression.java</span></div><h1>SearchExpression.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph;
+
+/**
+ * Kind of object that a search-graph node represents.
+ *
+ * &lt;p&gt;Originally nodes only ever held a single algebraic {@link #TERM};
+ * with the integration of the math-domain solvers
+ * ({@code LinearEquationSolver}, {@code LinearInequalitySolver},
+ * derivative rewrites, matrix demos) the graph also needs to carry
+ * equations, inequalities, vectors and matrices as first-class nodes so
+ * that the visual search graph, replay overlay and exports can render
+ * them properly — instead of squeezing everything through the &quot;term&quot;
+ * code path.&lt;/p&gt;
+ *
+ * &lt;p&gt;The enum is intentionally small and stable; renderers and JSON
+ * serializers branch on it directly. New domains should reuse one of
+ * the existing entries or add a new one explicitly.&lt;/p&gt;
+ */
+<span class="fc" id="L19">public enum SearchExpression {</span>
+    /** Plain algebraic expression such as {@code 2*x + 3}. */
+<span class="fc" id="L21">    TERM,</span>
+    /** Equation of two terms: {@code lhs = rhs}. */
+<span class="fc" id="L23">    EQUATION,</span>
+    /** Inequality of two terms: {@code lhs ⋈ rhs}. */
+<span class="fc" id="L25">    INEQUALITY,</span>
+    /** Vector literal: {@code [v1, v2, ...]}. */
+<span class="fc" id="L27">    VECTOR,</span>
+    /** Matrix literal: {@code [[a, b], [c, d], ...]}. */
+<span class="fc" id="L29">    MATRIX;</span>
+
+    /**
+     * Cheap heuristic classifier used by adapters that only have access
+     * to the rendered string form of an expression. It looks at the
+     * structural separators ({@code =}, {@code &lt;}/{@code &gt;}, opening
+     * matrix bracket {@code [[}) and defaults to {@link #TERM}.
+     *
+     * &lt;p&gt;The classifier is intentionally syntactic: it does not parse
+     * the expression. Callers that need precise typing should construct
+     * the {@link SearchExpression} explicitly when they know the source
+     * domain.&lt;/p&gt;
+     */
+    public static SearchExpression classify(String expression) {
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L44">            return TERM;</span>
+        }
+<span class="fc" id="L46">        String trimmed = expression.trim();</span>
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">        if (trimmed.startsWith(&quot;[[&quot;) || trimmed.startsWith(&quot;\\begin{bmatrix}&quot;)) {</span>
+<span class="nc" id="L48">            return MATRIX;</span>
+        }
+<span class="pc bpc" id="L50" title="5 of 6 branches missed.">        if (trimmed.startsWith(&quot;[&quot;) &amp;&amp; trimmed.endsWith(&quot;]&quot;) &amp;&amp; !trimmed.contains(&quot;=&quot;)) {</span>
+<span class="nc" id="L51">            return VECTOR;</span>
+        }
+        // Inequality comparators take precedence over plain '=' because
+        // '&lt;=' / '&gt;=' contain it too.
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        if (trimmed.contains(&quot;&lt;&quot;) || trimmed.contains(&quot;&gt;&quot;)) {</span>
+<span class="nc" id="L56">            return INEQUALITY;</span>
+        }
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (trimmed.contains(&quot;=&quot;)) {</span>
+<span class="fc" id="L59">            return EQUATION;</span>
+        }
+<span class="fc" id="L61">        return TERM;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

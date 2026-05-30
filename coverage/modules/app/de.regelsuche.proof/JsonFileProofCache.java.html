@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonFileProofCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">JsonFileProofCache.java</span></div><h1>JsonFileProofCache.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import de.regelsuche.json.MiniJson;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Persistent {@link ProofCache} backed by a single JSON file.
+ *
+ * &lt;p&gt;Only entries with a status of at least
+ * {@link CandidateProofStatus#FORMALLY_PROVABLE} are persisted — caching a
+ * failed attempt is pointless. Writes are atomic (temp file + rename).&lt;/p&gt;
+ *
+ * &lt;p&gt;Cache keys embed the prover {@code workerId} &lt;em&gt;and&lt;/em&gt; a configurable
+ * {@code proverVersion} (set at construction time): when the prover changes
+ * the cache becomes transparent rather than risk reusing stale results.&lt;/p&gt;
+ */
+public final class JsonFileProofCache implements ProofCache {
+
+<span class="fc" id="L32">    private static final CandidateProofStatus MIN_CACHE_THRESHOLD =</span>
+        CandidateProofStatus.FORMALLY_PROVABLE;
+
+    private final Path file;
+<span class="fc" id="L36">    private final Map&lt;ProofCacheKey, ProofCacheEntry&gt; entries = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L38">    public JsonFileProofCache(Path file) throws IOException {</span>
+<span class="fc" id="L39">        this.file = file;</span>
+<span class="fc" id="L40">        Path parent = file.getParent();</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (parent != null) {</span>
+<span class="fc" id="L42">            Files.createDirectories(parent);</span>
+        }
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (Files.isRegularFile(file)) {</span>
+<span class="fc" id="L45">            load();</span>
+        }
+<span class="fc" id="L47">    }</span>
+
+    @Override
+    public Optional&lt;CandidateProofStatus&gt; get(ProofCacheKey key) {
+<span class="fc" id="L51">        ProofCacheEntry entry = entries.get(key);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        return entry == null ? Optional.empty() : Optional.of(entry.status());</span>
+    }
+
+    @Override
+    public void put(ProofCacheKey key, CandidateProofStatus status) {
+<span class="fc" id="L57">        putEntry(key, ProofCacheEntry.ofStatus(status));</span>
+<span class="fc" id="L58">    }</span>
+
+    @Override
+    public Optional&lt;ProofCacheEntry&gt; getEntry(ProofCacheKey key) {
+<span class="fc" id="L62">        return Optional.ofNullable(entries.get(key));</span>
+    }
+
+    @Override
+    public synchronized void putEntry(ProofCacheKey key, ProofCacheEntry entry) {
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">        if (entry == null || entry.status() == null) {</span>
+<span class="nc" id="L68">            return;</span>
+        }
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (entry.status().ordinal() &lt; MIN_CACHE_THRESHOLD.ordinal()) {</span>
+<span class="fc" id="L71">            return;</span>
+        }
+<span class="fc" id="L73">        entries.put(key, entry);</span>
+        try {
+<span class="fc" id="L75">            persist();</span>
+<span class="nc" id="L76">        } catch (IOException ex) {</span>
+<span class="nc" id="L77">            throw new UncheckedIOException(&quot;Failed to persist proof cache&quot;, ex);</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc" id="L79">    }</span>
+
+    @Override
+    public int size() {
+<span class="fc" id="L83">        return entries.size();</span>
+    }
+
+    @Override
+    public synchronized void clear() {
+<span class="nc" id="L88">        entries.clear();</span>
+        try {
+<span class="nc" id="L90">            persist();</span>
+<span class="nc" id="L91">        } catch (IOException ex) {</span>
+<span class="nc" id="L92">            throw new UncheckedIOException(&quot;Failed to persist proof cache&quot;, ex);</span>
+<span class="nc" id="L93">        }</span>
+<span class="nc" id="L94">    }</span>
+
+    // ── persistence ─────────────────────────────────────────────────────────
+
+    private void load() throws IOException {
+<span class="fc" id="L99">        String content = Files.readString(file, StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (Map&lt;String, String&gt; raw : MiniJson.parseObjectArray(content, &quot;entries&quot;)) {</span>
+<span class="fc" id="L101">            ProofCacheKey key = new ProofCacheKey(</span>
+<span class="fc" id="L102">                raw.getOrDefault(&quot;canonicalLeft&quot;, &quot;&quot;),</span>
+<span class="fc" id="L103">                raw.getOrDefault(&quot;canonicalRight&quot;, &quot;&quot;),</span>
+<span class="fc" id="L104">                raw.getOrDefault(&quot;assumptionsSorted&quot;, &quot;&quot;),</span>
+<span class="fc" id="L105">                raw.getOrDefault(&quot;proverVersion&quot;, &quot;unknown&quot;)</span>
+            );
+<span class="fc" id="L107">            ProofCacheEntry entry = new ProofCacheEntry(</span>
+<span class="fc" id="L108">                safeStatus(raw.getOrDefault(&quot;status&quot;, CandidateProofStatus.FORMALLY_PROVABLE.name())),</span>
+<span class="fc" id="L109">                raw.getOrDefault(&quot;artifactId&quot;, &quot;&quot;),</span>
+<span class="fc" id="L110">                Instant.parse(raw.getOrDefault(&quot;createdAt&quot;, Instant.EPOCH.toString())),</span>
+<span class="fc" id="L111">                raw.getOrDefault(&quot;outputDigest&quot;, &quot;&quot;),</span>
+<span class="fc" id="L112">                parseLong(raw.getOrDefault(&quot;durationMillis&quot;, &quot;0&quot;))</span>
+            );
+<span class="fc" id="L114">            entries.put(key, entry);</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">    }</span>
+
+    private synchronized void persist() throws IOException {
+<span class="fc" id="L119">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L120">        builder.append(&quot;{\n  \&quot;entries\&quot;: [\n&quot;);</span>
+<span class="fc" id="L121">        List&lt;Map.Entry&lt;ProofCacheKey, ProofCacheEntry&gt;&gt; sorted = new ArrayList&lt;&gt;(entries.entrySet());</span>
+<span class="fc" id="L122">        sorted.sort(Comparator</span>
+<span class="pc" id="L123">            .&lt;Map.Entry&lt;ProofCacheKey, ProofCacheEntry&gt;, String&gt;comparing(e -&gt; e.getKey().canonicalLeft())</span>
+<span class="pc" id="L124">            .thenComparing(e -&gt; e.getKey().canonicalRight())</span>
+<span class="pc" id="L125">            .thenComparing(e -&gt; e.getKey().assumptionsSorted())</span>
+<span class="pc" id="L126">            .thenComparing(e -&gt; e.getKey().proverVersion()));</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (int i = 0; i &lt; sorted.size(); i++) {</span>
+<span class="fc" id="L128">            ProofCacheKey key = sorted.get(i).getKey();</span>
+<span class="fc" id="L129">            ProofCacheEntry value = sorted.get(i).getValue();</span>
+<span class="fc" id="L130">            builder.append(&quot;    {&quot;);</span>
+<span class="fc" id="L131">            builder.append(&quot;\&quot;canonicalLeft\&quot;:&quot;).append(quote(key.canonicalLeft()));</span>
+<span class="fc" id="L132">            builder.append(&quot;,\&quot;canonicalRight\&quot;:&quot;).append(quote(key.canonicalRight()));</span>
+<span class="fc" id="L133">            builder.append(&quot;,\&quot;assumptionsSorted\&quot;:&quot;).append(quote(key.assumptionsSorted()));</span>
+<span class="fc" id="L134">            builder.append(&quot;,\&quot;proverVersion\&quot;:&quot;).append(quote(key.proverVersion()));</span>
+<span class="fc" id="L135">            builder.append(&quot;,\&quot;status\&quot;:&quot;).append(quote(value.status().name()));</span>
+<span class="fc" id="L136">            builder.append(&quot;,\&quot;artifactId\&quot;:&quot;).append(quote(value.artifactId()));</span>
+<span class="fc" id="L137">            builder.append(&quot;,\&quot;createdAt\&quot;:&quot;).append(quote(value.createdAt().toString()));</span>
+<span class="fc" id="L138">            builder.append(&quot;,\&quot;outputDigest\&quot;:&quot;).append(quote(value.outputDigest()));</span>
+<span class="fc" id="L139">            builder.append(&quot;,\&quot;durationMillis\&quot;:&quot;).append(value.durationMillis());</span>
+<span class="fc" id="L140">            builder.append('}');</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if (i &lt; sorted.size() - 1) {</span>
+<span class="nc" id="L142">                builder.append(',');</span>
+            }
+<span class="fc" id="L144">            builder.append('\n');</span>
+        }
+<span class="fc" id="L146">        builder.append(&quot;  ]\n}\n&quot;);</span>
+<span class="fc" id="L147">        AtomicJsonFile.writeUtf8(file, builder.toString());</span>
+<span class="fc" id="L148">    }</span>
+
+    private static CandidateProofStatus safeStatus(String name) {
+        try {
+<span class="fc" id="L152">            return CandidateProofStatus.valueOf(name);</span>
+<span class="nc" id="L153">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L154">            return CandidateProofStatus.FORMALLY_PROVABLE;</span>
+        }
+    }
+
+    private static long parseLong(String value) {
+        try {
+<span class="fc" id="L160">            return Long.parseLong(value);</span>
+<span class="nc" id="L161">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L162">            return 0L;</span>
+        }
+    }
+
+    private static String quote(String value) {
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L168">            return &quot;null&quot;;</span>
+        }
+<span class="fc" id="L170">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L172">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L173" title="5 of 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L174">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L175">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L176">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L177">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L178">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+                default -&gt; {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L181">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+                    } else {
+<span class="fc" id="L183">                        builder.append(c);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L188">        builder.append('&quot;');</span>
+<span class="fc" id="L189">        return builder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

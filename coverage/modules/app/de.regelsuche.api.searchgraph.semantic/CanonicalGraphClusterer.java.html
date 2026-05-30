@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CanonicalGraphClusterer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph.semantic</a> &gt; <span class="el_source">CanonicalGraphClusterer.java</span></div><h1>CanonicalGraphClusterer.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph.semantic;
+
+import de.regelsuche.assumption.AssumptionContext;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+public final class CanonicalGraphClusterer {
+
+    private final ExpressionCanonicalizer canonicalizer;
+
+    public CanonicalGraphClusterer() {
+<span class="fc" id="L18">        this(new ExpressionCanonicalizer());</span>
+<span class="fc" id="L19">    }</span>
+
+<span class="fc" id="L21">    public CanonicalGraphClusterer(ExpressionCanonicalizer canonicalizer) {</span>
+<span class="fc" id="L22">        this.canonicalizer = Objects.requireNonNull(canonicalizer);</span>
+<span class="fc" id="L23">    }</span>
+
+    public List&lt;CanonicalExpressionCluster&gt; cluster(Collection&lt;String&gt; expressions, AssumptionContext assumptions) {
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        List&lt;ExpressionEvidence&gt; evidence = (expressions == null ? List.&lt;String&gt;of() : expressions.stream().toList())</span>
+<span class="fc" id="L27">            .stream()</span>
+<span class="fc" id="L28">            .map(e -&gt; new ExpressionEvidence(e, Integer.MAX_VALUE, Integer.MIN_VALUE))</span>
+<span class="fc" id="L29">            .toList();</span>
+<span class="fc" id="L30">        return clusterWithEvidence(evidence, assumptions);</span>
+    }
+
+    List&lt;CanonicalExpressionCluster&gt; clusterWithEvidence(Collection&lt;ExpressionEvidence&gt; evidence, AssumptionContext assumptions) {
+<span class="pc bpc" id="L34" title="1 of 4 branches missed.">        if (evidence == null || evidence.isEmpty()) {</span>
+<span class="fc" id="L35">            return List.of();</span>
+        }
+<span class="fc" id="L37">        String assumptionFingerprint = ExpressionCanonicalizer.assumptionFingerprint(assumptions);</span>
+<span class="fc" id="L38">        Map&lt;String, List&lt;ExpressionEvidence&gt;&gt; byHash = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L39">        Map&lt;String, String&gt; canonicalByHash = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (ExpressionEvidence expression : evidence) {</span>
+<span class="pc bpc" id="L41" title="3 of 6 branches missed.">            if (expression == null || expression.expression() == null || expression.expression().isBlank()) {</span>
+<span class="nc" id="L42">                continue;</span>
+            }
+<span class="fc" id="L44">            String canonical = canonicalizer.canonicalize(expression.expression());</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            String hash = canonicalizer.stableHash(canonical + (assumptionFingerprint.isEmpty() ? &quot;&quot; : &quot;\u0001&quot; + assumptionFingerprint));</span>
+<span class="fc" id="L46">            canonicalByHash.putIfAbsent(hash, canonical);</span>
+<span class="fc" id="L47">            byHash.computeIfAbsent(hash, k -&gt; new ArrayList&lt;&gt;()).add(expression);</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        List&lt;CanonicalExpressionCluster&gt; out = new ArrayList&lt;&gt;(byHash.size());</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;ExpressionEvidence&gt;&gt; entry : byHash.entrySet()) {</span>
+<span class="fc" id="L51">            List&lt;ExpressionEvidence&gt; variants = entry.getValue();</span>
+<span class="fc" id="L52">            variants.sort(Comparator.comparing(ExpressionEvidence::expression));</span>
+<span class="fc" id="L53">            ExpressionEvidence representative = variants.stream().min(</span>
+<span class="fc" id="L54">                Comparator.comparingInt(ExpressionEvidence::score).reversed()</span>
+<span class="fc" id="L55">                    .thenComparingInt(v -&gt; canonicalizer.astNodeCount(v.expression()))</span>
+<span class="fc" id="L56">                    .thenComparingInt(v -&gt; v.expression().length())</span>
+<span class="fc" id="L57">                    .thenComparing(ExpressionEvidence::expression)</span>
+<span class="fc" id="L58">            ).orElseThrow();</span>
+<span class="fc" id="L59">            int minDepth = variants.stream().mapToInt(ExpressionEvidence::depth).min().orElse(0);</span>
+<span class="fc" id="L60">            int bestScore = variants.stream().mapToInt(ExpressionEvidence::score).max().orElse(0);</span>
+<span class="fc" id="L61">            out.add(new CanonicalExpressionCluster(</span>
+<span class="fc" id="L62">                entry.getKey(),</span>
+<span class="fc" id="L63">                canonicalByHash.getOrDefault(entry.getKey(), representative.expression()),</span>
+<span class="fc" id="L64">                representative.expression(),</span>
+<span class="fc" id="L65">                variants.stream().map(ExpressionEvidence::expression).distinct().toList(),</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                minDepth == Integer.MAX_VALUE ? 0 : minDepth,</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                bestScore == Integer.MIN_VALUE ? 0 : bestScore,</span>
+                assumptionFingerprint
+            ));
+<span class="fc" id="L70">        }</span>
+<span class="fc" id="L71">        out.sort(Comparator.comparing(CanonicalExpressionCluster::canonicalHash));</span>
+<span class="fc" id="L72">        return out;</span>
+    }
+
+<span class="fc" id="L75">    record ExpressionEvidence(String expression, int depth, int score) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

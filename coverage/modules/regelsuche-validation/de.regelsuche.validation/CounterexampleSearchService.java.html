@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CounterexampleSearchService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-validation</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.validation</a> &gt; <span class="el_source">CounterexampleSearchService.java</span></div><h1>CounterexampleSearchService.java</h1><pre class="source lang-java linenums">package de.regelsuche.validation;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Stable port for counterexample search over a candidate equivalence.
+ *
+ * &lt;p&gt;Introduced as part of Teil 0 of the Discovery Epic (issue #41,
+ * &quot;Interfaces zuerst&quot;): downstream validation, mining and proof features
+ * depend on this abstraction instead of a concrete SMT/random-search
+ * backend so the mathematical core remains infrastructure-agnostic.
+ *
+ * &lt;p&gt;{@link RewriteRuleValidationService} provides the existing random-
+ * sampling based counterexample search; future SMT/proof-based engines
+ * implement the same port.
+ */
+public interface CounterexampleSearchService {
+
+    /**
+     * Try to find a counterexample for a full hypothesis under a bounded budget.
+     */
+    CounterexampleSearchResult search(HypothesisInput hypothesis, CounterexampleBudget budget);
+
+    /**
+     * Backwards-compatible convenience API for callers that only have two expressions.
+     */
+    default Optional&lt;Counterexample&gt; search(String leftExpression, String rightExpression) {
+<span class="nc" id="L29">        HypothesisInput hypothesis = new HypothesisInput(</span>
+            &quot;&quot;,
+            leftExpression,
+            rightExpression,
+<span class="nc" id="L33">            List.of()</span>
+        );
+<span class="nc" id="L35">        return search(hypothesis, CounterexampleBudget.defaultBudget()).counterexample();</span>
+    }
+
+    /**
+     * Lightweight hypothesis payload consumed by counterexample search backends.
+     */
+    record HypothesisInput(
+        String id,
+        String leftExpression,
+        String rightExpression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L47">        public HypothesisInput {</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            id = id == null ? &quot;&quot; : id;</span>
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">            if (leftExpression == null || leftExpression.isBlank()) {</span>
+<span class="nc" id="L50">                throw new IllegalArgumentException(&quot;leftExpression must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">            if (rightExpression == null || rightExpression.isBlank()) {</span>
+<span class="nc" id="L53">                throw new IllegalArgumentException(&quot;rightExpression must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc" id="L56">        }</span>
+    }
+
+    /**
+     * Search budget. Keeps randomness deterministic by carrying the seed explicitly.
+     */
+    record CounterexampleBudget(
+        int numericRandomSamples,
+        boolean includeEdgeCases,
+        boolean includeMatrixAssignments,
+        long randomSeed,
+        boolean includeComplexAssignments,
+        boolean includeRationalAssignments,
+        int maxMatrixDimension,
+        long timeoutMillis
+    ) {
+<span class="fc" id="L72">        public CounterexampleBudget {</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (numericRandomSamples &lt; 0) {</span>
+<span class="nc" id="L74">                throw new IllegalArgumentException(&quot;numericRandomSamples must be &gt;= 0&quot;);</span>
+            }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (maxMatrixDimension &lt; 0) {</span>
+<span class="nc" id="L77">                throw new IllegalArgumentException(&quot;maxMatrixDimension must be &gt;= 0&quot;);</span>
+            }
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (timeoutMillis &lt; 0) {</span>
+<span class="nc" id="L80">                throw new IllegalArgumentException(&quot;timeoutMillis must be &gt;= 0&quot;);</span>
+            }
+<span class="fc" id="L82">        }</span>
+
+        public CounterexampleBudget(
+            int numericRandomSamples,
+            boolean includeEdgeCases,
+            boolean includeMatrixAssignments,
+            long randomSeed
+        ) {
+<span class="fc" id="L90">            this(numericRandomSamples, includeEdgeCases, includeMatrixAssignments, randomSeed, false);</span>
+<span class="fc" id="L91">        }</span>
+
+        public CounterexampleBudget(
+            int numericRandomSamples,
+            boolean includeEdgeCases,
+            boolean includeMatrixAssignments,
+            long randomSeed,
+            boolean includeComplexAssignments
+        ) {
+<span class="fc" id="L100">            this(numericRandomSamples, includeEdgeCases, includeMatrixAssignments, randomSeed,</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                includeComplexAssignments, false, includeMatrixAssignments ? 2 : 0, 0L);</span>
+<span class="fc" id="L102">        }</span>
+
+        public static CounterexampleBudget defaultBudget() {
+<span class="fc" id="L105">            return new CounterexampleBudget(16, true, true, 1L, false, true, 2, 0L);</span>
+        }
+
+        public int maxNumericSamples() {
+<span class="fc" id="L109">            return numericRandomSamples;</span>
+        }
+
+        public boolean includeBoundaryValues() {
+<span class="fc" id="L113">            return includeEdgeCases;</span>
+        }
+
+        public boolean includeMatrices() {
+<span class="fc" id="L117">            return includeMatrixAssignments;</span>
+        }
+
+        public boolean includeComplex() {
+<span class="fc" id="L121">            return includeComplexAssignments;</span>
+        }
+
+        public boolean includeRationals() {
+<span class="fc" id="L125">            return includeRationalAssignments;</span>
+        }
+
+        public List&lt;String&gt; sourceFlags() {
+<span class="nc" id="L129">            List&lt;String&gt; flags = new java.util.ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            if (includeEdgeCases) {</span>
+<span class="nc" id="L131">                flags.add(&quot;boundary-values&quot;);</span>
+            }
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (includeRationalAssignments) {</span>
+<span class="nc" id="L134">                flags.add(&quot;rational-samples&quot;);</span>
+            }
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            if (numericRandomSamples &gt; 0) {</span>
+<span class="nc" id="L137">                flags.add(&quot;numeric-random&quot;);</span>
+            }
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (includeMatrixAssignments) {</span>
+<span class="nc" id="L140">                flags.add(&quot;matrix-non-commutative&quot;);</span>
+            }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            if (includeComplexAssignments) {</span>
+<span class="nc" id="L143">                flags.add(&quot;complex-samples&quot;);</span>
+            }
+<span class="nc" id="L145">            return List.copyOf(flags);</span>
+        }
+    }
+
+    /**
+     * Full result of a counterexample search.
+     */
+    record CounterexampleSearchResult(
+        Status status,
+        Optional&lt;Counterexample&gt; counterexample,
+        List&lt;String&gt; inferredAssumptions,
+        List&lt;String&gt; attemptedSources,
+        String explanation
+    ) {
+        public CounterexampleSearchResult(Optional&lt;Counterexample&gt; counterexample, List&lt;String&gt; inferredAssumptions, List&lt;String&gt; attemptedSources) {
+<span class="nc" id="L160">            this(deriveStatus(counterexample, attemptedSources), counterexample, inferredAssumptions, attemptedSources,</span>
+<span class="nc" id="L161">                deriveExplanation(deriveStatus(counterexample, attemptedSources), attemptedSources));</span>
+<span class="nc" id="L162">        }</span>
+
+        public CounterexampleSearchResult(
+            Status status,
+            Optional&lt;Counterexample&gt; counterexample,
+            List&lt;String&gt; inferredAssumptions,
+            List&lt;String&gt; attemptedSources
+        ) {
+<span class="nc" id="L170">            this(status, counterexample, inferredAssumptions, attemptedSources,</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                deriveExplanation(status == null ? deriveStatus(counterexample, attemptedSources) : status, attemptedSources));</span>
+<span class="nc" id="L172">        }</span>
+
+<span class="fc" id="L174">        public CounterexampleSearchResult {</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            status = status == null ? deriveStatus(counterexample, attemptedSources) : status;</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            counterexample = counterexample == null ? Optional.empty() : counterexample;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            inferredAssumptions = inferredAssumptions == null ? List.of() : List.copyOf(inferredAssumptions);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            attemptedSources = attemptedSources == null ? List.of() : List.copyOf(attemptedSources);</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">            explanation = explanation == null || explanation.isBlank()</span>
+<span class="nc" id="L180">                ? deriveExplanation(status, attemptedSources)</span>
+<span class="fc" id="L181">                : explanation;</span>
+<span class="fc" id="L182">        }</span>
+
+        public static CounterexampleSearchResult noCounterexample() {
+<span class="nc" id="L185">            return new CounterexampleSearchResult(Status.NO_COUNTEREXAMPLE_FOUND, Optional.empty(), List.of(), List.of());</span>
+        }
+
+        public static CounterexampleSearchResult inconclusive() {
+<span class="nc" id="L189">            return new CounterexampleSearchResult(Status.INCONCLUSIVE, Optional.empty(), List.of(), List.of());</span>
+        }
+
+        public static CounterexampleSearchResult inconclusive(String explanation) {
+<span class="fc" id="L193">            return new CounterexampleSearchResult(Status.INCONCLUSIVE, Optional.empty(), List.of(), List.of(), explanation);</span>
+        }
+
+        public static CounterexampleSearchResult counterexampleFound(
+            Counterexample counterexample,
+            List&lt;String&gt; inferredAssumptions,
+            List&lt;String&gt; attemptedSources
+        ) {
+<span class="fc" id="L201">            return new CounterexampleSearchResult(</span>
+                Status.COUNTEREXAMPLE_FOUND,
+<span class="fc" id="L203">                Optional.of(counterexample),</span>
+                inferredAssumptions,
+                attemptedSources,
+                &quot;refuting sample found&quot;
+            );
+        }
+
+        public static CounterexampleSearchResult noCounterexampleFound(
+            List&lt;String&gt; inferredAssumptions,
+            List&lt;String&gt; attemptedSources
+        ) {
+<span class="fc" id="L214">            return new CounterexampleSearchResult(</span>
+                Status.NO_COUNTEREXAMPLE_FOUND,
+<span class="fc" id="L216">                Optional.empty(),</span>
+                inferredAssumptions,
+                attemptedSources,
+<span class="fc" id="L219">                deriveExplanation(Status.NO_COUNTEREXAMPLE_FOUND, attemptedSources)</span>
+            );
+        }
+
+        private static Status deriveStatus(Optional&lt;Counterexample&gt; counterexample, List&lt;String&gt; attemptedSources) {
+<span class="nc bnc" id="L224" title="All 4 branches missed.">            if (counterexample != null &amp;&amp; counterexample.isPresent()) {</span>
+<span class="nc" id="L225">                return Status.COUNTEREXAMPLE_FOUND;</span>
+            }
+<span class="nc bnc" id="L227" title="All 4 branches missed.">            if (attemptedSources == null || attemptedSources.isEmpty()) {</span>
+<span class="nc" id="L228">                return Status.INCONCLUSIVE;</span>
+            }
+<span class="nc" id="L230">            return Status.NO_COUNTEREXAMPLE_FOUND;</span>
+        }
+
+        private static String deriveExplanation(Status status, List&lt;String&gt; attemptedSources) {
+<span class="pc bpc" id="L234" title="2 of 3 branches missed.">            return switch (status) {</span>
+<span class="nc" id="L235">                case COUNTEREXAMPLE_FOUND -&gt; &quot;refuting sample found&quot;;</span>
+<span class="fc" id="L236">                case NO_COUNTEREXAMPLE_FOUND -&gt; &quot;no refutation found within configured budget&quot;;</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">                case INCONCLUSIVE -&gt; attemptedSources == null || attemptedSources.isEmpty()</span>
+<span class="nc" id="L238">                    ? &quot;no executable counterexample source was available&quot;</span>
+<span class="nc" id="L239">                    : &quot;counterexample search ended without a reliable verdict&quot;;</span>
+            };
+        }
+    }
+
+<span class="fc" id="L244">    enum Status {</span>
+<span class="fc" id="L245">        NO_COUNTEREXAMPLE_FOUND,</span>
+<span class="fc" id="L246">        COUNTEREXAMPLE_FOUND,</span>
+<span class="fc" id="L247">        INCONCLUSIVE</span>
+    }
+
+    /**
+     * A concrete counterexample: a variable assignment plus the resulting
+     * inequality (e.g. {@code &quot;x=2 ⇒ left=4, right=5&quot;}).
+     *
+     * @param assignments variable bindings causing the inequality (e.g.
+     *     {@code &quot;x=2&quot;}, {@code &quot;y=-1&quot;})
+     * @param leftValue evaluated value of the left expression
+     * @param rightValue evaluated value of the right expression
+     */
+    record Counterexample(List&lt;String&gt; assignments, String leftValue, String rightValue) {
+<span class="fc" id="L260">        public Counterexample {</span>
+<span class="fc" id="L261">            assignments = List.copyOf(assignments);</span>
+<span class="fc" id="L262">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

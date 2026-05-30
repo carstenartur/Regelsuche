@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonFileProofJobRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">JsonFileProofJobRepository.java</span></div><h1>JsonFileProofJobRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.json.MiniJson;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * File-backed {@link ProofJobRepository} that persists every state change to
+ * a single JSON file.
+ *
+ * &lt;p&gt;Writes are performed via an atomic &quot;write-temp-then-move&quot; so the on-disk
+ * representation never ends up half-written even if the JVM dies in the
+ * middle of a {@link #save} call. On startup the file is parsed and all jobs
+ * are re-hydrated; jobs that were {@link ProofJobStatus#RUNNING} at shutdown
+ * are flipped back to {@link ProofJobStatus#QUEUED} so the scheduler resumes
+ * them.&lt;/p&gt;
+ */
+public final class JsonFileProofJobRepository implements ProofJobRepository {
+
+    private final Path file;
+<span class="fc" id="L34">    private final Map&lt;String, ProofJob&gt; jobs = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L36">    public JsonFileProofJobRepository(Path file) throws IOException {</span>
+<span class="fc" id="L37">        this.file = file;</span>
+<span class="fc" id="L38">        Path parent = file.getParent();</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (parent != null) {</span>
+<span class="fc" id="L40">            Files.createDirectories(parent);</span>
+        }
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (Files.isRegularFile(file)) {</span>
+<span class="fc" id="L43">            load();</span>
+        }
+<span class="fc" id="L45">    }</span>
+
+    // ── ProofJobRepository ──────────────────────────────────────────────────
+
+    @Override
+    public synchronized void save(ProofJob job) {
+<span class="fc" id="L51">        jobs.put(job.id(), job);</span>
+        try {
+<span class="fc" id="L53">            persist();</span>
+<span class="nc" id="L54">        } catch (IOException ex) {</span>
+<span class="nc" id="L55">            throw new UncheckedIOException(&quot;Failed to persist proof job &quot; + job.id(), ex);</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">    }</span>
+
+    @Override
+    public Optional&lt;ProofJob&gt; findById(String id) {
+<span class="fc" id="L61">        return Optional.ofNullable(jobs.get(id));</span>
+    }
+
+    @Override
+    public List&lt;ProofJob&gt; findAll() {
+<span class="nc" id="L66">        return List.copyOf(jobs.values());</span>
+    }
+
+    @Override
+    public List&lt;ProofJob&gt; findByStatus(ProofJobStatus status) {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        return jobs.values().stream().filter(j -&gt; j.status() == status).toList();</span>
+    }
+
+    @Override
+    public Optional&lt;ProofJob&gt; findNextQueued() {
+<span class="fc" id="L76">        return jobs.values().stream()</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            .filter(j -&gt; j.status() == ProofJobStatus.QUEUED</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                || j.status() == ProofJobStatus.RETRYING)</span>
+<span class="fc" id="L79">            .min(Comparator</span>
+<span class="fc" id="L80">                .comparingInt(ProofJob::priority)</span>
+<span class="fc" id="L81">                .thenComparing(ProofJob::createdAt));</span>
+    }
+
+    @Override
+    public synchronized void delete(String id) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (jobs.remove(id) != null) {</span>
+            try {
+<span class="nc" id="L88">                persist();</span>
+<span class="nc" id="L89">            } catch (IOException ex) {</span>
+<span class="nc" id="L90">                throw new UncheckedIOException(&quot;Failed to persist after delete&quot;, ex);</span>
+<span class="nc" id="L91">            }</span>
+        }
+<span class="nc" id="L93">    }</span>
+
+    // ── persistence ─────────────────────────────────────────────────────────
+
+    private void load() throws IOException {
+<span class="fc" id="L98">        String content = Files.readString(file, StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (Map&lt;String, String&gt; raw : MiniJson.parseObjectArray(content, &quot;jobs&quot;)) {</span>
+<span class="fc" id="L100">            ProofJob job = jobFromRaw(raw);</span>
+            // RUNNING jobs at the time the JVM died are not actually running
+            // any more — flip them back to QUEUED so the scheduler retries.
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (job.status() == ProofJobStatus.RUNNING) {</span>
+<span class="fc" id="L104">                job = job.withStatus(ProofJobStatus.QUEUED);</span>
+            }
+<span class="fc" id="L106">            jobs.put(job.id(), job);</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc" id="L108">    }</span>
+
+    private synchronized void persist() throws IOException {
+<span class="fc" id="L111">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L112">        builder.append(&quot;{\n  \&quot;jobs\&quot;: [\n&quot;);</span>
+<span class="fc" id="L113">        List&lt;ProofJob&gt; all = new ArrayList&lt;&gt;(jobs.values());</span>
+<span class="fc" id="L114">        all.sort(Comparator.comparing(ProofJob::createdAt));</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (int i = 0; i &lt; all.size(); i++) {</span>
+<span class="fc" id="L116">            ProofJob job = all.get(i);</span>
+<span class="fc" id="L117">            builder.append(&quot;    {&quot;);</span>
+<span class="fc" id="L118">            builder.append(&quot;\&quot;id\&quot;:&quot;).append(quote(job.id()));</span>
+<span class="fc" id="L119">            builder.append(&quot;,\&quot;leftPattern\&quot;:&quot;).append(quote(job.leftPattern()));</span>
+<span class="fc" id="L120">            builder.append(&quot;,\&quot;rightPattern\&quot;:&quot;).append(quote(job.rightPattern()));</span>
+<span class="fc" id="L121">            builder.append(&quot;,\&quot;assumptions\&quot;:&quot;).append(quoteArray(assumptionsAsStrings(job.assumptions())));</span>
+<span class="fc" id="L122">            builder.append(&quot;,\&quot;assumptionKinds\&quot;:&quot;).append(quoteArray(assumptionKindsAsStrings(job.assumptions())));</span>
+<span class="fc" id="L123">            builder.append(&quot;,\&quot;status\&quot;:&quot;).append(quote(job.status().name()));</span>
+<span class="fc" id="L124">            builder.append(&quot;,\&quot;priority\&quot;:&quot;).append(job.priority());</span>
+<span class="fc" id="L125">            builder.append(&quot;,\&quot;retryCount\&quot;:&quot;).append(job.retryCount());</span>
+<span class="fc" id="L126">            builder.append(&quot;,\&quot;maxRetries\&quot;:&quot;).append(job.maxRetries());</span>
+<span class="fc" id="L127">            builder.append(&quot;,\&quot;workerId\&quot;:&quot;).append(quote(job.workerType()));</span>
+<span class="fc" id="L128">            builder.append(&quot;,\&quot;createdAt\&quot;:&quot;).append(quote(job.createdAt().toString()));</span>
+<span class="fc" id="L129">            builder.append(&quot;,\&quot;updatedAt\&quot;:&quot;).append(quote(job.updatedAt().toString()));</span>
+<span class="fc" id="L130">            builder.append(&quot;,\&quot;lastError\&quot;:&quot;).append(quote(job.errorMessage()));</span>
+<span class="fc" id="L131">            builder.append(&quot;,\&quot;proofStatus\&quot;:&quot;)</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                .append(job.resultStatus() == null ? &quot;null&quot; : quote(job.resultStatus().name()));</span>
+<span class="fc" id="L133">            builder.append('}');</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (i &lt; all.size() - 1) {</span>
+<span class="fc" id="L135">                builder.append(',');</span>
+            }
+<span class="fc" id="L137">            builder.append('\n');</span>
+        }
+<span class="fc" id="L139">        builder.append(&quot;  ]\n}\n&quot;);</span>
+<span class="fc" id="L140">        AtomicJsonFile.writeUtf8(file, builder.toString());</span>
+<span class="fc" id="L141">    }</span>
+
+    // ── helpers ─────────────────────────────────────────────────────────────
+
+    private static ProofJob jobFromRaw(Map&lt;String, String&gt; raw) {
+<span class="fc" id="L146">        List&lt;String&gt; expressions = MiniJson.parseStringArray(</span>
+<span class="fc" id="L147">            raw.getOrDefault(&quot;assumptions&quot;, &quot;[]&quot;));</span>
+<span class="fc" id="L148">        List&lt;String&gt; kinds = MiniJson.parseStringArray(</span>
+<span class="fc" id="L149">            raw.getOrDefault(&quot;assumptionKinds&quot;, &quot;[]&quot;));</span>
+<span class="fc" id="L150">        List&lt;Assumption&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (int i = 0; i &lt; expressions.size(); i++) {</span>
+<span class="fc" id="L152">            String expr = expressions.get(i);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            Assumption.Kind kind = i &lt; kinds.size()</span>
+<span class="fc" id="L154">                ? safeKind(kinds.get(i))</span>
+<span class="pc" id="L155">                : Assumption.Kind.CUSTOM;</span>
+<span class="fc" id="L156">            assumptions.add(new Assumption(kind, expr));</span>
+        }
+<span class="fc" id="L158">        String resultStatusRaw = raw.get(&quot;proofStatus&quot;);</span>
+        CandidateProofStatus resultStatus = resultStatusRaw == null
+<span class="pc bpc" id="L160" title="2 of 6 branches missed.">            || resultStatusRaw.equals(&quot;null&quot;) || resultStatusRaw.isBlank()</span>
+<span class="fc" id="L161">            ? null</span>
+<span class="fc" id="L162">            : safeStatus(resultStatusRaw);</span>
+<span class="fc" id="L163">        return new ProofJob(</span>
+<span class="fc" id="L164">            raw.get(&quot;id&quot;),</span>
+<span class="fc" id="L165">            raw.getOrDefault(&quot;leftPattern&quot;, &quot;&quot;),</span>
+<span class="fc" id="L166">            raw.getOrDefault(&quot;rightPattern&quot;, &quot;&quot;),</span>
+            assumptions,
+<span class="fc" id="L168">            ProofJobStatus.valueOf(raw.getOrDefault(&quot;status&quot;, ProofJobStatus.QUEUED.name())),</span>
+<span class="fc" id="L169">            Integer.parseInt(raw.getOrDefault(&quot;priority&quot;, &quot;0&quot;)),</span>
+<span class="fc" id="L170">            Integer.parseInt(raw.getOrDefault(&quot;retryCount&quot;, &quot;0&quot;)),</span>
+<span class="fc" id="L171">            Integer.parseInt(raw.getOrDefault(&quot;maxRetries&quot;, &quot;3&quot;)),</span>
+<span class="fc" id="L172">            raw.getOrDefault(&quot;workerId&quot;, &quot;lean4&quot;),</span>
+<span class="fc" id="L173">            Instant.parse(raw.getOrDefault(&quot;createdAt&quot;, Instant.EPOCH.toString())),</span>
+<span class="fc" id="L174">            Instant.parse(raw.getOrDefault(&quot;updatedAt&quot;, Instant.EPOCH.toString())),</span>
+            resultStatus,
+<span class="fc" id="L176">            raw.getOrDefault(&quot;lastError&quot;, &quot;&quot;)</span>
+        );
+    }
+
+    private static Assumption.Kind safeKind(String name) {
+        try {
+<span class="fc" id="L182">            return Assumption.Kind.valueOf(name);</span>
+<span class="nc" id="L183">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L184">            return Assumption.Kind.CUSTOM;</span>
+        }
+    }
+
+    private static CandidateProofStatus safeStatus(String name) {
+        try {
+<span class="fc" id="L190">            return CandidateProofStatus.valueOf(name);</span>
+<span class="nc" id="L191">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L192">            return CandidateProofStatus.OBSERVED;</span>
+        }
+    }
+
+    private static List&lt;String&gt; assumptionsAsStrings(List&lt;Assumption&gt; assumptions) {
+<span class="fc" id="L197">        return assumptions.stream().map(Assumption::expression).toList();</span>
+    }
+
+    private static List&lt;String&gt; assumptionKindsAsStrings(List&lt;Assumption&gt; assumptions) {
+<span class="fc" id="L201">        return assumptions.stream().map(a -&gt; a.kind().name()).toList();</span>
+    }
+
+    private static String quote(String value) {
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L206">            return &quot;null&quot;;</span>
+        }
+<span class="fc" id="L208">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L210">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L211" title="5 of 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L212">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L213">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L214">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L215">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L216">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+                default -&gt; {
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L219">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+                    } else {
+<span class="fc" id="L221">                        builder.append(c);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L226">        builder.append('&quot;');</span>
+<span class="fc" id="L227">        return builder.toString();</span>
+    }
+
+    private static String quoteArray(List&lt;String&gt; values) {
+<span class="fc" id="L231">        StringBuilder builder = new StringBuilder(&quot;[&quot;);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (int i = 0; i &lt; values.size(); i++) {</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L234">                builder.append(',');</span>
+            }
+<span class="fc" id="L236">            builder.append(quote(values.get(i)));</span>
+        }
+<span class="fc" id="L238">        builder.append(']');</span>
+<span class="fc" id="L239">        return builder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

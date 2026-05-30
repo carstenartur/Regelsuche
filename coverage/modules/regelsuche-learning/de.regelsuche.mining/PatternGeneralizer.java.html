@@ -1,0 +1,495 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PatternGeneralizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">PatternGeneralizer.java</span></div><h1>PatternGeneralizer.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class PatternGeneralizer {
+<span class="fc" id="L22">    private static final Pattern TEMPORARY_PLACEHOLDER = Pattern.compile(&quot;\\b(?:v|tmp)\\d+\\b&quot;);</span>
+<span class="fc" id="L23">    private static final Pattern MACRO_PLACEHOLDER = Pattern.compile(&quot;\\b[A-Z]\\b&quot;);</span>
+    private final AstNormalizer normalizer;
+    private final ParameterRelationMiner relationMiner;
+<span class="fc" id="L26">    private final ExpressionParser expressionParser = new ExpressionParser();</span>
+
+    public PatternGeneralizer() {
+<span class="fc" id="L29">        this(new AstNormalizer(), new ParameterRelationMiner());</span>
+<span class="fc" id="L30">    }</span>
+
+<span class="fc" id="L32">    PatternGeneralizer(AstNormalizer normalizer, ParameterRelationMiner relationMiner) {</span>
+<span class="fc" id="L33">        this.normalizer = normalizer;</span>
+<span class="fc" id="L34">        this.relationMiner = relationMiner;</span>
+<span class="fc" id="L35">    }</span>
+
+    public String skeleton(SuccessfulTransformationPath path) {
+<span class="nc" id="L38">        NormalizedNode left = normalizer.normalize(path.originalExpression());</span>
+<span class="nc" id="L39">        NormalizedNode right = normalizer.normalize(path.targetExpression());</span>
+<span class="nc" id="L40">        Map&lt;String, String&gt; canonicalVariableBindings = canonicalVariableBindings(path.originalExpression(), path.targetExpression());</span>
+<span class="nc" id="L41">        return left.skeletonString() + &quot;-&gt;&quot; + right.skeletonString();</span>
+    }
+
+    public Optional&lt;GeneralizedPattern&gt; generalize(List&lt;SuccessfulTransformationPath&gt; paths) {
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (paths.isEmpty()) {</span>
+<span class="fc" id="L46">            return Optional.empty();</span>
+        }
+<span class="fc" id="L48">        List&lt;NormalizedNode&gt; leftNodes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L49">        List&lt;NormalizedNode&gt; rightNodes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (SuccessfulTransformationPath path : paths) {</span>
+<span class="fc" id="L51">            leftNodes.add(normalizer.normalize(path.originalExpression()));</span>
+<span class="fc" id="L52">            rightNodes.add(normalizer.normalize(path.targetExpression()));</span>
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">        PlaceholderState state = new PlaceholderState();</span>
+<span class="fc" id="L55">        Optional&lt;NormalizedNode&gt; leftPattern = generalizeNodes(leftNodes, state);</span>
+<span class="fc" id="L56">        Optional&lt;NormalizedNode&gt; rightPattern = generalizeNodes(rightNodes, state);</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        if (leftPattern.isEmpty() || rightPattern.isEmpty()) {</span>
+<span class="nc" id="L58">            return Optional.empty();</span>
+        }
+        // Mine integer relations if any integer placeholders exist.
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        ParameterRelationMiner.RelationResult relations = state.values.isEmpty()</span>
+<span class="fc" id="L62">            ? ParameterRelationMiner.RelationResult.empty()</span>
+<span class="fc" id="L63">            : relationMiner.mine(state.values);</span>
+        // Require at least one kind of abstraction: integer relations or expression placeholders.
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        boolean hasIntegerRelation = !relations.isEmpty();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        boolean hasExpressionPlaceholders = !state.expressionValues.isEmpty();</span>
+<span class="fc bfc" id="L67" title="All 4 branches covered.">        if (!hasIntegerRelation &amp;&amp; !hasExpressionPlaceholders) {</span>
+<span class="fc" id="L68">            return Optional.empty();</span>
+        }
+<span class="fc" id="L70">        String left = relations.apply(leftPattern.orElseThrow()).canonicalString();</span>
+<span class="fc" id="L71">        String right = relations.apply(rightPattern.orElseThrow()).canonicalString();</span>
+        // Build combined descriptions: integer relations + expression placeholder notes.
+<span class="fc" id="L73">        List&lt;String&gt; descriptions = new ArrayList&lt;&gt;(relations.descriptions());</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : state.expressionValues.entrySet()) {</span>
+<span class="fc" id="L75">            descriptions.add(entry.getKey() + &quot; \u2208 {&quot; + String.join(&quot;, &quot;, entry.getValue()) + &quot;}&quot;);</span>
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">        return Optional.of(normalizeGeneratedPlaceholders(new GeneralizedPattern(</span>
+            left, right, state.values, descriptions, state.expressionValues
+        )));
+    }
+
+    public Optional&lt;GeneralizedPattern&gt; generalizeSingleExampleSchema(SuccessfulTransformationPath path) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L84">            return Optional.empty();</span>
+        }
+<span class="fc" id="L86">        Optional&lt;GeneralizedPattern&gt; variableSchema = generalizeSingleVariableSchema(path);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (variableSchema.isPresent()) {</span>
+<span class="fc" id="L88">            return variableSchema;</span>
+        }
+<span class="fc" id="L90">        NormalizedNode left = normalizer.normalize(path.originalExpression());</span>
+<span class="fc" id="L91">        NormalizedNode right = normalizer.normalize(path.targetExpression());</span>
+<span class="fc" id="L92">        Map&lt;String, String&gt; canonicalVariableBindings = canonicalVariableBindings(path.originalExpression(), path.targetExpression());</span>
+<span class="fc" id="L93">        Optional&lt;NormalizedNode&gt; placeholderSubtree = commonExpressionSubtrees(left, right).stream()</span>
+<span class="fc" id="L94">            .max(Comparator</span>
+<span class="fc" id="L95">                .comparingInt(this::nodeCount)</span>
+<span class="fc" id="L96">                .thenComparing(NormalizedNode::canonicalString));</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (placeholderSubtree.isEmpty()) {</span>
+<span class="nc" id="L98">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L101">        String placeholder = &quot;A&quot;;</span>
+<span class="fc" id="L102">        NormalizedNode generalizedLeft = replaceSubtree(left, placeholderSubtree.orElseThrow(), placeholder);</span>
+<span class="fc" id="L103">        NormalizedNode generalizedRight = replaceSubtree(right, placeholderSubtree.orElseThrow(), placeholder);</span>
+<span class="fc" id="L104">        Map&lt;String, String&gt; generatedPlaceholders = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        String reservedVariable = placeholderSubtree.orElseThrow().kind() == NormalizedNode.Kind.VARIABLE</span>
+<span class="fc" id="L106">            ? placeholderSubtree.orElseThrow().name()</span>
+<span class="pc" id="L107">            : null;</span>
+<span class="fc" id="L108">        generalizedLeft = promoteRemainingVariables(generalizedLeft, reservedVariable, generatedPlaceholders);</span>
+<span class="fc" id="L109">        generalizedRight = promoteRemainingVariables(generalizedRight, reservedVariable, generatedPlaceholders);</span>
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        if (!containsPlaceholder(generalizedLeft, placeholder) || !containsPlaceholder(generalizedRight, placeholder)) {</span>
+<span class="nc" id="L111">            return Optional.empty();</span>
+        }
+<span class="fc" id="L113">        String leftPattern = generalizedLeft.canonicalString();</span>
+<span class="fc" id="L114">        String rightPattern = generalizedRight.canonicalString();</span>
+<span class="pc bpc" id="L115" title="3 of 4 branches missed.">        if (leftPattern.equals(left.canonicalString()) &amp;&amp; rightPattern.equals(right.canonicalString())) {</span>
+<span class="nc" id="L116">            return Optional.empty();</span>
+        }
+<span class="fc" id="L118">        Map&lt;String, List&lt;String&gt;&gt; expressionValues = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L119">        expressionValues.put(placeholder, List.of(bindingFor(placeholderSubtree.orElseThrow(), canonicalVariableBindings)));</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : generatedPlaceholders.entrySet()) {</span>
+<span class="fc" id="L121">            expressionValues.put(entry.getValue(), List.of(canonicalVariableBindings.getOrDefault(entry.getKey(), entry.getKey())));</span>
+<span class="fc" id="L122">        }</span>
+<span class="fc" id="L123">        return Optional.of(normalizeGeneratedPlaceholders(new GeneralizedPattern(</span>
+            leftPattern,
+            rightPattern,
+<span class="fc" id="L126">            Map.of(),</span>
+<span class="fc" id="L127">            expressionValues.entrySet().stream()</span>
+<span class="fc" id="L128">                .map(entry -&gt; entry.getKey() + &quot; \u2208 {&quot; + String.join(&quot;, &quot;, entry.getValue()) + &quot;}&quot;)</span>
+<span class="fc" id="L129">                .toList(),</span>
+            expressionValues
+        )));
+    }
+
+    private GeneralizedPattern normalizeGeneratedPlaceholders(GeneralizedPattern pattern) {
+<span class="fc" id="L135">        Map&lt;String, String&gt; renames = temporaryPlaceholderRenames(pattern);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (renames.isEmpty()) {</span>
+<span class="fc" id="L137">            return pattern;</span>
+        }
+<span class="fc" id="L139">        Map&lt;String, List&lt;Integer&gt;&gt; placeholderValues = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        for (Map.Entry&lt;String, List&lt;Integer&gt;&gt; entry : pattern.placeholderValues().entrySet()) {</span>
+<span class="nc" id="L141">            placeholderValues.put(renames.getOrDefault(entry.getKey(), entry.getKey()), entry.getValue());</span>
+<span class="nc" id="L142">        }</span>
+<span class="fc" id="L143">        Map&lt;String, List&lt;String&gt;&gt; expressionValues = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : pattern.expressionPlaceholderValues().entrySet()) {</span>
+<span class="fc" id="L145">            expressionValues.put(</span>
+<span class="fc" id="L146">                renames.getOrDefault(entry.getKey(), entry.getKey()),</span>
+<span class="fc" id="L147">                entry.getValue().stream().map(value -&gt; replaceTemporaryPlaceholders(value, renames)).toList()</span>
+            );
+<span class="fc" id="L149">        }</span>
+<span class="fc" id="L150">        return new GeneralizedPattern(</span>
+<span class="fc" id="L151">            replaceTemporaryPlaceholders(pattern.leftPattern(), renames),</span>
+<span class="fc" id="L152">            replaceTemporaryPlaceholders(pattern.rightPattern(), renames),</span>
+            placeholderValues,
+<span class="fc" id="L154">            pattern.parameterRelations().stream()</span>
+<span class="fc" id="L155">                .map(relation -&gt; replaceTemporaryPlaceholders(relation, renames))</span>
+<span class="fc" id="L156">                .toList(),</span>
+            expressionValues
+        );
+    }
+
+    private Map&lt;String, String&gt; temporaryPlaceholderRenames(GeneralizedPattern pattern) {
+<span class="fc" id="L162">        Set&lt;String&gt; existingMacroPlaceholders = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L163">        collectMacroPlaceholders(pattern.leftPattern(), existingMacroPlaceholders);</span>
+<span class="fc" id="L164">        collectMacroPlaceholders(pattern.rightPattern(), existingMacroPlaceholders);</span>
+<span class="fc" id="L165">        pattern.parameterRelations().forEach(relation -&gt; collectMacroPlaceholders(relation, existingMacroPlaceholders));</span>
+<span class="fc" id="L166">        Map&lt;String, String&gt; renames = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L167">        collectTemporaryPlaceholders(pattern.leftPattern(), renames, existingMacroPlaceholders);</span>
+<span class="fc" id="L168">        collectTemporaryPlaceholders(pattern.rightPattern(), renames, existingMacroPlaceholders);</span>
+<span class="fc" id="L169">        pattern.parameterRelations().forEach(relation -&gt; collectTemporaryPlaceholders(relation, renames, existingMacroPlaceholders));</span>
+<span class="fc" id="L170">        pattern.expressionPlaceholderValues().forEach((key, values) -&gt; {</span>
+<span class="fc" id="L171">            collectTemporaryPlaceholders(key, renames, existingMacroPlaceholders);</span>
+<span class="fc" id="L172">            values.forEach(value -&gt; collectTemporaryPlaceholders(value, renames, existingMacroPlaceholders));</span>
+<span class="fc" id="L173">        });</span>
+<span class="fc" id="L174">        return renames;</span>
+    }
+
+    private void collectMacroPlaceholders(String text, Set&lt;String&gt; placeholders) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        Matcher matcher = MACRO_PLACEHOLDER.matcher(text == null ? &quot;&quot; : text);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L180">            placeholders.add(matcher.group());</span>
+        }
+<span class="fc" id="L182">    }</span>
+
+    private void collectTemporaryPlaceholders(String text, Map&lt;String, String&gt; renames, Set&lt;String&gt; existingMacroPlaceholders) {
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        Matcher matcher = TEMPORARY_PLACEHOLDER.matcher(text == null ? &quot;&quot; : text);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L187">            renames.computeIfAbsent(matcher.group(), ignored -&gt; nextStableMacroPlaceholder(existingMacroPlaceholders));</span>
+        }
+<span class="fc" id="L189">    }</span>
+
+    private String nextStableMacroPlaceholder(Set&lt;String&gt; existingMacroPlaceholders) {
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        for (char name = 'B'; name &lt;= 'Z'; name++) {</span>
+<span class="fc" id="L193">            String candidate = String.valueOf(name);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (existingMacroPlaceholders.add(candidate)) {</span>
+<span class="fc" id="L195">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L198">        throw new IllegalStateException(&quot;exhausted stable macro placeholders&quot;);</span>
+    }
+
+    private String replaceTemporaryPlaceholders(String text, Map&lt;String, String&gt; renames) {
+<span class="fc" id="L202">        String result = text;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : renames.entrySet()) {</span>
+<span class="fc" id="L204">            result = result.replaceAll(&quot;\\b&quot; + Pattern.quote(entry.getKey()) + &quot;\\b&quot;, entry.getValue());</span>
+<span class="fc" id="L205">        }</span>
+<span class="fc" id="L206">        return result;</span>
+    }
+
+    private Optional&lt;GeneralizedPattern&gt; generalizeSingleVariableSchema(SuccessfulTransformationPath path) {
+        Expr left;
+        Expr right;
+        try {
+<span class="fc" id="L213">            left = expressionParser.parseTerm(path.originalExpression());</span>
+<span class="fc" id="L214">            right = expressionParser.parseTerm(path.targetExpression());</span>
+<span class="nc" id="L215">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L216">            return Optional.empty();</span>
+<span class="fc" id="L217">        }</span>
+<span class="fc" id="L218">        Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L219">        collectVariables(left, variables);</span>
+<span class="fc" id="L220">        collectVariables(right, variables);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (variables.size() != 1) {</span>
+<span class="fc" id="L222">            return Optional.empty();</span>
+        }
+<span class="fc" id="L224">        String variable = variables.iterator().next();</span>
+<span class="fc" id="L225">        Expr placeholder = new VariableExpr(&quot;A&quot;);</span>
+<span class="fc" id="L226">        Expr generalizedLeft = replaceVariable(left, variable, placeholder);</span>
+<span class="fc" id="L227">        Expr generalizedRight = replaceVariable(right, variable, placeholder);</span>
+<span class="fc" id="L228">        String leftPattern = compactPower(ExpressionFormatter.format(generalizedLeft));</span>
+<span class="fc" id="L229">        String rightPattern = compactPower(ExpressionFormatter.format(generalizedRight));</span>
+<span class="pc bpc" id="L230" title="3 of 4 branches missed.">        if (leftPattern.equals(path.originalExpression()) &amp;&amp; rightPattern.equals(path.targetExpression())) {</span>
+<span class="nc" id="L231">            return Optional.empty();</span>
+        }
+<span class="fc" id="L233">        return Optional.of(new GeneralizedPattern(</span>
+            leftPattern,
+            rightPattern,
+<span class="fc" id="L236">            Map.of(),</span>
+<span class="fc" id="L237">            List.of(&quot;A \u2208 {&quot; + variable + &quot;}&quot;),</span>
+<span class="fc" id="L238">            Map.of(&quot;A&quot;, List.of(variable))</span>
+        ));
+    }
+
+    private String compactPower(String expression) {
+<span class="fc" id="L243">        return expression.replace(&quot; ^ &quot;, &quot;^&quot;);</span>
+    }
+
+    private void collectVariables(Expr expression, Set&lt;String&gt; variables) {
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L248">            variables.add(variable.name());</span>
+<span class="fc" id="L249">            return;</span>
+        }
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L253">                collectVariables(argument, variables);</span>
+<span class="nc" id="L254">            }</span>
+<span class="nc" id="L255">            return;</span>
+        }
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L258">            collectVariables(binary.left(), variables);</span>
+<span class="fc" id="L259">            collectVariables(binary.right(), variables);</span>
+        }
+<span class="fc" id="L261">    }</span>
+
+    private Expr replaceVariable(Expr expression, String variable, Expr placeholder) {
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            return variableExpr.name().equals(variable) ? placeholder : variableExpr;</span>
+        }
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        if (expression instanceof NumberExpr) {</span>
+<span class="fc" id="L268">            return expression;</span>
+        }
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L271">            return new FunctionExpr(function.name(), function.arguments().stream()</span>
+<span class="nc" id="L272">                .map(argument -&gt; replaceVariable(argument, variable, placeholder))</span>
+<span class="nc" id="L273">                .toList());</span>
+        }
+<span class="fc" id="L275">        BinaryExpr binary = (BinaryExpr) expression;</span>
+<span class="fc" id="L276">        return new BinaryExpr(</span>
+<span class="fc" id="L277">            replaceVariable(binary.left(), variable, placeholder),</span>
+<span class="fc" id="L278">            binary.operator(),</span>
+<span class="fc" id="L279">            replaceVariable(binary.right(), variable, placeholder)</span>
+        );
+    }
+
+    private Map&lt;String, String&gt; canonicalVariableBindings(String originalExpression, String targetExpression) {
+<span class="fc" id="L284">        Map&lt;String, String&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L285">        collectCanonicalVariableBindings(originalExpression, bindings);</span>
+<span class="fc" id="L286">        collectCanonicalVariableBindings(targetExpression, bindings);</span>
+<span class="fc" id="L287">        return bindings;</span>
+    }
+
+    private void collectCanonicalVariableBindings(String expression, Map&lt;String, String&gt; canonicalBindings) {
+        try {
+<span class="fc" id="L292">            collectCanonicalVariableBindings(expressionParser.parseTerm(expression), new LinkedHashMap&lt;&gt;(), canonicalBindings);</span>
+<span class="nc" id="L293">        } catch (IllegalArgumentException exception) {</span>
+            // Keep normalization-based bindings only; callers fall back to canonical variable names.
+<span class="fc" id="L295">        }</span>
+<span class="fc" id="L296">    }</span>
+
+    private void collectCanonicalVariableBindings(
+        Expr expression,
+        Map&lt;String, String&gt; localVariables,
+        Map&lt;String, String&gt; canonicalBindings
+    ) {
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L304">            String canonical = localVariables.computeIfAbsent(</span>
+<span class="fc" id="L305">                variable.name(),</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">                key -&gt; localVariables.isEmpty() ? &quot;x&quot; : &quot;v&quot; + localVariables.size()</span>
+            );
+<span class="fc" id="L308">            canonicalBindings.putIfAbsent(canonical, variable.name());</span>
+<span class="fc" id="L309">            return;</span>
+        }
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L313">                collectCanonicalVariableBindings(argument, localVariables, canonicalBindings);</span>
+<span class="nc" id="L314">            }</span>
+<span class="nc" id="L315">            return;</span>
+        }
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L318">            collectCanonicalVariableBindings(binary.left(), localVariables, canonicalBindings);</span>
+<span class="fc" id="L319">            collectCanonicalVariableBindings(binary.right(), localVariables, canonicalBindings);</span>
+        }
+<span class="fc" id="L321">    }</span>
+
+    private String bindingFor(NormalizedNode node, Map&lt;String, String&gt; canonicalVariableBindings) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (node.kind() == NormalizedNode.Kind.VARIABLE) {</span>
+<span class="fc" id="L325">            return canonicalVariableBindings.getOrDefault(node.name(), node.name());</span>
+        }
+<span class="nc" id="L327">        return node.canonicalString();</span>
+    }
+
+    private NormalizedNode promoteRemainingVariables(
+        NormalizedNode node,
+        String reservedVariable,
+        Map&lt;String, String&gt; generatedPlaceholders
+    ) {
+<span class="pc bpc" id="L335" title="1 of 4 branches missed.">        if (node.kind() == NormalizedNode.Kind.VARIABLE &amp;&amp; !node.name().equals(reservedVariable)) {</span>
+<span class="fc" id="L336">            return NormalizedNode.placeholder(generatedPlaceholders.computeIfAbsent(</span>
+<span class="fc" id="L337">                node.name(),</span>
+<span class="fc" id="L338">                key -&gt; nextStableExpressionPlaceholder(generatedPlaceholders.size())</span>
+            ));
+        }
+<span class="fc" id="L341">        List&lt;NormalizedNode&gt; children = node.children().stream()</span>
+<span class="fc" id="L342">            .map(child -&gt; promoteRemainingVariables(child, reservedVariable, generatedPlaceholders))</span>
+<span class="fc" id="L343">            .toList();</span>
+<span class="pc bpc" id="L344" title="2 of 7 branches missed.">        return switch (node.kind()) {</span>
+<span class="fc" id="L345">            case NUMBER -&gt; NormalizedNode.number(node.number());</span>
+<span class="nc" id="L346">            case VARIABLE -&gt; NormalizedNode.variable(node.name());</span>
+<span class="fc" id="L347">            case PLACEHOLDER -&gt; NormalizedNode.placeholder(node.name());</span>
+<span class="fc" id="L348">            case ADD -&gt; NormalizedNode.add(children);</span>
+<span class="fc" id="L349">            case MUL -&gt; NormalizedNode.multiply(children);</span>
+<span class="fc" id="L350">            case POW -&gt; NormalizedNode.pow(children.get(0), children.get(1));</span>
+<span class="nc" id="L351">            case FUNCTION -&gt; NormalizedNode.function(node.name(), children);</span>
+        };
+    }
+
+    private String nextStableExpressionPlaceholder(int index) {
+<span class="fc" id="L356">        return String.valueOf((char) ('B' + index));</span>
+    }
+
+    private Optional&lt;NormalizedNode&gt; generalizeNodes(List&lt;NormalizedNode&gt; nodes, PlaceholderState state) {
+<span class="fc" id="L360">        NormalizedNode first = nodes.getFirst();</span>
+<span class="fc" id="L361">        boolean allEqual = nodes.stream().allMatch(first::equals);</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (allEqual) {</span>
+<span class="fc" id="L363">            return Optional.of(first);</span>
+        }
+
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        boolean allNumbers = nodes.stream().allMatch(node -&gt; node.kind() == NormalizedNode.Kind.NUMBER);</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (allNumbers) {</span>
+<span class="fc" id="L368">            String placeholder = state.nextPlaceholder();</span>
+<span class="fc" id="L369">            state.values.put(placeholder, nodes.stream().map(NormalizedNode::number).toList());</span>
+<span class="fc" id="L370">            return Optional.of(NormalizedNode.placeholder(placeholder));</span>
+        }
+        // Anti-unification over variables: different variable names become expression placeholders.
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">        boolean allVariables = nodes.stream().allMatch(node -&gt; node.kind() == NormalizedNode.Kind.VARIABLE);</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        if (allVariables) {</span>
+<span class="nc" id="L375">            boolean allSameName = nodes.stream().allMatch(n -&gt; first.name().equals(n.name()));</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">            if (!allSameName) {</span>
+<span class="nc" id="L377">                String placeholder = state.nextExpressionPlaceholder();</span>
+<span class="nc" id="L378">                state.expressionValues.put(placeholder,</span>
+<span class="nc" id="L379">                    nodes.stream().map(NormalizedNode::canonicalString).distinct().toList());</span>
+<span class="nc" id="L380">                return Optional.of(NormalizedNode.placeholder(placeholder));</span>
+            }
+        }
+<span class="fc" id="L383">        boolean sameShape = nodes.stream().allMatch(first::sameShape);</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (!sameShape) {</span>
+            // Anti-unification over subtrees: structurally different subtrees become expression placeholders.
+<span class="fc" id="L386">            String placeholder = state.nextExpressionPlaceholder();</span>
+<span class="fc" id="L387">            state.expressionValues.put(placeholder,</span>
+<span class="fc" id="L388">                nodes.stream().map(NormalizedNode::canonicalString).distinct().toList());</span>
+<span class="fc" id="L389">            return Optional.of(NormalizedNode.placeholder(placeholder));</span>
+        }
+<span class="pc bpc" id="L391" title="2 of 4 branches missed.">        if (first.kind() == NormalizedNode.Kind.NUMBER || first.kind() == NormalizedNode.Kind.VARIABLE) {</span>
+<span class="nc" id="L392">            return Optional.empty();</span>
+        }
+<span class="fc" id="L394">        List&lt;NormalizedNode&gt; generalizedChildren = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        for (int childIndex = 0; childIndex &lt; first.children().size(); childIndex++) {</span>
+<span class="fc" id="L396">            List&lt;NormalizedNode&gt; childNodes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">            for (NormalizedNode node : nodes) {</span>
+<span class="fc" id="L398">                childNodes.add(node.children().get(childIndex));</span>
+<span class="fc" id="L399">            }</span>
+<span class="fc" id="L400">            Optional&lt;NormalizedNode&gt; child = generalizeNodes(childNodes, state);</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">            if (child.isEmpty()) {</span>
+<span class="nc" id="L402">                return Optional.empty();</span>
+            }
+<span class="fc" id="L404">            generalizedChildren.add(child.orElseThrow());</span>
+        }
+<span class="pc bpc" id="L406" title="3 of 6 branches missed.">        return switch (first.kind()) {</span>
+<span class="fc" id="L407">            case ADD -&gt; Optional.of(NormalizedNode.add(generalizedChildren));</span>
+<span class="fc" id="L408">            case MUL -&gt; Optional.of(NormalizedNode.multiply(generalizedChildren));</span>
+<span class="fc" id="L409">            case POW -&gt; Optional.of(NormalizedNode.pow(generalizedChildren.get(0), generalizedChildren.get(1)));</span>
+<span class="nc" id="L410">            case FUNCTION -&gt; Optional.of(NormalizedNode.function(first.name(), generalizedChildren));</span>
+<span class="nc" id="L411">            case PLACEHOLDER -&gt; Optional.of(first);</span>
+<span class="nc" id="L412">            case NUMBER, VARIABLE -&gt; Optional.empty();</span>
+        };
+    }
+
+    private List&lt;NormalizedNode&gt; commonExpressionSubtrees(NormalizedNode left, NormalizedNode right) {
+<span class="fc" id="L417">        Map&lt;String, NormalizedNode&gt; leftSubtrees = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L418">        collectExpressionSubtrees(left, left, leftSubtrees);</span>
+<span class="fc" id="L419">        Map&lt;String, NormalizedNode&gt; rightSubtrees = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L420">        collectExpressionSubtrees(right, right, rightSubtrees);</span>
+<span class="fc" id="L421">        List&lt;NormalizedNode&gt; common = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">        for (Map.Entry&lt;String, NormalizedNode&gt; entry : leftSubtrees.entrySet()) {</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (rightSubtrees.containsKey(entry.getKey())) {</span>
+<span class="fc" id="L424">                common.add(entry.getValue());</span>
+            }
+<span class="fc" id="L426">        }</span>
+<span class="fc" id="L427">        return common;</span>
+    }
+
+    private void collectExpressionSubtrees(
+        NormalizedNode node,
+        NormalizedNode root,
+        Map&lt;String, NormalizedNode&gt; subtrees
+    ) {
+<span class="fc bfc" id="L435" title="All 4 branches covered.">        if (node.kind() != NormalizedNode.Kind.NUMBER &amp;&amp; node != root) {</span>
+<span class="fc" id="L436">            subtrees.putIfAbsent(node.canonicalString(), node);</span>
+        }
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        for (NormalizedNode child : node.children()) {</span>
+<span class="fc" id="L439">            collectExpressionSubtrees(child, root, subtrees);</span>
+<span class="fc" id="L440">        }</span>
+<span class="fc" id="L441">    }</span>
+
+    private NormalizedNode replaceSubtree(NormalizedNode node, NormalizedNode target, String placeholder) {
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        if (node.equals(target)) {</span>
+<span class="fc" id="L445">            return NormalizedNode.placeholder(placeholder);</span>
+        }
+<span class="fc" id="L447">        List&lt;NormalizedNode&gt; children = node.children().stream()</span>
+<span class="fc" id="L448">            .map(child -&gt; replaceSubtree(child, target, placeholder))</span>
+<span class="fc" id="L449">            .toList();</span>
+<span class="pc bpc" id="L450" title="2 of 7 branches missed.">        return switch (node.kind()) {</span>
+<span class="fc" id="L451">            case NUMBER -&gt; NormalizedNode.number(node.number());</span>
+<span class="fc" id="L452">            case VARIABLE -&gt; NormalizedNode.variable(node.name());</span>
+<span class="nc" id="L453">            case PLACEHOLDER -&gt; NormalizedNode.placeholder(node.name());</span>
+<span class="fc" id="L454">            case ADD -&gt; NormalizedNode.add(children);</span>
+<span class="fc" id="L455">            case MUL -&gt; NormalizedNode.multiply(children);</span>
+<span class="fc" id="L456">            case POW -&gt; NormalizedNode.pow(children.get(0), children.get(1));</span>
+<span class="nc" id="L457">            case FUNCTION -&gt; NormalizedNode.function(node.name(), children);</span>
+        };
+    }
+
+    private boolean containsPlaceholder(NormalizedNode node, String placeholder) {
+<span class="pc bpc" id="L462" title="1 of 4 branches missed.">        if (node.kind() == NormalizedNode.Kind.PLACEHOLDER &amp;&amp; placeholder.equals(node.name())) {</span>
+<span class="fc" id="L463">            return true;</span>
+        }
+<span class="fc" id="L465">        return node.children().stream().anyMatch(child -&gt; containsPlaceholder(child, placeholder));</span>
+    }
+
+    private int nodeCount(NormalizedNode node) {
+<span class="fc" id="L469">        int total = 1;</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">        for (NormalizedNode child : node.children()) {</span>
+<span class="nc" id="L471">            total += nodeCount(child);</span>
+<span class="nc" id="L472">        }</span>
+<span class="fc" id="L473">        return total;</span>
+    }
+
+<span class="fc" id="L476">    private static final class PlaceholderState {</span>
+        private int integerIndex;
+        private int expressionIndex;
+<span class="fc" id="L479">        private final Map&lt;String, List&lt;Integer&gt;&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L480">        private final Map&lt;String, List&lt;String&gt;&gt; expressionValues = new LinkedHashMap&lt;&gt;();</span>
+
+        private String nextPlaceholder() {
+<span class="fc" id="L483">            integerIndex++;</span>
+<span class="fc" id="L484">            return &quot;N&quot; + integerIndex;</span>
+        }
+
+        private String nextExpressionPlaceholder() {
+            // Use single uppercase letters (B, C, D, ...) for expression-level placeholders.
+            // We skip 'A' since ParameterRelationMiner uses 'A' as its canonical parameter name.
+<span class="fc" id="L490">            expressionIndex++;</span>
+<span class="fc" id="L491">            return String.valueOf((char) ('A' + expressionIndex)); // 1→B, 2→C, ...</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

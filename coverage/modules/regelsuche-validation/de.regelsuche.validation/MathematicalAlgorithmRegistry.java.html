@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MathematicalAlgorithmRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-validation</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.validation</a> &gt; <span class="el_source">MathematicalAlgorithmRegistry.java</span></div><h1>MathematicalAlgorithmRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.validation;
+
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Optional;
+
+public interface MathematicalAlgorithmRegistry {
+    String POLYNOMIAL_EQUIVALENCE = &quot;polynomialEquivalence&quot;;
+    String GROEBNER_BASIS = &quot;groebnerBasis&quot;;
+    String JAS_BACKEND = &quot;jasBackend&quot;;
+    String SINGULAR_BACKEND = &quot;singularBackend&quot;;
+    String KNUTH_BENDIX = &quot;knuthBendix&quot;;
+    String CRITICAL_PAIRS = &quot;criticalPairs&quot;;
+    String PSLQ = &quot;pslq&quot;;
+    String NUMERIC_RELATION_SEARCH = &quot;numericRelationSearch&quot;;
+
+    Collection&lt;AlgorithmDescriptor&gt; algorithms();
+
+    Optional&lt;AlgorithmDescriptor&gt; find(String algorithmId);
+
+    default boolean isEnabled(String algorithmId) {
+<span class="nc" id="L23">        return find(algorithmId).map(AlgorithmDescriptor::enabled).orElse(false);</span>
+    }
+
+    record AlgorithmDescriptor(
+        String id,
+        String capability,
+        boolean enabled,
+        AlgorithmBudget budget,
+        ProofSemantics proofSemantics,
+        EnumSet&lt;ResultType&gt; resultTypes
+    ) {
+<span class="nc" id="L34">        public AlgorithmDescriptor {</span>
+<span class="nc bnc" id="L35" title="All 4 branches missed.">            if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L36">                throw new IllegalArgumentException(&quot;id must not be blank&quot;);</span>
+            }
+<span class="nc bnc" id="L38" title="All 4 branches missed.">            if (capability == null || capability.isBlank()) {</span>
+<span class="nc" id="L39">                throw new IllegalArgumentException(&quot;capability must not be blank&quot;);</span>
+            }
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            budget = budget == null ? AlgorithmBudget.unbounded() : budget;</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">            proofSemantics = proofSemantics == null ? ProofSemantics.UNKNOWN : proofSemantics;</span>
+<span class="nc bnc" id="L43" title="All 4 branches missed.">            resultTypes = resultTypes == null || resultTypes.isEmpty() ? EnumSet.of(ResultType.DIAGNOSTIC) : EnumSet.copyOf(resultTypes);</span>
+<span class="nc" id="L44">        }</span>
+    }
+
+<span class="nc" id="L47">    record AlgorithmBudget(</span>
+        int maxSteps,
+        int maxStates,
+        int maxCoefficient,
+        double tolerance,
+        int maxTerms,
+        int maxDegree,
+        int maxVariables
+    ) {
+        public AlgorithmBudget(int maxSteps, int maxStates, int maxCoefficient, double tolerance) {
+<span class="nc" id="L57">            this(maxSteps, maxStates, maxCoefficient, tolerance, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE);</span>
+<span class="nc" id="L58">        }</span>
+
+        public static AlgorithmBudget unbounded() {
+<span class="nc" id="L61">            return new AlgorithmBudget(</span>
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE,
+                0.0,
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE
+            );
+        }
+
+        public static AlgorithmBudget bounded(int maxSteps, int maxStates, int maxCoefficient, double tolerance) {
+<span class="nc" id="L73">            return new AlgorithmBudget(maxSteps, maxStates, maxCoefficient, tolerance);</span>
+        }
+
+        public static AlgorithmBudget bounded(
+            int maxSteps,
+            int maxStates,
+            int maxCoefficient,
+            double tolerance,
+            int maxTerms,
+            int maxDegree,
+            int maxVariables
+        ) {
+<span class="nc" id="L85">            return new AlgorithmBudget(maxSteps, maxStates, maxCoefficient, tolerance, maxTerms, maxDegree, maxVariables);</span>
+        }
+    }
+
+<span class="nc" id="L89">    enum ProofSemantics {</span>
+<span class="nc" id="L90">        PROOF_FOR_SUPPORTED_DOMAIN,</span>
+<span class="nc" id="L91">        HYPOTHESIS_ONLY,</span>
+<span class="nc" id="L92">        DIAGNOSTIC_ONLY,</span>
+<span class="nc" id="L93">        UNKNOWN</span>
+    }
+
+<span class="nc" id="L96">    enum ResultType {</span>
+<span class="nc" id="L97">        PROOF,</span>
+<span class="nc" id="L98">        REFUTATION,</span>
+<span class="nc" id="L99">        HYPOTHESIS,</span>
+<span class="nc" id="L100">        DIAGNOSTIC</span>
+    }
+
+<span class="nc" id="L103">    enum ExecutionStatus {</span>
+<span class="nc" id="L104">        SUCCESS,</span>
+<span class="nc" id="L105">        UNKNOWN,</span>
+<span class="nc" id="L106">        UNAVAILABLE,</span>
+<span class="nc" id="L107">        DISABLED,</span>
+<span class="nc" id="L108">        BUDGET_EXHAUSTED</span>
+    }
+
+    record AlgorithmExecutionResult(ExecutionStatus status, ResultType resultType, String detail, Map&lt;String, Object&gt; payload) {
+<span class="nc" id="L112">        public AlgorithmExecutionResult {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            payload = payload == null ? Map.of() : Map.copyOf(payload);</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="nc" id="L115">        }</span>
+
+        public static AlgorithmExecutionResult disabled(String detail) {
+<span class="nc" id="L118">            return new AlgorithmExecutionResult(ExecutionStatus.DISABLED, ResultType.DIAGNOSTIC, detail, Map.of());</span>
+        }
+
+        public static AlgorithmExecutionResult unknown(String detail) {
+<span class="nc" id="L122">            return new AlgorithmExecutionResult(ExecutionStatus.UNKNOWN, ResultType.DIAGNOSTIC, detail, Map.of());</span>
+        }
+
+        public static AlgorithmExecutionResult unavailable(String detail) {
+<span class="nc" id="L126">            return new AlgorithmExecutionResult(ExecutionStatus.UNAVAILABLE, ResultType.DIAGNOSTIC, detail, Map.of());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

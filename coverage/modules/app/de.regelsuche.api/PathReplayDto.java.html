@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PathReplayDto.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api</a> &gt; <span class="el_source">PathReplayDto.java</span></div><h1>PathReplayDto.java</h1><pre class="source lang-java linenums">package de.regelsuche.api;
+
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.explain.ExplanationService;
+import de.regelsuche.export.MathDiff;
+import de.regelsuche.export.MathPresentation;
+import de.regelsuche.mining.MacroMoveExpansion;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Step-wise replay representation of a {@link DiscoveredTransformation}.
+ *
+ * &lt;p&gt;Returned by {@code GET /api/paths/{id}/replay} (Step 2). Each step
+ * carries both raw and LaTeX-rendered expressions plus a human-readable
+ * rule explanation, suitable for the replay UI tab.&lt;/p&gt;
+ *
+ * &lt;p&gt;Stage 3: every step additionally carries a server-side
+ * {@code comparatorFlipped} flag (so the front-end and the codec agree
+ * on inequality-flip detection) and {@code changedFromSpans} /
+ * {@code changedToSpans} token-level diff payloads consumed by the
+ * colour-diff highlighting in the replay tab.&lt;/p&gt;
+ */
+public record PathReplayDto(
+    String pathId,
+    List&lt;ReplayStep&gt; steps,
+    String alignedDerivationLatex,
+    String alignedDerivationLatexWithDiff
+) {
+<span class="fc" id="L32">    public PathReplayDto {</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        if (pathId == null || pathId.isBlank()) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;pathId is required&quot;);</span>
+        }
+<span class="fc" id="L36">        steps = List.copyOf(steps);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        alignedDerivationLatex = alignedDerivationLatex == null ? &quot;&quot; : alignedDerivationLatex;</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        alignedDerivationLatexWithDiff = alignedDerivationLatexWithDiff == null</span>
+<span class="pc" id="L39">            ? &quot;&quot; : alignedDerivationLatexWithDiff;</span>
+<span class="fc" id="L40">    }</span>
+
+    /**
+     * Backward-compatible 3-arg constructor used by callers that pre-date
+     * the Stage 3 diff-annotated derivation block. Derives the diff
+     * block from {@code alignedDerivationLatex}'s underlying steps.
+     */
+    public PathReplayDto(String pathId, List&lt;ReplayStep&gt; steps, String alignedDerivationLatex) {
+<span class="nc" id="L48">        this(pathId, steps, alignedDerivationLatex, deriveWithDiff(steps));</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Backward-compatible constructor that derives the aligned
+     * derivation block from {@code steps} via {@link #MATH}.
+     */
+    public PathReplayDto(String pathId, List&lt;ReplayStep&gt; steps) {
+<span class="fc" id="L56">        this(pathId, steps, derive(steps), deriveWithDiff(steps));</span>
+<span class="fc" id="L57">    }</span>
+
+    private static String derive(List&lt;ReplayStep&gt; steps) {
+<span class="fc" id="L60">        return renderAligned(steps, false);</span>
+    }
+
+    private static String deriveWithDiff(List&lt;ReplayStep&gt; steps) {
+<span class="fc" id="L64">        return renderAligned(steps, true);</span>
+    }
+
+    private static String renderAligned(List&lt;ReplayStep&gt; steps, boolean withDiff) {
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">        if (steps == null || steps.isEmpty()) {</span>
+<span class="nc" id="L69">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L71">        List&lt;MathPresentation.DerivationStep&gt; derivation = new ArrayList&lt;&gt;(steps.size());</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (ReplayStep step : steps) {</span>
+<span class="fc" id="L73">            derivation.add(new MathPresentation.DerivationStep(</span>
+<span class="fc" id="L74">                step.fromLatex(),</span>
+<span class="fc" id="L75">                step.toLatex(),</span>
+<span class="fc" id="L76">                step.ruleId(),</span>
+<span class="fc" id="L77">                step.comparatorFlipped(),</span>
+<span class="fc" id="L78">                step.changedFromSpans(),</span>
+<span class="fc" id="L79">                step.changedToSpans(),</span>
+<span class="fc" id="L80">                step.toExpression(),</span>
+<span class="fc" id="L81">                step.fromExpression()</span>
+            ));
+<span class="fc" id="L83">        }</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        return withDiff</span>
+<span class="fc" id="L85">            ? MATH.alignedDerivationLatexWithDiff(derivation)</span>
+<span class="fc" id="L86">            : MATH.alignedDerivationLatex(derivation);</span>
+    }
+
+    public record ReplayStep(
+        int stepIndex,
+        String fromExpression,
+        String fromLatex,
+        String toExpression,
+        String toLatex,
+        String ruleId,
+        String ruleExplanation,
+        int scoreDelta,
+        boolean equivalencePreserving,
+        boolean comparatorFlipped,
+        List&lt;int[]&gt; changedFromSpans,
+        List&lt;int[]&gt; changedToSpans,
+        MacroMoveExpansion macroMoveExpansion
+    ) {
+<span class="fc" id="L104">        public ReplayStep {</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            changedFromSpans = changedFromSpans == null</span>
+<span class="pc" id="L106">                ? List.of() : List.copyOf(changedFromSpans);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            changedToSpans = changedToSpans == null</span>
+<span class="pc" id="L108">                ? List.of() : List.copyOf(changedToSpans);</span>
+<span class="fc" id="L109">        }</span>
+
+        public ReplayStep(
+            int stepIndex,
+            String fromExpression,
+            String fromLatex,
+            String toExpression,
+            String toLatex,
+            String ruleId,
+            String ruleExplanation,
+            int scoreDelta,
+            boolean equivalencePreserving,
+            boolean comparatorFlipped,
+            List&lt;int[]&gt; changedFromSpans,
+            List&lt;int[]&gt; changedToSpans
+        ) {
+<span class="fc" id="L125">            this(</span>
+                stepIndex,
+                fromExpression,
+                fromLatex,
+                toExpression,
+                toLatex,
+                ruleId,
+                ruleExplanation,
+                scoreDelta,
+                equivalencePreserving,
+                comparatorFlipped,
+                changedFromSpans,
+                changedToSpans,
+                null
+            );
+<span class="fc" id="L140">        }</span>
+
+        /**
+         * Backward-compatible 9-arg constructor used by callers and codec
+         * readers that pre-date the Stage 3 diff payload. Computes the
+         * comparator-flip flag from the rule id and the from/to texts and
+         * derives the diff spans from the from/to LaTeX strings.
+         */
+        public ReplayStep(
+            int stepIndex,
+            String fromExpression,
+            String fromLatex,
+            String toExpression,
+            String toLatex,
+            String ruleId,
+            String ruleExplanation,
+            int scoreDelta,
+            boolean equivalencePreserving
+        ) {
+<span class="fc" id="L159">            this(</span>
+                stepIndex,
+                fromExpression,
+                fromLatex,
+                toExpression,
+                toLatex,
+                ruleId,
+                ruleExplanation,
+                scoreDelta,
+                equivalencePreserving,
+<span class="fc" id="L169">                MathPresentation.detectComparatorFlip(ruleId, fromExpression, toExpression),</span>
+<span class="fc" id="L170">                MathDiff.diffSpans(fromLatex, toLatex).fromSpans(),</span>
+<span class="fc" id="L171">                MathDiff.diffSpans(fromLatex, toLatex).toSpans(),</span>
+                null
+            );
+<span class="fc" id="L174">        }</span>
+
+        /**
+         * Stage 5 — structured {@link de.regelsuche.export.layout.MathLayout MathLayout}
+         * for this step (the &quot;to&quot; side, which is what the UI shows for the
+         * step's result row). Derived on demand from {@link #toLatex()}
+         * and {@link #toExpression()}.
+         */
+        public de.regelsuche.export.layout.MathLayout layout() {
+<span class="fc" id="L183">            return MATH.layoutWithDiff(</span>
+                fromExpression,
+                toExpression,
+                toLatex,
+                changedToSpans
+            );
+        }
+    }
+
+    public static PathReplayDto from(DiscoveredTransformation path, ExplanationService explanationService) {
+<span class="fc" id="L193">        return from(path, explanationService, Map.of());</span>
+    }
+
+    public static PathReplayDto from(
+        DiscoveredTransformation path,
+        ExplanationService explanationService,
+        Map&lt;Integer, MacroMoveExpansion&gt; macroExpansionsByStepIndex
+    ) {
+<span class="fc" id="L201">        List&lt;TransformationStep&gt; steps = path.steps();</span>
+<span class="fc" id="L202">        List&lt;ReplayStep&gt; replaySteps = new ArrayList&lt;&gt;(steps.size());</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (TransformationStep step : steps) {</span>
+<span class="fc" id="L204">            String fromLatex = toLatex(step.beforeExpression());</span>
+<span class="fc" id="L205">            String toLatex = toLatex(step.afterExpression());</span>
+<span class="fc" id="L206">            MathDiff.Result diff = MathDiff.diffSpans(fromLatex, toLatex);</span>
+<span class="fc" id="L207">            boolean flipped = MathPresentation.detectComparatorFlip(</span>
+<span class="fc" id="L208">                step.ruleId(), step.beforeExpression(), step.afterExpression());</span>
+<span class="fc" id="L209">            replaySteps.add(new ReplayStep(</span>
+<span class="fc" id="L210">                step.index(),</span>
+<span class="fc" id="L211">                step.beforeExpression(),</span>
+                fromLatex,
+<span class="fc" id="L213">                step.afterExpression(),</span>
+                toLatex,
+<span class="fc" id="L215">                step.ruleId(),</span>
+<span class="fc" id="L216">                explanationService.renderStep(step, ExplanationService.Form.SCHOOL),</span>
+<span class="fc" id="L217">                step.scoreAfter() - step.scoreBefore(),</span>
+<span class="fc" id="L218">                step.equivalencePreserving(),</span>
+                flipped,
+<span class="fc" id="L220">                diff.fromSpans(),</span>
+<span class="fc" id="L221">                diff.toSpans(),</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                macroExpansionsByStepIndex == null ? null : macroExpansionsByStepIndex.get(step.index())</span>
+            ));
+<span class="fc" id="L224">        }</span>
+<span class="fc" id="L225">        return new PathReplayDto(path.id(), replaySteps);</span>
+    }
+
+<span class="fc" id="L228">    private static final MathPresentation MATH = MathPresentation.DEFAULT;</span>
+
+    private static String toLatex(String expression) {
+<span class="fc" id="L231">        return MATH.latex(expression);</span>
+    }
+
+    /**
+     * Stage 5 — structured aligned-derivation
+     * {@link de.regelsuche.export.layout.MathLayout MathLayout} for this
+     * replay. Derived on demand from the contained steps via
+     * {@link MathPresentation#derivationLayout(java.util.List)} so the
+     * record itself stays codec-compatible while still exposing the
+     * layout pipeline to layout-aware front-ends and exports.
+     */
+    public de.regelsuche.export.layout.MathLayout derivationLayout() {
+<span class="fc" id="L243">        List&lt;MathPresentation.DerivationStep&gt; derivation = new ArrayList&lt;&gt;(steps.size());</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (ReplayStep step : steps) {</span>
+<span class="fc" id="L245">            derivation.add(new MathPresentation.DerivationStep(</span>
+<span class="fc" id="L246">                step.fromLatex(),</span>
+<span class="fc" id="L247">                step.toLatex(),</span>
+<span class="fc" id="L248">                step.ruleId(),</span>
+<span class="fc" id="L249">                step.comparatorFlipped(),</span>
+<span class="fc" id="L250">                step.changedFromSpans(),</span>
+<span class="fc" id="L251">                step.changedToSpans(),</span>
+<span class="fc" id="L252">                step.toExpression(),</span>
+<span class="fc" id="L253">                step.fromExpression()</span>
+            ));
+<span class="fc" id="L255">        }</span>
+<span class="fc" id="L256">        return MATH.alignedDerivationLayoutWithDiff(derivation);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

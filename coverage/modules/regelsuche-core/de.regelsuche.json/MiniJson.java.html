@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MiniJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.json</a> &gt; <span class="el_source">MiniJson.java</span></div><h1>MiniJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.json;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Minimal hand-written JSON reader used to re-hydrate
+ * small JSON snapshots without pulling in a
+ * full JSON library.
+ *
+ * &lt;p&gt;It supports the very narrow subset emitted by
+ * the repository persistence helpers:
+ * an object with one named array of flat objects whose values are strings,
+ * numbers, booleans, {@code null} or arrays of strings. Anything else will
+ * be ignored or produce best-effort string values.&lt;/p&gt;
+ */
+public final class MiniJson {
+    private MiniJson() {
+    }
+
+    /** Parse the named top-level array of objects into a list of key/value maps. */
+    public static List&lt;Map&lt;String, String&gt;&gt; parseObjectArray(String json, String key) {
+<span class="nc" id="L25">        Cursor cursor = new Cursor(json);</span>
+<span class="nc" id="L26">        cursor.expect('{');</span>
+<span class="nc" id="L27">        List&lt;Map&lt;String, String&gt;&gt; result = new ArrayList&lt;&gt;();</span>
+        while (true) {
+<span class="nc" id="L29">            cursor.skipWhitespace();</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">            if (cursor.peek('}')) {</span>
+<span class="nc" id="L31">                cursor.advance();</span>
+<span class="nc" id="L32">                break;</span>
+            }
+<span class="nc" id="L34">            String fieldName = cursor.readString();</span>
+<span class="nc" id="L35">            cursor.skipWhitespace();</span>
+<span class="nc" id="L36">            cursor.expect(':');</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">            if (fieldName.equals(key)) {</span>
+<span class="nc" id="L38">                cursor.skipWhitespace();</span>
+<span class="nc" id="L39">                cursor.expect('[');</span>
+                while (true) {
+<span class="nc" id="L41">                    cursor.skipWhitespace();</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">                    if (cursor.peek(']')) {</span>
+<span class="nc" id="L43">                        cursor.advance();</span>
+<span class="nc" id="L44">                        break;</span>
+                    }
+<span class="nc" id="L46">                    result.add(parseFlatObject(cursor));</span>
+<span class="nc" id="L47">                    cursor.skipWhitespace();</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">                    if (cursor.peek(',')) {</span>
+<span class="nc" id="L49">                        cursor.advance();</span>
+                    }
+                }
+            } else {
+<span class="nc" id="L53">                cursor.skipValue();</span>
+            }
+<span class="nc" id="L55">            cursor.skipWhitespace();</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            if (cursor.peek(',')) {</span>
+<span class="nc" id="L57">                cursor.advance();</span>
+            }
+<span class="nc" id="L59">        }</span>
+<span class="nc" id="L60">        return result;</span>
+    }
+
+    /** Parse a JSON array of strings into a Java list (e.g. {@code [&quot;a&quot;,&quot;b&quot;]}). */
+    public static List&lt;String&gt; parseStringArray(String json) {
+<span class="nc bnc" id="L65" title="All 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L66">            return List.of();</span>
+        }
+<span class="nc" id="L68">        Cursor cursor = new Cursor(json);</span>
+<span class="nc" id="L69">        cursor.skipWhitespace();</span>
+<span class="nc" id="L70">        cursor.expect('[');</span>
+<span class="nc" id="L71">        List&lt;String&gt; out = new ArrayList&lt;&gt;();</span>
+        while (true) {
+<span class="nc" id="L73">            cursor.skipWhitespace();</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            if (cursor.peek(']')) {</span>
+<span class="nc" id="L75">                cursor.advance();</span>
+<span class="nc" id="L76">                break;</span>
+            }
+<span class="nc" id="L78">            out.add(cursor.readString());</span>
+<span class="nc" id="L79">            cursor.skipWhitespace();</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (cursor.peek(',')) {</span>
+<span class="nc" id="L81">                cursor.advance();</span>
+            }
+        }
+<span class="nc" id="L84">        return out;</span>
+    }
+
+    private static Map&lt;String, String&gt; parseFlatObject(Cursor cursor) {
+<span class="nc" id="L88">        Map&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L89">        cursor.skipWhitespace();</span>
+<span class="nc" id="L90">        cursor.expect('{');</span>
+        while (true) {
+<span class="nc" id="L92">            cursor.skipWhitespace();</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (cursor.peek('}')) {</span>
+<span class="nc" id="L94">                cursor.advance();</span>
+<span class="nc" id="L95">                return result;</span>
+            }
+<span class="nc" id="L97">            String key = cursor.readString();</span>
+<span class="nc" id="L98">            cursor.skipWhitespace();</span>
+<span class="nc" id="L99">            cursor.expect(':');</span>
+<span class="nc" id="L100">            cursor.skipWhitespace();</span>
+<span class="nc" id="L101">            result.put(key, cursor.readRawValue());</span>
+<span class="nc" id="L102">            cursor.skipWhitespace();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (cursor.peek(',')) {</span>
+<span class="nc" id="L104">                cursor.advance();</span>
+            }
+<span class="nc" id="L106">        }</span>
+    }
+
+    private static final class Cursor {
+        private final String source;
+        private int position;
+
+<span class="nc" id="L113">        Cursor(String source) {</span>
+<span class="nc" id="L114">            this.source = source;</span>
+<span class="nc" id="L115">            this.position = 0;</span>
+<span class="nc" id="L116">        }</span>
+
+        void expect(char expected) {
+<span class="nc" id="L119">            skipWhitespace();</span>
+<span class="nc bnc" id="L120" title="All 4 branches missed.">            if (position &gt;= source.length() || source.charAt(position) != expected) {</span>
+<span class="nc" id="L121">                throw new IllegalArgumentException(</span>
+                    &quot;Expected '&quot; + expected + &quot;' at position &quot; + position);
+            }
+<span class="nc" id="L124">            position++;</span>
+<span class="nc" id="L125">        }</span>
+
+        boolean peek(char c) {
+<span class="nc" id="L128">            skipWhitespace();</span>
+<span class="nc bnc" id="L129" title="All 4 branches missed.">            return position &lt; source.length() &amp;&amp; source.charAt(position) == c;</span>
+        }
+
+        void advance() {
+<span class="nc" id="L133">            position++;</span>
+<span class="nc" id="L134">        }</span>
+
+        void skipWhitespace() {
+<span class="nc bnc" id="L137" title="All 4 branches missed.">            while (position &lt; source.length() &amp;&amp; Character.isWhitespace(source.charAt(position))) {</span>
+<span class="nc" id="L138">                position++;</span>
+            }
+<span class="nc" id="L140">        }</span>
+
+        String readString() {
+<span class="nc" id="L143">            skipWhitespace();</span>
+<span class="nc" id="L144">            expect('&quot;');</span>
+<span class="nc" id="L145">            StringBuilder builder = new StringBuilder();</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            while (position &lt; source.length()) {</span>
+<span class="nc" id="L147">                char c = source.charAt(position++);</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if (c == '&quot;') {</span>
+<span class="nc" id="L149">                    return builder.toString();</span>
+                }
+<span class="nc bnc" id="L151" title="All 4 branches missed.">                if (c == '\\' &amp;&amp; position &lt; source.length()) {</span>
+<span class="nc" id="L152">                    char escaped = source.charAt(position++);</span>
+<span class="nc bnc" id="L153" title="All 8 branches missed.">                    switch (escaped) {</span>
+<span class="nc" id="L154">                        case '&quot;' -&gt; builder.append('&quot;');</span>
+<span class="nc" id="L155">                        case '\\' -&gt; builder.append('\\');</span>
+<span class="nc" id="L156">                        case 'n' -&gt; builder.append('\n');</span>
+<span class="nc" id="L157">                        case 'r' -&gt; builder.append('\r');</span>
+<span class="nc" id="L158">                        case 't' -&gt; builder.append('\t');</span>
+<span class="nc" id="L159">                        case '/' -&gt; builder.append('/');</span>
+                        case 'u' -&gt; {
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                            if (position + 4 &gt; source.length()) {</span>
+<span class="nc" id="L162">                                throw new IllegalArgumentException(&quot;Truncated unicode escape&quot;);</span>
+                            }
+<span class="nc" id="L164">                            int codePoint = Integer.parseInt(source.substring(position, position + 4), 16);</span>
+<span class="nc" id="L165">                            builder.append((char) codePoint);</span>
+<span class="nc" id="L166">                            position += 4;</span>
+<span class="nc" id="L167">                        }</span>
+<span class="nc" id="L168">                        default -&gt; builder.append(escaped);</span>
+                    }
+<span class="nc" id="L170">                } else {</span>
+<span class="nc" id="L171">                    builder.append(c);</span>
+                }
+<span class="nc" id="L173">            }</span>
+<span class="nc" id="L174">            throw new IllegalArgumentException(&quot;Unterminated string&quot;);</span>
+        }
+
+        /** Read the raw value text (string contents, number, boolean, null, or nested array). */
+        String readRawValue() {
+<span class="nc" id="L179">            skipWhitespace();</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            if (position &gt;= source.length()) {</span>
+<span class="nc" id="L181">                return &quot;&quot;;</span>
+            }
+<span class="nc" id="L183">            char c = source.charAt(position);</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">            if (c == '&quot;') {</span>
+<span class="nc" id="L185">                return readString();</span>
+            }
+<span class="nc bnc" id="L187" title="All 2 branches missed.">            if (c == '[') {</span>
+<span class="nc" id="L188">                int start = position;</span>
+<span class="nc" id="L189">                skipArray();</span>
+<span class="nc" id="L190">                return source.substring(start, position);</span>
+            }
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (c == '{') {</span>
+<span class="nc" id="L193">                int start = position;</span>
+<span class="nc" id="L194">                skipObject();</span>
+<span class="nc" id="L195">                return source.substring(start, position);</span>
+            }
+<span class="nc" id="L197">            int start = position;</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            while (position &lt; source.length()</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                &amp;&amp; &quot;,}]\n\r\t &quot;.indexOf(source.charAt(position)) &lt; 0) {</span>
+<span class="nc" id="L200">                position++;</span>
+            }
+<span class="nc" id="L202">            return source.substring(start, position);</span>
+        }
+
+        void skipValue() {
+<span class="nc" id="L206">            readRawValue();</span>
+<span class="nc" id="L207">        }</span>
+
+        private void skipArray() {
+<span class="nc" id="L210">            expect('[');</span>
+<span class="nc" id="L211">            int depth = 1;</span>
+<span class="nc bnc" id="L212" title="All 4 branches missed.">            while (position &lt; source.length() &amp;&amp; depth &gt; 0) {</span>
+<span class="nc" id="L213">                char c = source.charAt(position++);</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                if (c == '&quot;') {</span>
+<span class="nc" id="L215">                    skipStringFromInside();</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">                } else if (c == '[') {</span>
+<span class="nc" id="L217">                    depth++;</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                } else if (c == ']') {</span>
+<span class="nc" id="L219">                    depth--;</span>
+                }
+<span class="nc" id="L221">            }</span>
+<span class="nc" id="L222">        }</span>
+
+        private void skipObject() {
+<span class="nc" id="L225">            expect('{');</span>
+<span class="nc" id="L226">            int depth = 1;</span>
+<span class="nc bnc" id="L227" title="All 4 branches missed.">            while (position &lt; source.length() &amp;&amp; depth &gt; 0) {</span>
+<span class="nc" id="L228">                char c = source.charAt(position++);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                if (c == '&quot;') {</span>
+<span class="nc" id="L230">                    skipStringFromInside();</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">                } else if (c == '{') {</span>
+<span class="nc" id="L232">                    depth++;</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                } else if (c == '}') {</span>
+<span class="nc" id="L234">                    depth--;</span>
+                }
+<span class="nc" id="L236">            }</span>
+<span class="nc" id="L237">        }</span>
+
+        private void skipStringFromInside() {
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            while (position &lt; source.length()) {</span>
+<span class="nc" id="L241">                char c = source.charAt(position++);</span>
+<span class="nc bnc" id="L242" title="All 4 branches missed.">                if (c == '\\' &amp;&amp; position &lt; source.length()) {</span>
+<span class="nc" id="L243">                    position++;</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">                } else if (c == '&quot;') {</span>
+<span class="nc" id="L245">                    return;</span>
+                }
+<span class="nc" id="L247">            }</span>
+<span class="nc" id="L248">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

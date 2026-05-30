@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GoalAwareMacroMoveSelector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">GoalAwareMacroMoveSelector.java</span></div><h1>GoalAwareMacroMoveSelector.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.inventory.RuleInventoryRepository;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Selects which macro moves from the inventory are appropriate for the
+ * current search state, based on:
+ *
+ * &lt;ol&gt;
+ *   &lt;li&gt;Cost reduction: only rules that produced positive average improvement.&lt;/li&gt;
+ *   &lt;li&gt;Goal alignment: only rules whose left pattern looks structurally
+ *       similar to the current expression (simple prefix/substring match
+ *       on the canonical pattern).&lt;/li&gt;
+ *   &lt;li&gt;Frequency threshold: only rules that have been applied at least
+ *       {@code minOccurrences} times (already satisfied at inventory time, but
+ *       the selector can tighten the filter).&lt;/li&gt;
+ *   &lt;li&gt;Confidence threshold: only rules above a configurable confidence score.&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;This class is intentionally stateless so it can be reused across
+ * parallel search workers.&lt;/p&gt;
+ */
+public class GoalAwareMacroMoveSelector {
+
+    /** Minimum confidence score for a rule to be eligible. */
+    public static final double DEFAULT_MIN_CONFIDENCE = 0.5;
+
+    /** Minimum average improvement for a rule to be eligible. */
+    public static final double DEFAULT_MIN_IMPROVEMENT = 0.0;
+
+    /** Minimum occurrence count for a rule to be eligible. */
+    public static final int DEFAULT_MIN_OCCURRENCES = 1;
+
+    private final RuleInventoryRepository inventory;
+    private final double minConfidence;
+    private final double minImprovement;
+    private final int minOccurrences;
+
+    public GoalAwareMacroMoveSelector(RuleInventoryRepository inventory) {
+<span class="fc" id="L48">        this(inventory, DEFAULT_MIN_CONFIDENCE, DEFAULT_MIN_IMPROVEMENT, DEFAULT_MIN_OCCURRENCES);</span>
+<span class="fc" id="L49">    }</span>
+
+    public GoalAwareMacroMoveSelector(
+        RuleInventoryRepository inventory,
+        double minConfidence,
+        double minImprovement,
+        int minOccurrences
+<span class="fc" id="L56">    ) {</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (inventory == null) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(&quot;inventory must not be null&quot;);</span>
+        }
+<span class="fc" id="L60">        this.inventory = inventory;</span>
+<span class="fc" id="L61">        this.minConfidence = minConfidence;</span>
+<span class="fc" id="L62">        this.minImprovement = minImprovement;</span>
+<span class="fc" id="L63">        this.minOccurrences = minOccurrences;</span>
+<span class="fc" id="L64">    }</span>
+
+    /**
+     * Returns the subset of enabled inventory rules that are worth trying
+     * for the given current expression.
+     *
+     * @param currentExpression  the expression at the current search node
+     * @return candidate macro rules that may reduce cost for this expression
+     */
+    public List&lt;ReusableRule&gt; selectFor(String currentExpression) {
+<span class="fc" id="L74">        return selectFor(currentExpression, null, List.of());</span>
+    }
+
+    /**
+     * Returns eligible macro rules sorted by score. If {@code goalExpression}
+     * is provided, candidates must also overlap structurally with that target
+     * (or expose tokens that may enable additional rules).
+     */
+    public List&lt;ReusableRule&gt; selectFor(String currentExpression, String goalExpression) {
+<span class="fc" id="L83">        return selectFor(currentExpression, goalExpression, List.of());</span>
+    }
+
+    /**
+     * Returns eligible macro rules under the current assumption context.
+     * Rules with assumptions are selected only if all of them are already
+     * satisfied by the caller-supplied context.
+     */
+    public List&lt;ReusableRule&gt; selectFor(
+        String currentExpression,
+        String goalExpression,
+        List&lt;String&gt; carriedAssumptions
+    ) {
+<span class="fc bfc" id="L96" title="All 4 branches covered.">        if (currentExpression == null || currentExpression.isBlank()) {</span>
+<span class="fc" id="L97">            return List.of();</span>
+        }
+<span class="fc" id="L99">        Set&lt;String&gt; normalizedCarried = new LinkedHashSet&lt;&gt;(</span>
+<span class="fc" id="L100">            AssumptionSignature.ofExpressions(carriedAssumptions).normalizedAssumptions()</span>
+        );
+<span class="fc" id="L102">        List&lt;ScoredMacroMove&gt; selected = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (ReusableRule rule : inventory.findAll()) {</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (!inventory.isEnabled(rule.id())) {</span>
+<span class="fc" id="L105">                continue;</span>
+            }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (rule.confidenceScore() &lt; minConfidence) {</span>
+<span class="fc" id="L108">                continue;</span>
+            }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (rule.averageImprovement() &lt;= minImprovement) {</span>
+<span class="fc" id="L111">                continue;</span>
+            }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (rule.occurrenceCount() &lt; minOccurrences) {</span>
+<span class="nc" id="L114">                continue;</span>
+            }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (!normalizedCarried.containsAll(rule.assumptions())) {</span>
+<span class="fc" id="L117">                continue;</span>
+            }
+<span class="fc" id="L119">            double score = score(rule, currentExpression, goalExpression);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (score &gt; 0.0) {</span>
+<span class="fc" id="L121">                selected.add(new ScoredMacroMove(rule, score));</span>
+            }
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        selected.sort(Comparator.comparingDouble(ScoredMacroMove::score).reversed());</span>
+<span class="fc" id="L125">        return selected.stream().map(ScoredMacroMove::rule).toList();</span>
+    }
+
+    /** Returns a numeric score for diagnostics and tests; 0 means rejected. */
+    public double score(ReusableRule rule, String currentExpression, String goalExpression) {
+<span class="pc bpc" id="L130" title="3 of 6 branches missed.">        if (rule == null || currentExpression == null || currentExpression.isBlank()) {</span>
+<span class="nc" id="L131">            return 0.0;</span>
+        }
+<span class="fc" id="L133">        int currentOverlap = structuralOverlap(rule.leftPattern(), currentExpression);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (currentOverlap &lt;= 0) {</span>
+<span class="nc" id="L135">            return 0.0;</span>
+        }
+<span class="fc" id="L137">        int currentNamedOverlap = namedStructuralOverlap(rule.leftPattern(), currentExpression);</span>
+<span class="fc bfc" id="L138" title="All 4 branches covered.">        if (currentNamedOverlap &lt;= 0 &amp;&amp; hasNamedTokens(rule.leftPattern())) {</span>
+<span class="fc" id="L139">            return 0.0;</span>
+        }
+<span class="pc bpc" id="L141" title="1 of 4 branches missed.">        int goalOverlap = goalExpression == null || goalExpression.isBlank()</span>
+<span class="fc" id="L142">            ? 0</span>
+<span class="fc" id="L143">            : Math.max(</span>
+<span class="fc" id="L144">                structuralOverlap(rule.rightPattern(), goalExpression),</span>
+<span class="fc" id="L145">                structuralOverlap(rule.leftPattern(), goalExpression)</span>
+            );
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        int namedGoalOverlap = goalExpression == null || goalExpression.isBlank()</span>
+<span class="fc" id="L148">            ? 0</span>
+<span class="fc" id="L149">            : Math.max(</span>
+<span class="fc" id="L150">                namedStructuralOverlap(rule.rightPattern(), goalExpression),</span>
+<span class="fc" id="L151">                namedStructuralOverlap(rule.leftPattern(), goalExpression)</span>
+            );
+<span class="fc" id="L153">        boolean exposesNewApplicableRules = exposesNewApplicableRules(rule, currentExpression);</span>
+<span class="pc bpc" id="L154" title="4 of 8 branches missed.">        if (goalExpression != null &amp;&amp; !goalExpression.isBlank() &amp;&amp; namedGoalOverlap &lt;= 0 &amp;&amp; !exposesNewApplicableRules) {</span>
+<span class="nc" id="L155">            return 0.0;</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        double exposureBonus = exposesNewApplicableRules ? 1.0 : 0.0;</span>
+<span class="fc" id="L158">        return (rule.confidenceScore() * 10.0)</span>
+<span class="fc" id="L159">            + Math.max(0.0, rule.averageImprovement())</span>
+<span class="fc" id="L160">            + Math.log1p(rule.occurrenceCount())</span>
+            + currentOverlap
+            + (2.0 * goalOverlap)
+            + exposureBonus;
+    }
+
+    /**
+     * Heuristic goal-alignment check.
+     *
+     * &lt;p&gt;A rule is considered goal-aligned when the structural skeleton of
+     * its left pattern shares operator tokens or named identifiers with the
+     * current expression. Pure integer literals are excluded to avoid
+     * spurious matches (every expression &quot;contains&quot; the number 1 or 2).&lt;/p&gt;
+     */
+    private boolean isGoalAligned(ReusableRule rule, String currentExpression) {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        return structuralOverlap(rule.leftPattern(), currentExpression) &gt; 0;</span>
+    }
+
+    private int structuralOverlap(String pattern, String expression) {
+<span class="pc bpc" id="L179" title="4 of 8 branches missed.">        if (pattern == null || pattern.isBlank() || expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L180">            return 0;</span>
+        }
+<span class="fc" id="L182">        Set&lt;String&gt; expressionTokens = tokens(expression);</span>
+<span class="fc" id="L183">        int matches = 0;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (String token : tokens(pattern)) {</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (expressionTokens.contains(token)) {</span>
+<span class="fc" id="L186">                matches++;</span>
+            }
+<span class="fc" id="L188">        }</span>
+<span class="fc" id="L189">        return matches;</span>
+    }
+
+    private int namedStructuralOverlap(String pattern, String expression) {
+<span class="fc" id="L193">        Set&lt;String&gt; expressionTokens = tokens(expression);</span>
+<span class="fc" id="L194">        int matches = 0;</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (String token : tokens(pattern)) {</span>
+<span class="fc bfc" id="L196" title="All 4 branches covered.">            if (!token.startsWith(&quot;op:&quot;) &amp;&amp; expressionTokens.contains(token)) {</span>
+<span class="fc" id="L197">                matches++;</span>
+            }
+<span class="fc" id="L199">        }</span>
+<span class="fc" id="L200">        return matches;</span>
+    }
+
+    private boolean exposesNewApplicableRules(ReusableRule rule, String currentExpression) {
+<span class="fc" id="L204">        Set&lt;String&gt; current = tokens(currentExpression);</span>
+<span class="fc" id="L205">        Set&lt;String&gt; produced = tokens(rule.rightPattern());</span>
+<span class="fc" id="L206">        produced.removeAll(current);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        return !produced.isEmpty();</span>
+    }
+
+    private boolean hasNamedTokens(String expression) {
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        return tokens(expression).stream().anyMatch(token -&gt; !token.startsWith(&quot;op:&quot;));</span>
+    }
+
+    private Set&lt;String&gt; tokens(String expression) {
+<span class="fc" id="L215">        Set&lt;String&gt; result = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (String operator : List.of(&quot;+&quot;, &quot;-&quot;, &quot;*&quot;, &quot;/&quot;, &quot;^&quot;)) {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            if (expression.contains(operator)) {</span>
+<span class="fc" id="L218">                result.add(&quot;op:&quot; + operator);</span>
+            }
+<span class="fc" id="L220">        }</span>
+        // Extract significant tokens from pattern (operators and named identifiers only).
+<span class="fc" id="L222">        String[] tokens = expression.split(&quot;[\\s()^+\\-*/,]+&quot;);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        for (String token : tokens) {</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            if (token.isEmpty()) {</span>
+<span class="fc" id="L225">                continue;</span>
+            }
+            // Skip single-uppercase-letter placeholders (A, B, C, ...) and N\d+ placeholders.
+<span class="pc bpc" id="L228" title="1 of 4 branches missed.">            if (token.matches(&quot;[A-Z]&quot;) || token.matches(&quot;N\\d+&quot;)) {</span>
+<span class="nc" id="L229">                continue;</span>
+            }
+            // Skip pure integer literals — they appear in almost any expression and cause
+            // false-positive goal-alignment matches.
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (token.matches(&quot;-?\\d+&quot;)) {</span>
+<span class="fc" id="L234">                continue;</span>
+            }
+<span class="fc" id="L236">            result.add(token);</span>
+        }
+<span class="fc" id="L238">        return result;</span>
+    }
+
+<span class="fc" id="L241">    public record ScoredMacroMove(ReusableRule rule, double score) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

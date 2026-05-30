@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PersistenceContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence</a> &gt; <span class="el_source">PersistenceContext.java</span></div><h1>PersistenceContext.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence;
+
+import de.regelsuche.graph.ExpressionGraphStore;
+import de.regelsuche.graph.InMemoryExpressionGraphStore;
+import de.regelsuche.graph.Neo4jExpressionGraphStore;
+import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.inventory.Neo4jRuleInventoryRepository;
+import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.persistence.relational.PersistenceAdapterFactory;
+import de.regelsuche.persistence.relational.RelationalPersistenceAdapters;
+import de.regelsuche.search.memory.InMemoryTranspositionTable;
+import de.regelsuche.search.memory.JsonFileTranspositionTable;
+import de.regelsuche.search.memory.Neo4jTranspositionTable;
+import de.regelsuche.search.memory.TranspositionTable;
+import java.io.PrintStream;
+import java.util.Optional;
+
+/**
+ * Resolved persistence wiring: an {@link ExpressionGraphStore} + a
+ * {@link RuleInventoryRepository}, chosen based on a {@link PersistenceConfig}.
+ *
+ * &lt;p&gt;{@link #from(PersistenceConfig, PrintStream)} is the single entry point
+ * the CLI / web layer uses; it never throws on missing Neo4j credentials,
+ * instead logging the fallback decision so the killer-demo always boots.&lt;/p&gt;
+ */
+public final class PersistenceContext implements AutoCloseable {
+
+    private final GraphPersistenceMode effectiveMode;
+    private final ExpressionGraphStore graphStore;
+    private final RuleInventoryRepository inventoryRepository;
+    private final TranspositionTable transpositionTable;
+    private final RelationalPersistenceAdapters relationalAdapters;
+
+    private PersistenceContext(
+        GraphPersistenceMode effectiveMode,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TranspositionTable transpositionTable
+    ) {
+<span class="fc" id="L40">        this(effectiveMode, graphStore, inventoryRepository, transpositionTable, null);</span>
+<span class="fc" id="L41">    }</span>
+
+    private PersistenceContext(
+        GraphPersistenceMode effectiveMode,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TranspositionTable transpositionTable,
+        RelationalPersistenceAdapters relationalAdapters
+<span class="fc" id="L49">    ) {</span>
+<span class="fc" id="L50">        this.effectiveMode = effectiveMode;</span>
+<span class="fc" id="L51">        this.graphStore = graphStore;</span>
+<span class="fc" id="L52">        this.inventoryRepository = inventoryRepository;</span>
+<span class="fc" id="L53">        this.transpositionTable = transpositionTable;</span>
+<span class="fc" id="L54">        this.relationalAdapters = relationalAdapters;</span>
+<span class="fc" id="L55">    }</span>
+
+    public GraphPersistenceMode effectiveMode() {
+<span class="fc" id="L58">        return effectiveMode;</span>
+    }
+
+    public ExpressionGraphStore graphStore() {
+<span class="fc" id="L62">        return graphStore;</span>
+    }
+
+    public RuleInventoryRepository inventoryRepository() {
+<span class="fc" id="L66">        return inventoryRepository;</span>
+    }
+
+    public TranspositionTable transpositionTable() {
+<span class="fc" id="L70">        return transpositionTable;</span>
+    }
+
+    public Optional&lt;RelationalPersistenceAdapters&gt; relationalAdapters() {
+<span class="fc" id="L74">        return Optional.ofNullable(relationalAdapters);</span>
+    }
+
+    /**
+     * Build a {@link PersistenceContext} from {@code config}. Falls back to
+     * a safe in-process mode and logs the reason if the requested mode is
+     * unavailable (no Neo4j credentials, embedded Neo4j not bundled, ...).
+     *
+     * @param log destination for informational fallback messages; may be
+     *            {@code null} to silence them
+     */
+    public static PersistenceContext from(PersistenceConfig config, PrintStream log) {
+<span class="pc bpc" id="L86" title="2 of 6 branches missed.">        switch (config.mode()) {</span>
+            case IN_MEMORY -&gt; {
+<span class="fc" id="L88">                return new PersistenceContext(</span>
+                    GraphPersistenceMode.IN_MEMORY,
+                    new InMemoryExpressionGraphStore(),
+                    new InMemoryRuleInventoryRepository(),
+                    new InMemoryTranspositionTable()
+                );
+            }
+            case JSON_FILE -&gt; {
+<span class="fc" id="L96">                JsonFileExpressionGraphStore graph = new JsonFileExpressionGraphStore(config.storagePath());</span>
+<span class="fc" id="L97">                JsonFileRuleInventoryRepository inventory = new JsonFileRuleInventoryRepository(config.storagePath());</span>
+<span class="fc" id="L98">                JsonFileTranspositionTable table = new JsonFileTranspositionTable(config.storagePath());</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                if (log != null) {</span>
+<span class="nc" id="L100">                    log.println(&quot;Persistence: JSON_FILE at &quot; + graph.filePath().toAbsolutePath());</span>
+                }
+<span class="fc" id="L102">                return new PersistenceContext(GraphPersistenceMode.JSON_FILE, graph, inventory, table);</span>
+            }
+            case EMBEDDED_NEO4J -&gt; {
+                // Embedded Neo4j is intentionally not bundled today (would
+                // require pulling in the GPL-licensed `neo4j` artifact).
+                // Fall back to JSON_FILE at the configured path so the
+                // killer-demo's standard mode keeps working.
+<span class="fc" id="L109">                JsonFileExpressionGraphStore graph = new JsonFileExpressionGraphStore(config.storagePath());</span>
+<span class="fc" id="L110">                JsonFileRuleInventoryRepository inventory = new JsonFileRuleInventoryRepository(config.storagePath());</span>
+<span class="fc" id="L111">                JsonFileTranspositionTable table = new JsonFileTranspositionTable(config.storagePath());</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                if (log != null) {</span>
+<span class="nc" id="L113">                    log.println(&quot;Persistence: EMBEDDED_NEO4J requested but not bundled; &quot;</span>
+<span class="nc" id="L114">                        + &quot;using JSON_FILE at &quot; + graph.filePath().toAbsolutePath());</span>
+                }
+<span class="fc" id="L116">                return new PersistenceContext(GraphPersistenceMode.JSON_FILE, graph, inventory, table);</span>
+            }
+            case REMOTE_NEO4J -&gt; {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                if (!config.hasNeo4jCredentials()) {</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                    if (log != null) {</span>
+<span class="nc" id="L121">                        log.println(&quot;Persistence: REMOTE_NEO4J requested but NEO4J_URI/NEO4J_USER/&quot;</span>
+                            + &quot;NEO4J_PASSWORD not all set; falling back to JSON_FILE at &quot;
+<span class="nc" id="L123">                            + config.storagePath().toAbsolutePath());</span>
+                    }
+<span class="fc" id="L125">                    return from(</span>
+                        new PersistenceConfig(
+                            GraphPersistenceMode.JSON_FILE,
+<span class="fc" id="L128">                            config.storagePath(),</span>
+                            null, null, null
+                        ),
+                        log
+                    );
+                }
+<span class="nc" id="L134">                Neo4jExpressionGraphStore graph = new Neo4jExpressionGraphStore(</span>
+<span class="nc" id="L135">                    config.neo4jUri(), config.neo4jUser(), config.neo4jPassword());</span>
+<span class="nc" id="L136">                Neo4jRuleInventoryRepository inventory = new Neo4jRuleInventoryRepository(</span>
+<span class="nc" id="L137">                    config.neo4jUri(), config.neo4jUser(), config.neo4jPassword());</span>
+<span class="nc" id="L138">                Neo4jTranspositionTable table = new Neo4jTranspositionTable(</span>
+<span class="nc" id="L139">                    config.neo4jUri(), config.neo4jUser(), config.neo4jPassword());</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                if (log != null) {</span>
+<span class="nc" id="L141">                    log.println(&quot;Persistence: REMOTE_NEO4J at &quot; + config.neo4jUri());</span>
+                }
+<span class="nc" id="L143">                return new PersistenceContext(GraphPersistenceMode.REMOTE_NEO4J, graph, inventory, table);</span>
+            }
+            case POSTGRESQL, POSTGRESQL_WITH_JSON_FALLBACK -&gt; {
+<span class="nc" id="L146">                Optional&lt;RelationalPersistenceAdapters&gt; adapters = PersistenceAdapterFactory.create(config, log);</span>
+<span class="nc" id="L147">                JsonFileExpressionGraphStore graph = new JsonFileExpressionGraphStore(config.storagePath());</span>
+<span class="nc" id="L148">                JsonFileRuleInventoryRepository inventory = new JsonFileRuleInventoryRepository(config.storagePath());</span>
+<span class="nc" id="L149">                JsonFileTranspositionTable table = new JsonFileTranspositionTable(config.storagePath());</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                if (log != null) {</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                    if (adapters.isPresent()) {</span>
+<span class="nc" id="L152">                        log.println(&quot;Persistence: &quot; + config.mode() + &quot; relational metadata at &quot;</span>
+<span class="nc" id="L153">                            + config.postgresUrl() + &quot;; mathematical graph artifacts use JSON_FILE at &quot;</span>
+<span class="nc" id="L154">                            + graph.filePath().toAbsolutePath());</span>
+                    } else {
+<span class="nc" id="L156">                        log.println(&quot;Persistence: POSTGRESQL_WITH_JSON_FALLBACK running JSON-only at &quot;</span>
+<span class="nc" id="L157">                            + graph.filePath().toAbsolutePath());</span>
+                    }
+                }
+<span class="nc" id="L160">                return new PersistenceContext(</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                    adapters.isPresent() ? config.mode() : GraphPersistenceMode.JSON_FILE,</span>
+                    graph,
+                    inventory,
+                    table,
+<span class="nc" id="L165">                    adapters.orElse(null)</span>
+                );
+            }
+<span class="nc" id="L168">            default -&gt; throw new IllegalStateException(&quot;Unhandled mode: &quot; + config.mode());</span>
+        }
+    }
+
+    @Override
+    public void close() {
+<span class="fc" id="L174">        closeQuietly(graphStore);</span>
+<span class="fc" id="L175">        closeQuietly(inventoryRepository);</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (transpositionTable instanceof AutoCloseable closable) {</span>
+<span class="nc" id="L177">            closeQuietly(closable);</span>
+        }
+<span class="fc" id="L179">        closeQuietly(relationalAdapters);</span>
+<span class="fc" id="L180">    }</span>
+
+    private static void closeQuietly(AutoCloseable resource) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (resource == null) {</span>
+<span class="fc" id="L184">            return;</span>
+        }
+        try {
+<span class="fc" id="L187">            resource.close();</span>
+<span class="nc" id="L188">        } catch (Exception ignored) {</span>
+            // Intentionally swallowed: close errors must not block shutdown.
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

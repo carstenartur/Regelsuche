@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialRules.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.rules</a> &gt; <span class="el_source">PolynomialRules.java</span></div><h1>PolynomialRules.java</h1><pre class="source lang-java linenums">package de.regelsuche.rules;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.canonical.PolynomialNormalizer;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Curated polynomial rewrite rules.
+ *
+ * &lt;p&gt;These rules are &lt;strong&gt;atomic&lt;/strong&gt; by construction; they reuse the
+ * structural patterns from {@link AstRewriteTransformationEngine#defaultRules()}
+ * and add a small set of polynomial-specific atomic helpers (e.g. combining
+ * like terms with numeric coefficients) without ever encoding a textbook
+ * identity (binomial formula, difference of squares, ...) directly.&lt;/p&gt;
+ */
+public final class PolynomialRules {
+<span class="fc" id="L27">    private static final Set&lt;String&gt; IDS = Set.of(</span>
+        &quot;ast_add_zero_right&quot;,
+        &quot;ast_add_zero_left&quot;,
+        &quot;ast_multiply_one_right&quot;,
+        &quot;ast_multiply_one_left&quot;,
+        &quot;ast_multiply_zero_right&quot;,
+        &quot;ast_multiply_zero_left&quot;,
+        &quot;ast_subtract_zero&quot;,
+        &quot;ast_double_term&quot;,
+        &quot;ast_product_to_power_two&quot;,
+        &quot;ast_power_two_to_product&quot;,
+        &quot;ast_combine_powers&quot;,
+        &quot;ast_power_of_power&quot;,
+        &quot;ast_distribute_left_add&quot;,
+        &quot;ast_distribute_right_add&quot;,
+        &quot;ast_distribute_left_subtract&quot;,
+        &quot;ast_distribute_right_subtract&quot;,
+        &quot;ast_factor_common_left&quot;,
+        &quot;ast_factor_common_right&quot;,
+        &quot;ast_canonical_normalize&quot;,
+        &quot;polynomial_collect_like_terms&quot;
+    );
+
+    private PolynomialRules() {
+    }
+
+    public static List&lt;RewriteRule&gt; rules() {
+<span class="fc" id="L54">        List&lt;RewriteRule&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (RewriteRule rule : AstRewriteTransformationEngine.defaultRules()) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (IDS.contains(rule.id())) {</span>
+<span class="fc" id="L57">                result.add(rule);</span>
+            }
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        result.add(new CollectLikeTermsRule());</span>
+<span class="fc" id="L61">        result.add(new CombineLikeTermsRule());</span>
+<span class="fc" id="L62">        return List.copyOf(result);</span>
+    }
+
+    /**
+     * Visible collection step for fully expanded polynomial sums.
+     *
+     * &lt;p&gt;The canonicalizer intentionally does not expand composite
+     * polynomials, so this rule surfaces the final &quot;collect like terms&quot; move as
+     * an explicit search edge after distribution has produced a flat sum.&lt;/p&gt;
+     */
+<span class="fc" id="L72">    public static final class CollectLikeTermsRule implements RewriteRule {</span>
+<span class="fc" id="L73">        private final PolynomialNormalizer normalizer = new PolynomialNormalizer();</span>
+
+        @Override
+        public String id() {
+<span class="fc" id="L77">            return &quot;polynomial_collect_like_terms&quot;;</span>
+        }
+
+        @Override
+        public RewriteKind kind() {
+<span class="fc" id="L82">            return RewriteKind.SIMPLIFY;</span>
+        }
+
+        @Override
+        public boolean mayIncreaseComplexity() {
+<span class="fc" id="L87">            return false;</span>
+        }
+
+        @Override
+        public int estimatedCostDelta() {
+<span class="fc" id="L92">            return -4;</span>
+        }
+
+        @Override
+        public boolean isEquivalencePreservingByConstruction() {
+<span class="fc" id="L97">            return true;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            return normalized(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="fc" id="L107">            Expr normalized = normalized(subtree);</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (normalized == null) {</span>
+<span class="nc" id="L109">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="fc" id="L111">            return normalized;</span>
+        }
+
+        private Expr normalized(Expr subtree) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (!hasAddOrSubtractWithLikeTerms(subtree)) {</span>
+<span class="fc" id="L116">                return null;</span>
+            }
+<span class="fc" id="L118">            return normalizer.normalize(subtree)</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                .filter(normalized -&gt; !ExpressionFormatter.format(normalized).equals(ExpressionFormatter.format(subtree)))</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                .filter(normalized -&gt; nodeCount(normalized) &lt;= nodeCount(subtree))</span>
+<span class="fc" id="L121">                .orElse(null);</span>
+        }
+
+        private boolean hasAddOrSubtractWithLikeTerms(Expr subtree) {
+<span class="fc" id="L125">            List&lt;Expr&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L126">            collectTerms(subtree, terms);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (terms.size() &lt; 2) {</span>
+<span class="fc" id="L128">                return false;</span>
+            }
+<span class="fc" id="L130">            Set&lt;String&gt; seen = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            for (Expr term : terms) {</span>
+<span class="fc" id="L132">                String key = monomialKey(term);</span>
+<span class="fc bfc" id="L133" title="All 4 branches covered.">                if (!key.isBlank() &amp;&amp; !seen.add(key)) {</span>
+<span class="fc" id="L134">                    return true;</span>
+                }
+<span class="fc" id="L136">            }</span>
+<span class="fc" id="L137">            return false;</span>
+        }
+
+        private void collectTerms(Expr expression, List&lt;Expr&gt; terms) {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                if (binary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L143">                    collectTerms(binary.left(), terms);</span>
+<span class="fc" id="L144">                    collectTerms(binary.right(), terms);</span>
+<span class="fc" id="L145">                    return;</span>
+                }
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                if (binary.operator() == BinaryOperator.SUB) {</span>
+<span class="nc" id="L148">                    collectTerms(binary.left(), terms);</span>
+<span class="nc" id="L149">                    collectTerms(binary.right(), terms);</span>
+<span class="nc" id="L150">                    return;</span>
+                }
+            }
+<span class="fc" id="L153">            terms.add(expression);</span>
+<span class="fc" id="L154">        }</span>
+
+        private String monomialKey(Expr expression) {
+<span class="fc" id="L157">            List&lt;String&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L158">            collectNonNumericFactors(expression, factors);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (factors.isEmpty()) {</span>
+<span class="fc" id="L160">                return &quot;&quot;;</span>
+            }
+<span class="fc" id="L162">            factors.sort(String::compareTo);</span>
+<span class="fc" id="L163">            return String.join(&quot;*&quot;, factors);</span>
+        }
+
+        private void collectNonNumericFactors(Expr expression, List&lt;String&gt; factors) {
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (expression instanceof NumberExpr) {</span>
+<span class="fc" id="L168">                return;</span>
+            }
+<span class="pc bpc" id="L170" title="1 of 4 branches missed.">            if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L171">                collectNonNumericFactors(binary.left(), factors);</span>
+<span class="fc" id="L172">                collectNonNumericFactors(binary.right(), factors);</span>
+<span class="fc" id="L173">                return;</span>
+            }
+<span class="fc" id="L175">            factors.add(ExpressionFormatter.format(expression));</span>
+<span class="fc" id="L176">        }</span>
+
+        private int nodeCount(Expr expression) {
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L180">                return 1 + nodeCount(binary.left()) + nodeCount(binary.right());</span>
+            }
+<span class="fc" id="L182">            return 1;</span>
+        }
+    }
+
+    /**
+     * Atomic rule combining {@code n*A + m*A -&gt; (n+m)*A} where {@code n} and
+     * {@code m} are integer literals and {@code A} is any expression.
+     *
+     * &lt;p&gt;This is a polynomial-specific atomic generalisation of the
+     * {@code ast_double_term} rule (which handles the {@code A + A} case).&lt;/p&gt;
+     */
+<span class="fc" id="L193">    public static final class CombineLikeTermsRule implements RewriteRule {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L196">            return &quot;polynomial_combine_like_terms&quot;;</span>
+        }
+
+        @Override
+        public RewriteKind kind() {
+<span class="fc" id="L201">            return RewriteKind.SIMPLIFY;</span>
+        }
+
+        @Override
+        public boolean mayIncreaseComplexity() {
+<span class="fc" id="L206">            return false;</span>
+        }
+
+        @Override
+        public int estimatedCostDelta() {
+<span class="fc" id="L211">            return -2;</span>
+        }
+
+        @Override
+        public boolean isEquivalencePreservingByConstruction() {
+<span class="fc" id="L216">            return true;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            return extract(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="fc" id="L226">            LikeTerms terms = extract(subtree);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            if (terms == null) {</span>
+<span class="nc" id="L228">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="fc" id="L230">            double combined = terms.leftCoefficient() + terms.rightCoefficient();</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">            if (combined == 0) {</span>
+<span class="nc" id="L232">                return new NumberExpr(0);</span>
+            }
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (combined == 1) {</span>
+<span class="nc" id="L235">                return terms.body();</span>
+            }
+<span class="fc" id="L237">            return new BinaryExpr(new NumberExpr(combined), BinaryOperator.MUL, terms.body());</span>
+        }
+
+        private LikeTerms extract(Expr subtree) {
+<span class="fc bfc" id="L241" title="All 4 branches covered.">            if (!(subtree instanceof BinaryExpr addition) || addition.operator() != BinaryOperator.ADD) {</span>
+<span class="fc" id="L242">                return null;</span>
+            }
+<span class="fc" id="L244">            Coefficient left = asCoefficient(addition.left());</span>
+<span class="fc" id="L245">            Coefficient right = asCoefficient(addition.right());</span>
+<span class="pc bpc" id="L246" title="2 of 6 branches missed.">            if (left == null || right == null || !left.body().equals(right.body())) {</span>
+<span class="fc" id="L247">                return null;</span>
+            }
+            // Avoid overlap with ast_double_term (A + A) by requiring at least one explicit numeric coefficient.
+<span class="fc bfc" id="L250" title="All 4 branches covered.">            if (left.coefficient() == 1 &amp;&amp; right.coefficient() == 1) {</span>
+<span class="fc" id="L251">                return null;</span>
+            }
+<span class="fc" id="L253">            return new LikeTerms(left.coefficient(), right.coefficient(), left.body());</span>
+        }
+
+        private Coefficient asCoefficient(Expr expression) {
+<span class="fc bfc" id="L257" title="All 4 branches covered.">            if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                if (binary.left() instanceof NumberExpr number) {</span>
+<span class="fc" id="L259">                    return new Coefficient(number.value(), binary.right());</span>
+                }
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                if (binary.right() instanceof NumberExpr number) {</span>
+<span class="fc" id="L262">                    return new Coefficient(number.value(), binary.left());</span>
+                }
+            }
+<span class="fc" id="L265">            return new Coefficient(1, expression);</span>
+        }
+
+<span class="fc" id="L268">        private record Coefficient(double coefficient, Expr body) {</span>
+        }
+
+<span class="fc" id="L271">        private record LikeTerms(double leftCoefficient, double rightCoefficient, Expr body) {</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

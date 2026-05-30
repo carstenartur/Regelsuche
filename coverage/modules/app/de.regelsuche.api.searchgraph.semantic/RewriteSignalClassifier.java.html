@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RewriteSignalClassifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph.semantic</a> &gt; <span class="el_source">RewriteSignalClassifier.java</span></div><h1>RewriteSignalClassifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph.semantic;
+
+import de.regelsuche.api.searchgraph.SearchGraphEdgeDto;
+import de.regelsuche.transform.RewriteKind;
+
+<span class="fc" id="L6">public final class RewriteSignalClassifier {</span>
+
+    public RewriteSignal classify(SearchGraphEdgeDto edge) {
+<span class="pc bpc" id="L9" title="1 of 2 branches missed.">        if (edge == null) {</span>
+<span class="nc" id="L10">            return RewriteSignal.LOW_SIGNAL;</span>
+        }
+<span class="pc bpc" id="L12" title="1 of 2 branches missed.">        String rule = (edge.ruleId() == null ? &quot;&quot; : edge.ruleId()).toLowerCase(java.util.Locale.ROOT);</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        if (isLowSignalRuleName(rule)) {</span>
+<span class="fc" id="L14">            return RewriteSignal.LOW_SIGNAL;</span>
+        }
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (edge.ruleKind() == RewriteKind.NORMALIZE) {</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">            return edge.scoreDelta() == 0 ? RewriteSignal.LOW_SIGNAL : RewriteSignal.MEDIUM_SIGNAL;</span>
+        }
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (Math.abs(edge.scoreDelta()) &gt;= 2) {</span>
+<span class="fc" id="L20">            return RewriteSignal.HIGH_SIGNAL;</span>
+        }
+<span class="fc" id="L22">        return RewriteSignal.MEDIUM_SIGNAL;</span>
+    }
+
+    private static boolean isLowSignalRuleName(String rule) {
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        return rule.contains(&quot;commut&quot;)</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            || rule.contains(&quot;associat&quot;)</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">            || rule.contains(&quot;parenth&quot;)</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">            || rule.contains(&quot;format&quot;)</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            || rule.contains(&quot;sort&quot;)</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            || rule.contains(&quot;canonical&quot;)</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            || rule.contains(&quot;normalize&quot;)</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            || rule.contains(&quot;neutral&quot;)</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            || rule.contains(&quot;identity&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

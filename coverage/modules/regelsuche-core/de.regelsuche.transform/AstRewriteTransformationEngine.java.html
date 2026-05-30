@@ -1,0 +1,510 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstRewriteTransformationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">AstRewriteTransformationEngine.java</span></div><h1>AstRewriteTransformationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+public class AstRewriteTransformationEngine implements TransformationEngine {
+    private static final int DEFAULT_MAX_AST_SIZE_INCREASE = 12;
+    private static final int DEFAULT_MAX_CANDIDATES_PER_STATE = 80;
+
+<span class="fc" id="L22">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L23">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+    private final List&lt;RewriteRule&gt; rules;
+    private final int maxAstSizeIncreasePerStep;
+    private final int maxCandidatesPerState;
+
+    public AstRewriteTransformationEngine() {
+<span class="fc" id="L29">        this(defaultRules());</span>
+<span class="fc" id="L30">    }</span>
+
+    public AstRewriteTransformationEngine(List&lt;RewriteRule&gt; rules) {
+<span class="fc" id="L33">        this(rules, DEFAULT_MAX_AST_SIZE_INCREASE, DEFAULT_MAX_CANDIDATES_PER_STATE);</span>
+<span class="fc" id="L34">    }</span>
+
+<span class="fc" id="L36">    public AstRewriteTransformationEngine(List&lt;RewriteRule&gt; rules, int maxAstSizeIncreasePerStep, int maxCandidatesPerState) {</span>
+<span class="fc" id="L37">        this.rules = List.copyOf(rules);</span>
+<span class="fc" id="L38">        this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;</span>
+<span class="fc" id="L39">        this.maxCandidatesPerState = maxCandidatesPerState;</span>
+<span class="fc" id="L40">    }</span>
+
+    public List&lt;RewriteRule&gt; rules() {
+<span class="nc" id="L43">        return rules;</span>
+    }
+
+    @Override
+    public List&lt;Transformation&gt; transform(String expression) {
+        Expr root;
+        try {
+<span class="fc" id="L50">            root = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="nc" id="L51">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L52">            return List.of();</span>
+<span class="fc" id="L53">        }</span>
+
+<span class="fc" id="L55">        String formattedInput = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L56">        int originalSize = canonicalizer.astNodeCount(formattedInput);</span>
+<span class="fc" id="L57">        Set&lt;Transformation&gt; transformations = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (RewriteResult result : rewriteEverywhere(root)) {</span>
+<span class="fc" id="L59">            String formatted = ExpressionFormatter.format(result.expression());</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            if (formatted.equals(formattedInput)) {</span>
+<span class="nc" id="L61">                continue;</span>
+            }
+<span class="fc" id="L63">            int growth = canonicalizer.astNodeCount(formatted) - originalSize;</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            if (growth &gt; maxAstSizeIncreasePerStep) {</span>
+<span class="nc" id="L65">                continue;</span>
+            }
+<span class="fc" id="L67">            RewriteRule rule = result.rule();</span>
+<span class="fc" id="L68">            transformations.add(new Transformation(</span>
+<span class="fc" id="L69">                rule.id(),</span>
+                formatted,
+<span class="fc" id="L71">                rule.kind(),</span>
+<span class="fc" id="L72">                rule.mayIncreaseComplexity(),</span>
+<span class="fc" id="L73">                rule.estimatedCostDelta(),</span>
+<span class="fc" id="L74">                rule.isEquivalencePreservingByConstruction(),</span>
+<span class="fc" id="L75">                rule.id() + &quot;:&quot; + result.sourceSubtreeHash()</span>
+            ));
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (transformations.size() &gt;= maxCandidatesPerState) {</span>
+<span class="nc" id="L78">                break;</span>
+            }
+<span class="fc" id="L80">        }</span>
+<span class="fc" id="L81">        return new ArrayList&lt;&gt;(transformations);</span>
+    }
+
+    private List&lt;RewriteResult&gt; rewriteEverywhere(Expr subtree) {
+<span class="fc" id="L85">        List&lt;RewriteResult&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L86">        String subtreeHash = canonicalizer.stableHash(ExpressionFormatter.format(subtree));</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (rule.matches(subtree)) {</span>
+<span class="fc" id="L89">                Expr rewritten = rule.apply(subtree);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                if (!rewritten.equals(subtree)) {</span>
+<span class="fc" id="L91">                    results.add(new RewriteResult(rule, rewritten, subtreeHash));</span>
+                }
+            }
+<span class="fc" id="L94">        }</span>
+
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (subtree instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            for (RewriteResult leftRewrite : rewriteEverywhere(binaryExpr.left())) {</span>
+<span class="fc" id="L98">                results.add(new RewriteResult(</span>
+<span class="fc" id="L99">                    leftRewrite.rule(),</span>
+<span class="fc" id="L100">                    new BinaryExpr(leftRewrite.expression(), binaryExpr.operator(), binaryExpr.right()),</span>
+<span class="fc" id="L101">                    leftRewrite.sourceSubtreeHash()</span>
+                ));
+<span class="fc" id="L103">            }</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            for (RewriteResult rightRewrite : rewriteEverywhere(binaryExpr.right())) {</span>
+<span class="fc" id="L105">                results.add(new RewriteResult(</span>
+<span class="fc" id="L106">                    rightRewrite.rule(),</span>
+<span class="fc" id="L107">                    new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rightRewrite.expression()),</span>
+<span class="fc" id="L108">                    rightRewrite.sourceSubtreeHash()</span>
+                ));
+<span class="fc" id="L110">            }</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        } else if (subtree instanceof FunctionExpr functionExpr) {</span>
+<span class="nc" id="L112">            List&lt;Expr&gt; arguments = functionExpr.arguments();</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
+<span class="nc" id="L114">                final int position = index;</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index))) {</span>
+<span class="nc" id="L116">                    List&lt;Expr&gt; replaced = new ArrayList&lt;&gt;(arguments);</span>
+<span class="nc" id="L117">                    replaced.set(position, argRewrite.expression());</span>
+<span class="nc" id="L118">                    results.add(new RewriteResult(</span>
+<span class="nc" id="L119">                        argRewrite.rule(),</span>
+<span class="nc" id="L120">                        new FunctionExpr(functionExpr.name(), replaced),</span>
+<span class="nc" id="L121">                        argRewrite.sourceSubtreeHash()</span>
+                    ));
+<span class="nc" id="L123">                }</span>
+            }
+        }
+<span class="fc" id="L126">        return results;</span>
+    }
+
+    public static List&lt;RewriteRule&gt; defaultRules() {
+<span class="fc" id="L130">        PatternExpr a = PatternExpr.var(&quot;A&quot;);</span>
+<span class="fc" id="L131">        PatternExpr b = PatternExpr.var(&quot;B&quot;);</span>
+<span class="fc" id="L132">        PatternExpr c = PatternExpr.var(&quot;C&quot;);</span>
+<span class="fc" id="L133">        return List.of(</span>
+<span class="fc" id="L134">            simplify(&quot;ast_add_zero_right&quot;, op(BinaryOperator.ADD, a, num(0)), a),</span>
+<span class="fc" id="L135">            simplify(&quot;ast_add_zero_left&quot;, op(BinaryOperator.ADD, num(0), a), a),</span>
+<span class="fc" id="L136">            simplify(&quot;ast_multiply_one_right&quot;, op(BinaryOperator.MUL, a, num(1)), a),</span>
+<span class="fc" id="L137">            simplify(&quot;ast_multiply_one_left&quot;, op(BinaryOperator.MUL, num(1), a), a),</span>
+<span class="fc" id="L138">            simplify(&quot;ast_multiply_zero_right&quot;, op(BinaryOperator.MUL, a, num(0)), num(0)),</span>
+<span class="fc" id="L139">            simplify(&quot;ast_multiply_zero_left&quot;, op(BinaryOperator.MUL, num(0), a), num(0)),</span>
+<span class="fc" id="L140">            simplify(&quot;ast_subtract_zero&quot;, op(BinaryOperator.SUB, a, num(0)), a),</span>
+<span class="fc" id="L141">            simplify(&quot;ast_divide_one&quot;, op(BinaryOperator.DIV, a, num(1)), a),</span>
+            new DoubleTermRule(),
+<span class="fc" id="L143">            normalize(&quot;ast_product_to_power_two&quot;, op(BinaryOperator.MUL, a, a), op(BinaryOperator.POW, a, num(2))),</span>
+<span class="fc" id="L144">            expand(&quot;ast_power_two_to_product&quot;, op(BinaryOperator.POW, a, num(2)), op(BinaryOperator.MUL, a, a), 3),</span>
+            new CombinePowersRule(),
+            new PowerOfPowerRule(),
+<span class="fc" id="L147">            expand(&quot;ast_distribute_left_add&quot;, op(BinaryOperator.MUL, a, op(BinaryOperator.ADD, b, c)),</span>
+<span class="fc" id="L148">                op(BinaryOperator.ADD, op(BinaryOperator.MUL, a, b), op(BinaryOperator.MUL, a, c)), 5),</span>
+<span class="fc" id="L149">            expand(&quot;ast_distribute_right_add&quot;, op(BinaryOperator.MUL, op(BinaryOperator.ADD, b, c), a),</span>
+<span class="fc" id="L150">                op(BinaryOperator.ADD, op(BinaryOperator.MUL, b, a), op(BinaryOperator.MUL, c, a)), 5),</span>
+<span class="fc" id="L151">            expand(&quot;ast_distribute_left_subtract&quot;, op(BinaryOperator.MUL, a, op(BinaryOperator.SUB, b, c)),</span>
+<span class="fc" id="L152">                op(BinaryOperator.SUB, op(BinaryOperator.MUL, a, b), op(BinaryOperator.MUL, a, c)), 5),</span>
+<span class="fc" id="L153">            expand(&quot;ast_distribute_right_subtract&quot;, op(BinaryOperator.MUL, op(BinaryOperator.SUB, b, c), a),</span>
+<span class="fc" id="L154">                op(BinaryOperator.SUB, op(BinaryOperator.MUL, b, a), op(BinaryOperator.MUL, c, a)), 5),</span>
+            new PatternRewriteRule(
+                &quot;ast_square_difference_factor&quot;,
+<span class="fc" id="L157">                op(BinaryOperator.SUB, op(BinaryOperator.POW, a, num(2)), op(BinaryOperator.POW, b, num(2))),</span>
+<span class="fc" id="L158">                op(BinaryOperator.MUL, op(BinaryOperator.SUB, a, b), op(BinaryOperator.ADD, a, b)),</span>
+                RewriteKind.FACTOR,
+                false,
+                -4,
+                true
+            ),
+            new FactorCommonLeftRule(),
+            new FactorCommonRightRule(),
+            new CanonicalNormalizeRule()
+        );
+    }
+
+    private static PatternRewriteRule simplify(String id, PatternExpr source, PatternExpr target) {
+<span class="fc" id="L171">        return new PatternRewriteRule(id, source, target, RewriteKind.SIMPLIFY, false, -2, true);</span>
+    }
+
+    private static PatternRewriteRule normalize(String id, PatternExpr source, PatternExpr target) {
+<span class="fc" id="L175">        return new PatternRewriteRule(id, source, target, RewriteKind.NORMALIZE, false, 0, true);</span>
+    }
+
+    private static PatternRewriteRule expand(String id, PatternExpr source, PatternExpr target, int costDelta) {
+<span class="fc" id="L179">        return new PatternRewriteRule(id, source, target, RewriteKind.EXPAND, true, costDelta, true);</span>
+    }
+
+    private static PatternExpr num(double value) {
+<span class="fc" id="L183">        return PatternExpr.num(value);</span>
+    }
+
+    private static PatternExpr op(BinaryOperator operator, PatternExpr left, PatternExpr right) {
+<span class="fc" id="L187">        return PatternExpr.op(operator, left, right);</span>
+    }
+
+<span class="fc" id="L190">    private record RewriteResult(RewriteRule rule, Expr expression, String sourceSubtreeHash) {</span>
+    }
+
+    private abstract static class MetadataRule implements RewriteRule {
+        private final RewriteKind kind;
+        private final boolean mayIncreaseComplexity;
+        private final int estimatedCostDelta;
+
+<span class="fc" id="L198">        private MetadataRule(RewriteKind kind, boolean mayIncreaseComplexity, int estimatedCostDelta) {</span>
+<span class="fc" id="L199">            this.kind = kind;</span>
+<span class="fc" id="L200">            this.mayIncreaseComplexity = mayIncreaseComplexity;</span>
+<span class="fc" id="L201">            this.estimatedCostDelta = estimatedCostDelta;</span>
+<span class="fc" id="L202">        }</span>
+
+        @Override
+        public RewriteKind kind() {
+<span class="fc" id="L206">            return kind;</span>
+        }
+
+        @Override
+        public boolean mayIncreaseComplexity() {
+<span class="fc" id="L211">            return mayIncreaseComplexity;</span>
+        }
+
+        @Override
+        public int estimatedCostDelta() {
+<span class="fc" id="L216">            return estimatedCostDelta;</span>
+        }
+
+        @Override
+        public boolean isEquivalencePreservingByConstruction() {
+<span class="fc" id="L221">            return true;</span>
+        }
+    }
+
+    private static final class CombinePowersRule extends MetadataRule {
+        private CombinePowersRule() {
+<span class="fc" id="L227">            super(RewriteKind.SIMPLIFY, false, -2);</span>
+<span class="fc" id="L228">        }</span>
+
+        @Override
+        public String id() {
+<span class="fc" id="L232">            return &quot;ast_combine_powers&quot;;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            return exponents(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="nc" id="L242">            PowerPair pair = exponents(subtree);</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            if (pair == null) {</span>
+<span class="nc" id="L244">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="nc" id="L246">            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent() + pair.rightExponent()));</span>
+        }
+
+        private PowerPair exponents(Expr subtree) {
+<span class="fc bfc" id="L250" title="All 4 branches covered.">            if (!(subtree instanceof BinaryExpr multiplication) || multiplication.operator() != BinaryOperator.MUL) {</span>
+<span class="fc" id="L251">                return null;</span>
+            }
+<span class="fc" id="L253">            Power left = asPower(multiplication.left());</span>
+<span class="fc" id="L254">            Power right = asPower(multiplication.right());</span>
+<span class="pc bpc" id="L255" title="5 of 6 branches missed.">            if (left != null &amp;&amp; right != null &amp;&amp; left.base().equals(right.base())) {</span>
+<span class="nc" id="L256">                return new PowerPair(left.base(), left.exponent(), right.exponent());</span>
+            }
+<span class="fc" id="L258">            return null;</span>
+        }
+    }
+
+    private static final class PowerOfPowerRule extends MetadataRule {
+        private PowerOfPowerRule() {
+<span class="fc" id="L264">            super(RewriteKind.SIMPLIFY, false, -2);</span>
+<span class="fc" id="L265">        }</span>
+
+        @Override
+        public String id() {
+<span class="fc" id="L269">            return &quot;ast_power_of_power&quot;;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">            return powers(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="nc" id="L279">            PowerPair pair = powers(subtree);</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            if (pair == null) {</span>
+<span class="nc" id="L281">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="nc" id="L283">            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent() * pair.rightExponent()));</span>
+        }
+
+        private PowerPair powers(Expr subtree) {
+<span class="fc bfc" id="L287" title="All 4 branches covered.">            if (!(subtree instanceof BinaryExpr outerPower) || outerPower.operator() != BinaryOperator.POW</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                || !(outerPower.right() instanceof NumberExpr outerExponent)) {</span>
+<span class="fc" id="L289">                return null;</span>
+            }
+<span class="fc" id="L291">            Power innerPower = asPower(outerPower.left());</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (innerPower == null) {</span>
+<span class="fc" id="L293">                return null;</span>
+            }
+<span class="nc" id="L295">            return new PowerPair(innerPower.base(), innerPower.exponent(), outerExponent.value());</span>
+        }
+    }
+
+    private static final class FactorCommonLeftRule extends MetadataRule {
+        private FactorCommonLeftRule() {
+<span class="fc" id="L301">            super(RewriteKind.FACTOR, false, -3);</span>
+<span class="fc" id="L302">        }</span>
+
+        @Override
+        public String id() {
+<span class="fc" id="L306">            return &quot;ast_factor_common_left&quot;;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            return commonTerms(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="fc" id="L316">            CommonTerms terms = commonTerms(subtree);</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">            if (terms == null) {</span>
+<span class="nc" id="L318">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="fc" id="L320">            return new BinaryExpr(</span>
+<span class="fc" id="L321">                terms.common(),</span>
+                BinaryOperator.MUL,
+<span class="fc" id="L323">                new BinaryExpr(terms.leftRemainder(), BinaryOperator.ADD, terms.rightRemainder())</span>
+            );
+        }
+
+        private CommonTerms commonTerms(Expr subtree) {
+<span class="fc bfc" id="L328" title="All 4 branches covered.">            if (!(subtree instanceof BinaryExpr addition) || addition.operator() != BinaryOperator.ADD</span>
+<span class="fc bfc" id="L329" title="All 4 branches covered.">                || !(addition.left() instanceof BinaryExpr leftProduct) || leftProduct.operator() != BinaryOperator.MUL</span>
+<span class="pc bpc" id="L330" title="1 of 4 branches missed.">                || !(addition.right() instanceof BinaryExpr rightProduct) || rightProduct.operator() != BinaryOperator.MUL) {</span>
+<span class="fc" id="L331">                return null;</span>
+            }
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            if (leftProduct.left().equals(rightProduct.left())) {</span>
+<span class="fc" id="L334">                return new CommonTerms(leftProduct.left(), leftProduct.right(), rightProduct.right());</span>
+            }
+<span class="fc" id="L336">            return null;</span>
+        }
+    }
+
+    private static final class DoubleTermRule extends MetadataRule {
+        private DoubleTermRule() {
+<span class="fc" id="L342">            super(RewriteKind.NORMALIZE, false, 0);</span>
+<span class="fc" id="L343">        }</span>
+
+        @Override
+        public String id() {
+<span class="fc" id="L347">            return &quot;ast_double_term&quot;;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">            return findDuplicateTermIndices(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="nc" id="L357">            List&lt;Expr&gt; terms = flattenAddition(subtree);</span>
+<span class="nc" id="L358">            int[] indices = findDuplicateTermIndices(terms);</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">            if (indices == null) {</span>
+<span class="nc" id="L360">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="nc" id="L362">            Expr duplicate = terms.get(indices[0]);</span>
+<span class="nc" id="L363">            List&lt;Expr&gt; rewritten = new ArrayList&lt;&gt;(terms);</span>
+            // Remove the later index first so the earlier index stays valid.
+<span class="nc" id="L365">            rewritten.remove(indices[1]);</span>
+<span class="nc" id="L366">            rewritten.remove(indices[0]);</span>
+<span class="nc" id="L367">            rewritten.add(new BinaryExpr(new NumberExpr(2), BinaryOperator.MUL, duplicate));</span>
+<span class="nc" id="L368">            return buildAddition(rewritten);</span>
+        }
+
+        private int[] findDuplicateTermIndices(Expr subtree) {
+<span class="fc bfc" id="L372" title="All 4 branches covered.">            if (!(subtree instanceof BinaryExpr addition) || addition.operator() != BinaryOperator.ADD) {</span>
+<span class="fc" id="L373">                return null;</span>
+            }
+<span class="fc" id="L375">            return findDuplicateTermIndices(flattenAddition(subtree));</span>
+        }
+
+        private int[] findDuplicateTermIndices(List&lt;Expr&gt; terms) {
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            for (int i = 0; i &lt; terms.size(); i++) {</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">                for (int j = i + 1; j &lt; terms.size(); j++) {</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">                    if (terms.get(i).equals(terms.get(j))) {</span>
+<span class="nc" id="L382">                        return new int[] { i, j };</span>
+                    }
+                }
+            }
+<span class="fc" id="L386">            return null;</span>
+        }
+
+        private List&lt;Expr&gt; flattenAddition(Expr expression) {
+<span class="fc bfc" id="L390" title="All 4 branches covered.">            if (expression instanceof BinaryExpr binaryExpr &amp;&amp; binaryExpr.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L391">                List&lt;Expr&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L392">                terms.addAll(flattenAddition(binaryExpr.left()));</span>
+<span class="fc" id="L393">                terms.addAll(flattenAddition(binaryExpr.right()));</span>
+<span class="fc" id="L394">                return terms;</span>
+            }
+<span class="fc" id="L396">            return List.of(expression);</span>
+        }
+
+        private Expr buildAddition(List&lt;Expr&gt; terms) {
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            if (terms.isEmpty()) {</span>
+<span class="nc" id="L401">                return new NumberExpr(0);</span>
+            }
+<span class="nc" id="L403">            Expr expression = terms.getFirst();</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">            for (int i = 1; i &lt; terms.size(); i++) {</span>
+<span class="nc" id="L405">                expression = new BinaryExpr(expression, BinaryOperator.ADD, terms.get(i));</span>
+            }
+<span class="nc" id="L407">            return expression;</span>
+        }
+    }
+
+    private static final class FactorCommonRightRule extends MetadataRule {
+        private FactorCommonRightRule() {
+<span class="fc" id="L413">            super(RewriteKind.FACTOR, false, -3);</span>
+<span class="fc" id="L414">        }</span>
+
+        @Override
+        public String id() {
+<span class="fc" id="L418">            return &quot;ast_factor_common_right&quot;;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            return commonTerms(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="fc" id="L428">            CommonTerms terms = commonTerms(subtree);</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">            if (terms == null) {</span>
+<span class="nc" id="L430">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="fc" id="L432">            return new BinaryExpr(</span>
+<span class="fc" id="L433">                new BinaryExpr(terms.leftRemainder(), BinaryOperator.ADD, terms.rightRemainder()),</span>
+                BinaryOperator.MUL,
+<span class="fc" id="L435">                terms.common()</span>
+            );
+        }
+
+        private CommonTerms commonTerms(Expr subtree) {
+<span class="fc bfc" id="L440" title="All 4 branches covered.">            if (!(subtree instanceof BinaryExpr addition) || addition.operator() != BinaryOperator.ADD</span>
+<span class="fc bfc" id="L441" title="All 4 branches covered.">                || !(addition.left() instanceof BinaryExpr leftProduct) || leftProduct.operator() != BinaryOperator.MUL</span>
+<span class="pc bpc" id="L442" title="1 of 4 branches missed.">                || !(addition.right() instanceof BinaryExpr rightProduct) || rightProduct.operator() != BinaryOperator.MUL) {</span>
+<span class="fc" id="L443">                return null;</span>
+            }
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            if (leftProduct.right().equals(rightProduct.right())) {</span>
+<span class="fc" id="L446">                return new CommonTerms(leftProduct.right(), leftProduct.left(), rightProduct.left());</span>
+            }
+<span class="fc" id="L448">            return null;</span>
+        }
+    }
+
+    private static final class CanonicalNormalizeRule extends MetadataRule {
+<span class="fc" id="L453">        private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L454">        private final ExpressionParser parser = new ExpressionParser();</span>
+
+        private CanonicalNormalizeRule() {
+<span class="fc" id="L457">            super(RewriteKind.NORMALIZE, false, 0);</span>
+<span class="fc" id="L458">        }</span>
+
+        @Override
+        public String id() {
+<span class="fc" id="L462">            return &quot;ast_canonical_normalize&quot;;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="fc bfc" id="L467" title="All 2 branches covered.">            return normalized(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="fc" id="L472">            Expr normalized = normalized(subtree);</span>
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">            if (normalized == null) {</span>
+<span class="nc" id="L474">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="fc" id="L476">            return normalized;</span>
+        }
+
+        private Expr normalized(Expr subtree) {
+<span class="fc" id="L480">            String formatted = ExpressionFormatter.format(subtree);</span>
+<span class="fc" id="L481">            String canonical = canonicalizer.canonicalize(formatted);</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">            if (canonical.equals(formatted)) {</span>
+<span class="fc" id="L483">                return null;</span>
+            }
+            try {
+<span class="fc" id="L486">                return parser.parse(new InputRequest(InputType.TERM, canonical)).terms().getFirst();</span>
+<span class="nc" id="L487">            } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L488">                return null;</span>
+            }
+        }
+    }
+
+    private static Power asPower(Expr expression) {
+<span class="pc bpc" id="L494" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr power &amp;&amp; power.operator() == BinaryOperator.POW</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent) {</span>
+<span class="nc" id="L496">            return new Power(power.left(), exponent.value());</span>
+        }
+<span class="fc" id="L498">        return null;</span>
+    }
+
+<span class="nc" id="L501">    private record Power(Expr base, double exponent) {</span>
+    }
+
+<span class="nc" id="L504">    private record PowerPair(Expr base, double leftExponent, double rightExponent) {</span>
+    }
+
+<span class="fc" id="L507">    private record CommonTerms(Expr common, Expr leftRemainder, Expr rightRemainder) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

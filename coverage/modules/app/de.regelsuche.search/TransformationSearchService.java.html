@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransformationSearchService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search</a> &gt; <span class="el_source">TransformationSearchService.java</span></div><h1>TransformationSearchService.java</h1><pre class="source lang-java linenums">package de.regelsuche.search;
+
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.graph.ExpressionGraphStore;
+import de.regelsuche.graph.GraphEdge;
+import de.regelsuche.graph.GraphSnapshot;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.notify.SimplificationNotifier;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.parse.ParsedInput;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.scoring.cost.TransformationGoal;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.strategy.SearchStrategy;
+import de.regelsuche.mining.MacroMoveExpansion;
+import de.regelsuche.mining.MacroMoveTransformationEngine;
+import de.regelsuche.transform.TransformationEngine;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class TransformationSearchService {
+    private final ExpressionParser parser;
+    private final TransformationEngine engine;
+    private final ExpressionGraphStore graphStore;
+    private final SearchHeuristic heuristic;
+    private final SimplificationNotifier notifier;
+    private final SearchStrategy searchStrategy;
+    private final ExpressionScorer scorer;
+    private final ExpressionCanonicalizer canonicalizer;
+    private final ExecutorService executorService;
+<span class="fc" id="L45">    private final Set&lt;String&gt; globallyVisited = ConcurrentHashMap.newKeySet();</span>
+<span class="fc" id="L46">    private final List&lt;SimplificationSuccess&gt; successes = Collections.synchronizedList(new ArrayList&lt;&gt;());</span>
+
+    public TransformationSearchService(
+        TransformationEngine engine,
+        ExpressionGraphStore graphStore,
+        SearchHeuristic heuristic,
+        SimplificationNotifier notifier
+    ) {
+<span class="fc" id="L54">        this(engine, graphStore, heuristic, notifier, new BestFirstSearchStrategy());</span>
+<span class="fc" id="L55">    }</span>
+
+    public TransformationSearchService(
+        TransformationEngine engine,
+        ExpressionGraphStore graphStore,
+        SearchHeuristic heuristic,
+        SimplificationNotifier notifier,
+        SearchStrategy searchStrategy
+<span class="fc" id="L63">    ) {</span>
+<span class="fc" id="L64">        this.parser = new ExpressionParser();</span>
+<span class="fc" id="L65">        this.engine = engine;</span>
+<span class="fc" id="L66">        this.graphStore = graphStore;</span>
+<span class="fc" id="L67">        this.heuristic = heuristic;</span>
+<span class="fc" id="L68">        this.notifier = notifier;</span>
+<span class="fc" id="L69">        this.searchStrategy = searchStrategy;</span>
+<span class="fc" id="L70">        this.scorer = new ExpressionScorer();</span>
+<span class="fc" id="L71">        this.canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L72">        this.executorService = Executors.newSingleThreadExecutor();</span>
+<span class="fc" id="L73">    }</span>
+
+    public CompletableFuture&lt;Void&gt; submit(InputRequest input) {
+<span class="fc" id="L76">        return submit(input, null);</span>
+    }
+
+    public CompletableFuture&lt;Void&gt; submit(InputRequest input, TransformationGoal goal) {
+<span class="fc" id="L80">        ParsedInput parsed = parser.parse(input);</span>
+<span class="fc" id="L81">        List&lt;String&gt; roots = collectRoots(parsed);</span>
+<span class="fc" id="L82">        List&lt;CompletableFuture&lt;Void&gt;&gt; jobs = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (String root : roots) {</span>
+<span class="fc" id="L84">            jobs.add(CompletableFuture.runAsync(() -&gt; explore(root, goal), executorService));</span>
+<span class="fc" id="L85">        }</span>
+<span class="fc" id="L86">        return CompletableFuture.allOf(jobs.toArray(CompletableFuture[]::new));</span>
+    }
+
+    public Optional&lt;SimplificationSuccess&gt; getBestSolution() {
+<span class="fc" id="L90">        synchronized (successes) {</span>
+<span class="fc" id="L91">            return successes.stream().max((a, b) -&gt; Integer.compare(a.improvement(), b.improvement()));</span>
+        }
+    }
+
+    public List&lt;SimplificationSuccess&gt; getSuccesses() {
+<span class="fc" id="L96">        synchronized (successes) {</span>
+<span class="fc" id="L97">            return List.copyOf(successes);</span>
+        }
+    }
+
+    public GraphSnapshot getGraphSnapshot() {
+<span class="fc" id="L102">        return graphStore.snapshot();</span>
+    }
+
+    public void shutdown() {
+<span class="fc" id="L106">        executorService.shutdown();</span>
+<span class="fc" id="L107">    }</span>
+
+    private List&lt;String&gt; collectRoots(ParsedInput parsed) {
+<span class="fc" id="L110">        List&lt;String&gt; roots = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (Expr expr : parsed.terms()) {</span>
+<span class="fc" id="L112">            roots.add(ExpressionFormatter.format(expr));</span>
+<span class="fc" id="L113">        }</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        for (Equation equation : parsed.equations()) {</span>
+<span class="nc" id="L115">            roots.add(ExpressionFormatter.format(equation));</span>
+<span class="nc" id="L116">        }</span>
+<span class="fc" id="L117">        return roots;</span>
+    }
+
+    private void explore(String root, TransformationGoal goal) {
+<span class="fc" id="L121">        SearchProblem problem = new SearchProblem(root, engine, scorer, canonicalizer, heuristic)</span>
+<span class="fc" id="L122">            .withGoal(goal);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (SearchState state : searchStrategy.search(problem)) {</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            boolean alreadyVisited = !globallyVisited.add(state.canonicalHash() + &quot;:&quot; + state.appliedRuleApplications());</span>
+<span class="pc bpc" id="L125" title="3 of 4 branches missed.">            if (alreadyVisited &amp;&amp; state.improvement() &lt;= 0) {</span>
+<span class="nc" id="L126">                continue;</span>
+            }
+<span class="fc" id="L128">            graphStore.saveNode(state.expression(), state.score().weightedTotal());</span>
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">            if (state.parentExpression() != null &amp;&amp; state.appliedRuleId() != null) {</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                MacroMoveExpansion macroExpansion = engine instanceof MacroMoveTransformationEngine macroEngine</span>
+<span class="nc" id="L131">                    ? macroEngine.expansionFor(</span>
+<span class="nc" id="L132">                        state.parentExpression(),</span>
+<span class="nc" id="L133">                        state.expression(),</span>
+<span class="nc" id="L134">                        state.appliedRuleId()</span>
+<span class="nc" id="L135">                    ).orElse(null)</span>
+<span class="fc" id="L136">                    : null;</span>
+<span class="fc" id="L137">                graphStore.saveEdge(new GraphEdge(</span>
+<span class="fc" id="L138">                    state.parentExpression(),</span>
+<span class="fc" id="L139">                    state.expression(),</span>
+<span class="fc" id="L140">                    state.appliedRuleId(),</span>
+<span class="fc" id="L141">                    state.depth(),</span>
+<span class="fc" id="L142">                    state.improvement(),</span>
+<span class="fc" id="L143">                    root + &quot;#&quot; + state.depth(),</span>
+<span class="fc" id="L144">                    state.canonicalHash(),</span>
+<span class="fc" id="L145">                    scorer.score(state.parentExpression()).weightedTotal(),</span>
+<span class="fc" id="L146">                    state.score().weightedTotal(),</span>
+<span class="fc" id="L147">                    state.appliedRuleKind(),</span>
+<span class="fc" id="L148">                    state.mayIncreaseComplexity(),</span>
+<span class="fc" id="L149">                    state.estimatedCostDelta(),</span>
+<span class="fc" id="L150">                    state.equivalencePreservingByConstruction(),</span>
+                    CandidateProofStatus.OBSERVED,
+                    macroExpansion
+                ));
+            }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (state.improvement() &gt; 0) {</span>
+<span class="fc" id="L156">                SimplificationSuccess success = new SimplificationSuccess(</span>
+                    root,
+<span class="fc" id="L158">                    state.expression(),</span>
+<span class="fc" id="L159">                    state.appliedRuleId(),</span>
+<span class="fc" id="L160">                    state.depth(),</span>
+<span class="fc" id="L161">                    state.improvement(),</span>
+<span class="fc" id="L162">                    Instant.now()</span>
+                );
+<span class="fc" id="L164">                successes.add(success);</span>
+<span class="fc" id="L165">                int oldComplexity = scorer.score(state.parentExpression()).weightedTotal();</span>
+<span class="fc" id="L166">                int newComplexity = state.score().weightedTotal();</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                if (heuristic.shouldNotify(oldComplexity, newComplexity)) {</span>
+<span class="fc" id="L168">                    notifier.onSignificantSimplification(state.parentExpression(), state.expression());</span>
+                }
+            }
+<span class="fc" id="L171">        }</span>
+<span class="fc" id="L172">    }</span>
+
+    static int complexity(String expression) {
+<span class="nc" id="L175">        return new ExpressionScorer().score(expression).weightedTotal();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

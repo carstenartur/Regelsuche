@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryEngineFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery</a> &gt; <span class="el_source">DiscoveryEngineFactory.java</span></div><h1>DiscoveryEngineFactory.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery;
+
+import de.regelsuche.mining.GoalAwareMacroMoveSelector;
+import de.regelsuche.mining.MacroMoveTransformationEngine;
+import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.List;
+
+/** Composes discovery engines in deterministic order: base rewrite → hypothesis operators → learned macro moves. */
+public final class DiscoveryEngineFactory {
+    private final HypothesisOperatorRegistry registry;
+
+    public DiscoveryEngineFactory() {
+<span class="fc" id="L15">        this(new HypothesisOperatorRegistry());</span>
+<span class="fc" id="L16">    }</span>
+
+<span class="fc" id="L18">    public DiscoveryEngineFactory(HypothesisOperatorRegistry registry) {</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        this.registry = registry == null ? new HypothesisOperatorRegistry() : registry;</span>
+<span class="fc" id="L20">    }</span>
+
+    public TransformationEngine create(TransformationEngine baseEngine, DiscoveryOptions options) {
+<span class="nc" id="L23">        return create(baseEngine, options, null);</span>
+    }
+
+    public TransformationEngine create(
+        TransformationEngine baseEngine,
+        DiscoveryOptions options,
+        GoalAwareMacroMoveSelector macroSelector
+    ) {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (baseEngine == null) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(&quot;baseEngine is required&quot;);</span>
+        }
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        DiscoveryOptions resolved = options == null ? DiscoveryOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options;</span>
+<span class="fc" id="L35">        DiscoveryEngineOptions engineOptions = resolved.engine();</span>
+<span class="fc" id="L36">        TransformationEngine engine = baseEngine;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (engineOptions.enableHypothesisOperators()) {</span>
+<span class="fc" id="L38">            List&lt;HypothesisOperator&gt; operators = registry.selectOperators(resolved);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (!operators.isEmpty()) {</span>
+<span class="fc" id="L40">                engine = new HypothesisTransformationEngine(</span>
+                    engine,
+                    operators,
+<span class="fc" id="L43">                    engineOptions.maxHypothesisCandidatesPerOperator() * operators.size()</span>
+                );
+            }
+        }
+<span class="fc bfc" id="L47" title="All 4 branches covered.">        if (engineOptions.enableMacroReuse() &amp;&amp; macroSelector != null) {</span>
+<span class="fc" id="L48">            engine = new MacroMoveTransformationEngine(engine, macroSelector);</span>
+        }
+<span class="fc" id="L50">        return engine;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

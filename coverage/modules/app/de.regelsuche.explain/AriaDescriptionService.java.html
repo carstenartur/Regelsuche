@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AriaDescriptionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.explain</a> &gt; <span class="el_source">AriaDescriptionService.java</span></div><h1>AriaDescriptionService.java</h1><pre class="source lang-java linenums">package de.regelsuche.explain;
+
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.export.layout.AstAriaRenderer;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Generates ARIA-ready narration text for replay steps and
+ * transformation paths.
+ *
+ * &lt;p&gt;The narration is derived from the semantic transformation
+ * information (rule id, expression, equivalence status) — never from
+ * rendered HTML or LaTeX strings — to satisfy the requirement that
+ * &quot;the ARIA layer must use semantic transformation information, not
+ * regex/string parsing.&quot;&lt;/p&gt;
+ *
+ * &lt;p&gt;German ({@link Locale#GERMAN}) and English ({@link Locale#ENGLISH})
+ * are fully supported. All other locales fall back to English.&lt;/p&gt;
+ */
+public class AriaDescriptionService {
+
+    private final ExplanationService explanationService;
+
+    public AriaDescriptionService() {
+<span class="fc" id="L27">        this(new ExplanationService());</span>
+<span class="fc" id="L28">    }</span>
+
+<span class="fc" id="L30">    public AriaDescriptionService(ExplanationService explanationService) {</span>
+<span class="fc" id="L31">        this.explanationService = explanationService;</span>
+<span class="fc" id="L32">    }</span>
+
+    // ── Step narration ───────────────────────────────────────────────────────
+
+    /**
+     * Builds a screen-reader-friendly narration for a single
+     * transformation step.
+     *
+     * &lt;p&gt;Example output (English):
+     * &lt;pre&gt;
+     *   Step 1: Distributive law (addition, left). Before: a times open bracket b plus c close bracket.
+     *   After: a times b plus a times c. Equivalence-preserving.
+     * &lt;/pre&gt;&lt;/p&gt;
+     *
+     * @param step      the transformation step
+     * @param stepIndex 0-based step index used in the narration
+     * @param locale    target locale
+     * @return non-null, non-empty narration string
+     */
+    public String stepNarration(TransformationStep step, int stepIndex, Locale locale) {
+<span class="fc" id="L52">        boolean german = isGerman(locale);</span>
+<span class="fc" id="L53">        String fromAria = AstAriaRenderer.ariaLabel(step.beforeExpression(), locale);</span>
+<span class="fc" id="L54">        String toAria   = AstAriaRenderer.ariaLabel(step.afterExpression(), locale);</span>
+<span class="fc" id="L55">        String ruleLabel = explanationService.ruleTitle(step.ruleId(), locale);</span>
+
+        String equivalenceNote;
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (step.equivalencePreserving()) {</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            equivalenceNote = german ? &quot;Äquivalenz erhaltend.&quot; : &quot;Equivalence-preserving.&quot;;</span>
+        } else {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            equivalenceNote = german</span>
+<span class="nc" id="L62">                ? &quot;Achtung: Umformung ist nicht garantiert äquivalent.&quot;</span>
+<span class="nc" id="L63">                : &quot;Warning: transformation is not guaranteed to be equivalent.&quot;;</span>
+        }
+
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (german) {</span>
+<span class="fc" id="L67">            return &quot;Schritt &quot; + (stepIndex + 1) + &quot;: &quot; + ruleLabel + &quot; &quot;</span>
+                + &quot;Vorher: &quot; + fromAria + &quot;. &quot;
+                + &quot;Nachher: &quot; + toAria + &quot;. &quot;
+                + equivalenceNote;
+        } else {
+<span class="fc" id="L72">            return &quot;Step &quot; + (stepIndex + 1) + &quot;: &quot; + ruleLabel + &quot; &quot;</span>
+                + &quot;Before: &quot; + fromAria + &quot;. &quot;
+                + &quot;After: &quot; + toAria + &quot;. &quot;
+                + equivalenceNote;
+        }
+    }
+
+    // ── Comparator-flip warning ──────────────────────────────────────────────
+
+    /**
+     * Returns a warning narration when a transformation flips the
+     * comparator direction of an inequality.
+     *
+     * @param locale target locale
+     * @return warning string suitable for an {@code aria-live} region
+     */
+    public String comparatorFlipWarning(Locale locale) {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (isGerman(locale)) {</span>
+<span class="fc" id="L90">            return &quot;Warnung: Das Vergleichszeichen wurde umgekehrt, &quot;</span>
+                + &quot;weil durch eine negative Zahl dividiert (oder mit ihr multipliziert) wurde.&quot;;
+        } else {
+<span class="fc" id="L93">            return &quot;Warning: The comparator was flipped because division (or multiplication) &quot;</span>
+                + &quot;by a negative number was applied.&quot;;
+        }
+    }
+
+    // ── Path summary narration ───────────────────────────────────────────────
+
+    /**
+     * Builds a full narration for a complete transformation path,
+     * announcing each step in sequence.
+     *
+     * @param path   the transformation path
+     * @param locale target locale
+     * @return multi-line narration string
+     */
+    public String pathNarration(DiscoveredTransformation path, Locale locale) {
+<span class="fc" id="L109">        boolean german = isGerman(locale);</span>
+<span class="fc" id="L110">        List&lt;TransformationStep&gt; steps = path.steps();</span>
+<span class="fc" id="L111">        StringBuilder sb = new StringBuilder();</span>
+
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (german) {</span>
+<span class="nc" id="L114">            sb.append(&quot;Umformungspfad mit &quot;).append(steps.size())</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                .append(steps.size() == 1 ? &quot; Schritt.&quot; : &quot; Schritten.&quot;).append('\n');</span>
+<span class="nc" id="L116">            sb.append(&quot;Ausgangsausdruck: &quot;)</span>
+<span class="nc" id="L117">                .append(AstAriaRenderer.ariaLabel(path.originalExpression(), locale)).append('\n');</span>
+        } else {
+<span class="fc" id="L119">            sb.append(&quot;Transformation path with &quot;).append(steps.size())</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                .append(steps.size() == 1 ? &quot; step.&quot; : &quot; steps.&quot;).append('\n');</span>
+<span class="fc" id="L121">            sb.append(&quot;Original expression: &quot;)</span>
+<span class="fc" id="L122">                .append(AstAriaRenderer.ariaLabel(path.originalExpression(), locale)).append('\n');</span>
+        }
+
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (int i = 0; i &lt; steps.size(); i++) {</span>
+<span class="fc" id="L126">            sb.append(stepNarration(steps.get(i), i, locale)).append('\n');</span>
+        }
+
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (german) {</span>
+<span class="nc" id="L130">            sb.append(&quot;Ergebnis: &quot;)</span>
+<span class="nc" id="L131">                .append(AstAriaRenderer.ariaLabel(path.improvedExpression(), locale));</span>
+        } else {
+<span class="fc" id="L133">            sb.append(&quot;Result: &quot;)</span>
+<span class="fc" id="L134">                .append(AstAriaRenderer.ariaLabel(path.improvedExpression(), locale));</span>
+        }
+<span class="fc" id="L136">        return sb.toString();</span>
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private static boolean isGerman(Locale locale) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (locale == null) {</span>
+<span class="nc" id="L143">            return false;</span>
+        }
+<span class="fc" id="L145">        return &quot;de&quot;.equalsIgnoreCase(locale.getLanguage());</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PslqNumericRelationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.numeric</a> &gt; <span class="el_source">PslqNumericRelationService.java</span></div><h1>PslqNumericRelationService.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.numeric;
+
+import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import de.regelsuche.validation.NumericRelationService;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+public class PslqNumericRelationService implements NumericRelationService {
+    private final MathematicalAlgorithmRegistry registry;
+
+<span class="fc" id="L12">    public PslqNumericRelationService(MathematicalAlgorithmRegistry registry) {</span>
+<span class="fc" id="L13">        this.registry = registry;</span>
+<span class="fc" id="L14">    }</span>
+
+    @Override
+    public NumericRelationResult findIntegerRelation(List&lt;Double&gt; values) {
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        if (!registry.isEnabled(MathematicalAlgorithmRegistry.NUMERIC_RELATION_SEARCH)</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">            || !registry.isEnabled(MathematicalAlgorithmRegistry.PSLQ)) {</span>
+<span class="fc" id="L20">            return new NumericRelationResult(List.of(), Double.NaN,</span>
+<span class="fc" id="L21">                MathematicalAlgorithmRegistry.AlgorithmExecutionResult.disabled(</span>
+                    &quot;numericRelationSearch and pslq must be enabled&quot;));
+        }
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        if (values == null || values.size() &lt; 2) {</span>
+<span class="fc" id="L25">            return new NumericRelationResult(List.of(), Double.NaN,</span>
+<span class="fc" id="L26">                MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(&quot;at least two values are required&quot;));</span>
+        }
+<span class="pc bpc" id="L28" title="1 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || !Double.isFinite(value))) {</span>
+<span class="fc" id="L29">            return new NumericRelationResult(List.of(), Double.NaN,</span>
+<span class="fc" id="L30">                MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(&quot;finite numeric values are required&quot;));</span>
+        }
+<span class="fc bfc" id="L32" title="All 4 branches covered.">        if (values.stream().allMatch(value -&gt; Math.abs(value) &lt;= 1e-15)) {</span>
+<span class="fc" id="L33">            return new NumericRelationResult(List.of(), Double.NaN,</span>
+<span class="fc" id="L34">                MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(&quot;all-zero samples do not define a numeric relation&quot;));</span>
+        }
+
+<span class="fc" id="L37">        MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.PSLQ)</span>
+<span class="fc" id="L38">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L39">            .orElse(MathematicalAlgorithmRegistry.AlgorithmBudget.unbounded());</span>
+
+<span class="fc" id="L41">        SearchState state = new SearchState(values, budget.maxCoefficient(), budget.maxStates(), budget.tolerance());</span>
+<span class="fc" id="L42">        state.search(new int[values.size()], 0);</span>
+
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (state.bestCoefficients != null) {</span>
+<span class="fc" id="L45">            return new NumericRelationResult(</span>
+                state.bestCoefficients,
+                state.bestResidual,
+                new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
+                    MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS,
+                    MathematicalAlgorithmRegistry.ResultType.HYPOTHESIS,
+                    &quot;PSLQ-style numerical relation hypothesis (not a proof)&quot;,
+<span class="fc" id="L52">                    Map.of(&quot;evaluatedCandidates&quot;, state.evaluatedCandidates)</span>
+                )
+            );
+        }
+
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        MathematicalAlgorithmRegistry.ExecutionStatus status = state.evaluatedCandidates &gt;= budget.maxStates()</span>
+<span class="fc" id="L58">            ? MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED</span>
+<span class="pc" id="L59">            : MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN;</span>
+<span class="fc" id="L60">        return new NumericRelationResult(List.of(), Double.NaN,</span>
+            new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
+                status,
+                MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC,
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                status == MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED</span>
+<span class="fc" id="L65">                    ? &quot;search budget exhausted&quot;</span>
+<span class="pc" id="L66">                    : &quot;no integer relation found (unknown)&quot;,</span>
+<span class="fc" id="L67">                Map.of(&quot;evaluatedCandidates&quot;, state.evaluatedCandidates)</span>
+            )
+        );
+    }
+
+    private static final class SearchState {
+        private final List&lt;Double&gt; values;
+        private final int maxCoefficient;
+        private final int maxStates;
+        private final double tolerance;
+        private int evaluatedCandidates;
+        private List&lt;Integer&gt; bestCoefficients;
+<span class="fc" id="L79">        private double bestResidual = Double.POSITIVE_INFINITY;</span>
+
+<span class="fc" id="L81">        private SearchState(List&lt;Double&gt; values, int maxCoefficient, int maxStates, double tolerance) {</span>
+<span class="fc" id="L82">            this.values = values;</span>
+<span class="fc" id="L83">            this.maxCoefficient = Math.max(1, maxCoefficient);</span>
+<span class="fc" id="L84">            this.maxStates = Math.max(1, maxStates);</span>
+<span class="fc" id="L85">            this.tolerance = Math.max(1e-15, tolerance);</span>
+<span class="fc" id="L86">        }</span>
+
+        private void search(int[] coefficients, int index) {
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (evaluatedCandidates &gt;= maxStates) {</span>
+<span class="nc" id="L90">                return;</span>
+            }
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (index == coefficients.length) {</span>
+<span class="fc" id="L93">                evaluate(coefficients);</span>
+<span class="fc" id="L94">                return;</span>
+            }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            for (int coefficient = -maxCoefficient; coefficient &lt;= maxCoefficient; coefficient++) {</span>
+<span class="fc" id="L97">                coefficients[index] = coefficient;</span>
+<span class="fc" id="L98">                search(coefficients, index + 1);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                if (evaluatedCandidates &gt;= maxStates) {</span>
+<span class="fc" id="L100">                    return;</span>
+                }
+            }
+<span class="fc" id="L103">        }</span>
+
+        private void evaluate(int[] coefficients) {
+<span class="fc" id="L106">            evaluatedCandidates++;</span>
+<span class="fc" id="L107">            boolean allZero = true;</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (int coefficient : coefficients) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                if (coefficient != 0) {</span>
+<span class="fc" id="L110">                    allZero = false;</span>
+<span class="fc" id="L111">                    break;</span>
+                }
+            }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (allZero) {</span>
+<span class="fc" id="L115">                return;</span>
+            }
+
+<span class="fc" id="L118">            double residual = 0.0;</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            for (int i = 0; i &lt; coefficients.length; i++) {</span>
+<span class="fc" id="L120">                residual += coefficients[i] * values.get(i);</span>
+            }
+<span class="fc" id="L122">            double absoluteResidual = Math.abs(residual);</span>
+<span class="fc bfc" id="L123" title="All 4 branches covered.">            if (absoluteResidual &lt;= tolerance &amp;&amp; isBetter(coefficients, absoluteResidual)) {</span>
+<span class="fc" id="L124">                bestResidual = absoluteResidual;</span>
+<span class="fc" id="L125">                bestCoefficients = normalize(coefficients);</span>
+            }
+<span class="fc" id="L127">        }</span>
+
+        private boolean isBetter(int[] coefficients, double residual) {
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">            if (bestCoefficients == null || residual &lt; bestResidual - 1e-15) {</span>
+<span class="fc" id="L131">                return true;</span>
+            }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (Math.abs(residual - bestResidual) &gt; 1e-15) {</span>
+<span class="nc" id="L134">                return false;</span>
+            }
+<span class="fc" id="L136">            int score = complexity(coefficients);</span>
+<span class="fc" id="L137">            int bestScore = bestCoefficients.stream().mapToInt(Math::abs).sum();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            return score &lt; bestScore;</span>
+        }
+
+        private int complexity(int[] coefficients) {
+<span class="fc" id="L142">            int result = 0;</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            for (int coefficient : coefficients) {</span>
+<span class="fc" id="L144">                result += Math.abs(coefficient);</span>
+            }
+<span class="fc" id="L146">            return result;</span>
+        }
+
+        private List&lt;Integer&gt; normalize(int[] coefficients) {
+<span class="fc" id="L150">            int gcd = 0;</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            for (int coefficient : coefficients) {</span>
+<span class="fc" id="L152">                gcd = gcd(gcd, Math.abs(coefficient));</span>
+            }
+<span class="fc" id="L154">            List&lt;Integer&gt; normalized = new ArrayList&lt;&gt;(coefficients.length);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            for (int coefficient : coefficients) {</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                normalized.add(gcd == 0 ? coefficient : coefficient / gcd);</span>
+            }
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            for (int value : normalized) {</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                if (value &lt; 0) {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                    for (int i = 0; i &lt; normalized.size(); i++) {</span>
+<span class="fc" id="L161">                        normalized.set(i, -normalized.get(i));</span>
+                    }
+<span class="fc" id="L163">                    break;</span>
+                }
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                if (value &gt; 0) {</span>
+<span class="nc" id="L166">                    break;</span>
+                }
+<span class="nc" id="L168">            }</span>
+<span class="fc" id="L169">            return List.copyOf(normalized);</span>
+        }
+
+        private int gcd(int a, int b) {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (b == 0) {</span>
+<span class="fc" id="L174">                return Math.abs(a);</span>
+            }
+<span class="fc" id="L176">            return gcd(b, a % b);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

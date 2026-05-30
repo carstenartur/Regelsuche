@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProvenanceGraphAssembler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.provenance</a> &gt; <span class="el_source">ProvenanceGraphAssembler.java</span></div><h1>ProvenanceGraphAssembler.java</h1><pre class="source lang-java linenums">package de.regelsuche.provenance;
+
+import de.regelsuche.api.IdentityReportDto;
+import de.regelsuche.api.PathReplayDto;
+import de.regelsuche.api.searchgraph.SearchGraphEdgeDto;
+import de.regelsuche.api.searchgraph.SearchGraphNodeDto;
+import de.regelsuche.api.searchgraph.SearchGraphRecord;
+import de.regelsuche.mining.MacroRuleCandidate;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/** Builds a typed mathematical discovery provenance graph from a persisted search run. */
+<span class="fc" id="L18">public final class ProvenanceGraphAssembler {</span>
+    public ProvenanceGraph assemble(SearchGraphRecord record) {
+<span class="fc" id="L20">        Map&lt;String, ProvenanceNode&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L21">        List&lt;ProvenanceEdge&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L22">        String runId = &quot;search-run:&quot; + record.id();</span>
+<span class="fc" id="L23">        put(nodes, new ProvenanceNode(runId, ProvenanceNodeType.SEARCH_RUN, record.id(), Map.of(</span>
+<span class="fc" id="L24">            &quot;createdAt&quot;, record.createdAt().toString(),</span>
+<span class="fc" id="L25">            &quot;searchProfile&quot;, record.searchProfile(),</span>
+<span class="fc" id="L26">            &quot;domains&quot;, String.join(&quot;,&quot;, record.domains())</span>
+        )));
+
+<span class="fc" id="L29">        put(nodes, new ProvenanceNode(&quot;benchmark:&quot; + record.id(), ProvenanceNodeType.BENCHMARK_RUN,</span>
+<span class="fc" id="L30">            &quot;Benchmark &quot; + record.id(), Map.of(</span>
+<span class="fc" id="L31">                &quot;nodes&quot;, String.valueOf(record.graph().stats().nodesVisited()),</span>
+<span class="fc" id="L32">                &quot;edges&quot;, String.valueOf(record.graph().stats().edgesGenerated()),</span>
+<span class="fc" id="L33">                &quot;bestScore&quot;, String.valueOf(record.graph().stats().bestScore())</span>
+            )));
+<span class="fc" id="L35">        edges.add(new ProvenanceEdge(&quot;benchmark:&quot; + record.id(), runId, ProvenanceEdgeType.GENERATED_BY, Map.of()));</span>
+
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (SearchGraphNodeDto graphNode : record.graph().nodes()) {</span>
+<span class="fc" id="L38">            String nodeId = &quot;seed:&quot; + record.id() + &quot;:&quot; + graphNode.id();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (graphNode.depth() == 0) {</span>
+<span class="fc" id="L40">                put(nodes, new ProvenanceNode(nodeId, ProvenanceNodeType.SEED_EXPRESSION, graphNode.expression(),</span>
+<span class="fc" id="L41">                    Map.of(&quot;expression&quot;, graphNode.expression(), &quot;score&quot;, String.valueOf(graphNode.score()))));</span>
+<span class="fc" id="L42">                edges.add(new ProvenanceEdge(nodeId, runId, ProvenanceEdgeType.GENERATED_BY, Map.of()));</span>
+            }
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            if (graphNode.candidateStatus() == CandidateProofStatus.REJECTED) {</span>
+<span class="nc" id="L45">                String counterexampleId = &quot;counterexample:&quot; + record.id() + &quot;:&quot; + graphNode.id();</span>
+<span class="nc" id="L46">                put(nodes, new ProvenanceNode(counterexampleId, ProvenanceNodeType.COUNTEREXAMPLE,</span>
+<span class="nc" id="L47">                    &quot;Counterexample for &quot; + graphNode.expression(), Map.of(</span>
+<span class="nc" id="L48">                        &quot;expression&quot;, graphNode.expression(),</span>
+<span class="nc" id="L49">                        &quot;domains&quot;, String.join(&quot;,&quot;, record.domains())</span>
+                    )));
+<span class="nc" id="L51">                edges.add(new ProvenanceEdge(counterexampleId, runId, ProvenanceEdgeType.GENERATED_BY, Map.of()));</span>
+            }
+<span class="fc" id="L53">        }</span>
+
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (PathReplayDto replay : record.replays()) {</span>
+<span class="fc" id="L56">            String pathId = pathNodeId(record.id(), replay.pathId());</span>
+<span class="fc" id="L57">            put(nodes, new ProvenanceNode(pathId, ProvenanceNodeType.TRANSFORMATION_PATH, replay.pathId(),</span>
+<span class="fc" id="L58">                Map.of(&quot;stepCount&quot;, String.valueOf(replay.steps().size()))));</span>
+<span class="fc" id="L59">            edges.add(new ProvenanceEdge(pathId, runId, ProvenanceEdgeType.REPLAY_OF, Map.of()));</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            for (PathReplayDto.ReplayStep step : replay.steps()) {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                if (step.macroMoveExpansion() != null) {</span>
+<span class="nc" id="L62">                    String macroId = &quot;macro:&quot; + record.id() + &quot;:&quot; + step.ruleId();</span>
+<span class="nc" id="L63">                    put(nodes, new ProvenanceNode(macroId, ProvenanceNodeType.MACRO_MOVE, step.ruleId(),</span>
+<span class="nc" id="L64">                        Map.of(&quot;ruleId&quot;, step.ruleId())));</span>
+<span class="nc" id="L65">                    edges.add(new ProvenanceEdge(macroId, pathId, ProvenanceEdgeType.USEFUL_FOR,</span>
+<span class="nc" id="L66">                        Map.of(&quot;stepIndex&quot;, String.valueOf(step.stepIndex()))));</span>
+                }
+<span class="fc" id="L68">            }</span>
+<span class="fc" id="L69">        }</span>
+
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (SearchGraphEdgeDto edge : record.graph().edges()) {</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (String assumption : edge.assumptions()) {</span>
+<span class="fc" id="L73">                String assumptionId = assumptionNodeId(record.id(), assumption);</span>
+<span class="fc" id="L74">                put(nodes, new ProvenanceNode(assumptionId, ProvenanceNodeType.ASSUMPTION_SIGNATURE, assumption,</span>
+<span class="fc" id="L75">                    Map.of(&quot;assumption&quot;, assumption)));</span>
+<span class="fc" id="L76">                edges.add(new ProvenanceEdge(assumptionId, runId, ProvenanceEdgeType.GENERATED_BY, Map.of()));</span>
+<span class="fc" id="L77">            }</span>
+<span class="fc" id="L78">        }</span>
+
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (MacroRuleCandidate macro : record.macroRules()) {</span>
+<span class="fc" id="L81">            String macroId = &quot;macro:&quot; + record.id() + &quot;:&quot; + macro.id();</span>
+<span class="fc" id="L82">            put(nodes, new ProvenanceNode(macroId, ProvenanceNodeType.MACRO_MOVE, macro.id(), Map.of(</span>
+<span class="fc" id="L83">                &quot;leftPattern&quot;, macro.leftPattern(),</span>
+<span class="fc" id="L84">                &quot;rightPattern&quot;, macro.rightPattern(),</span>
+<span class="fc" id="L85">                &quot;occurrences&quot;, String.valueOf(macro.occurrences()),</span>
+<span class="fc" id="L86">                &quot;compressionRatio&quot;, String.valueOf(macro.compressionRatio()),</span>
+<span class="fc" id="L87">                &quot;proofStatus&quot;, macro.proofStatus().name()</span>
+            )));
+<span class="fc" id="L89">            edges.add(new ProvenanceEdge(macroId, runId, ProvenanceEdgeType.DERIVED_FROM, Map.of()));</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (String pathId : macro.supportingTransformationIds()) {</span>
+<span class="fc" id="L91">                put(nodes, new ProvenanceNode(pathNodeId(record.id(), pathId),</span>
+<span class="fc" id="L92">                    ProvenanceNodeType.TRANSFORMATION_PATH, pathId, Map.of()));</span>
+<span class="fc" id="L93">                edges.add(new ProvenanceEdge(macroId, pathNodeId(record.id(), pathId),</span>
+<span class="fc" id="L94">                    ProvenanceEdgeType.SUPPORTED_BY, Map.of()));</span>
+<span class="fc" id="L95">                edges.add(new ProvenanceEdge(macroId, pathNodeId(record.id(), pathId),</span>
+<span class="fc" id="L96">                    ProvenanceEdgeType.USEFUL_FOR, Map.of(&quot;source&quot;, &quot;macro-support&quot;)));</span>
+<span class="fc" id="L97">            }</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            for (String assumption : macro.assumptions()) {</span>
+<span class="fc" id="L99">                put(nodes, new ProvenanceNode(assumptionNodeId(record.id(), assumption),</span>
+<span class="fc" id="L100">                    ProvenanceNodeType.ASSUMPTION_SIGNATURE, assumption, Map.of(&quot;assumption&quot;, assumption)));</span>
+<span class="fc" id="L101">                edges.add(new ProvenanceEdge(macroId, assumptionNodeId(record.id(), assumption),</span>
+<span class="fc" id="L102">                    ProvenanceEdgeType.SUPPORTED_BY, Map.of(&quot;kind&quot;, &quot;assumption&quot;)));</span>
+<span class="fc" id="L103">            }</span>
+<span class="fc" id="L104">        }</span>
+
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (IdentityReportDto identity : record.identities()) {</span>
+<span class="fc" id="L107">            String hypothesisId = &quot;hypothesis:&quot; + record.id() + &quot;:&quot; + identity.id();</span>
+<span class="fc" id="L108">            put(nodes, new ProvenanceNode(hypothesisId, ProvenanceNodeType.HYPOTHESIS, identity.id(), Map.of(</span>
+<span class="fc" id="L109">                &quot;leftPattern&quot;, identity.leftPattern(),</span>
+<span class="fc" id="L110">                &quot;rightPattern&quot;, identity.rightPattern(),</span>
+<span class="fc" id="L111">                &quot;occurrences&quot;, String.valueOf(identity.occurrences()),</span>
+<span class="fc" id="L112">                &quot;compressionRatio&quot;, String.valueOf(identity.compressionRatio()),</span>
+<span class="fc" id="L113">                &quot;proofStatus&quot;, identity.proofStatus().name(),</span>
+<span class="fc" id="L114">                &quot;knownRuleStatus&quot;, identity.knownRuleStatus().name()</span>
+            )));
+<span class="fc" id="L116">            edges.add(new ProvenanceEdge(hypothesisId, runId, ProvenanceEdgeType.DERIVED_FROM, Map.of()));</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (String pathId : identity.supportingTransformationIds()) {</span>
+<span class="fc" id="L118">                put(nodes, new ProvenanceNode(pathNodeId(record.id(), pathId),</span>
+<span class="fc" id="L119">                    ProvenanceNodeType.TRANSFORMATION_PATH, pathId, Map.of()));</span>
+<span class="fc" id="L120">                edges.add(new ProvenanceEdge(hypothesisId, pathNodeId(record.id(), pathId),</span>
+<span class="fc" id="L121">                    ProvenanceEdgeType.SUPPORTED_BY, Map.of()));</span>
+<span class="fc" id="L122">                edges.add(new ProvenanceEdge(hypothesisId, pathNodeId(record.id(), pathId),</span>
+<span class="fc" id="L123">                    ProvenanceEdgeType.GENERALIZES, Map.of()));</span>
+<span class="fc" id="L124">            }</span>
+<span class="fc" id="L125">            addProofOrCounterexample(record, nodes, edges, identity, hypothesisId);</span>
+<span class="fc" id="L126">            addSpecializedEvidence(record, nodes, edges, identity, hypothesisId);</span>
+<span class="fc" id="L127">        }</span>
+
+<span class="fc" id="L129">        return new ProvenanceGraph(List.copyOf(nodes.values()), edges);</span>
+    }
+
+    private static void addSpecializedEvidence(
+        SearchGraphRecord record,
+        Map&lt;String, ProvenanceNode&gt; nodes,
+        List&lt;ProvenanceEdge&gt; edges,
+        IdentityReportDto identity,
+        String hypothesisId
+    ) {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (isSymbolicRegression(identity)) {</span>
+<span class="fc" id="L140">            String proposalId = &quot;symreg:&quot; + record.id() + &quot;:&quot; + identity.id();</span>
+<span class="fc" id="L141">            put(nodes, new ProvenanceNode(proposalId, ProvenanceNodeType.SYMBOLIC_REGRESSION_PROPOSAL,</span>
+<span class="fc" id="L142">                identity.id(), Map.of(</span>
+<span class="fc" id="L143">                    &quot;leftPattern&quot;, identity.leftPattern(),</span>
+<span class="fc" id="L144">                    &quot;rightPattern&quot;, identity.rightPattern(),</span>
+<span class="fc" id="L145">                    &quot;regressionSource&quot;, regressionSource(identity),</span>
+<span class="fc" id="L146">                    &quot;templateName&quot;, templateName(identity),</span>
+<span class="fc" id="L147">                    &quot;proofStatus&quot;, identity.proofStatus().name(),</span>
+<span class="fc" id="L148">                    &quot;supportCount&quot;, String.valueOf(identity.supportingTransformationIds().size())</span>
+                )));
+<span class="fc" id="L150">            edges.add(new ProvenanceEdge(hypothesisId, proposalId, ProvenanceEdgeType.SUPPORTED_BY,</span>
+<span class="fc" id="L151">                Map.of(&quot;kind&quot;, &quot;symbolic-regression&quot;)));</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            for (String pathId : identity.supportingTransformationIds()) {</span>
+<span class="fc" id="L153">                edges.add(new ProvenanceEdge(proposalId, pathNodeId(record.id(), pathId),</span>
+<span class="fc" id="L154">                    ProvenanceEdgeType.PROPOSAL_FROM, Map.of()));</span>
+<span class="fc" id="L155">            }</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (isNumericRelation(identity)) {</span>
+<span class="fc" id="L158">            String relationId = &quot;numeric-relation:&quot; + record.id() + &quot;:&quot; + identity.id();</span>
+<span class="fc" id="L159">            Map&lt;String, String&gt; relationProperties = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L160">            relationProperties.put(&quot;leftPattern&quot;, identity.leftPattern());</span>
+<span class="fc" id="L161">            relationProperties.put(&quot;rightPattern&quot;, identity.rightPattern());</span>
+<span class="fc" id="L162">            relationProperties.put(&quot;coefficients&quot;, String.join(&quot;,&quot;, numericCoefficientTokens(identity)));</span>
+<span class="fc" id="L163">            parseResidual(identity).ifPresent(value -&gt; relationProperties.put(&quot;residual&quot;, value));</span>
+<span class="fc" id="L164">            relationProperties.put(&quot;resultType&quot;, &quot;HYPOTHESIS&quot;);</span>
+<span class="fc" id="L165">            relationProperties.put(&quot;proofStatus&quot;, identity.proofStatus().name());</span>
+<span class="fc" id="L166">            relationProperties.put(&quot;status&quot;, &quot;SUCCESS&quot;);</span>
+<span class="fc" id="L167">            put(nodes, new ProvenanceNode(relationId, ProvenanceNodeType.NUMERIC_RELATION_CANDIDATE,</span>
+<span class="fc" id="L168">                identity.id(), relationProperties));</span>
+<span class="fc" id="L169">            edges.add(new ProvenanceEdge(hypothesisId, relationId, ProvenanceEdgeType.SUPPORTED_BY,</span>
+<span class="fc" id="L170">                Map.of(&quot;kind&quot;, &quot;numeric-relation&quot;)));</span>
+        }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (identity.proofStatus().atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED)) {</span>
+<span class="fc" id="L173">            String casId = &quot;cas:&quot; + record.id() + &quot;:&quot; + identity.id();</span>
+<span class="fc" id="L174">            put(nodes, new ProvenanceNode(casId, ProvenanceNodeType.CAS_VALIDATION_ATTEMPT,</span>
+<span class="fc" id="L175">                &quot;CAS &quot; + identity.id(), Map.of(</span>
+                    &quot;backend&quot;, &quot;domain-aware-cas-router&quot;,
+                    &quot;status&quot;, &quot;SUCCESS&quot;,
+                    &quot;resultType&quot;, &quot;PROOF&quot;,
+<span class="fc" id="L179">                    &quot;proofStatus&quot;, identity.proofStatus().name(),</span>
+<span class="fc" id="L180">                    &quot;domains&quot;, String.join(&quot;,&quot;, record.domains())</span>
+                )));
+<span class="fc" id="L182">            edges.add(new ProvenanceEdge(hypothesisId, casId,</span>
+                ProvenanceEdgeType.VALIDATED_BY_CAS,
+<span class="fc" id="L184">                Map.of()));</span>
+        }
+<span class="fc" id="L186">    }</span>
+
+    private static void addProofOrCounterexample(
+        SearchGraphRecord record,
+        Map&lt;String, ProvenanceNode&gt; nodes,
+        List&lt;ProvenanceEdge&gt; edges,
+        IdentityReportDto identity,
+        String hypothesisId
+    ) {
+<span class="fc" id="L195">        CounterexampleSearchService.Status status = identity.counterexampleStatus();</span>
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">        if (status == null &amp;&amp; identity.proofStatus() == CandidateProofStatus.REJECTED) {</span>
+<span class="nc" id="L197">            status = CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND;</span>
+        }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (status != null) {</span>
+<span class="fc" id="L200">            String attemptId = &quot;counterexample-attempt:&quot; + record.id() + &quot;:&quot; + identity.id();</span>
+<span class="fc" id="L201">            Map&lt;String, String&gt; attemptProperties = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L202">            attemptProperties.put(&quot;status&quot;, status.name());</span>
+<span class="fc" id="L203">            attemptProperties.put(&quot;attemptedSources&quot;, String.join(&quot;,&quot;, identity.counterexampleAttemptedSources()));</span>
+<span class="fc" id="L204">            attemptProperties.put(&quot;inferredAssumptions&quot;, String.join(&quot;,&quot;, identity.inferredAssumptions()));</span>
+<span class="fc" id="L205">            attemptProperties.put(&quot;explanation&quot;, identity.counterexampleExplanation());</span>
+<span class="fc" id="L206">            attemptProperties.put(&quot;runId&quot;, record.id());</span>
+<span class="fc" id="L207">            put(nodes, new ProvenanceNode(attemptId, ProvenanceNodeType.COUNTEREXAMPLE_SEARCH_ATTEMPT,</span>
+<span class="fc" id="L208">                &quot;Counterexample search &quot; + identity.id(), attemptProperties));</span>
+<span class="fc" id="L209">            edges.add(new ProvenanceEdge(hypothesisId, attemptId, ProvenanceEdgeType.HYPOTHESIS_TESTED_BY,</span>
+<span class="fc" id="L210">                Map.of(&quot;status&quot;, status.name())));</span>
+<span class="pc bpc" id="L211" title="2 of 3 branches missed.">            edges.add(new ProvenanceEdge(attemptId, hypothesisId, switch (status) {</span>
+<span class="fc" id="L212">                case COUNTEREXAMPLE_FOUND -&gt; ProvenanceEdgeType.FOUND_COUNTEREXAMPLE;</span>
+<span class="nc" id="L213">                case NO_COUNTEREXAMPLE_FOUND -&gt; ProvenanceEdgeType.NO_COUNTEREXAMPLE_WITHIN_BUDGET;</span>
+<span class="pc" id="L214">                case INCONCLUSIVE -&gt; ProvenanceEdgeType.INCONCLUSIVE_DUE_TO;</span>
+<span class="fc" id="L215">            }, Map.of(&quot;explanation&quot;, identity.counterexampleExplanation())));</span>
+        }
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (status == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {</span>
+<span class="fc" id="L218">            String counterexampleId = &quot;counterexample:&quot; + record.id() + &quot;:&quot; + identity.id();</span>
+<span class="fc" id="L219">            put(nodes, new ProvenanceNode(counterexampleId, ProvenanceNodeType.COUNTEREXAMPLE,</span>
+<span class="fc" id="L220">                &quot;Counterexample &quot; + identity.id(), Map.of(</span>
+                    &quot;failedAssumptions&quot;, &quot;&quot;,
+<span class="fc" id="L222">                    &quot;domains&quot;, String.join(&quot;,&quot;, record.domains()),</span>
+<span class="fc" id="L223">                    &quot;invalidRule&quot;, identity.id(),</span>
+<span class="fc" id="L224">                    &quot;status&quot;, status.name()</span>
+                )));
+<span class="fc" id="L226">            edges.add(new ProvenanceEdge(hypothesisId, counterexampleId, ProvenanceEdgeType.REFUTED_BY, Map.of()));</span>
+<span class="fc" id="L227">            return;</span>
+        }
+<span class="fc" id="L229">        String proofId = &quot;proof:&quot; + record.id() + &quot;:&quot; + identity.id();</span>
+<span class="fc" id="L230">        put(nodes, new ProvenanceNode(proofId, ProvenanceNodeType.PROOF_ATTEMPT,</span>
+<span class="fc" id="L231">            &quot;Proof &quot; + identity.id(), Map.of(</span>
+                &quot;backend&quot;, &quot;search-replay&quot;,
+<span class="fc" id="L233">                &quot;confidence&quot;, identity.proofStatus().name(),</span>
+                &quot;durationMillis&quot;, &quot;&quot;,
+<span class="fc" id="L235">                &quot;artifact&quot;, identity.id()</span>
+            )));
+<span class="fc" id="L237">        edges.add(new ProvenanceEdge(hypothesisId, proofId, ProvenanceEdgeType.SUPPORTED_BY, Map.of()));</span>
+<span class="fc" id="L238">    }</span>
+
+    private static String pathNodeId(String runId, String pathId) {
+<span class="fc" id="L241">        return &quot;path:&quot; + runId + &quot;:&quot; + pathId;</span>
+    }
+
+    private static String assumptionNodeId(String runId, String assumption) {
+<span class="fc" id="L245">        return &quot;assumption:&quot; + runId + &quot;:&quot; + Integer.toHexString(assumption.hashCode());</span>
+    }
+
+    private static void put(Map&lt;String, ProvenanceNode&gt; nodes, ProvenanceNode node) {
+<span class="fc" id="L249">        nodes.putIfAbsent(node.id(), node);</span>
+<span class="fc" id="L250">    }</span>
+
+    private static boolean isSymbolicRegression(IdentityReportDto identity) {
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        return identity.id().contains(&quot;symreg&quot;)</span>
+<span class="pc bpc" id="L254" title="2 of 4 branches missed.">            || identity.ruleIdSequence().stream().anyMatch(value -&gt; value.contains(&quot;symbolic-regression&quot;)</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">                || value.contains(&quot;template:&quot;));</span>
+    }
+
+    private static boolean isNumericRelation(IdentityReportDto identity) {
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        return identity.id().contains(&quot;pslq&quot;)</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            || identity.id().contains(&quot;numeric-relation&quot;)</span>
+<span class="pc bpc" id="L261" title="2 of 4 branches missed.">            || identity.ruleIdSequence().stream().anyMatch(value -&gt; value.contains(&quot;pslq&quot;)</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">                || value.contains(&quot;numeric-relation&quot;));</span>
+    }
+
+    private static String regressionSource(IdentityReportDto identity) {
+<span class="fc" id="L266">        return identity.ruleIdSequence().stream()</span>
+<span class="fc" id="L267">            .filter(value -&gt; value.contains(&quot;symbolic-regression&quot;))</span>
+<span class="fc" id="L268">            .findFirst()</span>
+<span class="fc" id="L269">            .orElse(&quot;symbolic-regression&quot;);</span>
+    }
+
+    private static String templateName(IdentityReportDto identity) {
+<span class="fc" id="L273">        return identity.ruleIdSequence().stream()</span>
+<span class="fc" id="L274">            .filter(value -&gt; value.startsWith(&quot;template:&quot;))</span>
+<span class="fc" id="L275">            .map(value -&gt; value.substring(&quot;template:&quot;.length()))</span>
+<span class="fc" id="L276">            .findFirst()</span>
+<span class="fc" id="L277">            .orElse(&quot;&quot;);</span>
+    }
+
+    private static List&lt;String&gt; numericCoefficientTokens(IdentityReportDto identity) {
+<span class="fc" id="L281">        return identity.ruleIdSequence().stream()</span>
+<span class="fc" id="L282">            .map(String::trim)</span>
+<span class="fc" id="L283">            .filter(ProvenanceGraphAssembler::isNumericToken)</span>
+<span class="fc" id="L284">            .toList();</span>
+    }
+
+    private static Optional&lt;String&gt; parseResidual(IdentityReportDto identity) {
+<span class="fc" id="L288">        return identity.ruleIdSequence().stream()</span>
+<span class="fc" id="L289">            .map(String::trim)</span>
+<span class="pc bpc" id="L290" title="1 of 4 branches missed.">            .filter(value -&gt; value.startsWith(&quot;residual:&quot;) || value.startsWith(&quot;residual=&quot;))</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            .map(value -&gt; value.substring(value.indexOf(':') &gt;= 0 ? value.indexOf(':') + 1 : value.indexOf('=') + 1).trim())</span>
+<span class="fc" id="L292">            .filter(ProvenanceGraphAssembler::isNumericToken)</span>
+<span class="fc" id="L293">            .findFirst();</span>
+    }
+
+    private static boolean isNumericToken(String value) {
+<span class="fc" id="L297">        return value.matches(&quot;[-+]?\\d+(?:\\.\\d+)?&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

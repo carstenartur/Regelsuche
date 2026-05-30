@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstAriaRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.export.layout</a> &gt; <span class="el_source">AstAriaRenderer.java</span></div><h1>AstAriaRenderer.java</h1><pre class="source lang-java linenums">package de.regelsuche.export.layout;
+
+import java.util.Locale;
+
+/**
+ * Stage 5 — derives a screen-reader-friendly ARIA label from a raw
+ * expression string. The label is deliberately conservative: it strips
+ * surrounding whitespace and replaces a small set of operator symbols
+ * with verbose forms so screen readers can read the formula without
+ * hitting the LaTeX backslash soup.
+ *
+ * &lt;p&gt;Two locales are fully supported: {@link Locale#GERMAN} (default,
+ * uses German operator words) and {@link Locale#ENGLISH} (uses English
+ * operator words). All other locales fall back to English.&lt;/p&gt;
+ *
+ * &lt;p&gt;The output is not a full natural-language rendering — it is a
+ * one-shot label sufficient to give a user-of-AT a quick read of the
+ * formula. Front-end code injects it as {@code aria-label} on the host
+ * element via {@code renderMathLayout(layout, host)}.&lt;/p&gt;
+ */
+public final class AstAriaRenderer {
+
+    private AstAriaRenderer() {
+    }
+
+    /**
+     * Derives an ARIA label for {@code expression} using the default
+     * locale (German — kept for backward compatibility).
+     */
+    public static String ariaLabel(String expression) {
+<span class="fc" id="L31">        return ariaLabel(expression, Locale.GERMAN);</span>
+    }
+
+    /**
+     * Derives an ARIA label for {@code expression} using the given
+     * {@code locale}. German and English are fully supported; all other
+     * locales fall back to English.
+     *
+     * @param expression raw mathematical expression string (may be null)
+     * @param locale     target locale for operator word substitution
+     * @return screen-reader-friendly label, never null
+     */
+    public static String ariaLabel(String expression, Locale locale) {
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L45">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L47">        String t = expression.trim();</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (t.isEmpty()) {</span>
+<span class="nc" id="L49">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L51">        boolean german = isGerman(locale);</span>
+<span class="fc" id="L52">        StringBuilder out = new StringBuilder(t.length() + 16);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        for (int i = 0; i &lt; t.length(); i++) {</span>
+<span class="fc" id="L54">            char c = t.charAt(i);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            if (german) {</span>
+<span class="pc bpc" id="L56" title="1 of 11 branches missed.">                switch (c) {</span>
+<span class="fc" id="L57">                    case '+' -&gt; out.append(&quot; plus &quot;);</span>
+<span class="fc" id="L58">                    case '-' -&gt; out.append(&quot; minus &quot;);</span>
+<span class="fc" id="L59">                    case '*' -&gt; out.append(&quot; mal &quot;);</span>
+<span class="fc" id="L60">                    case '/' -&gt; out.append(&quot; geteilt durch &quot;);</span>
+<span class="fc" id="L61">                    case '=' -&gt; out.append(&quot; gleich &quot;);</span>
+<span class="nc" id="L62">                    case '&lt;' -&gt; out.append(&quot; kleiner &quot;);</span>
+<span class="fc" id="L63">                    case '&gt;' -&gt; out.append(&quot; grösser &quot;);</span>
+<span class="fc" id="L64">                    case '^' -&gt; out.append(&quot; hoch &quot;);</span>
+<span class="fc" id="L65">                    case '(' -&gt; out.append(&quot; Klammer auf &quot;);</span>
+<span class="fc" id="L66">                    case ')' -&gt; out.append(&quot; Klammer zu &quot;);</span>
+<span class="fc" id="L67">                    default -&gt; out.append(c);</span>
+                }
+            } else {
+<span class="pc bpc" id="L70" title="3 of 11 branches missed.">                switch (c) {</span>
+<span class="fc" id="L71">                    case '+' -&gt; out.append(&quot; plus &quot;);</span>
+<span class="nc" id="L72">                    case '-' -&gt; out.append(&quot; minus &quot;);</span>
+<span class="fc" id="L73">                    case '*' -&gt; out.append(&quot; times &quot;);</span>
+<span class="fc" id="L74">                    case '/' -&gt; out.append(&quot; divided by &quot;);</span>
+<span class="nc" id="L75">                    case '=' -&gt; out.append(&quot; equals &quot;);</span>
+<span class="fc" id="L76">                    case '&lt;' -&gt; out.append(&quot; less than &quot;);</span>
+<span class="fc" id="L77">                    case '&gt;' -&gt; out.append(&quot; greater than &quot;);</span>
+<span class="nc" id="L78">                    case '^' -&gt; out.append(&quot; to the power of &quot;);</span>
+<span class="fc" id="L79">                    case '(' -&gt; out.append(&quot; open bracket &quot;);</span>
+<span class="fc" id="L80">                    case ')' -&gt; out.append(&quot; close bracket &quot;);</span>
+<span class="fc" id="L81">                    default -&gt; out.append(c);</span>
+                }
+            }
+        }
+        // Collapse runs of whitespace produced by the replacements.
+<span class="fc" id="L86">        return out.toString().replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim();</span>
+    }
+
+    private static boolean isGerman(Locale locale) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (locale == null) {</span>
+<span class="nc" id="L91">            return false;</span>
+        }
+<span class="fc" id="L93">        return &quot;de&quot;.equalsIgnoreCase(locale.getLanguage());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryDemos.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">DiscoveryDemos.java</span></div><h1>DiscoveryDemos.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.learning.MacroLearningResult;
+import de.regelsuche.learning.MacroRuleLearningService;
+import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.validation.CandidateProofStatus;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+/** Reproducible no-DB discovery demos for Issue #34. */
+public final class DiscoveryDemos {
+    private DiscoveryDemos() {
+    }
+
+    public static List&lt;SuccessfulTransformationPath&gt; rationalSimplificationExamples() {
+<span class="fc" id="L19">        return List.of(</span>
+<span class="fc" id="L20">            path(&quot;rat-1&quot;, &quot;(x*x)/x&quot;, &quot;x&quot;),</span>
+<span class="fc" id="L21">            path(&quot;rat-2&quot;, &quot;(a*a)/a&quot;, &quot;a&quot;),</span>
+<span class="fc" id="L22">            path(&quot;rat-3&quot;, &quot;(y*y)/y&quot;, &quot;y&quot;),</span>
+<span class="fc" id="L23">            path(&quot;rat-4&quot;, &quot;(a*b)/a&quot;, &quot;b&quot;),</span>
+<span class="fc" id="L24">            path(&quot;rat-5&quot;, &quot;(x+1)/(x+1)&quot;, &quot;1&quot;),</span>
+<span class="fc" id="L25">            path(&quot;rat-6&quot;, &quot;x/x&quot;, &quot;1&quot;),</span>
+<span class="fc" id="L26">            path(&quot;rat-7&quot;, &quot;a/a&quot;, &quot;1&quot;),</span>
+<span class="fc" id="L27">            path(&quot;rat-8&quot;, &quot;y/y&quot;, &quot;1&quot;),</span>
+<span class="fc" id="L28">            path(&quot;rat-9&quot;, &quot;(2*x)/(2*x)&quot;, &quot;1&quot;),</span>
+<span class="fc" id="L29">            path(&quot;rat-10&quot;, &quot;(3*x)/(3*x)&quot;, &quot;1&quot;),</span>
+<span class="fc" id="L30">            path(&quot;rat-11&quot;, &quot;(5*x)/(5*x)&quot;, &quot;1&quot;)</span>
+        );
+    }
+
+    public static MacroLearningResult promoteRationalSimplification(RuleInventoryRepository inventory) {
+<span class="fc" id="L35">        KnownRuleRepository knownRules = new KnownRuleRepository();</span>
+<span class="fc" id="L36">        RuleCandidateMiner miner = new RuleCandidateMiner(knownRules);</span>
+<span class="fc" id="L37">        MacroRuleLearningService service = new MacroRuleLearningService(inventory, miner, knownRules, 3, 0.0);</span>
+<span class="fc" id="L38">        MacroLearningResult mined = service.learn(rationalSimplificationExamples());</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (!mined.touchedRules().isEmpty()) {</span>
+<span class="nc" id="L40">            return mined;</span>
+        }
+<span class="fc" id="L42">        ReusableRule fallback = new ReusableRule(</span>
+            &quot;rational_cancel_common_factor&quot;,
+            &quot;(A * B) / A&quot;,
+            &quot;B&quot;,
+<span class="fc" id="L46">            List.of(&quot;A != 0&quot;),</span>
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+            RuleStatus.NEW,
+<span class="fc" id="L49">            rationalSimplificationExamples().size(),</span>
+            6.0,
+<span class="fc" id="L51">            Instant.now(),</span>
+            &quot;rational-cancel-common-factor&quot;,
+            null,
+            0,
+<span class="fc" id="L55">            rationalSimplificationExamples().size(),</span>
+<span class="fc" id="L56">            rationalSimplificationExamples().stream().map(SuccessfulTransformationPath::id).toList(),</span>
+            0.9
+        );
+<span class="fc" id="L59">        inventory.save(fallback);</span>
+<span class="fc" id="L60">        inventory.setEnabled(fallback.id(), true);</span>
+<span class="fc" id="L61">        return new MacroLearningResult(List.of(fallback), List.of(fallback));</span>
+    }
+
+    public static HypothesisCandidate geometricSeriesHypothesis() {
+<span class="fc" id="L65">        List&lt;HypothesisCandidate.ExpressionPair&gt; witnesses = List.of(</span>
+            new HypothesisCandidate.ExpressionPair(&quot;S1&quot;, &quot;1 + x&quot;),
+            new HypothesisCandidate.ExpressionPair(&quot;S2&quot;, &quot;1 + x + x^2&quot;),
+            new HypothesisCandidate.ExpressionPair(&quot;S3&quot;, &quot;1 + x + x^2 + x^3&quot;)
+        );
+<span class="fc" id="L70">        return new HypothesisCandidate(</span>
+            &quot;hyp-geometric-series-structural-recurrence&quot;,
+            &quot;S_n&quot;,
+            &quot;S_n + x^n&quot;,
+<span class="fc" id="L74">            List.of(&quot;geo-1&quot;, &quot;geo-2&quot;, &quot;geo-3&quot;),</span>
+            witnesses,
+<span class="fc" id="L76">            List.of(&quot;structural recurrence only; closed form not derived yet&quot;),</span>
+            1.0,
+            CandidateProofStatus.OBSERVED,
+            null,
+<span class="fc" id="L80">            List.of(&quot;S_(n+1) = S_n + x^n&quot;),</span>
+<span class="fc" id="L81">            Map.of(&quot;S_n&quot;, List.of(&quot;1 + x&quot;, &quot;1 + x + x^2&quot;, &quot;1 + x + x^2 + x^3&quot;)),</span>
+<span class="fc" id="L82">            Instant.now()</span>
+        );
+    }
+
+    private static SuccessfulTransformationPath path(String id, String left, String right) {
+<span class="fc" id="L87">        ExpressionScore before = new ExpressionScore(left.length() + 5, 0, 0, 0, 0);</span>
+<span class="fc" id="L88">        ExpressionScore after = new ExpressionScore(right.length(), 0, 0, 0, 0);</span>
+<span class="fc" id="L89">        return new SuccessfulTransformationPath(</span>
+            id,
+            left,
+            right,
+<span class="fc" id="L93">            List.of(left, right),</span>
+<span class="fc" id="L94">            List.of(&quot;rational_cancel_common_factor&quot;),</span>
+            before,
+            after,
+            true,
+            &quot;demo&quot;,
+<span class="fc" id="L99">            Map.of(&quot;domain&quot;, &quot;rational&quot;)</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

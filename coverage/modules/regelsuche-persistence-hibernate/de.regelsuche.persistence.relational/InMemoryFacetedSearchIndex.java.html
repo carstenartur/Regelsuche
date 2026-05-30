@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InMemoryFacetedSearchIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence-hibernate</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence.relational</a> &gt; <span class="el_source">InMemoryFacetedSearchIndex.java</span></div><h1>InMemoryFacetedSearchIndex.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence.relational;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/** Lightweight demo-mode implementation of the same full-text/facet contract. */
+<span class="fc" id="L11">public final class InMemoryFacetedSearchIndex implements FacetedSearchIndex {</span>
+<span class="fc" id="L12">    private final Map&lt;String, SearchIndexDocument&gt; documents = new ConcurrentHashMap&lt;&gt;();</span>
+
+    @Override
+    public void index(SearchIndexDocument document) {
+<span class="fc" id="L16">        documents.put(document.documentId(), document);</span>
+<span class="fc" id="L17">    }</span>
+
+    @Override
+    public List&lt;SearchResult&gt; search(SearchQuery query) {
+<span class="fc" id="L21">        List&lt;String&gt; terms = tokenize(query.text());</span>
+<span class="fc" id="L22">        return documents.values().stream()</span>
+<span class="pc bpc" id="L23" title="1 of 4 branches missed.">            .filter(document -&gt; query.types().isEmpty() || query.types().contains(document.type()))</span>
+<span class="fc" id="L24">            .filter(document -&gt; query.requiredFacets().stream().allMatch(document::hasFacet))</span>
+<span class="fc" id="L25">            .map(document -&gt; new SearchResult(document, score(document, terms)))</span>
+<span class="pc bpc" id="L26" title="1 of 4 branches missed.">            .filter(result -&gt; terms.isEmpty() || result.score() &gt; 0.0)</span>
+<span class="fc" id="L27">            .sorted(Comparator.comparingDouble(SearchResult::score).reversed()</span>
+<span class="pc" id="L28">                .thenComparing(result -&gt; result.document().type().name())</span>
+<span class="pc" id="L29">                .thenComparing(result -&gt; result.document().entityId()))</span>
+<span class="fc" id="L30">            .limit(query.limit())</span>
+<span class="fc" id="L31">            .toList();</span>
+    }
+
+    private static double score(SearchIndexDocument document, List&lt;String&gt; terms) {
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (terms.isEmpty()) {</span>
+<span class="fc" id="L36">            return 1.0;</span>
+        }
+<span class="fc" id="L38">        String title = document.title().toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L39">        String body = document.body().toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L40">        double score = 0.0;</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (String term : terms) {</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (title.contains(term)) {</span>
+<span class="fc" id="L43">                score += 2.0;</span>
+            }
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            if (body.contains(term)) {</span>
+<span class="fc" id="L46">                score += 1.0;</span>
+            }
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        return score;</span>
+    }
+
+    private static List&lt;String&gt; tokenize(String text) {
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">        if (text == null || text.isBlank()) {</span>
+<span class="fc" id="L54">            return List.of();</span>
+        }
+<span class="fc" id="L56">        String[] rawTerms = text.toLowerCase(Locale.ROOT).split(&quot;[^\\p{Alnum}]+&quot;, -1);</span>
+<span class="fc" id="L57">        List&lt;String&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (String term : rawTerms) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (!term.isBlank()) {</span>
+<span class="fc" id="L60">                terms.add(term);</span>
+            }
+        }
+<span class="fc" id="L63">        return terms;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

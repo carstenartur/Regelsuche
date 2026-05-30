@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NumericStabilityCost.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scoring.cost</a> &gt; <span class="el_source">NumericStabilityCost.java</span></div><h1>NumericStabilityCost.java</h1><pre class="source lang-java linenums">package de.regelsuche.scoring.cost;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.scoring.ExpressionScore;
+
+/**
+ * Penalises operations that are known to amplify floating-point error:
+ * subtraction of similar quantities (catastrophic cancellation), division
+ * by potentially small numbers, and integer powers above two computed via
+ * repeated multiplication of large coefficients.
+ *
+ * &lt;p&gt;The model is intentionally heuristic — it operates on the symbolic
+ * AST rather than IEEE-754 — but it captures the textbook reasoning that
+ * Horner-form is preferred over the expanded polynomial and that
+ * {@code (a - b)/c} is suspicious when {@code a} and {@code b} look
+ * structurally similar.&lt;/p&gt;
+ */
+<span class="fc" id="L22">public final class NumericStabilityCost implements CostModel {</span>
+
+    @Override
+    public int cost(String expression, Expr parsedAst, ExpressionScore score) {
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (parsedAst == null) {</span>
+<span class="nc" id="L27">            return Math.max(0, score.operatorCount() + score.nestingDepth());</span>
+        }
+<span class="fc" id="L29">        return baseCost(parsedAst) + instabilityPenalty(parsedAst);</span>
+    }
+
+    @Override
+    public String id() {
+<span class="fc" id="L34">        return &quot;numeric-stability&quot;;</span>
+    }
+
+    private int baseCost(Expr expression) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L39">            return 1 + baseCost(binary.left()) + baseCost(binary.right());</span>
+        }
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L42">            int total = 1;</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L44">                total += baseCost(argument);</span>
+<span class="nc" id="L45">            }</span>
+<span class="nc" id="L46">            return total;</span>
+        }
+<span class="fc" id="L48">        return 0;</span>
+    }
+
+    private int instabilityPenalty(Expr expression) {
+<span class="fc" id="L52">        int penalty = 0;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">            switch (binary.operator()) {</span>
+                case SUB -&gt; {
+                    // catastrophic cancellation: a - b with similarly-shaped
+                    // operands or both numeric is suspect.
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                    if (binary.left().equals(binary.right())) {</span>
+<span class="fc" id="L59">                        penalty += 6;</span>
+<span class="pc bpc" id="L60" title="3 of 4 branches missed.">                    } else if (binary.left() instanceof NumberExpr &amp;&amp; binary.right() instanceof NumberExpr) {</span>
+<span class="nc" id="L61">                        penalty += 2;</span>
+                    }
+                }
+                case DIV -&gt; {
+                    // division by a small or potentially zero denominator
+<span class="nc bnc" id="L66" title="All 4 branches missed.">                    if (binary.right() instanceof NumberExpr number &amp;&amp; Math.abs(number.value()) &lt; 1) {</span>
+<span class="nc" id="L67">                        penalty += 5;</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                    } else if (!(binary.right() instanceof NumberExpr)) {</span>
+<span class="nc" id="L69">                        penalty += 2;</span>
+                    }
+                }
+                case POW -&gt; {
+                    // High constant powers expanded raise instability vs. Horner
+<span class="pc bpc" id="L74" title="2 of 4 branches missed.">                    if (binary.right() instanceof NumberExpr number &amp;&amp; number.value() &gt; 3) {</span>
+<span class="fc" id="L75">                        penalty += (int) (number.value() - 3);</span>
+                    }
+<span class="fc" id="L77">                }</span>
+                default -&gt; {
+                    /* ADD, MUL: no extra penalty */
+                }
+            }
+<span class="fc" id="L82">            penalty += instabilityPenalty(binary.left());</span>
+<span class="fc" id="L83">            penalty += instabilityPenalty(binary.right());</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L86">                penalty += instabilityPenalty(argument);</span>
+<span class="nc" id="L87">            }</span>
+        }
+<span class="fc" id="L89">        return penalty;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

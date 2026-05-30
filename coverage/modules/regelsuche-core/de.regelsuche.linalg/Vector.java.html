@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Vector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.linalg</a> &gt; <span class="el_source">Vector.java</span></div><h1>Vector.java</h1><pre class="source lang-java linenums">package de.regelsuche.linalg;
+
+import java.util.Arrays;
+import java.util.Objects;
+
+/**
+ * Immutable real vector with the basic linear-algebra operations needed by
+ * the killer-demo flow: addition, scalar multiplication and dot product.
+ */
+public final class Vector {
+    private final double[] entries;
+
+<span class="fc" id="L13">    public Vector(double... entries) {</span>
+<span class="fc" id="L14">        Objects.requireNonNull(entries, &quot;entries&quot;);</span>
+<span class="fc" id="L15">        this.entries = entries.clone();</span>
+<span class="fc" id="L16">    }</span>
+
+    public int dimension() {
+<span class="fc" id="L19">        return entries.length;</span>
+    }
+
+    public double get(int index) {
+<span class="fc" id="L23">        return entries[index];</span>
+    }
+
+    public double[] toArray() {
+<span class="fc" id="L27">        return entries.clone();</span>
+    }
+
+    public Vector add(Vector other) {
+<span class="fc" id="L31">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (other.dimension() != dimension()) {</span>
+<span class="fc" id="L33">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L34">                &quot;dimension mismatch: &quot; + dimension() + &quot; vs &quot; + other.dimension());</span>
+        }
+<span class="fc" id="L36">        double[] result = new double[entries.length];</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (int i = 0; i &lt; entries.length; i++) {</span>
+<span class="fc" id="L38">            result[i] = entries[i] + other.entries[i];</span>
+        }
+<span class="fc" id="L40">        return new Vector(result);</span>
+    }
+
+    public Vector subtract(Vector other) {
+<span class="nc" id="L44">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (other.dimension() != dimension()) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L47">                &quot;dimension mismatch: &quot; + dimension() + &quot; vs &quot; + other.dimension());</span>
+        }
+<span class="nc" id="L49">        double[] result = new double[entries.length];</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        for (int i = 0; i &lt; entries.length; i++) {</span>
+<span class="nc" id="L51">            result[i] = entries[i] - other.entries[i];</span>
+        }
+<span class="nc" id="L53">        return new Vector(result);</span>
+    }
+
+    public Vector scale(double scalar) {
+<span class="nc" id="L57">        double[] result = new double[entries.length];</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        for (int i = 0; i &lt; entries.length; i++) {</span>
+<span class="nc" id="L59">            result[i] = entries[i] * scalar;</span>
+        }
+<span class="nc" id="L61">        return new Vector(result);</span>
+    }
+
+    public double dot(Vector other) {
+<span class="fc" id="L65">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (other.dimension() != dimension()) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L68">                &quot;dimension mismatch: &quot; + dimension() + &quot; vs &quot; + other.dimension());</span>
+        }
+<span class="fc" id="L70">        double sum = 0.0;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (int i = 0; i &lt; entries.length; i++) {</span>
+<span class="fc" id="L72">            sum += entries[i] * other.entries[i];</span>
+        }
+<span class="fc" id="L74">        return sum;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L79" title="All 4 branches missed.">        return obj instanceof Vector other &amp;&amp; Arrays.equals(this.entries, other.entries);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L84">        return Arrays.hashCode(entries);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L89">        return &quot;Vector&quot; + Arrays.toString(entries);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GalleryDiscoveryDescriptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">GalleryDiscoveryDescriptor.java</span></div><h1>GalleryDiscoveryDescriptor.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.validation.DiscoveryEvidenceKind;
+import de.regelsuche.validation.DiscoveryResultKind;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.regex.Pattern;
+
+/** Data-driven eligibility and rendering metadata for generated discovery gallery entries. */
+public record GalleryDiscoveryDescriptor(
+    String id,
+    String title,
+    Optional&lt;Pattern&gt; requiredInputPattern,
+    List&lt;String&gt; requiredRuleIds,
+    DiscoveryResultKind minimumResultKind,
+    Set&lt;DiscoveryEvidenceKind&gt; requiredEvidenceKinds,
+    List&lt;Function&lt;DeterministicDiscoveryExperimentRunner.SeedRunReport, Boolean&gt;&gt; requiredPredicates,
+    Function&lt;DeterministicDiscoveryExperimentRunner.SeedRunReport, List&lt;String&gt;&gt; renderMetadata
+) {
+<span class="fc" id="L22">    public GalleryDiscoveryDescriptor {</span>
+<span class="pc bpc" id="L23" title="4 of 8 branches missed.">        if (id == null || id.isBlank() || title == null || title.isBlank()) {</span>
+<span class="nc" id="L24">            throw new IllegalArgumentException(&quot;id and title are required&quot;);</span>
+        }
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        requiredInputPattern = requiredInputPattern == null ? Optional.empty() : requiredInputPattern;</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        requiredRuleIds = requiredRuleIds == null ? List.of() : List.copyOf(requiredRuleIds);</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        minimumResultKind = minimumResultKind == null ? DiscoveryResultKind.NO_CANDIDATE : minimumResultKind;</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        requiredEvidenceKinds = requiredEvidenceKinds == null ? Set.of() : Set.copyOf(requiredEvidenceKinds);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        requiredPredicates = requiredPredicates == null ? List.of() : List.copyOf(requiredPredicates);</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        renderMetadata = renderMetadata == null ? row -&gt; List.of() : renderMetadata;</span>
+<span class="fc" id="L32">    }</span>
+
+    public boolean matches(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+<span class="pc bpc" id="L35" title="2 of 4 branches missed.">        if (row == null || row.replayPath().isEmpty()) {</span>
+<span class="nc" id="L36">            return false;</span>
+        }
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (!row.rulePath().containsAll(requiredRuleIds)) {</span>
+<span class="fc" id="L39">            return false;</span>
+        }
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (rank(row.resultKind()) &lt; rank(minimumResultKind)) {</span>
+<span class="fc" id="L42">            return false;</span>
+        }
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (!row.evidence().containsAll(requiredEvidenceKinds)) {</span>
+<span class="fc" id="L45">            return false;</span>
+        }
+<span class="pc bpc" id="L47" title="3 of 4 branches missed.">        if (requiredInputPattern.isPresent() &amp;&amp; !requiredInputPattern.get().matcher(row.seed().expression()).matches()) {</span>
+<span class="nc" id="L48">            return false;</span>
+        }
+<span class="fc" id="L50">        return requiredPredicates.stream().allMatch(predicate -&gt; Boolean.TRUE.equals(predicate.apply(row)));</span>
+    }
+
+    private int rank(DiscoveryResultKind kind) {
+<span class="pc bpc" id="L54" title="3 of 7 branches missed.">        return switch (kind == null ? DiscoveryResultKind.NO_CANDIDATE : kind) {</span>
+<span class="fc" id="L55">            case NO_CANDIDATE -&gt; 0;</span>
+<span class="fc" id="L56">            case HYPOTHESIS_ONLY -&gt; 1;</span>
+<span class="nc" id="L57">            case BRIDGE_FOUND -&gt; 2;</span>
+<span class="fc" id="L58">            case TRANSFORMED -&gt; 3;</span>
+<span class="nc" id="L59">            case FALSE_POSITIVE -&gt; -1;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

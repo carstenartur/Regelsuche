@@ -1,0 +1,1120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemanticSearchGraphAssembler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph.semantic</a> &gt; <span class="el_source">SemanticSearchGraphAssembler.java</span></div><h1>SemanticSearchGraphAssembler.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph.semantic;
+
+import de.regelsuche.api.searchgraph.SearchExpression;
+import de.regelsuche.api.searchgraph.SearchGraphClusterDto;
+import de.regelsuche.api.searchgraph.SearchGraphDto;
+import de.regelsuche.api.searchgraph.SearchGraphEdgeDto;
+import de.regelsuche.api.searchgraph.SearchGraphNodeDto;
+import de.regelsuche.assumption.AssumptionContext;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.export.MathPresentation;
+import de.regelsuche.mining.MacroRuleCandidate;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+public final class SemanticSearchGraphAssembler {
+    private static final String EXPAND_AND_COLLECT_RULE_ID = &quot;polynomial_expand_and_collect_like_terms&quot;;
+    private static final String PREPARE_COLLECT_RULE_ID = &quot;polynomial_prepare_collect_like_terms&quot;;
+<span class="fc" id="L33">    private static final List&lt;String&gt; EXPAND_AND_COLLECT_HIDDEN_STEPS = List.of(</span>
+        &quot;distribute right add&quot;,
+        &quot;multiply constants&quot;,
+        &quot;product to power&quot;,
+        &quot;collect like terms&quot;
+    );
+
+    private final CanonicalGraphClusterer clusterer;
+    private final RewriteSignalClassifier rewriteSignalClassifier;
+    private final MainPathSelector mainPathSelector;
+    private final SemanticMacroCompressor macroCompressor;
+    private final SemanticLayoutService layoutService;
+
+    public SemanticSearchGraphAssembler() {
+<span class="fc" id="L47">        this(</span>
+            new CanonicalGraphClusterer(),
+            new RewriteSignalClassifier(),
+            new WeightedMainPathSelector(),
+            new SemanticMacroCompressor(),
+            new SemanticLayoutService()
+        );
+<span class="fc" id="L54">    }</span>
+
+    public SemanticSearchGraphAssembler(
+        CanonicalGraphClusterer clusterer,
+        RewriteSignalClassifier rewriteSignalClassifier,
+        MainPathSelector mainPathSelector,
+        SemanticMacroCompressor macroCompressor,
+        SemanticLayoutService layoutService
+<span class="fc" id="L62">    ) {</span>
+<span class="fc" id="L63">        this.clusterer = Objects.requireNonNull(clusterer);</span>
+<span class="fc" id="L64">        this.rewriteSignalClassifier = Objects.requireNonNull(rewriteSignalClassifier);</span>
+<span class="fc" id="L65">        this.mainPathSelector = Objects.requireNonNull(mainPathSelector);</span>
+<span class="fc" id="L66">        this.macroCompressor = Objects.requireNonNull(macroCompressor);</span>
+<span class="fc" id="L67">        this.layoutService = Objects.requireNonNull(layoutService);</span>
+<span class="fc" id="L68">    }</span>
+
+    public SemanticSearchGraphDto assemble(
+        SearchGraphDto rawGraph,
+        List&lt;DiscoveredTransformation&gt; paths,
+        List&lt;MacroRuleCandidate&gt; macroRules,
+        SemanticGraphViewMode mode,
+        boolean showLowSignal,
+        boolean showAlternatives,
+        boolean showVariants,
+        int maxAlternatives,
+        int maxVariantsPerCluster
+    ) {
+<span class="fc" id="L81">        return assemble(</span>
+            rawGraph,
+            paths,
+            macroRules,
+            mode,
+            SemanticMacroStepDisplay.COMPACT,
+            showLowSignal,
+            showAlternatives,
+            showVariants,
+            maxAlternatives,
+            maxVariantsPerCluster
+        );
+    }
+
+    public SemanticSearchGraphDto assemble(
+        SearchGraphDto rawGraph,
+        List&lt;DiscoveredTransformation&gt; paths,
+        List&lt;MacroRuleCandidate&gt; macroRules,
+        SemanticGraphViewMode mode,
+        SemanticMacroStepDisplay showMacroSteps,
+        boolean showLowSignal,
+        boolean showAlternatives,
+        boolean showVariants,
+        int maxAlternatives,
+        int maxVariantsPerCluster
+    ) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        SearchGraphDto graph = rawGraph == null ? new SearchGraphDto(List.of(), List.of(), List.of(), null) : rawGraph;</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        List&lt;DiscoveredTransformation&gt; pathList = paths == null ? List.of() : List.copyOf(paths);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        SemanticMacroStepDisplay macroStepDisplay = showMacroSteps == null ? SemanticMacroStepDisplay.COMPACT : showMacroSteps;</span>
+<span class="fc" id="L110">        MainPathCriteria criteria = MainPathCriteria.defaults();</span>
+<span class="fc" id="L111">        var mainPath = mainPathSelector.selectMainPath(pathList, graph, criteria).orElse(null);</span>
+<span class="fc" id="L112">        Set&lt;String&gt; mainPathExpressions = canonicalMainPath(mainPath);</span>
+<span class="fc" id="L113">        Map&lt;String, SemanticNodeKind&gt; explicitEndpointKinds = canonicalMainPathEndpointKinds(mainPath);</span>
+
+<span class="fc" id="L115">        List&lt;CanonicalGraphClusterer.ExpressionEvidence&gt; evidence = graph.nodes().stream()</span>
+<span class="fc" id="L116">            .map(n -&gt; new CanonicalGraphClusterer.ExpressionEvidence(n.expression(), n.depth(), n.score()))</span>
+<span class="fc" id="L117">            .toList();</span>
+<span class="fc" id="L118">        List&lt;CanonicalExpressionCluster&gt; canonicalClusters = clusterer.clusterWithEvidence(evidence, new AssumptionContext());</span>
+<span class="fc" id="L119">        Map&lt;String, CanonicalExpressionCluster&gt; byHash = canonicalClusters.stream()</span>
+<span class="fc" id="L120">            .collect(Collectors.toMap(CanonicalExpressionCluster::canonicalHash, c -&gt; c));</span>
+
+<span class="fc" id="L122">        Map&lt;String, String&gt; rawExpressionToClusterId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (CanonicalExpressionCluster c : canonicalClusters) {</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            for (String variant : c.variants()) {</span>
+<span class="fc" id="L125">                rawExpressionToClusterId.put(variant, c.canonicalHash());</span>
+<span class="fc" id="L126">            }</span>
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        MainPathProjection mainPathProjection = buildMainPathProjection(</span>
+            mainPath,
+            rawExpressionToClusterId,
+            byHash,
+            showLowSignal,
+            macroStepDisplay
+        );
+
+<span class="fc" id="L136">        List&lt;SemanticGraphNodeDto&gt; semanticNodes = canonicalClusters.stream()</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            .filter(c -&gt; !mainPathProjection.shadowedCanonicalNodeIds().contains(c.canonicalHash()))</span>
+<span class="fc" id="L138">            .map(c -&gt; toSemanticNode(</span>
+                c,
+<span class="fc" id="L140">                mainPathExpressions.contains(c.canonicalHash()),</span>
+<span class="fc" id="L141">                explicitEndpointKinds.get(c.canonicalHash()),</span>
+                showVariants,
+                maxVariantsPerCluster
+            ))
+<span class="fc" id="L145">            .collect(Collectors.toCollection(ArrayList::new));</span>
+<span class="fc" id="L146">        semanticNodes.addAll(mainPathProjection.nodes());</span>
+<span class="fc" id="L147">        semanticNodes = semanticNodes.stream()</span>
+<span class="fc" id="L148">            .sorted(Comparator.comparingInt(SemanticGraphNodeDto::minDepth).thenComparing(SemanticGraphNodeDto::id))</span>
+<span class="fc" id="L149">            .toList();</span>
+
+<span class="fc" id="L151">        List&lt;SearchGraphEdgeDto&gt; filteredRawEdges = graph.edges().stream()</span>
+<span class="fc bfc" id="L152" title="All 4 branches covered.">            .filter(e -&gt; showAlternatives || edgeOnMainPath(e, mainPath))</span>
+<span class="fc" id="L153">            .toList();</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        int hiddenAlternativeCount = showAlternatives</span>
+<span class="fc" id="L155">            ? 0</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            : (int) graph.edges().stream().filter(e -&gt; !edgeOnMainPath(e, mainPath)).count();</span>
+
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        List&lt;SemanticGraphEdgeDto&gt; macroEdges = macroCompressor.compress(filteredRawEdges, pathList, macroRules == null ? List.of() : macroRules);</span>
+<span class="fc" id="L159">        List&lt;SemanticGraphEdgeDto&gt; semanticEdges = collapseLowSignalEdges(</span>
+            filteredRawEdges,
+            macroEdges,
+            rawExpressionToClusterId,
+            mainPathExpressions,
+            mainPathProjection,
+            showLowSignal,
+            maxAlternatives
+        );
+
+<span class="fc" id="L169">        List&lt;SemanticGraphNodeDto&gt; modeNodes = filterNodesByMode(semanticNodes, mode);</span>
+<span class="fc" id="L170">        Set&lt;String&gt; modeNodeIds = modeNodes.stream().map(SemanticGraphNodeDto::id).collect(Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L171">        List&lt;SemanticGraphEdgeDto&gt; visibleEdges = semanticEdges.stream()</span>
+<span class="pc bpc" id="L172" title="2 of 4 branches missed.">            .filter(e -&gt; modeNodeIds.contains(e.from()) &amp;&amp; modeNodeIds.contains(e.to()))</span>
+<span class="fc" id="L173">            .toList();</span>
+<span class="fc" id="L174">        List&lt;SemanticGraphNodeDto&gt; visibleNodes = pruneNodesAfterEdgeFiltering(</span>
+            modeNodes,
+            visibleEdges,
+            mode,
+<span class="fc" id="L178">            mainPathProjection.visibleNodeIds()</span>
+        );
+<span class="fc" id="L180">        Set&lt;String&gt; visibleNodeIds = visibleNodes.stream().map(SemanticGraphNodeDto::id).collect(Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L181">        List&lt;SemanticGraphClusterDto&gt; semanticClusters = filterClustersByVisibleNodes(</span>
+<span class="fc" id="L182">            buildClusters(canonicalClusters, graph.clusters(), rawExpressionToClusterId),</span>
+            visibleNodeIds
+        );
+<span class="pc bpc" id="L185" title="2 of 4 branches missed.">        SemanticLayoutKind layoutKind = switch (mode) {</span>
+<span class="nc" id="L186">            case COMPLEXITY -&gt; SemanticLayoutKind.COMPLEXITY_AXIS;</span>
+<span class="fc" id="L187">            case MAIN_PATH -&gt; SemanticLayoutKind.MAIN_PATH_LAYERED;</span>
+<span class="nc" id="L188">            case RAW -&gt; SemanticLayoutKind.CLUSTERED_EXPLANATION;</span>
+<span class="fc" id="L189">            default -&gt; SemanticLayoutKind.CLUSTERED_EXPLANATION;</span>
+        };
+<span class="fc" id="L191">        SemanticLayoutDto layout = layoutService.layout(visibleNodes, visibleEdges, layoutKind);</span>
+
+<span class="fc" id="L193">        SemanticGraphStatsDto stats = new SemanticGraphStatsDto(</span>
+<span class="fc" id="L194">            graph.nodes().size(),</span>
+<span class="fc" id="L195">            graph.edges().size(),</span>
+<span class="fc" id="L196">            visibleNodes.size(),</span>
+<span class="fc" id="L197">            visibleEdges.size(),</span>
+<span class="fc" id="L198">            Math.max(0, graph.nodes().size() - semanticNodes.size()),</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            (int) graph.edges().stream().filter(e -&gt; rewriteSignalClassifier.classify(e) == RewriteSignal.LOW_SIGNAL).count(),</span>
+<span class="fc" id="L200">            (int) visibleEdges.stream().filter(SemanticGraphEdgeDto::macroMove).count(),</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            mainPath == null ? 0 : mainPath.steps().size(),</span>
+            hiddenAlternativeCount
+        );
+
+<span class="fc" id="L205">        return new SemanticSearchGraphDto(</span>
+            visibleNodes,
+            visibleEdges,
+            semanticClusters,
+            stats,
+            new SemanticGraphViewConfigDto(
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                mode == null ? SemanticGraphViewMode.SEMANTIC : mode,</span>
+                macroStepDisplay,
+                showLowSignal,
+                showAlternatives,
+                showVariants,
+                maxAlternatives,
+                maxVariantsPerCluster,
+                layout
+            )
+        );
+    }
+
+    private SemanticGraphNodeDto toSemanticNode(
+        CanonicalExpressionCluster cluster,
+        boolean onMainPath,
+        SemanticNodeKind explicitEndpointKind,
+        boolean showVariants,
+        int maxVariantsPerCluster
+    ) {
+<span class="fc" id="L230">        List&lt;String&gt; variants = cluster.variants();</span>
+        List&lt;String&gt; renderedVariants;
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (showVariants) {</span>
+<span class="nc" id="L233">            renderedVariants = variants.stream().limit(Math.max(1, maxVariantsPerCluster)).toList();</span>
+        } else {
+<span class="fc" id="L235">            renderedVariants = List.of();</span>
+        }
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        boolean explicitEndpoint = explicitEndpointKind != null;</span>
+<span class="fc" id="L238">        SemanticNodeKind kind = classifyNodeKind(cluster.representativeExpression(), explicitEndpointKind);</span>
+<span class="fc" id="L239">        String representativeLatex = MathPresentation.DEFAULT.latex(cluster.representativeExpression());</span>
+<span class="fc" id="L240">        return new SemanticGraphNodeDto(</span>
+<span class="fc" id="L241">            cluster.canonicalHash(),</span>
+<span class="fc" id="L242">            cluster.canonicalExpression(),</span>
+<span class="fc" id="L243">            cluster.representativeExpression(),</span>
+            representativeLatex,
+<span class="fc" id="L245">            MathPresentation.DEFAULT.layout(representativeLatex),</span>
+            renderedVariants,
+<span class="fc" id="L247">            variants.size(),</span>
+<span class="fc" id="L248">            cluster.minDepth(),</span>
+<span class="fc" id="L249">            cluster.bestScore(),</span>
+            onMainPath,
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            variants.size() &gt; 1,</span>
+<span class="fc" id="L252">            &quot;canonical:&quot; + cluster.canonicalHash(),</span>
+            kind,
+            explicitEndpoint
+        );
+    }
+
+    private SemanticNodeKind classifyNodeKind(String expression, SemanticNodeKind explicitEndpointKind) {
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (explicitEndpointKind != null) {</span>
+<span class="nc" id="L260">            return explicitEndpointKind;</span>
+        }
+<span class="fc" id="L262">        SearchExpression type = SearchExpression.classify(expression);</span>
+<span class="pc bpc" id="L263" title="1 of 3 branches missed.">        return switch (type) {</span>
+<span class="fc" id="L264">            case EQUATION, INEQUALITY -&gt; SemanticNodeKind.GOAL;</span>
+<span class="nc" id="L265">            case MATRIX, VECTOR -&gt; SemanticNodeKind.INTERMEDIATE;</span>
+<span class="fc" id="L266">            default -&gt; SemanticNodeKind.INTERMEDIATE;</span>
+        };
+    }
+
+    private static List&lt;SemanticGraphNodeDto&gt; filterNodesByMode(
+        List&lt;SemanticGraphNodeDto&gt; nodes,
+        SemanticGraphViewMode mode
+    ) {
+<span class="pc bpc" id="L274" title="2 of 6 branches missed.">        if (mode == null || mode == SemanticGraphViewMode.SEMANTIC || mode == SemanticGraphViewMode.RAW) {</span>
+<span class="fc" id="L275">            return nodes;</span>
+        }
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (mode == SemanticGraphViewMode.MAIN_PATH) {</span>
+<span class="fc" id="L278">            return nodes.stream().filter(SemanticGraphNodeDto::onMainPath).toList();</span>
+        }
+        // Complexity mode currently keeps all nodes and relies on layout kind.
+<span class="nc" id="L281">        return nodes;</span>
+    }
+
+    private static List&lt;SemanticGraphNodeDto&gt; pruneNodesAfterEdgeFiltering(
+        List&lt;SemanticGraphNodeDto&gt; nodes,
+        List&lt;SemanticGraphEdgeDto&gt; edges,
+        SemanticGraphViewMode mode,
+        Set&lt;String&gt; visibleMainPathNodeIds
+    ) {
+<span class="pc bpc" id="L290" title="2 of 4 branches missed.">        if (mode == SemanticGraphViewMode.RAW || mode == SemanticGraphViewMode.COMPLEXITY) {</span>
+<span class="nc" id="L291">            return nodes;</span>
+        }
+<span class="fc" id="L293">        Set&lt;String&gt; connectedNodeIds = edges.stream()</span>
+<span class="fc" id="L294">            .flatMap(e -&gt; java.util.stream.Stream.of(e.from(), e.to()))</span>
+<span class="fc" id="L295">            .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L296">        return nodes.stream()</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            .filter(n -&gt; connectedNodeIds.contains(n.id())</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">                || n.explicitEndpoint()</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">                || visibleMainPathNodeIds.contains(n.id())</span>
+<span class="pc bpc" id="L300" title="3 of 4 branches missed.">                || (visibleMainPathNodeIds.isEmpty() &amp;&amp; n.onMainPath()))</span>
+<span class="fc" id="L301">            .toList();</span>
+    }
+
+    private static List&lt;SemanticGraphClusterDto&gt; filterClustersByVisibleNodes(
+        List&lt;SemanticGraphClusterDto&gt; clusters,
+        Set&lt;String&gt; visibleNodeIds
+    ) {
+<span class="fc" id="L308">        return clusters.stream()</span>
+<span class="fc" id="L309">            .map(cluster -&gt; {</span>
+<span class="fc" id="L310">                List&lt;String&gt; nodeIds = cluster.nodeIds().stream()</span>
+<span class="fc" id="L311">                    .filter(visibleNodeIds::contains)</span>
+<span class="fc" id="L312">                    .toList();</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">                if (nodeIds.isEmpty()) {</span>
+<span class="fc" id="L314">                    return null;</span>
+                }
+<span class="fc" id="L316">                int hidden = cluster.hiddenNodeCount() + Math.max(0, cluster.nodeIds().size() - nodeIds.size());</span>
+<span class="fc" id="L317">                return new SemanticGraphClusterDto(</span>
+<span class="fc" id="L318">                    cluster.id(),</span>
+<span class="fc" id="L319">                    cluster.label(),</span>
+<span class="fc" id="L320">                    cluster.kind(),</span>
+                    nodeIds,
+                    hidden,
+<span class="fc" id="L323">                    cluster.cohesion()</span>
+                );
+            })
+<span class="fc" id="L326">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L327">            .toList();</span>
+    }
+
+    private List&lt;SemanticGraphEdgeDto&gt; collapseLowSignalEdges(
+        List&lt;SearchGraphEdgeDto&gt; rawEdges,
+        List&lt;SemanticGraphEdgeDto&gt; macroEdges,
+        Map&lt;String, String&gt; rawExpressionToClusterId,
+        Set&lt;String&gt; mainPathExpressions,
+        MainPathProjection mainPathProjection,
+        boolean showLowSignal,
+        int maxAlternatives
+    ) {
+<span class="fc" id="L339">        Map&lt;String, List&lt;SearchGraphEdgeDto&gt;&gt; lowSignalByPair = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L340">        List&lt;SemanticGraphEdgeDto&gt; out = new ArrayList&lt;&gt;(mainPathProjection.edges());</span>
+<span class="fc" id="L341">        Set&lt;String&gt; mainPathSourceEdgeIds = mainPathProjection.sourceEdgeIds();</span>
+<span class="fc" id="L342">        int alternatives = 0;</span>
+<span class="fc" id="L343">        Map&lt;String, SemanticGraphEdgeDto&gt; macroByRawId = macroEdges.stream().collect(Collectors.toMap(</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">            e -&gt; e.sourceEdgeIds().isEmpty() ? &quot;&quot; : e.sourceEdgeIds().getFirst(),</span>
+<span class="fc" id="L345">            e -&gt; e,</span>
+<span class="fc" id="L346">            (a, b) -&gt; a,</span>
+            LinkedHashMap::new
+        ));
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        for (SearchGraphEdgeDto edge : rawEdges) {</span>
+<span class="fc" id="L350">            String from = rawExpressionToClusterId.getOrDefault(edge.from(), edge.from());</span>
+<span class="fc" id="L351">            String to = rawExpressionToClusterId.getOrDefault(edge.to(), edge.to());</span>
+<span class="fc" id="L352">            String rawId = edgeId(edge.from(), edge.to(), edge.ruleId());</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">            if (mainPathSourceEdgeIds.contains(rawId)) {</span>
+<span class="fc" id="L354">                continue;</span>
+            }
+<span class="fc" id="L356">            RewriteSignal signal = rewriteSignalClassifier.classify(edge);</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            if (signal == RewriteSignal.LOW_SIGNAL) {</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">                if (!showLowSignal) {</span>
+<span class="fc" id="L359">                    String key = from + &quot;-&gt;&quot; + to;</span>
+<span class="fc" id="L360">                    lowSignalByPair.computeIfAbsent(key, k -&gt; new ArrayList&lt;&gt;()).add(edge);</span>
+<span class="fc" id="L361">                    continue;</span>
+                }
+            }
+<span class="fc" id="L364">            SemanticGraphEdgeDto macro = macroByRawId.get(rawId);</span>
+            SemanticEdgeKind kind;
+<span class="pc bpc" id="L366" title="2 of 4 branches missed.">            if (macro != null &amp;&amp; macro.macroMove()) {</span>
+<span class="nc" id="L367">                kind = SemanticEdgeKind.MACRO_MOVE;</span>
+<span class="fc bfc" id="L368" title="All 4 branches covered.">            } else if (mainPathExpressions.contains(from) &amp;&amp; mainPathExpressions.contains(to)) {</span>
+<span class="fc" id="L369">                kind = SemanticEdgeKind.MAIN_STEP;</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            } else if (signal == RewriteSignal.LOW_SIGNAL) {</span>
+<span class="nc" id="L371">                kind = SemanticEdgeKind.NORMALIZATION;</span>
+            } else {
+<span class="fc" id="L373">                kind = SemanticEdgeKind.ALTERNATIVE;</span>
+            }
+<span class="pc bpc" id="L375" title="1 of 6 branches missed.">            if (kind == SemanticEdgeKind.ALTERNATIVE &amp;&amp; maxAlternatives &gt; 0 &amp;&amp; alternatives &gt;= maxAlternatives) {</span>
+<span class="fc" id="L376">                continue;</span>
+            }
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            if (kind == SemanticEdgeKind.ALTERNATIVE) {</span>
+<span class="fc" id="L379">                alternatives++;</span>
+            }
+<span class="fc" id="L381">            out.add(new SemanticGraphEdgeDto(</span>
+                from,
+                to,
+<span class="fc" id="L384">                edge.ruleId(),</span>
+<span class="fc" id="L385">                edge.ruleLatex(),</span>
+<span class="fc" id="L386">                edge.layout(),</span>
+                kind,
+<span class="pc bpc" id="L388" title="3 of 6 branches missed.">                macro != null ? macro.atomicStepCount() : 1,</span>
+                0,
+                signal == RewriteSignal.LOW_SIGNAL,
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                macro != null &amp;&amp; macro.macroMove(),</span>
+<span class="fc" id="L392">                edge.macroMoveExpansion(),</span>
+<span class="fc" id="L393">                List.of(rawId),</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">                Math.abs(edge.scoreDelta()) + (kind == SemanticEdgeKind.MAIN_STEP ? 1.0 : 0.0)</span>
+            ));
+<span class="fc" id="L396">        }</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;SearchGraphEdgeDto&gt;&gt; entry : lowSignalByPair.entrySet()) {</span>
+<span class="fc" id="L398">            List&lt;SearchGraphEdgeDto&gt; collapsed = entry.getValue();</span>
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">            if (collapsed.isEmpty()) {</span>
+<span class="nc" id="L400">                continue;</span>
+            }
+<span class="fc" id="L402">            String[] pair = entry.getKey().split(&quot;-&gt;&quot;, 2);</span>
+<span class="fc" id="L403">            out.add(new SemanticGraphEdgeDto(</span>
+                pair[0],
+                pair[1],
+                &quot;low-signal-collapsed&quot;,
+<span class="fc" id="L407">                MathPresentation.DEFAULT.ruleLatex(&quot;low-signal-collapsed&quot;),</span>
+<span class="fc" id="L408">                MathPresentation.DEFAULT.layout(MathPresentation.DEFAULT.ruleLatex(&quot;low-signal-collapsed&quot;)),</span>
+                SemanticEdgeKind.LOW_SIGNAL_COLLAPSED,
+                0,
+<span class="fc" id="L411">                collapsed.size(),</span>
+                true,
+                false,
+                null,
+<span class="fc" id="L415">                collapsed.stream().map(e -&gt; e.from() + &quot;-&gt;&quot; + e.to() + &quot;:&quot; + e.ruleId()).toList(),</span>
+                0.0
+            ));
+<span class="fc" id="L418">        }</span>
+<span class="fc" id="L419">        return dedupeEdges(out);</span>
+    }
+
+    private MainPathProjection buildMainPathProjection(
+        DiscoveredTransformation mainPath,
+        Map&lt;String, String&gt; rawExpressionToClusterId,
+        Map&lt;String, CanonicalExpressionCluster&gt; clustersByHash,
+        boolean showLowSignal,
+        SemanticMacroStepDisplay showMacroSteps
+    ) {
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (mainPath == null) {</span>
+<span class="fc" id="L430">            return MainPathProjection.empty();</span>
+        }
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        boolean didactic = showMacroSteps == SemanticMacroStepDisplay.DIDACTIC;</span>
+<span class="fc" id="L433">        List&lt;SemanticGraphEdgeDto&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L434">        List&lt;SemanticGraphNodeDto&gt; nodes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L435">        Set&lt;String&gt; visibleNodeIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L436">        Set&lt;String&gt; shadowedCanonicalNodeIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L437">        Set&lt;String&gt; sourceEdgeIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        String currentVisible = didactic</span>
+<span class="fc" id="L439">            ? didacticNodeId(&quot;seed&quot;, mainPath.originalExpression())</span>
+<span class="fc" id="L440">            : clusterId(mainPath.originalExpression(), rawExpressionToClusterId);</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        String goal = didactic</span>
+<span class="fc" id="L442">            ? didacticNodeId(&quot;goal&quot;, mainPath.improvedExpression())</span>
+<span class="fc" id="L443">            : clusterId(mainPath.improvedExpression(), rawExpressionToClusterId);</span>
+<span class="fc" id="L444">        nodes.add(toMainPathNode(</span>
+            currentVisible,
+<span class="fc" id="L446">            mainPath.originalExpression(),</span>
+            0,
+            SemanticNodeKind.SEED,
+            rawExpressionToClusterId,
+            clustersByHash,
+            shadowedCanonicalNodeIds,
+            didactic
+        ));
+<span class="fc" id="L454">        visibleNodeIds.add(currentVisible);</span>
+<span class="fc" id="L455">        List&lt;String&gt; hiddenSources = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L456">        int hiddenSteps = 0;</span>
+<span class="fc" id="L457">        Set&lt;Integer&gt; preservedLowSignalSteps = lowSignalStepsNeededForReadableProjection(mainPath, showLowSignal);</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        for (int i = 0; i &lt; mainPath.steps().size(); i++) {</span>
+<span class="fc" id="L459">            TransformationStep step = mainPath.steps().get(i);</span>
+<span class="fc" id="L460">            String rawId = edgeId(step.beforeExpression(), step.afterExpression(), step.ruleId());</span>
+<span class="fc" id="L461">            sourceEdgeIds.add(rawId);</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            boolean lowSignal = classifyStepSignal(step) == RewriteSignal.LOW_SIGNAL;</span>
+<span class="pc bpc" id="L463" title="1 of 6 branches missed.">            if (!showLowSignal &amp;&amp; lowSignal &amp;&amp; !preservedLowSignalSteps.contains(i)) {</span>
+<span class="fc" id="L464">                hiddenSources.add(rawId);</span>
+<span class="fc" id="L465">                hiddenSteps++;</span>
+<span class="fc" id="L466">                continue;</span>
+            }
+<span class="fc bfc" id="L468" title="All 2 branches covered.">            boolean finalStep = i == mainPath.steps().size() - 1</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">                &amp;&amp; Objects.equals(step.afterExpression(), mainPath.improvedExpression());</span>
+<span class="fc bfc" id="L470" title="All 2 branches covered.">            String to = didactic</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">                ? didacticNodeId(finalStep ? &quot;goal&quot; : Integer.toString(step.index() + 1), step.afterExpression())</span>
+<span class="fc" id="L472">                : clusterId(step.afterExpression(), rawExpressionToClusterId);</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">            if (!visibleNodeIds.contains(to)) {</span>
+<span class="fc" id="L474">                nodes.add(toMainPathNode(</span>
+                    to,
+<span class="fc" id="L476">                    step.afterExpression(),</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">                    finalStep ? mainPath.steps().size() + 1 : step.index() + 1,</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">                    finalStep ? SemanticNodeKind.GOAL : SemanticNodeKind.INTERMEDIATE,</span>
+                    rawExpressionToClusterId,
+                    clustersByHash,
+                    shadowedCanonicalNodeIds,
+                    didactic
+                ));
+            }
+<span class="fc" id="L485">            List&lt;String&gt; edgeSources = new ArrayList&lt;&gt;(hiddenSources);</span>
+<span class="fc" id="L486">            edgeSources.add(rawId);</span>
+<span class="fc bfc" id="L487" title="All 4 branches covered.">            if (didactic &amp;&amp; &quot;polynomial_collect_like_terms&quot;.equals(step.ruleId())) {</span>
+<span class="fc" id="L488">                String expanded = didacticExpandedBeforeCollect(step.beforeExpression(), step.afterExpression());</span>
+<span class="fc" id="L489">                String collectInputId = currentVisible;</span>
+<span class="fc" id="L490">                String collectInputExpression = step.beforeExpression();</span>
+<span class="fc" id="L491">                boolean insertedDidacticStep = false;</span>
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">                if (!expanded.isBlank()) {</span>
+<span class="fc" id="L493">                    String expandedId = didacticNodeId(&quot;expand-&quot; + step.index(), expanded);</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">                    if (!visibleNodeIds.contains(expandedId)) {</span>
+<span class="fc" id="L495">                        nodes.add(toMainPathNode(</span>
+                            expandedId,
+                            expanded,
+<span class="fc" id="L498">                            step.index() + 1,</span>
+                            SemanticNodeKind.INTERMEDIATE,
+                            rawExpressionToClusterId,
+                            clustersByHash,
+                            shadowedCanonicalNodeIds,
+                            true
+                        ));
+                    }
+<span class="fc" id="L506">                    edges.add(projectedMainPathEdge(</span>
+                        collectInputId,
+                        expandedId,
+<span class="fc" id="L509">                        syntheticStep(step, expanded, &quot;ast_distribute_right_add&quot;),</span>
+                        0,
+                        edgeSources,
+                        false
+                    ));
+<span class="fc" id="L514">                    visibleNodeIds.add(expandedId);</span>
+<span class="fc" id="L515">                    collectInputId = expandedId;</span>
+<span class="fc" id="L516">                    collectInputExpression = expanded;</span>
+<span class="fc" id="L517">                    insertedDidacticStep = true;</span>
+                }
+<span class="fc" id="L519">                String prepared = didacticPreCollectExpression(collectInputExpression, step.afterExpression());</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">                if (!prepared.isBlank()) {</span>
+<span class="fc" id="L521">                    String preparedId = didacticNodeId(&quot;prepare-&quot; + step.index(), prepared);</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">                    if (!visibleNodeIds.contains(preparedId)) {</span>
+<span class="fc" id="L523">                        nodes.add(toMainPathNode(</span>
+                            preparedId,
+                            prepared,
+<span class="fc" id="L526">                            step.index() + 1,</span>
+                            SemanticNodeKind.INTERMEDIATE,
+                            rawExpressionToClusterId,
+                            clustersByHash,
+                            shadowedCanonicalNodeIds,
+                            true
+                        ));
+                    }
+<span class="fc" id="L534">                    edges.add(projectedMainPathEdge(</span>
+                        collectInputId,
+                        preparedId,
+<span class="fc" id="L537">                        syntheticStep(step, prepared, PREPARE_COLLECT_RULE_ID),</span>
+                        0,
+                        edgeSources,
+                        false
+                    ));
+<span class="fc" id="L542">                    visibleNodeIds.add(preparedId);</span>
+<span class="fc" id="L543">                    collectInputId = preparedId;</span>
+<span class="fc" id="L544">                    collectInputExpression = prepared;</span>
+<span class="fc" id="L545">                    insertedDidacticStep = true;</span>
+                }
+<span class="pc bpc" id="L547" title="1 of 2 branches missed.">                if (insertedDidacticStep) {</span>
+<span class="fc" id="L548">                    edges.add(projectedMainPathEdge(</span>
+                        collectInputId,
+                        to,
+<span class="fc" id="L551">                        syntheticStep(step, collectInputExpression, step.afterExpression(), step.ruleId()),</span>
+                        0,
+                        edgeSources,
+                        false
+                    ));
+<span class="fc" id="L556">                    visibleNodeIds.add(to);</span>
+<span class="fc" id="L557">                    currentVisible = to;</span>
+<span class="fc" id="L558">                    hiddenSources.clear();</span>
+<span class="fc" id="L559">                    hiddenSteps = 0;</span>
+<span class="fc" id="L560">                    continue;</span>
+                }
+            }
+<span class="fc bfc" id="L563" title="All 2 branches covered.">            if (currentVisible.equals(to)) {</span>
+<span class="fc bfc" id="L564" title="All 2 branches covered.">                if (finalStep) {</span>
+<span class="fc" id="L565">                    replaceMainPathNode(</span>
+                        nodes,
+<span class="fc" id="L567">                        toMainPathNode(</span>
+                            to,
+<span class="fc" id="L569">                            step.afterExpression(),</span>
+<span class="fc" id="L570">                            mainPath.steps().size() + 1,</span>
+                            SemanticNodeKind.GOAL,
+                            rawExpressionToClusterId,
+                            clustersByHash,
+                            shadowedCanonicalNodeIds,
+                            didactic
+                        )
+                    );
+<span class="fc bfc" id="L578" title="All 2 branches covered.">                    if (edges.isEmpty()) {</span>
+<span class="fc" id="L579">                        hiddenSources.add(rawId);</span>
+<span class="fc" id="L580">                        hiddenSteps++;</span>
+                    } else {
+<span class="fc" id="L582">                        int lastIndex = edges.size() - 1;</span>
+<span class="fc" id="L583">                        edges.set(lastIndex, reprojectFinalSameClusterEdge(edges.get(lastIndex), step, hiddenSteps, edgeSources, lowSignal));</span>
+<span class="fc" id="L584">                        hiddenSources.clear();</span>
+<span class="fc" id="L585">                        hiddenSteps = 0;</span>
+<span class="fc" id="L586">                    }</span>
+<span class="fc bfc" id="L587" title="All 2 branches covered.">                } else if (edges.isEmpty()) {</span>
+<span class="fc" id="L588">                    hiddenSources.add(rawId);</span>
+<span class="fc" id="L589">                    hiddenSteps++;</span>
+                } else {
+<span class="fc" id="L591">                    int lastIndex = edges.size() - 1;</span>
+<span class="fc" id="L592">                    edges.set(lastIndex, mergeCollapsedStep(edges.get(lastIndex), hiddenSteps + 1, edgeSources, lowSignal));</span>
+<span class="fc" id="L593">                    hiddenSources.clear();</span>
+<span class="fc" id="L594">                    hiddenSteps = 0;</span>
+                }
+<span class="fc" id="L596">                visibleNodeIds.add(to);</span>
+<span class="fc" id="L597">                continue;</span>
+            }
+<span class="fc" id="L599">            edges.add(projectedMainPathEdge(currentVisible, to, step, hiddenSteps, edgeSources, lowSignal));</span>
+<span class="fc" id="L600">            visibleNodeIds.add(to);</span>
+<span class="fc" id="L601">            currentVisible = to;</span>
+<span class="fc" id="L602">            hiddenSources.clear();</span>
+<span class="fc" id="L603">            hiddenSteps = 0;</span>
+        }
+<span class="pc bpc" id="L605" title="1 of 4 branches missed.">        if (hiddenSteps &gt; 0 &amp;&amp; !currentVisible.equals(goal)) {</span>
+<span class="nc" id="L606">            nodes.add(toMainPathNode(</span>
+                goal,
+<span class="nc" id="L608">                mainPath.improvedExpression(),</span>
+<span class="nc" id="L609">                mainPath.steps().size() + 1,</span>
+                SemanticNodeKind.GOAL,
+                rawExpressionToClusterId,
+                clustersByHash,
+                shadowedCanonicalNodeIds,
+                didactic
+            ));
+<span class="nc" id="L616">            edges.add(collapsedMainPathTailEdge(currentVisible, goal, hiddenSteps, hiddenSources));</span>
+<span class="nc" id="L617">            currentVisible = goal;</span>
+        }
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">        if (nodes.stream().noneMatch(n -&gt; n.id().equals(goal))) {</span>
+<span class="nc" id="L620">            nodes.add(toMainPathNode(</span>
+                goal,
+<span class="nc" id="L622">                mainPath.improvedExpression(),</span>
+<span class="nc" id="L623">                mainPath.steps().size() + 1,</span>
+                SemanticNodeKind.GOAL,
+                rawExpressionToClusterId,
+                clustersByHash,
+                shadowedCanonicalNodeIds,
+                didactic
+            ));
+        }
+<span class="fc" id="L631">        visibleNodeIds.add(goal);</span>
+<span class="fc" id="L632">        return new MainPathProjection(dedupeEdges(edges), visibleNodeIds, sourceEdgeIds, dedupeNodes(nodes), shadowedCanonicalNodeIds);</span>
+    }
+
+    private static Set&lt;Integer&gt; lowSignalStepsNeededForReadableProjection(
+        DiscoveredTransformation mainPath,
+        boolean showLowSignal
+    ) {
+<span class="pc bpc" id="L639" title="1 of 4 branches missed.">        if (showLowSignal || mainPath.steps().size() + 1 &lt; 4) {</span>
+<span class="fc" id="L640">            return Set.of();</span>
+        }
+<span class="fc" id="L642">        int visibleStates = 1;</span>
+<span class="fc bfc" id="L643" title="All 2 branches covered.">        for (TransformationStep step : mainPath.steps()) {</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">            if (classifyStepSignal(step) != RewriteSignal.LOW_SIGNAL) {</span>
+<span class="fc" id="L645">                visibleStates++;</span>
+            }
+<span class="fc" id="L647">        }</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">        TransformationStep lastStep = mainPath.steps().isEmpty() ? null : mainPath.steps().getLast();</span>
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">        if (lastStep != null</span>
+<span class="fc bfc" id="L650" title="All 2 branches covered.">            &amp;&amp; classifyStepSignal(lastStep) == RewriteSignal.LOW_SIGNAL</span>
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(lastStep.afterExpression(), mainPath.improvedExpression())) {</span>
+<span class="fc" id="L652">            visibleStates++;</span>
+        }
+<span class="fc" id="L654">        int missingStates = Math.max(0, 4 - visibleStates);</span>
+<span class="fc bfc" id="L655" title="All 2 branches covered.">        if (missingStates == 0) {</span>
+<span class="fc" id="L656">            return Set.of();</span>
+        }
+<span class="fc" id="L658">        Set&lt;Integer&gt; preserved = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L659" title="1 of 4 branches missed.">        for (int i = 0; i &lt; mainPath.steps().size() &amp;&amp; preserved.size() &lt; missingStates; i++) {</span>
+<span class="pc bpc" id="L660" title="1 of 2 branches missed.">            if (classifyStepSignal(mainPath.steps().get(i)) == RewriteSignal.LOW_SIGNAL) {</span>
+<span class="fc" id="L661">                preserved.add(i);</span>
+            }
+        }
+<span class="fc" id="L664">        return preserved;</span>
+    }
+
+    private SemanticGraphNodeDto toMainPathNode(
+        String id,
+        String expression,
+        int depth,
+        SemanticNodeKind kind,
+        Map&lt;String, String&gt; rawExpressionToClusterId,
+        Map&lt;String, CanonicalExpressionCluster&gt; clustersByHash,
+        Set&lt;String&gt; shadowedCanonicalNodeIds,
+        boolean distinctClusterIdentity
+    ) {
+<span class="fc" id="L677">        String canonicalId = clusterId(expression, rawExpressionToClusterId);</span>
+<span class="fc" id="L678">        shadowedCanonicalNodeIds.add(canonicalId);</span>
+<span class="fc" id="L679">        CanonicalExpressionCluster cluster = clustersByHash.get(canonicalId);</span>
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">        String canonicalExpression = cluster == null ? expression : cluster.canonicalExpression();</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">        int variantCount = cluster == null ? 1 : cluster.variants().size();</span>
+<span class="pc bpc" id="L682" title="1 of 2 branches missed.">        int bestScore = cluster == null ? 0 : cluster.bestScore();</span>
+<span class="fc" id="L683">        String representativeLatex = MathPresentation.DEFAULT.latex(expression);</span>
+<span class="fc" id="L684">        return new SemanticGraphNodeDto(</span>
+            id,
+            canonicalExpression,
+            expression,
+            representativeLatex,
+<span class="fc" id="L689">            MathPresentation.DEFAULT.layout(representativeLatex),</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">            List.of(),</span>
+            variantCount,
+            depth,
+            bestScore,
+            true,
+            variantCount &gt; 1,
+<span class="fc bfc" id="L696" title="All 6 branches covered.">            distinctClusterIdentity ? &quot;didactic:&quot; + id : &quot;canonical:&quot; + canonicalId,</span>
+            kind,
+            kind == SemanticNodeKind.SEED || kind == SemanticNodeKind.GOAL
+        );
+    }
+
+    private static void replaceMainPathNode(List&lt;SemanticGraphNodeDto&gt; nodes, SemanticGraphNodeDto replacement) {
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">        for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc bfc" id="L704" title="All 2 branches covered.">            if (nodes.get(i).id().equals(replacement.id())) {</span>
+<span class="fc" id="L705">                nodes.set(i, replacement);</span>
+<span class="fc" id="L706">                return;</span>
+            }
+        }
+<span class="nc" id="L709">        nodes.add(replacement);</span>
+<span class="nc" id="L710">    }</span>
+
+    private SemanticGraphEdgeDto projectedMainPathEdge(
+        String from,
+        String to,
+        TransformationStep step,
+        int hiddenSteps,
+        List&lt;String&gt; sourceEdgeIds,
+        boolean lowSignal
+    ) {
+<span class="fc" id="L720">        boolean expandAndCollect = isExpandAndCollectMacro(</span>
+<span class="fc" id="L721">            step.ruleId(),</span>
+            hiddenSteps,
+            sourceEdgeIds,
+<span class="fc" id="L724">            step.beforeExpression(),</span>
+<span class="fc" id="L725">            step.afterExpression()</span>
+        );
+<span class="fc bfc" id="L727" title="All 2 branches covered.">        String ruleId = expandAndCollect ? EXPAND_AND_COLLECT_RULE_ID : step.ruleId();</span>
+<span class="fc" id="L728">        String ruleLatex = MathPresentation.DEFAULT.ruleLatex(ruleId);</span>
+<span class="fc" id="L729">        return new SemanticGraphEdgeDto(</span>
+            from,
+            to,
+            ruleId,
+            ruleLatex,
+<span class="pc bpc" id="L734" title="1 of 4 branches missed.">            MathPresentation.DEFAULT.layout(ruleLatex),</span>
+            SemanticEdgeKind.MAIN_STEP,
+            hiddenSteps + 1,
+            hiddenSteps,
+            lowSignal &amp;&amp; hiddenSteps == 0,
+            expandAndCollect,
+            null,
+            sourceEdgeIds,
+<span class="fc bfc" id="L742" title="All 2 branches covered.">            expandAndCollect ? EXPAND_AND_COLLECT_HIDDEN_STEPS : List.of(),</span>
+<span class="fc" id="L743">            Math.abs(step.scoreBefore() - step.scoreAfter()) + 1.0</span>
+        );
+    }
+
+    private static SemanticGraphEdgeDto mergeCollapsedStep(
+        SemanticGraphEdgeDto edge,
+        int collapsedStepCount,
+        List&lt;String&gt; sourceEdgeIds,
+        boolean lowSignal
+    ) {
+<span class="fc" id="L753">        List&lt;String&gt; mergedSourceEdgeIds = new ArrayList&lt;&gt;(edge.sourceEdgeIds());</span>
+<span class="fc" id="L754">        mergedSourceEdgeIds.addAll(sourceEdgeIds);</span>
+<span class="fc" id="L755">        return new SemanticGraphEdgeDto(</span>
+<span class="fc" id="L756">            edge.from(),</span>
+<span class="fc" id="L757">            edge.to(),</span>
+<span class="fc" id="L758">            edge.ruleId(),</span>
+<span class="fc" id="L759">            edge.ruleLatex(),</span>
+<span class="fc" id="L760">            edge.layout(),</span>
+<span class="fc" id="L761">            edge.kind(),</span>
+<span class="fc" id="L762">            edge.atomicStepCount() + collapsedStepCount,</span>
+<span class="fc" id="L763">            edge.hiddenStepCount() + collapsedStepCount,</span>
+<span class="pc bpc" id="L764" title="2 of 4 branches missed.">            edge.lowSignal() || lowSignal,</span>
+<span class="fc" id="L765">            edge.macroMove(),</span>
+<span class="fc" id="L766">            edge.macroMoveExpansion(),</span>
+<span class="fc" id="L767">            mergedSourceEdgeIds.stream().distinct().toList(),</span>
+<span class="fc" id="L768">            edge.interestingness()</span>
+        );
+    }
+
+    private static SemanticGraphEdgeDto reprojectFinalSameClusterEdge(
+        SemanticGraphEdgeDto edge,
+        TransformationStep finalStep,
+        int hiddenSteps,
+        List&lt;String&gt; sourceEdgeIds,
+        boolean lowSignal
+    ) {
+<span class="fc" id="L779">        boolean expandAndCollect = isExpandAndCollectMacro(</span>
+<span class="fc" id="L780">            finalStep.ruleId(),</span>
+<span class="fc" id="L781">            hiddenSteps + edge.hiddenStepCount(),</span>
+            sourceEdgeIds,
+<span class="fc" id="L783">            finalStep.beforeExpression(),</span>
+<span class="fc" id="L784">            finalStep.afterExpression()</span>
+        );
+<span class="pc bpc" id="L786" title="1 of 2 branches missed.">        String ruleId = expandAndCollect ? EXPAND_AND_COLLECT_RULE_ID : finalStep.ruleId();</span>
+<span class="fc" id="L787">        String ruleLatex = MathPresentation.DEFAULT.ruleLatex(ruleId);</span>
+<span class="fc" id="L788">        List&lt;String&gt; mergedSourceEdgeIds = new ArrayList&lt;&gt;(edge.sourceEdgeIds());</span>
+<span class="fc" id="L789">        mergedSourceEdgeIds.addAll(sourceEdgeIds);</span>
+<span class="fc" id="L790">        return new SemanticGraphEdgeDto(</span>
+<span class="fc" id="L791">            edge.from(),</span>
+<span class="fc" id="L792">            edge.to(),</span>
+            ruleId,
+            ruleLatex,
+<span class="fc" id="L795">            MathPresentation.DEFAULT.layout(ruleLatex),</span>
+<span class="fc" id="L796">            edge.kind(),</span>
+<span class="fc" id="L797">            edge.atomicStepCount() + hiddenSteps + 1,</span>
+<span class="fc" id="L798">            edge.hiddenStepCount() + hiddenSteps + 1,</span>
+<span class="pc bpc" id="L799" title="2 of 4 branches missed.">            edge.lowSignal() || lowSignal,</span>
+<span class="pc bpc" id="L800" title="2 of 4 branches missed.">            edge.macroMove() || expandAndCollect,</span>
+<span class="fc" id="L801">            edge.macroMoveExpansion(),</span>
+<span class="fc" id="L802">            mergedSourceEdgeIds.stream().distinct().toList(),</span>
+<span class="pc bpc" id="L803" title="1 of 2 branches missed.">            expandAndCollect ? EXPAND_AND_COLLECT_HIDDEN_STEPS : edge.hiddenSteps(),</span>
+<span class="fc" id="L804">            Math.abs(finalStep.scoreBefore() - finalStep.scoreAfter()) + 1.0</span>
+        );
+    }
+
+    private static SemanticGraphEdgeDto collapsedMainPathTailEdge(
+        String from,
+        String to,
+        int hiddenSteps,
+        List&lt;String&gt; sourceEdgeIds
+    ) {
+<span class="nc" id="L814">        String ruleId = &quot;low-signal-collapsed&quot;;</span>
+<span class="nc" id="L815">        String ruleLatex = MathPresentation.DEFAULT.ruleLatex(ruleId);</span>
+<span class="nc" id="L816">        return new SemanticGraphEdgeDto(</span>
+            from,
+            to,
+            ruleId,
+            ruleLatex,
+<span class="nc" id="L821">            MathPresentation.DEFAULT.layout(ruleLatex),</span>
+            SemanticEdgeKind.MAIN_STEP,
+            hiddenSteps,
+            hiddenSteps,
+            true,
+            false,
+            null,
+            sourceEdgeIds,
+            1.0
+        );
+    }
+
+    private static boolean isExpandAndCollectMacro(
+        String ruleId,
+        int hiddenSteps,
+        List&lt;String&gt; sourceEdgeIds,
+        String beforeExpression,
+        String afterExpression
+    ) {
+<span class="pc bpc" id="L840" title="3 of 6 branches missed.">        return &quot;polynomial_collect_like_terms&quot;.equals(ruleId)</span>
+            &amp;&amp; ((hiddenSteps &gt; 0
+                &amp;&amp; sourceEdgeIds != null
+<span class="pc bnc" id="L843" title="All 2 branches missed.">                &amp;&amp; sourceEdgeIds.stream().anyMatch(id -&gt; id.contains(&quot;ast_distribute&quot;)))</span>
+<span class="fc bfc" id="L844" title="All 2 branches covered.">                || needsRemainingExpansionBeforeCollection(beforeExpression, afterExpression));</span>
+    }
+
+    private static boolean needsRemainingExpansionBeforeCollection(String beforeExpression, String afterExpression) {
+<span class="pc bpc" id="L848" title="1 of 2 branches missed.">        String before = beforeExpression == null ? &quot;&quot; : beforeExpression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L849" title="1 of 2 branches missed.">        String after = afterExpression == null ? &quot;&quot; : afterExpression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L850" title="2 of 6 branches missed.">        return before.contains(&quot;(&quot;) &amp;&amp; before.contains(&quot;)*&quot;) &amp;&amp; after.contains(&quot;^&quot;);</span>
+    }
+
+    private static String didacticNodeId(String sequence, String expression) {
+<span class="fc" id="L854">        String suffix = Integer.toUnsignedString(Objects.toString(expression, &quot;&quot;).hashCode(), 36);</span>
+<span class="fc" id="L855">        return &quot;didactic-&quot; + sequence.replaceAll(&quot;[^A-Za-z0-9_-]&quot;, &quot;-&quot;) + &quot;-&quot; + suffix;</span>
+    }
+
+    private static String didacticPreCollectExpression(String beforeExpression, String afterExpression) {
+        try {
+<span class="fc" id="L860">            Expr simplified = simplifyProductsForDidacticCollect(new ExpressionParser().parseTerm(beforeExpression));</span>
+<span class="fc" id="L861">            String formatted = ExpressionFormatter.format(simplified);</span>
+<span class="fc" id="L862">            String before = ExpressionFormatter.format(new ExpressionParser().parseTerm(beforeExpression));</span>
+<span class="fc" id="L863">            String after = ExpressionFormatter.format(new ExpressionParser().parseTerm(afterExpression));</span>
+<span class="pc bpc" id="L864" title="2 of 4 branches missed.">            if (!formatted.equals(before) &amp;&amp; !formatted.equals(after)) {</span>
+<span class="fc" id="L865">                return formatted;</span>
+            }
+<span class="nc" id="L867">        } catch (RuntimeException ignored) {</span>
+<span class="nc" id="L868">            return &quot;&quot;;</span>
+<span class="nc" id="L869">        }</span>
+<span class="nc" id="L870">        return &quot;&quot;;</span>
+    }
+
+    private static String didacticExpandedBeforeCollect(String beforeExpression, String afterExpression) {
+        try {
+<span class="fc" id="L875">            Expr expanded = expandProductsForDidacticCollect(new ExpressionParser().parseTerm(beforeExpression));</span>
+<span class="fc" id="L876">            String formatted = ExpressionFormatter.format(expanded);</span>
+<span class="fc" id="L877">            String before = ExpressionFormatter.format(new ExpressionParser().parseTerm(beforeExpression));</span>
+<span class="fc" id="L878">            String after = ExpressionFormatter.format(new ExpressionParser().parseTerm(afterExpression));</span>
+<span class="pc bpc" id="L879" title="2 of 4 branches missed.">            if (!formatted.equals(before) &amp;&amp; !formatted.equals(after)) {</span>
+<span class="fc" id="L880">                return formatted;</span>
+            }
+<span class="nc" id="L882">        } catch (RuntimeException ignored) {</span>
+<span class="nc" id="L883">            return &quot;&quot;;</span>
+<span class="nc" id="L884">        }</span>
+<span class="nc" id="L885">        return &quot;&quot;;</span>
+    }
+
+    private static TransformationStep syntheticStep(TransformationStep source, String afterExpression, String ruleId) {
+<span class="fc" id="L889">        return syntheticStep(source, source.beforeExpression(), afterExpression, ruleId);</span>
+    }
+
+    private static TransformationStep syntheticStep(
+        TransformationStep source,
+        String beforeExpression,
+        String afterExpression,
+        String ruleId
+    ) {
+<span class="fc" id="L898">        return new TransformationStep(</span>
+<span class="fc" id="L899">            source.index(),</span>
+            beforeExpression,
+            afterExpression,
+            ruleId,
+<span class="fc" id="L903">            source.ruleKind(),</span>
+<span class="fc" id="L904">            source.scoreBefore(),</span>
+<span class="fc" id="L905">            source.scoreAfter(),</span>
+<span class="fc" id="L906">            source.equivalencePreserving(),</span>
+<span class="fc" id="L907">            source.explanation(),</span>
+<span class="fc" id="L908">            source.assumptions()</span>
+        );
+    }
+
+    private static Expr expandProductsForDidacticCollect(Expr expression) {
+<span class="fc bfc" id="L913" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="fc" id="L914">            return expression;</span>
+        }
+<span class="fc" id="L916">        Expr left = expandProductsForDidacticCollect(binary.left());</span>
+<span class="fc" id="L917">        Expr right = expandProductsForDidacticCollect(binary.right());</span>
+<span class="pc bpc" id="L918" title="1 of 4 branches missed.">        if (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB) {</span>
+<span class="fc" id="L919">            return new BinaryExpr(left, binary.operator(), right);</span>
+        }
+<span class="pc bpc" id="L921" title="1 of 2 branches missed.">        if (binary.operator() != BinaryOperator.MUL) {</span>
+<span class="nc" id="L922">            return new BinaryExpr(left, binary.operator(), right);</span>
+        }
+<span class="pc bpc" id="L924" title="1 of 4 branches missed.">        if (left instanceof BinaryExpr leftBinary &amp;&amp; leftBinary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L925">            return new BinaryExpr(</span>
+<span class="fc" id="L926">                new BinaryExpr(leftBinary.left(), BinaryOperator.MUL, right),</span>
+                BinaryOperator.ADD,
+<span class="fc" id="L928">                new BinaryExpr(leftBinary.right(), BinaryOperator.MUL, right)</span>
+            );
+        }
+<span class="pc bpc" id="L931" title="3 of 4 branches missed.">        if (right instanceof BinaryExpr rightBinary &amp;&amp; rightBinary.operator() == BinaryOperator.ADD) {</span>
+<span class="nc" id="L932">            return new BinaryExpr(</span>
+<span class="nc" id="L933">                new BinaryExpr(left, BinaryOperator.MUL, rightBinary.left()),</span>
+                BinaryOperator.ADD,
+<span class="nc" id="L935">                new BinaryExpr(left, BinaryOperator.MUL, rightBinary.right())</span>
+            );
+        }
+<span class="fc" id="L938">        return new BinaryExpr(left, BinaryOperator.MUL, right);</span>
+    }
+
+    private static Expr simplifyProductsForDidacticCollect(Expr expression) {
+<span class="fc bfc" id="L942" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="fc" id="L943">            return expression;</span>
+        }
+<span class="fc" id="L945">        Expr left = simplifyProductsForDidacticCollect(binary.left());</span>
+<span class="fc" id="L946">        Expr right = simplifyProductsForDidacticCollect(binary.right());</span>
+<span class="pc bpc" id="L947" title="1 of 4 branches missed.">        if (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB) {</span>
+<span class="fc" id="L948">            return new BinaryExpr(left, binary.operator(), right);</span>
+        }
+<span class="pc bpc" id="L950" title="1 of 2 branches missed.">        if (binary.operator() != BinaryOperator.MUL) {</span>
+<span class="nc" id="L951">            return new BinaryExpr(left, binary.operator(), right);</span>
+        }
+<span class="fc bfc" id="L953" title="All 4 branches covered.">        if (left instanceof NumberExpr leftNumber &amp;&amp; right instanceof NumberExpr rightNumber) {</span>
+<span class="fc" id="L954">            return new NumberExpr(leftNumber.value() * rightNumber.value());</span>
+        }
+<span class="fc bfc" id="L956" title="All 2 branches covered.">        if (left.equals(right)) {</span>
+<span class="fc" id="L957">            return new BinaryExpr(left, BinaryOperator.POW, new NumberExpr(2));</span>
+        }
+<span class="pc bpc" id="L959" title="1 of 4 branches missed.">        if (!(left instanceof NumberExpr) &amp;&amp; right instanceof NumberExpr) {</span>
+<span class="fc" id="L960">            return new BinaryExpr(right, BinaryOperator.MUL, left);</span>
+        }
+<span class="fc" id="L962">        return new BinaryExpr(left, BinaryOperator.MUL, right);</span>
+    }
+
+    private static RewriteSignal classifyStepSignal(TransformationStep step) {
+<span class="pc bpc" id="L966" title="1 of 2 branches missed.">        String rule = (step.ruleId() == null ? &quot;&quot; : step.ruleId()).toLowerCase(java.util.Locale.ROOT);</span>
+<span class="pc bpc" id="L967" title="1 of 2 branches missed.">        if (rule.contains(&quot;commut&quot;)</span>
+<span class="pc bpc" id="L968" title="1 of 2 branches missed.">            || rule.contains(&quot;associat&quot;)</span>
+<span class="pc bpc" id="L969" title="1 of 2 branches missed.">            || rule.contains(&quot;parenth&quot;)</span>
+<span class="pc bpc" id="L970" title="1 of 2 branches missed.">            || rule.contains(&quot;format&quot;)</span>
+<span class="fc bfc" id="L971" title="All 2 branches covered.">            || rule.contains(&quot;sort&quot;)</span>
+<span class="fc bfc" id="L972" title="All 2 branches covered.">            || rule.contains(&quot;canonical&quot;)</span>
+<span class="pc bpc" id="L973" title="1 of 2 branches missed.">            || rule.contains(&quot;normalize&quot;)</span>
+<span class="pc bpc" id="L974" title="1 of 2 branches missed.">            || rule.contains(&quot;neutral&quot;)</span>
+<span class="pc bpc" id="L975" title="1 of 2 branches missed.">            || rule.contains(&quot;identity&quot;)) {</span>
+<span class="fc" id="L976">            return RewriteSignal.LOW_SIGNAL;</span>
+        }
+<span class="fc bfc" id="L978" title="All 2 branches covered.">        if (step.ruleKind() == de.regelsuche.transform.RewriteKind.NORMALIZE) {</span>
+<span class="pc bpc" id="L979" title="1 of 2 branches missed.">            return step.scoreBefore() == step.scoreAfter() ? RewriteSignal.LOW_SIGNAL : RewriteSignal.MEDIUM_SIGNAL;</span>
+        }
+<span class="fc bfc" id="L981" title="All 2 branches covered.">        if (Math.abs(step.scoreBefore() - step.scoreAfter()) &gt;= 2) {</span>
+<span class="fc" id="L982">            return RewriteSignal.HIGH_SIGNAL;</span>
+        }
+<span class="fc" id="L984">        return RewriteSignal.MEDIUM_SIGNAL;</span>
+    }
+
+    private static String clusterId(String expression, Map&lt;String, String&gt; rawExpressionToClusterId) {
+<span class="fc" id="L988">        String mapped = rawExpressionToClusterId.get(expression);</span>
+<span class="fc bfc" id="L989" title="All 2 branches covered.">        if (mapped != null) {</span>
+<span class="fc" id="L990">            return mapped;</span>
+        }
+<span class="fc" id="L992">        de.regelsuche.canonical.ExpressionCanonicalizer canonicalizer = new de.regelsuche.canonical.ExpressionCanonicalizer();</span>
+<span class="fc" id="L993">        return canonicalizer.stableHash(canonicalizer.canonicalize(expression));</span>
+    }
+
+    private static String edgeId(String from, String to, String ruleId) {
+<span class="fc" id="L997">        return from + &quot;-&gt;&quot; + to + &quot;:&quot; + ruleId;</span>
+    }
+
+    private record MainPathProjection(
+        List&lt;SemanticGraphEdgeDto&gt; edges,
+        Set&lt;String&gt; visibleNodeIds,
+        Set&lt;String&gt; sourceEdgeIds,
+        List&lt;SemanticGraphNodeDto&gt; nodes,
+        Set&lt;String&gt; shadowedCanonicalNodeIds
+    ) {
+<span class="fc" id="L1007">        private MainPathProjection {</span>
+<span class="fc" id="L1008">            edges = List.copyOf(edges);</span>
+<span class="fc" id="L1009">            visibleNodeIds = Set.copyOf(visibleNodeIds);</span>
+<span class="fc" id="L1010">            sourceEdgeIds = Set.copyOf(sourceEdgeIds);</span>
+<span class="fc" id="L1011">            nodes = List.copyOf(nodes);</span>
+<span class="fc" id="L1012">            shadowedCanonicalNodeIds = Set.copyOf(shadowedCanonicalNodeIds);</span>
+<span class="fc" id="L1013">        }</span>
+
+        private static MainPathProjection empty() {
+<span class="fc" id="L1016">            return new MainPathProjection(List.of(), Set.of(), Set.of(), List.of(), Set.of());</span>
+        }
+    }
+
+    private static List&lt;SemanticGraphNodeDto&gt; dedupeNodes(Collection&lt;SemanticGraphNodeDto&gt; nodes) {
+<span class="fc" id="L1021">        Map&lt;String, SemanticGraphNodeDto&gt; byId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L1022" title="All 2 branches covered.">        for (SemanticGraphNodeDto node : nodes) {</span>
+<span class="fc" id="L1023">            byId.putIfAbsent(node.id(), node);</span>
+<span class="fc" id="L1024">        }</span>
+<span class="fc" id="L1025">        return new ArrayList&lt;&gt;(byId.values());</span>
+    }
+
+    private static List&lt;SemanticGraphEdgeDto&gt; dedupeEdges(Collection&lt;SemanticGraphEdgeDto&gt; edges) {
+<span class="fc" id="L1029">        Map&lt;String, SemanticGraphEdgeDto&gt; byKey = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L1030" title="All 2 branches covered.">        for (SemanticGraphEdgeDto edge : edges) {</span>
+<span class="fc" id="L1031">            String key = edge.from() + &quot;|&quot; + edge.to() + &quot;|&quot; + edge.ruleId() + &quot;|&quot; + edge.kind();</span>
+<span class="fc" id="L1032">            byKey.putIfAbsent(key, edge);</span>
+<span class="fc" id="L1033">        }</span>
+<span class="fc" id="L1034">        return new ArrayList&lt;&gt;(byKey.values());</span>
+    }
+
+    private static List&lt;SemanticGraphClusterDto&gt; buildClusters(
+        List&lt;CanonicalExpressionCluster&gt; canonicalClusters,
+        List&lt;SearchGraphClusterDto&gt; rawClusters,
+        Map&lt;String, String&gt; rawExpressionToClusterId
+    ) {
+<span class="fc" id="L1042">        List&lt;SemanticGraphClusterDto&gt; out = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L1043" title="All 2 branches covered.">        for (CanonicalExpressionCluster cluster : canonicalClusters) {</span>
+<span class="fc" id="L1044">            out.add(new SemanticGraphClusterDto(</span>
+<span class="fc" id="L1045">                &quot;canonical:&quot; + cluster.canonicalHash(),</span>
+<span class="fc" id="L1046">                cluster.canonicalExpression(),</span>
+                SemanticClusterKind.CANONICAL_EQUIVALENCE,
+<span class="fc" id="L1048">                List.of(cluster.canonicalHash()),</span>
+<span class="fc" id="L1049">                Math.max(0, cluster.variants().size() - 1),</span>
+<span class="pc bpc" id="L1050" title="1 of 2 branches missed.">                cluster.variants().isEmpty() ? 0.0 : 1.0 / cluster.variants().size()</span>
+            ));
+<span class="fc" id="L1052">        }</span>
+<span class="pc bpc" id="L1053" title="1 of 2 branches missed.">        if (rawClusters != null) {</span>
+<span class="fc bfc" id="L1054" title="All 2 branches covered.">            for (SearchGraphClusterDto cluster : rawClusters) {</span>
+<span class="fc" id="L1055">                List&lt;String&gt; mappedNodeIds = cluster.nodeIds().stream()</span>
+<span class="fc" id="L1056">                    .map(id -&gt; rawExpressionToClusterId.getOrDefault(id, id))</span>
+<span class="fc" id="L1057">                    .distinct()</span>
+<span class="fc" id="L1058">                    .toList();</span>
+<span class="pc bpc" id="L1059" title="1 of 2 branches missed.">                if (mappedNodeIds.isEmpty()) {</span>
+<span class="nc" id="L1060">                    continue;</span>
+                }
+<span class="fc" id="L1062">                out.add(new SemanticGraphClusterDto(</span>
+<span class="fc" id="L1063">                    &quot;raw:&quot; + cluster.id(),</span>
+<span class="fc" id="L1064">                    cluster.label(),</span>
+<span class="fc bfc" id="L1065" title="All 3 branches covered.">                    switch (cluster.type()) {</span>
+<span class="fc" id="L1066">                        case MACRO_SEQUENCE -&gt; SemanticClusterKind.MACRO_SEQUENCE;</span>
+<span class="fc" id="L1067">                        case STRUCTURAL_PATTERN -&gt; SemanticClusterKind.STRUCTURAL_PATTERN;</span>
+<span class="fc" id="L1068">                        default -&gt; SemanticClusterKind.DOMAIN_FAMILY;</span>
+                    },
+                    mappedNodeIds,
+                    0,
+<span class="fc" id="L1072">                    cluster.cohesionScore()</span>
+                ));
+<span class="fc" id="L1074">            }</span>
+        }
+<span class="fc" id="L1076">        return out;</span>
+    }
+
+    private static boolean edgeOnMainPath(SearchGraphEdgeDto edge, DiscoveredTransformation mainPath) {
+<span class="pc bpc" id="L1080" title="1 of 2 branches missed.">        if (mainPath == null) {</span>
+<span class="nc" id="L1081">            return true;</span>
+        }
+<span class="fc bfc" id="L1083" title="All 2 branches covered.">        for (TransformationStep step : mainPath.steps()) {</span>
+<span class="fc bfc" id="L1084" title="All 2 branches covered.">            if (step.beforeExpression().equals(edge.from())</span>
+<span class="fc bfc" id="L1085" title="All 2 branches covered.">                &amp;&amp; step.afterExpression().equals(edge.to())</span>
+<span class="pc bpc" id="L1086" title="1 of 2 branches missed.">                &amp;&amp; step.ruleId().equals(edge.ruleId())) {</span>
+<span class="fc" id="L1087">                return true;</span>
+            }
+<span class="fc" id="L1089">        }</span>
+<span class="fc" id="L1090">        return false;</span>
+    }
+
+    private static Set&lt;String&gt; canonicalMainPath(DiscoveredTransformation path) {
+<span class="fc bfc" id="L1094" title="All 2 branches covered.">        if (path == null) {</span>
+<span class="fc" id="L1095">            return Set.of();</span>
+        }
+<span class="fc" id="L1097">        de.regelsuche.canonical.ExpressionCanonicalizer canonicalizer = new de.regelsuche.canonical.ExpressionCanonicalizer();</span>
+<span class="fc" id="L1098">        Set&lt;String&gt; result = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L1099">        result.add(canonicalizer.stableHash(canonicalizer.canonicalize(path.originalExpression())));</span>
+<span class="fc bfc" id="L1100" title="All 2 branches covered.">        for (TransformationStep step : path.steps()) {</span>
+<span class="fc" id="L1101">            result.add(canonicalizer.stableHash(canonicalizer.canonicalize(step.beforeExpression())));</span>
+<span class="fc" id="L1102">            result.add(canonicalizer.stableHash(canonicalizer.canonicalize(step.afterExpression())));</span>
+<span class="fc" id="L1103">        }</span>
+<span class="fc" id="L1104">        result.add(canonicalizer.stableHash(canonicalizer.canonicalize(path.improvedExpression())));</span>
+<span class="fc" id="L1105">        return result;</span>
+    }
+
+    private static Map&lt;String, SemanticNodeKind&gt; canonicalMainPathEndpointKinds(DiscoveredTransformation path) {
+<span class="fc bfc" id="L1109" title="All 2 branches covered.">        if (path == null) {</span>
+<span class="fc" id="L1110">            return Map.of();</span>
+        }
+<span class="fc" id="L1112">        de.regelsuche.canonical.ExpressionCanonicalizer canonicalizer = new de.regelsuche.canonical.ExpressionCanonicalizer();</span>
+<span class="fc" id="L1113">        Map&lt;String, SemanticNodeKind&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L1114">        result.put(canonicalizer.stableHash(canonicalizer.canonicalize(path.originalExpression())), SemanticNodeKind.SEED);</span>
+<span class="fc" id="L1115">        result.put(canonicalizer.stableHash(canonicalizer.canonicalize(path.improvedExpression())), SemanticNodeKind.GOAL);</span>
+<span class="fc" id="L1116">        return result;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

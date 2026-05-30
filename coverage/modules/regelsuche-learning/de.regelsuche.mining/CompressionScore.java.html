@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompressionScore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">CompressionScore.java</span></div><h1>CompressionScore.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+/** Rewards hypotheses that compress long successful paths into one reusable macro. */
+<span class="fc" id="L4">public final class CompressionScore implements InterestingnessScoringModule {</span>
+    @Override
+    public String name() {
+<span class="fc" id="L7">        return &quot;compression&quot;;</span>
+    }
+
+    @Override
+    public double score(InterestingnessScoringContext context) {
+<span class="fc" id="L12">        HypothesisCandidate candidate = context.candidate();</span>
+<span class="fc" id="L13">        double pathCompression = candidate.supportingPaths().stream()</span>
+<span class="fc" id="L14">            .mapToInt(CompressionScore::estimatedPathLength)</span>
+<span class="fc" id="L15">            .average()</span>
+<span class="fc" id="L16">            .stream()</span>
+<span class="fc" id="L17">            .map(length -&gt; Math.log1p(Math.max(0.0, length - 1.0)))</span>
+<span class="fc" id="L18">            .findFirst()</span>
+<span class="fc" id="L19">            .orElse(0.0);</span>
+<span class="fc" id="L20">        int leftComplexity = structuralComplexity(candidate.leftPattern());</span>
+<span class="fc" id="L21">        int rightComplexity = structuralComplexity(candidate.rightPattern());</span>
+<span class="fc" id="L22">        double expressionCompression = Math.max(0.0, leftComplexity - rightComplexity) / 4.0;</span>
+<span class="fc" id="L23">        return pathCompression + expressionCompression;</span>
+    }
+
+    private static int estimatedPathLength(String pathId) {
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">        if (pathId == null || pathId.isBlank()) {</span>
+<span class="nc" id="L28">            return 1;</span>
+        }
+<span class="fc" id="L30">        return Math.max(1, pathId.split(&quot;&gt;|/|:&quot;, -1).length);</span>
+    }
+
+    private static int structuralComplexity(String expression) {
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L35">            return 0;</span>
+        }
+<span class="fc" id="L37">        int tokens = 0;</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int i = 0; i &lt; expression.length(); i++) {</span>
+<span class="fc" id="L39">            char ch = expression.charAt(i);</span>
+<span class="fc bfc" id="L40" title="All 4 branches covered.">            if (&quot;+-*/^(),&quot;.indexOf(ch) &gt;= 0 || Character.isLetterOrDigit(ch)) {</span>
+<span class="fc" id="L41">                tokens++;</span>
+            }
+        }
+<span class="fc" id="L44">        return tokens;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

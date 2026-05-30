@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MacroMoveExpansion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">MacroMoveExpansion.java</span></div><h1>MacroMoveExpansion.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.discovery.TransformationStep;
+
+import java.util.List;
+
+/**
+ * Represents a macro move in the replay/search graph: a single high-level
+ * step that compresses multiple atomic rewrite steps into one.
+ *
+ * &lt;p&gt;The macro move is presented compactly in the UI but can be expanded
+ * to reveal the full atomic step sequence via {@link #atomicSteps()}.&lt;/p&gt;
+ *
+ * &lt;p&gt;Created when a {@link MacroRuleCandidate} is applied during search,
+ * or when the search graph is post-processed to identify collapsible sub-paths
+ * that match a known macro rule.&lt;/p&gt;
+ *
+ * @param macroRuleId       the ID of the macro rule that produced this move
+ * @param fromExpression    the expression before applying the macro
+ * @param toExpression      the expression after applying the macro
+ * @param atomicSteps       the original atomic steps compressed by this macro
+ * @param supportingPathIds reconstruction references for the supporting mined paths
+ * @param compressionRatio  ratio of atomic steps replaced (≥ 1.0)
+ * @param expanded          whether the UI should initially show the expanded view
+ */
+public record MacroMoveExpansion(
+    String macroRuleId,
+    String fromExpression,
+    String toExpression,
+    List&lt;TransformationStep&gt; atomicSteps,
+    List&lt;String&gt; supportingPathIds,
+    List&lt;String&gt; assumptions,
+    double compressionRatio,
+    boolean expanded,
+    MacroMoveStatistics stats
+) {
+<span class="fc" id="L37">    public MacroMoveExpansion {</span>
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">        if (macroRuleId == null || macroRuleId.isBlank()) {</span>
+<span class="nc" id="L39">            throw new IllegalArgumentException(&quot;macroRuleId must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        atomicSteps = atomicSteps == null ? List.of() : List.copyOf(atomicSteps);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        supportingPathIds = supportingPathIds == null ? List.of() : List.copyOf(supportingPathIds);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (compressionRatio &lt; 1.0) {</span>
+<span class="nc" id="L45">            compressionRatio = 1.0;</span>
+        }
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        stats = stats == null ? MacroMoveStatistics.empty() : stats;</span>
+<span class="fc" id="L48">    }</span>
+
+    public MacroMoveExpansion(
+        String macroRuleId,
+        String fromExpression,
+        String toExpression,
+        List&lt;TransformationStep&gt; atomicSteps,
+        List&lt;String&gt; supportingPathIds,
+        double compressionRatio,
+        boolean expanded
+    ) {
+<span class="fc" id="L59">        this(macroRuleId, fromExpression, toExpression, atomicSteps, supportingPathIds, List.of(),</span>
+<span class="fc" id="L60">            compressionRatio, expanded, MacroMoveStatistics.empty());</span>
+<span class="fc" id="L61">    }</span>
+
+    public MacroMoveExpansion(
+        String macroRuleId,
+        String fromExpression,
+        String toExpression,
+        List&lt;TransformationStep&gt; atomicSteps,
+        double compressionRatio,
+        boolean expanded
+    ) {
+<span class="nc" id="L71">        this(macroRuleId, fromExpression, toExpression, atomicSteps, List.of(), List.of(), compressionRatio, expanded,</span>
+<span class="nc" id="L72">            MacroMoveStatistics.empty());</span>
+<span class="nc" id="L73">    }</span>
+
+    /** Returns a copy with the expanded flag toggled. */
+    public MacroMoveExpansion withExpanded(boolean newExpanded) {
+<span class="nc" id="L77">        return new MacroMoveExpansion(</span>
+            macroRuleId, fromExpression, toExpression,
+            atomicSteps, supportingPathIds, assumptions, compressionRatio, newExpanded, stats
+        );
+    }
+
+    /** Returns the number of atomic steps compressed. */
+    public int atomicStepCount() {
+<span class="nc" id="L85">        return atomicSteps.size();</span>
+    }
+
+    /**
+     * Creates a {@link MacroMoveExpansion} from a macro rule candidate and
+     * the corresponding discovered atomic steps.
+     *
+     * @param candidate   the macro rule candidate that was applied
+     * @param atomicSteps the atomic steps the macro compresses
+     * @return a compact macro move with the full replay available
+     */
+    public static MacroMoveExpansion from(
+        MacroRuleCandidate candidate,
+        List&lt;TransformationStep&gt; atomicSteps
+    ) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        String from = atomicSteps.isEmpty() ? candidate.leftPattern()</span>
+<span class="nc" id="L101">            : atomicSteps.getFirst().beforeExpression();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        String to = atomicSteps.isEmpty() ? candidate.rightPattern()</span>
+<span class="nc" id="L103">            : atomicSteps.getLast().afterExpression();</span>
+<span class="nc" id="L104">        return new MacroMoveExpansion(</span>
+<span class="nc" id="L105">            candidate.id(),</span>
+            from,
+            to,
+            atomicSteps,
+<span class="nc" id="L109">            candidate.supportingTransformationIds(),</span>
+<span class="nc" id="L110">            List.of(),</span>
+<span class="nc" id="L111">            candidate.compressionRatio(),</span>
+            false,
+<span class="nc" id="L113">            MacroMoveStatistics.empty()</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

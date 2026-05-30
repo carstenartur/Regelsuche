@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultTemplateSymbolicRegressionBackend.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">DefaultTemplateSymbolicRegressionBackend.java</span></div><h1>DefaultTemplateSymbolicRegressionBackend.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.OptionalDouble;
+
+/** Internal template backend used as the default symbolic-regression baseline. */
+<span class="fc" id="L9">public final class DefaultTemplateSymbolicRegressionBackend implements SymbolicRegressionBackend {</span>
+    private static final double EPSILON = 1e-9;
+
+    @Override
+    public List&lt;SymbolicRegressionSample&gt; extractSamples(List&lt;SuccessfulTransformationPath&gt; paths, int minimumSupport) {
+<span class="pc bpc" id="L14" title="2 of 4 branches missed.">        if (paths == null || paths.size() &lt; minimumSupport) {</span>
+<span class="nc" id="L15">            return List.of();</span>
+        }
+<span class="fc" id="L17">        List&lt;SymbolicRegressionSample&gt; samples = paths.stream()</span>
+<span class="fc" id="L18">            .map(DefaultTemplateSymbolicRegressionBackend::sample)</span>
+<span class="fc" id="L19">            .flatMap(java.util.Optional::stream)</span>
+<span class="fc" id="L20">            .sorted(Comparator.comparing(SymbolicRegressionSample::pathId))</span>
+<span class="fc" id="L21">            .toList();</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        return samples.size() &lt; minimumSupport ? List.of() : samples;</span>
+    }
+
+    @Override
+    public List&lt;SymbolicRegressionFittedResult&gt; fit(List&lt;SymbolicRegressionSample&gt; samples, int minimumSupport) {
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">        if (samples == null || samples.size() &lt; minimumSupport) {</span>
+<span class="nc" id="L28">            return List.of();</span>
+        }
+<span class="fc" id="L30">        return templateLibrary().stream()</span>
+<span class="fc" id="L31">            .map(template -&gt; template.fit(samples, minimumSupport))</span>
+<span class="fc" id="L32">            .flatMap(java.util.Optional::stream)</span>
+<span class="fc" id="L33">            .toList();</span>
+    }
+
+    static String format(double value) {
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (Math.abs(value - Math.rint(value)) &lt;= EPSILON) {</span>
+<span class="fc" id="L38">            return Long.toString(Math.round(value));</span>
+        }
+<span class="fc" id="L40">        return Double.toString(value);</span>
+    }
+
+    private static List&lt;Template&gt; templateLibrary() {
+<span class="fc" id="L44">        return List.of(</span>
+<span class="fc" id="L45">            Template.constant(),</span>
+<span class="fc" id="L46">            Template.shift(),</span>
+<span class="fc" id="L47">            Template.scale(),</span>
+<span class="fc" id="L48">            Template.affine(),</span>
+<span class="fc" id="L49">            Template.square(),</span>
+<span class="fc" id="L50">            Template.polynomialDegree(2),</span>
+<span class="fc" id="L51">            Template.polynomialDegree(3),</span>
+<span class="fc" id="L52">            Template.reciprocalShift(),</span>
+<span class="fc" id="L53">            Template.geometricSequence()</span>
+        );
+    }
+
+    private static java.util.Optional&lt;SymbolicRegressionSample&gt; sample(SuccessfulTransformationPath path) {
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L59">            return java.util.Optional.empty();</span>
+        }
+<span class="fc" id="L61">        OptionalDouble x = parseNumber(path.originalExpression());</span>
+<span class="fc" id="L62">        OptionalDouble y = parseNumber(path.targetExpression());</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (x.isEmpty() || y.isEmpty()) {</span>
+<span class="nc" id="L64">            return java.util.Optional.empty();</span>
+        }
+<span class="fc" id="L66">        return java.util.Optional.of(new SymbolicRegressionSample(path.id(), x.getAsDouble(), y.getAsDouble()));</span>
+    }
+
+    private static OptionalDouble parseNumber(String expression) {
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L71">            return OptionalDouble.empty();</span>
+        }
+        try {
+<span class="fc" id="L74">            return OptionalDouble.of(Double.parseDouble(expression.trim()));</span>
+<span class="nc" id="L75">        } catch (NumberFormatException ignored) {</span>
+<span class="nc" id="L76">            return OptionalDouble.empty();</span>
+        }
+    }
+
+    private interface Template {
+        java.util.Optional&lt;SymbolicRegressionFittedResult&gt; fit(List&lt;SymbolicRegressionSample&gt; samples, int minimumSupport);
+
+        static Template constant() {
+<span class="fc" id="L84">            return (samples, minimumSupport) -&gt; {</span>
+<span class="fc" id="L85">                double c = samples.getFirst().y();</span>
+<span class="fc" id="L86">                return supported(samples, sample -&gt; close(sample.y(), c), minimumSupport)</span>
+<span class="pc" id="L87">                    .map(support -&gt; new SymbolicRegressionFittedResult(&quot;constant&quot;, format(c), support));</span>
+            };
+        }
+
+        static Template shift() {
+<span class="fc" id="L92">            return (samples, minimumSupport) -&gt; {</span>
+<span class="fc" id="L93">                double c = samples.getFirst().y() - samples.getFirst().x();</span>
+<span class="fc" id="L94">                return supported(samples, sample -&gt; close(sample.y(), sample.x() + c), minimumSupport)</span>
+<span class="pc bnc" id="L95" title="All 2 branches missed.">                    .map(support -&gt; new SymbolicRegressionFittedResult(&quot;shift&quot;, c &gt;= 0</span>
+<span class="nc" id="L96">                        ? &quot;x + &quot; + format(c)</span>
+<span class="nc" id="L97">                        : &quot;x - &quot; + format(-c), support));</span>
+            };
+        }
+
+        static Template scale() {
+<span class="fc" id="L102">            return (samples, minimumSupport) -&gt; {</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                SymbolicRegressionSample anchor = samples.stream().filter(sample -&gt; Math.abs(sample.x()) &gt; EPSILON).findFirst().orElse(null);</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                if (anchor == null) {</span>
+<span class="nc" id="L105">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L107">                double a = anchor.y() / anchor.x();</span>
+<span class="fc" id="L108">                return supported(samples, sample -&gt; close(sample.y(), a * sample.x()), minimumSupport)</span>
+<span class="fc" id="L109">                    .map(support -&gt; new SymbolicRegressionFittedResult(&quot;scale&quot;, format(a) + &quot; * x&quot;, support));</span>
+            };
+        }
+
+        static Template affine() {
+<span class="fc" id="L114">            return (samples, minimumSupport) -&gt; {</span>
+<span class="fc" id="L115">                List&lt;SymbolicRegressionSample&gt; distinct = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                for (SymbolicRegressionSample sample : samples) {</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                    if (distinct.stream().noneMatch(existing -&gt; close(existing.x(), sample.x()))) {</span>
+<span class="fc" id="L118">                        distinct.add(sample);</span>
+                    }
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                    if (distinct.size() == 2) {</span>
+<span class="fc" id="L121">                        break;</span>
+                    }
+<span class="fc" id="L123">                }</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                if (distinct.size() &lt; 2) {</span>
+<span class="nc" id="L125">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L127">                SymbolicRegressionSample first = distinct.get(0);</span>
+<span class="fc" id="L128">                SymbolicRegressionSample second = distinct.get(1);</span>
+<span class="fc" id="L129">                double a = (second.y() - first.y()) / (second.x() - first.x());</span>
+<span class="fc" id="L130">                double b = first.y() - a * first.x();</span>
+<span class="fc" id="L131">                return supported(samples, sample -&gt; close(sample.y(), a * sample.x() + b), minimumSupport)</span>
+<span class="fc" id="L132">                    .map(support -&gt; new SymbolicRegressionFittedResult(&quot;affine&quot;, format(a) + &quot; * x&quot;</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                        + (b &gt;= 0 ? &quot; + &quot; + format(b) : &quot; - &quot; + format(-b)), support));</span>
+            };
+        }
+
+        static Template square() {
+<span class="fc" id="L138">            return (samples, minimumSupport) -&gt; supported(samples, sample -&gt; close(sample.y(), sample.x() * sample.x()), minimumSupport)</span>
+<span class="pc" id="L139">                .map(support -&gt; new SymbolicRegressionFittedResult(&quot;square&quot;, &quot;x^2&quot;, support));</span>
+        }
+
+        static Template polynomialDegree(int degree) {
+<span class="fc" id="L143">            return (samples, minimumSupport) -&gt; {</span>
+<span class="fc" id="L144">                List&lt;SymbolicRegressionSample&gt; distinct = distinctByX(samples, degree + 1);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                if (distinct.size() &lt; degree + 1) {</span>
+<span class="fc" id="L146">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L148">                double[] coefficients = solveVandermonde(distinct, degree);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                if (coefficients.length == 0) {</span>
+<span class="nc" id="L150">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L152">                return supportedWithResidual(</span>
+                    samples,
+<span class="fc" id="L154">                    sample -&gt; evaluatePolynomial(coefficients, sample.x()),</span>
+                    minimumSupport
+<span class="fc" id="L156">                ).map(support -&gt; new SymbolicRegressionFittedResult(</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                    degree == 2 ? &quot;polynomial-degree-2&quot; : &quot;polynomial-degree-3&quot;,</span>
+<span class="fc" id="L158">                    polynomialExpression(coefficients),</span>
+<span class="fc" id="L159">                    support.samples(),</span>
+<span class="fc" id="L160">                    support.maxResidual(),</span>
+<span class="fc" id="L161">                    support.confidence()</span>
+                ));
+            };
+        }
+
+        static Template reciprocalShift() {
+<span class="fc" id="L167">            return (samples, minimumSupport) -&gt; {</span>
+<span class="fc" id="L168">                List&lt;SymbolicRegressionSample&gt; distinct = samples.stream()</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                    .filter(sample -&gt; Math.abs(sample.y()) &gt; EPSILON)</span>
+<span class="fc" id="L170">                    .collect(java.util.stream.Collectors.toCollection(ArrayList::new));</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                if (distinct.size() &lt; 2) {</span>
+<span class="nc" id="L172">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L174">                SymbolicRegressionSample first = distinct.get(0);</span>
+<span class="fc" id="L175">                SymbolicRegressionSample second = distinct.stream()</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">                    .filter(sample -&gt; !close(sample.y(), first.y()))</span>
+<span class="fc" id="L177">                    .findFirst()</span>
+<span class="fc" id="L178">                    .orElse(null);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                if (second == null) {</span>
+<span class="nc" id="L180">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L182">                double b = (second.y() * second.x() - first.y() * first.x()) / (first.y() - second.y());</span>
+<span class="fc" id="L183">                double a = first.y() * (first.x() + b);</span>
+<span class="pc bpc" id="L184" title="3 of 6 branches missed.">                if (!Double.isFinite(a) || !Double.isFinite(b) || Math.abs(a) &lt;= EPSILON) {</span>
+<span class="nc" id="L185">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L187">                return supportedWithResidual(</span>
+                    samples,
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                    sample -&gt; Math.abs(sample.x() + b) &lt;= EPSILON ? Double.NaN : a / (sample.x() + b),</span>
+                    minimumSupport
+<span class="fc" id="L191">                ).map(support -&gt; new SymbolicRegressionFittedResult(</span>
+                    &quot;rational-reciprocal-shift&quot;,
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                    format(a) + &quot; / (x &quot; + (b &gt;= 0 ? &quot;+ &quot; + format(b) : &quot;- &quot; + format(-b)) + &quot;)&quot;,</span>
+<span class="fc" id="L194">                    support.samples(),</span>
+<span class="fc" id="L195">                    support.maxResidual(),</span>
+<span class="fc" id="L196">                    support.confidence()</span>
+                ));
+            };
+        }
+
+        static Template geometricSequence() {
+<span class="fc" id="L202">            return (samples, minimumSupport) -&gt; {</span>
+<span class="fc" id="L203">                List&lt;SymbolicRegressionSample&gt; distinct = distinctByX(samples, 2);</span>
+<span class="pc bpc" id="L204" title="1 of 6 branches missed.">                if (distinct.size() &lt; 2 || distinct.stream().anyMatch(sample -&gt; sample.y() &lt;= 0)) {</span>
+<span class="fc" id="L205">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L207">                SymbolicRegressionSample first = distinct.get(0);</span>
+<span class="fc" id="L208">                SymbolicRegressionSample second = distinct.get(1);</span>
+<span class="fc" id="L209">                double deltaX = second.x() - first.x();</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                if (Math.abs(deltaX) &lt;= EPSILON) {</span>
+<span class="nc" id="L211">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L213">                double r = Math.pow(second.y() / first.y(), 1.0 / deltaX);</span>
+<span class="fc" id="L214">                double a = first.y() / Math.pow(r, first.x());</span>
+<span class="pc bpc" id="L215" title="4 of 8 branches missed.">                if (!Double.isFinite(a) || !Double.isFinite(r) || a &lt;= 0 || r &lt;= 0) {</span>
+<span class="nc" id="L216">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L218">                return supportedWithResidual(</span>
+                    samples,
+<span class="fc" id="L220">                    sample -&gt; a * Math.pow(r, sample.x()),</span>
+                    minimumSupport
+<span class="fc" id="L222">                ).map(support -&gt; new SymbolicRegressionFittedResult(</span>
+                    &quot;geometric-sequence&quot;,
+<span class="fc" id="L224">                    format(a) + &quot; * &quot; + format(r) + &quot;^x&quot;,</span>
+<span class="fc" id="L225">                    support.samples(),</span>
+<span class="fc" id="L226">                    support.maxResidual(),</span>
+<span class="fc" id="L227">                    support.confidence()</span>
+                ));
+            };
+        }
+
+        private static java.util.Optional&lt;List&lt;SymbolicRegressionSample&gt;&gt; supported(
+            List&lt;SymbolicRegressionSample&gt; samples,
+            java.util.function.Predicate&lt;SymbolicRegressionSample&gt; predicate,
+            int minimumSupport
+        ) {
+<span class="fc" id="L237">            List&lt;SymbolicRegressionSample&gt; support = samples.stream().filter(predicate).toList();</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            return support.size() &gt;= minimumSupport ? java.util.Optional.of(support) : java.util.Optional.empty();</span>
+        }
+
+        private static java.util.Optional&lt;SupportFit&gt; supportedWithResidual(
+            List&lt;SymbolicRegressionSample&gt; samples,
+            java.util.function.ToDoubleFunction&lt;SymbolicRegressionSample&gt; evaluator,
+            int minimumSupport
+        ) {
+<span class="fc" id="L246">            List&lt;SymbolicRegressionSample&gt; support = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L247">            double maxResidual = 0.0;</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            for (SymbolicRegressionSample sample : samples) {</span>
+<span class="fc" id="L249">                double predicted = evaluator.applyAsDouble(sample);</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">                if (!Double.isFinite(predicted)) {</span>
+<span class="fc" id="L251">                    continue;</span>
+                }
+<span class="fc" id="L253">                double residual = Math.abs(sample.y() - predicted);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                if (residual &lt;= EPSILON) {</span>
+<span class="fc" id="L255">                    support.add(sample);</span>
+<span class="fc" id="L256">                    maxResidual = Math.max(maxResidual, residual);</span>
+                }
+<span class="fc" id="L258">            }</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (support.size() &lt; minimumSupport) {</span>
+<span class="fc" id="L260">                return java.util.Optional.empty();</span>
+            }
+<span class="fc" id="L262">            double confidence = (double) support.size() / (double) samples.size();</span>
+<span class="fc" id="L263">            return java.util.Optional.of(new SupportFit(support, maxResidual, confidence));</span>
+        }
+
+        private static List&lt;SymbolicRegressionSample&gt; distinctByX(List&lt;SymbolicRegressionSample&gt; samples, int limit) {
+<span class="fc" id="L267">            List&lt;SymbolicRegressionSample&gt; distinct = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            for (SymbolicRegressionSample sample : samples) {</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                if (distinct.stream().noneMatch(existing -&gt; close(existing.x(), sample.x()))) {</span>
+<span class="fc" id="L270">                    distinct.add(sample);</span>
+                }
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                if (distinct.size() == limit) {</span>
+<span class="fc" id="L273">                    break;</span>
+                }
+<span class="fc" id="L275">            }</span>
+<span class="fc" id="L276">            return distinct;</span>
+        }
+
+        private static double[] solveVandermonde(List&lt;SymbolicRegressionSample&gt; samples, int degree) {
+<span class="fc" id="L280">            int n = degree + 1;</span>
+<span class="fc" id="L281">            double[][] matrix = new double[n][n + 1];</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            for (int row = 0; row &lt; n; row++) {</span>
+<span class="fc" id="L283">                double power = 1.0;</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">                for (int col = 0; col &lt; n; col++) {</span>
+<span class="fc" id="L285">                    matrix[row][col] = power;</span>
+<span class="fc" id="L286">                    power *= samples.get(row).x();</span>
+                }
+<span class="fc" id="L288">                matrix[row][n] = samples.get(row).y();</span>
+            }
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            for (int pivot = 0; pivot &lt; n; pivot++) {</span>
+<span class="fc" id="L291">                int best = pivot;</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">                for (int row = pivot + 1; row &lt; n; row++) {</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">                    if (Math.abs(matrix[row][pivot]) &gt; Math.abs(matrix[best][pivot])) {</span>
+<span class="fc" id="L294">                        best = row;</span>
+                    }
+                }
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">                if (Math.abs(matrix[best][pivot]) &lt;= EPSILON) {</span>
+<span class="nc" id="L298">                    return new double[0];</span>
+                }
+<span class="fc" id="L300">                double[] tmp = matrix[pivot];</span>
+<span class="fc" id="L301">                matrix[pivot] = matrix[best];</span>
+<span class="fc" id="L302">                matrix[best] = tmp;</span>
+<span class="fc" id="L303">                double divisor = matrix[pivot][pivot];</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">                for (int col = pivot; col &lt;= n; col++) {</span>
+<span class="fc" id="L305">                    matrix[pivot][col] /= divisor;</span>
+                }
+<span class="fc bfc" id="L307" title="All 2 branches covered.">                for (int row = 0; row &lt; n; row++) {</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">                    if (row == pivot) {</span>
+<span class="fc" id="L309">                        continue;</span>
+                    }
+<span class="fc" id="L311">                    double factor = matrix[row][pivot];</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                    for (int col = pivot; col &lt;= n; col++) {</span>
+<span class="fc" id="L313">                        matrix[row][col] -= factor * matrix[pivot][col];</span>
+                    }
+                }
+            }
+<span class="fc" id="L317">            double[] coefficients = new double[n];</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L319">                coefficients[i] = matrix[i][n];</span>
+            }
+<span class="fc" id="L321">            return coefficients;</span>
+        }
+
+        private static double evaluatePolynomial(double[] coefficients, double x) {
+<span class="fc" id="L325">            double value = 0.0;</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            for (int i = coefficients.length - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L327">                value = value * x + coefficients[i];</span>
+            }
+<span class="fc" id="L329">            return value;</span>
+        }
+
+        private static String polynomialExpression(double[] coefficients) {
+<span class="fc" id="L333">            StringBuilder expression = new StringBuilder();</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            for (int power = coefficients.length - 1; power &gt;= 0; power--) {</span>
+<span class="fc" id="L335">                double coefficient = coefficients[power];</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                if (Math.abs(coefficient) &lt;= EPSILON) {</span>
+<span class="fc" id="L337">                    continue;</span>
+                }
+<span class="fc bfc" id="L339" title="All 2 branches covered.">                boolean negative = coefficient &lt; 0;</span>
+<span class="fc" id="L340">                double absolute = Math.abs(coefficient);</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                if (!expression.isEmpty()) {</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">                    expression.append(negative ? &quot; - &quot; : &quot; + &quot;);</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">                } else if (negative) {</span>
+<span class="fc" id="L344">                    expression.append(&quot;-&quot;);</span>
+                }
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                if (power == 0) {</span>
+<span class="fc" id="L347">                    expression.append(format(absolute));</span>
+                } else {
+<span class="fc bfc" id="L349" title="All 2 branches covered.">                    if (!close(absolute, 1.0)) {</span>
+<span class="fc" id="L350">                        expression.append(format(absolute)).append(&quot; * &quot;);</span>
+                    }
+<span class="fc" id="L352">                    expression.append(&quot;x&quot;);</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                    if (power &gt; 1) {</span>
+<span class="fc" id="L354">                        expression.append(&quot;^&quot;).append(power);</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            return expression.isEmpty() ? &quot;0&quot; : expression.toString();</span>
+        }
+
+        private static boolean close(double left, double right) {
+<span class="fc bfc" id="L362" title="All 2 branches covered.">            return Math.abs(left - right) &lt;= EPSILON;</span>
+        }
+
+<span class="fc" id="L365">        record SupportFit(List&lt;SymbolicRegressionSample&gt; samples, double maxResidual, double confidence) {</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryEngineOptions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery</a> &gt; <span class="el_source">DiscoveryEngineOptions.java</span></div><h1>DiscoveryEngineOptions.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery;
+
+/** Engine-level discovery configuration for local rewrites, hypothesis operators and macro reuse. */
+public record DiscoveryEngineOptions(
+    boolean enableHypothesisOperators,
+    boolean enableMacroReuse,
+    int maxHypothesisCandidatesPerOperator,
+    int searchDepth,
+    int searchBudget,
+    DiscoveryProfile profile
+) {
+    public static final int DEFAULT_MAX_HYPOTHESIS_CANDIDATES_PER_OPERATOR = 6;
+    public static final int DEFAULT_SEARCH_DEPTH = 4;
+    public static final int DEFAULT_SEARCH_BUDGET = 160;
+
+<span class="fc" id="L16">    public DiscoveryEngineOptions {</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        profile = profile == null ? DiscoveryProfile.PURE_REWRITE : profile;</span>
+<span class="fc" id="L18">        maxHypothesisCandidatesPerOperator = Math.max(0, maxHypothesisCandidatesPerOperator);</span>
+<span class="fc" id="L19">        searchDepth = Math.max(0, searchDepth);</span>
+<span class="fc" id="L20">        searchBudget = Math.max(0, searchBudget);</span>
+<span class="fc" id="L21">    }</span>
+
+    public static DiscoveryEngineOptions forProfile(DiscoveryProfile profile) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        DiscoveryProfile resolved = profile == null ? DiscoveryProfile.PURE_REWRITE : profile;</span>
+<span class="fc bfc" id="L25" title="All 4 branches covered.">        return switch (resolved) {</span>
+<span class="fc" id="L26">            case PURE_REWRITE -&gt; new DiscoveryEngineOptions(false, false,</span>
+                DEFAULT_MAX_HYPOTHESIS_CANDIDATES_PER_OPERATOR, DEFAULT_SEARCH_DEPTH, DEFAULT_SEARCH_BUDGET, resolved);
+<span class="fc" id="L28">            case HYPOTHESIS_ONLY -&gt; new DiscoveryEngineOptions(true, false,</span>
+                DEFAULT_MAX_HYPOTHESIS_CANDIDATES_PER_OPERATOR, DEFAULT_SEARCH_DEPTH, DEFAULT_SEARCH_BUDGET, resolved);
+<span class="fc" id="L30">            case MACRO_REUSE_ONLY -&gt; new DiscoveryEngineOptions(false, true,</span>
+                DEFAULT_MAX_HYPOTHESIS_CANDIDATES_PER_OPERATOR, DEFAULT_SEARCH_DEPTH, DEFAULT_SEARCH_BUDGET, resolved);
+<span class="fc" id="L32">            case HYPOTHESIS_AND_MACRO_REUSE, RESEARCH_DISCOVERY_PIPELINE -&gt; new DiscoveryEngineOptions(true, true,</span>
+                DEFAULT_MAX_HYPOTHESIS_CANDIDATES_PER_OPERATOR, DEFAULT_SEARCH_DEPTH, DEFAULT_SEARCH_BUDGET, resolved);
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

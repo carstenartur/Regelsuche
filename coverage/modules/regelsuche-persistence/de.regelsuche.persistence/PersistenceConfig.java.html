@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PersistenceConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence</a> &gt; <span class="el_source">PersistenceConfig.java</span></div><h1>PersistenceConfig.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Resolved persistence configuration.
+ *
+ * &lt;p&gt;The killer-demo standard mode is engineered around two simple knobs:&lt;/p&gt;
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@code REGELSUCHE_PERSISTENCE_MODE} (or JVM property
+ *       {@code regelsuche.persistence.mode}) — see {@link GraphPersistenceMode}.&lt;/li&gt;
+ *   &lt;li&gt;{@code REGELSUCHE_PERSISTENCE_PATH} (or JVM property
+ *       {@code regelsuche.persistence.path}) — directory for {@link
+ *       GraphPersistenceMode#JSON_FILE} / {@link GraphPersistenceMode#EMBEDDED_NEO4J}.
+ *       Defaults to {@code ./data/regelsuche}.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;The optional Full Mode reads the standard PostgreSQL and Neo4j environment
+ * variables: {@code POSTGRES_URL}, {@code POSTGRES_USER}, {@code
+ * POSTGRES_PASSWORD}, {@code NEO4J_URI}, {@code NEO4J_USER}, {@code
+ * NEO4J_PASSWORD}. If the PostgreSQL triplet is set &lt;em&gt;and&lt;/em&gt; the mode
+ * hasn't been chosen explicitly, the configuration resolves to {@link
+ * GraphPersistenceMode#POSTGRESQL_WITH_JSON_FALLBACK}; if only the Neo4j
+ * triplet is present it resolves to {@link GraphPersistenceMode#REMOTE_NEO4J}.&lt;/p&gt;
+ *
+ * &lt;p&gt;This class is intentionally a plain immutable record + a static factory
+ * so it can be exercised from tests without touching real environment
+ * variables.&lt;/p&gt;
+ */
+public record PersistenceConfig(
+    GraphPersistenceMode mode,
+    Path storagePath,
+    String neo4jUri,
+    String neo4jUser,
+    String neo4jPassword,
+    String postgresUrl,
+    String postgresUser,
+    String postgresPassword
+) {
+
+    public static final String ENV_MODE = &quot;REGELSUCHE_PERSISTENCE_MODE&quot;;
+    public static final String ENV_PATH = &quot;REGELSUCHE_PERSISTENCE_PATH&quot;;
+    public static final String ENV_NEO4J_URI = &quot;NEO4J_URI&quot;;
+    public static final String ENV_NEO4J_USER = &quot;NEO4J_USER&quot;;
+    public static final String ENV_NEO4J_PASSWORD = &quot;NEO4J_PASSWORD&quot;;
+    public static final String ENV_POSTGRES_URL = &quot;POSTGRES_URL&quot;;
+    public static final String ENV_POSTGRES_USER = &quot;POSTGRES_USER&quot;;
+    public static final String ENV_POSTGRES_PASSWORD = &quot;POSTGRES_PASSWORD&quot;;
+    public static final String PROP_MODE = &quot;regelsuche.persistence.mode&quot;;
+    public static final String PROP_PATH = &quot;regelsuche.persistence.path&quot;;
+    public static final String PROP_POSTGRES_URL = &quot;regelsuche.postgres.url&quot;;
+    public static final String PROP_POSTGRES_USER = &quot;regelsuche.postgres.user&quot;;
+    public static final String PROP_POSTGRES_PASSWORD = &quot;regelsuche.postgres.password&quot;;
+    public static final String DEFAULT_PATH = &quot;./data/regelsuche&quot;;
+
+    public PersistenceConfig(
+        GraphPersistenceMode mode,
+        Path storagePath,
+        String neo4jUri,
+        String neo4jUser,
+        String neo4jPassword
+    ) {
+<span class="nc" id="L68">        this(mode, storagePath, neo4jUri, neo4jUser, neo4jPassword, null, null, null);</span>
+<span class="nc" id="L69">    }</span>
+
+<span class="fc" id="L71">    public PersistenceConfig {</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (mode == null) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException(&quot;mode must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (storagePath == null) {</span>
+<span class="nc" id="L76">            throw new IllegalArgumentException(&quot;storagePath must not be null&quot;);</span>
+        }
+<span class="fc" id="L78">    }</span>
+
+    /** Ephemeral in-memory configuration with a placeholder storage path. */
+    public static PersistenceConfig inMemory() {
+<span class="nc" id="L82">        return new PersistenceConfig(</span>
+            GraphPersistenceMode.IN_MEMORY,
+<span class="nc" id="L84">            Paths.get(DEFAULT_PATH),</span>
+            null, null, null, null, null, null
+        );
+    }
+
+    /** File-backed configuration rooted at {@code path}. */
+    public static PersistenceConfig jsonFile(Path path) {
+<span class="nc" id="L91">        return new PersistenceConfig(</span>
+            GraphPersistenceMode.JSON_FILE,
+            path,
+            null, null, null, null, null, null
+        );
+    }
+
+    /** PostgreSQL-backed Discovery metadata with JSON fallback for graph-shaped artifacts. */
+    public static PersistenceConfig postgresqlWithJsonFallback(
+        Path path,
+        String postgresUrl,
+        String postgresUser,
+        String postgresPassword
+    ) {
+<span class="nc" id="L105">        return new PersistenceConfig(</span>
+            GraphPersistenceMode.POSTGRESQL_WITH_JSON_FALLBACK,
+            path,
+            null, null, null,
+            postgresUrl, postgresUser, postgresPassword
+        );
+    }
+
+    /**
+     * Resolve a {@link PersistenceConfig} from environment variables and
+     * JVM properties. Explicit JVM properties win over environment
+     * variables; if neither is set, defaults to {@link
+     * GraphPersistenceMode#IN_MEMORY} so unit tests and short-lived CLI
+     * commands stay side-effect-free.
+     *
+     * &lt;p&gt;The Docker image sets {@code REGELSUCHE_PERSISTENCE_MODE=JSON_FILE}
+     * and {@code REGELSUCHE_PERSISTENCE_PATH=/opt/regelsuche/data} via the
+     * {@code Dockerfile} so the killer-demo's first run already produces
+     * persistent artifacts.&lt;/p&gt;
+     */
+    public static PersistenceConfig fromEnvironment(Map&lt;String, String&gt; env) {
+<span class="fc" id="L126">        String rawMode = firstNonBlank(</span>
+<span class="fc" id="L127">            System.getProperty(PROP_MODE),</span>
+<span class="fc" id="L128">            env.get(ENV_MODE)</span>
+        );
+<span class="fc" id="L130">        String rawPath = firstNonBlank(</span>
+<span class="fc" id="L131">            System.getProperty(PROP_PATH),</span>
+<span class="fc" id="L132">            env.get(ENV_PATH)</span>
+        );
+<span class="fc" id="L134">        String uri = firstNonBlank(env.get(ENV_NEO4J_URI), System.getProperty(&quot;regelsuche.neo4j.uri&quot;));</span>
+<span class="fc" id="L135">        String user = firstNonBlank(env.get(ENV_NEO4J_USER), System.getProperty(&quot;regelsuche.neo4j.user&quot;));</span>
+<span class="fc" id="L136">        String password = firstNonBlank(env.get(ENV_NEO4J_PASSWORD), System.getProperty(&quot;regelsuche.neo4j.password&quot;));</span>
+<span class="fc" id="L137">        String postgresUrl = firstNonBlank(env.get(ENV_POSTGRES_URL), System.getProperty(PROP_POSTGRES_URL));</span>
+<span class="fc" id="L138">        String postgresUser = firstNonBlank(env.get(ENV_POSTGRES_USER), System.getProperty(PROP_POSTGRES_USER));</span>
+<span class="fc" id="L139">        String postgresPassword = firstNonBlank(env.get(ENV_POSTGRES_PASSWORD), System.getProperty(PROP_POSTGRES_PASSWORD));</span>
+
+        GraphPersistenceMode mode;
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (rawMode != null) {</span>
+<span class="fc" id="L143">            mode = parseMode(rawMode);</span>
+<span class="pc bpc" id="L144" title="2 of 6 branches missed.">        } else if (postgresUrl != null &amp;&amp; postgresUser != null &amp;&amp; postgresPassword != null) {</span>
+            // Auto-detect relational Full Mode when the PostgreSQL env vars are all present.
+<span class="fc" id="L146">            mode = GraphPersistenceMode.POSTGRESQL_WITH_JSON_FALLBACK;</span>
+<span class="pc bpc" id="L147" title="1 of 6 branches missed.">        } else if (uri != null &amp;&amp; user != null &amp;&amp; password != null) {</span>
+            // Auto-detect Full Mode when the Neo4j env vars are all present.
+<span class="fc" id="L149">            mode = GraphPersistenceMode.REMOTE_NEO4J;</span>
+        } else {
+<span class="fc" id="L151">            mode = GraphPersistenceMode.IN_MEMORY;</span>
+        }
+
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        Path path = Paths.get(rawPath == null ? DEFAULT_PATH : rawPath);</span>
+<span class="fc" id="L155">        return new PersistenceConfig(mode, path, uri, user, password, postgresUrl, postgresUser, postgresPassword);</span>
+    }
+
+    /** Convenience: read from the JVM's real environment. */
+    public static PersistenceConfig fromEnvironment() {
+<span class="nc" id="L160">        return fromEnvironment(System.getenv());</span>
+    }
+
+    private static GraphPersistenceMode parseMode(String raw) {
+        try {
+<span class="fc" id="L165">            return GraphPersistenceMode.valueOf(raw.trim().toUpperCase(Locale.ROOT));</span>
+<span class="nc" id="L166">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L167">            throw new IllegalArgumentException(</span>
+                &quot;Unsupported persistence mode '&quot; + raw + &quot;'. Expected one of: &quot;
+<span class="nc" id="L169">                    + java.util.Arrays.toString(GraphPersistenceMode.values()),</span>
+                ex
+            );
+        }
+    }
+
+    private static String firstNonBlank(String... values) {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="pc bpc" id="L177" title="1 of 4 branches missed.">            if (value != null &amp;&amp; !value.isBlank()) {</span>
+<span class="fc" id="L178">                return value;</span>
+            }
+        }
+<span class="fc" id="L181">        return null;</span>
+    }
+
+    /** Convenience: whether all Neo4j credentials are set. */
+    public boolean hasNeo4jCredentials() {
+<span class="pc bpc" id="L186" title="1 of 6 branches missed.">        return neo4jUri != null &amp;&amp; neo4jUser != null &amp;&amp; neo4jPassword != null;</span>
+    }
+
+    /** Convenience: whether all PostgreSQL connection settings are set. */
+    public boolean hasPostgresCredentials() {
+<span class="pc bpc" id="L191" title="2 of 6 branches missed.">        return postgresUrl != null &amp;&amp; postgresUser != null &amp;&amp; postgresPassword != null;</span>
+    }
+
+    public Optional&lt;String&gt; neo4jUriOptional() {
+<span class="nc" id="L195">        return Optional.ofNullable(neo4jUri);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

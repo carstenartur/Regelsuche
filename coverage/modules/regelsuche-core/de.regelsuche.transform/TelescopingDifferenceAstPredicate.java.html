@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TelescopingDifferenceAstPredicate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">TelescopingDifferenceAstPredicate.java</span></div><h1>TelescopingDifferenceAstPredicate.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+
+/** Structural predicate for unit-fraction differences such as {@code 1/u - 1/(u + 1)}. */
+public final class TelescopingDifferenceAstPredicate {
+<span class="fc" id="L16">    private static final ExpressionParser PARSER = new ExpressionParser();</span>
+<span class="fc" id="L17">    private static final ExpressionCanonicalizer CANONICALIZER = new ExpressionCanonicalizer();</span>
+
+    private TelescopingDifferenceAstPredicate() {
+    }
+
+    public static boolean containsTelescopingDifference(String expression) {
+        try {
+<span class="fc" id="L24">            Expr root = PARSER.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="fc" id="L25">            return containsTelescopingDifference(root);</span>
+<span class="nc" id="L26">        } catch (RuntimeException ignored) {</span>
+<span class="nc" id="L27">            return false;</span>
+        }
+    }
+
+    private static boolean containsTelescopingDifference(Expr expression) {
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            if (binary.operator() == BinaryOperator.SUB</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                &amp;&amp; unitDenominator(binary.left()) != null</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                &amp;&amp; isUnitStep(unitDenominator(binary.right()), unitDenominator(binary.left()))) {</span>
+<span class="fc" id="L36">                return true;</span>
+            }
+<span class="nc bnc" id="L38" title="All 4 branches missed.">            return containsTelescopingDifference(binary.left()) || containsTelescopingDifference(binary.right());</span>
+        }
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L41">            return function.arguments().stream().anyMatch(TelescopingDifferenceAstPredicate::containsTelescopingDifference);</span>
+        }
+<span class="nc" id="L43">        return false;</span>
+    }
+
+    private static Expr unitDenominator(Expr expression) {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            &amp;&amp; binary.operator() == BinaryOperator.DIV</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            &amp;&amp; binary.left() instanceof NumberExpr number</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            &amp;&amp; Double.compare(number.value(), 1.0) == 0) {</span>
+<span class="fc" id="L51">            return binary.right();</span>
+        }
+<span class="nc" id="L53">        return null;</span>
+    }
+
+    private static boolean isUnitStep(Expr candidate, Expr base) {
+<span class="fc" id="L57">        AdditiveOffset candidateOffset = additiveOffset(candidate);</span>
+<span class="fc" id="L58">        AdditiveOffset baseOffset = additiveOffset(base);</span>
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">        if (candidateOffset != null</span>
+            &amp;&amp; baseOffset != null
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            &amp;&amp; same(candidateOffset.symbolicPart(), baseOffset.symbolicPart())</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            &amp;&amp; Double.compare(candidateOffset.offset() - baseOffset.offset(), 1.0) == 0) {</span>
+<span class="fc" id="L63">            return true;</span>
+        }
+<span class="nc" id="L65">        return isPlusOne(candidate, base);</span>
+    }
+
+    private static boolean isPlusOne(Expr candidate, Expr base) {
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        if (!(candidate instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.ADD) {</span>
+<span class="nc" id="L70">            return false;</span>
+        }
+<span class="nc bnc" id="L72" title="All 4 branches missed.">        return (isOne(binary.right()) &amp;&amp; same(binary.left(), base))</span>
+<span class="nc bnc" id="L73" title="All 4 branches missed.">            || (isOne(binary.left()) &amp;&amp; same(binary.right(), base));</span>
+    }
+
+    private static boolean isOne(Expr expression) {
+<span class="nc bnc" id="L77" title="All 4 branches missed.">        return expression instanceof NumberExpr number &amp;&amp; Double.compare(number.value(), 1.0) == 0;</span>
+    }
+
+    private static boolean same(Expr left, Expr right) {
+<span class="fc" id="L81">        return CANONICALIZER.stableHash(ExpressionFormatter.format(left))</span>
+<span class="fc" id="L82">            .equals(CANONICALIZER.stableHash(ExpressionFormatter.format(right)));</span>
+    }
+
+    private static AdditiveOffset additiveOffset(Expr expression) {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
+<span class="nc" id="L87">            return new AdditiveOffset(new NumberExpr(0), number.value());</span>
+        }
+<span class="pc bpc" id="L89" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (binary.right() instanceof NumberExpr right) {</span>
+<span class="fc" id="L91">                return new AdditiveOffset(binary.left(), right.value());</span>
+            }
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (binary.left() instanceof NumberExpr left) {</span>
+<span class="nc" id="L94">                return new AdditiveOffset(binary.right(), left.value());</span>
+            }
+        }
+<span class="fc" id="L97">        return new AdditiveOffset(expression, 0.0);</span>
+    }
+
+<span class="fc" id="L100">    private record AdditiveOffset(Expr symbolicPart, double offset) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

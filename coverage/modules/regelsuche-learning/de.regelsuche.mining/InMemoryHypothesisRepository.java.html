@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InMemoryHypothesisRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InMemoryHypothesisRepository.java</span></div><h1>InMemoryHypothesisRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * In-memory implementation of {@link HypothesisRepository}.
+ *
+ * &lt;p&gt;Thread-safety: not guaranteed — use external synchronisation when
+ * multiple threads access the same instance (e.g. during parallel discovery
+ * workers).  For single-threaded discovery pipelines this is sufficient.&lt;/p&gt;
+ */
+<span class="fc" id="L15">public class InMemoryHypothesisRepository implements HypothesisRepository {</span>
+
+<span class="fc" id="L17">    private final Map&lt;String, HypothesisCandidate&gt; store = new LinkedHashMap&lt;&gt;();</span>
+
+    @Override
+    public void save(String hypothesisId, HypothesisCandidate hypothesis) {
+<span class="pc bpc" id="L21" title="2 of 4 branches missed.">        if (hypothesisId == null || hypothesisId.isBlank()) {</span>
+<span class="nc" id="L22">            throw new IllegalArgumentException(&quot;hypothesisId must not be blank&quot;);</span>
+        }
+<span class="fc" id="L24">        store.put(hypothesisId, hypothesis);</span>
+<span class="fc" id="L25">    }</span>
+
+    @Override
+    public Optional&lt;HypothesisCandidate&gt; findById(String hypothesisId) {
+<span class="fc" id="L29">        return Optional.ofNullable(store.get(hypothesisId));</span>
+    }
+
+    @Override
+    public List&lt;HypothesisCandidate&gt; findAll() {
+<span class="fc" id="L34">        return List.copyOf(store.values());</span>
+    }
+
+    @Override
+    public void delete(String hypothesisId) {
+<span class="fc" id="L39">        store.remove(hypothesisId);</span>
+<span class="fc" id="L40">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

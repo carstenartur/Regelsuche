@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ENode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">ENode.java</span></div><h1>ENode.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * One node in an {@link EGraph}: a symbol (operator name, function name,
+ * variable name, or numeric literal) together with the e-class IDs of its
+ * children.
+ *
+ * &lt;p&gt;An e-node is the analogue of an AST node, but children are referenced
+ * via {@link EClassId}s rather than by direct pointer. Two e-nodes are
+ * structurally equal when they share the same {@code symbol} and the same
+ * sequence of &lt;em&gt;canonical&lt;/em&gt; child e-class IDs — which is how
+ * {@link EGraph#rebuild()} discovers congruence (&quot;if {@code a≡b} then
+ * {@code f(a)≡f(b)}&quot;).&lt;/p&gt;
+ *
+ * &lt;p&gt;This record is immutable; the e-graph achieves congruence closure by
+ * &lt;em&gt;replacing&lt;/em&gt; stale e-nodes via {@link #canonicalize}, not by
+ * mutating them in place.&lt;/p&gt;
+ */
+public record ENode(String symbol, List&lt;EClassId&gt; children) {
+
+<span class="fc" id="L25">    public ENode {</span>
+<span class="pc bpc" id="L26" title="2 of 4 branches missed.">        if (symbol == null || symbol.isEmpty()) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;symbol must not be empty&quot;);</span>
+        }
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        children = children == null ? List.of() : List.copyOf(children);</span>
+<span class="fc" id="L30">    }</span>
+
+    /** Convenience constructor for leaves (variables, numbers). */
+    public static ENode leaf(String symbol) {
+<span class="fc" id="L34">        return new ENode(symbol, List.of());</span>
+    }
+
+    /**
+     * Return a copy of this node with every child replaced by its current
+     * canonical (find-root) e-class ID under {@code unionFind}.
+     */
+    public ENode canonicalize(UnionFind unionFind) {
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (children.isEmpty()) {</span>
+<span class="fc" id="L43">            return this;</span>
+        }
+<span class="fc" id="L45">        EClassId[] canonical = new EClassId[children.size()];</span>
+<span class="fc" id="L46">        boolean changed = false;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (int i = 0; i &lt; children.size(); i++) {</span>
+<span class="fc" id="L48">            EClassId before = children.get(i);</span>
+<span class="fc" id="L49">            EClassId after = unionFind.find(before);</span>
+<span class="fc" id="L50">            canonical[i] = after;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (!Objects.equals(before, after)) {</span>
+<span class="fc" id="L52">                changed = true;</span>
+            }
+        }
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (!changed) {</span>
+<span class="fc" id="L56">            return this;</span>
+        }
+<span class="fc" id="L58">        return new ENode(symbol, List.of(canonical));</span>
+    }
+
+    /** {@code true} if this node has no children. */
+    public boolean isLeaf() {
+<span class="fc" id="L63">        return children.isEmpty();</span>
+    }
+
+    /** Read-only view of the child references. */
+    public List&lt;EClassId&gt; childView() {
+<span class="nc" id="L68">        return Collections.unmodifiableList(children);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

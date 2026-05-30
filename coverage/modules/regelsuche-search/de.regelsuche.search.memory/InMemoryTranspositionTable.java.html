@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InMemoryTranspositionTable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.memory</a> &gt; <span class="el_source">InMemoryTranspositionTable.java</span></div><h1>InMemoryTranspositionTable.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.memory;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Thread-safe in-memory {@link TranspositionTable} backed by a
+ * {@link ConcurrentHashMap}.
+ *
+ * &lt;p&gt;Default implementation used when
+ * {@link de.regelsuche.persistence.GraphPersistenceMode#IN_MEMORY} is
+ * selected or no persistence context is configured (e.g. in tests).&lt;/p&gt;
+ */
+<span class="fc" id="L18">public class InMemoryTranspositionTable implements TranspositionTable {</span>
+
+<span class="fc" id="L20">    private final ConcurrentHashMap&lt;String, TranspositionEntry&gt; entries = new ConcurrentHashMap&lt;&gt;();</span>
+
+    @Override
+    public Optional&lt;TranspositionEntry&gt; lookup(String canonicalHash) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (canonicalHash == null) {</span>
+<span class="nc" id="L25">            return Optional.empty();</span>
+        }
+<span class="fc" id="L27">        return Optional.ofNullable(entries.get(canonicalHash));</span>
+    }
+
+    @Override
+    public synchronized TranspositionEntry record(TranspositionEntry entry) {
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (entry == null) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(&quot;entry must not be null&quot;);</span>
+        }
+<span class="fc" id="L35">        TranspositionEntry existing = entries.get(entry.canonicalHash());</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (existing == null) {</span>
+<span class="fc" id="L37">            entries.put(entry.canonicalHash(), entry);</span>
+<span class="fc" id="L38">            return entry;</span>
+        }
+<span class="fc" id="L40">        TranspositionEntry merged = existing.merge(</span>
+<span class="fc" id="L41">            entry.bestScore(),</span>
+<span class="fc" id="L42">            entry.minDepthSeen(),</span>
+<span class="fc" id="L43">            entry.bestKnownPathId(),</span>
+<span class="fc" id="L44">            entry.reachedByRuleIds(),</span>
+<span class="fc" id="L45">            entry.lastSeen()</span>
+        );
+<span class="fc" id="L47">        entries.put(merged.canonicalHash(), merged);</span>
+<span class="fc" id="L48">        return merged;</span>
+    }
+
+    @Override
+    public Collection&lt;TranspositionEntry&gt; entries() {
+<span class="nc" id="L53">        List&lt;TranspositionEntry&gt; copy = new ArrayList&lt;&gt;(entries.values());</span>
+<span class="nc" id="L54">        return Collections.unmodifiableCollection(copy);</span>
+    }
+
+    @Override
+    public int size() {
+<span class="fc" id="L59">        return entries.size();</span>
+    }
+
+    @Override
+    public void clear() {
+<span class="nc" id="L64">        entries.clear();</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * Drop the entry for {@code canonicalHash}. Used by
+     * {@link GlobalMemoryService#garbageCollect} to evict rare, old
+     * entries. No-op if no entry exists for the hash.
+     */
+    public void remove(String canonicalHash) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (canonicalHash == null) {</span>
+<span class="nc" id="L74">            return;</span>
+        }
+<span class="nc" id="L76">        entries.remove(canonicalHash);</span>
+<span class="nc" id="L77">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

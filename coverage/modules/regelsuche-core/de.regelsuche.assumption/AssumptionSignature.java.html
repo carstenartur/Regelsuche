@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssumptionSignature.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.assumption</a> &gt; <span class="el_source">AssumptionSignature.java</span></div><h1>AssumptionSignature.java</h1><pre class="source lang-java linenums">package de.regelsuche.assumption;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.TreeSet;
+
+/**
+ * Normalized, comparable signature for a set of assumptions.
+ */
+public record AssumptionSignature(List&lt;String&gt; normalizedAssumptions, String fingerprint) {
+<span class="fc" id="L12">    public AssumptionSignature {</span>
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">        normalizedAssumptions = normalizedAssumptions == null ? List.of() : List.copyOf(normalizedAssumptions);</span>
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">        fingerprint = fingerprint == null ? &quot;&quot; : fingerprint;</span>
+<span class="fc" id="L15">    }</span>
+
+    public static AssumptionSignature ofExpressions(Collection&lt;String&gt; assumptions) {
+<span class="pc bpc" id="L18" title="1 of 4 branches missed.">        if (assumptions == null || assumptions.isEmpty()) {</span>
+<span class="fc" id="L19">            return new AssumptionSignature(List.of(), &quot;&quot;);</span>
+        }
+<span class="fc" id="L21">        TreeSet&lt;String&gt; normalized = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (String assumption : assumptions) {</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            if (assumption == null) {</span>
+<span class="nc" id="L24">                continue;</span>
+            }
+<span class="fc" id="L26">            String canonical = normalizeExpression(assumption);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            if (!canonical.isBlank()) {</span>
+<span class="fc" id="L28">                normalized.add(canonical);</span>
+            }
+<span class="fc" id="L30">        }</span>
+<span class="fc" id="L31">        List&lt;String&gt; list = List.copyOf(normalized);</span>
+<span class="fc" id="L32">        return new AssumptionSignature(list, String.join(&quot;;&quot;, list));</span>
+    }
+
+    public static AssumptionSignature ofAssumptions(Collection&lt;Assumption&gt; assumptions) {
+<span class="nc bnc" id="L36" title="All 4 branches missed.">        if (assumptions == null || assumptions.isEmpty()) {</span>
+<span class="nc" id="L37">            return new AssumptionSignature(List.of(), &quot;&quot;);</span>
+        }
+<span class="nc" id="L39">        TreeSet&lt;String&gt; normalized = new TreeSet&lt;&gt;();</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        for (Assumption assumption : assumptions) {</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            if (assumption == null) {</span>
+<span class="nc" id="L42">                continue;</span>
+            }
+<span class="nc" id="L44">            String canonical = assumption.kind() + &quot;|&quot; + normalizeExpression(assumption.expression());</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">            if (!canonical.isBlank()) {</span>
+<span class="nc" id="L46">                normalized.add(canonical);</span>
+            }
+<span class="nc" id="L48">        }</span>
+<span class="nc" id="L49">        List&lt;String&gt; list = List.copyOf(normalized);</span>
+<span class="nc" id="L50">        return new AssumptionSignature(list, String.join(&quot;;&quot;, list));</span>
+    }
+
+    public static AssumptionSignature merge(AssumptionSignature left, AssumptionSignature right) {
+<span class="nc" id="L54">        Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="nc" id="L55">        Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="nc" id="L56">        TreeSet&lt;String&gt; merged = new TreeSet&lt;&gt;(left.normalizedAssumptions());</span>
+<span class="nc" id="L57">        merged.addAll(right.normalizedAssumptions());</span>
+<span class="nc" id="L58">        List&lt;String&gt; list = List.copyOf(merged);</span>
+<span class="nc" id="L59">        return new AssumptionSignature(list, String.join(&quot;;&quot;, list));</span>
+    }
+
+    /**
+     * Normalize common textual variants of assumptions.
+     */
+    public static String normalizeExpression(String expression) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L67">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L69">        String canonical = expression.trim()</span>
+<span class="fc" id="L70">            .replace(&quot;≠&quot;, &quot;!=&quot;)</span>
+<span class="fc" id="L71">            .replaceAll(&quot;\\s+&quot;, &quot; &quot;)</span>
+<span class="fc" id="L72">            .replaceAll(&quot;^not\\((.*)=0\\)$&quot;, &quot;$1 != 0&quot;)</span>
+<span class="fc" id="L73">            .replaceAll(&quot;\\s*!=\\s*&quot;, &quot; != &quot;)</span>
+<span class="fc" id="L74">            .replaceAll(&quot;\\s*&gt;=\\s*&quot;, &quot; &gt;= &quot;)</span>
+<span class="fc" id="L75">            .replaceAll(&quot;\\s*&lt;=\\s*&quot;, &quot; &lt;= &quot;)</span>
+<span class="fc" id="L76">            .replaceAll(&quot;\\s*&gt;(?!=)\\s*&quot;, &quot; &gt; &quot;)</span>
+<span class="fc" id="L77">            .replaceAll(&quot;\\s*&lt;(?!=)\\s*&quot;, &quot; &lt; &quot;)</span>
+<span class="fc" id="L78">            .trim();</span>
+<span class="fc" id="L79">        int notEquals = canonical.indexOf(&quot; != &quot;);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (notEquals &gt;= 0) {</span>
+<span class="fc" id="L81">            String left = canonical.substring(0, notEquals).trim();</span>
+<span class="fc" id="L82">            String right = canonical.substring(notEquals + 4).trim();</span>
+<span class="fc" id="L83">            left = stripOuterParens(left);</span>
+<span class="fc" id="L84">            right = stripOuterParens(right);</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">            if (isZero(left) &amp;&amp; !right.isBlank()) {</span>
+<span class="fc" id="L86">                return right + &quot; != 0&quot;;</span>
+            }
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">            if (isZero(right) &amp;&amp; !left.isBlank()) {</span>
+<span class="fc" id="L89">                return left + &quot; != 0&quot;;</span>
+            }
+        }
+<span class="fc" id="L92">        return canonical;</span>
+    }
+
+    private static boolean isZero(String value) {
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        return value.equals(&quot;0&quot;) || value.equals(&quot;0.0&quot;);</span>
+    }
+
+    private static String stripOuterParens(String value) {
+<span class="fc" id="L100">        String result = value;</span>
+<span class="pc bpc" id="L101" title="5 of 6 branches missed.">        while (result.startsWith(&quot;(&quot;) &amp;&amp; result.endsWith(&quot;)&quot;) &amp;&amp; result.length() &gt; 1) {</span>
+<span class="nc" id="L102">            result = result.substring(1, result.length() - 1).trim();</span>
+        }
+<span class="fc" id="L104">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

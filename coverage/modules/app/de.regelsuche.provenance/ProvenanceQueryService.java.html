@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProvenanceQueryService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.provenance</a> &gt; <span class="el_source">ProvenanceQueryService.java</span></div><h1>ProvenanceQueryService.java</h1><pre class="source lang-java linenums">package de.regelsuche.provenance;
+
+import de.regelsuche.api.searchgraph.SearchGraphRecord;
+import de.regelsuche.api.searchgraph.SearchGraphRepository;
+import java.util.List;
+import java.util.Optional;
+
+/** Public query facade for typed provenance graph analytics over persisted search runs. */
+public final class ProvenanceQueryService {
+    private final SearchGraphRepository repository;
+<span class="nc" id="L11">    private final ProvenanceGraphAssembler assembler = new ProvenanceGraphAssembler();</span>
+<span class="nc" id="L12">    private final ProvenanceGraphQueries queries = new ProvenanceGraphQueries();</span>
+
+<span class="nc" id="L14">    public ProvenanceQueryService(SearchGraphRepository repository) {</span>
+<span class="nc" id="L15">        this.repository = repository;</span>
+<span class="nc" id="L16">    }</span>
+
+    public Optional&lt;ProvenanceGraph&gt; graphForRun(String runId) {
+<span class="nc" id="L19">        return repository.findById(runId).map(assembler::assemble);</span>
+    }
+
+    public List&lt;ProvenanceNode&gt; strongestHypotheses(String runId, int limit) {
+<span class="nc" id="L23">        return graphForRun(runId)</span>
+<span class="nc" id="L24">            .map(graph -&gt; queries.strongestHypotheses(graph, limit))</span>
+<span class="nc" id="L25">            .orElse(List.of());</span>
+    }
+
+    public List&lt;ProvenanceNode&gt; domainRefutations(String runId, String domain) {
+<span class="nc" id="L29">        return graphForRun(runId)</span>
+<span class="nc" id="L30">            .map(graph -&gt; queries.hypothesesRefutedOnlyInDomain(graph, domain))</span>
+<span class="nc" id="L31">            .orElse(List.of());</span>
+    }
+
+    public List&lt;ProvenanceNode&gt; derivationLineage(String runId, String hypothesisId) {
+<span class="nc" id="L35">        return graphForRun(runId)</span>
+<span class="nc" id="L36">            .map(graph -&gt; queries.derivationLineage(graph, hypothesisId))</span>
+<span class="nc" id="L37">            .orElse(List.of());</span>
+    }
+
+    public List&lt;SearchGraphRecord&gt; runs() {
+<span class="nc" id="L41">        return repository.findAll();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebSecurityConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">WebSecurityConfig.java</span></div><h1>WebSecurityConfig.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import java.nio.file.Path;
+import java.util.Objects;
+
+/**
+ * Optional security configuration for {@link WebWorkbenchServer}.
+ *
+ * &lt;p&gt;The web workbench started out as an explicitly local-only tool, so the
+ * defaults remain &quot;no auth, no TLS&quot;. This config object lets callers opt in
+ * to HTTP Basic authentication and/or TLS without changing the existing
+ * constructors.&lt;/p&gt;
+ *
+ * &lt;p&gt;Notes:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Basic Auth is enabled by setting both {@link #username} and
+ *       {@link #password}. The realm defaults to {@code &quot;Regelsuche&quot;}.&lt;/li&gt;
+ *   &lt;li&gt;TLS is enabled by providing a {@link #keystorePath} along with the
+ *       keystore password. The keystore type defaults to {@code &quot;PKCS12&quot;}
+ *       (the recommended modern default).&lt;/li&gt;
+ *   &lt;li&gt;Both options can be combined; for production deployments callers
+ *       should set both.&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public final class WebSecurityConfig {
+    private final String username;
+    private final String password;
+    private final String realm;
+    private final Path keystorePath;
+    private final char[] keystorePassword;
+    private final String keystoreType;
+    private final int maxRequestBytes;
+
+<span class="fc" id="L34">    private WebSecurityConfig(Builder builder) {</span>
+<span class="fc" id="L35">        this.username = builder.username;</span>
+<span class="fc" id="L36">        this.password = builder.password;</span>
+<span class="fc" id="L37">        this.realm = builder.realm;</span>
+<span class="fc" id="L38">        this.keystorePath = builder.keystorePath;</span>
+<span class="fc" id="L39">        this.keystorePassword = builder.keystorePassword;</span>
+<span class="fc" id="L40">        this.keystoreType = builder.keystoreType;</span>
+<span class="fc" id="L41">        this.maxRequestBytes = builder.maxRequestBytes;</span>
+<span class="fc" id="L42">    }</span>
+
+    /** @return a configuration with no security enabled (legacy default). */
+    public static WebSecurityConfig none() {
+<span class="fc" id="L46">        return new Builder().build();</span>
+    }
+
+    public static Builder builder() {
+<span class="fc" id="L50">        return new Builder();</span>
+    }
+
+    public boolean isAuthEnabled() {
+<span class="pc bpc" id="L54" title="3 of 8 branches missed.">        return username != null &amp;&amp; !username.isBlank() &amp;&amp; password != null &amp;&amp; !password.isBlank();</span>
+    }
+
+    public boolean isTlsEnabled() {
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        return keystorePath != null;</span>
+    }
+
+    public String username() {
+<span class="fc" id="L62">        return username;</span>
+    }
+
+    public String password() {
+<span class="fc" id="L66">        return password;</span>
+    }
+
+    public String realm() {
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        return realm == null ? &quot;Regelsuche&quot; : realm;</span>
+    }
+
+    public Path keystorePath() {
+<span class="nc" id="L74">        return keystorePath;</span>
+    }
+
+    public char[] keystorePassword() {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        return keystorePassword == null ? new char[0] : keystorePassword.clone();</span>
+    }
+
+    public String keystoreType() {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        return keystoreType == null ? &quot;PKCS12&quot; : keystoreType;</span>
+    }
+
+    public int maxRequestBytes() {
+<span class="fc" id="L86">        return maxRequestBytes;</span>
+    }
+
+<span class="fc" id="L89">    public static final class Builder {</span>
+        private String username;
+        private String password;
+        private String realm;
+        private Path keystorePath;
+        private char[] keystorePassword;
+        private String keystoreType;
+<span class="fc" id="L96">        private int maxRequestBytes = 1 &lt;&lt; 20; // 1 MiB cap on JSON request bodies</span>
+
+        public Builder basicAuth(String username, String password) {
+<span class="fc" id="L99">            this.username = Objects.requireNonNull(username, &quot;username&quot;);</span>
+<span class="fc" id="L100">            this.password = Objects.requireNonNull(password, &quot;password&quot;);</span>
+<span class="fc" id="L101">            return this;</span>
+        }
+
+        public Builder realm(String realm) {
+<span class="fc" id="L105">            this.realm = realm;</span>
+<span class="fc" id="L106">            return this;</span>
+        }
+
+        public Builder tls(Path keystorePath, char[] keystorePassword) {
+<span class="nc" id="L110">            return tls(keystorePath, keystorePassword, &quot;PKCS12&quot;);</span>
+        }
+
+        public Builder tls(Path keystorePath, char[] keystorePassword, String keystoreType) {
+<span class="nc" id="L114">            this.keystorePath = Objects.requireNonNull(keystorePath, &quot;keystorePath&quot;);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            this.keystorePassword = keystorePassword == null ? new char[0] : keystorePassword.clone();</span>
+<span class="nc" id="L116">            this.keystoreType = keystoreType;</span>
+<span class="nc" id="L117">            return this;</span>
+        }
+
+        public Builder maxRequestBytes(int max) {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">            if (max &lt; 1024) {</span>
+<span class="nc" id="L122">                throw new IllegalArgumentException(&quot;maxRequestBytes must be &gt;= 1024&quot;);</span>
+            }
+<span class="nc" id="L124">            this.maxRequestBytes = max;</span>
+<span class="nc" id="L125">            return this;</span>
+        }
+
+        public WebSecurityConfig build() {
+<span class="fc" id="L129">            return new WebSecurityConfig(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

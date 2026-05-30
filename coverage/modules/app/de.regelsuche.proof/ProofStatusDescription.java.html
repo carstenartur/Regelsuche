@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofStatusDescription.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofStatusDescription.java</span></div><h1>ProofStatusDescription.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import de.regelsuche.validation.CandidateProofStatus;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Human-readable explanations for each {@link CandidateProofStatus}.
+ *
+ * &lt;p&gt;Used by the {@code /api/proof-status} endpoint and the UI badge tooltips
+ * so users understand what level of trust each rule has earned (only observed,
+ * validated by examples, symbolically verified by SymPy/SMT, formally
+ * provable, or formally proved).&lt;/p&gt;
+ */
+public final class ProofStatusDescription {
+
+<span class="fc" id="L18">    public record Description(</span>
+        CandidateProofStatus status,
+        String label,
+        String summaryDe,
+        String summaryEn
+    ) {
+    }
+
+<span class="fc" id="L26">    private static final Map&lt;CandidateProofStatus, Description&gt; DESCRIPTIONS = build();</span>
+
+    private static Map&lt;CandidateProofStatus, Description&gt; build() {
+<span class="fc" id="L29">        Map&lt;CandidateProofStatus, Description&gt; map = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L30">        map.put(CandidateProofStatus.REJECTED, new Description(</span>
+            CandidateProofStatus.REJECTED,
+            &quot;Verworfen&quot;,
+            &quot;Regel wurde durch Gegenbeispiele oder Widerspruch verworfen und ist nicht im Inventar aktiv.&quot;,
+            &quot;Rule was rejected by counter-examples or contradiction and is not active in the inventory.&quot;
+        ));
+<span class="fc" id="L36">        map.put(CandidateProofStatus.OBSERVED, new Description(</span>
+            CandidateProofStatus.OBSERVED,
+            &quot;Beobachtet&quot;,
+            &quot;Regel ist nur als Muster beobachtet – noch keine Validierung durch Beispiele oder Solver.&quot;,
+            &quot;Rule is only observed as a pattern – no example validation or solver check yet.&quot;
+        ));
+<span class="fc" id="L42">        map.put(CandidateProofStatus.VALIDATED_BY_EXAMPLES, new Description(</span>
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+            &quot;Durch Beispiele bestätigt&quot;,
+            &quot;Regel ist auf einer Menge konkreter Beispiele gleichwertigkeitserhaltend.&quot;,
+            &quot;Rule preserves equivalence on a set of concrete examples.&quot;
+        ));
+<span class="fc" id="L48">        map.put(CandidateProofStatus.SYMBOLICALLY_VERIFIED, new Description(</span>
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+            &quot;Symbolisch verifiziert&quot;,
+            &quot;Regel wurde durch ein symbolisches Verfahren (SymPy/SMT) als allgemein gültig geprüft.&quot;,
+            &quot;Rule has been verified as universally valid via a symbolic procedure (SymPy/SMT).&quot;
+        ));
+<span class="fc" id="L54">        map.put(CandidateProofStatus.FORMALLY_PROVABLE, new Description(</span>
+            CandidateProofStatus.FORMALLY_PROVABLE,
+            &quot;Formal beweisbar&quot;,
+            &quot;Es existiert ein formaler Beweis-Pfad (z.B. Lean-Skizze), der noch nicht durchgeführt wurde.&quot;,
+            &quot;A formal proof outline exists (e.g. a Lean sketch) but has not been completed yet.&quot;
+        ));
+<span class="fc" id="L60">        map.put(CandidateProofStatus.FORMALLY_PROVED, new Description(</span>
+            CandidateProofStatus.FORMALLY_PROVED,
+            &quot;Formal bewiesen&quot;,
+            &quot;Regel wurde formal in einem Beweissystem bewiesen (Lean/Isabelle/Coq).&quot;,
+            &quot;Rule has been formally proved in a proof assistant (Lean/Isabelle/Coq).&quot;
+        ));
+<span class="fc" id="L66">        return java.util.Collections.unmodifiableMap(map);</span>
+    }
+
+    private ProofStatusDescription() {
+    }
+
+    public static Map&lt;CandidateProofStatus, Description&gt; all() {
+<span class="nc" id="L73">        return DESCRIPTIONS;</span>
+    }
+
+    public static Description of(CandidateProofStatus status) {
+<span class="fc" id="L77">        return DESCRIPTIONS.get(status);</span>
+    }
+
+    public static Description ofName(String name) {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L82">            return null;</span>
+        }
+        try {
+<span class="fc" id="L85">            return DESCRIPTIONS.get(CandidateProofStatus.valueOf(name.toUpperCase(Locale.ROOT)));</span>
+<span class="nc" id="L86">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L87">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

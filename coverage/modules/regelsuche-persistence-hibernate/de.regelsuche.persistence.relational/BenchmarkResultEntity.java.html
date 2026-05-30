@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BenchmarkResultEntity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence-hibernate</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence.relational</a> &gt; <span class="el_source">BenchmarkResultEntity.java</span></div><h1>BenchmarkResultEntity.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence.relational;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.GenericField;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.KeywordField;
+
+@Entity
+@Indexed
+@Table(name = &quot;benchmark_results&quot;, indexes = {
+    @Index(name = &quot;idx_benchmark_results_experiment&quot;, columnList = &quot;experiment_id&quot;),
+    @Index(name = &quot;idx_benchmark_results_name&quot;, columnList = &quot;benchmark_name&quot;)
+})
+public class BenchmarkResultEntity {
+    @Id
+    private String id;
+    @Column(name = &quot;experiment_id&quot;)
+    private String experimentId;
+    @FullTextField
+    @KeywordField(name = &quot;benchmarkNameExact&quot;)
+    @Column(name = &quot;benchmark_name&quot;, nullable = false)
+    private String benchmarkName;
+    @GenericField
+    @Column(name = &quot;duration_millis&quot;, nullable = false)
+    private long durationMillis;
+    @GenericField
+    @Column(name = &quot;solved_count&quot;, nullable = false)
+    private int solvedCount;
+    @GenericField
+    @Column(name = &quot;total_count&quot;, nullable = false)
+    private int totalCount;
+    @GenericField
+    @Column(name = &quot;quality_score&quot;, nullable = false)
+    private double qualityScore;
+    @Column(name = &quot;measured_at&quot;, nullable = false)
+    private Instant measuredAt;
+    @FullTextField(name = &quot;metrics&quot;)
+    @Column(name = &quot;metrics_text&quot;, nullable = false, columnDefinition = &quot;text&quot;)
+    private String metricsText;
+
+<span class="nc" id="L47">    protected BenchmarkResultEntity() {</span>
+<span class="nc" id="L48">    }</span>
+
+    public BenchmarkResultEntity(String id, String experimentId, String benchmarkName, long durationMillis,
+<span class="nc" id="L51">        int solvedCount, int totalCount, double qualityScore, Instant measuredAt) {</span>
+<span class="nc" id="L52">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        this.experimentId = experimentId == null ? &quot;&quot; : experimentId;</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        this.benchmarkName = benchmarkName == null ? id : benchmarkName;</span>
+<span class="nc bnc" id="L55" title="All 6 branches missed.">        if (durationMillis &lt; 0 || solvedCount &lt; 0 || totalCount &lt; 0) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;benchmark counters must not be negative&quot;);</span>
+        }
+<span class="nc" id="L58">        this.durationMillis = durationMillis;</span>
+<span class="nc" id="L59">        this.solvedCount = solvedCount;</span>
+<span class="nc" id="L60">        this.totalCount = totalCount;</span>
+<span class="nc" id="L61">        this.qualityScore = Math.max(0.0, Math.min(1.0, qualityScore));</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        this.measuredAt = measuredAt == null ? Instant.now() : measuredAt;</span>
+<span class="nc" id="L63">        this.metricsText = &quot;duration &quot; + durationMillis + &quot; solved &quot; + solvedCount + &quot; total &quot; + totalCount</span>
+            + &quot; quality &quot; + this.qualityScore;
+<span class="nc" id="L65">    }</span>
+
+<span class="nc" id="L67">    public String id() { return id; }</span>
+<span class="nc" id="L68">    public String experimentId() { return experimentId; }</span>
+<span class="nc" id="L69">    public String benchmarkName() { return benchmarkName; }</span>
+<span class="nc" id="L70">    public long durationMillis() { return durationMillis; }</span>
+<span class="nc" id="L71">    public int solvedCount() { return solvedCount; }</span>
+<span class="nc" id="L72">    public int totalCount() { return totalCount; }</span>
+<span class="nc" id="L73">    public double qualityScore() { return qualityScore; }</span>
+<span class="nc" id="L74">    public Instant measuredAt() { return measuredAt; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

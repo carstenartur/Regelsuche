@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PersistenceAdapterFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence-hibernate</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence.relational</a> &gt; <span class="el_source">PersistenceAdapterFactory.java</span></div><h1>PersistenceAdapterFactory.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence.relational;
+
+import de.regelsuche.persistence.GraphPersistenceMode;
+import de.regelsuche.persistence.PersistenceConfig;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.Persistence;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.file.Files;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.Map;
+import java.util.Optional;
+
+public final class PersistenceAdapterFactory {
+    public static final String PERSISTENCE_UNIT = &quot;regelsuche-postgresql&quot;;
+
+    private PersistenceAdapterFactory() {
+    }
+
+    public static Optional&lt;RelationalPersistenceAdapters&gt; create(PersistenceConfig config, PrintStream log) {
+<span class="nc bnc" id="L23" title="All 2 branches missed.">        if (config.mode() != GraphPersistenceMode.POSTGRESQL</span>
+<span class="nc bnc" id="L24" title="All 2 branches missed.">            &amp;&amp; config.mode() != GraphPersistenceMode.POSTGRESQL_WITH_JSON_FALLBACK) {</span>
+<span class="nc" id="L25">            return Optional.empty();</span>
+        }
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        if (!config.hasPostgresCredentials()) {</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">            if (config.mode() == GraphPersistenceMode.POSTGRESQL) {</span>
+<span class="nc" id="L29">                throw new IllegalArgumentException(&quot;POSTGRESQL mode requires POSTGRES_URL, POSTGRES_USER and POSTGRES_PASSWORD&quot;);</span>
+            }
+<span class="nc" id="L31">            ensureJsonFallbackPath(config, log);</span>
+<span class="nc" id="L32">            return Optional.empty();</span>
+        }
+<span class="nc" id="L34">        try (Connection connection = DriverManager.getConnection(</span>
+<span class="nc" id="L35">            config.postgresUrl(), config.postgresUser(), config.postgresPassword())) {</span>
+<span class="nc" id="L36">            new DatabaseMigrationRunner().migrate(connection);</span>
+<span class="nc" id="L37">        } catch (SQLException | IOException exception) {</span>
+<span class="nc" id="L38">            throw new IllegalStateException(&quot;Could not initialize PostgreSQL persistence at &quot; + config.postgresUrl(), exception);</span>
+<span class="nc" id="L39">        }</span>
+<span class="nc" id="L40">        EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory(PERSISTENCE_UNIT, Map.of(</span>
+<span class="nc" id="L41">            &quot;jakarta.persistence.jdbc.url&quot;, config.postgresUrl(),</span>
+<span class="nc" id="L42">            &quot;jakarta.persistence.jdbc.user&quot;, config.postgresUser(),</span>
+<span class="nc" id="L43">            &quot;jakarta.persistence.jdbc.password&quot;, config.postgresPassword(),</span>
+<span class="nc" id="L44">            &quot;hibernate.search.backend.directory.root&quot;, config.storagePath().resolve(&quot;hibernate-search&quot;).toAbsolutePath().toString()</span>
+        ));
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (log != null) {</span>
+<span class="nc" id="L47">            log.println(&quot;Persistence: Hibernate ORM/Search metadata initialized at &quot; + config.postgresUrl());</span>
+        }
+<span class="nc" id="L49">        return Optional.of(RelationalPersistenceAdapters.of(entityManagerFactory));</span>
+    }
+
+    private static void ensureJsonFallbackPath(PersistenceConfig config, PrintStream log) {
+        try {
+<span class="nc" id="L54">            Files.createDirectories(config.storagePath());</span>
+<span class="nc" id="L55">        } catch (IOException exception) {</span>
+<span class="nc" id="L56">            throw new IllegalStateException(&quot;Hybrid mode requires a writable JSON fallback path: &quot;</span>
+<span class="nc" id="L57">                + config.storagePath().toAbsolutePath(), exception);</span>
+<span class="nc" id="L58">        }</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (log != null) {</span>
+<span class="nc" id="L60">            log.println(&quot;Persistence: hybrid PostgreSQL config incomplete; using JSON fallback at &quot;</span>
+<span class="nc" id="L61">                + config.storagePath().toAbsolutePath());</span>
+        }
+<span class="nc" id="L63">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

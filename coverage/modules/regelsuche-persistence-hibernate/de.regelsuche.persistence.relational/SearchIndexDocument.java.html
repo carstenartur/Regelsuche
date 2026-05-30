@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchIndexDocument.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence-hibernate</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence.relational</a> &gt; <span class="el_source">SearchIndexDocument.java</span></div><h1>SearchIndexDocument.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence.relational;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.List;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.DocumentId;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.KeywordField;
+import org.hibernate.type.SqlTypes;
+
+@Entity
+@Indexed
+@Table(name = &quot;search_index_documents&quot;, indexes = @Index(name = &quot;idx_search_index_documents_type&quot;, columnList = &quot;type&quot;))
+public class SearchIndexDocument {
+    @Id
+    @DocumentId
+    @Column(name = &quot;document_id&quot;, nullable = false)
+    private String documentId;
+    @Enumerated(EnumType.STRING)
+    @KeywordField
+    @Column(name = &quot;type&quot;, nullable = false)
+    private SearchEntityType type;
+    @KeywordField
+    @Column(name = &quot;entity_id&quot;, nullable = false)
+    private String entityId;
+    @FullTextField
+    @Column(name = &quot;title&quot;, nullable = false, columnDefinition = &quot;text&quot;)
+    private String title;
+    @FullTextField
+    @Column(name = &quot;body&quot;, nullable = false, columnDefinition = &quot;text&quot;)
+    private String body;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;facets&quot;, nullable = false, columnDefinition = &quot;jsonb&quot;)
+    private String facetsJson;
+    @KeywordField(name = &quot;facet&quot;)
+    @FullTextField(name = &quot;facets&quot;)
+    @Column(name = &quot;facets_text&quot;, nullable = false, columnDefinition = &quot;text&quot;)
+    private String facetsText;
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private Instant updatedAt;
+
+<span class="nc" id="L50">    protected SearchIndexDocument() {</span>
+<span class="nc" id="L51">    }</span>
+
+    public SearchIndexDocument(SearchEntityType type, String entityId, String title, String body,
+<span class="fc" id="L54">        List&lt;SearchFacet&gt; facets, Instant updatedAt) {</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;type must not be null&quot;);</span>
+        }
+<span class="fc" id="L58">        this.type = type;</span>
+<span class="fc" id="L59">        this.entityId = SearchRunEntity.requireId(entityId, &quot;entityId&quot;);</span>
+<span class="fc" id="L60">        this.documentId = type + &quot;:&quot; + this.entityId;</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        this.title = title == null ? &quot;&quot; : title;</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        this.body = body == null ? &quot;&quot; : body;</span>
+<span class="fc" id="L63">        this.facetsJson = RelationalJson.object(facets);</span>
+<span class="fc" id="L64">        this.facetsText = RelationalJson.joinFacets(facets);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        this.updatedAt = updatedAt == null ? Instant.now() : updatedAt;</span>
+<span class="fc" id="L66">    }</span>
+
+    public boolean hasFacet(SearchFacet facet) {
+<span class="fc" id="L69">        return facets().contains(facet);</span>
+    }
+
+<span class="fc" id="L72">    public String documentId() { return documentId; }</span>
+<span class="fc" id="L73">    public SearchEntityType type() { return type; }</span>
+<span class="fc" id="L74">    public String entityId() { return entityId; }</span>
+<span class="fc" id="L75">    public String title() { return title; }</span>
+<span class="fc" id="L76">    public String body() { return body; }</span>
+<span class="fc" id="L77">    public List&lt;SearchFacet&gt; facets() { return RelationalJson.facets(facetsJson); }</span>
+<span class="nc" id="L78">    public Instant updatedAt() { return updatedAt; }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

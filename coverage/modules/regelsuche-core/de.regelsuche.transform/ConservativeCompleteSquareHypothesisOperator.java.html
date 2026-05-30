@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConservativeCompleteSquareHypothesisOperator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">ConservativeCompleteSquareHypothesisOperator.java</span></div><h1>ConservativeCompleteSquareHypothesisOperator.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Bounded conservative square-completion operator.
+ *
+ * &lt;p&gt;It only emits candidates with zero or negative perfect-square remainder;
+ * it deliberately does not emit positive-remainder completions such as
+ * {@code x^2 + 6*x + 6 -&gt; (x + 3)^2 - 3} until that scope is validated.&lt;/p&gt;
+ */
+public class ConservativeCompleteSquareHypothesisOperator implements HypothesisOperator {
+    public static final String RULE_ID = &quot;hypothesis_complete_square_preparation&quot;;
+    private static final int DEFAULT_MAX_CANDIDATES = 6;
+
+<span class="fc" id="L29">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L30">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+    private final int maxCandidates;
+
+    public ConservativeCompleteSquareHypothesisOperator() {
+<span class="fc" id="L34">        this(DEFAULT_MAX_CANDIDATES);</span>
+<span class="fc" id="L35">    }</span>
+
+<span class="fc" id="L37">    public ConservativeCompleteSquareHypothesisOperator(int maxCandidates) {</span>
+<span class="fc" id="L38">        this.maxCandidates = Math.max(0, maxCandidates);</span>
+<span class="fc" id="L39">    }</span>
+
+    @Override
+    public List&lt;Transformation&gt; generateCandidates(String expression) {
+        Expr root;
+        try {
+<span class="fc" id="L45">            root = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="nc" id="L46">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L47">            return List.of();</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        String formattedInput = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L50">        int originalSize = canonicalizer.astNodeCount(formattedInput);</span>
+<span class="fc" id="L51">        List&lt;Expr&gt; terms = flattenPositiveAddends(root);</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        if (terms.size() &lt; 2 || terms.size() &gt; 3) {</span>
+<span class="nc" id="L53">            return List.of();</span>
+        }
+
+<span class="fc" id="L56">        Map&lt;String, ScoredCandidate&gt; candidates = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L57">        addUnivariateCandidate(terms, formattedInput, originalSize, candidates);</span>
+<span class="fc" id="L58">        addBivariatePerfectSquareCandidate(terms, formattedInput, originalSize, candidates);</span>
+<span class="fc" id="L59">        return candidates.values().stream()</span>
+<span class="fc" id="L60">            .sorted(Comparator.comparingInt(ScoredCandidate::score)</span>
+<span class="pc" id="L61">                .thenComparing(candidate -&gt; candidate.transformation().transformedExpression()))</span>
+<span class="fc" id="L62">            .limit(maxCandidates)</span>
+<span class="fc" id="L63">            .map(ScoredCandidate::transformation)</span>
+<span class="fc" id="L64">            .toList();</span>
+    }
+
+    private void addUnivariateCandidate(
+        List&lt;Expr&gt; terms,
+        String formattedInput,
+        int originalSize,
+        Map&lt;String, ScoredCandidate&gt; candidates
+    ) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (terms.size() != 3) {</span>
+<span class="nc" id="L74">            return;</span>
+        }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (int squareIndex = 0; squareIndex &lt; terms.size(); squareIndex++) {</span>
+<span class="fc" id="L77">            Expr base = squareBase(terms.get(squareIndex));</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (base == null) {</span>
+<span class="fc" id="L79">                continue;</span>
+            }
+<span class="fc" id="L81">            LinearTerm linear = null;</span>
+<span class="fc" id="L82">            Double constant = null;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            for (int index = 0; index &lt; terms.size(); index++) {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                if (index == squareIndex) {</span>
+<span class="fc" id="L85">                    continue;</span>
+                }
+<span class="fc" id="L87">                Expr term = terms.get(index);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                if (term instanceof NumberExpr numberExpr) {</span>
+<span class="fc" id="L89">                    constant = numberExpr.value();</span>
+                } else {
+<span class="fc" id="L91">                    linear = linearTermForBase(term, base);</span>
+                }
+            }
+<span class="pc bpc" id="L94" title="2 of 6 branches missed.">            if (linear == null || constant == null || !isEvenInteger(linear.coefficient())) {</span>
+<span class="nc" id="L95">                continue;</span>
+            }
+<span class="fc" id="L97">            double offset = linear.coefficient() / 2.0;</span>
+<span class="fc" id="L98">            double remainder = constant - offset * offset;</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">            if (remainder &gt; 0 || !isPerfectSquare(Math.abs(remainder))) {</span>
+<span class="fc" id="L100">                continue;</span>
+            }
+<span class="fc" id="L102">            Expr completed = squared(new BinaryExpr(base, BinaryOperator.ADD, new NumberExpr(offset)));</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            Expr candidate = remainder == 0</span>
+<span class="nc" id="L104">                ? completed</span>
+<span class="fc" id="L105">                : new BinaryExpr(completed, BinaryOperator.SUB, squared(new NumberExpr(Math.sqrt(Math.abs(remainder)))));</span>
+<span class="fc" id="L106">            addCandidate(candidate, formattedInput, originalSize, candidates);</span>
+        }
+<span class="fc" id="L108">    }</span>
+
+    private void addBivariatePerfectSquareCandidate(
+        List&lt;Expr&gt; terms,
+        String formattedInput,
+        int originalSize,
+        Map&lt;String, ScoredCandidate&gt; candidates
+    ) {
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (terms.size() != 3) {</span>
+<span class="nc" id="L117">            return;</span>
+        }
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        for (int leftIndex = 0; leftIndex &lt; terms.size(); leftIndex++) {</span>
+<span class="fc" id="L120">            Expr left = squareBase(terms.get(leftIndex));</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (left == null) {</span>
+<span class="fc" id="L122">                continue;</span>
+            }
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            for (int rightIndex = leftIndex + 1; rightIndex &lt; terms.size(); rightIndex++) {</span>
+<span class="fc" id="L125">                Expr right = squareBase(terms.get(rightIndex));</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                if (right == null) {</span>
+<span class="fc" id="L127">                    continue;</span>
+                }
+<span class="fc" id="L129">                int crossIndex = 3 - leftIndex - rightIndex;</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                if (crossTermMatches(terms.get(crossIndex), left, right)) {</span>
+<span class="fc" id="L131">                    addCandidate(squared(new BinaryExpr(left, BinaryOperator.ADD, right)), formattedInput, originalSize, candidates);</span>
+                }
+            }
+        }
+<span class="fc" id="L135">    }</span>
+
+    private void addCandidate(
+        Expr candidate,
+        String formattedInput,
+        int originalSize,
+        Map&lt;String, ScoredCandidate&gt; candidates
+    ) {
+<span class="fc" id="L143">        String formatted = ExpressionFormatter.format(candidate);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (formatted.equals(formattedInput)) {</span>
+<span class="nc" id="L145">            return;</span>
+        }
+<span class="fc" id="L147">        int candidateSize = canonicalizer.astNodeCount(formatted);</span>
+<span class="fc" id="L148">        int growth = candidateSize - originalSize;</span>
+<span class="fc" id="L149">        String key = canonicalizer.stableHash(formatted);</span>
+<span class="fc" id="L150">        candidates.putIfAbsent(key, new ScoredCandidate(growth * 2 + candidateSize, new Transformation(</span>
+            RULE_ID,
+            formatted,
+            RewriteKind.NORMALIZE,
+            true,
+<span class="fc" id="L155">            Math.max(1, growth),</span>
+            true,
+<span class="fc" id="L157">            RULE_ID + &quot;:&quot; + canonicalizer.stableHash(formattedInput) + &quot;-&gt;&quot; + key</span>
+        )));
+<span class="fc" id="L159">    }</span>
+
+    private List&lt;Expr&gt; flattenPositiveAddends(Expr expression) {
+<span class="fc bfc" id="L162" title="All 4 branches covered.">        if (expression instanceof BinaryExpr binaryExpr &amp;&amp; binaryExpr.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L163">            List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L164">            result.addAll(flattenPositiveAddends(binaryExpr.left()));</span>
+<span class="fc" id="L165">            result.addAll(flattenPositiveAddends(binaryExpr.right()));</span>
+<span class="fc" id="L166">            return result;</span>
+        }
+<span class="fc" id="L168">        return List.of(expression);</span>
+    }
+
+    private Expr squareBase(Expr expression) {
+<span class="fc" id="L172">        return expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            &amp;&amp; binary.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            &amp;&amp; binary.right() instanceof NumberExpr exponent</span>
+<span class="pc bpc" id="L175" title="1 of 4 branches missed.">            &amp;&amp; Double.compare(exponent.value(), 2.0) == 0</span>
+<span class="fc" id="L176">            ? binary.left()</span>
+<span class="fc" id="L177">            : null;</span>
+    }
+
+    private LinearTerm linearTermForBase(Expr expression, Expr base) {
+<span class="fc" id="L181">        List&lt;Expr&gt; factors = flattenMultiplication(expression);</span>
+<span class="fc" id="L182">        double coefficient = 1.0;</span>
+<span class="fc" id="L183">        List&lt;Expr&gt; symbolic = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (Expr factor : factors) {</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (factor instanceof NumberExpr numberExpr) {</span>
+<span class="fc" id="L186">                coefficient *= numberExpr.value();</span>
+            } else {
+<span class="fc" id="L188">                symbolic.add(factor);</span>
+            }
+<span class="fc" id="L190">        }</span>
+<span class="fc bfc" id="L191" title="All 4 branches covered.">        if (symbolic.size() == 1 &amp;&amp; sameExpression(symbolic.getFirst(), base)) {</span>
+<span class="fc" id="L192">            return new LinearTerm(coefficient);</span>
+        }
+<span class="fc" id="L194">        return null;</span>
+    }
+
+    private boolean crossTermMatches(Expr expression, Expr left, Expr right) {
+<span class="fc" id="L198">        List&lt;Expr&gt; factors = flattenMultiplication(expression);</span>
+<span class="fc" id="L199">        double coefficient = 1.0;</span>
+<span class="fc" id="L200">        List&lt;Expr&gt; symbolic = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (Expr factor : factors) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (factor instanceof NumberExpr numberExpr) {</span>
+<span class="fc" id="L203">                coefficient *= numberExpr.value();</span>
+            } else {
+<span class="fc" id="L205">                symbolic.add(factor);</span>
+            }
+<span class="fc" id="L207">        }</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        return Double.compare(coefficient, 2.0) == 0</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            &amp;&amp; symbolic.size() == 2</span>
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">            &amp;&amp; ((sameExpression(symbolic.get(0), left) &amp;&amp; sameExpression(symbolic.get(1), right))</span>
+<span class="pc bpc" id="L211" title="3 of 4 branches missed.">            || (sameExpression(symbolic.get(0), right) &amp;&amp; sameExpression(symbolic.get(1), left)));</span>
+    }
+
+    private List&lt;Expr&gt; flattenMultiplication(Expr expression) {
+<span class="fc bfc" id="L215" title="All 4 branches covered.">        if (expression instanceof BinaryExpr binaryExpr &amp;&amp; binaryExpr.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L216">            List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L217">            result.addAll(flattenMultiplication(binaryExpr.left()));</span>
+<span class="fc" id="L218">            result.addAll(flattenMultiplication(binaryExpr.right()));</span>
+<span class="fc" id="L219">            return result;</span>
+        }
+<span class="fc" id="L221">        return List.of(expression);</span>
+    }
+
+    private boolean sameExpression(Expr left, Expr right) {
+<span class="fc" id="L225">        return canonicalizer.stableHash(ExpressionFormatter.format(left))</span>
+<span class="fc" id="L226">            .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));</span>
+    }
+
+    private Expr squared(Expr expression) {
+<span class="fc" id="L230">        return new BinaryExpr(expression, BinaryOperator.POW, new NumberExpr(2));</span>
+    }
+
+    private boolean isEvenInteger(double value) {
+<span class="pc bpc" id="L234" title="2 of 4 branches missed.">        return Math.rint(value) == value &amp;&amp; ((long) value) % 2 == 0;</span>
+    }
+
+    private boolean isPerfectSquare(double value) {
+<span class="pc bpc" id="L238" title="2 of 4 branches missed.">        if (value &lt; 0 || Math.rint(value) != value) {</span>
+<span class="nc" id="L239">            return false;</span>
+        }
+<span class="fc" id="L241">        long rounded = (long) value;</span>
+<span class="fc" id="L242">        long root = Math.round(Math.sqrt(rounded));</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        return root * root == rounded;</span>
+    }
+
+<span class="fc" id="L246">    private record LinearTerm(double coefficient) {</span>
+    }
+
+<span class="fc" id="L249">    private record ScoredCandidate(int score, Transformation transformation) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemanticDiscoveryReportViewAssembler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery</a> &gt; <span class="el_source">SemanticDiscoveryReportViewAssembler.java</span></div><h1>SemanticDiscoveryReportViewAssembler.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery;
+
+import de.regelsuche.api.searchgraph.SearchGraphAssembler;
+import de.regelsuche.api.searchgraph.SearchGraphDto;
+import de.regelsuche.api.searchgraph.semantic.SemanticEdgeKind;
+import de.regelsuche.api.searchgraph.semantic.SemanticGraphEdgeDto;
+import de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode;
+import de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphAssembler;
+import de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphDto;
+import de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunner;
+import de.regelsuche.benchmark.DiscoverySemanticReportView;
+import de.regelsuche.graph.ExpressionGraphStore;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/** Bridges app-level search graph semantics into experiment report artifacts. */
+<span class="fc" id="L18">final class SemanticDiscoveryReportViewAssembler {</span>
+<span class="fc" id="L19">    private final SearchGraphAssembler rawAssembler = new SearchGraphAssembler();</span>
+<span class="fc" id="L20">    private final SemanticSearchGraphAssembler semanticAssembler = new SemanticSearchGraphAssembler();</span>
+
+    DiscoverySemanticReportView assemble(
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        ExpressionGraphStore graphStore
+    ) {
+<span class="fc" id="L26">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="fc" id="L27">        Objects.requireNonNull(graphStore, &quot;graphStore&quot;);</span>
+<span class="fc" id="L28">        List&lt;DiscoveredTransformation&gt; transformations = graphStore.discoveredTransformations();</span>
+<span class="fc" id="L29">        SearchGraphDto raw = rawAssembler.assemble(</span>
+<span class="fc" id="L30">            graphStore.snapshot(),</span>
+<span class="fc" id="L31">            List.of(),</span>
+<span class="fc" id="L32">            graphStore.ruleCandidates(),</span>
+<span class="fc" id="L33">            graphStore.reusableRules().size(),</span>
+            transformations
+        );
+<span class="fc" id="L36">        SemanticSearchGraphDto global = semanticAssembler.assemble(</span>
+            raw,
+            transformations,
+<span class="fc" id="L39">            List.of(),</span>
+            SemanticGraphViewMode.SEMANTIC,
+            false,
+            true,
+            false,
+            64,
+            8
+        );
+<span class="fc" id="L47">        List&lt;DiscoverySemanticReportView.SemanticPath&gt; paths = report.rows().stream()</span>
+<span class="fc" id="L48">            .map(row -&gt; semanticPath(row, raw, transformations))</span>
+<span class="fc" id="L49">            .toList();</span>
+<span class="fc" id="L50">        int semanticNodeCount = paths.stream().mapToInt(path -&gt; path.nodes().size()).sum();</span>
+<span class="fc" id="L51">        int semanticEdgeCount = paths.stream().mapToInt(path -&gt; path.edges().size()).sum();</span>
+<span class="fc" id="L52">        int collapsedLowSignalCount = global.edges().stream()</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            .filter(edge -&gt; edge.kind() == SemanticEdgeKind.LOW_SIGNAL_COLLAPSED)</span>
+<span class="fc" id="L54">            .mapToInt(SemanticGraphEdgeDto::hiddenStepCount)</span>
+<span class="fc" id="L55">            .sum();</span>
+<span class="fc" id="L56">        return new DiscoverySemanticReportView(</span>
+            &quot;SemanticSearchGraphAssembler&quot;,
+<span class="fc" id="L58">            global.stats().rawNodeCount(),</span>
+<span class="fc" id="L59">            global.stats().rawEdgeCount(),</span>
+            semanticNodeCount,
+            semanticEdgeCount,
+<span class="fc" id="L62">            global.stats().collapsedVariantCount(),</span>
+            collapsedLowSignalCount,
+            paths
+        );
+    }
+
+    private DiscoverySemanticReportView.SemanticPath semanticPath(
+        DeterministicDiscoveryExperimentRunner.SeedRunReport row,
+        SearchGraphDto raw,
+        List&lt;DiscoveredTransformation&gt; transformations
+    ) {
+<span class="fc" id="L73">        DiscoveredTransformation transformation = findTransformation(row, transformations);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (transformation == null) {</span>
+<span class="fc" id="L75">            return DiscoverySemanticReportView.fromReplayPaths(new DeterministicDiscoveryExperimentRunner.DiscoveryReport(</span>
+<span class="fc" id="L76">                List.of(row),</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, row.success() ? 1 : 0,</span>
+<span class="fc" id="L78">                    row.hypotheses().size(), row.counterexamples().size(), row.elapsedMillis(), row.memoryBytes()),</span>
+                0L
+<span class="fc" id="L80">            )).paths().getFirst();</span>
+        }
+<span class="fc" id="L82">        SemanticSearchGraphDto semantic = semanticAssembler.assemble(</span>
+            raw,
+<span class="fc" id="L84">            List.of(transformation),</span>
+<span class="fc" id="L85">            List.of(),</span>
+            SemanticGraphViewMode.MAIN_PATH,
+            false,
+            false,
+            false,
+            16,
+            6
+        );
+<span class="fc" id="L93">        List&lt;DiscoverySemanticReportView.SemanticNode&gt; nodes = semantic.nodes().stream()</span>
+<span class="fc" id="L94">            .sorted(Comparator.comparingInt(node -&gt; firstReplayIndex(row.replayPath(), node.representativeExpression())))</span>
+<span class="fc" id="L95">            .map(node -&gt; new DiscoverySemanticReportView.SemanticNode(node.id(), node.representativeExpression()))</span>
+<span class="fc" id="L96">            .toList();</span>
+<span class="fc" id="L97">        List&lt;DiscoverySemanticReportView.SemanticEdge&gt; edges = semantic.edges().stream()</span>
+<span class="fc" id="L98">            .map(edge -&gt; new DiscoverySemanticReportView.SemanticEdge(</span>
+<span class="fc" id="L99">                edge.from(),</span>
+<span class="fc" id="L100">                edge.to(),</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                edge.kind() == SemanticEdgeKind.LOW_SIGNAL_COLLAPSED ? &quot;low-signal collapsed&quot; : &quot;semantic main step&quot;,</span>
+<span class="fc" id="L102">                edge.kind().name(),</span>
+<span class="fc" id="L103">                edge.hiddenStepCount()</span>
+            ))
+<span class="fc" id="L105">            .toList();</span>
+<span class="fc" id="L106">        return new DiscoverySemanticReportView.SemanticPath(row.seed().id(), nodes, edges);</span>
+    }
+
+    private static DiscoveredTransformation findTransformation(
+        DeterministicDiscoveryExperimentRunner.SeedRunReport row,
+        List&lt;DiscoveredTransformation&gt; transformations
+    ) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (row.replayPath().isEmpty()) {</span>
+<span class="fc" id="L114">            return null;</span>
+        }
+<span class="fc" id="L116">        String first = row.replayPath().getFirst();</span>
+<span class="fc" id="L117">        String last = row.replayPath().getLast();</span>
+<span class="fc" id="L118">        return transformations.stream()</span>
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">            .filter(t -&gt; sameEndpoint(t.originalExpression(), first) &amp;&amp; sameEndpoint(t.improvedExpression(), last))</span>
+<span class="fc" id="L120">            .findFirst()</span>
+<span class="fc" id="L121">            .or(() -&gt; transformations.stream()</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                .filter(t -&gt; t.steps().stream().anyMatch(step -&gt; row.replayPath().contains(step.beforeExpression())</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                    || row.replayPath().contains(step.afterExpression())))</span>
+<span class="fc" id="L124">                .findFirst())</span>
+<span class="fc" id="L125">            .orElse(null);</span>
+    }
+
+    private static boolean sameEndpoint(String left, String right) {
+<span class="fc" id="L129">        return Objects.equals(left, right);</span>
+    }
+
+    private static int firstReplayIndex(List&lt;String&gt; replayPath, String expression) {
+<span class="fc" id="L133">        int index = replayPath.indexOf(expression);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        return index &lt; 0 ? Integer.MAX_VALUE : index;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

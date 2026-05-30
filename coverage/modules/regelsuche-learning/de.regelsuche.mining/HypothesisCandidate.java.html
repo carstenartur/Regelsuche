@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HypothesisCandidate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">HypothesisCandidate.java</span></div><h1>HypothesisCandidate.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * A mined hypothesis waiting to be validated, refuted, or promoted to a
+ * reusable macro rule.
+ *
+ * &lt;p&gt;Lifecycle:&lt;/p&gt;
+ * &lt;pre&gt;
+ * Path-Mining
+ *   → Generalisation (PatternGeneralizer / anti-unification)
+ *   → HypothesisCandidate  ← created here
+ *   → Counterexample Search  (CounterexampleSearchService)
+ *   → optional symbolic Proof (EquivalenceService)
+ *   → Promotion → ReusableRule (MacroRuleLearningService)
+ * &lt;/pre&gt;
+ *
+ * &lt;p&gt;A hypothesis that accumulates a counterexample transitions to
+ * {@link CandidateProofStatus#REJECTED}. A hypothesis confirmed by
+ * independent fresh examples transitions to
+ * {@link CandidateProofStatus#VALIDATED_BY_EXAMPLES} (or higher).&lt;/p&gt;
+ *
+ * @param id                       stable, unique identifier (e.g. canonical hash)
+ * @param leftPattern              generalised left-hand side of the rule
+ * @param rightPattern             generalised right-hand side of the rule
+ * @param supportingPaths          ids of discovered paths that support this hypothesis
+ * @param supportingExpressions    concrete (left, right) expression pairs as witnesses
+ * @param assumptions              assumptions under which the hypothesis holds
+ * @param noveltyScore             0.0–1.0 score reflecting how different this hypothesis
+ *                                 is from already-known rules (1.0 = completely new)
+ * @param proofStatus              current validation state
+ * @param counterexampleStatus     {@code null} if no search was performed, {@code true}
+ *                                 if a counterexample was found, {@code false} otherwise
+ * @param counterexampleSearchStatus tri-state status of the latest counterexample search
+ * @param counterexampleAttemptedSources attempted search sources for the latest counterexample run
+ * @param counterexampleExplanation human-readable explanation for the latest counterexample status
+ * @param parameterRelations       human-readable algebraic relations between placeholders
+ * @param expressionPlaceholders   expression-level placeholders introduced by anti-unification
+ * @param createdAt                when the hypothesis was first created
+ */
+public record HypothesisCandidate(
+    String id,
+    String leftPattern,
+    String rightPattern,
+    List&lt;String&gt; supportingPaths,
+    List&lt;ExpressionPair&gt; supportingExpressions,
+    List&lt;String&gt; assumptions,
+    double noveltyScore,
+    CandidateProofStatus proofStatus,
+    Boolean counterexampleStatus,
+    CounterexampleSearchService.Status counterexampleSearchStatus,
+    List&lt;String&gt; counterexampleAttemptedSources,
+    String counterexampleExplanation,
+    List&lt;String&gt; parameterRelations,
+    java.util.Map&lt;String, List&lt;String&gt;&gt; expressionPlaceholders,
+    Instant createdAt
+) {
+    /** A concrete (before, after) expression pair that supports this hypothesis. */
+<span class="fc" id="L67">    public record ExpressionPair(String left, String right) {}</span>
+
+    public HypothesisCandidate(
+        String id,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; supportingPaths,
+        List&lt;ExpressionPair&gt; supportingExpressions,
+        List&lt;String&gt; assumptions,
+        double noveltyScore,
+        CandidateProofStatus proofStatus,
+        Boolean counterexampleStatus,
+        List&lt;String&gt; parameterRelations,
+        java.util.Map&lt;String, List&lt;String&gt;&gt; expressionPlaceholders,
+        Instant createdAt
+    ) {
+<span class="fc" id="L83">        this(id, leftPattern, rightPattern, supportingPaths, supportingExpressions, assumptions, noveltyScore,</span>
+<span class="fc" id="L84">            proofStatus, counterexampleStatus, statusFromLegacy(counterexampleStatus), List.of(), &quot;&quot;,</span>
+            parameterRelations, expressionPlaceholders, createdAt);
+<span class="fc" id="L86">    }</span>
+
+<span class="fc" id="L88">    public HypothesisCandidate {</span>
+<span class="pc bpc" id="L89" title="1 of 4 branches missed.">        if (id == null || id.isBlank()) {</span>
+<span class="fc" id="L90">            throw new IllegalArgumentException(&quot;id must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">        if (leftPattern == null || rightPattern == null) {</span>
+<span class="nc" id="L93">            throw new IllegalArgumentException(&quot;patterns must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        supportingPaths = supportingPaths == null ? List.of() : List.copyOf(supportingPaths);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        supportingExpressions = supportingExpressions == null ? List.of() : List.copyOf(supportingExpressions);</span>
+<span class="fc" id="L97">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="fc bfc" id="L98" title="All 4 branches covered.">        if (noveltyScore &lt; 0.0 || noveltyScore &gt; 1.0) {</span>
+<span class="fc" id="L99">            noveltyScore = Math.max(0.0, Math.min(1.0, noveltyScore));</span>
+        }
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED : proofStatus;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (counterexampleSearchStatus == null) {</span>
+<span class="fc" id="L103">            counterexampleSearchStatus = statusFromLegacy(counterexampleStatus);</span>
+        }
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        counterexampleAttemptedSources = counterexampleAttemptedSources == null</span>
+<span class="nc" id="L106">            ? List.of()</span>
+<span class="fc" id="L107">            : List.copyOf(counterexampleAttemptedSources);</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        counterexampleExplanation = counterexampleExplanation == null ? &quot;&quot; : counterexampleExplanation;</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        parameterRelations = parameterRelations == null ? List.of() : List.copyOf(parameterRelations);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        expressionPlaceholders = expressionPlaceholders == null</span>
+<span class="fc" id="L111">            ? java.util.Map.of()</span>
+<span class="fc" id="L112">            : expressionPlaceholders.entrySet().stream()</span>
+<span class="fc" id="L113">                .collect(Collectors.toUnmodifiableMap(</span>
+                    java.util.Map.Entry::getKey,
+<span class="fc" id="L115">                    e -&gt; List.copyOf(e.getValue())</span>
+                ));
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="fc" id="L118">    }</span>
+
+    /** Returns a copy with the updated proof status. */
+    public HypothesisCandidate withProofStatus(CandidateProofStatus newStatus) {
+<span class="fc" id="L122">        return new HypothesisCandidate(id, leftPattern, rightPattern,</span>
+            supportingPaths, supportingExpressions, assumptions,
+            noveltyScore, newStatus, counterexampleStatus, counterexampleSearchStatus,
+            counterexampleAttemptedSources, counterexampleExplanation,
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
+
+    /** Returns a copy with a counterexample verdict (true = found, false = not found). */
+    public HypothesisCandidate withCounterexampleStatus(boolean found) {
+<span class="fc" id="L131">        return new HypothesisCandidate(id, leftPattern, rightPattern,</span>
+            supportingPaths, supportingExpressions, assumptions,
+<span class="fc" id="L133">            noveltyScore, proofStatus, found, statusFromLegacy(found),</span>
+            counterexampleAttemptedSources, counterexampleExplanation,
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
+
+    /** Returns a copy annotated with the complete counterexample search result. */
+    public HypothesisCandidate withCounterexampleResult(CounterexampleSearchService.CounterexampleSearchResult result) {
+<span class="nc bnc" id="L140" title="All 3 branches missed.">        Boolean legacyStatus = switch (result.status()) {</span>
+<span class="nc" id="L141">            case COUNTEREXAMPLE_FOUND -&gt; Boolean.TRUE;</span>
+<span class="nc" id="L142">            case NO_COUNTEREXAMPLE_FOUND -&gt; Boolean.FALSE;</span>
+<span class="nc" id="L143">            case INCONCLUSIVE -&gt; null;</span>
+        };
+<span class="nc" id="L145">        return new HypothesisCandidate(id, leftPattern, rightPattern,</span>
+            supportingPaths, supportingExpressions, assumptions,
+<span class="nc" id="L147">            noveltyScore, proofStatus, legacyStatus, result.status(),</span>
+<span class="nc" id="L148">            result.attemptedSources(), result.explanation(),</span>
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
+
+    /** Returns a copy with normalized assumptions. */
+    public HypothesisCandidate withAssumptions(List&lt;String&gt; newAssumptions) {
+<span class="fc" id="L154">        return new HypothesisCandidate(id, leftPattern, rightPattern,</span>
+            supportingPaths, supportingExpressions, newAssumptions,
+            noveltyScore, proofStatus, counterexampleStatus, counterexampleSearchStatus,
+            counterexampleAttemptedSources, counterexampleExplanation,
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
+
+    /** Returns a copy with an updated ranking/novelty score. */
+    public HypothesisCandidate withNoveltyScore(double newNoveltyScore) {
+<span class="nc" id="L163">        return new HypothesisCandidate(id, leftPattern, rightPattern,</span>
+            supportingPaths, supportingExpressions, assumptions,
+            newNoveltyScore, proofStatus, counterexampleStatus, counterexampleSearchStatus,
+            counterexampleAttemptedSources, counterexampleExplanation,
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
+
+    /** Creates a {@link HypothesisCandidate} from a {@link RuleCandidate}. */
+    public static HypothesisCandidate from(RuleCandidate candidate, double noveltyScore) {
+<span class="fc" id="L172">        return from(candidate, noveltyScore, List.of());</span>
+    }
+
+    /** Creates a {@link HypothesisCandidate} and populates concrete witnesses from mined paths. */
+    public static HypothesisCandidate from(
+        RuleCandidate candidate,
+        double noveltyScore,
+        List&lt;SuccessfulTransformationPath&gt; paths
+    ) {
+<span class="fc" id="L181">        Set&lt;String&gt; supportingIds = Set.copyOf(candidate.supportingTransformationIds());</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        List&lt;ExpressionPair&gt; witnesses = paths == null</span>
+<span class="nc" id="L183">            ? List.of()</span>
+<span class="fc" id="L184">            : paths.stream()</span>
+<span class="pc" id="L185">                .filter(path -&gt; supportingIds.contains(path.id()))</span>
+<span class="pc" id="L186">                .map(path -&gt; new ExpressionPair(path.originalExpression(), path.targetExpression()))</span>
+<span class="fc" id="L187">                .toList();</span>
+<span class="fc" id="L188">        return new HypothesisCandidate(</span>
+<span class="fc" id="L189">            candidate.canonicalHash(),</span>
+<span class="fc" id="L190">            candidate.leftPattern(),</span>
+<span class="fc" id="L191">            candidate.rightPattern(),</span>
+<span class="fc" id="L192">            candidate.supportingTransformationIds(),</span>
+            witnesses,
+<span class="fc" id="L194">            List.of(),</span>
+            noveltyScore,
+<span class="fc" id="L196">            candidate.proofStatus(),</span>
+            null,
+            null,
+<span class="fc" id="L199">            List.of(),</span>
+            &quot;&quot;,
+<span class="fc" id="L201">            candidate.parameterRelations(),</span>
+<span class="fc" id="L202">            java.util.Map.of(),</span>
+<span class="fc" id="L203">            Instant.now()</span>
+        );
+    }
+
+    private static CounterexampleSearchService.Status statusFromLegacy(Boolean counterexampleStatus) {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (counterexampleStatus == null) {</span>
+<span class="fc" id="L209">            return null;</span>
+        }
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        return counterexampleStatus</span>
+<span class="fc" id="L212">            ? CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND</span>
+<span class="fc" id="L213">            : CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

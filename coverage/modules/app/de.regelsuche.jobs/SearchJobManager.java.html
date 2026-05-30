@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchJobManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.jobs</a> &gt; <span class="el_source">SearchJobManager.java</span></div><h1>SearchJobManager.java</h1><pre class="source lang-java linenums">package de.regelsuche.jobs;
+
+import de.regelsuche.checkpoint.InMemorySearchCheckpointRepository;
+import de.regelsuche.checkpoint.SearchCheckpoint;
+import de.regelsuche.checkpoint.SearchCheckpointRepository;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.search.SimplificationSuccess;
+import de.regelsuche.search.TransformationSearchService;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+
+/**
+ * Coordinates {@link SearchJob}s on top of {@link TransformationSearchService}s.
+ *
+ * &lt;p&gt;The manager intentionally does not bundle the search infrastructure
+ * itself: callers provide a {@link Function} that turns a {@link SearchJob}
+ * into a freshly configured {@link TransformationSearchService} (with the
+ * appropriate profile / heuristic / engine). The manager then runs the job
+ * asynchronously and tracks lifecycle state.&lt;/p&gt;
+ *
+ * &lt;p&gt;Lifecycle:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link #submit(String, InputType, String, java.util.List)} creates a {@link SearchJob.State#QUEUED} job
+ *       and starts it on the shared executor.&lt;/li&gt;
+ *   &lt;li&gt;{@link #pause(String)} requests cooperative pausing; the running search
+ *       continues until the next checkpoint, after which the job state flips
+ *       to {@link SearchJob.State#PAUSED}.&lt;/li&gt;
+ *   &lt;li&gt;{@link #resume(String)} restarts a paused job from the latest checkpoint.&lt;/li&gt;
+ *   &lt;li&gt;{@link #cancel(String)} sets the state to {@link SearchJob.State#CANCELLED}
+ *       and shuts down the service.&lt;/li&gt;
+ *   &lt;li&gt;{@link #checkpoint(Path)} writes all job states to disk; {@link #restore(Path)}
+ *       restores them (without re-running unless {@link #resume(String)} is invoked).&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;The implementation is deliberately self-contained — it never blocks on
+ * external resources beyond the search service the caller supplies — so it
+ * fits within the existing minimal-dependency style of the project.&lt;/p&gt;
+ */
+public class SearchJobManager {
+<span class="fc" id="L58">    private final Map&lt;String, JobHandle&gt; jobs = new ConcurrentHashMap&lt;&gt;();</span>
+    private final Function&lt;SearchJob, TransformationSearchService&gt; serviceFactory;
+    private final SearchCheckpointRepository checkpointRepository;
+
+    public SearchJobManager(Function&lt;SearchJob, TransformationSearchService&gt; serviceFactory) {
+<span class="fc" id="L63">        this(serviceFactory, new InMemorySearchCheckpointRepository());</span>
+<span class="fc" id="L64">    }</span>
+
+    public SearchJobManager(
+        Function&lt;SearchJob, TransformationSearchService&gt; serviceFactory,
+        SearchCheckpointRepository checkpointRepository
+<span class="fc" id="L69">    ) {</span>
+<span class="fc" id="L70">        this.serviceFactory = serviceFactory;</span>
+<span class="fc" id="L71">        this.checkpointRepository = checkpointRepository;</span>
+<span class="fc" id="L72">    }</span>
+
+    public SearchCheckpointRepository checkpointRepository() {
+<span class="nc" id="L75">        return checkpointRepository;</span>
+    }
+
+    public SearchJob submit(String expression, InputType inputType, String profile, List&lt;String&gt; notes) {
+<span class="fc" id="L79">        SearchJob job = new SearchJob(</span>
+<span class="fc" id="L80">            UUID.randomUUID().toString(),</span>
+            expression,
+<span class="fc" id="L82">            inputType.name(),</span>
+            profile,
+            SearchJob.State.QUEUED,
+            null,
+            null,
+            0,
+            0,
+            null,
+            0,
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            notes == null ? List.of() : notes</span>
+        );
+<span class="fc" id="L93">        JobHandle handle = new JobHandle(job);</span>
+<span class="fc" id="L94">        jobs.put(job.id(), handle);</span>
+<span class="fc" id="L95">        handle.start();</span>
+<span class="fc" id="L96">        return handle.snapshot();</span>
+    }
+
+    public List&lt;SearchJob&gt; list() {
+<span class="fc" id="L100">        return jobs.values().stream()</span>
+<span class="fc" id="L101">            .map(JobHandle::snapshot)</span>
+<span class="fc" id="L102">            .sorted(Comparator.comparing(SearchJob::createdAt))</span>
+<span class="fc" id="L103">            .toList();</span>
+    }
+
+    public Optional&lt;SearchJob&gt; get(String id) {
+<span class="fc" id="L107">        JobHandle handle = jobs.get(id);</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        return handle == null ? Optional.empty() : Optional.of(handle.snapshot());</span>
+    }
+
+    public Optional&lt;SearchJob&gt; pause(String id) {
+<span class="nc" id="L112">        JobHandle handle = jobs.get(id);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (handle == null) {</span>
+<span class="nc" id="L114">            return Optional.empty();</span>
+        }
+<span class="nc" id="L116">        handle.requestPause();</span>
+<span class="nc" id="L117">        return Optional.of(handle.snapshot());</span>
+    }
+
+    public Optional&lt;SearchJob&gt; resume(String id) {
+<span class="nc" id="L121">        JobHandle handle = jobs.get(id);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (handle == null) {</span>
+<span class="nc" id="L123">            return Optional.empty();</span>
+        }
+<span class="nc" id="L125">        handle.resumeFromCheckpoint();</span>
+<span class="nc" id="L126">        return Optional.of(handle.snapshot());</span>
+    }
+
+    public Optional&lt;SearchJob&gt; cancel(String id) {
+<span class="fc" id="L130">        JobHandle handle = jobs.get(id);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (handle == null) {</span>
+<span class="nc" id="L132">            return Optional.empty();</span>
+        }
+<span class="fc" id="L134">        handle.cancel();</span>
+<span class="fc" id="L135">        return Optional.of(handle.snapshot());</span>
+    }
+
+    public void shutdown() {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (JobHandle handle : jobs.values()) {</span>
+<span class="fc" id="L140">            handle.cancel();</span>
+<span class="fc" id="L141">        }</span>
+<span class="fc" id="L142">    }</span>
+
+    /** Persist all job snapshots to {@code file} as JSON. */
+    public synchronized void checkpoint(Path file) throws IOException {
+<span class="fc" id="L146">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L147">        builder.append(&quot;{\n  \&quot;jobs\&quot;: [\n&quot;);</span>
+<span class="fc" id="L148">        List&lt;SearchJob&gt; all = list();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (int i = 0; i &lt; all.size(); i++) {</span>
+<span class="fc" id="L150">            SearchJob job = all.get(i);</span>
+<span class="fc" id="L151">            builder.append(&quot;    {&quot;);</span>
+<span class="fc" id="L152">            builder.append(&quot;\&quot;id\&quot;:&quot;).append(quote(job.id()));</span>
+<span class="fc" id="L153">            builder.append(&quot;,\&quot;expression\&quot;:&quot;).append(quote(job.expression()));</span>
+<span class="fc" id="L154">            builder.append(&quot;,\&quot;inputType\&quot;:&quot;).append(quote(job.inputType()));</span>
+<span class="fc" id="L155">            builder.append(&quot;,\&quot;profile\&quot;:&quot;).append(quote(job.profile()));</span>
+<span class="fc" id="L156">            builder.append(&quot;,\&quot;state\&quot;:&quot;).append(quote(job.state().name()));</span>
+<span class="fc" id="L157">            builder.append(&quot;,\&quot;createdAt\&quot;:&quot;).append(quote(job.createdAt().toString()));</span>
+<span class="fc" id="L158">            builder.append(&quot;,\&quot;updatedAt\&quot;:&quot;).append(quote(job.updatedAt().toString()));</span>
+<span class="fc" id="L159">            builder.append(&quot;,\&quot;exploredStates\&quot;:&quot;).append(job.exploredStates());</span>
+<span class="fc" id="L160">            builder.append(&quot;,\&quot;discoveredSuccesses\&quot;:&quot;).append(job.discoveredSuccesses());</span>
+<span class="fc" id="L161">            builder.append(&quot;,\&quot;bestExpression\&quot;:&quot;).append(quote(job.bestExpression()));</span>
+<span class="fc" id="L162">            builder.append(&quot;,\&quot;bestImprovement\&quot;:&quot;).append(job.bestImprovement());</span>
+<span class="fc" id="L163">            builder.append('}');</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            if (i &lt; all.size() - 1) {</span>
+<span class="nc" id="L165">                builder.append(',');</span>
+            }
+<span class="fc" id="L167">            builder.append('\n');</span>
+        }
+<span class="fc" id="L169">        builder.append(&quot;  ]\n}\n&quot;);</span>
+<span class="fc" id="L170">        Files.writeString(file, builder.toString(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L171">    }</span>
+
+    /**
+     * Re-hydrate jobs from a checkpoint file written by
+     * {@link #checkpoint(Path)}. Restored jobs are &lt;strong&gt;not&lt;/strong&gt;
+     * automatically resumed — call {@link #resume(String)} for the ones you
+     * want to continue.
+     */
+    public synchronized void restore(Path file) throws IOException {
+<span class="fc" id="L180">        String json = Files.readString(file, StandardCharsets.UTF_8);</span>
+        // Hand-rolled minimal parsing matching the checkpoint format.
+<span class="fc" id="L182">        int arrayStart = json.indexOf(&quot;\&quot;jobs\&quot;&quot;);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (arrayStart &lt; 0) {</span>
+<span class="nc" id="L184">            return;</span>
+        }
+<span class="fc" id="L186">        int bracket = json.indexOf('[', arrayStart);</span>
+<span class="fc" id="L187">        int close = json.lastIndexOf(']');</span>
+<span class="pc bpc" id="L188" title="2 of 4 branches missed.">        if (bracket &lt; 0 || close &lt; bracket) {</span>
+<span class="nc" id="L189">            return;</span>
+        }
+<span class="fc" id="L191">        String body = json.substring(bracket + 1, close);</span>
+<span class="fc" id="L192">        int position = 0;</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        while (position &lt; body.length()) {</span>
+<span class="fc" id="L194">            int braceStart = body.indexOf('{', position);</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            if (braceStart &lt; 0) {</span>
+<span class="fc" id="L196">                break;</span>
+            }
+<span class="fc" id="L198">            int braceEnd = matchingBrace(body, braceStart);</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (braceEnd &lt; 0) {</span>
+<span class="nc" id="L200">                break;</span>
+            }
+<span class="fc" id="L202">            String entry = body.substring(braceStart, braceEnd + 1);</span>
+<span class="fc" id="L203">            Map&lt;String, String&gt; raw = parseFlat(entry);</span>
+<span class="fc" id="L204">            SearchJob job = new SearchJob(</span>
+<span class="fc" id="L205">                raw.get(&quot;id&quot;),</span>
+<span class="fc" id="L206">                raw.getOrDefault(&quot;expression&quot;, &quot;&quot;),</span>
+<span class="fc" id="L207">                raw.getOrDefault(&quot;inputType&quot;, &quot;TERM&quot;),</span>
+<span class="fc" id="L208">                raw.getOrDefault(&quot;profile&quot;, &quot;FAST_SIMPLIFY&quot;),</span>
+<span class="fc" id="L209">                SearchJob.State.valueOf(raw.getOrDefault(&quot;state&quot;, &quot;QUEUED&quot;)),</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                raw.containsKey(&quot;createdAt&quot;) ? java.time.Instant.parse(raw.get(&quot;createdAt&quot;)) : null,</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                raw.containsKey(&quot;updatedAt&quot;) ? java.time.Instant.parse(raw.get(&quot;updatedAt&quot;)) : null,</span>
+<span class="fc" id="L212">                parseInt(raw.get(&quot;discoveredSuccesses&quot;)),</span>
+<span class="fc" id="L213">                parseInt(raw.get(&quot;exploredStates&quot;)),</span>
+<span class="fc" id="L214">                raw.getOrDefault(&quot;bestExpression&quot;, null),</span>
+<span class="fc" id="L215">                parseInt(raw.get(&quot;bestImprovement&quot;)),</span>
+<span class="fc" id="L216">                List.of()</span>
+            );
+<span class="fc" id="L218">            jobs.put(job.id(), new JobHandle(job).pausedFromRestore());</span>
+<span class="fc" id="L219">            position = braceEnd + 1;</span>
+<span class="fc" id="L220">        }</span>
+<span class="fc" id="L221">    }</span>
+
+    private static int matchingBrace(String text, int openIndex) {
+<span class="fc" id="L224">        int depth = 0;</span>
+<span class="fc" id="L225">        boolean inString = false;</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        for (int i = openIndex; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L227">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            if (inString) {</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">                if (c == '\\') {</span>
+<span class="nc" id="L230">                    i++;</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">                } else if (c == '&quot;') {</span>
+<span class="fc" id="L232">                    inString = false;</span>
+                }
+                continue;
+            }
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L237">                inString = true;</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            } else if (c == '{') {</span>
+<span class="fc" id="L239">                depth++;</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            } else if (c == '}') {</span>
+<span class="fc" id="L241">                depth--;</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">                if (depth == 0) {</span>
+<span class="fc" id="L243">                    return i;</span>
+                }
+            }
+        }
+<span class="nc" id="L247">        return -1;</span>
+    }
+
+    private static Map&lt;String, String&gt; parseFlat(String entry) {
+<span class="fc" id="L251">        Map&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L252">        int position = 1; // skip leading '{'</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        while (position &lt; entry.length() - 1) {</span>
+<span class="fc" id="L254">            position = skipWhitespaceAndCommas(entry, position);</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            if (position &gt;= entry.length() - 1) {</span>
+<span class="nc" id="L256">                break;</span>
+            }
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (entry.charAt(position) != '&quot;') {</span>
+<span class="nc" id="L259">                break;</span>
+            }
+<span class="fc" id="L261">            int keyEnd = findStringEnd(entry, position + 1);</span>
+<span class="fc" id="L262">            String key = entry.substring(position + 1, keyEnd);</span>
+<span class="fc" id="L263">            position = keyEnd + 1;</span>
+<span class="pc bpc" id="L264" title="2 of 4 branches missed.">            while (position &lt; entry.length() &amp;&amp; entry.charAt(position) != ':') {</span>
+<span class="nc" id="L265">                position++;</span>
+            }
+<span class="fc" id="L267">            position++;</span>
+<span class="fc" id="L268">            position = skipWhitespaceAndCommas(entry, position);</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            if (position &gt;= entry.length()) {</span>
+<span class="nc" id="L270">                break;</span>
+            }
+            String value;
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            if (entry.charAt(position) == '&quot;') {</span>
+<span class="fc" id="L274">                int valueEnd = findStringEnd(entry, position + 1);</span>
+<span class="fc" id="L275">                value = entry.substring(position + 1, valueEnd);</span>
+<span class="fc" id="L276">                position = valueEnd + 1;</span>
+<span class="fc" id="L277">            } else {</span>
+<span class="fc" id="L278">                int valueStart = position;</span>
+<span class="pc bpc" id="L279" title="1 of 4 branches missed.">                while (position &lt; entry.length() &amp;&amp; &quot;,}\n\r&quot;.indexOf(entry.charAt(position)) &lt; 0) {</span>
+<span class="fc" id="L280">                    position++;</span>
+                }
+<span class="fc" id="L282">                value = entry.substring(valueStart, position).trim();</span>
+            }
+<span class="fc" id="L284">            result.put(key, value);</span>
+<span class="fc" id="L285">        }</span>
+<span class="fc" id="L286">        return result;</span>
+    }
+
+    private static int skipWhitespaceAndCommas(String entry, int position) {
+<span class="pc bpc" id="L290" title="2 of 6 branches missed.">        while (position &lt; entry.length() &amp;&amp; (Character.isWhitespace(entry.charAt(position)) || entry.charAt(position) == ',')) {</span>
+<span class="fc" id="L291">            position++;</span>
+        }
+<span class="fc" id="L293">        return position;</span>
+    }
+
+    private static int findStringEnd(String entry, int start) {
+<span class="fc" id="L297">        int position = start;</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        while (position &lt; entry.length()) {</span>
+<span class="fc" id="L299">            char c = entry.charAt(position);</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc" id="L301">                position += 2;</span>
+<span class="nc" id="L302">                continue;</span>
+            }
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L305">                return position;</span>
+            }
+<span class="fc" id="L307">            position++;</span>
+<span class="fc" id="L308">        }</span>
+<span class="nc" id="L309">        return entry.length();</span>
+    }
+
+    private static int parseInt(String raw) {
+<span class="pc bpc" id="L313" title="3 of 6 branches missed.">        if (raw == null || raw.isBlank() || raw.equals(&quot;null&quot;)) {</span>
+<span class="nc" id="L314">            return 0;</span>
+        }
+        try {
+<span class="fc" id="L317">            return Integer.parseInt(raw.trim());</span>
+<span class="nc" id="L318">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L319">            return 0;</span>
+        }
+    }
+
+    private static String quote(String value) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L325">            return &quot;null&quot;;</span>
+        }
+<span class="fc" id="L327">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L329">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L330" title="5 of 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L331">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L332">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L333">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L334">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L335">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+                default -&gt; {
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L338">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+                    } else {
+<span class="fc" id="L340">                        builder.append(c);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L345">        builder.append('&quot;');</span>
+<span class="fc" id="L346">        return builder.toString();</span>
+    }
+
+    private final class JobHandle {
+        private final AtomicReference&lt;SearchJob&gt; state;
+        private volatile TransformationSearchService activeService;
+        private volatile CompletableFuture&lt;Void&gt; activeFuture;
+        private volatile boolean pauseRequested;
+
+<span class="fc" id="L355">        JobHandle(SearchJob initial) {</span>
+<span class="fc" id="L356">            this.state = new AtomicReference&lt;&gt;(initial);</span>
+<span class="fc" id="L357">        }</span>
+
+        JobHandle pausedFromRestore() {
+<span class="fc" id="L360">            state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED));</span>
+<span class="fc" id="L361">            return this;</span>
+        }
+
+        SearchJob snapshot() {
+<span class="fc" id="L365">            return state.get();</span>
+        }
+
+        void start() {
+<span class="fc" id="L369">            SearchJob current = state.updateAndGet(snapshot -&gt; snapshot.withState(SearchJob.State.RUNNING));</span>
+<span class="fc" id="L370">            launch(current);</span>
+<span class="fc" id="L371">        }</span>
+
+        void resume() {
+<span class="nc" id="L374">            SearchJob current = state.get();</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">            if (current.state() == SearchJob.State.RUNNING) {</span>
+<span class="nc" id="L376">                return;</span>
+            }
+<span class="nc" id="L378">            pauseRequested = false;</span>
+<span class="nc" id="L379">            SearchJob running = state.updateAndGet(snapshot -&gt; snapshot.withState(SearchJob.State.RUNNING));</span>
+<span class="nc" id="L380">            launch(running);</span>
+<span class="nc" id="L381">        }</span>
+
+        /**
+         * Resume from the latest stored {@link SearchCheckpoint} if any. The
+         * job's effective input is rebuilt from the checkpoint's
+         * {@link SearchCheckpoint#resumeSeed() resume seed} so that the
+         * resumed search continues from progress instead of starting over.
+         */
+        void resumeFromCheckpoint() {
+<span class="nc" id="L390">            SearchJob current = state.get();</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">            if (current.state() == SearchJob.State.RUNNING) {</span>
+<span class="nc" id="L392">                return;</span>
+            }
+<span class="nc" id="L394">            pauseRequested = false;</span>
+<span class="nc" id="L395">            Optional&lt;SearchCheckpoint&gt; checkpoint = checkpointRepository.findByJobId(current.id());</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">            if (checkpoint.isPresent()) {</span>
+<span class="nc" id="L397">                SearchCheckpoint cp = checkpoint.get();</span>
+<span class="nc" id="L398">                SearchJob resumed = new SearchJob(</span>
+<span class="nc" id="L399">                    current.id(),</span>
+<span class="nc" id="L400">                    cp.resumeSeed(),</span>
+<span class="nc" id="L401">                    current.inputType(),</span>
+<span class="nc" id="L402">                    current.profile(),</span>
+                    SearchJob.State.RUNNING,
+<span class="nc" id="L404">                    current.createdAt(),</span>
+<span class="nc" id="L405">                    Instant.now(),</span>
+<span class="nc" id="L406">                    current.discoveredSuccesses(),</span>
+<span class="nc" id="L407">                    current.exploredStates(),</span>
+<span class="nc" id="L408">                    current.bestExpression(),</span>
+<span class="nc" id="L409">                    current.bestImprovement(),</span>
+<span class="nc" id="L410">                    current.notes()</span>
+                );
+<span class="nc" id="L412">                state.set(resumed);</span>
+<span class="nc" id="L413">                launch(resumed);</span>
+<span class="nc" id="L414">            } else {</span>
+<span class="nc" id="L415">                SearchJob running = state.updateAndGet(snapshot -&gt; snapshot.withState(SearchJob.State.RUNNING));</span>
+<span class="nc" id="L416">                launch(running);</span>
+            }
+<span class="nc" id="L418">        }</span>
+
+        void requestPause() {
+<span class="nc" id="L421">            pauseRequested = true;</span>
+<span class="nc" id="L422">            TransformationSearchService service = activeService;</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">            if (service != null) {</span>
+<span class="nc" id="L424">                service.shutdown();</span>
+            }
+<span class="nc" id="L426">            state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED));</span>
+<span class="nc" id="L427">        }</span>
+
+        void cancel() {
+<span class="fc" id="L430">            pauseRequested = true;</span>
+<span class="fc" id="L431">            TransformationSearchService service = activeService;</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">            if (service != null) {</span>
+<span class="fc" id="L433">                service.shutdown();</span>
+            }
+<span class="fc" id="L435">            state.updateAndGet(current -&gt; current.withState(SearchJob.State.CANCELLED));</span>
+<span class="fc" id="L436">        }</span>
+
+        private void launch(SearchJob current) {
+<span class="fc" id="L439">            TransformationSearchService service = serviceFactory.apply(current);</span>
+<span class="fc" id="L440">            activeService = service;</span>
+<span class="fc" id="L441">            CompletableFuture&lt;Void&gt; future = service.submit(</span>
+<span class="fc" id="L442">                new InputRequest(InputType.valueOf(current.inputType()), current.expression())</span>
+            );
+<span class="fc" id="L444">            activeFuture = future;</span>
+<span class="fc" id="L445">            future.whenComplete((ignored, error) -&gt; finalizeRun(service, error));</span>
+<span class="fc" id="L446">        }</span>
+
+        private void finalizeRun(TransformationSearchService service, Throwable error) {
+            try {
+<span class="fc" id="L450">                List&lt;SimplificationSuccess&gt; successes = service.getSuccesses();</span>
+<span class="fc" id="L451">                int explored = service.getGraphSnapshot().nodes().size();</span>
+<span class="fc" id="L452">                Optional&lt;SimplificationSuccess&gt; best = service.getBestSolution();</span>
+<span class="fc" id="L453">                String bestExpr = best.map(SimplificationSuccess::simplifiedExpression).orElse(null);</span>
+<span class="fc" id="L454">                int improvement = best.map(SimplificationSuccess::improvement).orElse(0);</span>
+<span class="fc" id="L455">                state.updateAndGet(current -&gt;</span>
+<span class="fc" id="L456">                    current.withProgress(explored, successes.size(), bestExpr, improvement));</span>
+
+                // Always persist a checkpoint so a later resume can pick up.
+<span class="fc" id="L459">                writeCheckpoint(service, successes);</span>
+
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">                if (error != null) {</span>
+<span class="nc" id="L462">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.FAILED));</span>
+<span class="pc bpc" id="L463" title="1 of 4 branches missed.">                } else if (pauseRequested &amp;&amp; state.get().state() != SearchJob.State.CANCELLED) {</span>
+<span class="nc" id="L464">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED));</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">                } else if (state.get().state() == SearchJob.State.CANCELLED) {</span>
+                    // keep cancelled
+                } else {
+<span class="fc" id="L468">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.DONE));</span>
+                }
+            } finally {
+<span class="fc" id="L471">                service.shutdown();</span>
+            }
+<span class="fc" id="L473">        }</span>
+
+        private void writeCheckpoint(TransformationSearchService service, List&lt;SimplificationSuccess&gt; successes) {
+<span class="fc" id="L476">            SearchJob current = state.get();</span>
+            // Use the visited node set from the graph snapshot as a proxy for
+            // already-explored states. The frontier is the best successes (sorted
+            // by improvement descending) so resume can re-seed from the most
+            // promising state.
+<span class="fc" id="L481">            Set&lt;String&gt; visited = new LinkedHashSet&lt;&gt;(service.getGraphSnapshot().nodes());</span>
+<span class="fc" id="L482">            List&lt;SearchCheckpoint.BestPath&gt; bestPaths = successes.stream()</span>
+<span class="fc" id="L483">                .sorted(Comparator.comparingInt(SimplificationSuccess::improvement).reversed())</span>
+<span class="fc" id="L484">                .limit(16)</span>
+<span class="fc" id="L485">                .map(success -&gt; new SearchCheckpoint.BestPath(</span>
+<span class="fc" id="L486">                    success.simplifiedExpression(),</span>
+<span class="fc" id="L487">                    success.improvement(),</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">                    success.transformationRule() == null ? &quot;&quot; : success.transformationRule()))</span>
+<span class="fc" id="L489">                .toList();</span>
+<span class="fc" id="L490">            List&lt;String&gt; frontier = bestPaths.stream()</span>
+<span class="fc" id="L491">                .map(SearchCheckpoint.BestPath::expression)</span>
+<span class="fc" id="L492">                .toList();</span>
+<span class="fc" id="L493">            SearchCheckpoint checkpoint = new SearchCheckpoint(</span>
+<span class="fc" id="L494">                current.id(),</span>
+<span class="fc" id="L495">                current.expression(),</span>
+<span class="fc" id="L496">                current.profile(),</span>
+                &quot;default&quot;,
+                frontier,
+<span class="fc" id="L499">                List.copyOf(visited),</span>
+                bestPaths,
+<span class="fc" id="L501">                current.id().hashCode(),</span>
+<span class="fc" id="L502">                current.createdAt(),</span>
+<span class="fc" id="L503">                Instant.now()</span>
+            );
+<span class="fc" id="L505">            checkpointRepository.save(checkpoint);</span>
+<span class="fc" id="L506">        }</span>
+    }
+
+    /** Convenience: render an unmodifiable snapshot map for diagnostic UIs. */
+    public Map&lt;String, SearchJob&gt; snapshotMap() {
+<span class="nc" id="L511">        Map&lt;String, SearchJob&gt; map = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L512" title="All 2 branches missed.">        for (Map.Entry&lt;String, JobHandle&gt; entry : jobs.entrySet()) {</span>
+<span class="nc" id="L513">            map.put(entry.getKey(), entry.getValue().snapshot());</span>
+<span class="nc" id="L514">        }</span>
+<span class="nc" id="L515">        return Collections.unmodifiableMap(map);</span>
+    }
+
+    /** Compare two job lists by id for diff-based UIs. */
+    public static List&lt;String&gt; diffIds(List&lt;SearchJob&gt; previous, List&lt;SearchJob&gt; current) {
+<span class="nc" id="L520">        List&lt;String&gt; diff = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">        for (SearchJob job : current) {</span>
+<span class="nc" id="L522">            boolean exists = previous.stream().anyMatch(other -&gt; other.id().equals(job.id()));</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">            if (!exists) {</span>
+<span class="nc" id="L524">                diff.add(job.id());</span>
+            }
+<span class="nc" id="L526">        }</span>
+<span class="nc" id="L527">        return diff;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

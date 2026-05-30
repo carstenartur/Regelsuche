@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlaceholderSubstitutionGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.learning</a> &gt; <span class="el_source">PlaceholderSubstitutionGenerator.java</span></div><h1>PlaceholderSubstitutionGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.learning;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.mining.ParameterRelation;
+import de.regelsuche.mining.PatternBinary;
+import de.regelsuche.mining.PatternFunction;
+import de.regelsuche.mining.PatternVariable;
+import de.regelsuche.mining.RulePatternInstantiator;
+import de.regelsuche.mining.RulePatternNode;
+import de.regelsuche.mining.RulePatternParser;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Generates deterministic placeholder substitution grids while preserving supported parameter relations. */
+<span class="fc" id="L21">public class PlaceholderSubstitutionGenerator {</span>
+<span class="fc" id="L22">    static final List&lt;String&gt; GENERATED_SUBSTITUTIONS =</span>
+<span class="fc" id="L23">        List.of(&quot;x&quot;, &quot;y&quot;, &quot;z&quot;, &quot;x + 1&quot;, &quot;2*x&quot;, &quot;x^2&quot;, &quot;n + 2&quot;);</span>
+    private static final int MAX_GENERATED_INSTANCES = 256;
+
+<span class="fc" id="L26">    private final ExpressionParser expressionParser = new ExpressionParser();</span>
+<span class="fc" id="L27">    private final RulePatternParser patternParser = new RulePatternParser();</span>
+<span class="fc" id="L28">    private final RulePatternInstantiator instantiator = new RulePatternInstantiator();</span>
+
+    public List&lt;Map&lt;String, Expr&gt;&gt; generate(Set&lt;String&gt; placeholders, List&lt;String&gt; assumptions) {
+<span class="pc bpc" id="L31" title="2 of 4 branches missed.">        if (placeholders == null || placeholders.isEmpty()) {</span>
+<span class="nc" id="L32">            return List.of();</span>
+        }
+<span class="fc" id="L34">        Set&lt;String&gt; orderedPlaceholders = new LinkedHashSet&lt;&gt;(placeholders);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        RelationPlan relationPlan = relationPlan(orderedPlaceholders, assumptions == null ? List.of() : assumptions);</span>
+<span class="fc" id="L36">        List&lt;String&gt; independentPlaceholders = orderedPlaceholders.stream()</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            .filter(placeholder -&gt; !relationPlan.equalsRelations().containsKey(placeholder))</span>
+<span class="fc" id="L38">            .toList();</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (wouldExceedInstanceBudget(independentPlaceholders.size())) {</span>
+<span class="nc" id="L40">            throw new UnsupportedRelationException(&quot;substitution grid exceeds safe budget for placeholders &quot; + orderedPlaceholders);</span>
+        }
+
+<span class="fc" id="L43">        List&lt;Map&lt;String, Expr&gt;&gt; substitutions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L44">        populateGrid(independentPlaceholders, 0, new LinkedHashMap&lt;&gt;(), relationPlan, orderedPlaceholders, substitutions);</span>
+<span class="fc" id="L45">        return substitutions;</span>
+    }
+
+    private RelationPlan relationPlan(Set&lt;String&gt; placeholders, List&lt;String&gt; assumptions) {
+<span class="fc" id="L49">        Map&lt;String, RulePatternNode&gt; equalsRelations = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L50">        List&lt;NotEqualsRelation&gt; notEqualsRelations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (String assumption : assumptions) {</span>
+<span class="pc bpc" id="L52" title="2 of 6 branches missed.">            if (assumption == null || (!assumption.contains(&quot;=&quot;) &amp;&amp; !assumption.contains(&quot;!=&quot;))) {</span>
+<span class="fc" id="L53">                continue;</span>
+            }
+<span class="fc" id="L55">            ParameterRelation relation = ParameterRelation.parse(assumption)</span>
+<span class="pc" id="L56">                .orElseThrow(() -&gt; new UnsupportedRelationException(&quot;unsupported relation syntax: &quot; + assumption));</span>
+<span class="fc" id="L57">            Set&lt;String&gt; relationPlaceholders = placeholdersIn(relation.left(), relation.right());</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (relationPlaceholders.isEmpty()) {</span>
+<span class="nc" id="L59">                continue;</span>
+            }
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (!placeholders.containsAll(relationPlaceholders)) {</span>
+<span class="fc" id="L62">                throw new UnsupportedRelationException(&quot;relation uses unknown placeholders: &quot; + assumption);</span>
+            }
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            if (relation.operator() == ParameterRelation.Operator.NOT_EQUALS) {</span>
+<span class="nc" id="L65">                notEqualsRelations.add(new NotEqualsRelation(patternParser.parse(relation.left()), patternParser.parse(relation.right())));</span>
+<span class="nc" id="L66">                continue;</span>
+            }
+<span class="nc bnc" id="L68" title="All 4 branches missed.">            if (!placeholders.contains(relation.left()) || !relation.left().matches(&quot;[A-Z]&quot;)) {</span>
+<span class="nc" id="L69">                throw new UnsupportedRelationException(&quot;only placeholder-target equality relations are supported: &quot; + assumption);</span>
+            }
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (equalsRelations.put(relation.left(), patternParser.parse(relation.right())) != null) {</span>
+<span class="nc" id="L72">                throw new UnsupportedRelationException(&quot;multiple equality relations target placeholder &quot; + relation.left());</span>
+            }
+<span class="nc" id="L74">        }</span>
+<span class="fc" id="L75">        return new RelationPlan(equalsRelations, notEqualsRelations);</span>
+    }
+
+    private Set&lt;String&gt; placeholdersIn(String left, String right) {
+<span class="fc" id="L79">        Set&lt;String&gt; placeholders = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L80">        collectPlaceholders(patternParser.parse(left), placeholders);</span>
+<span class="fc" id="L81">        collectPlaceholders(patternParser.parse(right), placeholders);</span>
+<span class="fc" id="L82">        return placeholders;</span>
+    }
+
+    private void populateGrid(
+        List&lt;String&gt; independentPlaceholders,
+        int index,
+        Map&lt;String, Expr&gt; current,
+        RelationPlan relationPlan,
+        Set&lt;String&gt; allPlaceholders,
+        List&lt;Map&lt;String, Expr&gt;&gt; substitutions
+    ) {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (index &lt; independentPlaceholders.size()) {</span>
+<span class="fc" id="L94">            String placeholder = independentPlaceholders.get(index);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            for (String sample : GENERATED_SUBSTITUTIONS) {</span>
+<span class="fc" id="L96">                current.put(placeholder, expressionParser.parseTerm(sample));</span>
+<span class="fc" id="L97">                populateGrid(independentPlaceholders, index + 1, current, relationPlan, allPlaceholders, substitutions);</span>
+<span class="fc" id="L98">                current.remove(placeholder);</span>
+<span class="fc" id="L99">            }</span>
+<span class="fc" id="L100">            return;</span>
+        }
+
+<span class="fc" id="L103">        Map&lt;String, Expr&gt; completed = completeRelations(current, relationPlan, allPlaceholders);</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (satisfiesNotEquals(completed, relationPlan.notEqualsRelations())) {</span>
+<span class="fc" id="L105">            substitutions.add(completed);</span>
+        }
+<span class="fc" id="L107">    }</span>
+
+    private Map&lt;String, Expr&gt; completeRelations(Map&lt;String, Expr&gt; base, RelationPlan relationPlan, Set&lt;String&gt; allPlaceholders) {
+<span class="fc" id="L110">        Map&lt;String, Expr&gt; completed = new LinkedHashMap&lt;&gt;(base);</span>
+        boolean changed;
+        do {
+<span class="fc" id="L113">            changed = false;</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            for (Map.Entry&lt;String, RulePatternNode&gt; relation : relationPlan.equalsRelations().entrySet()) {</span>
+<span class="nc bnc" id="L115" title="All 4 branches missed.">                if (!completed.containsKey(relation.getKey()) &amp;&amp; placeholdersResolvable(relation.getValue(), completed.keySet())) {</span>
+<span class="nc" id="L116">                    completed.put(relation.getKey(), instantiator.instantiate(relation.getValue(), completed));</span>
+<span class="nc" id="L117">                    changed = true;</span>
+                }
+<span class="nc" id="L119">            }</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        } while (changed);</span>
+
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (!completed.keySet().containsAll(allPlaceholders)) {</span>
+<span class="nc" id="L123">            Set&lt;String&gt; unresolved = new LinkedHashSet&lt;&gt;(allPlaceholders);</span>
+<span class="nc" id="L124">            unresolved.removeAll(completed.keySet());</span>
+<span class="nc" id="L125">            throw new UnsupportedRelationException(&quot;cyclic or unresolved placeholder relations: &quot; + unresolved);</span>
+        }
+<span class="fc" id="L127">        return completed;</span>
+    }
+
+    private boolean satisfiesNotEquals(Map&lt;String, Expr&gt; bindings, List&lt;NotEqualsRelation&gt; notEqualsRelations) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        for (NotEqualsRelation relation : notEqualsRelations) {</span>
+<span class="nc" id="L132">            String left = ExpressionFormatter.format(instantiator.instantiate(relation.left(), bindings));</span>
+<span class="nc" id="L133">            String right = ExpressionFormatter.format(instantiator.instantiate(relation.right(), bindings));</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">            if (left.equals(right)) {</span>
+<span class="nc" id="L135">                return false;</span>
+            }
+<span class="nc" id="L137">        }</span>
+<span class="fc" id="L138">        return true;</span>
+    }
+
+    private boolean wouldExceedInstanceBudget(int independentPlaceholderCount) {
+<span class="fc" id="L142">        int generated = 1;</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (int index = 0; index &lt; independentPlaceholderCount; index++) {</span>
+<span class="fc" id="L144">            generated *= GENERATED_SUBSTITUTIONS.size();</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (generated &gt; MAX_GENERATED_INSTANCES) {</span>
+<span class="nc" id="L146">                return true;</span>
+            }
+        }
+<span class="fc" id="L149">        return false;</span>
+    }
+
+    private boolean placeholdersResolvable(RulePatternNode node, Set&lt;String&gt; boundPlaceholders) {
+<span class="nc" id="L153">        Set&lt;String&gt; placeholders = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc" id="L154">        collectPlaceholders(node, placeholders);</span>
+<span class="nc" id="L155">        return boundPlaceholders.containsAll(placeholders);</span>
+    }
+
+    private void collectPlaceholders(RulePatternNode node, Set&lt;String&gt; placeholders) {
+<span class="pc bpc" id="L159" title="1 of 4 branches missed.">        if (node instanceof PatternVariable variable &amp;&amp; variable.name().matches(&quot;[A-Z]&quot;)) {</span>
+<span class="fc" id="L160">            placeholders.add(variable.name());</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        } else if (node instanceof PatternBinary binary) {</span>
+<span class="fc" id="L162">            collectPlaceholders(binary.left(), placeholders);</span>
+<span class="fc" id="L163">            collectPlaceholders(binary.right(), placeholders);</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        } else if (node instanceof PatternFunction function) {</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            for (RulePatternNode argument : function.arguments()) {</span>
+<span class="nc" id="L166">                collectPlaceholders(argument, placeholders);</span>
+<span class="nc" id="L167">            }</span>
+        }
+<span class="fc" id="L169">    }</span>
+
+    public static class UnsupportedRelationException extends RuntimeException {
+        public UnsupportedRelationException(String message) {
+<span class="fc" id="L173">            super(message);</span>
+<span class="fc" id="L174">        }</span>
+    }
+
+<span class="fc" id="L177">    private record RelationPlan(</span>
+        Map&lt;String, RulePatternNode&gt; equalsRelations,
+        List&lt;NotEqualsRelation&gt; notEqualsRelations
+    ) {
+    }
+
+<span class="nc" id="L183">    private record NotEqualsRelation(RulePatternNode left, RulePatternNode right) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

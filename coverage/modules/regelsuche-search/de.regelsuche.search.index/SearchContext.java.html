@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.index</a> &gt; <span class="el_source">SearchContext.java</span></div><h1>SearchContext.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.index;
+
+import java.util.Set;
+
+/** Query context for goal-, domain-, proof-, and assumption-aware candidate retrieval. */
+public record SearchContext(
+    String goalExpression,
+    TermRuleIndex.ProofStatusRank minimumProofStatus,
+    String domain,
+    boolean includeAtomicRules,
+    boolean includeMacroMoves,
+    Set&lt;String&gt; assumptionSignature
+) {
+<span class="fc" id="L14">    public SearchContext {</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        goalExpression = goalExpression == null ? &quot;&quot; : goalExpression;</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        minimumProofStatus = minimumProofStatus == null</span>
+<span class="nc" id="L17">            ? TermRuleIndex.ProofStatusRank.OBSERVED</span>
+<span class="fc" id="L18">            : minimumProofStatus;</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        domain = domain == null ? &quot;&quot; : domain;</span>
+<span class="pc bpc" id="L20" title="1 of 4 branches missed.">        includeAtomicRules = includeAtomicRules || !includeMacroMoves;</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        assumptionSignature = assumptionSignature == null ? Set.of() : Set.copyOf(assumptionSignature);</span>
+<span class="fc" id="L22">    }</span>
+
+    public static SearchContext all() {
+<span class="nc" id="L25">        return from(TermRuleIndex.Query.all());</span>
+    }
+
+    public static SearchContext from(TermRuleIndex.Query query) {
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        TermRuleIndex.Query effective = query == null ? TermRuleIndex.Query.all() : query;</span>
+<span class="fc" id="L30">        return new SearchContext(</span>
+<span class="fc" id="L31">            effective.goalExpression(),</span>
+<span class="fc" id="L32">            effective.minimumProofStatus(),</span>
+<span class="fc" id="L33">            effective.domain(),</span>
+<span class="fc" id="L34">            effective.includeAtomicRules(),</span>
+<span class="fc" id="L35">            effective.includeMacroMoves(),</span>
+<span class="fc" id="L36">            Set.of()</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

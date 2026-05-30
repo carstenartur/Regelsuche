@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialDiscoveryPack.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">PolynomialDiscoveryPack.java</span></div><h1>PolynomialDiscoveryPack.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import java.util.List;
+
+/** Curated polynomial examples used to exercise exact algebraic discovery and reporting. */
+public final class PolynomialDiscoveryPack {
+    private PolynomialDiscoveryPack() {
+    }
+
+    public static List&lt;Example&gt; examples() {
+<span class="fc" id="L13">        return List.of(</span>
+            new Example(
+                &quot;binomial-square&quot;,
+                &quot;(x + a)^2 - (x^2 + 2*a*x + a^2)&quot;,
+<span class="fc" id="L17">                List.of(&quot;1&quot;),</span>
+                Kind.IDENTITY,
+                true
+            ),
+            new Example(
+                &quot;difference-of-squares&quot;,
+                &quot;x^2 - a^2&quot;,
+<span class="fc" id="L24">                List.of(&quot;x - a&quot;, &quot;x + a&quot;),</span>
+                Kind.FACTORIZATION,
+                true
+            ),
+            new Example(
+                &quot;cubic-factorization&quot;,
+                &quot;x^3 - 1&quot;,
+<span class="fc" id="L31">                List.of(&quot;x - 1&quot;, &quot;x^2 + x + 1&quot;),</span>
+                Kind.FACTORIZATION,
+                true
+            ),
+            new Example(
+                &quot;elimination-consequence&quot;,
+                &quot;2*y - 1&quot;,
+<span class="fc" id="L38">                List.of(&quot;x + y - 1&quot;, &quot;x - y&quot;),</span>
+                Kind.IDEAL_MEMBERSHIP,
+                true
+            ),
+            new Example(
+                &quot;non-member-counterexample-trap&quot;,
+                &quot;x + y&quot;,
+<span class="fc" id="L45">                List.of(&quot;x*y - 1&quot;),</span>
+                Kind.COUNTEREXAMPLE_TRAP,
+                false
+            ),
+            new Example(
+                &quot;non-member-ideal&quot;,
+                &quot;x&quot;,
+<span class="fc" id="L52">                List.of(&quot;x^2&quot;),</span>
+                Kind.IDEAL_MEMBERSHIP,
+                false
+            ),
+            new Example(
+                &quot;rational-coefficients&quot;,
+                &quot;0.5*x + 0.5*x - 1&quot;,
+<span class="fc" id="L59">                List.of(&quot;x - 1&quot;),</span>
+                Kind.RATIONAL_SIMPLIFICATION,
+                true
+            ),
+            new Example(
+                &quot;rational-coefficient-ideal&quot;,
+                &quot;0.5*x - 0.5&quot;,
+<span class="fc" id="L66">                List.of(&quot;x - 1&quot;),</span>
+                Kind.RATIONAL_SIMPLIFICATION,
+                true
+            ),
+            new Example(
+                &quot;unsupported-trig-radical-division&quot;,
+                &quot;sin(x) + sqrt(y) + x / y&quot;,
+<span class="fc" id="L73">                List.of(&quot;x&quot;),</span>
+                Kind.UNSUPPORTED_DOMAIN,
+                false,
+                MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN,
+                null
+            ),
+            new Example(
+                &quot;budget-limit&quot;,
+                &quot;x*y&quot;,
+<span class="fc" id="L82">                List.of(&quot;x&quot;, &quot;y&quot;),</span>
+                Kind.BUDGET_LIMIT,
+                false,
+                MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED,
+<span class="fc" id="L86">                MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(0, 1, 0, 0.0, 256, 20, 8)</span>
+            )
+        );
+    }
+
+    public static String renderReportJson(List&lt;EvaluationResult&gt; results) {
+<span class="fc" id="L92">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L93">        writer.beginObject();</span>
+<span class="fc" id="L94">        writer.property(&quot;schema&quot;, &quot;regelsuche.polynomial-discovery-pack-report/v1&quot;);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        writer.array(&quot;cases&quot;, cases -&gt; (results == null ? List.&lt;EvaluationResult&gt;of() : results).forEach(result -&gt;</span>
+<span class="fc" id="L96">            cases.objectValue(object -&gt; {</span>
+<span class="fc" id="L97">                object.property(&quot;id&quot;, result.example().id());</span>
+<span class="fc" id="L98">                object.property(&quot;kind&quot;, result.example().kind().name());</span>
+<span class="fc" id="L99">                object.property(&quot;expectedMember&quot;, result.example().expectedMember());</span>
+<span class="fc" id="L100">                object.property(&quot;actualMember&quot;, result.actualMember());</span>
+<span class="fc" id="L101">                object.property(&quot;actualResult&quot;, result.actualResult());</span>
+<span class="fc" id="L102">                object.property(&quot;status&quot;, result.status().name());</span>
+<span class="fc" id="L103">            })</span>
+        ));
+<span class="fc" id="L105">        writer.endObject();</span>
+<span class="fc" id="L106">        return writer.toString();</span>
+    }
+
+<span class="fc" id="L109">    public enum Kind {</span>
+<span class="fc" id="L110">        IDENTITY,</span>
+<span class="fc" id="L111">        FACTORIZATION,</span>
+<span class="fc" id="L112">        ELIMINATION,</span>
+<span class="fc" id="L113">        IDEAL_MEMBERSHIP,</span>
+<span class="fc" id="L114">        RATIONAL_SIMPLIFICATION,</span>
+<span class="fc" id="L115">        COUNTEREXAMPLE_TRAP,</span>
+<span class="fc" id="L116">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L117">        BUDGET_LIMIT</span>
+    }
+
+    public record Example(
+        String id,
+        String polynomial,
+        List&lt;String&gt; generators,
+        Kind kind,
+        boolean expectedMember,
+        MathematicalAlgorithmRegistry.ExecutionStatus expectedStatus,
+        MathematicalAlgorithmRegistry.AlgorithmBudget budget
+    ) {
+        public Example(String id, String polynomial, List&lt;String&gt; generators, Kind kind, boolean expectedMember) {
+<span class="fc" id="L130">            this(id, polynomial, generators, kind, expectedMember, MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS, null);</span>
+<span class="fc" id="L131">        }</span>
+
+<span class="fc" id="L133">        public Example {</span>
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L135">                throw new IllegalArgumentException(&quot;id must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L137" title="2 of 4 branches missed.">            if (polynomial == null || polynomial.isBlank()) {</span>
+<span class="nc" id="L138">                throw new IllegalArgumentException(&quot;polynomial must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            generators = generators == null ? List.of() : List.copyOf(generators);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            kind = kind == null ? Kind.IDENTITY : kind;</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            expectedStatus = expectedStatus == null ? MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS : expectedStatus;</span>
+<span class="fc" id="L143">        }</span>
+    }
+
+    public record EvaluationResult(
+        Example example,
+        boolean actualMember,
+        String actualResult,
+        MathematicalAlgorithmRegistry.ExecutionStatus status
+    ) {
+<span class="fc" id="L152">        public EvaluationResult {</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (example == null) {</span>
+<span class="nc" id="L154">                throw new IllegalArgumentException(&quot;example must not be null&quot;);</span>
+            }
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            actualResult = actualResult == null ? &quot;&quot; : actualResult;</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            status = status == null ? MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN : status;</span>
+<span class="fc" id="L158">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

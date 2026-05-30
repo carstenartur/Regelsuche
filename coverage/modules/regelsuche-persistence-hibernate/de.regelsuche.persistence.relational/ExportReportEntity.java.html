@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExportReportEntity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence-hibernate</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence.relational</a> &gt; <span class="el_source">ExportReportEntity.java</span></div><h1>ExportReportEntity.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence.relational;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.List;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.KeywordField;
+import org.hibernate.type.SqlTypes;
+
+@Entity
+@Indexed
+@Table(name = &quot;export_reports&quot;, indexes = {
+    @Index(name = &quot;idx_export_reports_experiment&quot;, columnList = &quot;experiment_id&quot;),
+    @Index(name = &quot;idx_export_reports_format&quot;, columnList = &quot;format&quot;)
+})
+public class ExportReportEntity {
+    @Id
+    private String id;
+    @Column(name = &quot;experiment_id&quot;)
+    private String experimentId;
+    @FullTextField
+    @Column(name = &quot;title&quot;, nullable = false)
+    private String title;
+    @KeywordField
+    @Column(name = &quot;format&quot;, nullable = false)
+    private String format;
+    @Column(name = &quot;storage_uri&quot;, nullable = false)
+    private String storageUri;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;referenced_search_run_ids&quot;, nullable = false, columnDefinition = &quot;jsonb&quot;)
+    private String referencedSearchRunIdsJson;
+    @FullTextField
+    @Column(name = &quot;body&quot;, nullable = false, columnDefinition = &quot;text&quot;)
+    private String body;
+    @KeywordField
+    @Column(name = &quot;domain&quot;, nullable = false)
+    private String domain;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;facets&quot;, nullable = false, columnDefinition = &quot;jsonb&quot;)
+    private String facetsJson;
+    @FullTextField(name = &quot;facets&quot;)
+    @Column(name = &quot;facets_text&quot;, nullable = false, columnDefinition = &quot;text&quot;)
+    private String facetsText;
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private Instant createdAt;
+
+<span class="nc" id="L53">    protected ExportReportEntity() {</span>
+<span class="nc" id="L54">    }</span>
+
+    public ExportReportEntity(String id, String experimentId, String title, String format, String storageUri,
+        List&lt;String&gt; referencedSearchRunIds, Instant createdAt) {
+<span class="nc" id="L58">        this(id, experimentId, title, &quot;&quot;, &quot;general&quot;, List.of(), format, storageUri, referencedSearchRunIds, createdAt);</span>
+<span class="nc" id="L59">    }</span>
+
+    public ExportReportEntity(String id, String experimentId, String title, String body, String domain,
+<span class="nc" id="L62">        List&lt;SearchFacet&gt; facets, String format, String storageUri, List&lt;String&gt; referencedSearchRunIds, Instant createdAt) {</span>
+<span class="nc" id="L63">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        this.experimentId = experimentId == null ? &quot;&quot; : experimentId;</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        this.title = title == null ? id : title;</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        this.body = body == null ? &quot;&quot; : body;</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        this.domain = domain == null ? &quot;general&quot; : domain;</span>
+<span class="nc" id="L68">        this.facetsJson = RelationalJson.object(facets);</span>
+<span class="nc" id="L69">        this.facetsText = RelationalJson.joinFacets(facets);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        this.format = format == null ? &quot;markdown&quot; : format;</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        this.storageUri = storageUri == null ? &quot;&quot; : storageUri;</span>
+<span class="nc" id="L72">        this.referencedSearchRunIdsJson = RelationalJson.array(referencedSearchRunIds);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        this.createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="nc" id="L74">    }</span>
+
+<span class="nc" id="L76">    public String id() { return id; }</span>
+<span class="nc" id="L77">    public String experimentId() { return experimentId; }</span>
+<span class="nc" id="L78">    public String title() { return title; }</span>
+<span class="nc" id="L79">    public String body() { return body; }</span>
+<span class="nc" id="L80">    public String domain() { return domain; }</span>
+<span class="nc" id="L81">    public List&lt;SearchFacet&gt; facets() { return RelationalJson.facets(facetsJson); }</span>
+<span class="nc" id="L82">    public String format() { return format; }</span>
+<span class="nc" id="L83">    public String storageUri() { return storageUri; }</span>
+<span class="nc" id="L84">    public List&lt;String&gt; referencedSearchRunIds() { return RelationalJson.arrayValues(referencedSearchRunIdsJson); }</span>
+<span class="nc" id="L85">    public Instant createdAt() { return createdAt; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

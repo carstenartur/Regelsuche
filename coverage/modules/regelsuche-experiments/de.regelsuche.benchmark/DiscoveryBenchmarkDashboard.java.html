@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryBenchmarkDashboard.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">DiscoveryBenchmarkDashboard.java</span></div><h1>DiscoveryBenchmarkDashboard.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.validation.DiscoveryEvidenceKind;
+import de.regelsuche.validation.DiscoveryResultKind;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Aggregates discovery corpus/replay rows into an operator benchmark dashboard. */
+<span class="nc" id="L12">public final class DiscoveryBenchmarkDashboard {</span>
+    public List&lt;Row&gt; aggregate(List&lt;DeterministicDiscoveryExperimentRunner.SeedRunReport&gt; reports) {
+<span class="nc" id="L14">        Map&lt;String, Accumulator&gt; byOperator = new TreeMap&lt;&gt;();</span>
+<span class="nc bnc" id="L15" title="All 4 branches missed.">        for (DeterministicDiscoveryExperimentRunner.SeedRunReport report : reports == null</span>
+<span class="nc" id="L16">            ? List.&lt;DeterministicDiscoveryExperimentRunner.SeedRunReport&gt;of()</span>
+<span class="nc" id="L17">            : reports) {</span>
+<span class="nc" id="L18">            String operator = operator(report);</span>
+<span class="nc" id="L19">            byOperator.computeIfAbsent(operator, Accumulator::new).add(report);</span>
+<span class="nc" id="L20">        }</span>
+<span class="nc" id="L21">        return byOperator.values().stream().map(Accumulator::toRow).toList();</span>
+    }
+
+    public String renderMarkdown(List&lt;Row&gt; rows) {
+<span class="nc" id="L25">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L26">        out.append(&quot;| Operator | Cases | Candidates | Bridge | Transformed | Macro learned | Macro reused | False positives | Avg time | Notes |\n&quot;);</span>
+<span class="nc" id="L27">        out.append(&quot;| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="nc bnc" id="L28" title="All 4 branches missed.">        for (Row row : rows == null ? List.&lt;Row&gt;of() : rows) {</span>
+<span class="nc" id="L29">            out.append(&quot;| &quot;)</span>
+<span class="nc" id="L30">                .append(escape(row.operator()))</span>
+<span class="nc" id="L31">                .append(&quot; | &quot;).append(row.cases())</span>
+<span class="nc" id="L32">                .append(&quot; | &quot;).append(row.candidates())</span>
+<span class="nc" id="L33">                .append(&quot; | &quot;).append(row.bridge())</span>
+<span class="nc" id="L34">                .append(&quot; | &quot;).append(row.transformed())</span>
+<span class="nc" id="L35">                .append(&quot; | &quot;).append(row.macroLearned())</span>
+<span class="nc" id="L36">                .append(&quot; | &quot;).append(row.macroReused())</span>
+<span class="nc" id="L37">                .append(&quot; | &quot;).append(row.falsePositives())</span>
+<span class="nc" id="L38">                .append(&quot; | &quot;).append(String.format(Locale.ROOT, &quot;%.1f ms&quot;, row.avgTimeMillis()))</span>
+<span class="nc" id="L39">                .append(&quot; | &quot;).append(escape(row.notes()))</span>
+<span class="nc" id="L40">                .append(&quot; |\n&quot;);</span>
+<span class="nc" id="L41">        }</span>
+<span class="nc" id="L42">        return out.toString();</span>
+    }
+
+    private String operator(DeterministicDiscoveryExperimentRunner.SeedRunReport report) {
+<span class="nc" id="L46">        return report.seed().tags().stream()</span>
+<span class="nc" id="L47">            .filter(tag -&gt; tag.startsWith(&quot;operator:&quot;))</span>
+<span class="nc" id="L48">            .map(tag -&gt; tag.substring(&quot;operator:&quot;.length()))</span>
+<span class="nc" id="L49">            .findFirst()</span>
+<span class="nc" id="L50">            .orElse(report.seed().category());</span>
+    }
+
+    private String escape(String value) {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+<span class="nc" id="L57">    public record Row(</span>
+        String operator,
+        int cases,
+        int candidates,
+        int bridge,
+        int transformed,
+        int macroLearned,
+        int macroReused,
+        int falsePositives,
+        double avgTimeMillis,
+        String notes
+    ) {
+    }
+
+    private static final class Accumulator {
+        private final String operator;
+        private int cases;
+        private int candidates;
+        private int bridge;
+        private int transformed;
+        private int macroLearned;
+        private int macroReused;
+        private int falsePositives;
+        private long elapsedMillis;
+<span class="nc" id="L81">        private final Set&lt;String&gt; notes = new java.util.TreeSet&lt;&gt;();</span>
+
+<span class="nc" id="L83">        private Accumulator(String operator) {</span>
+<span class="nc" id="L84">            this.operator = operator;</span>
+<span class="nc" id="L85">        }</span>
+
+        private void add(DeterministicDiscoveryExperimentRunner.SeedRunReport report) {
+<span class="nc" id="L88">            cases++;</span>
+<span class="nc" id="L89">            candidates += report.hypotheses().size();</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (rank(report.resultKind()) &gt;= rank(DiscoveryResultKind.BRIDGE_FOUND)) {</span>
+<span class="nc" id="L91">                bridge++;</span>
+            }
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (report.resultKind() == DiscoveryResultKind.TRANSFORMED) {</span>
+<span class="nc" id="L94">                transformed++;</span>
+            }
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (report.evidence().contains(DiscoveryEvidenceKind.MACRO_LEARNED)) {</span>
+<span class="nc" id="L97">                macroLearned++;</span>
+            }
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (report.evidence().contains(DiscoveryEvidenceKind.MACRO_REUSED)) {</span>
+<span class="nc" id="L100">                macroReused++;</span>
+            }
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (report.resultKind() == DiscoveryResultKind.FALSE_POSITIVE) {</span>
+<span class="nc" id="L103">                falsePositives++;</span>
+            }
+<span class="nc" id="L105">            elapsedMillis += report.elapsedMillis();</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (!report.summary().isBlank()) {</span>
+<span class="nc" id="L107">                notes.add(report.summary());</span>
+            }
+<span class="nc" id="L109">        }</span>
+
+        private Row toRow() {
+<span class="nc" id="L112">            return new Row(operator, cases, candidates, bridge, transformed, macroLearned, macroReused, falsePositives,</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                cases == 0 ? 0.0 : (double) elapsedMillis / cases,</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                notes.isEmpty() ? &quot;actual corpus/replay rows&quot; : String.join(&quot;; &quot;, notes));</span>
+        }
+
+        private int rank(DiscoveryResultKind kind) {
+<span class="nc bnc" id="L118" title="All 7 branches missed.">            return switch (kind == null ? DiscoveryResultKind.NO_CANDIDATE : kind) {</span>
+<span class="nc" id="L119">                case NO_CANDIDATE -&gt; 0;</span>
+<span class="nc" id="L120">                case HYPOTHESIS_ONLY -&gt; 1;</span>
+<span class="nc" id="L121">                case BRIDGE_FOUND -&gt; 2;</span>
+<span class="nc" id="L122">                case TRANSFORMED -&gt; 3;</span>
+<span class="nc" id="L123">                case FALSE_POSITIVE -&gt; -1;</span>
+            };
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

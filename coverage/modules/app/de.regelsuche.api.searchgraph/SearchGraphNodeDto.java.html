@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchGraphNodeDto.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api.searchgraph</a> &gt; <span class="el_source">SearchGraphNodeDto.java</span></div><h1>SearchGraphNodeDto.java</h1><pre class="source lang-java linenums">package de.regelsuche.api.searchgraph;
+
+import de.regelsuche.validation.CandidateProofStatus;
+
+/**
+ * Node DTO for the Visual Search Graph.
+ *
+ * &lt;p&gt;Represents a single expression encountered during search, enriched with
+ * UI-relevant attributes (best-path / dead-end markers, validation status, cluster id).
+ *
+ * &lt;p&gt;See {@code docs/visual-search-graph.md}.
+ */
+public record SearchGraphNodeDto(
+    String id,
+    String expression,
+    String latex,
+    int score,
+    int depth,
+    int visitedCount,
+    boolean isBest,
+    boolean isDeadEnd,
+    CandidateProofStatus candidateStatus,
+    String clusterId,
+    SearchExpression expressionType,
+    String expressionLatex
+) {
+<span class="fc" id="L27">    public SearchGraphNodeDto {</span>
+<span class="pc bpc" id="L28" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;id is required&quot;);</span>
+        }
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(&quot;expression is required&quot;);</span>
+        }
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        latex = latex == null ? &quot;&quot; : latex;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        candidateStatus = candidateStatus == null ? CandidateProofStatus.OBSERVED : candidateStatus;</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        clusterId = clusterId == null ? &quot;&quot; : clusterId;</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        expressionType = expressionType == null ? SearchExpression.classify(expression) : expressionType;</span>
+        // Stage 4: dedicated `expressionLatex` that is always routed
+        // through the central `MathPresentation.latex(...)` pipeline so
+        // the Cytoscape KaTeX overlay layer receives a guaranteed-non-
+        // blank, canonically-rendered LaTeX string per node. Falls back
+        // to the legacy `latex` field (or a fresh `MathPresentation`
+        // render of `expression`) when callers do not set it explicitly.
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">        if (expressionLatex == null || expressionLatex.isBlank()) {</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            if (!latex.isBlank()) {</span>
+<span class="fc" id="L46">                expressionLatex = latex;</span>
+            } else {
+<span class="fc" id="L48">                expressionLatex = de.regelsuche.export.MathPresentation.DEFAULT.latex(expression);</span>
+            }
+        }
+<span class="fc" id="L51">    }</span>
+
+    /**
+     * Backwards-compatible constructor used by callers that pre-date
+     * the Stage 4 {@code expressionLatex} field. Routes through the
+     * compact ctor so {@code expressionLatex} is populated from the
+     * existing {@code latex} string (or, failing that, from a fresh
+     * {@code MathPresentation.latex(expression)} render).
+     */
+    public SearchGraphNodeDto(
+        String id,
+        String expression,
+        String latex,
+        int score,
+        int depth,
+        int visitedCount,
+        boolean isBest,
+        boolean isDeadEnd,
+        CandidateProofStatus candidateStatus,
+        String clusterId,
+        SearchExpression expressionType
+    ) {
+<span class="nc" id="L73">        this(id, expression, latex, score, depth, visitedCount, isBest, isDeadEnd,</span>
+            candidateStatus, clusterId, expressionType, null);
+<span class="nc" id="L75">    }</span>
+
+    /**
+     * Backwards-compatible constructor used by callers that pre-date
+     * the typed-expression integration. The {@link #expressionType()}
+     * is inferred from the raw {@code expression} string via
+     * {@link SearchExpression#classify(String)}.
+     */
+    public SearchGraphNodeDto(
+        String id,
+        String expression,
+        String latex,
+        int score,
+        int depth,
+        int visitedCount,
+        boolean isBest,
+        boolean isDeadEnd,
+        CandidateProofStatus candidateStatus,
+        String clusterId
+    ) {
+<span class="fc" id="L95">        this(id, expression, latex, score, depth, visitedCount, isBest, isDeadEnd,</span>
+<span class="fc" id="L96">            candidateStatus, clusterId, SearchExpression.classify(expression), null);</span>
+<span class="fc" id="L97">    }</span>
+
+    /**
+     * Stage 5 — structured {@link de.regelsuche.export.layout.MathLayout MathLayout}
+     * for the node's expression. Derived on demand from {@link #expressionLatex()}
+     * via {@link de.regelsuche.export.MathPresentation#layout(String)} with an
+     * ARIA label sourced from the raw {@link #expression()}. Layout-aware
+     * front-end overlays consume this via {@code renderMathLayout(layout, host)}.
+     */
+    public de.regelsuche.export.layout.MathLayout layout() {
+<span class="fc" id="L107">        return de.regelsuche.export.layout.MathLayout.fromLatexFragment(</span>
+            expressionLatex,
+<span class="fc" id="L109">            de.regelsuche.export.layout.AstAriaRenderer.ariaLabel(expression)</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

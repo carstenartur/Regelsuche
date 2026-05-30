@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryCampaign.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">DiscoveryCampaign.java</span></div><h1>DiscoveryCampaign.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.List;
+
+/** Product-level campaign descriptor for replayable multi-seed discovery runs; execution is handled by runners. */
+public record DiscoveryCampaign(
+    String id,
+    List&lt;String&gt; seedIds,
+    int globalBudget,
+    int parallelism,
+    List&lt;String&gt; enabledBackends,
+    String persistenceMode,
+    List&lt;String&gt; reportArtifacts
+) {
+<span class="fc" id="L16">    public DiscoveryCampaign {</span>
+<span class="pc bpc" id="L17" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L18">            throw new IllegalArgumentException(&quot;id must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        seedIds = seedIds == null ? List.of() : List.copyOf(seedIds);</span>
+<span class="fc" id="L21">        globalBudget = Math.max(0, globalBudget);</span>
+<span class="fc" id="L22">        parallelism = Math.max(1, parallelism);</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        enabledBackends = enabledBackends == null ? List.of() : List.copyOf(enabledBackends);</span>
+<span class="pc bpc" id="L24" title="2 of 4 branches missed.">        persistenceMode = persistenceMode == null || persistenceMode.isBlank() ? &quot;IN_MEMORY&quot; : persistenceMode;</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        reportArtifacts = reportArtifacts == null ? List.of() : List.copyOf(reportArtifacts);</span>
+<span class="fc" id="L26">    }</span>
+
+    public static DiscoveryCampaign fromReport(
+        String id,
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
+        int globalBudget,
+        int parallelism,
+        List&lt;String&gt; enabledBackends,
+        String persistenceMode
+    ) {
+<span class="fc" id="L36">        return new DiscoveryCampaign(</span>
+            id,
+<span class="fc" id="L38">            report.rows().stream().map(row -&gt; row.seed().id()).sorted().toList(),</span>
+            globalBudget,
+            parallelism,
+            enabledBackends,
+            persistenceMode,
+<span class="fc" id="L43">            List.of(</span>
+                &quot;discovery-report.json&quot;,
+                &quot;discovery-report.html&quot;,
+                &quot;discovery-report.md&quot;,
+                &quot;discovery-replay.json&quot;,
+                &quot;discovery-campaign.json&quot;,
+                &quot;hypotheses.json&quot;,
+                &quot;macro-rules.json&quot;,
+                &quot;counterexamples.json&quot;,
+                &quot;provenance.graph.json&quot;,
+                &quot;reproducibility-pack.json&quot;
+            )
+        );
+    }
+
+    public String renderJson() {
+<span class="fc" id="L59">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L60">        writer.beginObject();</span>
+<span class="fc" id="L61">        writer.property(&quot;schema&quot;, &quot;regelsuche.discovery-campaign/v1&quot;);</span>
+<span class="fc" id="L62">        writer.property(&quot;kind&quot;, &quot;descriptor&quot;);</span>
+<span class="fc" id="L63">        writer.property(&quot;id&quot;, id);</span>
+<span class="fc" id="L64">        writer.array(&quot;seedIds&quot;, seeds -&gt; seedIds.forEach(seeds::value));</span>
+<span class="fc" id="L65">        writer.object(&quot;budgets&quot;, budgets -&gt; {</span>
+<span class="fc" id="L66">            budgets.property(&quot;globalBudget&quot;, globalBudget);</span>
+<span class="fc" id="L67">            budgets.property(&quot;parallelism&quot;, parallelism);</span>
+<span class="fc" id="L68">        });</span>
+<span class="fc" id="L69">        writer.array(&quot;enabledBackends&quot;, backends -&gt; enabledBackends.forEach(backends::value));</span>
+<span class="fc" id="L70">        writer.property(&quot;persistenceMode&quot;, persistenceMode);</span>
+<span class="fc" id="L71">        writer.array(&quot;reportArtifacts&quot;, artifacts -&gt; reportArtifacts.forEach(artifacts::value));</span>
+<span class="fc" id="L72">        writer.endObject();</span>
+<span class="fc" id="L73">        return writer.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

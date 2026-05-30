@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseMigrationRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-persistence-hibernate</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.persistence.relational</a> &gt; <span class="el_source">DatabaseMigrationRunner.java</span></div><h1>DatabaseMigrationRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.persistence.relational;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.List;
+
+/** Minimal Flyway-style migration runner for the optional PostgreSQL mode. */
+public final class DatabaseMigrationRunner {
+<span class="fc" id="L15">    public static final List&lt;DatabaseMigration&gt; DEFAULT_MIGRATIONS = List.of(</span>
+        new DatabaseMigration(1, &quot;discovery_persistence&quot;, &quot;db/migration/V1__discovery_persistence.sql&quot;),
+        new DatabaseMigration(2, &quot;full_text_and_facets&quot;, &quot;db/migration/V2__full_text_and_facets.sql&quot;),
+        new DatabaseMigration(3, &quot;hibernate_search_fields&quot;, &quot;db/migration/V3__hibernate_search_fields.sql&quot;),
+        new DatabaseMigration(4, &quot;hypothesis_candidate_metadata&quot;, &quot;db/migration/V4__hypothesis_candidate_metadata.sql&quot;),
+        new DatabaseMigration(5, &quot;counterexample_search_status&quot;, &quot;db/migration/V5__counterexample_search_status.sql&quot;)
+    );
+
+    private final List&lt;DatabaseMigration&gt; migrations;
+    private final ClassLoader classLoader;
+
+    public DatabaseMigrationRunner() {
+<span class="nc" id="L27">        this(DEFAULT_MIGRATIONS, DatabaseMigrationRunner.class.getClassLoader());</span>
+<span class="nc" id="L28">    }</span>
+
+<span class="nc" id="L30">    public DatabaseMigrationRunner(List&lt;DatabaseMigration&gt; migrations, ClassLoader classLoader) {</span>
+<span class="nc" id="L31">        this.migrations = List.copyOf(migrations);</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        this.classLoader = classLoader == null ? DatabaseMigrationRunner.class.getClassLoader() : classLoader;</span>
+<span class="nc" id="L33">    }</span>
+
+    public void migrate(Connection connection) throws SQLException, IOException {
+<span class="nc bnc" id="L36" title="All 2 branches missed.">        if (connection == null) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;connection must not be null&quot;);</span>
+        }
+<span class="nc" id="L39">        boolean originalAutoCommit = connection.getAutoCommit();</span>
+<span class="nc" id="L40">        connection.setAutoCommit(false);</span>
+        try {
+<span class="nc" id="L42">            ensureHistoryTable(connection);</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            for (DatabaseMigration migration : migrations) {</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">                if (!isApplied(connection, migration.version())) {</span>
+<span class="nc" id="L45">                    executeSql(connection, readResource(migration.resourcePath()));</span>
+<span class="nc" id="L46">                    recordApplied(connection, migration);</span>
+                }
+<span class="nc" id="L48">            }</span>
+<span class="nc" id="L49">            connection.commit();</span>
+<span class="nc" id="L50">        } catch (SQLException | IOException | RuntimeException ex) {</span>
+<span class="nc" id="L51">            connection.rollback();</span>
+<span class="nc" id="L52">            throw ex;</span>
+        } finally {
+<span class="nc" id="L54">            connection.setAutoCommit(originalAutoCommit);</span>
+        }
+<span class="nc" id="L56">    }</span>
+
+    private void ensureHistoryTable(Connection connection) throws SQLException {
+<span class="nc" id="L59">        try (Statement statement = connection.createStatement()) {</span>
+<span class="nc" id="L60">            statement.execute(&quot;CREATE TABLE IF NOT EXISTS regelsuche_schema_history (&quot;</span>
+                + &quot;version INTEGER PRIMARY KEY, &quot;
+                + &quot;name VARCHAR(200) NOT NULL, &quot;
+                + &quot;applied_at TIMESTAMPTZ NOT NULL DEFAULT now())&quot;);
+        }
+<span class="nc" id="L65">    }</span>
+
+    private boolean isApplied(Connection connection, int version) throws SQLException {
+<span class="nc" id="L68">        try (PreparedStatement statement = connection.prepareStatement(</span>
+            &quot;SELECT 1 FROM regelsuche_schema_history WHERE version = ?&quot;)) {
+<span class="nc" id="L70">            statement.setInt(1, version);</span>
+<span class="nc" id="L71">            try (ResultSet resultSet = statement.executeQuery()) {</span>
+<span class="nc" id="L72">                return resultSet.next();</span>
+            }
+        }
+    }
+
+    private void recordApplied(Connection connection, DatabaseMigration migration) throws SQLException {
+<span class="nc" id="L78">        try (PreparedStatement statement = connection.prepareStatement(</span>
+            &quot;INSERT INTO regelsuche_schema_history(version, name) VALUES (?, ?)&quot;)) {
+<span class="nc" id="L80">            statement.setInt(1, migration.version());</span>
+<span class="nc" id="L81">            statement.setString(2, migration.name());</span>
+<span class="nc" id="L82">            statement.executeUpdate();</span>
+        }
+<span class="nc" id="L84">    }</span>
+
+    private String readResource(String resourcePath) throws IOException {
+<span class="nc" id="L87">        try (InputStream input = classLoader.getResourceAsStream(resourcePath)) {</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            if (input == null) {</span>
+<span class="nc" id="L89">                throw new IOException(&quot;Missing migration resource: &quot; + resourcePath);</span>
+            }
+<span class="nc" id="L91">            return new String(input.readAllBytes(), StandardCharsets.UTF_8);</span>
+        }
+    }
+
+    private void executeSql(Connection connection, String sql) throws SQLException {
+<span class="nc" id="L96">        try (Statement statement = connection.createStatement()) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            for (String command : sql.split(&quot;;\\s*(?:\\r?\\n|$)&quot;)) {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                if (!command.isBlank()) {</span>
+<span class="nc" id="L99">                    statement.execute(command);</span>
+                }
+            }
+        }
+<span class="nc" id="L103">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

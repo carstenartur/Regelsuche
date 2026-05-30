@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryTrace.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery</a> &gt; <span class="el_source">DiscoveryTrace.java</span></div><h1>DiscoveryTrace.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery;
+
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.DiscoveryEvidenceKind;
+import de.regelsuche.validation.DiscoveryResultKind;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+/** Immutable replay/search summary shared by corpus tests, reports and gallery exports. */
+public record DiscoveryTrace(
+    String inputExpression,
+    String finalExpression,
+    DiscoveryResultKind resultKind,
+    List&lt;String&gt; replayPath,
+    List&lt;String&gt; rulePath,
+    List&lt;String&gt; hypothesisCandidates,
+    Optional&lt;String&gt; learnedMacroId,
+    Optional&lt;String&gt; reusedMacroId,
+    Set&lt;DiscoveryEvidenceKind&gt; evidence,
+    CandidateProofStatus proofStatus,
+    List&lt;String&gt; assumptions,
+    String notes
+) {
+<span class="nc" id="L25">    public DiscoveryTrace {</span>
+<span class="nc bnc" id="L26" title="All 4 branches missed.">        if (inputExpression == null || inputExpression.isBlank()) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;inputExpression is required&quot;);</span>
+        }
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        finalExpression = finalExpression == null ? &quot;&quot; : finalExpression;</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        resultKind = resultKind == null ? DiscoveryResultKind.NO_CANDIDATE : resultKind;</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        replayPath = replayPath == null ? List.of() : List.copyOf(replayPath);</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        hypothesisCandidates = hypothesisCandidates == null ? List.of() : List.copyOf(hypothesisCandidates);</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        learnedMacroId = learnedMacroId == null ? Optional.empty() : learnedMacroId;</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        reusedMacroId = reusedMacroId == null ? Optional.empty() : reusedMacroId;</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">        evidence = evidence == null ? Set.of() : Set.copyOf(evidence);</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED : proofStatus;</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        notes = notes == null ? &quot;&quot; : notes;</span>
+<span class="nc" id="L40">    }</span>
+
+    public DiscoveryTrace(
+        String inputExpression,
+        String finalExpression,
+        DiscoveryResultKind resultKind,
+        List&lt;String&gt; replayPath,
+        List&lt;String&gt; rulePath,
+        List&lt;String&gt; hypothesisCandidates,
+        Optional&lt;String&gt; learnedMacroId,
+        Optional&lt;String&gt; reusedMacroId,
+        CandidateProofStatus proofStatus,
+        String notes
+    ) {
+<span class="nc" id="L54">        this(inputExpression, finalExpression, resultKind, replayPath, rulePath, hypothesisCandidates,</span>
+<span class="nc" id="L55">            learnedMacroId, reusedMacroId, Set.of(), proofStatus, List.of(), notes);</span>
+<span class="nc" id="L56">    }</span>
+
+    public DiscoveryTrace(
+        String inputExpression,
+        String finalExpression,
+        DiscoveryResultKind resultKind,
+        List&lt;String&gt; replayPath,
+        List&lt;String&gt; rulePath,
+        List&lt;String&gt; hypothesisCandidates,
+        Optional&lt;String&gt; learnedMacroId,
+        Optional&lt;String&gt; reusedMacroId,
+        Set&lt;DiscoveryEvidenceKind&gt; evidence,
+        CandidateProofStatus proofStatus,
+        String notes
+    ) {
+<span class="nc" id="L71">        this(inputExpression, finalExpression, resultKind, replayPath, rulePath, hypothesisCandidates,</span>
+<span class="nc" id="L72">            learnedMacroId, reusedMacroId, evidence, proofStatus, List.of(), notes);</span>
+<span class="nc" id="L73">    }</span>
+
+    public static DiscoveryTrace noCandidate(String inputExpression, String notes) {
+<span class="nc" id="L76">        return new DiscoveryTrace(inputExpression, inputExpression, DiscoveryResultKind.NO_CANDIDATE,</span>
+<span class="nc" id="L77">            List.of(), List.of(), List.of(), Optional.empty(), Optional.empty(), Set.of(), CandidateProofStatus.OBSERVED,</span>
+<span class="nc" id="L78">            List.of(), notes);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
