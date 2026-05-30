@@ -17,10 +17,12 @@ on:
       - '.github/workflows/benchmark.yml'
   workflow_dispatch:
 
+concurrency:
+  group: pages-publish-${{ github.repository }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
 permissions:
   contents: write       # auto-push benchmark results to gh-pages
-  deployments: write    # create deployment status for benchmark
-  pull-requests: write  # post alert comments on PRs
 
 jobs:
   benchmark:

@@ -9,6 +9,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: pages-publish-${{ github.repository }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -240,7 +244,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: app/build/reports/jacoco/test/**
+          path: '**/build/reports/jacoco/**'
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
