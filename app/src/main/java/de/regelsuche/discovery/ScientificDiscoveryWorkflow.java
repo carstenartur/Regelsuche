@@ -232,10 +232,6 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             || FactoredProductAstPredicate.containsFactoredProduct(reportedState.expression())) {
             evidence.add(DiscoveryEvidenceKind.FACTORED);
         }
-        if (reportedState.appliedRuleIds().stream().anyMatch(this::isHiddenStructureHypothesisRule)
-            && resultKind != DiscoveryResultKind.NO_CANDIDATE) {
-            evidence.add(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED);
-        }
         return evidence.isEmpty() ? Set.of() : Set.copyOf(evidence);
     }
 
@@ -345,7 +341,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         return switch (resultKind) {
             case TRANSFORMED ->
                 "hidden-structure reproduced: hypothesis path reached bridge state and factored via ast_square_difference_factor";
-            case BRIDGE_FOUND -> "hidden-structure incomplete: reached validated bridge state but did not factor";
+            case BRIDGE_FOUND -> "hidden-structure incomplete: reached bridge state but did not factor";
             case HYPOTHESIS_ONLY ->
                 "hidden-structure incomplete: hypothesis candidate participated but did not reach a bridge state";
             default -> "hidden-structure failed: no hypothesis path found";

@@ -259,7 +259,7 @@ public final class DiscoveryReplayArtifactWriter {
                 .append(" | ").append(escapeMarkdown(operatorLabel(row.rulePath())))
                 .append(" | ").append(row.resultKind().name())
                 .append(" | ").append(isBridgeKind(row) ? "yes" : "no")
-                .append(" | ").append(isTransformedKind(row) ? "yes" : "no")
+                .append(" | ").append(hasSimplifiedOrFactoredEvidence(row) ? "yes" : "no")
                 .append(" | ").append(isMacroLearnedKind(row) ? "yes" : "no")
                 .append(" | ").append(hasMacroReuseEvidence(row) ? "yes" : "no")
                 .append(" | ").append(row.counterexampleSearchStatus().name())
@@ -831,18 +831,17 @@ public final class DiscoveryReplayArtifactWriter {
         return row.resultKind() == DiscoveryResultKind.BRIDGE_FOUND || row.resultKind() == DiscoveryResultKind.TRANSFORMED;
     }
 
-    private boolean isTransformedKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
-        return row.resultKind() == DiscoveryResultKind.TRANSFORMED;
+    private static boolean hasSimplifiedOrFactoredEvidence(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
+        return row.evidence().contains(DiscoveryEvidenceKind.SIMPLIFIED)
+            || row.evidence().contains(DiscoveryEvidenceKind.FACTORED);
     }
 
     private boolean isMacroLearnedKind(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
-        return row.evidence().contains(DiscoveryEvidenceKind.MACRO_LEARNED)
-            || row.rulePath().stream().anyMatch(rule -> rule.contains("macro") && rule.contains("learn"));
+        return row.evidence().contains(DiscoveryEvidenceKind.MACRO_LEARNED);
     }
 
     private static boolean hasMacroReuseEvidence(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
-        return row.evidence().contains(DiscoveryEvidenceKind.MACRO_REUSED)
-            || row.rulePath().stream().anyMatch(rule -> rule.contains("macro"));
+        return row.evidence().contains(DiscoveryEvidenceKind.MACRO_REUSED);
     }
 
     private String operatorLabel(List<String> rulePath) {
