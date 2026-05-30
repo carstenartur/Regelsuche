@@ -33,6 +33,7 @@ public class PatternGeneralizer {
     public String skeleton(SuccessfulTransformationPath path) {
         NormalizedNode left = normalizer.normalize(path.originalExpression());
         NormalizedNode right = normalizer.normalize(path.targetExpression());
+        Map<String, String> canonicalVariableBindings = canonicalVariableBindings(path.originalExpression(), path.targetExpression());
         return left.skeletonString() + "->" + right.skeletonString();
     }
 
@@ -95,6 +96,12 @@ public class PatternGeneralizer {
         String placeholder = "A";
         NormalizedNode generalizedLeft = replaceSubtree(left, placeholderSubtree.orElseThrow(), placeholder);
         NormalizedNode generalizedRight = replaceSubtree(right, placeholderSubtree.orElseThrow(), placeholder);
+        Map<String, String> generatedPlaceholders = new LinkedHashMap<>();
+        String reservedVariable = placeholderSubtree.orElseThrow().kind() == NormalizedNode.Kind.VARIABLE
+            ? placeholderSubtree.orElseThrow().name()
+            : null;
+        generalizedLeft = promoteRemainingVariables(generalizedLeft, reservedVariable, generatedPlaceholders);
+        generalizedRight = promoteRemainingVariables(generalizedRight, reservedVariable, generatedPlaceholders);
         if (!containsPlaceholder(generalizedLeft, placeholder) || !containsPlaceholder(generalizedRight, placeholder)) {
             return Optional.empty();
         }
@@ -103,15 +110,18 @@ public class PatternGeneralizer {
         if (leftPattern.equals(left.canonicalString()) && rightPattern.equals(right.canonicalString())) {
             return Optional.empty();
         }
-        Map<String, List<String>> expressionValues = Map.of(
-            placeholder,
-            List.of(placeholderSubtree.orElseThrow().canonicalString())
-        );
+        Map<String, List<String>> expressionValues = new LinkedHashMap<>();
+        expressionValues.put(placeholder, List.of(bindingFor(placeholderSubtree.orElseThrow(), canonicalVariableBindings)));
+        for (Map.Entry<String, String> entry : generatedPlaceholders.entrySet()) {
+            expressionValues.put(entry.getValue(), List.of(canonicalVariableBindings.getOrDefault(entry.getKey(), entry.getKey())));
+        }
         return Optional.of(new GeneralizedPattern(
             leftPattern,
             rightPattern,
             Map.of(),
-            List.of(placeholder + " \u2208 {" + placeholderSubtree.orElseThrow().canonicalString() + "}"),
+            expressionValues.entrySet().stream()
+                .map(entry -> entry.getKey() + " \u2208 {" + String.join(", ", entry.getValue()) + "}")
+                .toList(),
             expressionValues
         ));
     }
@@ -188,6 +198,82 @@ public class PatternGeneralizer {
             binary.operator(),
             replaceVariable(binary.right(), variable, placeholder)
         );
+    }
+
+    private Map<String, String> canonicalVariableBindings(String originalExpression, String targetExpression) {
+        Map<String, String> bindings = new LinkedHashMap<>();
+        collectCanonicalVariableBindings(originalExpression, bindings);
+        collectCanonicalVariableBindings(targetExpression, bindings);
+        return bindings;
+    }
+
+    private void collectCanonicalVariableBindings(String expression, Map<String, String> canonicalBindings) {
+        try {
+            collectCanonicalVariableBindings(expressionParser.parseTerm(expression), new LinkedHashMap<>(), canonicalBindings);
+        } catch (IllegalArgumentException exception) {
+            // Keep normalization-based bindings only; callers fall back to canonical variable names.
+        }
+    }
+
+    private void collectCanonicalVariableBindings(
+        Expr expression,
+        Map<String, String> localVariables,
+        Map<String, String> canonicalBindings
+    ) {
+        if (expression instanceof VariableExpr variable) {
+            String canonical = localVariables.computeIfAbsent(
+                variable.name(),
+                key -> localVariables.isEmpty() ? "x" : "v" + localVariables.size()
+            );
+            canonicalBindings.putIfAbsent(canonical, variable.name());
+            return;
+        }
+        if (expression instanceof FunctionExpr function) {
+            for (Expr argument : function.arguments()) {
+                collectCanonicalVariableBindings(argument, localVariables, canonicalBindings);
+            }
+            return;
+        }
+        if (expression instanceof BinaryExpr binary) {
+            collectCanonicalVariableBindings(binary.left(), localVariables, canonicalBindings);
+            collectCanonicalVariableBindings(binary.right(), localVariables, canonicalBindings);
+        }
+    }
+
+    private String bindingFor(NormalizedNode node, Map<String, String> canonicalVariableBindings) {
+        if (node.kind() == NormalizedNode.Kind.VARIABLE) {
+            return canonicalVariableBindings.getOrDefault(node.name(), node.name());
+        }
+        return node.canonicalString();
+    }
+
+    private NormalizedNode promoteRemainingVariables(
+        NormalizedNode node,
+        String reservedVariable,
+        Map<String, String> generatedPlaceholders
+    ) {
+        if (node.kind() == NormalizedNode.Kind.VARIABLE && !node.name().equals(reservedVariable)) {
+            return NormalizedNode.placeholder(generatedPlaceholders.computeIfAbsent(
+                node.name(),
+                key -> nextStableExpressionPlaceholder(generatedPlaceholders.size())
+            ));
+        }
+        List<NormalizedNode> children = node.children().stream()
+            .map(child -> promoteRemainingVariables(child, reservedVariable, generatedPlaceholders))
+            .toList();
+        return switch (node.kind()) {
+            case NUMBER -> NormalizedNode.number(node.number());
+            case VARIABLE -> NormalizedNode.variable(node.name());
+            case PLACEHOLDER -> NormalizedNode.placeholder(node.name());
+            case ADD -> NormalizedNode.add(children);
+            case MUL -> NormalizedNode.multiply(children);
+            case POW -> NormalizedNode.pow(children.get(0), children.get(1));
+            case FUNCTION -> NormalizedNode.function(node.name(), children);
+        };
+    }
+
+    private String nextStableExpressionPlaceholder(int index) {
+        return String.valueOf((char) ('B' + index));
     }
 
     private Optional<NormalizedNode> generalizeNodes(List<NormalizedNode> nodes, PlaceholderState state) {
