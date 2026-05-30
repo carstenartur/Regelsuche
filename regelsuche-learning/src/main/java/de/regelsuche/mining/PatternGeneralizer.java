@@ -85,6 +85,7 @@ public class PatternGeneralizer {
         }
         NormalizedNode left = normalizer.normalize(path.originalExpression());
         NormalizedNode right = normalizer.normalize(path.targetExpression());
+        Map<String, String> canonicalVariableBindings = canonicalVariableBindings(path.originalExpression(), path.targetExpression());
         Optional<NormalizedNode> placeholderSubtree = commonExpressionSubtrees(left, right).stream()
             .max(Comparator
                 .comparingInt(this::nodeCount)

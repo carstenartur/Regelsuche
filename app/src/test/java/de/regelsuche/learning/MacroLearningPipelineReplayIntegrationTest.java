@@ -77,6 +77,16 @@ class MacroLearningPipelineReplayIntegrationTest {
             result.stageEvidence().toString());
 
         ReusableRule learned = result.newlyActivated().getFirst();
+        assertTrue(learned.leftPattern().contains("A^4"), learned.toString());
+        assertTrue(learned.leftPattern().contains("4*B^4"), learned.toString());
+        assertTrue(learned.rightPattern().contains("A^2"), learned.toString());
+        assertTrue(learned.rightPattern().contains("2*A*B"), learned.toString());
+        assertTrue(learned.rightPattern().contains("2*B^2"), learned.toString());
+        assertTrue(learned.parameterRelations().contains("A \u2208 {x}"), learned.parameterRelations().toString());
+        assertTrue(learned.parameterRelations().contains("B \u2208 {y}"), learned.parameterRelations().toString());
+        assertTrue(result.validationExamples().stream()
+            .anyMatch(example -> example.substitution().contains("A = ") && example.substitution().contains("B = ")),
+            result.validationExamples().toString());
         MacroMoveTransformationEngine engine = new MacroMoveTransformationEngine(
             new AstRewriteTransformationEngine(List.of(), 0, 0),
             new GoalAwareMacroMoveSelector(inventory),
@@ -89,16 +99,7 @@ class MacroLearningPipelineReplayIntegrationTest {
             .filter(transformation -> transformation.rule().equals(learned.id()))
             .toList();
 
-        if (reused.isEmpty()) {
-            assertTrue(result.stageEvidence().stream()
-                .anyMatch(stage -> stage.equals(
-                    "generalize schema: A^4 + 4*v1^4 -> (A^2 + 2*A*v1 + 2*v1^2)*(A^2 - 2*A*v1 + 2*v1^2)")),
-                result.stageEvidence().toString());
-            assertTrue(result.stageEvidence().stream()
-                .anyMatch(stage -> stage.equals("mine parameter relations: [A ∈ {x}]")),
-                result.stageEvidence().toString());
-            return;
-        }
+        assertFalse(reused.isEmpty(), "learned symbolic Sophie-Germain macro was not reused: " + result.stageEvidence());
         assertTrue(equivalence.areEquivalent(reuseInput, reused.getFirst().transformedExpression()),
             reused.toString());
     }
