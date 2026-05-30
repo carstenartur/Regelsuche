@@ -127,6 +127,28 @@ class DemoDocumentationTest {
     }
 
     @Test
+    void convergentMermaidInGalleryMustMatchGeneratedArtifact() throws IOException {
+        Path gallery = REPO_ROOT.resolve("docs/demo-gallery.md");
+        Path artifact = REPO_ROOT.resolve("docs/assets/screenshots/convergent-sophie-germain.mmd");
+        String galleryMarkdown = Files.readString(gallery, StandardCharsets.UTF_8);
+        String generatedMermaid = Files.readString(artifact, StandardCharsets.UTF_8).stripTrailing();
+        Pattern mermaidBlock = Pattern.compile("```mermaid\\R(?<body>.*?)```", Pattern.DOTALL);
+        Matcher matcher = mermaidBlock.matcher(galleryMarkdown);
+        List<String> staleBlocks = new ArrayList<>();
+
+        while (matcher.find()) {
+            String body = matcher.group("body").stripTrailing();
+            if (isConvergentSophieGermainMermaid(body) && !body.equals(generatedMermaid)) {
+                staleBlocks.add(body);
+            }
+        }
+
+        assertTrue(staleBlocks.isEmpty(),
+            "docs/demo-gallery.md must not contain a stale manually copied convergent Mermaid block; "
+                + "link docs/assets/screenshots/convergent-sophie-germain.mmd or copy it exactly");
+    }
+
+    @Test
     void localDocsLinksAndImagesResolve() throws IOException {
         assertMarkdownReferencesResolve(REPO_ROOT.resolve("README.md"));
         assertMarkdownReferencesResolve(REPO_ROOT.resolve("docs/demo-gallery.md"));
@@ -255,5 +277,12 @@ class DemoDocumentationTest {
             .replaceAll("\\s+", "-")
             .replaceAll("[^\\p{IsAlphabetic}\\p{IsDigit}-]", "");
         return slug;
+    }
+
+    private static boolean isConvergentSophieGermainMermaid(String mermaid) {
+        return mermaid.contains("macro_sophie_germain")
+            || mermaid.contains("convergent-sophie-germain")
+            || (mermaid.contains("hypothesis_difference_of_squares_preparation")
+                && mermaid.contains("x^4 + 4*y^4"));
     }
 }

@@ -26,20 +26,22 @@ Aktualisieren der Gallery:
 
 In dieser Reihenfolge erschließt sich der Funktionsumfang am schnellsten:
 
-1. [Symbolic Sophie-Germain discovery](#symbolic-sophie-germain-discovery) —
+1. [Convergent discovery](#convergent-discovery-multiple-paths-to-one-result) —
+   derselbe Ausdruck erreicht dasselbe Ergebnis über Discovery und Makro.
+2. [Symbolic Sophie-Germain discovery](#symbolic-sophie-germain-discovery) —
    versteckte Differenz von Quadraten aus Replay-Evidence.
-2. [Learned macro reuse](#learned-macro-reuse) — das gelernte Muster
+3. [Learned macro reuse](#learned-macro-reuse) — das gelernte Muster
    `A^4 + 4*B^4` auf einen neuen Ausdruck anwenden.
-3. [Binomische Formel](#binomische-formel) — der „Hello World“ der Suche.
-4. [Bruchkürzung mit Annahme `x ≠ 0`](#bruchkürzung-mit-annahme-x--0) —
+4. [Binomische Formel](#binomische-formel) — der „Hello World“ der Suche.
+5. [Bruchkürzung mit Annahme `x ≠ 0`](#bruchkürzung-mit-annahme-x--0) —
    warum Annahmen sichtbar bleiben müssen.
-5. [Ungleichung mit Vorzeichen-Flip](#ungleichung-mit-vorzeichen-flip) —
+6. [Ungleichung mit Vorzeichen-Flip](#ungleichung-mit-vorzeichen-flip) —
    der kritische Schritt wird hervorgehoben.
-6. [Makroregel-Lernen](#makroregel-lernen) — wie das System eigene
+7. [Makroregel-Lernen](#makroregel-lernen) — wie das System eigene
    Abkürzungen aufbaut.
-7. [Proof-Job-Panel](#proof-job-panel--a--0--a) — von der Regel zum
+8. [Proof-Job-Panel](#proof-job-panel--a--0--a) — von der Regel zum
    formalen Beweis.
-8. [Export-Bundle](#export-bundle) — den Rechenweg außerhalb der App
+9. [Export-Bundle](#export-bundle) — den Rechenweg außerhalb der App
    nutzen.
 
 Die übrigen Demos (Trigonometrie, Polynom-Expansion, Lineare Gleichung,
@@ -90,6 +92,48 @@ Kurze Erklärungen für die Begriffe, die in den Demos auftauchen:
 
 Diese Begriffe werden in der UI zusätzlich als Tooltips angeboten
 (siehe `docs/web-ui-user-guide.md`).
+
+---
+
+## Convergent discovery: multiple paths to one result
+
+Warum convergent discovery matters: Ein CAS liefert typischerweise eine
+Antwort. Regelsuche kann mehrere mathematische Wege zeigen, die auf denselben
+kanonischen Zielzustand konvergieren — und sichtbar machen, wann ein
+entdeckter Weg zur gelernten Abkürzung wird.
+
+Der Graph wird aus `ConvergentDiscoveryReport`-Daten erzeugt; er ist kein
+handgezeichnetes Diagramm. Der passende generierte Mermaid-Graph liegt unter
+[`assets/screenshots/convergent-sophie-germain.mmd`](assets/screenshots/convergent-sophie-germain.mmd),
+die Roh-Gallery-Evidence unter
+[`assets/screenshots/convergent-sophie-germain-gallery-snippet.md`](assets/screenshots/convergent-sophie-germain-gallery-snippet.md).
+
+**A. Sophie-Germain: discovery path vs learned macro shortcut**
+
+- **Input** — `x^4 + 4*y^4`
+- **Path 1** — hidden structure discovery:
+  `hypothesis_difference_of_squares_preparation` →
+  `ast_square_difference_factor`.
+- **Path 2** — learned macro shortcut: `macro_*`.
+- **Same result** —
+  `(A^2 - 2AB + 2B^2)(A^2 + 2AB + 2B^2)`, instantiated for
+  `A=x`, `B=y`.
+- **Reporting fields** — distinct paths: 2; path families:
+  `HIDDEN_STRUCTURE`, `FACTORIZATION`, `LEARNED_MACRO`; shortest path:
+  macro shortcut; most didactic path: hidden-structure discovery; validation:
+  equivalence-preserving by construction; source replay:
+  `convergent-sophie-germain-hidden-structure-replay`.
+
+**B. Complete-square convergence**
+
+- **Input** — `x^2 + 6*x + 5`
+- **Path 1** — complete square:
+  `hypothesis_complete_square_preparation` then factorization.
+- **Path 2** — bounded quadratic factorization:
+  `hypothesis_quadratic_factorization`.
+- **Same result** — `(x + 1)(x + 5)`.
+- **Eligibility** — shown only when `ConvergentCompleteSquareGalleryTest`
+  proves both real rule paths exist.
 
 ---
 
