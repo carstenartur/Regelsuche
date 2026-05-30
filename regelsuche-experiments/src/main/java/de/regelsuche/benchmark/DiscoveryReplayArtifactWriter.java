@@ -1046,6 +1046,8 @@ public final class DiscoveryReplayArtifactWriter {
             Map.entry("screenshotPng", 1),
             Map.entry("replayGif", 1),
             Map.entry("reproducibilityPack", 1),
+            Map.entry("mermaidGraph", 1),
+            Map.entry("gallerySnippet", 1),
             Map.entry("hypotheses", 1),
             Map.entry("macroRules", 1),
             Map.entry("counterexamples", 1),

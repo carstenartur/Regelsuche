@@ -347,7 +347,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-v1
       - name: Record screenshots and videos
-        run: ./gradlew e2eTest -Pregelsuche.recordDocs=true
+        run: ./gradlew test e2eTest -Pregelsuche.recordDocs=true
       - name: Detect screenshot changes
         id: screenshot_changes
         run: |

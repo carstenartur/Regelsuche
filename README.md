@@ -201,8 +201,8 @@ Pull Requests sind willkommen — bitte beachte:
 * `./gradlew test` muss grün sein,
 * `./gradlew e2eTest` muss grün sein, sobald UI-Code geändert wurde
   (siehe [docs/testing.md](docs/testing.md)),
-* Screenshots in [docs/demo-gallery.md](docs/demo-gallery.md) werden
-  ausschließlich über `./gradlew e2eTest -Pregelsuche.recordDocs=true`
+* Screenshots in [docs/demo-gallery.md](docs/demo-gallery.md) werden über
+  `./gradlew test e2eTest -Pregelsuche.recordDocs=true`
   aktualisiert — niemals händisch ersetzen.
 * Nutzerseitige Texte (Demo-Gallery, UI, Replay-Karten, Berichte)
   bitte gegen die

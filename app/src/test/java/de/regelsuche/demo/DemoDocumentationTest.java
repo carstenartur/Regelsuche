@@ -34,7 +34,7 @@ class DemoDocumentationTest {
 
     private static final Path REPO_ROOT = locateRepoRoot();
     private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[[^]]*]\\(([^)]+)\\)");
-    private static final Pattern MARKDOWN_LINK = Pattern.compile("(?<!!)(?<!\\!)\\[[^]]*]\\(([^)]+)\\)");
+    private static final Pattern MARKDOWN_LINK = Pattern.compile("(?<!!)\\[[^]]*]\\(([^)]+)\\)");
     private static final Pattern MARKDOWN_HEADING = Pattern.compile("^#{1,6}\\s+(.+)$", Pattern.MULTILINE);
 
     @Test

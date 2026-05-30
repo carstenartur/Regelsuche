@@ -19,7 +19,7 @@ Test rot wird.
 Aktualisieren der Gallery:
 
 ```bash
-./gradlew e2eTest -Pregelsuche.recordDocs=true
+./gradlew test e2eTest -Pregelsuche.recordDocs=true
 ```
 
 ## Empfohlene Tour
