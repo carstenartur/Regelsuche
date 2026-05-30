@@ -101,6 +101,31 @@ class HiddenStructureDiscoveryCorpusTest {
         }
     }
 
+    @Test
+    void discoversSymbolicSophieGermainThroughPreparationAndSquareDifferenceFactorization() {
+        String source = "x^4 + 4*y^4";
+        SearchProblem problem = new SearchProblem(
+            source,
+            hiddenStructureEngine(),
+            scorer,
+            new ExpressionCanonicalizer(),
+            new SearchHeuristic(4, 160, 1, 10, 200, 200)
+        );
+
+        SearchState factoredState = new BestFirstSearchStrategy().search(problem).stream()
+            .filter(state -> state.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID))
+            .filter(state -> state.appliedRuleIds().contains("ast_square_difference_factor"))
+            .findFirst()
+            .orElseThrow();
+
+        assertTrue(factoredState.appliedRuleIds().contains(DifferenceOfSquaresPreparationOperator.RULE_ID),
+            factoredState.appliedRuleIds().toString());
+        assertTrue(factoredState.appliedRuleIds().contains("ast_square_difference_factor"),
+            factoredState.appliedRuleIds().toString());
+        assertTrue(factoredState.path().stream().anyMatch(path ->
+            path.contains("(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2")), factoredState.path().toString());
+    }
+
     private CorpusRow evaluate(CorpusCase seed) {
         TransformationEngine engine = hiddenStructureEngine();
         List<Transformation> hypothesisCandidates = engine.transform(seed.expression()).stream()

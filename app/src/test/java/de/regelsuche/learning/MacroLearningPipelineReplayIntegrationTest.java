@@ -60,6 +60,50 @@ class MacroLearningPipelineReplayIntegrationTest {
     }
 
     @Test
+    void symbolicSophieGermainMacroLearnsFromActualReplayAndReusesWhenSupported() {
+        SuccessfulTransformationPath path = hiddenStructureReplayPath(
+            "x^4 + 4*y^4",
+            "sophie-symbolic-real-hidden-structure-replay"
+        );
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        MacroLearningResult result = new MacroLearningPipeline(inventory).learn(List.of(path));
+
+        assertFalse(result.newlyActivated().isEmpty(), result.stageEvidence().toString());
+        assertFalse(result.validationExamples().isEmpty(), result.stageEvidence().toString());
+        assertTrue(result.validationExamples().stream().allMatch(MacroValidationExample::equivalent),
+            result.validationExamples().toString());
+        assertTrue(result.stageEvidence().stream()
+            .anyMatch(stage -> stage.contains("generate placeholder substitutions")),
+            result.stageEvidence().toString());
+
+        ReusableRule learned = result.newlyActivated().getFirst();
+        MacroMoveTransformationEngine engine = new MacroMoveTransformationEngine(
+            new AstRewriteTransformationEngine(List.of(), 0, 0),
+            new GoalAwareMacroMoveSelector(inventory),
+            null,
+            Map.of(learned.id(), atomicSteps(path)),
+            learned.assumptions()
+        );
+        String reuseInput = "(x+1)^4 + 4*z^4";
+        List<Transformation> reused = engine.transform(reuseInput).stream()
+            .filter(transformation -> transformation.rule().equals(learned.id()))
+            .toList();
+
+        if (reused.isEmpty()) {
+            assertTrue(result.stageEvidence().stream()
+                .anyMatch(stage -> stage.equals(
+                    "generalize schema: A^4 + 4*v1^4 -> (A^2 + 2*A*v1 + 2*v1^2)*(A^2 - 2*A*v1 + 2*v1^2)")),
+                result.stageEvidence().toString());
+            assertTrue(result.stageEvidence().stream()
+                .anyMatch(stage -> stage.equals("mine parameter relations: [A ∈ {x}]")),
+                result.stageEvidence().toString());
+            return;
+        }
+        assertTrue(equivalence.areEquivalent(reuseInput, reused.getFirst().transformedExpression()),
+            reused.toString());
+    }
+
+    @Test
     void telescopingMacroLearnsFromRealOperatorCorpusWorkflowAndReuses() {
         SuccessfulTransformationPath path = operatorCorpusReplayPath(
             "telescoping-fraction",
@@ -214,11 +258,14 @@ class MacroLearningPipelineReplayIntegrationTest {
     }
 
     private SuccessfulTransformationPath hiddenStructureReplayPath() {
+        return hiddenStructureReplayPath("x^4 + 4", "sophie-real-hidden-structure-replay");
+    }
+
+    private SuccessfulTransformationPath hiddenStructureReplayPath(String source, String pathId) {
         HypothesisTransformationEngine engine = new HypothesisTransformationEngine(
             new AstRewriteTransformationEngine(),
             List.of(new DifferenceOfSquaresPreparationOperator())
         );
-        String source = "x^4 + 4";
         SearchProblem problem = new SearchProblem(
             source,
             engine,
@@ -232,7 +279,7 @@ class MacroLearningPipelineReplayIntegrationTest {
             .findFirst()
             .orElseThrow();
         return new SuccessfulTransformationPath(
-            "sophie-real-hidden-structure-replay",
+            pathId,
             factoredState.path().getFirst(),
             factoredState.path().getLast(),
             factoredState.path(),
