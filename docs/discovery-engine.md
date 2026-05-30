@@ -50,6 +50,16 @@ Zentrale Bausteine:
   Discovery-Szenarien und wachsende E-Graph-Matcher-Indizes. Exportierte
   Metriken sind u. a. `rulesSkippedByIndex`, `nodesScanned`,
   `matcherCacheHits` und durchschnittliche Kandidatenmengen.
+- Die `HypothesisOperatorRegistry` enthält neben den polynomialen
+  Bridge-Operatoren auch `telescoping-fraction` und `rationalization`. Beide
+  bleiben konservativ: Telescoping deckt die Unit-Step-Form
+  `1 / (u * (u + 1)) → 1/u - 1/(u + 1)` ab, Rationalization deckt
+  `1 / (sqrt(u) ± c)` ab und trägt die benötigte Annahme wie `u != c^2` im
+  Transformationsschlüssel.
+- `DiscoveryBenchmarkDashboard` aggregiert Operator-Korpora ausschließlich aus
+  erzeugten Corpus-/Replay-Zeilen: Cases, Kandidaten, Bridge-/Transform-Status,
+  Makro-Lernen/-Reuse, False Positives und Durchschnittszeit werden nicht
+  statisch erfunden.
 
 Wichtige Einstiegspunkte:
 

@@ -56,6 +56,10 @@ Die generierte Discovery-Gallery im Markdown-Report verwendet ausschließlich
 vorhandene Replay-Pfade, Rule-Paths, `GalleryDiscoveryDescriptor`-Eligibility und
 den bestehenden Mermaid-Export. Wenn ein Lauf keinen passenden Descriptor erfüllt,
 wird keine Gallery-Demo erfunden.
+Aktuelle Descriptoren decken Sophie-Germain-Replays, gelernte Makro-Reuse-Evidenz
+und Telescoping-Fraction-Replays ab; Telescoping erscheint nur bei
+`hypothesis_telescoping_fraction`, validierter Evidence und einem Replay-Pfad mit
+`1/u - 1/(u + 1)`-Struktur.
 
 Browser-E2E und Doku-Assets:
 
@@ -99,3 +103,8 @@ Der `ConservativeCompleteSquareHypothesisOperator` ist ein bounded conservative
 square-completion Operator: Er emittiert nur Kandidaten mit Rest `0` oder
 negativem perfekten Quadrat und deckt nicht alle algebraisch möglichen
 quadratischen Ergänzungen ab.
+
+`TelescopingFractionHypothesisOperator` und `RationalizationHypothesisOperator`
+sind ebenfalls bewusst begrenzt. Near-Misses wie `1/(n*(n+2))`,
+`1/(sqrt(x)+sqrt(y))` oder `1/(sqrt(x)+y)` werden im ersten Schritt nicht als
+validierte Discoveries berichtet.
