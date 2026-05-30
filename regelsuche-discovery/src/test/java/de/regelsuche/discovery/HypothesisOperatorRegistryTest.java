@@ -1,23 +1,27 @@
-package de.regelsuche.transform;
+package de.regelsuche.discovery;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
+import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.Transformation;
 import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class HypothesisOperatorRegistryTest {
     @Test
-    void containsInitialOperatorsWithUniqueStableIds() {
+    void containsInitialOperatorsWithUniqueStableMetadata() {
         HypothesisOperatorRegistry registry = new HypothesisOperatorRegistry();
 
-        List<String> ids = registry.stableIds();
+        List<String> ids = registry.all().stream().map(HypothesisOperatorDescriptor::id).toList();
 
         assertTrue(ids.contains(DifferenceOfSquaresPreparationOperator.RULE_ID));
-        assertTrue(ids.contains(CompleteSquareHypothesisOperator.RULE_ID));
+        assertTrue(ids.contains(ConservativeCompleteSquareHypothesisOperator.RULE_ID));
         assertEquals(ids.size(), new HashSet<>(ids).size());
+        assertEquals("complete-square", registry.byId(ConservativeCompleteSquareHypothesisOperator.RULE_ID).orElseThrow().displayName());
     }
 
     @Test
@@ -27,14 +31,18 @@ class HypothesisOperatorRegistryTest {
         assertTrue(registry.selectOperators(DiscoveryOptions.forProfile(DiscoveryProfile.PURE_REWRITE)).isEmpty());
         assertFalse(registry.selectOperators(DiscoveryOptions.forProfile(DiscoveryProfile.HYPOTHESIS_ONLY)).isEmpty());
         assertTrue(registry.selectOperators(DiscoveryOptions.forProfile(DiscoveryProfile.MACRO_REUSE_ONLY)).isEmpty());
-        assertFalse(registry.selectOperators(DiscoveryOptions.forProfile(DiscoveryProfile.FULL_DISCOVERY)).isEmpty());
+        assertFalse(registry.selectOperators(DiscoveryOptions.forProfile(DiscoveryProfile.HYPOTHESIS_AND_MACRO_REUSE)).isEmpty());
     }
 
     @Test
     void maxCandidateBudgetIsPropagatedToOperators() {
         HypothesisOperatorRegistry registry = new HypothesisOperatorRegistry();
-        DiscoveryOptions zeroBudget = new DiscoveryOptions(true, false, false, false, 0, 4, 160,
-            DiscoveryProfile.HYPOTHESIS_ONLY);
+        DiscoveryOptions zeroBudget = new DiscoveryOptions(
+            DiscoveryProfile.HYPOTHESIS_ONLY,
+            new DiscoveryEngineOptions(true, false, 0, 4, 160, DiscoveryProfile.HYPOTHESIS_ONLY),
+            DiscoveryLearningOptions.disabled(),
+            false
+        );
 
         List<Transformation> candidates = registry.selectOperators(zeroBudget).stream()
             .flatMap(operator -> operator.generateCandidates("x^4 + 4").stream())
@@ -46,8 +54,12 @@ class HypothesisOperatorRegistryTest {
     @Test
     void customOptionsCanEnableOperatorsIndependentOfProfile() {
         HypothesisOperatorRegistry registry = new HypothesisOperatorRegistry();
-        DiscoveryOptions customOptions = new DiscoveryOptions(true, false, false, false, 6, 4, 160,
-            DiscoveryProfile.PURE_REWRITE);
+        DiscoveryOptions customOptions = new DiscoveryOptions(
+            DiscoveryProfile.PURE_REWRITE,
+            new DiscoveryEngineOptions(true, false, 6, 4, 160, DiscoveryProfile.PURE_REWRITE),
+            DiscoveryLearningOptions.disabled(),
+            false
+        );
 
         assertFalse(registry.selectOperators(customOptions).isEmpty());
     }

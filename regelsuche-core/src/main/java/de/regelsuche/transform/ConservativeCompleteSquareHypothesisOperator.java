@@ -19,9 +19,10 @@ import java.util.Map;
  * Bounded conservative square-completion operator.
  *
  * <p>It only emits candidates with zero or negative perfect-square remainder;
- * it does not cover every valid square completion.</p>
+ * it deliberately does not emit positive-remainder completions such as
+ * {@code x^2 + 6*x + 6 -> (x + 3)^2 - 3} until that scope is validated.</p>
  */
-public class CompleteSquareHypothesisOperator implements HypothesisOperator {
+public class ConservativeCompleteSquareHypothesisOperator implements HypothesisOperator {
     public static final String RULE_ID = "hypothesis_complete_square_preparation";
     private static final int DEFAULT_MAX_CANDIDATES = 6;
 
@@ -29,11 +30,11 @@ public class CompleteSquareHypothesisOperator implements HypothesisOperator {
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final int maxCandidates;
 
-    public CompleteSquareHypothesisOperator() {
+    public ConservativeCompleteSquareHypothesisOperator() {
         this(DEFAULT_MAX_CANDIDATES);
     }
 
-    public CompleteSquareHypothesisOperator(int maxCandidates) {
+    public ConservativeCompleteSquareHypothesisOperator(int maxCandidates) {
         this.maxCandidates = Math.max(0, maxCandidates);
     }
 

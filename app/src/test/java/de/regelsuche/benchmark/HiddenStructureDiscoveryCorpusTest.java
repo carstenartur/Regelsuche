@@ -95,8 +95,7 @@ class HiddenStructureDiscoveryCorpusTest {
             }
             if (row.seed().expectation() == Expectation.DOCUMENT_ONLY) {
                 assertTrue(List.of(DiscoveryResultKind.NO_CANDIDATE, DiscoveryResultKind.BRIDGE_FOUND,
-                    DiscoveryResultKind.FACTORED, DiscoveryResultKind.MACRO_LEARNED, DiscoveryResultKind.MACRO_REUSED,
-                    DiscoveryResultKind.FALSE_POSITIVE)
+                    DiscoveryResultKind.TRANSFORMED, DiscoveryResultKind.FALSE_POSITIVE)
                     .contains(row.observedResult()), row.seed().expression() + "\n" + summaryTable);
             }
         }
@@ -132,8 +131,8 @@ class HiddenStructureDiscoveryCorpusTest {
         DiscoveryResultKind observedResult = observedResult(seed, hypothesisCandidates, bridgeDiscovered, factoredDiscovery,
             learnedMacro, reusable);
         String notes = notes(seed, reportedState, hypothesisCandidates, observedResult, learned);
-        return new CorpusRow(seed, observedResult.hasBridge(), observedResult.hasTransformedResult(), rulePath,
-            observedResult.hasMacroLearning(), observedResult.hasMacroReuse(), replayPath, observedResult, notes);
+        return new CorpusRow(seed, observedResult == DiscoveryResultKind.BRIDGE_FOUND || observedResult == DiscoveryResultKind.TRANSFORMED,
+            observedResult == DiscoveryResultKind.TRANSFORMED, rulePath, learnedMacro, reusable, replayPath, observedResult, notes);
     }
 
     private TransformationEngine hiddenStructureEngine() {
@@ -250,13 +249,13 @@ class HiddenStructureDiscoveryCorpusTest {
         boolean reusable
     ) {
         if (reusable) {
-            return DiscoveryResultKind.MACRO_REUSED;
+            return DiscoveryResultKind.TRANSFORMED;
         }
         if (learnedMacro) {
-            return DiscoveryResultKind.MACRO_LEARNED;
+            return DiscoveryResultKind.TRANSFORMED;
         }
         if (factoredDiscovery) {
-            return DiscoveryResultKind.FACTORED;
+            return DiscoveryResultKind.TRANSFORMED;
         }
         if (bridgeDiscovered) {
             return DiscoveryResultKind.BRIDGE_FOUND;

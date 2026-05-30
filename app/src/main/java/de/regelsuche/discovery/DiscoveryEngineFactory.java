@@ -2,10 +2,7 @@ package de.regelsuche.discovery;
 
 import de.regelsuche.mining.GoalAwareMacroMoveSelector;
 import de.regelsuche.mining.MacroMoveTransformationEngine;
-import de.regelsuche.transform.DiscoveryOptions;
-import de.regelsuche.transform.DiscoveryProfile;
 import de.regelsuche.transform.HypothesisOperator;
-import de.regelsuche.transform.HypothesisOperatorRegistry;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.List;
@@ -35,18 +32,19 @@ public final class DiscoveryEngineFactory {
             throw new IllegalArgumentException("baseEngine is required");
         }
         DiscoveryOptions resolved = options == null ? DiscoveryOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options;
+        DiscoveryEngineOptions engineOptions = resolved.engine();
         TransformationEngine engine = baseEngine;
-        if (resolved.enableHypothesisOperators()) {
+        if (engineOptions.enableHypothesisOperators()) {
             List<HypothesisOperator> operators = registry.selectOperators(resolved);
             if (!operators.isEmpty()) {
                 engine = new HypothesisTransformationEngine(
                     engine,
                     operators,
-                    resolved.maxHypothesisCandidatesPerOperator() * operators.size()
+                    engineOptions.maxHypothesisCandidatesPerOperator() * operators.size()
                 );
             }
         }
-        if (resolved.enableMacroReuse() && macroSelector != null) {
+        if (engineOptions.enableMacroReuse() && macroSelector != null) {
             engine = new MacroMoveTransformationEngine(engine, macroSelector);
         }
         return engine;

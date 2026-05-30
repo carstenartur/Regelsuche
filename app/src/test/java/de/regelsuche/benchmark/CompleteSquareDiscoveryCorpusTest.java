@@ -12,7 +12,7 @@ import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.CompleteSquareHypothesisOperator;
+import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.PolynomialBridgeAstPredicate;
 import de.regelsuche.transform.TransformationEngine;
@@ -48,7 +48,7 @@ class CompleteSquareDiscoveryCorpusTest {
             }
         }
         for (String expression : nearMisses) {
-            assertFalse(new CompleteSquareHypothesisOperator().generateCandidates(expression).stream()
+            assertFalse(new ConservativeCompleteSquareHypothesisOperator().generateCandidates(expression).stream()
                 .anyMatch(candidate -> polynomialEquivalence.arePolynomiallyEquivalent(expression, candidate.transformedExpression())),
                 expression);
         }
@@ -57,7 +57,7 @@ class CompleteSquareDiscoveryCorpusTest {
     private SearchState firstBridge(String expression) {
         TransformationEngine engine = new HypothesisTransformationEngine(
             new AstRewriteTransformationEngine(AstRewriteTransformationEngine.defaultRules(), 128, 160),
-            List.of(new CompleteSquareHypothesisOperator())
+            List.of(new ConservativeCompleteSquareHypothesisOperator())
         );
         SearchProblem problem = new SearchProblem(
             expression,
@@ -67,7 +67,7 @@ class CompleteSquareDiscoveryCorpusTest {
             new SearchHeuristic(3, 80, 1, 10, 200, 200)
         );
         return new BestFirstSearchStrategy().search(problem).stream()
-            .filter(state -> state.appliedRuleIds().contains(CompleteSquareHypothesisOperator.RULE_ID))
+            .filter(state -> state.appliedRuleIds().contains(ConservativeCompleteSquareHypothesisOperator.RULE_ID))
             .filter(state -> PolynomialBridgeAstPredicate.containsBridge(state.expression()))
             .findFirst()
             .orElse(null);

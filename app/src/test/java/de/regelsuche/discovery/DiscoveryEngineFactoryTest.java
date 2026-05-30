@@ -8,8 +8,6 @@ import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.GoalAwareMacroMoveSelector;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
-import de.regelsuche.transform.DiscoveryOptions;
-import de.regelsuche.transform.DiscoveryProfile;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
@@ -58,15 +56,27 @@ class DiscoveryEngineFactoryTest {
     }
 
     @Test
-    void fullDiscoveryCanEmitBothHypothesisAndMacroRules() {
+    void hypothesisAndMacroReuseCanEmitBothHypothesisAndMacroRules() {
         List<Transformation> transformations = factory.create(
             emptyBase,
-            DiscoveryOptions.forProfile(DiscoveryProfile.FULL_DISCOVERY),
+            DiscoveryOptions.forProfile(DiscoveryProfile.HYPOTHESIS_AND_MACRO_REUSE),
             macroSelector()
         ).transform("x^4 + 4");
 
         assertTrue(transformations.stream().anyMatch(this::isHypothesis));
         assertTrue(transformations.stream().anyMatch(this::isMacro));
+    }
+
+    @Test
+    void hypothesisAndMacroReuseWithNullMacroSelectorBehavesLikeHypothesisOnly() {
+        List<Transformation> transformations = factory.create(
+            emptyBase,
+            DiscoveryOptions.forProfile(DiscoveryProfile.HYPOTHESIS_AND_MACRO_REUSE),
+            null
+        ).transform("x^4 + 4");
+
+        assertTrue(transformations.stream().anyMatch(this::isHypothesis));
+        assertTrue(transformations.stream().noneMatch(this::isMacro));
     }
 
     private boolean isHypothesis(Transformation transformation) {

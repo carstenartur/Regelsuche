@@ -28,10 +28,7 @@ import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.DiscoveryOptions;
-import de.regelsuche.transform.DiscoveryProfile;
 import de.regelsuche.transform.FactoredProductAstPredicate;
-import de.regelsuche.transform.HypothesisOperatorRegistry;
 import de.regelsuche.transform.SquareDifferenceAstPredicate;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.SymPyTransformationEngine;
@@ -55,14 +52,13 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     private static final Instant FIXED_INSTANT = Instant.EPOCH;
 
     private final PersistenceContext context;
+    private final DiscoveryWorkflowConfiguration workflowConfiguration;
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final AstRewriteTransformationEngine searchEngine = new AstRewriteTransformationEngine(DemoRuleSet.rules());
-    private final DiscoveryOptions hiddenStructureOptions = DiscoveryOptions.forProfile(DiscoveryProfile.FULL_DISCOVERY);
-    private final HypothesisOperatorRegistry hypothesisOperatorRegistry = new HypothesisOperatorRegistry();
-    private final DiscoveryEngineFactory discoveryEngineFactory = new DiscoveryEngineFactory(hypothesisOperatorRegistry);
-    private final TransformationEngine hiddenStructureSearchEngine = discoveryEngineFactory.create(
-        new AstRewriteTransformationEngine(DemoRuleSet.rules()), hiddenStructureOptions);
+    private final DiscoveryOptions hiddenStructureOptions;
+    private final HypothesisOperatorRegistry hypothesisOperatorRegistry;
+    private final TransformationEngine hiddenStructureSearchEngine;
     private final BestFirstSearchStrategy searchStrategy = new BestFirstSearchStrategy();
     private final DeterministicCounterexampleSearchService counterexamples = new DeterministicCounterexampleSearchService();
     private final DefaultMathematicalAlgorithmRegistry algorithmRegistry = new DefaultMathematicalAlgorithmRegistry();
@@ -70,12 +66,30 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         new PolynomialNormalFormEquivalenceService(algorithmRegistry);
     private final DomainAwareCasRouter casRouter = new DomainAwareCasRouter(algorithmRegistry);
 
-    private ScientificDiscoveryWorkflow(PersistenceContext context) {
+    private ScientificDiscoveryWorkflow(PersistenceContext context, DiscoveryWorkflowConfiguration workflowConfiguration) {
         this.context = context;
+        this.workflowConfiguration = workflowConfiguration == null
+            ? DiscoveryWorkflowConfiguration.defaults()
+            : workflowConfiguration;
+        this.hiddenStructureOptions = this.workflowConfiguration.options();
+        this.hypothesisOperatorRegistry = this.workflowConfiguration.operatorRegistry();
+        this.hiddenStructureSearchEngine = new DiscoveryEngineFactory(hypothesisOperatorRegistry).create(
+            new AstRewriteTransformationEngine(DemoRuleSet.rules()),
+            hiddenStructureOptions,
+            this.workflowConfiguration.macroMoveSelector().orElse(null)
+        );
     }
 
     public static ScientificDiscoveryWorkflow boot(PersistenceConfig config, PrintStream log) {
-        return new ScientificDiscoveryWorkflow(PersistenceContext.from(config, log));
+        return boot(config, log, DiscoveryWorkflowConfiguration.defaults());
+    }
+
+    public static ScientificDiscoveryWorkflow boot(
+        PersistenceConfig config,
+        PrintStream log,
+        DiscoveryWorkflowConfiguration workflowConfiguration
+    ) {
+        return new ScientificDiscoveryWorkflow(PersistenceContext.from(config, log), workflowConfiguration);
     }
 
     public RunResult run(String experimentId, List<SeedExpression> seeds, int globalBudget, int parallelism, Path artifactDirectory) {
@@ -158,7 +172,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             .filter(transformation -> isHiddenStructureHypothesisRule(transformation.rule()))
             .toList();
         SearchProblem problem = new SearchProblem(root, hiddenStructureSearchEngine, scorer, canonicalizer,
-            new SearchHeuristic(hiddenStructureOptions.searchDepth(), hiddenStructureOptions.searchBudget(), 1, 10, 200, 200));
+            new SearchHeuristic(hiddenStructureOptions.engine().searchDepth(), hiddenStructureOptions.engine().searchBudget(), 1, 10, 200, 200));
         List<SearchState> states = searchStrategy.search(problem);
         SearchState hypothesisState = states.stream()
             .filter(state -> state.appliedRuleIds().stream().anyMatch(this::isHiddenStructureHypothesisRule))
@@ -187,7 +201,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             context.graphStore().saveDiscoveredTransformation(toDiscovered(pathId, root, factoredState, before));
         }
         return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
-            resultKind.discovered(),
+            isDiscovered(resultKind),
             hiddenStructureSummary(resultKind),
             hypothesisCandidates.stream().map(Transformation::transformedExpression).toList(),
             List.of(),
@@ -294,7 +308,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         SearchState factoredState
     ) {
         if (factoredState != null) {
-            return DiscoveryResultKind.FACTORED;
+            return DiscoveryResultKind.TRANSFORMED;
         }
         if (bridgeState != null) {
             return DiscoveryResultKind.BRIDGE_FOUND;
@@ -307,13 +321,17 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
 
     private String hiddenStructureSummary(DiscoveryResultKind resultKind) {
         return switch (resultKind) {
-            case FACTORED ->
+            case TRANSFORMED ->
                 "hidden-structure reproduced: hypothesis path reached bridge state and factored via ast_square_difference_factor";
             case BRIDGE_FOUND -> "hidden-structure incomplete: reached validated bridge state but did not factor";
             case HYPOTHESIS_ONLY ->
                 "hidden-structure incomplete: hypothesis candidate participated but did not reach a bridge state";
             default -> "hidden-structure failed: no hypothesis path found";
         };
+    }
+
+    private boolean isDiscovered(DiscoveryResultKind resultKind) {
+        return resultKind == DiscoveryResultKind.BRIDGE_FOUND || resultKind == DiscoveryResultKind.TRANSFORMED;
     }
 
     private DiscoveredTransformation toDiscovered(String pathId, String root, SearchState state, ExpressionScore before) {

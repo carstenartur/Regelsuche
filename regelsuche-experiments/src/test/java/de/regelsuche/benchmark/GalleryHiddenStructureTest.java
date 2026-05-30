@@ -24,7 +24,7 @@ class GalleryHiddenStructureTest {
                 List.of(),
                 "",
                 List.of("x^4 + 4", "(x ^ 2 + 2) ^ 2 - (2 * x) ^ 2", "(x ^ 2 + 2 - 2 * x) * (x ^ 2 + 2 + 2 * x)"),
-                DiscoveryResultKind.FACTORED,
+                DiscoveryResultKind.TRANSFORMED,
                 List.of("hypothesis_difference_of_squares_preparation", "ast_square_difference_factor"),
                 0L,
                 0L
@@ -57,7 +57,7 @@ class GalleryHiddenStructureTest {
                 List.of(),
                 "",
                 List.of("x^4 + 4", "(x^2 + 2*x + 2)^2", "(x^2 + 2*x + 2) * (x^2 + 2*x + 2)"),
-                DiscoveryResultKind.FACTORED,
+                DiscoveryResultKind.TRANSFORMED,
                 List.of("hypothesis_difference_of_squares_preparation", "ast_square_difference_factor"),
                 0L,
                 0L

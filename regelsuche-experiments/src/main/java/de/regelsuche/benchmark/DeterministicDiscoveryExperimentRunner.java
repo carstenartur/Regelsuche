@@ -216,7 +216,7 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
                 return DiscoveryResultKind.NO_CANDIDATE;
             }
             if (success && replayPath != null && replayPath.size() > 1) {
-                return DiscoveryResultKind.SIMPLIFIED;
+                return DiscoveryResultKind.TRANSFORMED;
             }
             return hypotheses == null || hypotheses.isEmpty()
                 ? DiscoveryResultKind.NO_CANDIDATE

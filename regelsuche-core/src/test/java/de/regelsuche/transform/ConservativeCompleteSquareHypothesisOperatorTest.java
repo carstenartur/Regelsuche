@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class CompleteSquareHypothesisOperatorTest {
-    private final CompleteSquareHypothesisOperator operator = new CompleteSquareHypothesisOperator();
+class ConservativeCompleteSquareHypothesisOperatorTest {
+    private final ConservativeCompleteSquareHypothesisOperator operator = new ConservativeCompleteSquareHypothesisOperator();
 
     @Test
     void positiveCandidatesAreBoundedAndDeterministic() {
@@ -19,7 +19,7 @@ class CompleteSquareHypothesisOperatorTest {
         assertTrue(first.size() <= 6);
         assertEquals(first, second);
         assertTrue(first.stream().anyMatch(candidate ->
-            candidate.rule().equals(CompleteSquareHypothesisOperator.RULE_ID)
+            candidate.rule().equals(ConservativeCompleteSquareHypothesisOperator.RULE_ID)
                 && SquareDifferenceAstPredicate.containsSquareDifference(candidate.transformedExpression())));
     }
 
