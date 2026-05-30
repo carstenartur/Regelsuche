@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class RuleCandidateMiner {
     private final KnownRuleRepository knownRules;
@@ -68,6 +69,50 @@ public class RuleCandidateMiner {
                 || bucket.proofStatus.ordinal() >= minReusableStatus.ordinal())
             .map(bucket -> bucket.toCandidate(knownRules))
             .toList();
+    }
+
+    public Optional<RuleCandidate> mineFromSinglePathForValidatedSchema(SuccessfulTransformationPath path) {
+        if (path == null || !path.equivalenceVerified()) {
+            return Optional.empty();
+        }
+        return patternGeneralizer.generalizeSingleExampleSchema(path)
+            .filter(pattern -> !pattern.expressionPlaceholderValues().isEmpty())
+            .filter(validator::validateGeneratedExpressionInstantiations)
+            .filter(validator::validate)
+            .map(pattern -> toSinglePathCandidate(path, pattern))
+            .filter(candidate -> candidate.status() == RuleStatus.NEW);
+    }
+
+    public List<RuleCandidate> mineFromSinglePathForValidatedSchema(List<SuccessfulTransformationPath> paths) {
+        if (paths == null || paths.isEmpty()) {
+            return List.of();
+        }
+        Map<String, RuleCandidate> deduplicated = new LinkedHashMap<>();
+        for (SuccessfulTransformationPath path : paths) {
+            mineFromSinglePathForValidatedSchema(path)
+                .ifPresent(candidate -> deduplicated.putIfAbsent(candidate.canonicalHash(), candidate));
+        }
+        return List.copyOf(deduplicated.values());
+    }
+
+    private RuleCandidate toSinglePathCandidate(SuccessfulTransformationPath path, GeneralizedPattern pattern) {
+        CandidateProofStatus proofStatus = validator.proofStatus(pattern);
+        String hash = RulePatternCanonicalizer.hash(pattern.leftPattern(), pattern.rightPattern());
+        return new RuleCandidate(
+            pattern.leftPattern(),
+            pattern.rightPattern(),
+            1,
+            path.scoreImprovement(),
+            path.scoreImprovement(),
+            path.equivalenceVerified(),
+            true,
+            !pattern.expressionPlaceholderValues().isEmpty(),
+            pattern.parameterRelations(),
+            knownRules.statusFor(pattern.leftPattern(), pattern.rightPattern()),
+            proofStatus,
+            hash,
+            List.of(path.id())
+        );
     }
 
     private static final class CandidateBucket {

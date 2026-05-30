@@ -110,7 +110,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
             -Math.max(1, (int) Math.round(Math.max(1.0, rule.averageImprovement()))),
             true
         );
-        AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(List.of(rewriteRule));
+        AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(List.of(rewriteRule), Integer.MAX_VALUE, 80);
         MacroMoveStatistics before = statisticsByRuleId.getOrDefault(rule.id(), MacroMoveStatistics.empty());
         List<Transformation> transformations = macroEngine.transform(expression);
         int improved = (int) transformations.stream().filter(t -> t.estimatedCostDelta() < 0).count();

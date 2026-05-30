@@ -5,7 +5,10 @@ import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -15,6 +18,7 @@ public class CandidateValidator {
     private final RulePatternInstantiator patternInstantiator;
     private final FreshBindingGenerator freshBindingGenerator;
     private final ParameterRelationEvaluator parameterRelationEvaluator;
+    private final ExpressionParser expressionParser = new ExpressionParser();
 
     public CandidateValidator(EquivalenceService equivalenceService) {
         this(
@@ -54,6 +58,36 @@ public class CandidateValidator {
             return CandidateProofStatus.SYMBOLICALLY_VERIFIED;
         }
         return CandidateProofStatus.VALIDATED_BY_EXAMPLES;
+    }
+
+    public boolean validateGeneratedExpressionInstantiations(GeneralizedPattern pattern) {
+        RulePatternNode leftPattern = patternParser.parse(pattern.leftPattern());
+        RulePatternNode rightPattern = patternParser.parse(pattern.rightPattern());
+        Set<String> placeholders = new LinkedHashSet<>();
+        collectPlaceholders(leftPattern, placeholders);
+        collectPlaceholders(rightPattern, placeholders);
+        Set<String> expressionPlaceholders = new LinkedHashSet<>();
+        for (String placeholder : placeholders) {
+            if (placeholder.matches("[A-Z]")) {
+                expressionPlaceholders.add(placeholder);
+            }
+        }
+        if (expressionPlaceholders.isEmpty()) {
+            return false;
+        }
+        for (String sample : List.of("x", "y", "x + 1", "2*x", "x^2")) {
+            Map<String, Expr> bindings = new LinkedHashMap<>();
+            Expr sampleExpression = expressionParser.parseTerm(sample);
+            for (String placeholder : expressionPlaceholders) {
+                bindings.put(placeholder, sampleExpression);
+            }
+            String left = ExpressionFormatter.format(patternInstantiator.instantiate(leftPattern, bindings));
+            String right = ExpressionFormatter.format(patternInstantiator.instantiate(rightPattern, bindings));
+            if (!equivalenceService.areEquivalent(left, right)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean validateFreshExamples(GeneralizedPattern pattern) {

@@ -6,7 +6,13 @@ bereits gefundenen `DiscoveredTransformation`s gemined und repräsentieren die
 
 ## Algorithmus
 
-Implementiert in `de.regelsuche.mining.MacroRuleMiner` (Sliding-Window-Frequenzanalyse):
+Implementiert in zwei komplementären Pfaden:
+
+- `de.regelsuche.mining.MacroRuleMiner` für Sliding-Window-Frequenzanalyse über
+  wiederholte Regel-Id-Sequenzen.
+- `de.regelsuche.mining.RuleCandidateMiner` +
+  `PatternGeneralizer` + `CandidateValidator` für validierte Regel-Schemata aus
+  erfolgreichen Transformationspfaden.
 
 1. Pro `DiscoveredTransformation` wird die Regel-Id-Sequenz extrahiert.
 2. Für jede Fensterlänge `n ∈ [minSequenceLength, maxSequenceLength]` werden alle
@@ -14,9 +20,32 @@ Implementiert in `de.regelsuche.mining.MacroRuleMiner` (Sliding-Window-Frequenza
 3. Sequenzen, die ≥ `minOccurrences` mal auftauchen, werden als
    `MacroRuleCandidate` emittiert.
 4. `leftPattern`/`rightPattern` sind die Start- bzw. End-Ausdrücke des ersten
-   beobachteten Vorkommens. Anti-Unifikation zur Verallgemeinerung ist als
-   spätere Erweiterung geplant.
+   beobachteten Vorkommens. Wiederkehrende Schemata werden im
+   `RuleCandidateMiner` über Anti-Unifikation bzw. validierte
+   Ein-Beispiel-Schemaextraktion verallgemeinert.
 5. `compressionRatio = sequenceLength / 1.0`.
+
+## Hidden-Structure Generalisierung
+
+Hidden-Structure-Funde werden in drei Stufen behandelt:
+
+1. **Konkretes Replay:** Ein Suchlauf findet und speichert einen realen Pfad, z. B.
+   `x^4 + 4 → … → (x^2 - 2*x + 2) * (x^2 + 2*x + 2)`.
+2. **Validiertes Ein-Beispiel-Schema:** Wenn dieser konkrete Pfad
+   äquivalenzerhaltend ist, kann `PatternGeneralizer` gemeinsame
+   Ausdrucks-Teilbäume konsistent durch denselben Platzhalter ersetzen, z. B.
+   `A^4 + 4 → (A^2 - 2*A + 2) * (A^2 + 2*A + 2)`. Vor der Promotion validiert
+   `CandidateValidator` generierte Instanzen wie `A=x`, `A=y`, `A=x+1`,
+   `A=2*x` und `A=x^2` mit dem konfigurierten `EquivalenceService`.
+   Dieser Pfad ist explizit opt-in und senkt nicht die normalen Mining-Schwellen.
+3. **Zukünftiges Mehrparameter-Schema:** Breitere Schemata wie
+   `A^4 + 4*B^4 → …` bleiben Future Work.
+
+Aktuelles Matching ist strukturell mit vorhandener Normalisierung. Formen wie
+`(x^2)^2 + 4` können daher nach `ast_power_of_power` als `x^4 + 4` vom Makro
+erfasst werden. Algebraisch äquivalente, aber strukturell verdeckte Formen wie
+`x^4 + 2*x^2 + 1 + 3 - 2*x^2` werden noch nicht über eine ganze
+Äquivalenzklasse gematcht.
 
 Defaults (per Konstruktor konfigurierbar):
 

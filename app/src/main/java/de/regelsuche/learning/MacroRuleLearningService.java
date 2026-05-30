@@ -87,6 +87,19 @@ public class MacroRuleLearningService {
             CandidateProofStatus.VALIDATED_BY_EXAMPLES
         );
         List<RuleCandidate> candidates = miner.mine(paths, settings);
+        if (minOccurrences == 1) {
+            Set<String> existingHashes = new LinkedHashSet<>();
+            for (RuleCandidate candidate : candidates) {
+                existingHashes.add(candidate.canonicalHash());
+            }
+            List<RuleCandidate> extended = new ArrayList<>(candidates);
+            for (RuleCandidate candidate : miner.mineFromSinglePathForValidatedSchema(paths)) {
+                if (existingHashes.add(candidate.canonicalHash())) {
+                    extended.add(candidate);
+                }
+            }
+            candidates = extended;
+        }
         // Index paths by id so we can recover the atomic rule-id sequence for
         // each candidate and tag the resulting reusable rule with its domain
         // (equations / inequalities / calculus / linear-algebra / algebra).
