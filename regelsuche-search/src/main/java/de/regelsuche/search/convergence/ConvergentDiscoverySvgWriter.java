@@ -9,7 +9,7 @@ import java.util.Set;
 /** Renders a convergent discovery SVG from report data only. */
 public final class ConvergentDiscoverySvgWriter {
     private static final String SOURCE = "convergent-sophie-germain.mmd";
-    private static final String GENERATED_BY = "ConvergentDiscoveryMermaidWriter";
+    private static final String GENERATED_BY = "ConvergentDiscoverySvgWriter";
     private static final int MARGIN_X = 60;
     private static final int MARGIN_Y = 120;
     private static final int COLUMN_WIDTH = 330;
@@ -34,7 +34,7 @@ public final class ConvergentDiscoverySvgWriter {
             .append(SOURCE)
             .append("\" data-generated-by=\"")
             .append(GENERATED_BY)
-            .append("\" data-rendered-by=\"ConvergentDiscoverySvgWriter\">\n");
+            .append("\">\n");
         out.append("  <title id=\"title\">Convergent Sophie-Germain discovery graph</title>\n");
         out.append("  <desc id=\"desc\">Generated from convergent discovery report data.</desc>\n");
         out.append("  <metadata>");
@@ -69,7 +69,12 @@ public final class ConvergentDiscoverySvgWriter {
         for (ConvergentPath path : report.pathsToTarget()) {
             for (int i = 1; i < path.expressions().size(); i++) {
                 Node from = layout.nodes().get(key(path.expressions().get(i - 1)));
-                Node to = layout.nodes().get(key(path.expressions().get(i)));
+                Node to = i == path.expressions().size() - 1
+                    ? layout.convergenceNode()
+                    : layout.nodes().get(key(path.expressions().get(i)));
+                if (from == null || to == null) {
+                    continue;
+                }
                 String rule = path.ruleFamilies().get(i - 1) + ": " + path.ruleIds().get(i - 1);
                 String edgeKey = from.id() + "->" + to.id() + "|" + rule;
                 if (!from.id().equals(to.id()) && renderedEdges.add(edgeKey)) {
@@ -102,6 +107,9 @@ public final class ConvergentDiscoverySvgWriter {
         Node convergence = new Node(key(target), target, "convergence",
             MARGIN_X + COLUMN_WIDTH * maxDepth, input.y());
         nodes.put(convergence.id(), convergence);
+        String didacticPathId = report.convergentStates().isEmpty()
+            ? null
+            : report.convergentStates().getFirst().mostDidacticPathId();
         for (int row = 0; row < report.pathsToTarget().size(); row++) {
             ConvergentPath path = report.pathsToTarget().get(row);
             for (int depth = 1; depth < path.expressions().size() - 1; depth++) {
@@ -109,15 +117,14 @@ public final class ConvergentDiscoverySvgWriter {
                 nodes.putIfAbsent(key(expression), new Node(
                     key(expression),
                     expression,
-                    path.pathId().equals(report.convergentStates().isEmpty()
-                        ? "" : report.convergentStates().getFirst().mostDidacticPathId())
+                    didacticPathId != null && path.pathId().equals(didacticPathId)
                         ? "didactic" : "path",
                     MARGIN_X + COLUMN_WIDTH * depth,
                     MARGIN_Y + row * ROW_HEIGHT
                 ));
             }
         }
-        return new GraphLayout(width, height, nodes);
+        return new GraphLayout(width, height, nodes, convergence);
     }
 
     private void edge(StringBuilder out, Node from, Node to, String label, boolean macro) {
@@ -165,8 +172,7 @@ public final class ConvergentDiscoverySvgWriter {
     }
 
     private String key(String expression) {
-        String hash = canonicalizer.stableHash(expression == null ? "" : expression);
-        return "conv_" + Integer.toHexString(hash.hashCode()).replace('-', 'n');
+        return "conv_" + canonicalizer.stableHash(expression == null ? "" : expression);
     }
 
     private String escapeXml(String value) {
@@ -177,7 +183,7 @@ public final class ConvergentDiscoverySvgWriter {
             .replace(">", "&gt;");
     }
 
-    private record GraphLayout(int width, int height, Map<String, Node> nodes) {
+    private record GraphLayout(int width, int height, Map<String, Node> nodes, Node convergenceNode) {
     }
 
     private record Node(String id, String label, String kind, int x, int y) {

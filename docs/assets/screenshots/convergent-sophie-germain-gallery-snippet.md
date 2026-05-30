@@ -8,7 +8,7 @@
 - most didactic path: path-302e8c08-a1ae088a
 - macro shortcut path: path-4111dc07-9adfc77c
 - validation status: VALIDATED_BY_CONSTRUCTION
-- source replay ids: 
+- source replay ids: (none)
 
 #### Path 1: path-4111dc07-9adfc77c
 

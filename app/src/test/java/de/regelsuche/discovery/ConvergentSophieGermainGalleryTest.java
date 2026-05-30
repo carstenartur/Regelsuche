@@ -89,7 +89,7 @@ class ConvergentSophieGermainGalleryTest {
         assertTrue(mermaid.contains("macro_"), mermaid);
         String svg = new ConvergentDiscoverySvgWriter().render(report);
         assertTrue(svg.contains("data-source=\"convergent-sophie-germain.mmd\""), svg);
-        assertTrue(svg.contains("data-generated-by=\"ConvergentDiscoveryMermaidWriter\""), svg);
+        assertTrue(svg.contains("data-generated-by=\"ConvergentDiscoverySvgWriter\""), svg);
         assertMermaidLabelsAppearInSvg(mermaid, svg);
         assertNoManualOnlyNodes(svg);
         String snippet = new ConvergentDiscoveryGallerySnippetWriter().render(report);
@@ -123,7 +123,7 @@ class ConvergentSophieGermainGalleryTest {
         assertTrue(Files.exists(docsSvg), "Missing generated SVG asset");
         String docsSvgContent = Files.readString(docsSvg);
         assertTrue(Boolean.getBoolean("regelsuche.recordDocs")
-            || docsSvgContent.contains("data-generated-by=\"ConvergentDiscoveryMermaidWriter\""),
+            || docsSvgContent.contains("data-generated-by=\"ConvergentDiscoverySvgWriter\""),
             "SVG must be freshly generated in recordDocs mode or carry generated provenance");
     }
 
@@ -156,7 +156,7 @@ class ConvergentSophieGermainGalleryTest {
         boolean generatedInRecordDocs = Boolean.getBoolean("regelsuche.recordDocs")
             && Files.getLastModifiedTime(svg).toMillis() >= Files.getLastModifiedTime(mmd).toMillis();
         boolean hasProvenance = svgContent.contains("data-source=\"convergent-sophie-germain.mmd\"")
-            && svgContent.contains("data-generated-by=\"ConvergentDiscoveryMermaidWriter\"");
+            && svgContent.contains("data-generated-by=\"ConvergentDiscoverySvgWriter\"");
         assertTrue(generatedInRecordDocs || hasProvenance,
             "SVG must be newer/generated in recordDocs mode or carry generated provenance");
     }

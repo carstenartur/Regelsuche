@@ -22,11 +22,12 @@ public final class ConvergentDiscoveryGallerySnippetWriter {
                 .distinct()
                 .collect(Collectors.joining(", ")))
             .append('\n');
+        String sourceReplayIds = report.pathsToTarget().stream()
+            .flatMap(path -> path.sourceReplayIds().stream())
+            .distinct()
+            .collect(Collectors.joining(", "));
         out.append("- source replay ids: ")
-            .append(report.pathsToTarget().stream()
-                .flatMap(path -> path.sourceReplayIds().stream())
-                .distinct()
-                .collect(Collectors.joining(", ")))
+            .append(sourceReplayIds.isBlank() ? "(none)" : sourceReplayIds)
             .append("\n\n");
         int index = 1;
         for (ConvergentPath path : report.pathsToTarget()) {

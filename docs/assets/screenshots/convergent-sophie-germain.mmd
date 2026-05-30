@@ -1,45 +1,30 @@
 graph TD
-  conv_d60ad9a1["x^4 + 4*y^4"]:::input
-  conv_cec0e1bc["(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"]:::convergence
-  conv_d60ad9a1 -->|LEARNED_MACRO: macro_6bd0496b| conv_cec0e1bc
-  conv_cec0e1bc["(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"]
-  conv_d60ad9a1 -->|LEARNED_MACRO: macro_6bd0496b| conv_cec0e1bc
-  conv_cec0e1bc["(x ^ 2 + 2 * x * y + 2 * y * y) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"]:::convergence
-  conv_cec0e1bc -->|OTHER: ast_power_two_to_product| conv_cec0e1bc
-  conv_51309728["(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"]
-  conv_d60ad9a1 -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_51309728
-  conv_cec0e1bc["(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)"]:::convergence
-  conv_51309728 -->|FACTORIZATION: ast_square_difference_factor| conv_cec0e1bc
-  conv_51309728["(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"]
-  conv_d60ad9a1 -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_51309728
-  conv_51309728["(x ^ 2 + 2 * y * y) ^ 2 - (2 * x * y) ^ 2"]
-  conv_51309728 -->|OTHER: ast_power_two_to_product| conv_51309728
-  conv_cec0e1bc["(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y * y + 2 * x * y)"]:::convergence
-  conv_51309728 -->|FACTORIZATION: ast_square_difference_factor| conv_cec0e1bc
-  conv_cec0e1bc["(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"]
-  conv_d60ad9a1 -->|LEARNED_MACRO: macro_6bd0496b| conv_cec0e1bc
-  conv_cec0e1bc["(x * x + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"]
-  conv_cec0e1bc -->|OTHER: ast_power_two_to_product| conv_cec0e1bc
-  conv_cec0e1bc["(x * x + 2 * x * y + 2 * y * y) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"]:::convergence
-  conv_cec0e1bc -->|OTHER: ast_power_two_to_product| conv_cec0e1bc
-  conv_51309728["(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"]
-  conv_d60ad9a1 -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_51309728
-  conv_51309728["(x * x + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"]
-  conv_51309728 -->|OTHER: ast_power_two_to_product| conv_51309728
-  conv_cec0e1bc["(x * x + 2 * y ^ 2 - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y)"]
-  conv_51309728 -->|FACTORIZATION: ast_square_difference_factor| conv_cec0e1bc
-  conv_cec0e1bc["(x * x + 2 * y * y - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y)"]:::convergence
-  conv_cec0e1bc -->|OTHER: ast_power_two_to_product| conv_cec0e1bc
-  conv_51309728["(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"]:::didactic
-  conv_d60ad9a1 -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_51309728
-  conv_cec0e1bc["(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)"]:::didactic
-  conv_51309728 -->|FACTORIZATION: ast_square_difference_factor| conv_cec0e1bc
-  conv_cec0e1bc["(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)"]:::didactic
-  conv_cec0e1bc -->|NORMALIZATION: ast_canonical_normalize| conv_cec0e1bc
-  conv_cec0e1bc["(0 - 2 * x * y + x * x + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)"]:::convergence
-  conv_cec0e1bc -->|OTHER: ast_power_two_to_product| conv_cec0e1bc
-  class conv_cec0e1bc convergence
-  class conv_cec0e1bc macro
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f["x^4 + 4*y^4"]:::input
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead["(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"]:::convergence
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|LEARNED_MACRO: macro_6bd0496b| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|LEARNED_MACRO: macro_6bd0496b| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776["(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"]
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|FACTORIZATION: ast_square_difference_factor| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|OTHER: ast_power_two_to_product| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|FACTORIZATION: ast_square_difference_factor| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|LEARNED_MACRO: macro_6bd0496b| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|OTHER: ast_power_two_to_product| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|FACTORIZATION: ast_square_difference_factor| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|FACTORIZATION: ast_square_difference_factor| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|NORMALIZATION: ast_canonical_normalize| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  class conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead didactic
+  class conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 didactic
+  class conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead convergence
+  class conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead macro
   classDef input fill:#eef2ff,stroke:#4338ca,stroke-width:2px
   classDef convergence fill:#dcfce7,stroke:#15803d,stroke-width:3px
   classDef didactic fill:#fef3c7,stroke:#d97706,stroke-width:2px

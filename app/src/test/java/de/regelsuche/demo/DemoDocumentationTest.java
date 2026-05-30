@@ -175,7 +175,7 @@ class DemoDocumentationTest {
         assertTrue(image.contains("x^4 + 4*y^4"), "image must visibly show the Sophie-Germain input");
         assertTrue(image.contains("data-source=\"convergent-sophie-germain.mmd\""),
             "image must declare its generated Mermaid source");
-        assertTrue(image.contains("data-generated-by=\"ConvergentDiscoveryMermaidWriter\""),
+        assertTrue(image.contains("data-generated-by=\"ConvergentDiscoverySvgWriter\""),
             "image must carry generated provenance");
         assertTrue(image.contains("HIDDEN_STRUCTURE"),
             "image must show the hidden-structure path from generated report data");
