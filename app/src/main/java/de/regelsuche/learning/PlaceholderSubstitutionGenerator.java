@@ -20,7 +20,7 @@ import java.util.Set;
 /** Generates deterministic placeholder substitution grids while preserving supported parameter relations. */
 public class PlaceholderSubstitutionGenerator {
     static final List<String> GENERATED_SUBSTITUTIONS =
-        List.of("x", "y", "x + 1", "2*x", "x^2", "n + 2");
+        List.of("x", "y", "z", "x + 1", "2*x", "x^2", "n + 2");
     private static final int MAX_GENERATED_INSTANCES = 256;
 
     private final ExpressionParser expressionParser = new ExpressionParser();

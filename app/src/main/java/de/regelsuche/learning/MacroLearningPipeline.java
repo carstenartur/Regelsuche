@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 public class MacroLearningPipeline {
     public static final double DEFAULT_CONFIDENCE_THRESHOLD = 0.8;
     private static final Pattern PLACEHOLDER = Pattern.compile("\\b[A-Z]\\b");
+    private static final Pattern TEMPORARY_PLACEHOLDER = Pattern.compile("\\b(?:v|tmp)\\d+\\b");
 
     private final RuleInventoryRepository inventory;
     private final PatternGeneralizer generalizer;
@@ -89,6 +90,8 @@ public class MacroLearningPipeline {
                     stages.add("extract source/target pairs: " + path.id());
                     stages.add("generalize schema: " + pattern.leftPattern() + " -> " + pattern.rightPattern());
                     stages.add("mine parameter relations: " + pattern.parameterRelations());
+                    stages.add("placeholder count: " + placeholders(pattern.leftPattern()).size());
+                    stages.add("source path id: " + path.id());
                     List<MacroValidationExample> examples = validateGeneratedSchema(pattern, stages);
                     validationExamples.addAll(examples);
                     boolean generatedValid = !examples.isEmpty() && examples.stream().allMatch(MacroValidationExample::equivalent);
@@ -110,9 +113,10 @@ public class MacroLearningPipeline {
                         ReusableRule rule = promote(path, pattern, confidence, symbolic, generalizedAssumptions(path.assumptions()));
                         touched.add(rule);
                         promoted.add(rule);
+                        stages.add("promotion reason: generated substitutions validate and no counterexample found for " + path.id());
                         stages.add("promote: " + rule.id());
                     } else {
-                        stages.add("reject: quality gates failed for " + path.id());
+                        stages.add(stageEvidenceOnlyReason(pattern, path.id()));
                     }
                 });
         }
@@ -124,6 +128,11 @@ public class MacroLearningPipeline {
         RulePatternNode rightPattern = patternParser.parse(pattern.rightPattern());
         Set<String> detectedPlaceholders = new LinkedHashSet<>(placeholders(pattern.leftPattern()));
         detectedPlaceholders.addAll(placeholders(pattern.rightPattern()));
+        Set<String> temporaryPlaceholders = temporaryPlaceholders(pattern);
+        if (!temporaryPlaceholders.isEmpty()) {
+            stages.add("reject: unnormalized temporary placeholders: " + temporaryPlaceholders);
+            return List.of();
+        }
         if (detectedPlaceholders.isEmpty()) {
             stages.add("reject: generated schema has no placeholders");
             return List.of();
@@ -140,6 +149,7 @@ public class MacroLearningPipeline {
             return List.of();
         }
         stages.add("generate placeholder substitutions: " + substitutions.size());
+        stages.add("generated assignment count: " + substitutions.size());
         List<MacroValidationExample> examples = new ArrayList<>();
         for (Map<String, Expr> substitution : substitutions) {
             String left = ExpressionFormatter.format(instantiator.instantiate(leftPattern, substitution));
@@ -173,17 +183,27 @@ public class MacroLearningPipeline {
         Set<String> targetPlaceholders = placeholders(pattern.rightPattern());
         boolean hasPlaceholder = !sourcePlaceholders.isEmpty();
         boolean targetBound = sourcePlaceholders.containsAll(targetPlaceholders);
+        boolean hasNoTemporaryPlaceholders = temporaryPlaceholders(pattern).isEmpty();
         boolean structuredRelations = pattern.parameterRelations().stream()
             .filter(relation -> relation.contains("=") || relation.contains("!="))
             .allMatch(relation -> ParameterRelation.parse(relation).isPresent());
         boolean noCounterexample = counterexamples.status() != CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND;
         return hasPlaceholder
             && targetBound
+            && hasNoTemporaryPlaceholders
             && structuredRelations
             && generatedValid
             && (symbolic || noCounterexample)
             && confidence >= confidenceThreshold
             && examples.stream().allMatch(MacroValidationExample::equivalent);
+    }
+
+    private String stageEvidenceOnlyReason(GeneralizedPattern pattern, String pathId) {
+        Set<String> temporaryPlaceholders = temporaryPlaceholders(pattern);
+        if (!temporaryPlaceholders.isEmpty()) {
+            return "reject: unnormalized temporary placeholders: " + temporaryPlaceholders;
+        }
+        return "reject: quality gates failed for " + pathId;
     }
 
     private Set<String> placeholders(String pattern) {
@@ -193,6 +213,25 @@ public class MacroLearningPipeline {
             placeholders.add(matcher.group());
         }
         return placeholders;
+    }
+
+    private Set<String> temporaryPlaceholders(GeneralizedPattern pattern) {
+        Set<String> placeholders = new LinkedHashSet<>();
+        collectTemporaryPlaceholders(pattern.leftPattern(), placeholders);
+        collectTemporaryPlaceholders(pattern.rightPattern(), placeholders);
+        pattern.parameterRelations().forEach(relation -> collectTemporaryPlaceholders(relation, placeholders));
+        pattern.expressionPlaceholderValues().forEach((key, values) -> {
+            collectTemporaryPlaceholders(key, placeholders);
+            values.forEach(value -> collectTemporaryPlaceholders(value, placeholders));
+        });
+        return placeholders;
+    }
+
+    private void collectTemporaryPlaceholders(String text, Set<String> placeholders) {
+        Matcher matcher = TEMPORARY_PLACEHOLDER.matcher(text == null ? "" : text);
+        while (matcher.find()) {
+            placeholders.add(matcher.group());
+        }
     }
 
     private double confidence(

@@ -15,8 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PatternGeneralizer {
+    private static final Pattern TEMPORARY_PLACEHOLDER = Pattern.compile("\\b(?:v|tmp)\\d+\\b");
+    private static final Pattern MACRO_PLACEHOLDER = Pattern.compile("\\b[A-Z]\\b");
     private final AstNormalizer normalizer;
     private final ParameterRelationMiner relationMiner;
     private final ExpressionParser expressionParser = new ExpressionParser();
@@ -70,9 +74,9 @@ public class PatternGeneralizer {
         for (Map.Entry<String, List<String>> entry : state.expressionValues.entrySet()) {
             descriptions.add(entry.getKey() + " \u2208 {" + String.join(", ", entry.getValue()) + "}");
         }
-        return Optional.of(new GeneralizedPattern(
+        return Optional.of(normalizeGeneratedPlaceholders(new GeneralizedPattern(
             left, right, state.values, descriptions, state.expressionValues
-        ));
+        )));
     }
 
     public Optional<GeneralizedPattern> generalizeSingleExampleSchema(SuccessfulTransformationPath path) {
@@ -116,7 +120,7 @@ public class PatternGeneralizer {
         for (Map.Entry<String, String> entry : generatedPlaceholders.entrySet()) {
             expressionValues.put(entry.getValue(), List.of(canonicalVariableBindings.getOrDefault(entry.getKey(), entry.getKey())));
         }
-        return Optional.of(new GeneralizedPattern(
+        return Optional.of(normalizeGeneratedPlaceholders(new GeneralizedPattern(
             leftPattern,
             rightPattern,
             Map.of(),
@@ -124,7 +128,82 @@ public class PatternGeneralizer {
                 .map(entry -> entry.getKey() + " \u2208 {" + String.join(", ", entry.getValue()) + "}")
                 .toList(),
             expressionValues
-        ));
+        )));
+    }
+
+    private GeneralizedPattern normalizeGeneratedPlaceholders(GeneralizedPattern pattern) {
+        Map<String, String> renames = temporaryPlaceholderRenames(pattern);
+        if (renames.isEmpty()) {
+            return pattern;
+        }
+        Map<String, List<Integer>> placeholderValues = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Integer>> entry : pattern.placeholderValues().entrySet()) {
+            placeholderValues.put(renames.getOrDefault(entry.getKey(), entry.getKey()), entry.getValue());
+        }
+        Map<String, List<String>> expressionValues = new LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> entry : pattern.expressionPlaceholderValues().entrySet()) {
+            expressionValues.put(
+                renames.getOrDefault(entry.getKey(), entry.getKey()),
+                entry.getValue().stream().map(value -> replaceTemporaryPlaceholders(value, renames)).toList()
+            );
+        }
+        return new GeneralizedPattern(
+            replaceTemporaryPlaceholders(pattern.leftPattern(), renames),
+            replaceTemporaryPlaceholders(pattern.rightPattern(), renames),
+            placeholderValues,
+            pattern.parameterRelations().stream()
+                .map(relation -> replaceTemporaryPlaceholders(relation, renames))
+                .toList(),
+            expressionValues
+        );
+    }
+
+    private Map<String, String> temporaryPlaceholderRenames(GeneralizedPattern pattern) {
+        Set<String> existingMacroPlaceholders = new LinkedHashSet<>();
+        collectMacroPlaceholders(pattern.leftPattern(), existingMacroPlaceholders);
+        collectMacroPlaceholders(pattern.rightPattern(), existingMacroPlaceholders);
+        pattern.parameterRelations().forEach(relation -> collectMacroPlaceholders(relation, existingMacroPlaceholders));
+        Map<String, String> renames = new LinkedHashMap<>();
+        collectTemporaryPlaceholders(pattern.leftPattern(), renames, existingMacroPlaceholders);
+        collectTemporaryPlaceholders(pattern.rightPattern(), renames, existingMacroPlaceholders);
+        pattern.parameterRelations().forEach(relation -> collectTemporaryPlaceholders(relation, renames, existingMacroPlaceholders));
+        pattern.expressionPlaceholderValues().forEach((key, values) -> {
+            collectTemporaryPlaceholders(key, renames, existingMacroPlaceholders);
+            values.forEach(value -> collectTemporaryPlaceholders(value, renames, existingMacroPlaceholders));
+        });
+        return renames;
+    }
+
+    private void collectMacroPlaceholders(String text, Set<String> placeholders) {
+        Matcher matcher = MACRO_PLACEHOLDER.matcher(text == null ? "" : text);
+        while (matcher.find()) {
+            placeholders.add(matcher.group());
+        }
+    }
+
+    private void collectTemporaryPlaceholders(String text, Map<String, String> renames, Set<String> existingMacroPlaceholders) {
+        Matcher matcher = TEMPORARY_PLACEHOLDER.matcher(text == null ? "" : text);
+        while (matcher.find()) {
+            renames.computeIfAbsent(matcher.group(), ignored -> nextStableMacroPlaceholder(existingMacroPlaceholders));
+        }
+    }
+
+    private String nextStableMacroPlaceholder(Set<String> existingMacroPlaceholders) {
+        for (char name = 'B'; name <= 'Z'; name++) {
+            String candidate = String.valueOf(name);
+            if (existingMacroPlaceholders.add(candidate)) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("exhausted stable macro placeholders");
+    }
+
+    private String replaceTemporaryPlaceholders(String text, Map<String, String> renames) {
+        String result = text;
+        for (Map.Entry<String, String> entry : renames.entrySet()) {
+            result = result.replaceAll("\\b" + Pattern.quote(entry.getKey()) + "\\b", entry.getValue());
+        }
+        return result;
     }
 
     private Optional<GeneralizedPattern> generalizeSingleVariableSchema(SuccessfulTransformationPath path) {

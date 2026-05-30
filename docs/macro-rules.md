@@ -57,8 +57,14 @@ Hidden-Structure-Funde werden anschließend in drei Stufen behandelt:
    `CandidateValidator` generierte Instanzen wie `A=x`, `A=y`, `A=x+1`,
    `A=2*x`, `A=x^2` und `A=n+2` mit dem konfigurierten `EquivalenceService`.
    Dieser Pfad ist explizit opt-in und senkt nicht die normalen Mining-Schwellen.
-3. **Zukünftiges Mehrparameter-Schema:** Breitere Schemata wie
-   `A^4 + 4*B^4 → …` bleiben Future Work.
+3. **Parametric Sophie-Germain learning:** Aus dem tatsächlichen Replay
+   `x^4 + 4*y^4 → (x^2 - 2*x*y + 2*y^2) * (x^2 + 2*x*y + 2*y^2)`
+   lernt `PatternGeneralizer` das Schema
+   `A^4 + 4*B^4 → (A^2 - 2*A*B + 2*B^2) * (A^2 + 2*A*B + 2*B^2)`.
+   Die Promotion validiert generierte Substitutionen für beide unabhängigen
+   Platzhalter und das gelernte Makro kann anschließend auf
+   `(x+1)^4 + 4*z^4` mit `A = x + 1`, `B = z` wiederverwendet werden. Es gibt
+   keine hart codierte Sophie-Germain-Rewrite-Regel.
 
 Aktuelles Matching ist strukturell mit vorhandener Normalisierung. Formen wie
 `(x^2)^2 + 4` können daher nach `ast_power_of_power` als `x^4 + 4` vom Makro
@@ -67,6 +73,14 @@ erfasst werden. Algebraisch äquivalente, aber strukturell verdeckte Formen wie
 Äquivalenzklasse gematcht. Hypothesen werden operatorspezifisch und begrenzt
 generiert; vor Discovery-, Makro- oder Gallery-Erfolg ist Validierung
 verpflichtend.
+
+## Parametric Sophie-Germain learning
+
+The Sophie-Germain macro is discovered from an actual replay of
+`x^4 + 4*y^4` and generalized to `A^4 + 4*B^4`. Promotion validates generated
+substitutions for the independent placeholders before the macro is enabled. The
+same learned rule can then be reused on `(x+1)^4 + 4*z^4` by binding
+`A = x + 1` and `B = z`; no hardcoded Sophie-Germain rewrite rule is installed.
 
 Defaults (per Konstruktor konfigurierbar):
 

@@ -1,6 +1,7 @@
 package de.regelsuche.learning;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunner;
@@ -60,7 +61,7 @@ class MacroLearningPipelineReplayIntegrationTest {
     }
 
     @Test
-    void symbolicSophieGermainMacroLearnsFromActualReplayAndReusesWhenSupported() {
+    void symbolicSophieGermainMacroLearnsFromActualReplayAndReuses() {
         SuccessfulTransformationPath path = hiddenStructureReplayPath(
             "x^4 + 4*y^4",
             "sophie-symbolic-real-hidden-structure-replay"
@@ -77,13 +78,23 @@ class MacroLearningPipelineReplayIntegrationTest {
             result.stageEvidence().toString());
 
         ReusableRule learned = result.newlyActivated().getFirst();
-        assertTrue(learned.leftPattern().contains("A^4"), learned.toString());
-        assertTrue(learned.leftPattern().contains("4*B^4"), learned.toString());
-        assertTrue(learned.rightPattern().contains("A^2"), learned.toString());
-        assertTrue(learned.rightPattern().contains("2*A*B"), learned.toString());
-        assertTrue(learned.rightPattern().contains("2*B^2"), learned.toString());
+        assertEquals("A^4 + 4*B^4", learned.leftPattern());
+        assertTrue(learned.rightPattern().equals("(A^2 + 2*A*B + 2*B^2)*(A^2 - 2*A*B + 2*B^2)")
+                || learned.rightPattern().equals("(A^2 - 2*A*B + 2*B^2)*(A^2 + 2*A*B + 2*B^2)"),
+            learned.rightPattern());
+        assertFalse(learned.leftPattern().contains("v1"), learned.toString());
+        assertFalse(learned.rightPattern().contains("v1"), learned.toString());
+        assertTrue(learned.supportingPathIds().contains("sophie-symbolic-real-hidden-structure-replay"),
+            learned.supportingPathIds().toString());
         assertTrue(learned.parameterRelations().contains("A \u2208 {x}"), learned.parameterRelations().toString());
         assertTrue(learned.parameterRelations().contains("B \u2208 {y}"), learned.parameterRelations().toString());
+        assertTrue(result.stageEvidence().stream()
+                .anyMatch(stage -> stage.contains("source path id: sophie-symbolic-real-hidden-structure-replay")),
+            result.stageEvidence().toString());
+        assertTrue(result.stageEvidence().stream().anyMatch(stage -> stage.contains("placeholder count: 2")),
+            result.stageEvidence().toString());
+        assertTrue(result.stageEvidence().stream().anyMatch(stage -> stage.contains("promotion reason:")),
+            result.stageEvidence().toString());
         assertTrue(result.validationExamples().stream()
             .anyMatch(example -> example.substitution().contains("A = ") && example.substitution().contains("B = ")),
             result.validationExamples().toString());
