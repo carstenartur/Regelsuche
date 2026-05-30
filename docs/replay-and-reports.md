@@ -37,6 +37,26 @@ Die HTML-/Markdown-/Replay-JSON-Reports enthalten zusätzlich:
 - `proofSuccessRate`
 - `artifactCounts`
 
+Discovery-Zeilen tragen zusätzlich die zentrale Klassifikation
+`DiscoveryResultKind` und eine einheitliche Summary-Tabelle mit:
+
+| Spalte | Inhalt |
+|--------|--------|
+| `expression` | Eingabeausdruck |
+| `operator` | beteiligter Hypothesenoperator |
+| `resultKind` | `NO_CANDIDATE`, `HYPOTHESIS_ONLY`, `BRIDGE_FOUND`, `FACTORED`, `SIMPLIFIED`, `MACRO_LEARNED`, `MACRO_REUSED` oder `FALSE_POSITIVE` |
+| `bridge?` | ob ein Bridge-Zustand im Replay erreicht wurde |
+| `simplified/factored?` | ob ein transformiertes Ziel erreicht wurde |
+| `learnedMacro?` / `macroReused?` | Makro-Lern- und Wiederverwendungsstatus |
+| `proofStatus` | Validierungs-/Counterexample-Status |
+| `rulePath` | echte Regel-IDs aus dem Replay |
+| `notes` | kurze Zusammenfassung |
+
+Die generierte Discovery-Gallery im Markdown-Report verwendet ausschließlich
+vorhandene Replay-Pfade, Rule-Paths und den bestehenden Mermaid-Export. Wenn ein
+Lauf keinen passenden Sophie-Germain- oder Makro-Reuse-Pfad enthält, wird keine
+Gallery-Demo erfunden.
+
 Browser-E2E und Doku-Assets:
 
 ```bash

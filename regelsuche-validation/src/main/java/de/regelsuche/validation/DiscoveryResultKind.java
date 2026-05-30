@@ -1,4 +1,4 @@
-package de.regelsuche.discovery;
+package de.regelsuche.validation;
 
 /** Classification levels for hidden-structure and macro-discovery outcomes. */
 public enum DiscoveryResultKind {

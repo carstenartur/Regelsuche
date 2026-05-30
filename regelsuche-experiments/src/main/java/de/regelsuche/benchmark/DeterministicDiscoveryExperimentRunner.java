@@ -1,8 +1,8 @@
 package de.regelsuche.benchmark;
 
 import de.regelsuche.example.SeedExpression;
-import de.regelsuche.discovery.DiscoveryResultKind;
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.validation.DiscoveryResultKind;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.ArrayList;
 import java.util.Comparator;

@@ -1,6 +1,7 @@
 package de.regelsuche.discovery;
 
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.DiscoveryResultKind;
 import java.util.List;
 import java.util.Optional;
 

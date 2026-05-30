@@ -27,7 +27,23 @@ Implementiert in zwei komplementären Pfaden:
 
 ## Hidden-Structure Generalisierung
 
-Hidden-Structure-Funde werden in drei Stufen behandelt:
+Hidden-Structure-Funde werden über `DiscoveryResultKind` klassifiziert:
+
+| Level | `DiscoveryResultKind` | Bedeutung |
+|-------|------------------------|-----------|
+| 0 | `NO_CANDIDATE` | kein begrenzter Hypothesenkandidat |
+| 1 | `HYPOTHESIS_ONLY` | Kandidat erzeugt, aber kein Replay-Bridge-State |
+| 2 | `BRIDGE_FOUND` | validierter Zwischenzustand wie Quadratdifferenz oder quadratische Ergänzung |
+| 3 | `FACTORED` / `SIMPLIFIED` | Replay erreicht faktorisierte oder vereinfachte Form |
+| 4 | `MACRO_LEARNED` | ein validiertes Schema wurde aus einem realen Pfad gelernt |
+| 5 | `MACRO_REUSED` | das gelernte Schema wurde in einem zweiten strukturell passenden Fall angewandt |
+
+Die aktuelle Infrastruktur unterstützt Sophie-Germain-Bridges und konservative
+quadratische Ergänzung (`CompleteSquareHypothesisOperator`). Alle Gallery- und
+Report-Einträge werden aus echten Replay-/Suchartefakten erzeugt; statische
+Diagramme oder erfundene Pfade sind nicht Teil des Flows.
+
+Hidden-Structure-Funde werden anschließend in drei Stufen behandelt:
 
 1. **Konkretes Replay:** Ein Suchlauf findet und speichert einen realen Pfad, z. B.
    `x^4 + 4 → … → (x^2 - 2*x + 2) * (x^2 + 2*x + 2)`.
@@ -45,7 +61,9 @@ Aktuelles Matching ist strukturell mit vorhandener Normalisierung. Formen wie
 `(x^2)^2 + 4` können daher nach `ast_power_of_power` als `x^4 + 4` vom Makro
 erfasst werden. Algebraisch äquivalente, aber strukturell verdeckte Formen wie
 `x^4 + 2*x^2 + 1 + 3 - 2*x^2` werden noch nicht über eine ganze
-Äquivalenzklasse gematcht.
+Äquivalenzklasse gematcht. Hypothesen werden operatorspezifisch und begrenzt
+generiert; vor Discovery-, Makro- oder Gallery-Erfolg ist Validierung
+verpflichtend.
 
 Defaults (per Konstruktor konfigurierbar):
 
