@@ -30,6 +30,17 @@ class ConvergentDiscoveryAnalysisTest {
         assertEquals(2, report.pathsToTarget().size());
         assertTrue(report.ruleFamiliesUsed().contains(RuleFamily.HIDDEN_STRUCTURE));
         assertTrue(report.ruleFamiliesUsed().contains(RuleFamily.LEARNED_MACRO));
+        assertTrue(report.pathsToTarget().stream().allMatch(path -> path.sourceReplayIds().isEmpty()));
+    }
+
+    @Test
+    void reportsCanonicalizedTargetExpression() {
+        ConvergentDiscoveryReport report = analysis.analyze("x + 1", List.of(
+            state(List.of("x + 1", "1 + x"), List.of("hypothesis_complete_square_preparation")),
+            state(List.of("x + 1", "x + 1 + 0"), List.of("macro_complete_square"))
+        ), canonicalizer, scorer);
+
+        assertEquals(canonicalizer.canonicalize("1 + x"), report.canonicalTargetExpression());
     }
 
     @Test

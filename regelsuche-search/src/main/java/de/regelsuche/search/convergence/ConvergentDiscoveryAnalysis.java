@@ -84,7 +84,7 @@ public final class ConvergentDiscoveryAnalysis {
         if (pathsToTarget.stream().anyMatch(ConvergentPath::containsMacroStep)) {
             evidenceKinds.add("MACRO_REUSE");
         }
-        String targetExpression = target == null ? "" : target.expression();
+        String targetExpression = target == null ? "" : canonicalizer.canonicalize(target.expression());
         return new ConvergentDiscoveryReport(
             inputExpression,
             targetExpression,
@@ -118,7 +118,7 @@ public final class ConvergentDiscoveryAnalysis {
             macro,
             validated ? "EQUIVALENCE_PRESERVING" : "MIXED",
             validated ? "VALIDATED_BY_CONSTRUCTION" : "REQUIRES_VALIDATION",
-            List.of(inputExpression)
+            List.of()
         );
     }
 

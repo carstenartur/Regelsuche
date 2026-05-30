@@ -125,13 +125,32 @@ public final class QuadraticFactorizationHypothesisOperator implements Hypothesi
     }
 
     private List<Expr> flattenAddends(Expr expression) {
-        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.ADD) {
-            List<Expr> result = new ArrayList<>();
-            result.addAll(flattenAddends(binary.left()));
-            result.addAll(flattenAddends(binary.right()));
-            return result;
+        List<Expr> result = new ArrayList<>();
+        collectAddends(expression, 1, result);
+        return result;
+    }
+
+    private void collectAddends(Expr expression, int sign, List<Expr> out) {
+        if (expression instanceof BinaryExpr binary) {
+            if (binary.operator() == BinaryOperator.ADD) {
+                collectAddends(binary.left(), sign, out);
+                collectAddends(binary.right(), sign, out);
+                return;
+            }
+            if (binary.operator() == BinaryOperator.SUB) {
+                collectAddends(binary.left(), sign, out);
+                collectAddends(binary.right(), -sign, out);
+                return;
+            }
         }
-        return List.of(expression);
+        out.add(sign >= 0 ? expression : negate(expression));
+    }
+
+    private Expr negate(Expr expression) {
+        if (expression instanceof NumberExpr number) {
+            return new NumberExpr(-number.value());
+        }
+        return new BinaryExpr(new NumberExpr(-1), BinaryOperator.MUL, expression);
     }
 
     private List<Expr> flattenFactors(Expr expression) {
