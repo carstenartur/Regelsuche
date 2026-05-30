@@ -10,6 +10,9 @@ public final class ConvergentDiscoveryMermaidWriter {
 
     public String render(ConvergentDiscoveryReport report) {
         StringBuilder out = new StringBuilder("graph TD\n");
+        if (report.convergentStates().isEmpty()) {
+            return out.append("  empty[\"No convergent state\"]\n").toString();
+        }
         Map<String, String> nodeIds = new HashMap<>();
         String inputId = nodeId(nodeIds, report.inputExpression());
         out.append("  ").append(inputId).append("[\"").append(escape(report.inputExpression())).append("\"]:::input\n");

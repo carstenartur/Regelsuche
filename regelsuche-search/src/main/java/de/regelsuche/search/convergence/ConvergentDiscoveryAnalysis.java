@@ -62,7 +62,9 @@ public final class ConvergentDiscoveryAnalysis {
             convergentStates.add(toState(entry.getKey(), distinct));
         }
         convergentStates.sort(Comparator
-            .comparingInt((ConvergentState state) -> bestLength(state.incomingPaths()))
+            .comparingInt((ConvergentState state) -> -familyPriority(state.incomingPaths()))
+            .thenComparingInt(state -> -bestLength(state.incomingPaths()))
+            .thenComparingInt(state -> bestScore(state.incomingPaths()))
             .thenComparing(ConvergentState::canonicalHash));
 
         ConvergentState target = convergentStates.isEmpty() ? null : convergentStates.getFirst();
@@ -82,7 +84,7 @@ public final class ConvergentDiscoveryAnalysis {
         if (pathsToTarget.stream().anyMatch(ConvergentPath::containsMacroStep)) {
             evidenceKinds.add("MACRO_REUSE");
         }
-        String targetExpression = pathsToTarget.isEmpty() ? "" : pathsToTarget.getFirst().finalExpression();
+        String targetExpression = target == null ? "" : target.expression();
         return new ConvergentDiscoveryReport(
             inputExpression,
             targetExpression,
@@ -125,6 +127,9 @@ public final class ConvergentDiscoveryAnalysis {
         for (ConvergentPath path : candidates.stream()
             .sorted(Comparator.comparingInt(ConvergentPath::length).thenComparing(ConvergentPath::pathId))
             .toList()) {
+            if (hasRepeatedExpression(path)) {
+                continue;
+            }
             String signature = semanticSignature(path);
             if (signature.isBlank()) {
                 continue;
@@ -132,6 +137,10 @@ public final class ConvergentDiscoveryAnalysis {
             distinct.putIfAbsent(signature, path);
         }
         return List.copyOf(distinct.values());
+    }
+
+    private boolean hasRepeatedExpression(ConvergentPath path) {
+        return new LinkedHashSet<>(path.expressions()).size() != path.expressions().size();
     }
 
     private String semanticSignature(ConvergentPath path) {
@@ -170,8 +179,11 @@ public final class ConvergentDiscoveryAnalysis {
         ConvergentPath didactic = paths.stream()
             .max(Comparator.comparingInt(this::didacticScore).thenComparing(ConvergentPath::pathId))
             .orElse(shortest);
+        ConvergentPath representative = paths.stream()
+            .min(Comparator.comparingInt(path -> path.score().weightedTotal()))
+            .orElse(shortest);
         return new ConvergentState(
-            shortest.finalExpression(),
+            representative.finalExpression(),
             canonicalHash,
             paths,
             shortest.pathId(),
@@ -198,6 +210,28 @@ public final class ConvergentDiscoveryAnalysis {
         return paths.stream().mapToInt(ConvergentPath::length).min().orElse(Integer.MAX_VALUE);
     }
 
+    private int bestScore(List<ConvergentPath> paths) {
+        return paths.stream().mapToInt(path -> path.score().weightedTotal()).min().orElse(Integer.MAX_VALUE);
+    }
+
+    private int familyPriority(List<ConvergentPath> paths) {
+        Set<RuleFamily> families = nonNormalizationFamilies(paths);
+        int priority = families.size();
+        if (families.contains(RuleFamily.LEARNED_MACRO)) {
+            priority += 8;
+        }
+        if (families.contains(RuleFamily.COMPLETE_SQUARE)) {
+            priority += 6;
+        }
+        if (families.contains(RuleFamily.HIDDEN_STRUCTURE)) {
+            priority += 5;
+        }
+        if (families.contains(RuleFamily.FACTORIZATION)) {
+            priority += 3;
+        }
+        return priority;
+    }
+
     private List<ConvergentPath> interestingAlternatives(List<ConvergentPath> paths) {
         if (paths.size() <= 1) {
             return List.of();
@@ -215,14 +249,23 @@ public final class ConvergentDiscoveryAnalysis {
         ExpressionCanonicalizer canonicalizer
     ) {
         String inputHash = canonicalizer.stableHash(inputExpression);
-        String finalHash = paths.isEmpty() ? "" : canonicalizer.stableHash(paths.getFirst().finalExpression());
+        Set<String> finalHashes = paths.stream()
+            .map(ConvergentPath::finalExpression)
+            .map(canonicalizer::stableHash)
+            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        Set<String> finalExpressions = paths.stream()
+            .map(ConvergentPath::finalExpression)
+            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         Map<String, List<ConvergentPath>> incoming = new LinkedHashMap<>();
         Map<String, String> expressionByHash = new LinkedHashMap<>();
         for (ConvergentPath path : paths) {
             for (int i = 1; i < path.expressions().size() - 1; i++) {
                 String expression = path.expressions().get(i);
                 String hash = canonicalizer.stableHash(expression);
-                if (hash.equals(inputHash) || hash.equals(finalHash)) {
+                if (hash.equals(inputHash)
+                    || finalHashes.contains(hash)
+                    || finalExpressions.contains(expression)
+                    || path.finalExpression().equals(expression)) {
                     continue;
                 }
                 expressionByHash.putIfAbsent(hash, expression);
@@ -231,11 +274,40 @@ public final class ConvergentDiscoveryAnalysis {
         }
         List<ConvergentState> shared = new ArrayList<>();
         for (Map.Entry<String, List<ConvergentPath>> entry : incoming.entrySet()) {
-            List<ConvergentPath> distinct = distinctInterestingPaths(entry.getValue());
-            if (distinct.size() >= 2) {
-                shared.add(toState(entry.getKey(), distinct));
+            List<ConvergentPath> incomingPaths = entry.getValue();
+            Set<String> pathIds = incomingPaths.stream()
+                .map(ConvergentPath::pathId)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+            if (pathIds.size() >= 2) {
+                shared.add(toState(entry.getKey(), expressionByHash.get(entry.getKey()),
+                    incomingPaths.stream().distinct().toList()));
             }
         }
+        shared.sort(Comparator.comparingInt((ConvergentState state) -> firstDepth(state.expression(), paths))
+            .thenComparing(ConvergentState::canonicalHash));
         return shared;
+    }
+
+    private int firstDepth(String expression, List<ConvergentPath> paths) {
+        int best = Integer.MAX_VALUE;
+        for (ConvergentPath path : paths) {
+            int index = path.expressions().indexOf(expression);
+            if (index >= 0) {
+                best = Math.min(best, index);
+            }
+        }
+        return best;
+    }
+
+    private ConvergentState toState(String canonicalHash, String expression, List<ConvergentPath> paths) {
+        ConvergentState state = toState(canonicalHash, paths);
+        return new ConvergentState(
+            expression,
+            state.canonicalHash(),
+            state.incomingPaths(),
+            state.shortestPathId(),
+            state.mostDidacticPathId(),
+            state.macroPathId()
+        );
     }
 }
