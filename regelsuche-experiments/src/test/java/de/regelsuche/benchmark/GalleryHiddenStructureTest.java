@@ -42,4 +42,32 @@ class GalleryHiddenStructureTest {
         assertTrue(markdown.contains("```mermaid"));
         assertFalse(markdown.contains("static Mermaid"));
     }
+
+    @Test
+    void galleryUsesPerfectSquareBridgeWhenReplayContainsNoSquareDifference() {
+        DeterministicDiscoveryExperimentRunner.DiscoveryReport report = new DeterministicDiscoveryExperimentRunner.DiscoveryReport(
+            List.of(new DeterministicDiscoveryExperimentRunner.SeedRunReport(
+                new SeedExpression("hidden-perfect-square", "x^4 + 4", "test", "hidden-structure", List.of(), List.of()),
+                true,
+                "hidden-structure reproduced through complete square bridge",
+                List.of("(x^2 + 2*x + 2)^2"),
+                List.of(),
+                CounterexampleSearchService.Status.INCONCLUSIVE,
+                List.of(),
+                List.of(),
+                "",
+                List.of("x^4 + 4", "(x^2 + 2*x + 2)^2", "(x^2 + 2*x + 2) * (x^2 + 2*x + 2)"),
+                DiscoveryResultKind.FACTORED,
+                List.of("hypothesis_difference_of_squares_preparation", "ast_square_difference_factor"),
+                0L,
+                0L
+            )),
+            new DeterministicDiscoveryExperimentRunner.DiscoveryMetrics(1, 1, 1, 0, 0L, 0L),
+            0L
+        );
+
+        String markdown = new DiscoveryReplayArtifactWriter().renderMarkdown(report);
+
+        assertTrue(markdown.contains("- discovered bridge: `(x^2 + 2*x + 2)^2`"));
+    }
 }

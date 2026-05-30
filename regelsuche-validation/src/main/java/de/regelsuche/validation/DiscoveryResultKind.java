@@ -13,8 +13,8 @@ public enum DiscoveryResultKind {
 
     public boolean hasCandidate() {
         return switch (this) {
-            case NO_CANDIDATE, FALSE_POSITIVE -> false;
-            case HYPOTHESIS_ONLY, BRIDGE_FOUND, FACTORED, SIMPLIFIED, MACRO_LEARNED, MACRO_REUSED -> true;
+            case NO_CANDIDATE -> false;
+            case HYPOTHESIS_ONLY, BRIDGE_FOUND, FACTORED, SIMPLIFIED, MACRO_LEARNED, MACRO_REUSED, FALSE_POSITIVE -> true;
         };
     }
 

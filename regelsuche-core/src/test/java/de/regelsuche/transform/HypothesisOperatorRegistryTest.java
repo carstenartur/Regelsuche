@@ -42,4 +42,13 @@ class HypothesisOperatorRegistryTest {
 
         assertTrue(candidates.isEmpty());
     }
+
+    @Test
+    void customOptionsCanEnableOperatorsIndependentOfProfile() {
+        HypothesisOperatorRegistry registry = new HypothesisOperatorRegistry();
+        DiscoveryOptions customOptions = new DiscoveryOptions(true, false, false, false, 6, 4, 160,
+            DiscoveryProfile.PURE_REWRITE);
+
+        assertFalse(registry.selectOperators(customOptions).isEmpty());
+    }
 }

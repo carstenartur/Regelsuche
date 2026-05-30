@@ -1,7 +1,7 @@
 package de.regelsuche.benchmark;
 
 import de.regelsuche.json.JsonWriter;
-import de.regelsuche.transform.SquareDifferenceAstPredicate;
+import de.regelsuche.transform.PolynomialBridgeAstPredicate;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -793,7 +793,7 @@ public final class DiscoveryReplayArtifactWriter {
 
     private String bridgeFrom(List<String> replayPath) {
         return replayPath.stream()
-            .filter(SquareDifferenceAstPredicate::containsSquareDifference)
+            .filter(PolynomialBridgeAstPredicate::containsBridge)
             .findFirst()
             .orElse(replayPath.getLast());
     }

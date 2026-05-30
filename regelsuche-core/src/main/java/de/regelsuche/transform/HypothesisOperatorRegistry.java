@@ -47,8 +47,7 @@ public final class HypothesisOperatorRegistry {
         if (options == null) {
             return false;
         }
-        return options.enableHypothesisOperators()
-            && (options.profile() == DiscoveryProfile.HYPOTHESIS_ONLY || options.profile() == DiscoveryProfile.FULL_DISCOVERY);
+        return options.enableHypothesisOperators();
     }
 
     public record Entry(String id, IntFunction<HypothesisOperator> factory) {

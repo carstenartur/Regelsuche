@@ -28,6 +28,7 @@ class DiscoveryResultKindTest {
         assertFalse(DiscoveryResultKind.MACRO_LEARNED.hasMacroReuse());
         assertTrue(DiscoveryResultKind.MACRO_REUSED.hasMacroLearning());
         assertTrue(DiscoveryResultKind.MACRO_REUSED.hasMacroReuse());
+        assertTrue(DiscoveryResultKind.FALSE_POSITIVE.hasCandidate());
         assertTrue(DiscoveryResultKind.FALSE_POSITIVE.isFalsePositive());
         assertFalse(DiscoveryResultKind.FALSE_POSITIVE.discovered());
     }
