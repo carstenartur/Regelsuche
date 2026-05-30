@@ -21,7 +21,7 @@ class RulePatternInstantiatorTest {
 
         var result = instantiator.instantiate(pattern, Map.of("A", expressionParser.parseTerm("x + 1")));
 
-        assertEquals("(x + 1)^2 + 2*(x + 1) + 1", ExpressionFormatter.format(result));
+        assertEquals("(x + 1) ^ 2 + 2 * (x + 1) + 1", ExpressionFormatter.format(result));
     }
 
     @Test
