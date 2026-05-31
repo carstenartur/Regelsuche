@@ -30,6 +30,13 @@ public final class PluginRuntime implements AutoCloseable {
     private TransformationRegistry transformationRegistry = new TransformationRegistry();
     private AstVisitorRegistry astVisitorRegistry = new AstVisitorRegistry();
     private MacroRegistry macroRegistry = new MacroRegistry();
+    private SearchStrategyRegistry searchStrategyRegistry = new SearchStrategyRegistry();
+    private HeuristicRegistry heuristicRegistry = new HeuristicRegistry();
+    private CostFunctionRegistry costFunctionRegistry = new CostFunctionRegistry();
+    private RendererRegistry rendererRegistry = new RendererRegistry();
+    private ExplanationRegistry explanationRegistry = new ExplanationRegistry();
+    private ParserExtensionRegistry parserExtensionRegistry = new ParserExtensionRegistry();
+    private ExampleRegistry exampleRegistry = new ExampleRegistry();
     private List<LoadedPlugin> loadedPlugins = List.of();
     private List<RuntimeDiagnostic> diagnostics = List.of();
     private List<PatternTransformation> macroTransformations = List.of();
@@ -54,6 +61,13 @@ public final class PluginRuntime implements AutoCloseable {
         this.transformationRegistry = new TransformationRegistry();
         this.astVisitorRegistry = new AstVisitorRegistry();
         this.macroRegistry = new MacroRegistry();
+        this.searchStrategyRegistry = new SearchStrategyRegistry();
+        this.heuristicRegistry = new HeuristicRegistry();
+        this.costFunctionRegistry = new CostFunctionRegistry();
+        this.rendererRegistry = new RendererRegistry();
+        this.explanationRegistry = new ExplanationRegistry();
+        this.parserExtensionRegistry = new ParserExtensionRegistry();
+        this.exampleRegistry = new ExampleRegistry();
         List<LoadedPlugin> discoveredPlugins = new ArrayList<>();
         List<RuntimeDiagnostic> discoveredDiagnostics = new ArrayList<>();
         if (config.loadClasspathPlugins()) {
@@ -100,6 +114,34 @@ public final class PluginRuntime implements AutoCloseable {
 
     public MacroRegistry macroRegistry() {
         return macroRegistry;
+    }
+
+    public SearchStrategyRegistry searchStrategyRegistry() {
+        return searchStrategyRegistry;
+    }
+
+    public HeuristicRegistry heuristicRegistry() {
+        return heuristicRegistry;
+    }
+
+    public CostFunctionRegistry costFunctionRegistry() {
+        return costFunctionRegistry;
+    }
+
+    public RendererRegistry rendererRegistry() {
+        return rendererRegistry;
+    }
+
+    public ExplanationRegistry explanationRegistry() {
+        return explanationRegistry;
+    }
+
+    public ParserExtensionRegistry parserExtensionRegistry() {
+        return parserExtensionRegistry;
+    }
+
+    public ExampleRegistry exampleRegistry() {
+        return exampleRegistry;
     }
 
     public List<LoadedPlugin> loadedPlugins() {
@@ -228,6 +270,13 @@ public final class PluginRuntime implements AutoCloseable {
             plugin.registerTransformations(transformationRegistry);
             plugin.registerVisitors(astVisitorRegistry);
             plugin.registerMacros(macroRegistry);
+            plugin.registerSearchStrategies(searchStrategyRegistry);
+            plugin.registerHeuristics(heuristicRegistry);
+            plugin.registerCostFunctions(costFunctionRegistry);
+            plugin.registerRenderers(rendererRegistry);
+            plugin.registerExplanations(explanationRegistry);
+            plugin.registerParserExtensions(parserExtensionRegistry);
+            plugin.registerExamples(exampleRegistry);
         } catch (RuntimeException ex) {
             LOGGER.warning(() -> "Plugin " + plugin.id() + " failed: " + ex.getMessage());
             discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(),
@@ -299,6 +348,13 @@ public final class PluginRuntime implements AutoCloseable {
                 ? disabledRuleId.substring("macro.".length())
                 : disabledRuleId;
             macroRegistry.disable(macroId);
+            searchStrategyRegistry.disable(disabledRuleId);
+            heuristicRegistry.disable(disabledRuleId);
+            costFunctionRegistry.disable(disabledRuleId);
+            rendererRegistry.disable(disabledRuleId);
+            explanationRegistry.disable(disabledRuleId);
+            parserExtensionRegistry.disable(disabledRuleId);
+            exampleRegistry.disable(disabledRuleId);
         }
     }
 

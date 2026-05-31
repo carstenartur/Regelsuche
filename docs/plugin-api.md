@@ -43,6 +43,22 @@ Metadaten über `AstVisitorContext` ablegen.
 
 `MacroRegistry` nimmt `RuleMacro`-Beiträge auf.
 
+### Laufzeit-Erweiterungspunkte
+
+Plugins können weitere steuerbare Erweiterungen registrieren:
+
+- `SearchStrategyRegistry` für benannte Suchstrategien
+- `HeuristicRegistry` für heuristische Bewertungen
+- `CostFunctionRegistry` für Kostenfunktionen auf Transformationen
+- `RendererRegistry` für Ausgabe-Renderer
+- `ExplanationRegistry` für regelbezogene Erklärungen
+- `ParserExtensionRegistry` für Eingabe-Normalisierungen vor dem Parsen
+- `ExampleRegistry` für Beispielpakete
+
+Alle diese Registries unterstützen `register`, `disable`, `registrations` und
+`enabledExtensions`, sodass Laufzeitkonfigurationen Beiträge gezielt abschalten
+und UI/CLI-Komponenten nur aktive Erweiterungen verwenden können.
+
 ## Beispielplugin
 
 `BinomialFormulaPlugin` demonstriert:
@@ -51,3 +67,4 @@ Metadaten über `AstVisitorContext` ablegen.
 - AST-Visitor für Binomialmuster
 - Transformationen für binomische Formeln
 - Makro-Registrierung
+- Laufzeit-Erweiterungen für Heuristik, Kosten, Renderer, Erklärungen, Parser-Normalisierung und Beispiele

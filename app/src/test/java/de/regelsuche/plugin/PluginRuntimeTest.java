@@ -41,6 +41,68 @@ class PluginRuntimeTest {
                 .anyMatch(rule -> rule.id().equals("binomial_square_forward")));
             assertTrue(runtime.astVisitorRegistry().registrations().stream()
                 .anyMatch(visitor -> visitor.id().equals("binomial-pattern-visitor")));
+            assertTrue(runtime.searchStrategyRegistry().registrations().stream()
+                .anyMatch(strategy -> strategy.id().equals("binomial-guided-search")));
+            assertTrue(runtime.heuristicRegistry().registrations().stream()
+                .anyMatch(heuristic -> heuristic.id().equals("binomial-pattern-heuristic")));
+            assertTrue(runtime.costFunctionRegistry().registrations().stream()
+                .anyMatch(costFunction -> costFunction.id().equals("binomial-cost-delta")));
+            assertTrue(runtime.rendererRegistry().registrations().stream()
+                .anyMatch(renderer -> renderer.id().equals("binomial-text-renderer")));
+            assertTrue(runtime.explanationRegistry().registrations().stream()
+                .anyMatch(explanation -> explanation.id().equals("binomial-explanations")));
+            assertTrue(runtime.parserExtensionRegistry().registrations().stream()
+                .anyMatch(parserExtension -> parserExtension.id().equals("unicode-square-parser")));
+            assertTrue(runtime.exampleRegistry().registrations().stream()
+                .anyMatch(examples -> examples.id().equals("binomial-examples")));
+        }
+    }
+
+    @Test
+    void newPluginExtensionRegistriesExposeUsableEnabledContributions(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of(),
+            Set.of()
+        ))) {
+            assertEquals(10, runtime.heuristicRegistry().enabledExtensions().stream()
+                .filter(heuristic -> heuristic.id().equals("binomial-pattern-heuristic"))
+                .findFirst()
+                .orElseThrow()
+                .score("(a + b)^2"));
+            assertEquals("x^2", runtime.parserExtensionRegistry().enabledExtensions().stream()
+                .filter(parserExtension -> parserExtension.id().equals("unicode-square-parser"))
+                .findFirst()
+                .orElseThrow()
+                .normalize("x²"));
+            assertTrue(runtime.explanationRegistry().enabledExtensions().stream()
+                .filter(explanation -> explanation.id().equals("binomial-explanations"))
+                .findFirst()
+                .orElseThrow()
+                .supportsRule("binomial_square_forward"));
+            assertTrue(runtime.exampleRegistry().enabledExtensions().stream()
+                .filter(examples -> examples.id().equals("binomial-examples"))
+                .findFirst()
+                .orElseThrow()
+                .examples().stream().anyMatch(example -> example.input().equals("(a + b)^2")));
+        }
+    }
+
+    @Test
+    void configuredDisabledIdsAlsoDisableNewPluginExtensionContributions(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of(),
+            Set.of("binomial-explanations")
+        ))) {
+            assertTrue(runtime.explanationRegistry().registrations().stream()
+                .anyMatch(explanation -> explanation.id().equals("binomial-explanations") && !explanation.enabled()));
+            assertFalse(runtime.explanationRegistry().enabledExtensions().stream()
+                .anyMatch(explanation -> explanation.id().equals("binomial-explanations")));
         }
     }
 

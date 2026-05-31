@@ -9,12 +9,19 @@ Regelsuche unterstützt ein leichtgewichtiges Java-Plugin-Modell auf Basis von `
 
 ## Plugin-Vertrag
 
-Ein Plugin implementiert `de.regelsuche.plugin.RegelsuchePlugin` und kann vier Registries erweitern:
+Ein Plugin implementiert `de.regelsuche.plugin.RegelsuchePlugin` und kann mehrere Registries erweitern:
 
 - `RuleRegistry`
 - `TransformationRegistry`
 - `AstVisitorRegistry`
 - `MacroRegistry`
+- `SearchStrategyRegistry`
+- `HeuristicRegistry`
+- `CostFunctionRegistry`
+- `RendererRegistry`
+- `ExplanationRegistry`
+- `ParserExtensionRegistry`
+- `ExampleRegistry`
 
 Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/example/BinomialFormulaPlugin.java`.
 
@@ -23,7 +30,7 @@ Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/exa
 - [x] Stabile Plugin-Schnittstelle (`RegelsuchePlugin`)
 - [x] Plugin-Discovery über `ServiceLoader`
 - [x] Vorbereitung für Reload über `PluginRuntime#reload()`
-- [x] Erweiterbare zentrale Registries: `RuleRegistry`, `TransformationRegistry`, `AstVisitorRegistry`, `MacroRegistry`
+- [x] Erweiterbare zentrale Registries: `RuleRegistry`, `TransformationRegistry`, `AstVisitorRegistry`, `MacroRegistry`, `SearchStrategyRegistry`, `HeuristicRegistry`, `CostFunctionRegistry`, `RendererRegistry`, `ExplanationRegistry`, `ParserExtensionRegistry`, `ExampleRegistry`
 - [x] Eigene AST-Visitor mit allen dokumentierten Hook-Phasen
 - [x] Plugin-Transformationen erscheinen als Suchgraph-Kanten
 - [x] Textbasierte Regeldateien werden geladen
