@@ -149,6 +149,51 @@ class DemoDocumentationTest {
     }
 
     @Test
+    void convergentSophieGermainVisibleImageIsDocumented() throws IOException {
+        String imageName = "convergent-sophie-germain.svg";
+        Path readmePath = REPO_ROOT.resolve("README.md");
+        Path galleryPath = REPO_ROOT.resolve("docs/demo-gallery.md");
+        Path imagePath = REPO_ROOT.resolve("docs/assets/screenshots").resolve(imageName);
+        Path mermaidPath = REPO_ROOT.resolve("docs/assets/screenshots/convergent-sophie-germain.mmd");
+        String readme = Files.readString(readmePath, StandardCharsets.UTF_8);
+        String gallery = Files.readString(galleryPath, StandardCharsets.UTF_8);
+
+        assertTrue(readme.contains(imageName), "README.md must reference " + imageName);
+        assertTrue(gallery.contains("<img") && gallery.contains(imageName),
+            "docs/demo-gallery.md must embed " + imageName + " with an <img> tag");
+        assertTrue(Files.exists(imagePath), imageName + " must exist next to the Mermaid source");
+        assertTrue(Files.exists(mermaidPath), "convergent-sophie-germain.mmd source must still exist");
+
+        String milestone = readme.substring(
+            readme.indexOf("## Recent discovery milestone"),
+            readme.indexOf("## 30 Sekunden"));
+        assertTrue(!milestone.contains("parametric-sophie-germain-discovery.png"),
+            "README milestone must show the convergent graph, not the old single-path screenshot");
+
+        String image = Files.readString(imagePath, StandardCharsets.UTF_8);
+        String mermaid = Files.readString(mermaidPath, StandardCharsets.UTF_8);
+        assertTrue(image.contains("x^4 + 4*y^4"), "image must visibly show the Sophie-Germain input");
+        assertTrue(image.contains("data-source=\"convergent-sophie-germain.mmd\""),
+            "image must declare its generated Mermaid source");
+        assertTrue(image.contains("data-generated-by=\"ConvergentDiscoverySvgWriter\""),
+            "image must carry generated provenance");
+        assertTrue(image.contains("HIDDEN_STRUCTURE"),
+            "image must show the hidden-structure path from generated report data");
+        assertTrue(image.contains("ast_square_difference_factor"),
+            "image must show the square-difference bridge from generated report data");
+        assertTrue(image.contains("LEARNED_MACRO"),
+            "image must show the learned macro path from generated report data");
+        assertTrue(mermaidLabels(mermaid).stream().allMatch(label -> image.contains(escapeXml(label))),
+            "image content must correspond to generated Mermaid nodes and labels");
+        assertTrue(!image.contains("path 1: hidden structure")
+                && !image.contains("path 2: learned macro shortcut")
+                && !image.contains("same target node"),
+            "image must not contain manual-only SVG nodes");
+        assertTrue(!image.contains("parametric-sophie-germain-discovery.png"),
+            "convergent image must not be the old parametric single-path screenshot");
+    }
+
+    @Test
     void localDocsLinksAndImagesResolve() throws IOException {
         assertMarkdownReferencesResolve(REPO_ROOT.resolve("README.md"));
         assertMarkdownReferencesResolve(REPO_ROOT.resolve("docs/demo-gallery.md"));
@@ -284,5 +329,26 @@ class DemoDocumentationTest {
             || mermaid.contains("convergent-sophie-germain")
             || (mermaid.contains("hypothesis_difference_of_squares_preparation")
                 && mermaid.contains("x^4 + 4*y^4"));
+    }
+
+    private static Set<String> mermaidLabels(String mermaid) {
+        Set<String> labels = new HashSet<>();
+        Matcher nodeMatcher = Pattern.compile("\\[\"([^\"]+)\"\\]").matcher(mermaid);
+        while (nodeMatcher.find()) {
+            labels.add(nodeMatcher.group(1));
+        }
+        Matcher edgeMatcher = Pattern.compile("\\|([^|]+)\\|").matcher(mermaid);
+        while (edgeMatcher.find()) {
+            labels.add(edgeMatcher.group(1));
+        }
+        return labels;
+    }
+
+    private static String escapeXml(String value) {
+        return (value == null ? "" : value)
+            .replace("&", "&amp;")
+            .replace("\"", "&quot;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;");
     }
 }

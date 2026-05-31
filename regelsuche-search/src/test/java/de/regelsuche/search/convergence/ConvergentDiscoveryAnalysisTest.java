@@ -9,6 +9,7 @@ import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.RewriteKind;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -79,6 +80,165 @@ class ConvergentDiscoveryAnalysisTest {
         assertEquals(RuleFamily.NORMALIZATION, classifier.classify("ast_canonical_normalize"));
     }
 
+    @Test
+    void rendersSyntheticSvgWithArtifactMetadata() {
+        String input = "a^2 + 2*a*b + b^2";
+        String target = "(a + b)^2";
+        ConvergentPath algebraPath = syntheticPath(
+            "binomial-factorization-path",
+            List.of(input, target),
+            List.of("ast_binomial_square_factor"),
+            List.of(RuleFamily.FACTORIZATION),
+            false
+        );
+        ConvergentPath macroPath = syntheticPath(
+            "binomial-macro-path",
+            List.of(input, "square(a + b)", target),
+            List.of("macro_binomial_square", "ast_expand_square_notation"),
+            List.of(RuleFamily.LEARNED_MACRO, RuleFamily.NORMALIZATION),
+            true
+        );
+        ConvergentDiscoveryReport report = new ConvergentDiscoveryReport(
+            input,
+            canonicalizer.canonicalize(target),
+            List.of(new ConvergentState(
+                target,
+                canonicalizer.stableHash(target),
+                List.of(algebraPath, macroPath),
+                algebraPath.pathId(),
+                macroPath.pathId(),
+                Optional.of(macroPath.pathId())
+            )),
+            List.of(algebraPath, macroPath),
+            List.of(),
+            List.of(),
+            Set.of(RuleFamily.FACTORIZATION, RuleFamily.LEARNED_MACRO),
+            Set.of("synthetic")
+        );
+
+        String svg = new ConvergentDiscoverySvgWriter().render(report,
+            new ArtifactMetadata("synthetic-binomial.mmd", "Synthetic binomial convergence graph"));
+        assertTrue(svg.contains("data-source=\"synthetic-binomial.mmd\""), svg);
+        assertTrue(svg.contains("<title id=\"title\">Synthetic binomial convergence graph</title>"), svg);
+        assertFalse(svg.contains("Sophie-Germain"), svg);
+
+        String inputTitledSvg = new ConvergentDiscoverySvgWriter().render(report,
+            new ArtifactMetadata("synthetic-binomial.mmd", ""));
+        assertTrue(inputTitledSvg.contains("<title id=\"title\">Convergent discovery: "
+            + input + "</title>"), inputTitledSvg);
+    }
+
+    @Test
+    void rendersGallerySnippetWithFriendlyPathLabels() {
+        String input = "x^4 + 4*y^4";
+        String target = "(x^2 - 2*x*y + 2*y^2)*(x^2 + 2*x*y + 2*y^2)";
+        ConvergentPath macroPath = syntheticPath(
+            "path-cryptic-macro",
+            List.of(input, target),
+            List.of("macro_sophie_germain"),
+            List.of(RuleFamily.LEARNED_MACRO),
+            true
+        );
+        ConvergentPath macroExpandedVariantPath = syntheticPath(
+            "path-cryptic-macro-expanded",
+            List.of(input, "expanded macro bridge", target),
+            List.of("macro_sophie_germain", "ast_distribute_left_add"),
+            List.of(RuleFamily.LEARNED_MACRO, RuleFamily.EXPANSION),
+            true
+        );
+        ConvergentPath hiddenStructurePath = syntheticPath(
+            "path-cryptic-hidden",
+            List.of(input, "(x^2 + 2*y^2)^2 - (2*x*y)^2", target),
+            List.of("hypothesis_difference_of_squares_preparation", "ast_square_difference_factor"),
+            List.of(RuleFamily.HIDDEN_STRUCTURE, RuleFamily.FACTORIZATION),
+            false,
+            List.of("convergent-sophie-germain-hidden-structure-replay")
+        );
+        ConvergentPath expandedVariantPath = syntheticPath(
+            "path-cryptic-expanded",
+            List.of(input, "(x^2 + 2*y^2)^2 - (2*x*y)^2", "expanded form", target),
+            List.of(
+                "hypothesis_difference_of_squares_preparation",
+                "ast_power_two_to_product",
+                "ast_square_difference_factor"
+            ),
+            List.of(RuleFamily.HIDDEN_STRUCTURE, RuleFamily.OTHER, RuleFamily.FACTORIZATION),
+            false
+        );
+        ConvergentDiscoveryReport report = new ConvergentDiscoveryReport(
+            input,
+            canonicalizer.canonicalize(target),
+            List.of(new ConvergentState(
+                target,
+                canonicalizer.stableHash(target),
+                List.of(macroPath, macroExpandedVariantPath, hiddenStructurePath, expandedVariantPath),
+                macroPath.pathId(),
+                hiddenStructurePath.pathId(),
+                Optional.of(macroPath.pathId())
+            )),
+            List.of(macroPath, macroExpandedVariantPath, hiddenStructurePath, expandedVariantPath),
+            List.of(),
+            List.of(expandedVariantPath),
+            Set.of(RuleFamily.LEARNED_MACRO, RuleFamily.HIDDEN_STRUCTURE, RuleFamily.FACTORIZATION),
+            Set.of("synthetic")
+        );
+
+        String snippet = new ConvergentDiscoveryGallerySnippetWriter().render(report);
+
+        assertTrue(snippet.contains("shortest path: learned macro shortcut"), snippet);
+        assertTrue(snippet.contains("most didactic path: hidden-structure discovery"), snippet);
+        assertTrue(snippet.contains("target: `" + target + "`"), snippet);
+        assertTrue(snippet.contains("Path 1: learned macro shortcut"), snippet);
+        assertTrue(snippet.contains("Path 2: learned macro + expansion variant"), snippet);
+        assertTrue(snippet.contains("Path 3: hidden-structure discovery"), snippet);
+        assertTrue(snippet.contains("Path 4: expanded hidden-structure variant"), snippet);
+        assertTrue(snippet.contains("source replay ids: convergent-sophie-germain-hidden-structure-replay"), snippet);
+        assertFalse(snippet.contains("path-cryptic-"), snippet);
+        assertFalse(snippet.contains("(none)"), snippet);
+    }
+
+    @Test
+    void omitsEmptySourceReplayIdsFromGallerySnippet() {
+        String input = "x^4 + 4*y^4";
+        String target = "(x^2 - 2*x*y + 2*y^2)*(x^2 + 2*x*y + 2*y^2)";
+        ConvergentPath macroPath = syntheticPath(
+            "path-cryptic-macro",
+            List.of(input, target),
+            List.of("macro_sophie_germain"),
+            List.of(RuleFamily.LEARNED_MACRO),
+            true
+        );
+        ConvergentPath hiddenStructurePath = syntheticPath(
+            "path-cryptic-hidden",
+            List.of(input, "(x^2 + 2*y^2)^2 - (2*x*y)^2", target),
+            List.of("hypothesis_difference_of_squares_preparation", "ast_square_difference_factor"),
+            List.of(RuleFamily.HIDDEN_STRUCTURE, RuleFamily.FACTORIZATION),
+            false
+        );
+        ConvergentDiscoveryReport report = new ConvergentDiscoveryReport(
+            input,
+            canonicalizer.canonicalize(target),
+            List.of(new ConvergentState(
+                target,
+                canonicalizer.stableHash(target),
+                List.of(macroPath, hiddenStructurePath),
+                macroPath.pathId(),
+                hiddenStructurePath.pathId(),
+                Optional.of(macroPath.pathId())
+            )),
+            List.of(macroPath, hiddenStructurePath),
+            List.of(),
+            List.of(),
+            Set.of(RuleFamily.LEARNED_MACRO, RuleFamily.HIDDEN_STRUCTURE, RuleFamily.FACTORIZATION),
+            Set.of("synthetic")
+        );
+
+        String snippet = new ConvergentDiscoveryGallerySnippetWriter().render(report);
+
+        assertFalse(snippet.contains("source replay ids:"), snippet);
+        assertFalse(snippet.contains("(none)"), snippet);
+    }
+
     private SearchState state(List<String> path, List<String> rules) {
         String expression = path.getLast();
         return new SearchState(
@@ -99,6 +259,41 @@ class ConvergentDiscoveryAnalysisTest {
             1,
             rules.stream().map(ignored -> RewriteKind.NORMALIZE).toList(),
             rules.stream().map(ignored -> true).toList()
+        );
+    }
+
+    private ConvergentPath syntheticPath(
+        String pathId,
+        List<String> expressions,
+        List<String> ruleIds,
+        List<RuleFamily> ruleFamilies,
+        boolean containsMacroStep
+    ) {
+        return syntheticPath(pathId, expressions, ruleIds, ruleFamilies, containsMacroStep, List.of());
+    }
+
+    private ConvergentPath syntheticPath(
+        String pathId,
+        List<String> expressions,
+        List<String> ruleIds,
+        List<RuleFamily> ruleFamilies,
+        boolean containsMacroStep,
+        List<String> sourceReplayIds
+    ) {
+        return new ConvergentPath(
+            pathId,
+            expressions,
+            ruleIds,
+            ruleFamilies,
+            expressions.getLast(),
+            scorer.score(expressions.getLast()),
+            ruleIds.size(),
+            false,
+            containsMacroStep,
+            containsMacroStep,
+            "proved",
+            "validated",
+            sourceReplayIds
         );
     }
 }

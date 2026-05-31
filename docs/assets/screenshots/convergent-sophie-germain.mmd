@@ -1,10 +1,30 @@
 graph TD
-  input["x^4 + 4*y^4"]:::input
-  bridge["(x^2 + 2*y^2)^2 - (2*x*y)^2"]:::didactic
-  factor["(x^2 - 2*x*y + 2*y^2)*(x^2 + 2*x*y + 2*y^2)"]:::convergence
-  input -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| bridge
-  bridge -->|FACTORIZATION: ast_square_difference_factor| factor
-  input -->|LEARNED_MACRO: macro_sophie_germain| factor
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f["x^4 + 4*y^4"]:::input
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead["(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"]:::convergence
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|LEARNED_MACRO: macro_6bd0496b| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|LEARNED_MACRO: macro_6bd0496b| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776["(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"]
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|FACTORIZATION: ast_square_difference_factor| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|OTHER: ast_power_two_to_product| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|FACTORIZATION: ast_square_difference_factor| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|LEARNED_MACRO: macro_6bd0496b| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|OTHER: ast_power_two_to_product| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|FACTORIZATION: ast_square_difference_factor| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_8af4242b0a075abdc3769a5efb1df631b56509c0b3f56e5f3bb04fbe17c0b36f -->|HIDDEN_STRUCTURE: hypothesis_difference_of_squares_preparation| conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776
+  conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 -->|FACTORIZATION: ast_square_difference_factor| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|NORMALIZATION: ast_canonical_normalize| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead -->|OTHER: ast_power_two_to_product| conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead
+  class conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead didactic
+  class conv_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776 didactic
+  class conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead convergence
+  class conv_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead macro
   classDef input fill:#eef2ff,stroke:#4338ca,stroke-width:2px
   classDef convergence fill:#dcfce7,stroke:#15803d,stroke-width:3px
   classDef didactic fill:#fef3c7,stroke:#d97706,stroke-width:2px

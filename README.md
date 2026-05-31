@@ -23,17 +23,18 @@
 
 ## Recent discovery milestone
 
-![Generated parametric Sophie-Germain discovery graph](docs/assets/screenshots/parametric-sophie-germain-discovery.png)
+<img src="docs/assets/screenshots/convergent-sophie-germain.svg" alt="Convergent Sophie-Germain graph showing the hidden-structure discovery path and learned macro shortcut reaching the same factored result." width="760">
 
-PR #70 made the hidden structure in `x^4 + 4*y^4` visible as a
-difference of squares:
+*Two real search paths converge: the didactic hidden-structure path and the learned macro shortcut.*
+
+PR #72 makes the convergent discovery proof visible directly: the input
+`x^4 + 4*y^4` follows a didactic hidden-structure path through the
+difference of squares
 `(x^2 + 2*y^2)^2 - (2xy)^2`.
-The same replay/search evidence taught the macro `A^4 + 4*B^4`, then
-reused it on `(x+1)^4 + 4*z^4`; the linked graph and gallery snippet are
-generated from those replay artifacts, not hand-drawn.
+The learned macro shortcut reaches the same factored target node.
 
-See the full [Demo Gallery](docs/demo-gallery.md#symbolic-sophie-germain-discovery)
-for the replay path and macro reuse entry.
+See the full [Demo Gallery](docs/demo-gallery.md#convergent-discovery-multiple-paths-to-one-result)
+for both converging paths and the generated evidence links.
 
 ## 30 Sekunden (Demo Standard)
 

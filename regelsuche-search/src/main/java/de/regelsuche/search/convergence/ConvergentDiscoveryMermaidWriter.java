@@ -1,8 +1,10 @@
 package de.regelsuche.search.convergence;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /** Renders a convergent discovery graph from report data only. */
 public final class ConvergentDiscoveryMermaidWriter {
@@ -14,20 +16,31 @@ public final class ConvergentDiscoveryMermaidWriter {
             return out.append("  empty[\"No convergent state\"]\n").toString();
         }
         Map<String, String> nodeIds = new HashMap<>();
+        Set<String> declaredNodes = new HashSet<>();
+        Set<String> didacticNodes = new HashSet<>();
+        String didacticPathId = report.convergentStates().isEmpty()
+            ? null
+            : report.convergentStates().getFirst().mostDidacticPathId();
         String inputId = nodeId(nodeIds, report.inputExpression());
         out.append("  ").append(inputId).append("[\"").append(escape(report.inputExpression())).append("\"]:::input\n");
+        declaredNodes.add(inputId);
         for (ConvergentPath path : report.pathsToTarget()) {
             String previous = inputId;
             for (int i = 1; i < path.expressions().size(); i++) {
                 String expression = path.expressions().get(i);
                 String current = nodeId(nodeIds, expression);
-                out.append("  ").append(current).append("[\"").append(escape(expression)).append("\"]");
-                if (i == path.expressions().size() - 1) {
-                    out.append(":::convergence");
-                } else if (path.pathId().equals(report.convergentStates().getFirst().mostDidacticPathId())) {
-                    out.append(":::didactic");
+                if (i < path.expressions().size() - 1
+                    && didacticPathId != null
+                    && path.pathId().equals(didacticPathId)) {
+                    didacticNodes.add(current);
                 }
-                out.append('\n');
+                if (declaredNodes.add(current)) {
+                    out.append("  ").append(current).append("[\"").append(escape(expression)).append("\"]");
+                    if (i == path.expressions().size() - 1) {
+                        out.append(":::convergence");
+                    }
+                    out.append('\n');
+                }
                 String rule = path.ruleIds().get(i - 1);
                 RuleFamily family = path.ruleFamilies().get(i - 1);
                 out.append("  ").append(previous)
@@ -35,6 +48,9 @@ public final class ConvergentDiscoveryMermaidWriter {
                     .append(current).append('\n');
                 previous = current;
             }
+        }
+        for (String didacticNode : didacticNodes) {
+            out.append("  class ").append(didacticNode).append(" didactic\n");
         }
         report.convergentStates().stream().findFirst().ifPresent(state -> {
             out.append("  class ").append(nodeId(nodeIds, state.expression())).append(" convergence\n");
@@ -54,7 +70,7 @@ public final class ConvergentDiscoveryMermaidWriter {
 
     private String nodeId(Map<String, String> nodeIds, String expression) {
         String hash = canonicalizer.stableHash(expression == null ? "" : expression);
-        return nodeIds.computeIfAbsent(hash, ignored -> "conv_" + Integer.toHexString(hash.hashCode()).replace('-', 'n'));
+        return nodeIds.computeIfAbsent(hash, ignored -> "conv_" + hash);
     }
 
     private String escape(String value) {
