@@ -165,6 +165,12 @@ public final class SearchSpaceEstimator {
             return null;
         }
         String size = projected == Long.MAX_VALUE ? "very large" : "~" + projected;
+        if (projected < visitBudget) {
+            return String.format(
+                "Possible search-space explosion: estimated growth rate %.2f, expected %s states "
+                    + "within the current visit budget of %d.",
+                branchingFactor, size, visitBudget);
+        }
         return String.format(
             "Possible search-space explosion: estimated growth rate %.2f, expected %s states "
                 + "exceed the visit budget of %d.",

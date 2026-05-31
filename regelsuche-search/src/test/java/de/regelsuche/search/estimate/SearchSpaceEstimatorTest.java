@@ -37,6 +37,16 @@ class SearchSpaceEstimatorTest {
     }
 
     @Test
+    void explosiveGrowthWithinBudgetDoesNotClaimBudgetExceeded() {
+        SearchSpaceEstimate estimate = estimator.estimate(List.of(1L, 2L), 2, 1_000_000);
+
+        assertEquals(SearchSpaceRisk.EXPLOSIVE, estimate.risk());
+        assertTrue(estimate.hasWarning());
+        assertTrue(estimate.projectedStateCount() < 1_000_000);
+        assertTrue(estimate.warning().contains("within the current visit budget of 1000000"));
+    }
+
+    @Test
     void slowGrowthIsModerateWithinBudget() {
         SearchSpaceEstimate estimate = estimator.estimate(List.of(10L, 11L, 12L), 4, 100_000);
 

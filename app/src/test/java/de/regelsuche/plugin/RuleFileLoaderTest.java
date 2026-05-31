@@ -80,6 +80,21 @@ class RuleFileLoaderTest {
     }
 
     @Test
+    void invalidHeadersMentionProfilesInDiagnostics(@TempDir Path tempDir) throws Exception {
+        Path file = tempDir.resolve("invalid-header.regelsuche");
+        Files.write(file, List.of(
+            "profil school_algebra:",
+            "  enable_tags:",
+            "    - factorization"
+        ));
+
+        RuleFileParseException exception = assertThrows(RuleFileParseException.class,
+            () -> new PluginRuntime.RuleFileLoader().load(file, new RuleRegistry(), new MacroRegistry()));
+
+        assertTrue(exception.getMessage().contains("Expected 'rule <id>:', 'macro <id>:' or 'profile <id>:'"));
+    }
+
+    @Test
     void bundledExampleRulePackageLoadsSuccessfully() {
         Path file = locateRepoRoot().resolve("examples/binomial-formulas.regelsuche");
 

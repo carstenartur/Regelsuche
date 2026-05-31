@@ -40,7 +40,7 @@ public final class RuleFileParser {
             Matcher header = HEADER.matcher(line);
             if (!header.matches()) {
                 diagnostics.add(new RuleFileDiagnostic(path, index + 1, Severity.ERROR,
-                    "Expected 'rule <id>:' or 'macro <id>:'"));
+                    "Expected 'rule <id>:', 'macro <id>:' or 'profile <id>:'"));
                 index++;
                 continue;
             }
