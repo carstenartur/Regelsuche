@@ -52,4 +52,22 @@ class PluginCliRouterTest {
         assertEquals(2, exit);
         assertTrue(output.toString().contains("Missing required property 'pattern'"), output::toString);
     }
+
+    @Test
+    void rulesConflictsReportsCompetingPatterns(@TempDir Path tempDir) {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        CliRouter router = new CliRouter(
+            new PrintStream(output),
+            new InMemoryExpressionGraphStore(),
+            new InMemoryRuleInventoryRepository(),
+            new DefaultTransformationExportService(),
+            true
+        );
+
+        int exit = router.run(new String[]{"rules", "conflicts", "--dir", tempDir.resolve("rules").toString()});
+
+        assertEquals(0, exit);
+        assertTrue(output.toString().contains("CONFLICT"), output::toString);
+        assertTrue(output.toString().contains("binomial_square_forward"), output::toString);
+    }
 }

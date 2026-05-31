@@ -34,6 +34,7 @@ public final class PluginRuntime implements AutoCloseable {
     private List<LoadedPlugin> loadedPlugins = List.of();
     private List<RuntimeDiagnostic> diagnostics = List.of();
     private List<PatternTransformation> macroTransformations = List.of();
+    private List<RuleConflictDetector.RuleConflict> conflicts = List.of();
     private URLClassLoader externalPluginClassLoader;
 
     public PluginRuntime() {
@@ -60,6 +61,13 @@ public final class PluginRuntime implements AutoCloseable {
         loadRuleFiles(discoveredDiagnostics);
         disableConfiguredRules();
         this.macroTransformations = buildMacroTransformations(discoveredDiagnostics);
+        this.conflicts = detectConflicts();
+        for (RuleConflictDetector.RuleConflict conflict : conflicts) {
+            discoveredDiagnostics.add(new RuntimeDiagnostic(
+                "rule-conflict",
+                "Competing rules share the same source pattern: " + String.join(", ", conflict.ruleIds())
+            ));
+        }
         loadedPlugins = List.copyOf(discoveredPlugins);
         diagnostics = List.copyOf(discoveredDiagnostics);
     }
@@ -98,6 +106,10 @@ public final class PluginRuntime implements AutoCloseable {
 
     public List<PatternTransformation> macroTransformations() {
         return macroTransformations;
+    }
+
+    public List<RuleConflictDetector.RuleConflict> conflicts() {
+        return conflicts;
     }
 
     public List<RegisteredRuleView> registeredRules() {
@@ -256,6 +268,20 @@ public final class PluginRuntime implements AutoCloseable {
             }
         }
         return List.copyOf(built);
+    }
+
+    private List<RuleConflictDetector.RuleConflict> detectConflicts() {
+        List<RuleConflictDetector.ConflictCandidate> candidates = new ArrayList<>();
+        for (RewriteRule rule : ruleRegistry.enabledRules()) {
+            candidates.add(new RuleConflictDetector.ConflictCandidate(rule.id(), rule));
+        }
+        for (PatternTransformation transformation : transformationRegistry.enabledTransformations()) {
+            candidates.add(new RuleConflictDetector.ConflictCandidate(transformation.id(), transformation));
+        }
+        for (PatternTransformation macroTransformation : macroTransformations) {
+            candidates.add(new RuleConflictDetector.ConflictCandidate(macroTransformation.id(), macroTransformation));
+        }
+        return RuleConflictDetector.detect(candidates);
     }
 
     private boolean isRuleFile(Path path) {

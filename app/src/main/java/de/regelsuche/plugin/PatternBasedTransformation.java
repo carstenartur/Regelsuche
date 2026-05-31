@@ -41,6 +41,14 @@ public final class PatternBasedTransformation implements PatternTransformation {
         return id;
     }
 
+    public PatternExpr source() {
+        return source;
+    }
+
+    public PatternExpr target() {
+        return target;
+    }
+
     @Override
     public RewriteKind kind() {
         return kind;

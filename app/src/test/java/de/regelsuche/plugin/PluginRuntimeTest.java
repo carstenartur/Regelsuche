@@ -116,6 +116,24 @@ class PluginRuntimeTest {
     }
 
     @Test
+    void competingMacroAndTransformationSourcePatternsAreReportedAsConflicts(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of(),
+            Set.of()
+        ))) {
+            assertTrue(runtime.conflicts().stream().anyMatch(conflict ->
+                conflict.ruleIds().contains("binomial_square_forward")
+                    && conflict.ruleIds().contains("macro.expand_square")));
+            assertTrue(runtime.diagnostics().stream().anyMatch(diagnostic ->
+                diagnostic.source().equals("rule-conflict")
+                    && diagnostic.message().contains("binomial_square_forward")));
+        }
+    }
+
+    @Test
     void disabledRulesAreNotApplied(@TempDir Path tempDir) {
         try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
             tempDir.resolve("plugins"),

@@ -220,7 +220,7 @@ public class CliRouter {
 
     private int runRules(String[] args) {
         if (args.length == 0) {
-            out.println("Usage: rules list|validate");
+            out.println("Usage: rules list|validate|conflicts");
             return 1;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
@@ -264,6 +264,26 @@ public class CliRouter {
                 } catch (RuleFileParseException ex) {
                     ex.diagnostics().forEach(diagnostic -> out.println(diagnostic.format()));
                     return 2;
+                }
+            }
+            case "conflicts" -> {
+                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
+                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+                    Paths.get("plugins"),
+                    rulesDir,
+                    true,
+                    java.util.Set.of(),
+                    java.util.Set.of()
+                ))) {
+                    if (runtime.conflicts().isEmpty()) {
+                        out.println("No rule conflicts detected.");
+                    } else {
+                        runtime.conflicts().forEach(conflict -> out.println(
+                            "CONFLICT competing rules share source pattern: "
+                                + String.join(", ", conflict.ruleIds())));
+                    }
+                    return 0;
                 }
             }
             default -> {
