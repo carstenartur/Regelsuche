@@ -12,6 +12,8 @@ class CliCommandRegistryTest {
 
         assertTrue(registry.contains("discover"));
         assertTrue(registry.contains("SERVE"));
+        assertTrue(registry.contains("plugins"));
+        assertTrue(registry.contains("rules"));
         assertFalse(registry.contains("term"));
     }
 }

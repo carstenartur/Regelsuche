@@ -1,0 +1,322 @@
+package de.regelsuche.plugin;
+
+import de.regelsuche.mining.RulePatternParser;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.logging.Logger;
+
+public final class PluginRuntime implements AutoCloseable {
+    private static final Logger LOGGER = Logger.getLogger(PluginRuntime.class.getName());
+
+    private final PluginRuntimeConfig config;
+    private final RuleFileLoader ruleFileLoader = new RuleFileLoader();
+    private RuleRegistry ruleRegistry = new RuleRegistry();
+    private TransformationRegistry transformationRegistry = new TransformationRegistry();
+    private AstVisitorRegistry astVisitorRegistry = new AstVisitorRegistry();
+    private MacroRegistry macroRegistry = new MacroRegistry();
+    private List<LoadedPlugin> loadedPlugins = List.of();
+    private List<RuntimeDiagnostic> diagnostics = List.of();
+    private URLClassLoader externalPluginClassLoader;
+
+    public PluginRuntime() {
+        this(PluginRuntimeConfig.defaults());
+    }
+
+    public PluginRuntime(PluginRuntimeConfig config) {
+        this.config = config;
+        reload();
+    }
+
+    public void reload() {
+        closeQuietly();
+        this.ruleRegistry = new RuleRegistry();
+        this.transformationRegistry = new TransformationRegistry();
+        this.astVisitorRegistry = new AstVisitorRegistry();
+        this.macroRegistry = new MacroRegistry();
+        List<LoadedPlugin> discoveredPlugins = new ArrayList<>();
+        List<RuntimeDiagnostic> discoveredDiagnostics = new ArrayList<>();
+        if (config.loadClasspathPlugins()) {
+            loadPlugins(ServiceLoader.load(RegelsuchePlugin.class), "classpath", discoveredPlugins, discoveredDiagnostics);
+        }
+        loadExternalPlugins(discoveredPlugins, discoveredDiagnostics);
+        loadRuleFiles(discoveredDiagnostics);
+        disableConfiguredRules();
+        loadedPlugins = List.copyOf(discoveredPlugins);
+        diagnostics = List.copyOf(discoveredDiagnostics);
+    }
+
+    public RuleRegistry ruleRegistry() {
+        return ruleRegistry;
+    }
+
+    public TransformationRegistry transformationRegistry() {
+        return transformationRegistry;
+    }
+
+    public AstVisitorRegistry astVisitorRegistry() {
+        return astVisitorRegistry;
+    }
+
+    public MacroRegistry macroRegistry() {
+        return macroRegistry;
+    }
+
+    public List<LoadedPlugin> loadedPlugins() {
+        return loadedPlugins;
+    }
+
+    public List<RuntimeDiagnostic> diagnostics() {
+        return diagnostics;
+    }
+
+    public PluginAwareAstRewriteTransformationEngine createTransformationEngine() {
+        List<RewriteRule> combined = new ArrayList<>(de.regelsuche.transform.AstRewriteTransformationEngine.defaultRules());
+        combined.addAll(ruleRegistry.enabledRules());
+        combined.addAll(transformationRegistry.enabledTransformations());
+        return new PluginAwareAstRewriteTransformationEngine(combined, astVisitorRegistry);
+    }
+
+    public List<RegisteredRuleView> registeredRules() {
+        Map<String, RegisteredRuleView> all = new LinkedHashMap<>();
+        for (RuleRegistry.RuleRegistration registration : ruleRegistry.registrations()) {
+            all.put(registration.id(), new RegisteredRuleView(
+                registration.id(),
+                registration.source(),
+                registration.explanation(),
+                registration.tags(),
+                registration.enabled(),
+                "rule"
+            ));
+        }
+        for (TransformationRegistry.TransformationRegistration registration : transformationRegistry.registrations()) {
+            all.put(registration.id(), new RegisteredRuleView(
+                registration.id(),
+                registration.source(),
+                registration.explanation(),
+                registration.tags(),
+                registration.enabled(),
+                "transformation"
+            ));
+        }
+        return List.copyOf(all.values());
+    }
+
+    @Override
+    public void close() {
+        closeQuietly();
+    }
+
+    private void loadExternalPlugins(List<LoadedPlugin> discoveredPlugins, List<RuntimeDiagnostic> discoveredDiagnostics) {
+        try {
+            if (!Files.isDirectory(config.pluginsDirectory())) {
+                return;
+            }
+            List<URL> urls = Files.list(config.pluginsDirectory())
+                .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar"))
+                .sorted(Comparator.comparing(Path::toString))
+                .map(this::toUrl)
+                .toList();
+            if (urls.isEmpty()) {
+                return;
+            }
+            externalPluginClassLoader = new URLClassLoader(urls.toArray(URL[]::new),
+                Thread.currentThread().getContextClassLoader());
+            loadPlugins(ServiceLoader.load(RegelsuchePlugin.class, externalPluginClassLoader),
+                config.pluginsDirectory().toString(), discoveredPlugins, discoveredDiagnostics);
+        } catch (IOException ex) {
+            discoveredDiagnostics.add(new RuntimeDiagnostic(
+                "plugin-runtime",
+                "Could not scan plugin directory " + config.pluginsDirectory() + ": " + ex.getMessage()
+            ));
+        }
+    }
+
+    private void loadPlugins(
+        ServiceLoader<RegelsuchePlugin> loader,
+        String source,
+        List<LoadedPlugin> discoveredPlugins,
+        List<RuntimeDiagnostic> discoveredDiagnostics
+    ) {
+        try {
+            for (RegelsuchePlugin plugin : loader) {
+                boolean enabled = !config.disabledPluginIds().contains(plugin.id());
+                discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, enabled));
+                if (!enabled) {
+                    discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(), "Plugin disabled by configuration"));
+                    continue;
+                }
+                registerPlugin(plugin, source, discoveredDiagnostics);
+            }
+        } catch (ServiceConfigurationError error) {
+            discoveredDiagnostics.add(new RuntimeDiagnostic(
+                "plugin-runtime",
+                "Failed to instantiate plugin from " + source + ": " + error.getMessage()
+            ));
+        }
+    }
+
+    private void registerPlugin(RegelsuchePlugin plugin, String source, List<RuntimeDiagnostic> discoveredDiagnostics) {
+        try {
+            plugin.registerRules(ruleRegistry);
+            plugin.registerTransformations(transformationRegistry);
+            plugin.registerVisitors(astVisitorRegistry);
+            plugin.registerMacros(macroRegistry);
+        } catch (RuntimeException ex) {
+            LOGGER.warning(() -> "Plugin " + plugin.id() + " failed: " + ex.getMessage());
+            discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(),
+                "Failed to register plugin contributions from " + source + ": " + ex.getMessage()));
+        }
+    }
+
+    private void loadRuleFiles(List<RuntimeDiagnostic> discoveredDiagnostics) {
+        if (!Files.isDirectory(config.rulesDirectory())) {
+            return;
+        }
+        try {
+            List<Path> files = Files.list(config.rulesDirectory())
+                .filter(Files::isRegularFile)
+                .filter(this::isRuleFile)
+                .sorted(Comparator.comparing(Path::toString))
+                .toList();
+            for (Path file : files) {
+                try {
+                    RuleFileLoadResult result = ruleFileLoader.load(file, ruleRegistry, macroRegistry);
+                    for (RuleFileParser.RuleFileDiagnostic diagnostic : result.diagnostics()) {
+                        discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
+                    }
+                } catch (RuleFileParseException ex) {
+                    for (RuleFileParser.RuleFileDiagnostic diagnostic : ex.diagnostics()) {
+                        discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            discoveredDiagnostics.add(new RuntimeDiagnostic(
+                "rule-runtime",
+                "Could not scan rule directory " + config.rulesDirectory() + ": " + ex.getMessage()
+            ));
+        }
+    }
+
+    private void disableConfiguredRules() {
+        Set<String> disabledRuleIds = new LinkedHashSet<>(config.disabledRuleIds());
+        for (String disabledRuleId : disabledRuleIds) {
+            ruleRegistry.disable(disabledRuleId);
+            transformationRegistry.disable(disabledRuleId);
+        }
+    }
+
+    private boolean isRuleFile(Path path) {
+        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".regelsuche") || name.endsWith(".rules");
+    }
+
+    private URL toUrl(Path path) {
+        try {
+            return path.toUri().toURL();
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("Invalid plugin path: " + path, ex);
+        }
+    }
+
+    private void closeQuietly() {
+        if (externalPluginClassLoader != null) {
+            try {
+                externalPluginClassLoader.close();
+            } catch (IOException ignored) {
+                // ignore close noise during reload
+            }
+            externalPluginClassLoader = null;
+        }
+    }
+
+    public record LoadedPlugin(String id, String name, String version, String source, boolean enabled) {
+    }
+
+    public record RuntimeDiagnostic(String source, String message) {
+    }
+
+    public record RegisteredRuleView(
+        String id,
+        String source,
+        String explanation,
+        List<String> tags,
+        boolean enabled,
+        String type
+    ) {
+        public RegisteredRuleView {
+            tags = List.copyOf(tags);
+        }
+    }
+
+    public static final class RuleFileLoader {
+        private final RuleFileParser parser = new RuleFileParser();
+        private final RulePatternParser patternParser = new RulePatternParser();
+
+        public RuleFileLoadResult load(Path file, RuleRegistry ruleRegistry, MacroRegistry macroRegistry) {
+            RuleFileParser.RulePackage rulePackage = parser.parse(file);
+            if (rulePackage.hasErrors()) {
+                throw new RuleFileParseException(rulePackage.diagnostics());
+            }
+            for (RuleFileParser.Entry entry : rulePackage.entries()) {
+                if (entry instanceof RuleFileParser.RuleDefinition rule) {
+                    registerRule(file, ruleRegistry, rule);
+                } else if (entry instanceof RuleFileParser.MacroDefinition macro) {
+                    macroRegistry.register(new RuleMacro(
+                        macro.id(),
+                        macro.input(),
+                        macro.output(),
+                        macro.explanation(),
+                        macro.tags()
+                    ), file.toString());
+                }
+            }
+            return new RuleFileLoadResult(rulePackage.entries().size(), rulePackage.diagnostics());
+        }
+
+        private void registerRule(Path file, RuleRegistry ruleRegistry, RuleFileParser.RuleDefinition rule) {
+            PatternExpr source = PatternExprMapper.toPatternExpr(patternParser.parse(rule.pattern()));
+            PatternExpr target = PatternExprMapper.toPatternExpr(patternParser.parse(rule.replace()));
+            String explanation = rule.explanation();
+            if (rule.direction() == RuleFileParser.RuleDirection.BOTH) {
+                ruleRegistry.register(new PatternRewriteRule(
+                    rule.id() + ".forward", source, target, RewriteKind.NORMALIZE, false, 0, true
+                ), file.toString(), explanation, rule.tags());
+                ruleRegistry.register(new PatternRewriteRule(
+                    rule.id() + ".backward", target, source, RewriteKind.NORMALIZE, false, 0, true
+                ), file.toString(), explanation, rule.tags());
+            } else if (rule.direction() == RuleFileParser.RuleDirection.BACKWARD) {
+                ruleRegistry.register(new PatternRewriteRule(
+                    rule.id(), target, source, RewriteKind.NORMALIZE, false, 0, true
+                ), file.toString(), explanation, rule.tags());
+            } else {
+                ruleRegistry.register(new PatternRewriteRule(
+                    rule.id(), source, target, RewriteKind.NORMALIZE, false, 0, true
+                ), file.toString(), explanation, rule.tags());
+            }
+        }
+    }
+
+    public record RuleFileLoadResult(int loadedEntries, List<RuleFileParser.RuleFileDiagnostic> diagnostics) {
+        public RuleFileLoadResult {
+            diagnostics = List.copyOf(diagnostics);
+        }
+    }
+}
