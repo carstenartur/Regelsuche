@@ -139,6 +139,13 @@ class ConvergentDiscoveryAnalysisTest {
             List.of(RuleFamily.LEARNED_MACRO),
             true
         );
+        ConvergentPath macroExpandedVariantPath = syntheticPath(
+            "path-cryptic-macro-expanded",
+            List.of(input, "expanded macro bridge", target),
+            List.of("macro_sophie_germain", "ast_distribute_left_add"),
+            List.of(RuleFamily.LEARNED_MACRO, RuleFamily.EXPANSION),
+            true
+        );
         ConvergentPath hiddenStructurePath = syntheticPath(
             "path-cryptic-hidden",
             List.of(input, "(x^2 + 2*y^2)^2 - (2*x*y)^2", target),
@@ -164,12 +171,12 @@ class ConvergentDiscoveryAnalysisTest {
             List.of(new ConvergentState(
                 target,
                 canonicalizer.stableHash(target),
-                List.of(macroPath, hiddenStructurePath, expandedVariantPath),
+                List.of(macroPath, macroExpandedVariantPath, hiddenStructurePath, expandedVariantPath),
                 macroPath.pathId(),
                 hiddenStructurePath.pathId(),
                 Optional.of(macroPath.pathId())
             )),
-            List.of(macroPath, hiddenStructurePath, expandedVariantPath),
+            List.of(macroPath, macroExpandedVariantPath, hiddenStructurePath, expandedVariantPath),
             List.of(),
             List.of(expandedVariantPath),
             Set.of(RuleFamily.LEARNED_MACRO, RuleFamily.HIDDEN_STRUCTURE, RuleFamily.FACTORIZATION),
@@ -180,9 +187,11 @@ class ConvergentDiscoveryAnalysisTest {
 
         assertTrue(snippet.contains("shortest path: learned macro shortcut"), snippet);
         assertTrue(snippet.contains("most didactic path: hidden-structure discovery"), snippet);
+        assertTrue(snippet.contains("target: `" + target + "`"), snippet);
         assertTrue(snippet.contains("Path 1: learned macro shortcut"), snippet);
-        assertTrue(snippet.contains("Path 2: hidden-structure discovery"), snippet);
-        assertTrue(snippet.contains("Path 3: expanded discovery variant"), snippet);
+        assertTrue(snippet.contains("Path 2: learned macro + expansion variant"), snippet);
+        assertTrue(snippet.contains("Path 3: hidden-structure discovery"), snippet);
+        assertTrue(snippet.contains("Path 4: expanded hidden-structure variant"), snippet);
         assertTrue(snippet.contains("source replay ids: convergent-sophie-germain-hidden-structure-replay"), snippet);
         assertFalse(snippet.contains("path-cryptic-"), snippet);
         assertFalse(snippet.contains("(none)"), snippet);

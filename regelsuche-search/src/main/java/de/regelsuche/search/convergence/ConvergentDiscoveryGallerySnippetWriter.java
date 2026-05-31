@@ -8,7 +8,7 @@ public final class ConvergentDiscoveryGallerySnippetWriter {
         StringBuilder out = new StringBuilder();
         out.append("### Convergent discovery: multiple paths to one result\n\n");
         out.append("- input: `").append(report.inputExpression()).append("`\n");
-        out.append("- target: `").append(report.canonicalTargetExpression()).append("`\n");
+        out.append("- target: `").append(displayTargetExpression(report)).append("`\n");
         out.append("- number of distinct paths: ").append(report.pathsToTarget().size()).append('\n');
         out.append("- path families: ").append(report.ruleFamiliesUsed()).append('\n');
         report.convergentStates().stream().findFirst().ifPresent(state -> {
@@ -52,19 +52,34 @@ public final class ConvergentDiscoveryGallerySnippetWriter {
 
     private String labelForPath(ConvergentPath path) {
         if (path.containsMacroStep()) {
+            if (isExpandedVariant(path)) {
+                return "learned macro + expansion variant";
+            }
             return "learned macro shortcut";
         }
-        if (path.ruleFamilies().contains(RuleFamily.HIDDEN_STRUCTURE)
-            && path.length() > nonNormalizationRuleCount(path)) {
-            return "expanded discovery variant";
-        }
         if (path.ruleFamilies().contains(RuleFamily.HIDDEN_STRUCTURE)) {
+            if (isExpandedVariant(path)) {
+                return "expanded hidden-structure variant";
+            }
             return "hidden-structure discovery";
         }
         if (path.ruleFamilies().contains(RuleFamily.EXPANSION)) {
             return "expanded discovery variant";
         }
         return "discovery path";
+    }
+
+    private String displayTargetExpression(ConvergentDiscoveryReport report) {
+        return report.convergentStates().stream()
+            .map(ConvergentState::expression)
+            .filter(expression -> expression != null && !expression.isBlank())
+            .findFirst()
+            .orElse(report.canonicalTargetExpression());
+    }
+
+    private boolean isExpandedVariant(ConvergentPath path) {
+        return path.ruleFamilies().contains(RuleFamily.EXPANSION)
+            || path.length() > nonNormalizationRuleCount(path);
     }
 
     private int nonNormalizationRuleCount(ConvergentPath path) {
