@@ -102,13 +102,25 @@ Antwort. Regelsuche kann mehrere mathematische Wege zeigen, die auf denselben
 kanonischen Zielzustand konvergieren — und sichtbar machen, wann ein
 entdeckter Weg zur gelernten Abkürzung wird.
 
-Der Graph wird aus `ConvergentDiscoveryReport`-Daten erzeugt; er ist kein
-handgezeichnetes Diagramm. Der passende generierte Mermaid-Graph liegt unter
+Der Hauptgraph wird als bounded search-space subgraph aus `SearchProblem`,
+`SearchState`-Replay und `ConvergentDiscoveryReport`-Daten erzeugt; er ist kein
+handgezeichnetes Diagramm. Der passende generierte Search-Space-SVG liegt unter
+[`assets/screenshots/search-space-sophie-germain.svg`](assets/screenshots/search-space-sophie-germain.svg),
+der kleine erklärende Konvergenz-Mermaid-Graph unter
 [`assets/screenshots/convergent-sophie-germain.mmd`](assets/screenshots/convergent-sophie-germain.mmd),
-die Roh-Gallery-Evidence unter
+und die Roh-Gallery-Evidence unter
 [`assets/screenshots/convergent-sophie-germain-gallery-snippet.md`](assets/screenshots/convergent-sophie-germain-gallery-snippet.md).
 
-**A. Sophie-Germain: discovery path vs learned macro shortcut**
+Regelsuche does not only output the factorization.
+It records the explored transformation space and shows which different ideas converge.
+
+**A. Sophie-Germain: generated search space with alternatives**
+
+<img src="assets/screenshots/search-space-sophie-germain.svg" alt="Generated Sophie-Germain search-space graph showing explored alternatives, hidden-structure path, learned macro shortcut, and convergence target.">
+
+*The generated subgraph keeps explored alternatives visible instead of reducing the evidence to the selected convergent paths.*
+
+**B. Small explanatory convergence diagram**
 
 <img src="assets/screenshots/convergent-sophie-germain.svg" alt="Convergent Sophie-Germain graph showing the hidden-structure discovery path and learned macro shortcut reaching the same factored result.">
 

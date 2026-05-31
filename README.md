@@ -23,15 +23,16 @@
 
 ## Recent discovery milestone
 
-<img src="docs/assets/screenshots/convergent-sophie-germain.svg" alt="Convergent Sophie-Germain graph showing the hidden-structure discovery path and learned macro shortcut reaching the same factored result." width="760">
+<img src="docs/assets/screenshots/search-space-sophie-germain.svg" alt="Generated Sophie-Germain search-space graph showing explored alternatives, hidden-structure path, learned macro shortcut, and convergence target." width="900">
 
-*Two real search paths converge: the didactic hidden-structure path and the learned macro shortcut.*
+*A real bounded search-space subgraph shows alternatives around the didactic hidden-structure path and learned macro shortcut.*
 
-PR #72 makes the convergent discovery proof visible directly: the input
-`x^4 + 4*y^4` follows a didactic hidden-structure path through the
-difference of squares
-`(x^2 + 2*y^2)^2 - (2xy)^2`.
-The learned macro shortcut reaches the same factored target node.
+Regelsuche does not only output the factorization.
+It records the explored transformation space and shows which different ideas converge.
+For `x^4 + 4*y^4`, the generated graph keeps less useful branches visible while
+highlighting the hidden-structure path through
+`(x^2 + 2*y^2)^2 - (2xy)^2`, the learned macro shortcut, and the shared
+factored target.
 
 See the full [Demo Gallery](docs/demo-gallery.md#convergent-discovery-multiple-paths-to-one-result)
 for both converging paths and the generated evidence links.

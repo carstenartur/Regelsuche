@@ -21,6 +21,9 @@ import de.regelsuche.search.convergence.ConvergentDiscoveryMermaidWriter;
 import de.regelsuche.search.convergence.ConvergentDiscoveryReport;
 import de.regelsuche.search.convergence.ConvergentDiscoverySvgWriter;
 import de.regelsuche.search.convergence.RuleFamily;
+import de.regelsuche.search.convergence.SearchSpaceSubgraph;
+import de.regelsuche.search.convergence.SearchSpaceSubgraphExtractor;
+import de.regelsuche.search.convergence.SearchSpaceSvgWriter;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
@@ -84,6 +87,16 @@ class ConvergentSophieGermainGalleryTest {
         assertTrue(report.pathsToTarget().stream().anyMatch(path ->
             path.ruleIds().stream().anyMatch(rule -> rule.startsWith("macro_"))), report.pathsToTarget().toString());
         assertTrue(equivalence.areEquivalent(input, report.canonicalTargetExpression()), report.canonicalTargetExpression());
+        SearchSpaceSubgraph searchSpace = new SearchSpaceSubgraphExtractor().extract(problem, states, report);
+        assertTrue(searchSpace.nodes().size() > 8, "Expected a visible search space: " + searchSpace.nodes());
+        assertTrue(searchSpace.edges().size() > 10, "Expected branched rule edges: " + searchSpace.edges());
+        assertTrue(searchSpace.edges().stream().map(SearchSpaceSubgraph.Edge::ruleFamily).distinct().count() >= 2,
+            searchSpace.edges().toString());
+        assertTrue(searchSpace.nodes().stream().anyMatch(SearchSpaceSubgraph.Node::isTarget), searchSpace.nodes().toString());
+        assertTrue(searchSpace.nodes().stream().anyMatch(node -> node.isTarget()
+            && (node.isOnDidacticPath() || node.isOnMacroPath())), searchSpace.nodes().toString());
+        assertTrue(searchSpace.nodes().stream().anyMatch(SearchSpaceSubgraph.Node::notSelected), searchSpace.nodes().toString());
+        assertTrue(searchSpace.nodes().stream().anyMatch(SearchSpaceSubgraph.Node::isDeadEnd), searchSpace.nodes().toString());
 
         String mermaid = new ConvergentDiscoveryMermaidWriter().render(report);
         assertTrue(mermaid.contains(DifferenceOfSquaresPreparationOperator.RULE_ID), mermaid);
@@ -94,20 +107,30 @@ class ConvergentSophieGermainGalleryTest {
         assertTrue(svg.contains("data-generated-by=\"ConvergentDiscoverySvgWriter\""), svg);
         assertMermaidLabelsAppearInSvg(mermaid, svg);
         assertNoManualOnlyNodes(svg);
+        String searchSpaceSvg = new SearchSpaceSvgWriter().render(searchSpace,
+            new ArtifactMetadata("search-space-sophie-germain.svg", "Generated Sophie-Germain search-space subgraph"));
+        assertTrue(searchSpaceSvg.contains("data-generated-by=\"SearchSpaceSvgWriter\""), searchSpaceSvg);
+        assertTrue(searchSpaceSvg.contains("data-generated-from=\"SearchSpaceSubgraph\""), searchSpaceSvg);
+        assertTrue(searchSpaceSvg.contains("alternative branch")
+            || searchSpaceSvg.contains("dead-end alternative"), searchSpaceSvg);
         String snippet = new ConvergentDiscoveryGallerySnippetWriter().render(report);
         assertTrue(snippet.contains("number of distinct paths"), snippet);
         assertTrue(snippet.contains("macro shortcut path"), snippet);
 
         Path graph = tempDir.resolve("convergent-sophie-germain.mmd");
         Path svgFile = tempDir.resolve("convergent-sophie-germain.svg");
+        Path searchSpaceSvgFile = tempDir.resolve("search-space-sophie-germain.svg");
         Path snippetFile = tempDir.resolve("convergent-sophie-germain-gallery-snippet.md");
         Files.writeString(graph, mermaid);
         Files.writeString(svgFile, svg);
+        Files.writeString(searchSpaceSvgFile, searchSpaceSvg);
         Files.writeString(snippetFile, snippet);
         assertTrue(Files.exists(graph));
         assertTrue(Files.exists(svgFile));
+        assertTrue(Files.exists(searchSpaceSvgFile));
         assertTrue(Files.size(graph) > 0);
         assertTrue(Files.size(svgFile) > 0);
+        assertTrue(Files.size(searchSpaceSvgFile) > 0);
         assertTrue(Files.size(snippetFile) > 0);
         assertGeneratedOrProvenancePresent(graph, svgFile, svg);
 
@@ -116,17 +139,30 @@ class ConvergentSophieGermainGalleryTest {
             Files.createDirectories(screenshots);
             Files.writeString(screenshots.resolve("convergent-sophie-germain.mmd"), mermaid);
             Files.writeString(screenshots.resolve("convergent-sophie-germain.svg"), svg);
+            Files.writeString(screenshots.resolve("search-space-sophie-germain.svg"), searchSpaceSvg);
             Files.writeString(screenshots.resolve("convergent-sophie-germain-gallery-snippet.md"), snippet);
         }
         Path screenshots = locateRepoRoot().resolve("docs/assets/screenshots");
         Path docsMmd = screenshots.resolve("convergent-sophie-germain.mmd");
         Path docsSvg = screenshots.resolve("convergent-sophie-germain.svg");
+        Path docsSearchSpaceSvg = screenshots.resolve("search-space-sophie-germain.svg");
         assertTrue(Files.exists(docsMmd), "Missing generated Mermaid asset");
         assertTrue(Files.exists(docsSvg), "Missing generated SVG asset");
+        assertTrue(Files.exists(docsSearchSpaceSvg), "Missing generated search-space SVG asset");
         String docsSvgContent = Files.readString(docsSvg);
+        String docsSearchSpaceSvgContent = Files.readString(docsSearchSpaceSvg);
         assertTrue(Boolean.getBoolean("regelsuche.recordDocs")
             || docsSvgContent.contains("data-generated-by=\"ConvergentDiscoverySvgWriter\""),
             "SVG must be freshly generated in recordDocs mode or carry generated provenance");
+        assertTrue(Boolean.getBoolean("regelsuche.recordDocs")
+            || docsSearchSpaceSvgContent.contains("data-generated-from=\"SearchSpaceSubgraph\""),
+            "Search-space SVG must be generated from SearchSpaceSubgraph");
+        String readme = Files.readString(locateRepoRoot().resolve("README.md"));
+        String gallery = Files.readString(locateRepoRoot().resolve("docs/demo-gallery.md"));
+        assertTrue(readme.contains("search-space-sophie-germain.svg"), "README must show the search-space SVG");
+        assertTrue(gallery.contains("search-space-sophie-germain.svg"), "Gallery must show the search-space SVG");
+        assertTrue(gallery.contains("Regelsuche does not only output the factorization.\n"
+            + "It records the explored transformation space and shows which different ideas converge."));
     }
 
     private void assertMermaidLabelsAppearInSvg(String mermaid, String svg) {

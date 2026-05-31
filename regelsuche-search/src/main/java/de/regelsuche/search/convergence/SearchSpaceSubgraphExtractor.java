@@ -41,8 +41,9 @@ public final class SearchSpaceSubgraphExtractor {
 
         List<Node> nodes = selectedStates.values().stream()
             .sorted(Comparator.comparingInt(SearchState::depth).thenComparing(SearchState::expression))
-            .map(state -> node(problem, state, report, incomingFamilies.getOrDefault(id(state.canonicalHash()), Set.of()),
-                sources.contains(id(state.canonicalHash()))))
+            .map(state -> node(problem, state, report,
+                incomingFamilies.getOrDefault(idForExpression(state.expression()), Set.of()),
+                sources.contains(idForExpression(state.expression()))))
             .toList();
         Set<String> nodeIds = nodes.stream().map(Node::id).collect(java.util.stream.Collectors.toSet());
         List<Edge> edges = edgeDrafts.stream()
@@ -61,18 +62,19 @@ public final class SearchSpaceSubgraphExtractor {
         Map<String, SearchState> byHash = new LinkedHashMap<>();
         for (SearchState state : exploredStates) {
             if (state.depth() <= maxDepth) {
-                byHash.putIfAbsent(id(state.canonicalHash()), state);
+                byHash.putIfAbsent(idForExpression(state.expression()), state);
             }
         }
         if (byHash.isEmpty()) {
             SearchState root = rootState(problem);
-            byHash.put(id(root.canonicalHash()), root);
+            byHash.put(idForExpression(root.expression()), root);
         }
+        expandBounded(problem, byHash, maxDepth);
         for (ConvergentPath path : report.pathsToTarget()) {
             for (int depth = 0; depth < path.expressions().size() && depth <= maxDepth; depth++) {
                 String expression = path.expressions().get(depth);
                 String hash = problem.canonicalizer().stableHash(expression);
-                byHash.putIfAbsent(id(hash), syntheticState(problem, path, depth, expression, hash));
+                byHash.putIfAbsent(idForExpression(expression), syntheticState(problem, path, depth, expression, hash));
             }
         }
         if (byHash.size() <= MAX_NODES) {
@@ -105,15 +107,15 @@ public final class SearchSpaceSubgraphExtractor {
         Set<String> edgeKeys = new HashSet<>();
         for (SearchState state : states.values()) {
             if (state.parentExpression() != null && state.appliedRuleId() != null) {
-                String from = id(problem.canonicalizer().stableHash(state.parentExpression()));
-                String to = id(state.canonicalHash());
+                String from = idForExpression(state.parentExpression());
+                String to = idForExpression(state.expression());
                 addEdge(edges, edgeKeys, incomingFamilies, from, to, state.appliedRuleId(), state.depth());
             }
         }
         for (ConvergentPath path : report.pathsToTarget()) {
             for (int index = 1; index < path.expressions().size(); index++) {
-                String from = id(problem.canonicalizer().stableHash(path.expressions().get(index - 1)));
-                String to = id(problem.canonicalizer().stableHash(path.expressions().get(index)));
+                String from = idForExpression(path.expressions().get(index - 1));
+                String to = idForExpression(path.expressions().get(index));
                 addEdge(edges, edgeKeys, incomingFamilies, from, to, path.ruleIds().get(index - 1), index);
             }
         }
@@ -122,9 +124,9 @@ public final class SearchSpaceSubgraphExtractor {
                 continue;
             }
             for (Transformation transformation : problem.engine().transform(state.expression())) {
-                String to = id(problem.canonicalizer().stableHash(transformation.transformedExpression()));
+                String to = idForExpression(transformation.transformedExpression());
                 if (states.containsKey(to)) {
-                    addEdge(edges, edgeKeys, incomingFamilies, id(state.canonicalHash()), to,
+                    addEdge(edges, edgeKeys, incomingFamilies, idForExpression(state.expression()), to,
                         transformation.rule(), state.depth() + 1);
                 }
             }
@@ -163,7 +165,7 @@ public final class SearchSpaceSubgraphExtractor {
         boolean notSelected = !isTarget && !didactic && !macro;
         boolean isDeadEnd = notSelected && !hasOutgoingEdge;
         return new Node(
-            id(state.canonicalHash()),
+            idForExpression(state.expression()),
             state.expression(),
             membership,
             ruleFamilies,
@@ -201,17 +203,16 @@ public final class SearchSpaceSubgraphExtractor {
 
     private Set<PathMembership> pathMembership(SearchProblem problem, String expression, ConvergentDiscoveryReport report) {
         Set<PathMembership> membership = new LinkedHashSet<>();
-        String hash = problem.canonicalizer().stableHash(expression);
         if (isTarget(expression, report)) {
             membership.add(PathMembership.TARGET);
         }
         selectedPath(report, false).ifPresent(path -> {
-            if (containsHash(problem, path, hash)) {
+            if (path.expressions().contains(expression)) {
                 membership.add(PathMembership.DIDACTIC);
             }
         });
         selectedPath(report, true).ifPresent(path -> {
-            if (containsHash(problem, path, hash)) {
+            if (path.expressions().contains(expression)) {
                 membership.add(PathMembership.MACRO);
             }
         });
@@ -231,12 +232,6 @@ public final class SearchSpaceSubgraphExtractor {
         return report.pathsToTarget().stream().filter(path -> path.pathId().equals(pathId)).findFirst();
     }
 
-    private boolean containsHash(SearchProblem problem, ConvergentPath path, String hash) {
-        return path.expressions().stream()
-            .map(problem.canonicalizer()::stableHash)
-            .anyMatch(hash::equals);
-    }
-
     private boolean isTarget(String expression, ConvergentDiscoveryReport report) {
         String canonical = new de.regelsuche.canonical.ExpressionCanonicalizer().canonicalize(expression);
         return canonical.equals(report.canonicalTargetExpression())
@@ -247,7 +242,9 @@ public final class SearchSpaceSubgraphExtractor {
         return selectedPath(report, macro).stream().anyMatch(path -> {
             for (int index = 1; index < path.expressions().size(); index++) {
                 String rule = path.ruleIds().get(index - 1);
-                if (rule.equals(edge.ruleId())) {
+                if (rule.equals(edge.ruleId())
+                    && idForExpression(path.expressions().get(index - 1)).equals(edge.fromId())
+                    && idForExpression(path.expressions().get(index)).equals(edge.toId())) {
                     return true;
                 }
             }
@@ -257,10 +254,10 @@ public final class SearchSpaceSubgraphExtractor {
 
     private Set<String> protectedNodeIds(SearchProblem problem, ConvergentDiscoveryReport report) {
         Set<String> ids = new HashSet<>();
-        ids.add(id(problem.canonicalizer().stableHash(problem.rootExpression())));
+        ids.add(idForExpression(problem.rootExpression()));
         for (ConvergentPath path : report.pathsToTarget()) {
             for (String expression : path.expressions()) {
-                ids.add(id(problem.canonicalizer().stableHash(expression)));
+                ids.add(idForExpression(expression));
             }
         }
         return ids;
@@ -282,8 +279,63 @@ public final class SearchSpaceSubgraphExtractor {
             RewriteKind.NORMALIZE, false, 0, true, 0);
     }
 
-    private String id(String canonicalHash) {
-        return "space_" + canonicalHash;
+    private void expandBounded(SearchProblem problem, Map<String, SearchState> states, int maxDepth) {
+        int cursor = 0;
+        while (cursor < states.size() && states.size() < MAX_NODES) {
+            SearchState current = new ArrayList<>(states.values()).get(cursor++);
+            if (current.depth() >= maxDepth) {
+                continue;
+            }
+            int generated = 0;
+            for (Transformation transformation : problem.engine().transform(current.expression())) {
+                if (generated >= problem.heuristic().maxCandidatesPerState() || states.size() >= MAX_NODES) {
+                    break;
+                }
+                String nextExpression = transformation.transformedExpression();
+                String nextId = idForExpression(nextExpression);
+                if (nextExpression.equals(current.expression()) || states.containsKey(nextId)) {
+                    continue;
+                }
+                ExpressionScore nextScore = problem.scorer().score(nextExpression);
+                List<String> path = new ArrayList<>(current.path());
+                path.add(nextExpression);
+                List<String> rules = new ArrayList<>(current.appliedRuleIds());
+                rules.add(transformation.rule());
+                Set<String> applications = new LinkedHashSet<>(current.appliedRuleApplications());
+                applications.add(transformation.applicationKey());
+                List<RewriteKind> kinds = new ArrayList<>(current.appliedRuleKinds());
+                kinds.add(transformation.kind());
+                List<Boolean> flags = new ArrayList<>(current.equivalencePreservingFlags());
+                flags.add(transformation.equivalencePreservingByConstruction());
+                List<String> assumptions = new ArrayList<>(current.assumptions());
+                assumptions.addAll(transformation.assumptions());
+                states.put(nextId, new SearchState(
+                    nextExpression,
+                    current.depth() + 1,
+                    nextScore,
+                    path,
+                    rules,
+                    applications,
+                    current.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0),
+                    problem.canonicalizer().stableHash(nextExpression),
+                    current.expression(),
+                    transformation.rule(),
+                    transformation.kind(),
+                    transformation.mayIncreaseComplexity(),
+                    transformation.estimatedCostDelta(),
+                    transformation.equivalencePreservingByConstruction(),
+                    current.score().weightedTotal() - nextScore.weightedTotal(),
+                    kinds,
+                    flags,
+                    assumptions
+                ));
+                generated++;
+            }
+        }
+    }
+
+    private String idForExpression(String expression) {
+        return "space_" + Integer.toUnsignedString((expression == null ? "" : expression).hashCode(), 16);
     }
 
     private record EdgeDraft(String id, String fromId, String toId, String ruleId, RuleFamily family, int depth) {
