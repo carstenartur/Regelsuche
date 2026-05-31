@@ -36,6 +36,10 @@ lässt sich der Suchraum gezielt auf eine Domäne einschränken. Details zur Syn
 
 ## Konflikterkennung
 
+Regeldateien können `conditions` in der Form `<name>: <value>` deklarieren. Die
+Einträge werden beim Laden validiert, typisiert und in den Registry-Metadaten
+sichtbar gemacht, sodass Plugins und Debug-Werkzeuge sie auswerten können.
+
 `RuleConflictDetector` vergleicht die Quellmuster (linke Seite) aller aktivierten Regeln,
 Transformationen und Makros. Platzhalternamen werden dabei auf ihre Reihenfolge des
 ersten Auftretens normalisiert, sodass `A^2 - B^2` und `X^2 - Y^2` als dasselbe Muster

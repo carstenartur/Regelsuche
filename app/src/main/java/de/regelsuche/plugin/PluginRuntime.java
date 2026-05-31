@@ -146,6 +146,7 @@ public final class PluginRuntime implements AutoCloseable {
                 registration.source(),
                 registration.explanation(),
                 registration.tags(),
+                registration.conditions(),
                 registration.enabled(),
                 "rule"
             ));
@@ -156,6 +157,7 @@ public final class PluginRuntime implements AutoCloseable {
                 registration.source(),
                 registration.explanation(),
                 registration.tags(),
+                List.of(),
                 registration.enabled(),
                 "transformation"
             ));
@@ -419,11 +421,13 @@ public final class PluginRuntime implements AutoCloseable {
         String source,
         String explanation,
         List<String> tags,
+        List<RuleFileParser.RuleCondition> conditions,
         boolean enabled,
         String type
     ) {
         public RegisteredRuleView {
             tags = List.copyOf(tags);
+            conditions = List.copyOf(conditions);
         }
     }
 
@@ -470,18 +474,18 @@ public final class PluginRuntime implements AutoCloseable {
             if (rule.direction() == RuleFileParser.RuleDirection.BOTH) {
                 ruleRegistry.register(new PatternRewriteRule(
                     rule.id() + ".forward", source, target, RewriteKind.NORMALIZE, false, costDelta, true
-                ), file.toString(), explanation, rule.tags());
+                ), file.toString(), explanation, rule.tags(), rule.conditions());
                 ruleRegistry.register(new PatternRewriteRule(
                     rule.id() + ".backward", target, source, RewriteKind.NORMALIZE, false, costDelta, true
-                ), file.toString(), explanation, rule.tags());
+                ), file.toString(), explanation, rule.tags(), rule.conditions());
             } else if (rule.direction() == RuleFileParser.RuleDirection.BACKWARD) {
                 ruleRegistry.register(new PatternRewriteRule(
                     rule.id(), target, source, RewriteKind.NORMALIZE, false, costDelta, true
-                ), file.toString(), explanation, rule.tags());
+                ), file.toString(), explanation, rule.tags(), rule.conditions());
             } else {
                 ruleRegistry.register(new PatternRewriteRule(
                     rule.id(), source, target, RewriteKind.NORMALIZE, false, costDelta, true
-                ), file.toString(), explanation, rule.tags());
+                ), file.toString(), explanation, rule.tags(), rule.conditions());
             }
         }
 

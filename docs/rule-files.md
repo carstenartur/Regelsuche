@@ -32,6 +32,24 @@ rule difference_of_squares:
 - `difficulty`
 - `explanation`
 
+## Bedingungen
+
+`conditions` ist eine Liste typisierter Schlüssel-Wert-Bedingungen. Jede Bedingung
+verwendet die Form `<name>: <value>` und wird beim Laden validiert und als Metadatum
+an der registrierten Regel gespeichert. Aktuell dienen diese Bedingungen der
+Validierung, Dokumentation, Debug-Ausgabe und späteren spezialisierten Matchern; die
+Standard-Pattern-Auswertung ignoriert unbekannte Bedingungen bewusst.
+
+Beispiele:
+
+```text
+conditions:
+  - A: expression
+  - B: expression
+  - commutative_addition: true
+  - commutative_multiplication: true
+```
+
 ## Unterstützte Makro-Felder
 
 - `input`

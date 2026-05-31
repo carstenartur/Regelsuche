@@ -12,7 +12,9 @@ import de.regelsuche.input.InputType;
 import de.regelsuche.notify.ConsoleNotifier;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.TransformationSearchService;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.Transformation;
+import java.util.EnumSet;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -75,6 +77,45 @@ class PluginRuntimeTest {
                 .anyMatch(edge -> edge.transformationRule().equals("binomial_square_forward")));
             service.shutdown();
         }
+    }
+
+    @Test
+    void pluginAwareEngineInvokesAllVisitorHookPhases() {
+        AstVisitorRegistry visitorRegistry = new AstVisitorRegistry();
+        for (AstVisitorPhase phase : AstVisitorPhase.values()) {
+            visitorRegistry.register(new AstVisitorPlugin() {
+                @Override
+                public String id() {
+                    return "capture-" + phase.name().toLowerCase();
+                }
+
+                @Override
+                public AstVisitorPhase phase() {
+                    return phase;
+                }
+
+                @Override
+                public void visit(de.regelsuche.ast.Expr root, AstVisitorContext context) {
+                    context.report(id(), "visited " + phase.name());
+                }
+            });
+        }
+        PluginAwareAstRewriteTransformationEngine engine = new PluginAwareAstRewriteTransformationEngine(
+            AstRewriteTransformationEngine.defaultRules(),
+            visitorRegistry
+        );
+
+        engine.transform("x + 0");
+
+        EnumSet<AstVisitorPhase> visited = EnumSet.noneOf(AstVisitorPhase.class);
+        for (AstVisitorContext.VisitorDiagnostic diagnostic : engine.lastVisitorDiagnostics()) {
+            for (AstVisitorPhase phase : AstVisitorPhase.values()) {
+                if (diagnostic.message().equals("visited " + phase.name())) {
+                    visited.add(phase);
+                }
+            }
+        }
+        assertEquals(EnumSet.allOf(AstVisitorPhase.class), visited);
     }
 
     @Test

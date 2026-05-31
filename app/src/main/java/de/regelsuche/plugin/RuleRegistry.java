@@ -11,15 +11,25 @@ public final class RuleRegistry {
     private final Map<String, MutableRuleRegistration> rules = new LinkedHashMap<>();
 
     public void register(RewriteRule rule) {
-        register(rule, "plugin", "", List.of());
+        register(rule, "plugin", "", List.of(), List.of());
     }
 
     public void register(RewriteRule rule, String source, String explanation, List<String> tags) {
+        register(rule, source, explanation, tags, List.of());
+    }
+
+    public void register(
+        RewriteRule rule,
+        String source,
+        String explanation,
+        List<String> tags,
+        List<RuleFileParser.RuleCondition> conditions
+    ) {
         Objects.requireNonNull(rule, "rule");
         if (rules.containsKey(rule.id())) {
             throw new IllegalArgumentException("Duplicate rule id: " + rule.id());
         }
-        rules.put(rule.id(), new MutableRuleRegistration(rule, source, explanation, tags));
+        rules.put(rule.id(), new MutableRuleRegistration(rule, source, explanation, tags, conditions));
     }
 
     public void disable(String id) {
@@ -53,10 +63,12 @@ public final class RuleRegistry {
         String source,
         String explanation,
         List<String> tags,
+        List<RuleFileParser.RuleCondition> conditions,
         boolean enabled
     ) {
         public RuleRegistration {
             tags = List.copyOf(tags);
+            conditions = List.copyOf(conditions);
         }
     }
 
@@ -65,17 +77,25 @@ public final class RuleRegistry {
         private final String source;
         private final String explanation;
         private final List<String> tags;
+        private final List<RuleFileParser.RuleCondition> conditions;
         private boolean enabled = true;
 
-        private MutableRuleRegistration(RewriteRule rule, String source, String explanation, List<String> tags) {
+        private MutableRuleRegistration(
+            RewriteRule rule,
+            String source,
+            String explanation,
+            List<String> tags,
+            List<RuleFileParser.RuleCondition> conditions
+        ) {
             this.rule = rule;
             this.source = source;
             this.explanation = explanation == null ? "" : explanation;
             this.tags = List.copyOf(tags);
+            this.conditions = List.copyOf(conditions);
         }
 
         private RuleRegistration snapshot() {
-            return new RuleRegistration(rule.id(), rule, source, explanation, tags, enabled);
+            return new RuleRegistration(rule.id(), rule, source, explanation, tags, conditions, enabled);
         }
     }
 }

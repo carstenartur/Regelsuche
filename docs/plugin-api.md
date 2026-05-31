@@ -35,6 +35,10 @@ Registrierung über `META-INF/services/de.regelsuche.plugin.RegelsuchePlugin`.
 - `BEFORE_OUTPUT`
 - `EXPLAIN_PATH`
 
+`PluginAwareAstRewriteTransformationEngine` ruft alle Phasen während eines
+Transformationsdurchlaufs auf. Visitor können Diagnosen, Marker und knotengebundene
+Metadaten über `AstVisitorContext` ablegen.
+
 ### Makros
 
 `MacroRegistry` nimmt `RuleMacro`-Beiträge auf.

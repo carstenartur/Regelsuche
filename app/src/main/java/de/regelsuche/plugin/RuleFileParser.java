@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 public final class RuleFileParser {
     private static final Pattern HEADER = Pattern.compile("^(rule|macro|profile)\\s+([A-Za-z0-9_.-]+):\\s*$");
     private static final Pattern PROPERTY = Pattern.compile("^([A-Za-z][A-Za-z0-9_-]*):\\s*(.*)$");
+    private static final Pattern CONDITION = Pattern.compile("^([A-Za-z][A-Za-z0-9_.-]*)\\s*:\\s*(\\S.*)$");
 
     public RulePackage parse(Path path) {
         try {
@@ -133,7 +134,7 @@ public final class RuleFileParser {
             return null;
         }
         List<String> tags = listProperty("tags", properties);
-        List<String> conditions = listProperty("conditions", properties);
+        List<RuleCondition> conditions = conditionProperty("conditions", properties, path, lineNumber, diagnostics);
         String explanation = stringOrDefault("explanation", properties, "");
         String difficulty = stringOrDefault("difficulty", properties, "unspecified");
         RuleDirection direction = parseDirection(path, lineNumber, stringOrDefault("direction", properties, "forward"), diagnostics);
@@ -255,6 +256,27 @@ public final class RuleFileParser {
         return List.of();
     }
 
+    private List<RuleCondition> conditionProperty(
+        String key,
+        Map<String, Object> properties,
+        Path path,
+        int lineNumber,
+        List<RuleFileDiagnostic> diagnostics
+    ) {
+        List<String> values = listProperty(key, properties);
+        List<RuleCondition> conditions = new ArrayList<>();
+        for (String value : values) {
+            Matcher matcher = CONDITION.matcher(value);
+            if (!matcher.matches()) {
+                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,
+                    "Condition '" + value + "' must use '<name>: <value>'"));
+                continue;
+            }
+            conditions.add(new RuleCondition(matcher.group(1), matcher.group(2)));
+        }
+        return List.copyOf(conditions);
+    }
+
     private RuleDirection parseDirection(
         Path path,
         int lineNumber,
@@ -303,7 +325,7 @@ public final class RuleFileParser {
         RuleDirection direction,
         int priority,
         List<String> tags,
-        List<String> conditions,
+        List<RuleCondition> conditions,
         String explanation,
         String difficulty
     ) implements Entry {
@@ -311,6 +333,9 @@ public final class RuleFileParser {
             tags = List.copyOf(tags);
             conditions = List.copyOf(conditions);
         }
+    }
+
+    public record RuleCondition(String name, String value) {
     }
 
     public record MacroDefinition(
