@@ -1,0 +1,23 @@
+rule extract_common_factor:
+  pattern: A*X + B*X
+  replace: (A + B)*X
+  direction: both
+  tags:
+    - factorization
+    - distributive
+  explanation: "Klammert den gemeinsamen Faktor X aus."
+
+rule difference_of_squares:
+  pattern: A^2 - B^2
+  replace: (A - B)*(A + B)
+  direction: both
+  tags:
+    - factorization
+  explanation: "Faktorisiert die Differenz zweier Quadrate."
+
+profile factorization_basics:
+  enable_tags:
+    - factorization
+    - distributive
+  disable_tags:
+    - complex_analysis

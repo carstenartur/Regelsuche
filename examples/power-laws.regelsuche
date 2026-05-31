@@ -1,0 +1,30 @@
+rule product_of_powers:
+  pattern: A^M * A^N
+  replace: A^(M + N)
+  direction: forward
+  tags:
+    - power-laws
+    - simplification
+  explanation: "Potenzen mit gleicher Basis werden durch Addition der Exponenten multipliziert."
+
+rule power_of_power:
+  pattern: (A^M)^N
+  replace: A^(M*N)
+  direction: forward
+  tags:
+    - power-laws
+    - simplification
+  explanation: "Eine Potenz potenziert multipliziert die Exponenten."
+
+rule power_of_product:
+  pattern: (A*B)^N
+  replace: A^N * B^N
+  direction: both
+  tags:
+    - power-laws
+  explanation: "Die Potenz eines Produkts verteilt sich auf die Faktoren."
+
+profile power_laws:
+  enable_tags:
+    - power-laws
+    - simplification

@@ -58,3 +58,15 @@ Ein Profil wird über `PluginRuntimeConfig#activeProfile` bzw. `rules list --pro
 aktiviert. Geladene Profile lassen sich mit `rules profiles` anzeigen.
 
 Beim Laden werden die DSL-Einträge in ein typisiertes internes Modell (`RuleFileParser`) überführt und anschließend als `PatternRewriteRule`/`RuleMacro`/`RuleProfile` registriert.
+
+## Beispiel-Regelpakete
+
+Im Verzeichnis `examples/` liegen ladbare Regelpakete für typische Schulmathematik-Domänen:
+
+- `binomial-formulas.regelsuche` – binomische Formeln
+- `factorization.regelsuche` – Ausklammern und Differenz zweier Quadrate
+- `power-laws.regelsuche` – Potenzgesetze
+- `trig-identities.regelsuche` – einfache trigonometrische Identitäten
+
+Jedes Paket bringt ein passendes Aktivierungsprofil mit und wird durch Tests in
+`RuleFileLoaderTest` auf fehlerfreies Laden geprüft.
