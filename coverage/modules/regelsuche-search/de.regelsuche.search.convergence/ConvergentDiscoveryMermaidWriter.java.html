@@ -1,64 +1,80 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConvergentDiscoveryMermaidWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.convergence</a> &gt; <span class="el_source">ConvergentDiscoveryMermaidWriter.java</span></div><h1>ConvergentDiscoveryMermaidWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.convergence;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /** Renders a convergent discovery graph from report data only. */
-<span class="nc" id="L8">public final class ConvergentDiscoveryMermaidWriter {</span>
-<span class="nc" id="L9">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="nc" id="L10">public final class ConvergentDiscoveryMermaidWriter {</span>
+<span class="nc" id="L11">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
 
     public String render(ConvergentDiscoveryReport report) {
-<span class="nc" id="L12">        StringBuilder out = new StringBuilder(&quot;graph TD\n&quot;);</span>
-<span class="nc bnc" id="L13" title="All 2 branches missed.">        if (report.convergentStates().isEmpty()) {</span>
-<span class="nc" id="L14">            return out.append(&quot;  empty[\&quot;No convergent state\&quot;]\n&quot;).toString();</span>
+<span class="nc" id="L14">        StringBuilder out = new StringBuilder(&quot;graph TD\n&quot;);</span>
+<span class="nc bnc" id="L15" title="All 2 branches missed.">        if (report.convergentStates().isEmpty()) {</span>
+<span class="nc" id="L16">            return out.append(&quot;  empty[\&quot;No convergent state\&quot;]\n&quot;).toString();</span>
         }
-<span class="nc" id="L16">        Map&lt;String, String&gt; nodeIds = new HashMap&lt;&gt;();</span>
-<span class="nc" id="L17">        String inputId = nodeId(nodeIds, report.inputExpression());</span>
-<span class="nc" id="L18">        out.append(&quot;  &quot;).append(inputId).append(&quot;[\&quot;&quot;).append(escape(report.inputExpression())).append(&quot;\&quot;]:::input\n&quot;);</span>
-<span class="nc bnc" id="L19" title="All 2 branches missed.">        for (ConvergentPath path : report.pathsToTarget()) {</span>
-<span class="nc" id="L20">            String previous = inputId;</span>
-<span class="nc bnc" id="L21" title="All 2 branches missed.">            for (int i = 1; i &lt; path.expressions().size(); i++) {</span>
-<span class="nc" id="L22">                String expression = path.expressions().get(i);</span>
-<span class="nc" id="L23">                String current = nodeId(nodeIds, expression);</span>
-<span class="nc" id="L24">                out.append(&quot;  &quot;).append(current).append(&quot;[\&quot;&quot;).append(escape(expression)).append(&quot;\&quot;]&quot;);</span>
-<span class="nc bnc" id="L25" title="All 2 branches missed.">                if (i == path.expressions().size() - 1) {</span>
-<span class="nc" id="L26">                    out.append(&quot;:::convergence&quot;);</span>
-<span class="nc bnc" id="L27" title="All 2 branches missed.">                } else if (path.pathId().equals(report.convergentStates().getFirst().mostDidacticPathId())) {</span>
-<span class="nc" id="L28">                    out.append(&quot;:::didactic&quot;);</span>
+<span class="nc" id="L18">        Map&lt;String, String&gt; nodeIds = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L19">        Set&lt;String&gt; declaredNodes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L20">        Set&lt;String&gt; didacticNodes = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L21" title="All 2 branches missed.">        String didacticPathId = report.convergentStates().isEmpty()</span>
+<span class="nc" id="L22">            ? null</span>
+<span class="nc" id="L23">            : report.convergentStates().getFirst().mostDidacticPathId();</span>
+<span class="nc" id="L24">        String inputId = nodeId(nodeIds, report.inputExpression());</span>
+<span class="nc" id="L25">        out.append(&quot;  &quot;).append(inputId).append(&quot;[\&quot;&quot;).append(escape(report.inputExpression())).append(&quot;\&quot;]:::input\n&quot;);</span>
+<span class="nc" id="L26">        declaredNodes.add(inputId);</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        for (ConvergentPath path : report.pathsToTarget()) {</span>
+<span class="nc" id="L28">            String previous = inputId;</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">            for (int i = 1; i &lt; path.expressions().size(); i++) {</span>
+<span class="nc" id="L30">                String expression = path.expressions().get(i);</span>
+<span class="nc" id="L31">                String current = nodeId(nodeIds, expression);</span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">                if (i &lt; path.expressions().size() - 1</span>
+                    &amp;&amp; didacticPathId != null
+<span class="nc bnc" id="L34" title="All 2 branches missed.">                    &amp;&amp; path.pathId().equals(didacticPathId)) {</span>
+<span class="nc" id="L35">                    didacticNodes.add(current);</span>
                 }
-<span class="nc" id="L30">                out.append('\n');</span>
-<span class="nc" id="L31">                String rule = path.ruleIds().get(i - 1);</span>
-<span class="nc" id="L32">                RuleFamily family = path.ruleFamilies().get(i - 1);</span>
-<span class="nc" id="L33">                out.append(&quot;  &quot;).append(previous)</span>
-<span class="nc" id="L34">                    .append(&quot; --&gt;|&quot;).append(escape(family + &quot;: &quot; + rule)).append(&quot;| &quot;)</span>
-<span class="nc" id="L35">                    .append(current).append('\n');</span>
-<span class="nc" id="L36">                previous = current;</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">                if (declaredNodes.add(current)) {</span>
+<span class="nc" id="L38">                    out.append(&quot;  &quot;).append(current).append(&quot;[\&quot;&quot;).append(escape(expression)).append(&quot;\&quot;]&quot;);</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">                    if (i == path.expressions().size() - 1) {</span>
+<span class="nc" id="L40">                        out.append(&quot;:::convergence&quot;);</span>
+                    }
+<span class="nc" id="L42">                    out.append('\n');</span>
+                }
+<span class="nc" id="L44">                String rule = path.ruleIds().get(i - 1);</span>
+<span class="nc" id="L45">                RuleFamily family = path.ruleFamilies().get(i - 1);</span>
+<span class="nc" id="L46">                out.append(&quot;  &quot;).append(previous)</span>
+<span class="nc" id="L47">                    .append(&quot; --&gt;|&quot;).append(escape(family + &quot;: &quot; + rule)).append(&quot;| &quot;)</span>
+<span class="nc" id="L48">                    .append(current).append('\n');</span>
+<span class="nc" id="L49">                previous = current;</span>
             }
-<span class="nc" id="L38">        }</span>
-<span class="nc" id="L39">        report.convergentStates().stream().findFirst().ifPresent(state -&gt; {</span>
-<span class="nc" id="L40">            out.append(&quot;  class &quot;).append(nodeId(nodeIds, state.expression())).append(&quot; convergence\n&quot;);</span>
-<span class="nc" id="L41">            state.macroPathId().ifPresent(pathId -&gt; report.pathsToTarget().stream()</span>
-<span class="nc" id="L42">                .filter(path -&gt; path.pathId().equals(pathId))</span>
-<span class="nc" id="L43">                .findFirst()</span>
-<span class="nc" id="L44">                .ifPresent(path -&gt; out.append(&quot;  class &quot;)</span>
-<span class="nc" id="L45">                    .append(nodeId(nodeIds, path.expressions().get(Math.max(1, path.expressions().size() - 1))))</span>
-<span class="nc" id="L46">                    .append(&quot; macro\n&quot;)));</span>
-<span class="nc" id="L47">        });</span>
-<span class="nc" id="L48">        out.append(&quot;  classDef input fill:#eef2ff,stroke:#4338ca,stroke-width:2px\n&quot;);</span>
-<span class="nc" id="L49">        out.append(&quot;  classDef convergence fill:#dcfce7,stroke:#15803d,stroke-width:3px\n&quot;);</span>
-<span class="nc" id="L50">        out.append(&quot;  classDef didactic fill:#fef3c7,stroke:#d97706,stroke-width:2px\n&quot;);</span>
-<span class="nc" id="L51">        out.append(&quot;  classDef macro fill:#e0f2fe,stroke:#0284c7,stroke-width:3px\n&quot;);</span>
-<span class="nc" id="L52">        return out.toString();</span>
+<span class="nc" id="L51">        }</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        for (String didacticNode : didacticNodes) {</span>
+<span class="nc" id="L53">            out.append(&quot;  class &quot;).append(didacticNode).append(&quot; didactic\n&quot;);</span>
+<span class="nc" id="L54">        }</span>
+<span class="nc" id="L55">        report.convergentStates().stream().findFirst().ifPresent(state -&gt; {</span>
+<span class="nc" id="L56">            out.append(&quot;  class &quot;).append(nodeId(nodeIds, state.expression())).append(&quot; convergence\n&quot;);</span>
+<span class="nc" id="L57">            state.macroPathId().ifPresent(pathId -&gt; report.pathsToTarget().stream()</span>
+<span class="nc" id="L58">                .filter(path -&gt; path.pathId().equals(pathId))</span>
+<span class="nc" id="L59">                .findFirst()</span>
+<span class="nc" id="L60">                .ifPresent(path -&gt; out.append(&quot;  class &quot;)</span>
+<span class="nc" id="L61">                    .append(nodeId(nodeIds, path.expressions().get(Math.max(1, path.expressions().size() - 1))))</span>
+<span class="nc" id="L62">                    .append(&quot; macro\n&quot;)));</span>
+<span class="nc" id="L63">        });</span>
+<span class="nc" id="L64">        out.append(&quot;  classDef input fill:#eef2ff,stroke:#4338ca,stroke-width:2px\n&quot;);</span>
+<span class="nc" id="L65">        out.append(&quot;  classDef convergence fill:#dcfce7,stroke:#15803d,stroke-width:3px\n&quot;);</span>
+<span class="nc" id="L66">        out.append(&quot;  classDef didactic fill:#fef3c7,stroke:#d97706,stroke-width:2px\n&quot;);</span>
+<span class="nc" id="L67">        out.append(&quot;  classDef macro fill:#e0f2fe,stroke:#0284c7,stroke-width:3px\n&quot;);</span>
+<span class="nc" id="L68">        return out.toString();</span>
     }
 
     private String nodeId(Map&lt;String, String&gt; nodeIds, String expression) {
-<span class="nc bnc" id="L56" title="All 2 branches missed.">        String hash = canonicalizer.stableHash(expression == null ? &quot;&quot; : expression);</span>
-<span class="nc" id="L57">        return nodeIds.computeIfAbsent(hash, ignored -&gt; &quot;conv_&quot; + Integer.toHexString(hash.hashCode()).replace('-', 'n'));</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        String hash = canonicalizer.stableHash(expression == null ? &quot;&quot; : expression);</span>
+<span class="nc" id="L73">        return nodeIds.computeIfAbsent(hash, ignored -&gt; &quot;conv_&quot; + hash);</span>
     }
 
     private String escape(String value) {
-<span class="nc bnc" id="L61" title="All 2 branches missed.">        return (value == null ? &quot;&quot; : value).replace(&quot;\&quot;&quot;, &quot;'&quot;);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        return (value == null ? &quot;&quot; : value).replace(&quot;\&quot;&quot;, &quot;'&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

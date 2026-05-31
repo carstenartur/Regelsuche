@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConvergentDiscoverySvgWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.convergence</a> &gt; <span class="el_source">ConvergentDiscoverySvgWriter.java</span></div><h1>ConvergentDiscoverySvgWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.convergence;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+
+/** Renders a convergent discovery SVG from report data only. */
+<span class="fc" id="L10">public final class ConvergentDiscoverySvgWriter {</span>
+    private static final String GENERATED_BY = &quot;ConvergentDiscoverySvgWriter&quot;;
+    private static final int MARGIN_X = 60;
+    private static final int MARGIN_Y = 120;
+    private static final int COLUMN_WIDTH = 330;
+    private static final int ROW_HEIGHT = 150;
+    private static final int NODE_WIDTH = 250;
+    private static final int NODE_HEIGHT = 82;
+
+<span class="fc" id="L19">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+
+    public String render(ConvergentDiscoveryReport report) {
+<span class="nc" id="L22">        return render(report, new ArtifactMetadata(&quot;&quot;, &quot;&quot;));</span>
+    }
+
+    public String render(ConvergentDiscoveryReport report, ArtifactMetadata metadata) {
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        ArtifactMetadata safeMetadata = metadata == null ? new ArtifactMetadata(&quot;&quot;, &quot;&quot;) : metadata;</span>
+<span class="fc" id="L27">        String title = title(report, safeMetadata);</span>
+<span class="fc" id="L28">        GraphLayout layout = layout(report);</span>
+<span class="fc" id="L29">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L30">        out.append(&quot;&lt;svg xmlns=\&quot;http://www.w3.org/2000/svg\&quot; width=\&quot;&quot;)</span>
+<span class="fc" id="L31">            .append(layout.width())</span>
+<span class="fc" id="L32">            .append(&quot;\&quot; height=\&quot;&quot;)</span>
+<span class="fc" id="L33">            .append(layout.height())</span>
+<span class="fc" id="L34">            .append(&quot;\&quot; viewBox=\&quot;0 0 &quot;)</span>
+<span class="fc" id="L35">            .append(layout.width())</span>
+<span class="fc" id="L36">            .append(' ')</span>
+<span class="fc" id="L37">            .append(layout.height())</span>
+<span class="fc" id="L38">            .append(&quot;\&quot; role=\&quot;img\&quot; aria-labelledby=\&quot;title desc\&quot; data-source=\&quot;&quot;)</span>
+<span class="fc" id="L39">            .append(escapeXml(safeMetadata.dataSource()))</span>
+<span class="fc" id="L40">            .append(&quot;\&quot; data-generated-by=\&quot;&quot;)</span>
+<span class="fc" id="L41">            .append(GENERATED_BY)</span>
+<span class="fc" id="L42">            .append(&quot;\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L43">        out.append(&quot;  &lt;title id=\&quot;title\&quot;&gt;&quot;).append(escapeXml(title)).append(&quot;&lt;/title&gt;\n&quot;);</span>
+<span class="fc" id="L44">        out.append(&quot;  &lt;desc id=\&quot;desc\&quot;&gt;Generated from convergent discovery report data.&lt;/desc&gt;\n&quot;);</span>
+<span class="fc" id="L45">        out.append(&quot;  &lt;metadata&gt;&quot;);</span>
+<span class="fc" id="L46">        out.append(escapeXml(report.inputExpression()));</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (ConvergentPath path : report.pathsToTarget()) {</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (String expression : path.expressions()) {</span>
+<span class="fc" id="L49">                out.append(&quot; | &quot;).append(escapeXml(expression));</span>
+<span class="fc" id="L50">            }</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            for (int i = 0; i &lt; path.ruleIds().size(); i++) {</span>
+<span class="fc" id="L52">                out.append(&quot; | &quot;).append(escapeXml(path.ruleFamilies().get(i) + &quot;: &quot; + path.ruleIds().get(i)));</span>
+            }
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">        out.append(&quot;&lt;/metadata&gt;\n&quot;);</span>
+<span class="fc" id="L56">        out.append(&quot;  &lt;defs&gt;\n&quot;);</span>
+<span class="fc" id="L57">        out.append(&quot;    &lt;marker id=\&quot;arrow\&quot; viewBox=\&quot;0 0 10 10\&quot; refX=\&quot;9\&quot; refY=\&quot;5\&quot; &quot;)</span>
+<span class="fc" id="L58">            .append(&quot;markerWidth=\&quot;9\&quot; markerHeight=\&quot;9\&quot; orient=\&quot;auto-start-reverse\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L59">        out.append(&quot;      &lt;path d=\&quot;M 0 0 L 10 5 L 0 10 z\&quot; fill=\&quot;#334155\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L60">        out.append(&quot;    &lt;/marker&gt;\n&quot;);</span>
+<span class="fc" id="L61">        out.append(&quot;  &lt;/defs&gt;\n&quot;);</span>
+<span class="fc" id="L62">        out.append(&quot;  &lt;rect width=\&quot;100%\&quot; height=\&quot;100%\&quot; fill=\&quot;#f8fafc\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L63">        out.append(&quot;  &lt;text x=\&quot;&quot;).append(layout.width() / 2).append(&quot;\&quot; y=\&quot;52\&quot; text-anchor=\&quot;middle\&quot; &quot;)</span>
+<span class="fc" id="L64">            .append(&quot;font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; font-size=\&quot;26\&quot; &quot;)</span>
+<span class="fc" id="L65">            .append(&quot;font-weight=\&quot;700\&quot; fill=\&quot;#0f172a\&quot;&gt;&quot;)</span>
+<span class="fc" id="L66">            .append(escapeXml(&quot;Convergent discovery: &quot; + report.inputExpression()))</span>
+<span class="fc" id="L67">            .append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="fc" id="L68">        out.append(&quot;  &lt;text x=\&quot;&quot;).append(layout.width() / 2).append(&quot;\&quot; y=\&quot;84\&quot; text-anchor=\&quot;middle\&quot; &quot;)</span>
+<span class="fc" id="L69">            .append(&quot;font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; font-size=\&quot;15\&quot; fill=\&quot;#475569\&quot;&gt;&quot;)</span>
+<span class="fc" id="L70">            .append(escapeXml(&quot;Generated from report data; &quot; + report.pathsToTarget().size()</span>
+                + &quot; paths converge.&quot;))
+<span class="fc" id="L72">            .append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="fc" id="L73">        Set&lt;String&gt; renderedEdges = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (ConvergentPath path : report.pathsToTarget()) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            for (int i = 1; i &lt; path.expressions().size(); i++) {</span>
+<span class="fc" id="L76">                Node from = layout.nodes().get(key(path.expressions().get(i - 1)));</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                Node to = i == path.expressions().size() - 1</span>
+<span class="fc" id="L78">                    ? layout.convergenceNode()</span>
+<span class="fc" id="L79">                    : layout.nodes().get(key(path.expressions().get(i)));</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">                if (from == null || to == null) {</span>
+<span class="nc" id="L81">                    continue;</span>
+                }
+<span class="fc" id="L83">                String rule = path.ruleFamilies().get(i - 1) + &quot;: &quot; + path.ruleIds().get(i - 1);</span>
+<span class="fc" id="L84">                String edgeKey = from.id() + &quot;-&gt;&quot; + to.id() + &quot;|&quot; + rule;</span>
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">                if (!from.id().equals(to.id()) &amp;&amp; renderedEdges.add(edgeKey)) {</span>
+<span class="fc" id="L86">                    edge(out, from, to, rule, path.containsMacroStep());</span>
+                }
+            }
+<span class="fc" id="L89">        }</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (Node node : layout.nodes().values()) {</span>
+<span class="fc" id="L91">            node(out, node);</span>
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">        out.append(&quot;&lt;/svg&gt;\n&quot;);</span>
+<span class="fc" id="L94">        return out.toString();</span>
+    }
+
+    private GraphLayout layout(ConvergentDiscoveryReport report) {
+<span class="fc" id="L98">        int pathCount = Math.max(1, report.pathsToTarget().size());</span>
+<span class="fc" id="L99">        int maxDepth = report.pathsToTarget().stream()</span>
+<span class="fc" id="L100">            .mapToInt(path -&gt; Math.max(1, path.expressions().size() - 1))</span>
+<span class="fc" id="L101">            .max()</span>
+<span class="fc" id="L102">            .orElse(1);</span>
+<span class="fc" id="L103">        int width = MARGIN_X * 2 + COLUMN_WIDTH * maxDepth + NODE_WIDTH;</span>
+<span class="fc" id="L104">        int height = MARGIN_Y * 2 + ROW_HEIGHT * pathCount;</span>
+<span class="fc" id="L105">        Map&lt;String, Node&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L106">        Node input = new Node(key(report.inputExpression()), report.inputExpression(), &quot;input&quot;,</span>
+            MARGIN_X, MARGIN_Y + (pathCount - 1) * ROW_HEIGHT / 2);
+<span class="fc" id="L108">        nodes.put(input.id(), input);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        String target = report.convergentStates().isEmpty()</span>
+<span class="nc" id="L110">            ? report.canonicalTargetExpression()</span>
+<span class="fc" id="L111">            : report.convergentStates().getFirst().expression();</span>
+<span class="fc" id="L112">        Node convergence = new Node(key(target), target, &quot;convergence&quot;,</span>
+<span class="fc" id="L113">            MARGIN_X + COLUMN_WIDTH * maxDepth, input.y());</span>
+<span class="fc" id="L114">        nodes.put(convergence.id(), convergence);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        String didacticPathId = report.convergentStates().isEmpty()</span>
+<span class="nc" id="L116">            ? null</span>
+<span class="fc" id="L117">            : report.convergentStates().getFirst().mostDidacticPathId();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (int row = 0; row &lt; report.pathsToTarget().size(); row++) {</span>
+<span class="fc" id="L119">            ConvergentPath path = report.pathsToTarget().get(row);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            for (int depth = 1; depth &lt; path.expressions().size() - 1; depth++) {</span>
+<span class="fc" id="L121">                String expression = path.expressions().get(depth);</span>
+<span class="fc" id="L122">                nodes.putIfAbsent(key(expression), new Node(</span>
+<span class="fc" id="L123">                    key(expression),</span>
+                    expression,
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">                    didacticPathId != null &amp;&amp; path.pathId().equals(didacticPathId)</span>
+<span class="pc" id="L126">                        ? &quot;didactic&quot; : &quot;path&quot;,</span>
+                    MARGIN_X + COLUMN_WIDTH * depth,
+                    MARGIN_Y + row * ROW_HEIGHT
+                ));
+            }
+        }
+<span class="fc" id="L132">        return new GraphLayout(width, height, nodes, convergence);</span>
+    }
+
+    private void edge(StringBuilder out, Node from, Node to, String label, boolean macro) {
+<span class="fc" id="L136">        int startX = from.x() + NODE_WIDTH;</span>
+<span class="fc" id="L137">        int startY = from.y() + NODE_HEIGHT / 2;</span>
+<span class="fc" id="L138">        int endX = to.x();</span>
+<span class="fc" id="L139">        int endY = to.y() + NODE_HEIGHT / 2;</span>
+<span class="fc" id="L140">        int midX = (startX + endX) / 2;</span>
+<span class="fc" id="L141">        int midY = (startY + endY) / 2 - 10;</span>
+<span class="fc" id="L142">        out.append(&quot;  &lt;path d=\&quot;M &quot;).append(startX).append(' ').append(startY)</span>
+<span class="fc" id="L143">            .append(&quot; C &quot;).append(midX).append(' ').append(startY)</span>
+<span class="fc" id="L144">            .append(&quot;, &quot;).append(midX).append(' ').append(endY)</span>
+<span class="fc" id="L145">            .append(&quot;, &quot;).append(endX).append(' ').append(endY)</span>
+<span class="fc" id="L146">            .append(&quot;\&quot; fill=\&quot;none\&quot; stroke=\&quot;&quot;)</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            .append(macro ? &quot;#0284c7&quot; : &quot;#334155&quot;)</span>
+<span class="fc" id="L148">            .append(&quot;\&quot; stroke-width=\&quot;3\&quot; marker-end=\&quot;url(#arrow)\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L149">        out.append(&quot;  &lt;text x=\&quot;&quot;).append(midX).append(&quot;\&quot; y=\&quot;&quot;).append(midY)</span>
+<span class="fc" id="L150">            .append(&quot;\&quot; text-anchor=\&quot;middle\&quot; font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; &quot;)</span>
+<span class="fc" id="L151">            .append(&quot;font-size=\&quot;13\&quot; font-weight=\&quot;700\&quot; fill=\&quot;&quot;)</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            .append(macro ? &quot;#075985&quot; : &quot;#334155&quot;)</span>
+<span class="fc" id="L153">            .append(&quot;\&quot;&gt;&quot;)</span>
+<span class="fc" id="L154">            .append(escapeXml(label))</span>
+<span class="fc" id="L155">            .append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="fc" id="L156">    }</span>
+
+    private void node(StringBuilder out, Node node) {
+<span class="fc" id="L159">        Style style = Style.of(node.kind());</span>
+<span class="fc" id="L160">        out.append(&quot;  &lt;g data-node-id=\&quot;&quot;).append(escapeXml(node.id())).append(&quot;\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L161">        out.append(&quot;    &lt;rect x=\&quot;&quot;).append(node.x()).append(&quot;\&quot; y=\&quot;&quot;).append(node.y())</span>
+<span class="fc" id="L162">            .append(&quot;\&quot; width=\&quot;&quot;).append(NODE_WIDTH).append(&quot;\&quot; height=\&quot;&quot;).append(NODE_HEIGHT)</span>
+<span class="fc" id="L163">            .append(&quot;\&quot; rx=\&quot;16\&quot; fill=\&quot;&quot;).append(style.fill()).append(&quot;\&quot; stroke=\&quot;&quot;)</span>
+<span class="fc" id="L164">            .append(style.stroke()).append(&quot;\&quot; stroke-width=\&quot;3\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L165">        out.append(&quot;    &lt;text x=\&quot;&quot;).append(node.x() + NODE_WIDTH / 2).append(&quot;\&quot; y=\&quot;&quot;)</span>
+<span class="fc" id="L166">            .append(node.y() + 31)</span>
+<span class="fc" id="L167">            .append(&quot;\&quot; text-anchor=\&quot;middle\&quot; font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; &quot;)</span>
+<span class="fc" id="L168">            .append(&quot;font-size=\&quot;14\&quot; font-weight=\&quot;700\&quot; fill=\&quot;&quot;).append(style.labelFill())</span>
+<span class="fc" id="L169">            .append(&quot;\&quot;&gt;&quot;).append(escapeXml(node.kind())).append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="fc" id="L170">        out.append(&quot;    &lt;text x=\&quot;&quot;).append(node.x() + NODE_WIDTH / 2).append(&quot;\&quot; y=\&quot;&quot;)</span>
+<span class="fc" id="L171">            .append(node.y() + 58)</span>
+<span class="fc" id="L172">            .append(&quot;\&quot; text-anchor=\&quot;middle\&quot; font-family=\&quot;ui-monospace,SFMono-Regular,&quot;)</span>
+<span class="fc" id="L173">            .append(&quot;Menlo,Consolas,monospace\&quot; font-size=\&quot;14\&quot; fill=\&quot;#111827\&quot;&gt;&quot;)</span>
+<span class="fc" id="L174">            .append(escapeXml(node.label()))</span>
+<span class="fc" id="L175">            .append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="fc" id="L176">        out.append(&quot;  &lt;/g&gt;\n&quot;);</span>
+<span class="fc" id="L177">    }</span>
+
+    private String key(String expression) {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        return &quot;conv_&quot; + canonicalizer.stableHash(expression == null ? &quot;&quot; : expression);</span>
+    }
+
+    private String title(ConvergentDiscoveryReport report, ArtifactMetadata metadata) {
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (!metadata.title().isBlank()) {</span>
+<span class="fc" id="L185">            return metadata.title();</span>
+        }
+<span class="fc" id="L187">        return &quot;Convergent discovery: &quot; + report.inputExpression();</span>
+    }
+
+    private String escapeXml(String value) {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        return (value == null ? &quot;&quot; : value)</span>
+<span class="fc" id="L192">            .replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
+<span class="fc" id="L193">            .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;)</span>
+<span class="fc" id="L194">            .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="fc" id="L195">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;);</span>
+    }
+
+<span class="fc" id="L198">    private record GraphLayout(int width, int height, Map&lt;String, Node&gt; nodes, Node convergenceNode) {</span>
+    }
+
+<span class="fc" id="L201">    private record Node(String id, String label, String kind, int x, int y) {</span>
+    }
+
+<span class="fc" id="L204">    private record Style(String fill, String stroke, String labelFill) {</span>
+        private static Style of(String kind) {
+<span class="pc bpc" id="L206" title="1 of 4 branches missed.">            return switch (kind) {</span>
+<span class="fc" id="L207">                case &quot;input&quot; -&gt; new Style(&quot;#eef2ff&quot;, &quot;#4338ca&quot;, &quot;#312e81&quot;);</span>
+<span class="fc" id="L208">                case &quot;convergence&quot; -&gt; new Style(&quot;#dcfce7&quot;, &quot;#15803d&quot;, &quot;#14532d&quot;);</span>
+<span class="fc" id="L209">                case &quot;didactic&quot; -&gt; new Style(&quot;#fef3c7&quot;, &quot;#d97706&quot;, &quot;#92400e&quot;);</span>
+<span class="nc" id="L210">                default -&gt; new Style(&quot;#e0f2fe&quot;, &quot;#0284c7&quot;, &quot;#075985&quot;);</span>
+            };
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
