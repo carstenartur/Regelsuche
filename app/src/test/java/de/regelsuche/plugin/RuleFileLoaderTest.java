@@ -120,7 +120,7 @@ class RuleFileLoaderTest {
             () -> new PluginRuntime.RuleFileLoader().load(file, new RuleRegistry(), new MacroRegistry()));
 
         assertTrue(exception.getMessage().contains("Condition 'commutative_addition' must use '<name>: <value>'"));
-        assertTrue(exception.getMessage().contains("invalid-conditions.regelsuche:1"));
+        assertTrue(exception.getMessage().contains("invalid-conditions.regelsuche:5"));
     }
 
     @Test

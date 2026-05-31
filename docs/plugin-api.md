@@ -52,7 +52,9 @@ Plugins können weitere steuerbare Erweiterungen registrieren:
 - `CostFunctionRegistry` für Kostenfunktionen auf Transformationen
 - `RendererRegistry` für Ausgabe-Renderer
 - `ExplanationRegistry` für regelbezogene Erklärungen
-- `ParserExtensionRegistry` für Eingabe-Normalisierungen vor dem Parsen
+- `ParserExtensionRegistry` für benannte Parser-Erweiterungen (Registry-only; der
+  Aufrufer muss `supports()`/`normalize()` aus den aktivierten Erweiterungen selbst
+  aufrufen – die Erweiterungen werden nicht automatisch in den Parsing-Pfad eingehängt)
 - `ExampleRegistry` für Beispielpakete
 
 Alle diese Registries unterstützen `register`, `disable`, `registrations` und

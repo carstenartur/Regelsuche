@@ -74,7 +74,7 @@ public final class RuleFileParser {
                 String key = property.group(1);
                 String value = property.group(2).trim();
                 if (value.isEmpty()) {
-                    List<String> items = new ArrayList<>();
+                    List<LineItem> items = new ArrayList<>();
                     int listIndex = index + 1;
                     while (listIndex < lines.size()) {
                         String listLine = lines.get(listIndex).trim();
@@ -85,7 +85,7 @@ public final class RuleFileParser {
                         if (!listLine.startsWith("-")) {
                             break;
                         }
-                        items.add(stripQuotes(listLine.substring(1).trim()));
+                        items.add(new LineItem(listIndex + 1, stripQuotes(listLine.substring(1).trim())));
                         listIndex++;
                     }
                     properties.put(key, List.copyOf(items));
@@ -248,10 +248,26 @@ public final class RuleFileParser {
     private List<String> listProperty(String key, Map<String, Object> properties) {
         Object value = properties.get(key);
         if (value instanceof List<?> list) {
-            return (List<String>) list;
+            return list.stream()
+                .map(item -> item instanceof LineItem li ? li.value() : (String) item)
+                .toList();
         }
         if (value instanceof String string && !string.isBlank()) {
             return List.of(stripQuotes(string));
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<LineItem> lineItemsProperty(String key, Map<String, Object> properties, int defaultLine) {
+        Object value = properties.get(key);
+        if (value instanceof List<?> list) {
+            return list.stream()
+                .map(item -> item instanceof LineItem li ? li : new LineItem(defaultLine, (String) item))
+                .toList();
+        }
+        if (value instanceof String string && !string.isBlank()) {
+            return List.of(new LineItem(defaultLine, stripQuotes(string)));
         }
         return List.of();
     }
@@ -263,13 +279,13 @@ public final class RuleFileParser {
         int lineNumber,
         List<RuleFileDiagnostic> diagnostics
     ) {
-        List<String> values = listProperty(key, properties);
+        List<LineItem> items = lineItemsProperty(key, properties, lineNumber);
         List<RuleCondition> conditions = new ArrayList<>();
-        for (String value : values) {
-            Matcher matcher = CONDITION.matcher(value);
+        for (LineItem item : items) {
+            Matcher matcher = CONDITION.matcher(item.value());
             if (!matcher.matches()) {
-                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,
-                    "Condition '" + value + "' must use '<name>: <value>'"));
+                diagnostics.add(new RuleFileDiagnostic(path, item.line(), Severity.ERROR,
+                    "Condition '" + item.value() + "' must use '<name>: <value>'"));
                 continue;
             }
             conditions.add(new RuleCondition(matcher.group(1), matcher.group(2)));
@@ -299,6 +315,9 @@ public final class RuleFileParser {
         }
         return value;
     }
+
+    /** Pairs a source-file line number with a parsed string value. */
+    private record LineItem(int line, String value) {}
 
     public sealed interface Entry permits RuleDefinition, MacroDefinition, ProfileDefinition {
         String id();
