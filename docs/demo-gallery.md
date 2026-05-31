@@ -102,13 +102,44 @@ Antwort. Regelsuche kann mehrere mathematische Wege zeigen, die auf denselben
 kanonischen Zielzustand konvergieren — und sichtbar machen, wann ein
 entdeckter Weg zur gelernten Abkürzung wird.
 
-Der Graph wird aus `ConvergentDiscoveryReport`-Daten erzeugt; er ist kein
-handgezeichnetes Diagramm. Der passende generierte Mermaid-Graph liegt unter
+Der Hauptgraph ist ein *bounded replay des explorierten Suchraums* — ein
+rekonstruierter Search-Space-Subgraph aus `SearchProblem`, `SearchState`-Replay und
+`ConvergentDiscoveryReport`-Daten; er ist kein handgezeichnetes Diagramm, aber auch keine
+vollständige Aufzeichnung der Suche. Ein Teil der Zustände wurde ursprünglich von der
+Suche exploriert (`data-originally-explored="true"`), weitere Zustände werden über eine
+begrenzte Expansion nur zur Visualisierung rekonstruiert. Die Grenzen `maxStates` und
+`maxDepth` sind im SVG-Untertitel und in den `data-`Attributen dokumentiert. Der passende
+generierte Search-Space-SVG liegt unter
+[`assets/screenshots/search-space-sophie-germain.svg`](assets/screenshots/search-space-sophie-germain.svg),
+die kompakte README-Variante unter
+[`assets/screenshots/search-space-sophie-germain-compact.svg`](assets/screenshots/search-space-sophie-germain-compact.svg),
+der kleine erklärende Konvergenz-Mermaid-Graph unter
 [`assets/screenshots/convergent-sophie-germain.mmd`](assets/screenshots/convergent-sophie-germain.mmd),
-die Roh-Gallery-Evidence unter
+und die Roh-Gallery-Evidence unter
 [`assets/screenshots/convergent-sophie-germain-gallery-snippet.md`](assets/screenshots/convergent-sophie-germain-gallery-snippet.md).
 
-**A. Sophie-Germain: discovery path vs learned macro shortcut**
+Begriffe im Graphen sind bewusst neutral gehalten: Ein Zustand wird nur dann als
+*convergence target* markiert, wenn mehrere unterschiedliche Transformationspfade
+tatsächlich dort zusammenlaufen. Andernfalls bleiben kanonische Zustände
+*canonical representative* bzw. *equivalence-class member*, damit der Graph nicht mehr
+behauptet, als programmatisch belegbar ist. Die Darstellung ist generisch für beliebige
+Suchprobleme und nicht auf `x^4 + 4*y^4` zugeschnitten.
+
+Regelsuche does not only output the factorization.
+It records the explored transformation space and shows which different ideas converge.
+
+**A. Sophie-Germain: reconstructed search space with alternatives**
+
+<img src="assets/screenshots/search-space-sophie-germain.svg" alt="Reconstructed Sophie-Germain search-space graph showing explored alternatives, the selected path, the learned macro shortcut, and the convergence target.">
+
+*The reconstructed subgraph keeps explored alternatives visible instead of reducing the evidence to the selected convergent paths.*
+
+A compact, README-friendly variant of the same data (rendered with
+`SearchSpaceSvgOptions.compact()`) shows the convergence at a glance:
+
+<img src="assets/screenshots/search-space-sophie-germain-compact.svg" alt="Compact Sophie-Germain convergence demonstration with a few alternative paths converging on one canonical result.">
+
+**B. Small explanatory convergence diagram**
 
 <img src="assets/screenshots/convergent-sophie-germain.svg" alt="Convergent Sophie-Germain graph showing the hidden-structure discovery path and learned macro shortcut reaching the same factored result.">
 

@@ -150,18 +150,27 @@ class DemoDocumentationTest {
 
     @Test
     void convergentSophieGermainVisibleImageIsDocumented() throws IOException {
-        String imageName = "convergent-sophie-germain.svg";
+        String imageName = "search-space-sophie-germain.svg";
+        String compactImageName = "search-space-sophie-germain-compact.svg";
+        String explanatoryImageName = "convergent-sophie-germain.svg";
         Path readmePath = REPO_ROOT.resolve("README.md");
         Path galleryPath = REPO_ROOT.resolve("docs/demo-gallery.md");
         Path imagePath = REPO_ROOT.resolve("docs/assets/screenshots").resolve(imageName);
+        Path compactImagePath = REPO_ROOT.resolve("docs/assets/screenshots").resolve(compactImageName);
+        Path explanatoryImagePath = REPO_ROOT.resolve("docs/assets/screenshots").resolve(explanatoryImageName);
         Path mermaidPath = REPO_ROOT.resolve("docs/assets/screenshots/convergent-sophie-germain.mmd");
         String readme = Files.readString(readmePath, StandardCharsets.UTF_8);
         String gallery = Files.readString(galleryPath, StandardCharsets.UTF_8);
 
-        assertTrue(readme.contains(imageName), "README.md must reference " + imageName);
+        assertTrue(readme.contains(compactImageName),
+            "README.md must reference the compact " + compactImageName);
         assertTrue(gallery.contains("<img") && gallery.contains(imageName),
-            "docs/demo-gallery.md must embed " + imageName + " with an <img> tag");
+            "docs/demo-gallery.md must embed the full " + imageName + " with an <img> tag");
+        assertTrue(gallery.contains("<img") && gallery.contains(explanatoryImageName),
+            "docs/demo-gallery.md must keep " + explanatoryImageName + " as a small explanatory diagram");
         assertTrue(Files.exists(imagePath), imageName + " must exist next to the Mermaid source");
+        assertTrue(Files.exists(compactImagePath), compactImageName + " must exist next to the Mermaid source");
+        assertTrue(Files.exists(explanatoryImagePath), explanatoryImageName + " must exist next to the Mermaid source");
         assertTrue(Files.exists(mermaidPath), "convergent-sophie-germain.mmd source must still exist");
 
         String milestone = readme.substring(
@@ -171,26 +180,29 @@ class DemoDocumentationTest {
             "README milestone must show the convergent graph, not the old single-path screenshot");
 
         String image = Files.readString(imagePath, StandardCharsets.UTF_8);
-        String mermaid = Files.readString(mermaidPath, StandardCharsets.UTF_8);
         assertTrue(image.contains("x^4 + 4*y^4"), "image must visibly show the Sophie-Germain input");
-        assertTrue(image.contains("data-source=\"convergent-sophie-germain.mmd\""),
-            "image must declare its generated Mermaid source");
-        assertTrue(image.contains("data-generated-by=\"ConvergentDiscoverySvgWriter\""),
+        assertTrue(image.contains("data-generated-from=\"SearchSpaceSubgraph\""),
+            "image must declare that it was generated from SearchSpaceSubgraph");
+        assertTrue(image.contains("data-generated-by=\"SearchSpaceSvgWriter\""),
             "image must carry generated provenance");
         assertTrue(image.contains("HIDDEN_STRUCTURE"),
             "image must show the hidden-structure path from generated report data");
-        assertTrue(image.contains("ast_square_difference_factor"),
-            "image must show the square-difference bridge from generated report data");
+        assertTrue(image.contains("alternative branch") || image.contains("dead-end alternative"),
+            "image must show explored alternatives from the generated search space");
         assertTrue(image.contains("LEARNED_MACRO"),
             "image must show the learned macro path from generated report data");
-        assertTrue(mermaidLabels(mermaid).stream().allMatch(label -> image.contains(escapeXml(label))),
-            "image content must correspond to generated Mermaid nodes and labels");
         assertTrue(!image.contains("path 1: hidden structure")
                 && !image.contains("path 2: learned macro shortcut")
                 && !image.contains("same target node"),
             "image must not contain manual-only SVG nodes");
         assertTrue(!image.contains("parametric-sophie-germain-discovery.png"),
             "convergent image must not be the old parametric single-path screenshot");
+
+        String compactImage = Files.readString(compactImagePath, StandardCharsets.UTF_8);
+        assertTrue(compactImage.contains("data-generated-from=\"SearchSpaceSubgraph\""),
+            "compact image must declare that it was generated from SearchSpaceSubgraph");
+        assertTrue(compactImage.contains("x^4 + 4*y^4"),
+            "compact image must visibly show the Sophie-Germain input");
     }
 
     @Test

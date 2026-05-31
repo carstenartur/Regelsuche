@@ -23,18 +23,23 @@
 
 ## Recent discovery milestone
 
-<img src="docs/assets/screenshots/convergent-sophie-germain.svg" alt="Convergent Sophie-Germain graph showing the hidden-structure discovery path and learned macro shortcut reaching the same factored result." width="760">
+<img src="docs/assets/screenshots/search-space-sophie-germain-compact.svg" alt="Compact Sophie-Germain convergence demonstration: a few alternative transformation paths converge on one canonical result." width="760">
 
-*Two real search paths converge: the didactic hidden-structure path and the learned macro shortcut.*
+*A compact, reconstructed search-space subgraph: a handful of alternative rewrite paths
+converge on one canonical result. (The full bounded graph lives in the gallery.)*
 
-PR #72 makes the convergent discovery proof visible directly: the input
-`x^4 + 4*y^4` follows a didactic hidden-structure path through the
-difference of squares
-`(x^2 + 2*y^2)^2 - (2xy)^2`.
-The learned macro shortcut reaches the same factored target node.
+Regelsuche does not only output the factorization.
+It records and replays a bounded slice of the explored transformation space and shows
+which different ideas converge. For `x^4 + 4*y^4`, the reconstructed graph keeps a few
+alternative branches visible while highlighting the selected path through
+`(x^2 + 2*y^2)^2 - (2xy)^2`, the learned macro shortcut, and the shared canonical target.
+
+The picture is a *bounded replay of the explored search space*, not a complete trace:
+some states were originally explored by the search, others are reconstructed for the
+visualization through a bounded expansion (limited by `maxStates` and `maxDepth`).
 
 See the full [Demo Gallery](docs/demo-gallery.md#convergent-discovery-multiple-paths-to-one-result)
-for both converging paths and the generated evidence links.
+for the larger reconstructed search space and the generated evidence links.
 
 ## 30 Sekunden (Demo Standard)
 
