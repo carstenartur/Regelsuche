@@ -85,6 +85,7 @@ public class App {
         System.out.println("  plugins list [--dir PATH]");
         System.out.println("  rules list [--dir PATH]");
         System.out.println("  rules validate <file.regelsuche>");
+        System.out.println("  rules conflicts [--dir PATH]");
         System.out.println("  inventory list");
         System.out.println("  inventory export --format json [--dir PATH]");
         System.out.println("  path show <pathId> --format markdown|latex|mermaid|json");

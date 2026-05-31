@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -147,11 +146,14 @@ public final class PluginRuntime implements AutoCloseable {
             if (!Files.isDirectory(config.pluginsDirectory())) {
                 return;
             }
-            List<URL> urls = Files.list(config.pluginsDirectory())
-                .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar"))
-                .sorted(Comparator.comparing(Path::toString))
-                .map(this::toUrl)
-                .toList();
+            List<URL> urls;
+            try (var stream = Files.list(config.pluginsDirectory())) {
+                urls = stream
+                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar"))
+                    .sorted(Comparator.comparing(Path::toString))
+                    .map(this::toUrl)
+                    .toList();
+            }
             if (urls.isEmpty()) {
                 return;
             }
@@ -208,38 +210,51 @@ public final class PluginRuntime implements AutoCloseable {
         if (!Files.isDirectory(config.rulesDirectory())) {
             return;
         }
-        try {
-            List<Path> files = Files.list(config.rulesDirectory())
+        List<Path> files;
+        try (var stream = Files.list(config.rulesDirectory())) {
+            files = stream
                 .filter(Files::isRegularFile)
                 .filter(this::isRuleFile)
                 .sorted(Comparator.comparing(Path::toString))
                 .toList();
-            for (Path file : files) {
-                try {
-                    RuleFileLoadResult result = ruleFileLoader.load(file, ruleRegistry, macroRegistry);
-                    for (RuleFileParser.RuleFileDiagnostic diagnostic : result.diagnostics()) {
-                        discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
-                    }
-                } catch (RuleFileParseException ex) {
-                    for (RuleFileParser.RuleFileDiagnostic diagnostic : ex.diagnostics()) {
-                        discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
-                    }
-                }
-            }
         } catch (IOException ex) {
             discoveredDiagnostics.add(new RuntimeDiagnostic(
                 "rule-runtime",
                 "Could not scan rule directory " + config.rulesDirectory() + ": " + ex.getMessage()
             ));
+            return;
+        }
+        for (Path file : files) {
+            try {
+                RuleFileLoadResult result = ruleFileLoader.load(file, ruleRegistry, macroRegistry);
+                for (RuleFileParser.RuleFileDiagnostic diagnostic : result.diagnostics()) {
+                    discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
+                }
+            } catch (RuleFileParseException ex) {
+                for (RuleFileParser.RuleFileDiagnostic diagnostic : ex.diagnostics()) {
+                    discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
+                }
+            } catch (RuntimeException ex) {
+                discoveredDiagnostics.add(new RuntimeDiagnostic(
+                    file.toString(),
+                    "Failed to load rule file: " + ex.getMessage()
+                ));
+            }
         }
     }
 
     private void disableConfiguredRules() {
-        Set<String> disabledRuleIds = new LinkedHashSet<>(config.disabledRuleIds());
-        for (String disabledRuleId : disabledRuleIds) {
+        for (String disabledRuleId : config.disabledRuleIds()) {
             ruleRegistry.disable(disabledRuleId);
+            // Also disable .forward/.backward variants generated for `direction: both` rules
+            ruleRegistry.disable(disabledRuleId + ".forward");
+            ruleRegistry.disable(disabledRuleId + ".backward");
             transformationRegistry.disable(disabledRuleId);
-            macroRegistry.disable(disabledRuleId);
+            // Macro edges are named "macro.<id>" but the registry stores them as "<id>"
+            String macroId = disabledRuleId.startsWith("macro.")
+                ? disabledRuleId.substring("macro.".length())
+                : disabledRuleId;
+            macroRegistry.disable(macroId);
         }
     }
 

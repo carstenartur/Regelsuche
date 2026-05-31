@@ -98,11 +98,11 @@ public final class RuleFileParser {
                 RuleDefinition rule = buildRule(path, lineNumber, id, properties, diagnostics);
                 if (rule != null) {
                     entries.add(rule);
-                    String signature = rule.pattern() + " -> " + rule.replace();
+                    String signature = rule.pattern();
                     String existing = signatures.putIfAbsent(signature, rule.id());
                     if (existing != null) {
                         diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,
-                            "Rule '" + rule.id() + "' duplicates the pattern of '" + existing + "'"));
+                            "Rule '" + rule.id() + "' has the same source pattern as '" + existing + "'"));
                     }
                 }
             } else {

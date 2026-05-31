@@ -30,12 +30,15 @@ import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.TransformationSearchService;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.SymPyTransformationEngine;
+import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -173,7 +176,13 @@ public class CliRouter {
         }
         String expression = String.join(" ", args);
         try (PluginRuntime runtime = new PluginRuntime(PluginRuntimeConfig.defaults())) {
-            TransformationEngine engine = runtime.createTransformationEngine();
+            TransformationEngine pluginEngine = runtime.createTransformationEngine();
+            TransformationEngine symPyEngine = new SymPyTransformationEngine();
+            TransformationEngine engine = expr -> {
+                LinkedHashSet<Transformation> combined = new LinkedHashSet<>(symPyEngine.transform(expr));
+                combined.addAll(pluginEngine.transform(expr));
+                return new ArrayList<>(combined);
+            };
             TransformationSearchService service = new TransformationSearchService(
                 engine,
                 graphStore,
