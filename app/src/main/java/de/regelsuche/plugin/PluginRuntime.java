@@ -34,6 +34,7 @@ public final class PluginRuntime implements AutoCloseable {
     private List<RuntimeDiagnostic> diagnostics = List.of();
     private List<PatternTransformation> macroTransformations = List.of();
     private List<RuleConflictDetector.RuleConflict> conflicts = List.of();
+    private List<RuleConflictDetector.CyclicConflict> cyclicConflicts = List.of();
     private List<RuleProfile> profiles = List.of();
     private URLClassLoader externalPluginClassLoader;
 
@@ -63,11 +64,19 @@ public final class PluginRuntime implements AutoCloseable {
         disableConfiguredRules();
         applyActiveProfile(discoveredDiagnostics);
         this.macroTransformations = buildMacroTransformations(discoveredDiagnostics);
-        this.conflicts = detectConflicts();
+        List<RuleConflictDetector.ConflictCandidate> conflictCandidates = buildConflictCandidates();
+        this.conflicts = RuleConflictDetector.detect(conflictCandidates);
         for (RuleConflictDetector.RuleConflict conflict : conflicts) {
             discoveredDiagnostics.add(new RuntimeDiagnostic(
                 "rule-conflict",
                 "Competing rules share the same source pattern: " + String.join(", ", conflict.ruleIds())
+            ));
+        }
+        this.cyclicConflicts = RuleConflictDetector.detectCycles(conflictCandidates);
+        for (RuleConflictDetector.CyclicConflict cycle : cyclicConflicts) {
+            discoveredDiagnostics.add(new RuntimeDiagnostic(
+                "rule-cycle",
+                "Inverse rules can loop indefinitely: " + String.join(", ", cycle.ruleIds())
             ));
         }
         loadedPlugins = List.copyOf(discoveredPlugins);
@@ -112,6 +121,10 @@ public final class PluginRuntime implements AutoCloseable {
 
     public List<RuleConflictDetector.RuleConflict> conflicts() {
         return conflicts;
+    }
+
+    public List<RuleConflictDetector.CyclicConflict> cyclicConflicts() {
+        return cyclicConflicts;
     }
 
     public List<RuleProfile> profiles() {
@@ -334,7 +347,7 @@ public final class PluginRuntime implements AutoCloseable {
         return List.copyOf(built);
     }
 
-    private List<RuleConflictDetector.RuleConflict> detectConflicts() {
+    private List<RuleConflictDetector.ConflictCandidate> buildConflictCandidates() {
         List<RuleConflictDetector.ConflictCandidate> candidates = new ArrayList<>();
         for (RewriteRule rule : ruleRegistry.enabledRules()) {
             candidates.add(new RuleConflictDetector.ConflictCandidate(rule.id(), rule));
@@ -345,7 +358,7 @@ public final class PluginRuntime implements AutoCloseable {
         for (PatternTransformation macroTransformation : macroTransformations) {
             candidates.add(new RuleConflictDetector.ConflictCandidate(macroTransformation.id(), macroTransformation));
         }
-        return RuleConflictDetector.detect(candidates);
+        return candidates;
     }
 
     private boolean isRuleFile(Path path) {

@@ -134,6 +134,25 @@ class PluginRuntimeTest {
     }
 
     @Test
+    void inverseBinomialRulesAreReportedAsCyclicConflicts(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of(),
+            Set.of()
+        ))) {
+            assertTrue(runtime.cyclicConflicts().stream().anyMatch(cycle ->
+                cycle.ruleIds().contains("binomial_square_forward")
+                    && cycle.ruleIds().contains("binomial_square_backward")));
+            assertTrue(runtime.diagnostics().stream().anyMatch(diagnostic ->
+                diagnostic.source().equals("rule-cycle")
+                    && diagnostic.message().contains("binomial_square_forward")
+                    && diagnostic.message().contains("binomial_square_backward")));
+        }
+    }
+
+    @Test
     void disabledRulesAreNotApplied(@TempDir Path tempDir) {
         try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
             tempDir.resolve("plugins"),

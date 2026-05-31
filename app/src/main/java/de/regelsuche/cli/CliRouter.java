@@ -287,12 +287,15 @@ public class CliRouter {
                     java.util.Set.of(),
                     java.util.Set.of()
                 ))) {
-                    if (runtime.conflicts().isEmpty()) {
+                    if (runtime.conflicts().isEmpty() && runtime.cyclicConflicts().isEmpty()) {
                         out.println("No rule conflicts detected.");
                     } else {
                         runtime.conflicts().forEach(conflict -> out.println(
                             "CONFLICT competing rules share source pattern: "
                                 + String.join(", ", conflict.ruleIds())));
+                        runtime.cyclicConflicts().forEach(cycle -> out.println(
+                            "CYCLE inverse rules can loop indefinitely: "
+                                + String.join(", ", cycle.ruleIds())));
                     }
                     return 0;
                 }

@@ -54,4 +54,45 @@ class RuleConflictDetectorTest {
 
         assertTrue(conflicts.isEmpty());
     }
+
+    @Test
+    void detectsMutuallyInverseRulesAsCycles() {
+        PatternExpr difference = differenceOfSquares("A", "B");
+        PatternExpr factored = PatternExpr.op(
+            BinaryOperator.MUL,
+            PatternExpr.op(BinaryOperator.SUB, PatternExpr.var("A"), PatternExpr.var("B")),
+            PatternExpr.op(BinaryOperator.ADD, PatternExpr.var("A"), PatternExpr.var("B"))
+        );
+        PatternRewriteRule factor = new PatternRewriteRule("factor", difference, factored);
+        // Inverse rule uses different placeholder names to confirm normalisation.
+        PatternExpr factoredXy = PatternExpr.op(
+            BinaryOperator.MUL,
+            PatternExpr.op(BinaryOperator.SUB, PatternExpr.var("X"), PatternExpr.var("Y")),
+            PatternExpr.op(BinaryOperator.ADD, PatternExpr.var("X"), PatternExpr.var("Y"))
+        );
+        PatternRewriteRule expand = new PatternRewriteRule("expand", factoredXy, differenceOfSquares("X", "Y"));
+
+        List<RuleConflictDetector.CyclicConflict> cycles = RuleConflictDetector.detectCycles(List.of(
+            new RuleConflictDetector.ConflictCandidate("factor", factor),
+            new RuleConflictDetector.ConflictCandidate("expand", expand)
+        ));
+
+        assertEquals(1, cycles.size());
+        assertEquals(List.of("expand", "factor"), cycles.get(0).ruleIds());
+    }
+
+    @Test
+    void doesNotReportNonInverseRulesAsCycles() {
+        PatternRewriteRule factor = new PatternRewriteRule(
+            "factor", differenceOfSquares("A", "B"), PatternExpr.var("A"));
+        PatternRewriteRule other = new PatternRewriteRule(
+            "other", PatternExpr.var("A"), PatternExpr.var("B"));
+
+        List<RuleConflictDetector.CyclicConflict> cycles = RuleConflictDetector.detectCycles(List.of(
+            new RuleConflictDetector.ConflictCandidate("factor", factor),
+            new RuleConflictDetector.ConflictCandidate("other", other)
+        ));
+
+        assertTrue(cycles.isEmpty());
+    }
 }

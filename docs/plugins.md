@@ -23,7 +23,7 @@ Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/exa
 - `plugins list` zeigt geladene Plugins
 - `rules list` zeigt geladene Regeln, Transformationen und Makros (`--profile <id>` wendet ein Aktivierungsprofil an)
 - `rules validate <datei>` prüft DSL-Dateien mit verständlichen Diagnosen
-- `rules conflicts` zeigt konkurrierende Regeln, die dasselbe Quellmuster verwenden
+- `rules conflicts` zeigt konkurrierende Regeln, die dasselbe Quellmuster verwenden, sowie zyklische (zueinander inverse) Regelpaare
 - `rules profiles` zeigt geladene Aktivierungsprofile
 
 ## Aktivierungsprofile
@@ -43,6 +43,15 @@ erkannt werden. Teilen sich zwei oder mehr Einträge dasselbe Quellmuster, konku
 sie um dieselben Treffer; `PluginRuntime` meldet das als `rule-conflict`-Diagnose und
 über `runtime.conflicts()`. So lassen sich doppelte oder widersprüchliche Suchkanten früh
 erkennen.
+
+Zusätzlich erkennt `RuleConflictDetector` zyklische (zueinander inverse) Regelpaare:
+Schreibt eine Regel `S -> T` und eine andere `T -> S`, bilden sie einen Zwei-Schritt-Zyklus
+im Suchgraphen und können die Suche endlos zwischen beiden Formen pendeln lassen. Die
+Platzhalternamen werden über Quell- und Zielmuster hinweg konsistent normalisiert, sodass
+`(A + B)^2 -> A^2 + 2*A*B + B^2` und `X^2 + 2*X*Y + Y^2 -> (X + Y)^2` als invers erkannt
+werden. `PluginRuntime` meldet solche Paare als `rule-cycle`-Diagnose und über
+`runtime.cyclicConflicts()`. So lassen sich potenzielle Endlosschleifen früh erkennen und
+durch Richtung, Priorität oder Aktivierungsprofile auflösen.
 
 ## Hot-Reload-Vorbereitung
 
