@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceEstimator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.estimate</a> &gt; <span class="el_source">SearchSpaceEstimator.java</span></div><h1>SearchSpaceEstimator.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.estimate;
+
+import java.util.List;
+
+/**
+ * Continuously estimates the size of a transformation search space from the
+ * number of states discovered at each search depth (the per-depth frontier
+ * sizes).
+ *
+ * &lt;p&gt;This implements the &quot;Suchraumabschätzung&quot; runtime requirement of issue #74.
+ * The estimate is deliberately approximate — it only needs to help a user judge
+ * the complexity of a query and warn early about a possible explosion of the
+ * search space. The estimator is pure (no search state of its own): callers feed
+ * it the observed frontier sizes and it returns a {@link SearchSpaceEstimate}.&lt;/p&gt;
+ *
+ * &lt;p&gt;The growth rate (branching factor) is the geometric mean of the ratios
+ * between successive non-empty frontier sizes. Using the geometric mean keeps the
+ * estimate stable when individual depths fluctuate. The expected total size is the
+ * known count plus a geometric projection of the deepest observed frontier up to
+ * the depth bound, saturated so it never overflows {@code long}.&lt;/p&gt;
+ */
+<span class="fc" id="L22">public final class SearchSpaceEstimator {</span>
+
+    /** Below this branching factor the frontier is considered stable. */
+    static final double STABLE_BRANCHING = 1.05;
+    /** At or above this branching factor the frontier grows noticeably. */
+    static final double MODERATE_BRANCHING = 1.20;
+    /** At or above this branching factor an explosion is likely. */
+    static final double EXPLOSIVE_BRANCHING = 2.0;
+
+    /**
+     * Estimates the search space from per-depth frontier sizes.
+     *
+     * @param statesPerDepth number of states discovered at depth {@code 0, 1, 2, …};
+     *                       index {@code i} holds the count for depth {@code i}.
+     *                       Must not be {@code null}; entries must be non-negative.
+     * @param maxDepth       depth bound of the search (from the heuristic); the
+     *                       projection extrapolates growth up to this depth
+     * @param visitBudget    maximum number of states the search may visit
+     *                       (e.g. {@code SearchHeuristic.maxVisitedExpressions()}),
+     *                       used to decide whether to warn about an explosion; must
+     *                       be positive
+     * @return the estimate; never {@code null}
+     */
+    public SearchSpaceEstimate estimate(List&lt;Long&gt; statesPerDepth, int maxDepth, long visitBudget) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (statesPerDepth == null) {</span>
+<span class="fc" id="L47">            throw new IllegalArgumentException(&quot;statesPerDepth must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (maxDepth &lt; 0) {</span>
+<span class="fc" id="L50">            throw new IllegalArgumentException(&quot;maxDepth must not be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (visitBudget &lt; 1) {</span>
+<span class="fc" id="L53">            throw new IllegalArgumentException(&quot;visitBudget must be positive&quot;);</span>
+        }
+
+<span class="fc" id="L56">        long knownStateCount = 0;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (Long count : statesPerDepth) {</span>
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">            if (count == null || count &lt; 0) {</span>
+<span class="fc" id="L59">                throw new IllegalArgumentException(&quot;frontier sizes must be non-negative&quot;);</span>
+            }
+<span class="fc" id="L61">            knownStateCount = saturatedAdd(knownStateCount, count);</span>
+<span class="fc" id="L62">        }</span>
+
+<span class="fc" id="L64">        double branchingFactor = estimateBranchingFactor(statesPerDepth);</span>
+<span class="fc" id="L65">        long deepestObservedDepth = deepestNonEmptyDepth(statesPerDepth);</span>
+<span class="fc" id="L66">        long deepestFrontier = deepestNonEmptyFrontier(statesPerDepth);</span>
+<span class="fc" id="L67">        long projected = projectTotal(</span>
+            knownStateCount, branchingFactor, deepestObservedDepth, deepestFrontier, maxDepth);
+
+<span class="fc" id="L70">        SearchSpaceRisk risk = classifyRisk(branchingFactor, projected, visitBudget);</span>
+<span class="fc" id="L71">        String warning = buildWarning(risk, projected, visitBudget, branchingFactor);</span>
+<span class="fc" id="L72">        return new SearchSpaceEstimate(knownStateCount, branchingFactor, projected, risk, warning);</span>
+    }
+
+    private double estimateBranchingFactor(List&lt;Long&gt; statesPerDepth) {
+        // Geometric mean of successive non-empty frontier ratios.
+<span class="fc" id="L77">        double logSum = 0.0;</span>
+<span class="fc" id="L78">        int ratios = 0;</span>
+<span class="fc" id="L79">        long previous = -1;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (Long count : statesPerDepth) {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (count == 0) {</span>
+<span class="fc" id="L82">                continue;</span>
+            }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (previous &gt; 0) {</span>
+<span class="fc" id="L85">                logSum += Math.log((double) count / (double) previous);</span>
+<span class="fc" id="L86">                ratios++;</span>
+            }
+<span class="fc" id="L88">            previous = count;</span>
+<span class="fc" id="L89">        }</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (ratios == 0) {</span>
+            // Not enough observations (zero or one non-empty depth): assume a
+            // stable frontier rather than guessing growth.
+<span class="fc" id="L93">            return 1.0;</span>
+        }
+<span class="fc" id="L95">        return Math.exp(logSum / ratios);</span>
+    }
+
+    private long deepestNonEmptyDepth(List&lt;Long&gt; statesPerDepth) {
+<span class="fc" id="L99">        long depth = -1;</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (int i = 0; i &lt; statesPerDepth.size(); i++) {</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (statesPerDepth.get(i) &gt; 0) {</span>
+<span class="fc" id="L102">                depth = i;</span>
+            }
+        }
+<span class="fc" id="L105">        return depth;</span>
+    }
+
+    private long deepestNonEmptyFrontier(List&lt;Long&gt; statesPerDepth) {
+<span class="pc bfc" id="L109" title="All 2 branches covered.">        for (int i = statesPerDepth.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L110">            long count = statesPerDepth.get(i);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (count &gt; 0) {</span>
+<span class="fc" id="L112">                return count;</span>
+            }
+        }
+<span class="fc" id="L115">        return 0;</span>
+    }
+
+    private long projectTotal(
+            long knownStateCount,
+            double branchingFactor,
+            long deepestObservedDepth,
+            long deepestFrontier,
+            int maxDepth) {
+<span class="fc" id="L124">        long remainingDepths = maxDepth - deepestObservedDepth;</span>
+<span class="pc bpc" id="L125" title="2 of 6 branches missed.">        if (remainingDepths &lt;= 0 || deepestFrontier &lt;= 0 || branchingFactor &lt;= 0) {</span>
+<span class="fc" id="L126">            return knownStateCount;</span>
+        }
+        // A stable or shrinking frontier roughly contributes one more frontier per
+        // remaining depth; modelling that as flat avoids overstating the total.
+<span class="fc" id="L130">        double frontier = deepestFrontier;</span>
+<span class="fc" id="L131">        long projected = knownStateCount;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (long step = 0; step &lt; remainingDepths; step++) {</span>
+<span class="fc" id="L133">            frontier *= branchingFactor;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (frontier &gt;= (double) Long.MAX_VALUE) {</span>
+<span class="fc" id="L135">                return Long.MAX_VALUE;</span>
+            }
+<span class="fc" id="L137">            projected = saturatedAdd(projected, (long) Math.ceil(frontier));</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            if (projected == Long.MAX_VALUE) {</span>
+<span class="nc" id="L139">                return Long.MAX_VALUE;</span>
+            }
+        }
+<span class="fc" id="L142">        return projected;</span>
+    }
+
+    private SearchSpaceRisk classifyRisk(double branchingFactor, long projected, long visitBudget) {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        boolean exceedsBudget = projected &gt;= visitBudget;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        boolean farExceedsBudget = projected != Long.MAX_VALUE</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            ? projected &gt;= saturatedMultiply(visitBudget, 10)</span>
+<span class="fc" id="L149">            : true;</span>
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">        if (branchingFactor &gt;= EXPLOSIVE_BRANCHING || farExceedsBudget) {</span>
+<span class="fc" id="L151">            return SearchSpaceRisk.EXPLOSIVE;</span>
+        }
+<span class="pc bpc" id="L153" title="1 of 4 branches missed.">        if (branchingFactor &gt;= MODERATE_BRANCHING || exceedsBudget) {</span>
+<span class="fc" id="L154">            return SearchSpaceRisk.HIGH;</span>
+        }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (branchingFactor &gt;= STABLE_BRANCHING) {</span>
+<span class="fc" id="L157">            return SearchSpaceRisk.MODERATE;</span>
+        }
+<span class="fc" id="L159">        return SearchSpaceRisk.LOW;</span>
+    }
+
+    private String buildWarning(
+            SearchSpaceRisk risk, long projected, long visitBudget, double branchingFactor) {
+<span class="fc bfc" id="L164" title="All 4 branches covered.">        if (risk == SearchSpaceRisk.LOW || risk == SearchSpaceRisk.MODERATE) {</span>
+<span class="fc" id="L165">            return null;</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        String size = projected == Long.MAX_VALUE ? &quot;very large&quot; : &quot;~&quot; + projected;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (projected &lt; visitBudget) {</span>
+<span class="fc" id="L169">            return String.format(</span>
+                &quot;Possible search-space explosion: estimated growth rate %.2f, expected %s states &quot;
+                    + &quot;within the current visit budget of %d.&quot;,
+<span class="fc" id="L172">                branchingFactor, size, visitBudget);</span>
+        }
+<span class="fc" id="L174">        return String.format(</span>
+            &quot;Possible search-space explosion: estimated growth rate %.2f, expected %s states &quot;
+                + &quot;exceed the visit budget of %d.&quot;,
+<span class="fc" id="L177">            branchingFactor, size, visitBudget);</span>
+    }
+
+    private static long saturatedAdd(long a, long b) {
+<span class="fc" id="L181">        long sum = a + b;</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (((a ^ sum) &amp; (b ^ sum)) &lt; 0) {</span>
+<span class="nc" id="L183">            return Long.MAX_VALUE;</span>
+        }
+<span class="fc" id="L185">        return sum;</span>
+    }
+
+    private static long saturatedMultiply(long a, long b) {
+<span class="fc" id="L189">        long result = a * b;</span>
+<span class="pc bpc" id="L190" title="5 of 8 branches missed.">        if (a != 0 &amp;&amp; (result / a != b || (a == -1 &amp;&amp; b == Long.MIN_VALUE))) {</span>
+<span class="nc" id="L191">            return Long.MAX_VALUE;</span>
+        }
+<span class="fc" id="L193">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

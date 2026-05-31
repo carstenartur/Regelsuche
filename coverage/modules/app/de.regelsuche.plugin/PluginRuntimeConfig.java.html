@@ -8,17 +8,29 @@ public record PluginRuntimeConfig(
     Path rulesDirectory,
     boolean loadClasspathPlugins,
     Set&lt;String&gt; disabledPluginIds,
-    Set&lt;String&gt; disabledRuleIds
+    Set&lt;String&gt; disabledRuleIds,
+    String activeProfile
 ) {
-<span class="fc" id="L13">    public PluginRuntimeConfig {</span>
-<span class="pc bpc" id="L14" title="1 of 2 branches missed.">        pluginsDirectory = pluginsDirectory == null ? Path.of(&quot;plugins&quot;) : pluginsDirectory;</span>
-<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        rulesDirectory = rulesDirectory == null ? Path.of(&quot;rules&quot;) : rulesDirectory;</span>
-<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        disabledPluginIds = Set.copyOf(disabledPluginIds == null ? Set.of() : disabledPluginIds);</span>
-<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        disabledRuleIds = Set.copyOf(disabledRuleIds == null ? Set.of() : disabledRuleIds);</span>
-<span class="fc" id="L18">    }</span>
+<span class="fc" id="L14">    public PluginRuntimeConfig {</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        pluginsDirectory = pluginsDirectory == null ? Path.of(&quot;plugins&quot;) : pluginsDirectory;</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        rulesDirectory = rulesDirectory == null ? Path.of(&quot;rules&quot;) : rulesDirectory;</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        disabledPluginIds = Set.copyOf(disabledPluginIds == null ? Set.of() : disabledPluginIds);</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        disabledRuleIds = Set.copyOf(disabledRuleIds == null ? Set.of() : disabledRuleIds);</span>
+<span class="pc bpc" id="L19" title="1 of 4 branches missed.">        activeProfile = activeProfile == null || activeProfile.isBlank() ? null : activeProfile;</span>
+<span class="fc" id="L20">    }</span>
+
+    public PluginRuntimeConfig(
+        Path pluginsDirectory,
+        Path rulesDirectory,
+        boolean loadClasspathPlugins,
+        Set&lt;String&gt; disabledPluginIds,
+        Set&lt;String&gt; disabledRuleIds
+    ) {
+<span class="fc" id="L29">        this(pluginsDirectory, rulesDirectory, loadClasspathPlugins, disabledPluginIds, disabledRuleIds, null);</span>
+<span class="fc" id="L30">    }</span>
 
     public static PluginRuntimeConfig defaults() {
-<span class="nc" id="L21">        return new PluginRuntimeConfig(Path.of(&quot;plugins&quot;), Path.of(&quot;rules&quot;), true, Set.of(), Set.of());</span>
+<span class="nc" id="L33">        return new PluginRuntimeConfig(Path.of(&quot;plugins&quot;), Path.of(&quot;rules&quot;), true, Set.of(), Set.of(), null);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

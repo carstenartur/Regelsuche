@@ -24,15 +24,15 @@ import java.util.Objects;
 
     public void disable(String id) {
 <span class="fc" id="L26">        MutableRuleRegistration registration = rules.get(id);</span>
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (registration != null) {</span>
-<span class="nc" id="L28">            registration.enabled = false;</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (registration != null) {</span>
+<span class="fc" id="L28">            registration.enabled = false;</span>
         }
 <span class="fc" id="L30">    }</span>
 
     public List&lt;RewriteRule&gt; enabledRules() {
 <span class="fc" id="L33">        List&lt;RewriteRule&gt; enabled = new ArrayList&lt;&gt;();</span>
 <span class="fc bfc" id="L34" title="All 2 branches covered.">        for (MutableRuleRegistration registration : rules.values()) {</span>
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            if (registration.enabled) {</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            if (registration.enabled) {</span>
 <span class="fc" id="L36">                enabled.add(registration.rule);</span>
             }
 <span class="fc" id="L38">        }</span>

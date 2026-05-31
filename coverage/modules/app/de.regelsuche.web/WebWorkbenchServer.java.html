@@ -315,8 +315,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L315">        String profileName = stringValue(body, &quot;profile&quot;, SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);</span>
 <span class="fc" id="L316">        String goalName = stringValue(body, &quot;goal&quot;, &quot;&quot;).toUpperCase(Locale.ROOT);</span>
 <span class="fc bfc" id="L317" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="fc" id="L318">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
-<span class="fc" id="L319">            return;</span>
+<span class="nc" id="L318">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
+<span class="nc" id="L319">            return;</span>
         }
         InputType type;
         SearchProfile profile;
@@ -2147,8 +2147,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2148">            return;</span>
         }
-<span class="fc" id="L2150">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="fc" id="L2151">    }</span>
+<span class="nc" id="L2150">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="nc" id="L2151">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2154">        var jobs = proofWorkbenchService.listJobs();</span>

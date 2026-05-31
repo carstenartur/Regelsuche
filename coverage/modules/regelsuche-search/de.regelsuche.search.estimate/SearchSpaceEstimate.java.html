@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceEstimate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.estimate</a> &gt; <span class="el_source">SearchSpaceEstimate.java</span></div><h1>SearchSpaceEstimate.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.estimate;
+
+/**
+ * Immutable result of a {@link SearchSpaceEstimator} run.
+ *
+ * &lt;p&gt;Mirrors the GUI/CLI fields requested in issue #74 (&quot;Suchraumabschätzung&quot;):
+ * the number of states already known, the estimated growth (branching) rate, the
+ * expected total search-space size if the search keeps growing at that rate up to
+ * the depth bound, a coarse {@link SearchSpaceRisk} level and a human-readable
+ * warning ({@code null} when there is nothing to warn about).&lt;/p&gt;
+ *
+ * @param knownStateCount          number of states observed so far
+ * @param estimatedBranchingFactor estimated average number of successor states per
+ *                                 state (the growth rate); {@code 1.0} means a
+ *                                 stable frontier, values below {@code 1.0} a
+ *                                 shrinking one
+ * @param projectedStateCount      expected total number of states if growth
+ *                                 continues at {@code estimatedBranchingFactor} up
+ *                                 to the depth bound (saturated, never overflows)
+ * @param risk                     coarse explosion-risk classification
+ * @param warning                  human-readable warning, or {@code null} when the
+ *                                 search is expected to stay within budget
+ */
+public record SearchSpaceEstimate(
+    long knownStateCount,
+    double estimatedBranchingFactor,
+    long projectedStateCount,
+    SearchSpaceRisk risk,
+    String warning
+) {
+<span class="fc" id="L31">    public SearchSpaceEstimate {</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (knownStateCount &lt; 0) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(&quot;knownStateCount must not be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (projectedStateCount &lt; 0) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(&quot;projectedStateCount must not be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">        if (Double.isNaN(estimatedBranchingFactor) || estimatedBranchingFactor &lt; 0) {</span>
+<span class="nc" id="L39">            throw new IllegalArgumentException(&quot;estimatedBranchingFactor must be a non-negative number&quot;);</span>
+        }
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (risk == null) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;risk must not be null&quot;);</span>
+        }
+<span class="fc" id="L44">    }</span>
+
+    /** Whether the estimator produced a warning the user should see. */
+    public boolean hasWarning() {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        return warning != null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

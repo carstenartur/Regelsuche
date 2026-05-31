@@ -18,12 +18,12 @@ final class PatternExprMapper {
 <span class="fc bfc" id="L18" title="All 2 branches covered.">        if (node instanceof PatternVariable variable) {</span>
 <span class="fc" id="L19">            return PatternExpr.var(variable.name());</span>
         }
-<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (node instanceof PatternFunction function) {</span>
-<span class="nc" id="L22">            PatternExpr[] converted = new PatternExpr[function.arguments().size()];</span>
-<span class="nc bnc" id="L23" title="All 2 branches missed.">            for (int i = 0; i &lt; converted.length; i++) {</span>
-<span class="nc" id="L24">                converted[i] = toPatternExpr(function.arguments().get(i));</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (node instanceof PatternFunction function) {</span>
+<span class="fc" id="L22">            PatternExpr[] converted = new PatternExpr[function.arguments().size()];</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">            for (int i = 0; i &lt; converted.length; i++) {</span>
+<span class="fc" id="L24">                converted[i] = toPatternExpr(function.arguments().get(i));</span>
             }
-<span class="nc" id="L26">            return PatternExpr.fn(function.name(), converted);</span>
+<span class="fc" id="L26">            return PatternExpr.fn(function.name(), converted);</span>
         }
 <span class="fc" id="L28">        PatternBinary binary = (PatternBinary) node;</span>
 <span class="fc" id="L29">        return PatternExpr.op(binary.op(), toPatternExpr(binary.left()), toPatternExpr(binary.right()));</span>

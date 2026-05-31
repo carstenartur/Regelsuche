@@ -4,10 +4,12 @@ import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Detects competing rules and transformations that share the same source
@@ -28,82 +30,164 @@ public final class RuleConflictDetector {
      *         pattern signature, in deterministic order
      */
     public static List&lt;RuleConflict&gt; detect(List&lt;ConflictCandidate&gt; items) {
-<span class="fc" id="L31">        Map&lt;String, List&lt;String&gt;&gt; bySignature = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (ConflictCandidate item : items) {</span>
-<span class="fc" id="L33">            Optional&lt;PatternExpr&gt; source = sourcePattern(item.rule());</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            if (source.isEmpty()) {</span>
-<span class="nc" id="L35">                continue;</span>
+<span class="fc" id="L33">        Map&lt;String, List&lt;String&gt;&gt; bySignature = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (ConflictCandidate item : items) {</span>
+<span class="fc" id="L35">            Optional&lt;PatternExpr&gt; source = sourcePattern(item.rule());</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (source.isEmpty()) {</span>
+<span class="nc" id="L37">                continue;</span>
             }
-<span class="fc" id="L37">            String signature = canonicalSignature(source.get());</span>
-<span class="fc" id="L38">            bySignature.computeIfAbsent(signature, key -&gt; new ArrayList&lt;&gt;()).add(item.id());</span>
-<span class="fc" id="L39">        }</span>
-<span class="fc" id="L40">        List&lt;RuleConflict&gt; conflicts = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : bySignature.entrySet()) {</span>
-<span class="fc" id="L42">            List&lt;String&gt; ids = entry.getValue();</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (ids.size() &gt; 1) {</span>
-<span class="fc" id="L44">                conflicts.add(new RuleConflict(entry.getKey(), List.copyOf(ids)));</span>
+<span class="fc" id="L39">            String signature = canonicalSignature(source.get());</span>
+<span class="fc" id="L40">            bySignature.computeIfAbsent(signature, key -&gt; new ArrayList&lt;&gt;()).add(item.id());</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">        List&lt;RuleConflict&gt; conflicts = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : bySignature.entrySet()) {</span>
+<span class="fc" id="L44">            List&lt;String&gt; ids = entry.getValue();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            if (ids.size() &gt; 1) {</span>
+<span class="fc" id="L46">                conflicts.add(new RuleConflict(entry.getKey(), List.copyOf(ids)));</span>
             }
-<span class="fc" id="L46">        }</span>
-<span class="fc" id="L47">        return List.copyOf(conflicts);</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        return List.copyOf(conflicts);</span>
+    }
+
+    /**
+     * Detects pairs of rules that are structural inverses of one another, i.e.
+     * one rewrites {@code S -&gt; T} while the other rewrites {@code T -&gt; S}. Such
+     * pairs form a two-step cycle in the search graph and can cause the rewriter
+     * to oscillate indefinitely between the two shapes (a potential infinite
+     * loop), so the runtime surfaces them so that priorities, directions or
+     * activation profiles can break the cycle.
+     *
+     * &lt;p&gt;Placeholder names are normalised consistently across each rule's source
+     * and target, so {@code (A + B)^2 -&gt; A^2 + 2*A*B + B^2} and
+     * {@code X^2 + 2*X*Y + Y^2 -&gt; (X + Y)^2} are recognised as inverses.&lt;/p&gt;
+     *
+     * @param items rules and transformations to analyse, in registration order
+     * @return one entry per pair of mutually inverse rules, in deterministic order
+     */
+    public static List&lt;CyclicConflict&gt; detectCycles(List&lt;ConflictCandidate&gt; items) {
+<span class="fc" id="L68">        record Directed(String id, String forward, String reverse) {</span>
+        }
+<span class="fc" id="L70">        List&lt;Directed&gt; directed = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L71">        Map&lt;String, List&lt;Directed&gt;&gt; byForward = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (ConflictCandidate item : items) {</span>
+<span class="fc" id="L73">            Optional&lt;PatternExpr&gt; source = sourcePattern(item.rule());</span>
+<span class="fc" id="L74">            Optional&lt;PatternExpr&gt; target = targetPattern(item.rule());</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">            if (source.isEmpty() || target.isEmpty()) {</span>
+<span class="nc" id="L76">                continue;</span>
+            }
+<span class="fc" id="L78">            String forward = pairSignature(source.get(), target.get());</span>
+<span class="fc" id="L79">            String reverse = pairSignature(target.get(), source.get());</span>
+<span class="fc" id="L80">            Directed entry = new Directed(item.id(), forward, reverse);</span>
+<span class="fc" id="L81">            directed.add(entry);</span>
+<span class="fc" id="L82">            byForward.computeIfAbsent(forward, key -&gt; new ArrayList&lt;&gt;()).add(entry);</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">        List&lt;CyclicConflict&gt; cycles = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L85">        Set&lt;String&gt; reported = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (Directed entry : directed) {</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (Directed inverse : byForward.getOrDefault(entry.reverse(), List.of())) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                if (inverse.id().equals(entry.id())) {</span>
+<span class="fc" id="L89">                    continue;</span>
+                }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                String pairKey = entry.id().compareTo(inverse.id()) &lt;= 0</span>
+<span class="fc" id="L92">                    ? entry.id() + '\u0000' + inverse.id()</span>
+<span class="fc" id="L93">                    : inverse.id() + '\u0000' + entry.id();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                if (!reported.add(pairKey)) {</span>
+<span class="fc" id="L95">                    continue;</span>
+                }
+<span class="fc" id="L97">                List&lt;String&gt; ids = new ArrayList&lt;&gt;(List.of(entry.id(), inverse.id()));</span>
+<span class="fc" id="L98">                ids.sort(String::compareTo);</span>
+<span class="fc" id="L99">                cycles.add(new CyclicConflict(List.copyOf(ids)));</span>
+<span class="fc" id="L100">            }</span>
+<span class="fc" id="L101">        }</span>
+<span class="fc" id="L102">        return List.copyOf(cycles);</span>
     }
 
     private static Optional&lt;PatternExpr&gt; sourcePattern(RewriteRule rule) {
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (rule instanceof PatternRewriteRule patternRule) {</span>
-<span class="fc" id="L52">            return Optional.of(patternRule.source());</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (rule instanceof PatternRewriteRule patternRule) {</span>
+<span class="fc" id="L107">            return Optional.of(patternRule.source());</span>
         }
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (rule instanceof PatternBasedTransformation transformation) {</span>
-<span class="fc" id="L55">            return Optional.of(transformation.source());</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (rule instanceof PatternBasedTransformation transformation) {</span>
+<span class="fc" id="L110">            return Optional.of(transformation.source());</span>
         }
-<span class="nc" id="L57">        return Optional.empty();</span>
+<span class="nc" id="L112">        return Optional.empty();</span>
+    }
+
+    private static Optional&lt;PatternExpr&gt; targetPattern(RewriteRule rule) {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (rule instanceof PatternRewriteRule patternRule) {</span>
+<span class="fc" id="L117">            return Optional.of(patternRule.target());</span>
+        }
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (rule instanceof PatternBasedTransformation transformation) {</span>
+<span class="fc" id="L120">            return Optional.of(transformation.target());</span>
+        }
+<span class="nc" id="L122">        return Optional.empty();</span>
+    }
+
+    private static String pairSignature(PatternExpr first, PatternExpr second) {
+<span class="fc" id="L126">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L127">        Map&lt;String, Integer&gt; placeholders = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L128">        appendSignature(first, builder, placeholders);</span>
+<span class="fc" id="L129">        builder.append(&quot;=&gt;&quot;);</span>
+<span class="fc" id="L130">        appendSignature(second, builder, placeholders);</span>
+<span class="fc" id="L131">        return builder.toString();</span>
     }
 
     private static String canonicalSignature(PatternExpr pattern) {
-<span class="fc" id="L61">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc" id="L62">        appendSignature(pattern, builder, new LinkedHashMap&lt;&gt;());</span>
-<span class="fc" id="L63">        return builder.toString();</span>
+<span class="fc" id="L135">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L136">        appendSignature(pattern, builder, new LinkedHashMap&lt;&gt;());</span>
+<span class="fc" id="L137">        return builder.toString();</span>
     }
 
     private static void appendSignature(PatternExpr pattern, StringBuilder builder, Map&lt;String, Integer&gt; placeholders) {
-<span class="pc bpc" id="L67" title="1 of 4 branches missed.">        switch (pattern) {</span>
-<span class="fc" id="L68">            case PatternExpr.Placeholder placeholder -&gt; {</span>
-<span class="fc" id="L69">                int index = placeholders.computeIfAbsent(placeholder.name(), key -&gt; placeholders.size());</span>
-<span class="fc" id="L70">                builder.append('?').append(index);</span>
-<span class="fc" id="L71">            }</span>
-<span class="fc" id="L72">            case PatternExpr.LiteralNumber literal -&gt; builder.append('#').append(literal.value());</span>
-<span class="fc" id="L73">            case PatternExpr.Operation operation -&gt; {</span>
-<span class="fc" id="L74">                builder.append('(');</span>
-<span class="fc" id="L75">                appendSignature(operation.left(), builder, placeholders);</span>
-<span class="fc" id="L76">                builder.append(operation.operator().symbol());</span>
-<span class="fc" id="L77">                appendSignature(operation.right(), builder, placeholders);</span>
-<span class="fc" id="L78">                builder.append(')');</span>
-<span class="fc" id="L79">            }</span>
-<span class="nc" id="L80">            case PatternExpr.Function function -&gt; {</span>
-<span class="nc" id="L81">                builder.append(function.name()).append('(');</span>
-<span class="nc" id="L82">                List&lt;PatternExpr&gt; arguments = function.arguments();</span>
-<span class="nc bnc" id="L83" title="All 2 branches missed.">                for (int i = 0; i &lt; arguments.size(); i++) {</span>
-<span class="nc bnc" id="L84" title="All 2 branches missed.">                    if (i &gt; 0) {</span>
-<span class="nc" id="L85">                        builder.append(',');</span>
+<span class="pc bpc" id="L141" title="1 of 4 branches missed.">        switch (pattern) {</span>
+<span class="fc" id="L142">            case PatternExpr.Placeholder placeholder -&gt; {</span>
+<span class="fc" id="L143">                int index = placeholders.computeIfAbsent(placeholder.name(), key -&gt; placeholders.size());</span>
+<span class="fc" id="L144">                builder.append('?').append(index);</span>
+<span class="fc" id="L145">            }</span>
+<span class="fc" id="L146">            case PatternExpr.LiteralNumber literal -&gt; builder.append('#').append(literal.value());</span>
+<span class="fc" id="L147">            case PatternExpr.Operation operation -&gt; {</span>
+<span class="fc" id="L148">                builder.append('(');</span>
+<span class="fc" id="L149">                appendSignature(operation.left(), builder, placeholders);</span>
+<span class="fc" id="L150">                builder.append(operation.operator().symbol());</span>
+<span class="fc" id="L151">                appendSignature(operation.right(), builder, placeholders);</span>
+<span class="fc" id="L152">                builder.append(')');</span>
+<span class="fc" id="L153">            }</span>
+<span class="nc" id="L154">            case PatternExpr.Function function -&gt; {</span>
+<span class="nc" id="L155">                builder.append(function.name()).append('(');</span>
+<span class="nc" id="L156">                List&lt;PatternExpr&gt; arguments = function.arguments();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                for (int i = 0; i &lt; arguments.size(); i++) {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                    if (i &gt; 0) {</span>
+<span class="nc" id="L159">                        builder.append(',');</span>
                     }
-<span class="nc" id="L87">                    appendSignature(arguments.get(i), builder, placeholders);</span>
+<span class="nc" id="L161">                    appendSignature(arguments.get(i), builder, placeholders);</span>
                 }
-<span class="nc" id="L89">                builder.append(')');</span>
+<span class="nc" id="L163">                builder.append(')');</span>
             }
         }
-<span class="fc" id="L92">    }</span>
+<span class="fc" id="L166">    }</span>
 
     /**
      * A rule or transformation that can participate in conflict detection.
      */
-<span class="fc" id="L97">    public record ConflictCandidate(String id, RewriteRule rule) {</span>
+<span class="fc" id="L171">    public record ConflictCandidate(String id, RewriteRule rule) {</span>
     }
 
     /**
      * A group of two or more rule ids that share the same source pattern.
      */
     public record RuleConflict(String patternSignature, List&lt;String&gt; ruleIds) {
-<span class="fc" id="L104">        public RuleConflict {</span>
-<span class="fc" id="L105">            ruleIds = List.copyOf(ruleIds);</span>
-<span class="fc" id="L106">        }</span>
+<span class="fc" id="L178">        public RuleConflict {</span>
+<span class="fc" id="L179">            ruleIds = List.copyOf(ruleIds);</span>
+<span class="fc" id="L180">        }</span>
+    }
+
+    /**
+     * A pair of rule ids that are structural inverses of one another and thus
+     * form a two-step cycle (a potential infinite loop) in the search graph.
+     */
+    public record CyclicConflict(List&lt;String&gt; ruleIds) {
+<span class="fc" id="L188">        public CyclicConflict {</span>
+<span class="fc" id="L189">            ruleIds = List.copyOf(ruleIds);</span>
+<span class="fc" id="L190">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
