@@ -9,6 +9,7 @@ rule difference_of_squares:
   pattern: A^2 - B^2
   replace: (A - B) * (A + B)
   direction: forward
+  priority: 5
   tags:
     - factorization
   explanation: "Erkennt die Differenz zweier Quadrate."
@@ -25,6 +26,7 @@ rule difference_of_squares:
 - `pattern`
 - `replace`
 - `direction` (`forward`, `backward`, `both`)
+- `priority` (Ganzzahl; höhere Werte werden als geringere Suchkosten registriert)
 - `tags`
 - `conditions`
 - `difficulty`
@@ -34,7 +36,9 @@ rule difference_of_squares:
 
 - `input`
 - `output`
+- `priority` (Ganzzahl; wird für die erzeugte Makro-Transformation übernommen)
 - `tags`
+- `difficulty`
 - `explanation`
 
 ## Aktivierungsprofile

@@ -1,6 +1,7 @@
 package de.regelsuche.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
@@ -254,6 +255,80 @@ class PluginRuntimeTest {
             assertTrue(runtime.loadedPlugins().stream().anyMatch(plugin -> plugin.id().equals("binomial-formulas")));
             assertTrue(runtime.diagnostics().stream()
                 .anyMatch(diagnostic -> diagnostic.message().contains("Missing required property 'pattern'")));
+            assertTrue(runtime.loadedRuleFiles().stream()
+                .anyMatch(ruleFile -> !ruleFile.loaded()
+                    && ruleFile.path().endsWith("broken.regelsuche")
+                    && ruleFile.diagnostics().stream().anyMatch(message -> message.contains("Missing required property 'pattern'"))));
+        }
+    }
+
+    @Test
+    void ruleFilesExposeLoadedDebugMetadataAndMapPrioritiesToCostDeltas(@TempDir Path tempDir) throws Exception {
+        Path rulesDir = tempDir.resolve("rules");
+        Files.createDirectories(rulesDir);
+        Files.writeString(rulesDir.resolve("prioritized.regelsuche"), """
+            rule high_priority:
+              pattern: A + 0
+              replace: A
+              priority: 7
+              tags:
+                - simplification
+
+            macro preferred_macro:
+              input: A * 1
+              output: A
+              priority: 3
+              tags:
+                - simplification
+            """);
+
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            rulesDir,
+            false,
+            Set.of(),
+            Set.of()
+        ))) {
+            assertTrue(runtime.loadedRuleFiles().stream()
+                .anyMatch(ruleFile -> ruleFile.loaded()
+                    && ruleFile.loadedEntries() == 2
+                    && ruleFile.path().endsWith("prioritized.regelsuche")));
+            assertEquals(-7, runtime.ruleRegistry().enabledRules().stream()
+                .filter(rule -> rule.id().equals("high_priority"))
+                .findFirst()
+                .orElseThrow()
+                .estimatedCostDelta());
+            assertEquals(-3, runtime.macroTransformations().stream()
+                .filter(transformation -> transformation.id().equals("macro.preferred_macro"))
+                .findFirst()
+                .orElseThrow()
+                .estimatedCostDelta());
+        }
+    }
+
+    @Test
+    void invalidPrioritiesAreReportedAsRuleFileDiagnostics(@TempDir Path tempDir) throws Exception {
+        Path rulesDir = tempDir.resolve("rules");
+        Files.createDirectories(rulesDir);
+        Files.writeString(rulesDir.resolve("bad-priority.regelsuche"), """
+            rule bad_priority:
+              pattern: A + 0
+              replace: A
+              priority: urgent
+            """);
+
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            rulesDir,
+            false,
+            Set.of(),
+            Set.of()
+        ))) {
+            assertTrue(runtime.diagnostics().stream()
+                .anyMatch(diagnostic -> diagnostic.message().contains("Property 'priority' must be an integer")));
+            assertTrue(runtime.loadedRuleFiles().stream()
+                .anyMatch(ruleFile -> !ruleFile.loaded()
+                    && ruleFile.path().endsWith("bad-priority.regelsuche")));
         }
     }
 }

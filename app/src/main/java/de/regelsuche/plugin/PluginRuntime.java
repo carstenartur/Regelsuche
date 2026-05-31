@@ -36,6 +36,7 @@ public final class PluginRuntime implements AutoCloseable {
     private List<RuleConflictDetector.RuleConflict> conflicts = List.of();
     private List<RuleConflictDetector.CyclicConflict> cyclicConflicts = List.of();
     private List<RuleProfile> profiles = List.of();
+    private List<LoadedRuleFile> loadedRuleFiles = List.of();
     private URLClassLoader externalPluginClassLoader;
 
     public PluginRuntime() {
@@ -60,7 +61,8 @@ public final class PluginRuntime implements AutoCloseable {
         }
         loadExternalPlugins(discoveredPlugins, discoveredDiagnostics);
         this.profiles = List.of();
-        loadRuleFiles(discoveredDiagnostics);
+        List<LoadedRuleFile> discoveredRuleFiles = new ArrayList<>();
+        loadRuleFiles(discoveredDiagnostics, discoveredRuleFiles);
         disableConfiguredRules();
         applyActiveProfile(discoveredDiagnostics);
         this.macroTransformations = buildMacroTransformations(discoveredDiagnostics);
@@ -80,6 +82,7 @@ public final class PluginRuntime implements AutoCloseable {
             ));
         }
         loadedPlugins = List.copyOf(discoveredPlugins);
+        loadedRuleFiles = List.copyOf(discoveredRuleFiles);
         diagnostics = List.copyOf(discoveredDiagnostics);
     }
 
@@ -129,6 +132,10 @@ public final class PluginRuntime implements AutoCloseable {
 
     public List<RuleProfile> profiles() {
         return profiles;
+    }
+
+    public List<LoadedRuleFile> loadedRuleFiles() {
+        return loadedRuleFiles;
     }
 
     public List<RegisteredRuleView> registeredRules() {
@@ -226,7 +233,7 @@ public final class PluginRuntime implements AutoCloseable {
         }
     }
 
-    private void loadRuleFiles(List<RuntimeDiagnostic> discoveredDiagnostics) {
+    private void loadRuleFiles(List<RuntimeDiagnostic> discoveredDiagnostics, List<LoadedRuleFile> discoveredRuleFiles) {
         if (!Files.isDirectory(config.rulesDirectory())) {
             return;
         }
@@ -247,6 +254,10 @@ public final class PluginRuntime implements AutoCloseable {
         for (Path file : files) {
             try {
                 RuleFileLoadResult result = ruleFileLoader.load(file, ruleRegistry, macroRegistry);
+                List<String> fileDiagnostics = result.diagnostics().stream()
+                    .map(RuleFileParser.RuleFileDiagnostic::format)
+                    .toList();
+                discoveredRuleFiles.add(new LoadedRuleFile(file.toString(), result.loadedEntries(), true, fileDiagnostics));
                 if (!result.profiles().isEmpty()) {
                     List<RuleProfile> merged = new ArrayList<>(this.profiles);
                     merged.addAll(result.profiles());
@@ -256,10 +267,16 @@ public final class PluginRuntime implements AutoCloseable {
                     discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
                 }
             } catch (RuleFileParseException ex) {
+                List<String> fileDiagnostics = ex.diagnostics().stream()
+                    .map(RuleFileParser.RuleFileDiagnostic::format)
+                    .toList();
+                discoveredRuleFiles.add(new LoadedRuleFile(file.toString(), 0, false, fileDiagnostics));
                 for (RuleFileParser.RuleFileDiagnostic diagnostic : ex.diagnostics()) {
                     discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
                 }
             } catch (RuntimeException ex) {
+                discoveredRuleFiles.add(new LoadedRuleFile(file.toString(), 0, false,
+                    List.of("ERROR " + file.getFileName() + ":0 - " + ex.getMessage())));
                 discoveredDiagnostics.add(new RuntimeDiagnostic(
                     file.toString(),
                     "Failed to load rule file: " + ex.getMessage()
@@ -333,7 +350,7 @@ public final class PluginRuntime implements AutoCloseable {
                     target,
                     RewriteKind.NORMALIZE,
                     false,
-                    0,
+                    -macro.priority(),
                     true,
                     macro.explanation()
                 ));
@@ -391,6 +408,12 @@ public final class PluginRuntime implements AutoCloseable {
     public record RuntimeDiagnostic(String source, String message) {
     }
 
+    public record LoadedRuleFile(String path, int loadedEntries, boolean loaded, List<String> diagnostics) {
+        public LoadedRuleFile {
+            diagnostics = List.copyOf(diagnostics);
+        }
+    }
+
     public record RegisteredRuleView(
         String id,
         String source,
@@ -423,7 +446,9 @@ public final class PluginRuntime implements AutoCloseable {
                         macro.input(),
                         macro.output(),
                         macro.explanation(),
-                        macro.tags()
+                        macro.tags(),
+                        macro.priority(),
+                        macro.difficulty()
                     ), file.toString());
                 } else if (entry instanceof RuleFileParser.ProfileDefinition profile) {
                     profiles.add(new RuleProfile(
@@ -441,22 +466,27 @@ public final class PluginRuntime implements AutoCloseable {
             PatternExpr source = PatternExprMapper.toPatternExpr(patternParser.parse(rule.pattern()));
             PatternExpr target = PatternExprMapper.toPatternExpr(patternParser.parse(rule.replace()));
             String explanation = rule.explanation();
+            int costDelta = costDeltaForPriority(rule.priority());
             if (rule.direction() == RuleFileParser.RuleDirection.BOTH) {
                 ruleRegistry.register(new PatternRewriteRule(
-                    rule.id() + ".forward", source, target, RewriteKind.NORMALIZE, false, 0, true
+                    rule.id() + ".forward", source, target, RewriteKind.NORMALIZE, false, costDelta, true
                 ), file.toString(), explanation, rule.tags());
                 ruleRegistry.register(new PatternRewriteRule(
-                    rule.id() + ".backward", target, source, RewriteKind.NORMALIZE, false, 0, true
+                    rule.id() + ".backward", target, source, RewriteKind.NORMALIZE, false, costDelta, true
                 ), file.toString(), explanation, rule.tags());
             } else if (rule.direction() == RuleFileParser.RuleDirection.BACKWARD) {
                 ruleRegistry.register(new PatternRewriteRule(
-                    rule.id(), target, source, RewriteKind.NORMALIZE, false, 0, true
+                    rule.id(), target, source, RewriteKind.NORMALIZE, false, costDelta, true
                 ), file.toString(), explanation, rule.tags());
             } else {
                 ruleRegistry.register(new PatternRewriteRule(
-                    rule.id(), source, target, RewriteKind.NORMALIZE, false, 0, true
+                    rule.id(), source, target, RewriteKind.NORMALIZE, false, costDelta, true
                 ), file.toString(), explanation, rule.tags());
             }
+        }
+
+        private int costDeltaForPriority(int priority) {
+            return -priority;
         }
     }
 

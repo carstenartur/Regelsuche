@@ -137,9 +137,10 @@ public final class RuleFileParser {
         String explanation = stringOrDefault("explanation", properties, "");
         String difficulty = stringOrDefault("difficulty", properties, "unspecified");
         RuleDirection direction = parseDirection(path, lineNumber, stringOrDefault("direction", properties, "forward"), diagnostics);
+        int priority = intOrDefault(path, lineNumber, "priority", properties, 0, diagnostics);
         validateKnownProperties(path, lineNumber, properties,
-            Set.of("pattern", "replace", "tags", "conditions", "explanation", "difficulty", "direction"), diagnostics);
-        return new RuleDefinition(id, lineNumber, pattern, replace, direction, tags, conditions, explanation, difficulty);
+            Set.of("pattern", "replace", "tags", "conditions", "explanation", "difficulty", "direction", "priority"), diagnostics);
+        return new RuleDefinition(id, lineNumber, pattern, replace, direction, priority, tags, conditions, explanation, difficulty);
     }
 
     private MacroDefinition buildMacro(
@@ -156,8 +157,11 @@ public final class RuleFileParser {
         }
         List<String> tags = listProperty("tags", properties);
         String explanation = stringOrDefault("explanation", properties, "");
-        validateKnownProperties(path, lineNumber, properties, Set.of("input", "output", "tags", "explanation"), diagnostics);
-        return new MacroDefinition(id, lineNumber, input, output, explanation, tags);
+        int priority = intOrDefault(path, lineNumber, "priority", properties, 0, diagnostics);
+        String difficulty = stringOrDefault("difficulty", properties, "unspecified");
+        validateKnownProperties(path, lineNumber, properties,
+            Set.of("input", "output", "tags", "explanation", "priority", "difficulty"), diagnostics);
+        return new MacroDefinition(id, lineNumber, input, output, explanation, tags, priority, difficulty);
     }
 
     private ProfileDefinition buildProfile(
@@ -211,6 +215,32 @@ public final class RuleFileParser {
     private String stringOrDefault(String key, Map<String, Object> properties, String defaultValue) {
         Object value = properties.get(key);
         return value instanceof String string ? string : defaultValue;
+    }
+
+    private int intOrDefault(
+        Path path,
+        int lineNumber,
+        String key,
+        Map<String, Object> properties,
+        int defaultValue,
+        List<RuleFileDiagnostic> diagnostics
+    ) {
+        Object value = properties.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof String string) {
+            try {
+                return Integer.parseInt(string);
+            } catch (NumberFormatException ex) {
+                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,
+                    "Property '" + key + "' must be an integer"));
+                return defaultValue;
+            }
+        }
+        diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,
+            "Property '" + key + "' must be an integer"));
+        return defaultValue;
     }
 
     @SuppressWarnings("unchecked")
@@ -271,6 +301,7 @@ public final class RuleFileParser {
         String pattern,
         String replace,
         RuleDirection direction,
+        int priority,
         List<String> tags,
         List<String> conditions,
         String explanation,
@@ -288,7 +319,9 @@ public final class RuleFileParser {
         String input,
         String output,
         String explanation,
-        List<String> tags
+        List<String> tags,
+        int priority,
+        String difficulty
     ) implements Entry {
         public MacroDefinition {
             tags = List.copyOf(tags);
