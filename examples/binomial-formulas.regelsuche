@@ -1,0 +1,43 @@
+rule dsl_binomial_square_forward:
+  pattern: (A + B)^2
+  replace: A^2 + 2*A*B + B^2
+  direction: forward
+  tags:
+    - binomial
+    - expansion
+  explanation: "Erweitert die erste binomische Formel."
+
+rule dsl_binomial_square_backward:
+  pattern: A^2 + 2*A*B + B^2
+  replace: (A + B)^2
+  direction: forward
+  tags:
+    - binomial
+    - factorization
+  explanation: "Faktorisiert die erste binomische Formel."
+
+rule dsl_binomial_square_minus_forward:
+  pattern: (A - B)^2
+  replace: A^2 - 2*A*B + B^2
+  direction: forward
+  tags:
+    - binomial
+    - expansion
+  explanation: "Erweitert die zweite binomische Formel."
+
+rule dsl_difference_of_squares:
+  pattern: A^2 - B^2
+  replace: (A - B) * (A + B)
+  direction: forward
+  tags:
+    - binomial
+    - factorization
+  explanation: "Erkennt die Differenz zweier Quadrate."
+
+macro expand_square:
+  input: (A + B)^2
+  output: A^2 + 2*A*B + B^2
+  tags:
+    - macro
+    - binomial
+  explanation: "Makro für die erste binomische Formel."

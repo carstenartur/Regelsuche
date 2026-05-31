@@ -22,17 +22,23 @@ import de.regelsuche.mining.RuleCandidateListener;
 import de.regelsuche.mining.RuleCandidateMiner;
 import de.regelsuche.mining.RuleDiscoveryService;
 import de.regelsuche.notify.ConsoleNotifier;
+import de.regelsuche.plugin.PluginRuntime;
+import de.regelsuche.plugin.PluginRuntimeConfig;
+import de.regelsuche.plugin.RuleFileParseException;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.TransformationSearchService;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.SymPyTransformationEngine;
+import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -91,6 +97,8 @@ public class CliRouter {
                 case "benchmark" -> runBenchmark(rest);
                 case "serve" -> runServe(rest);
                 case "explain" -> runExplain(rest);
+                case "plugins" -> runPlugins(rest);
+                case "rules" -> runRules(rest);
                 default -> {
                     out.println("Unknown command: " + command);
                     yield 1;
@@ -167,20 +175,131 @@ public class CliRouter {
             return 1;
         }
         String expression = String.join(" ", args);
-        TransformationEngine engine = new SymPyTransformationEngine();
-        TransformationSearchService service = new TransformationSearchService(
-            engine,
-            graphStore,
-            new SearchHeuristic(5, 500, 2),
-            new ConsoleNotifier()
-        );
-        service.submit(new InputRequest(InputType.TERM, expression)).join();
-        service.getBestSolution().ifPresentOrElse(
-            best -> out.println("Best simplification: " + best.simplifiedExpression()),
-            () -> out.println("No simplification found yet")
-        );
-        service.shutdown();
-        return 0;
+        try (PluginRuntime runtime = new PluginRuntime(PluginRuntimeConfig.defaults())) {
+            TransformationEngine pluginEngine = runtime.createTransformationEngine();
+            TransformationEngine symPyEngine = new SymPyTransformationEngine();
+            TransformationEngine engine = expr -> {
+                LinkedHashSet<Transformation> combined = new LinkedHashSet<>(symPyEngine.transform(expr));
+                combined.addAll(pluginEngine.transform(expr));
+                return new ArrayList<>(combined);
+            };
+            TransformationSearchService service = new TransformationSearchService(
+                engine,
+                graphStore,
+                new SearchHeuristic(5, 500, 2),
+                new ConsoleNotifier()
+            );
+            service.submit(new InputRequest(InputType.TERM, expression)).join();
+            service.getBestSolution().ifPresentOrElse(
+                best -> out.println("Best simplification: " + best.simplifiedExpression()),
+                () -> out.println("No simplification found yet")
+            );
+            service.shutdown();
+            return 0;
+        }
+    }
+
+    private int runPlugins(String[] args) {
+        String sub = args.length == 0 ? "list" : args[0].toLowerCase(Locale.ROOT);
+        if (!"list".equals(sub)) {
+            out.println("Usage: plugins list [--dir PATH]");
+            return 1;
+        }
+        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, Math.min(args.length, 1), args.length));
+        Path pluginsDir = Paths.get(options.getOrDefault("dir", "plugins"));
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            pluginsDir,
+            Paths.get("rules"),
+            true,
+            java.util.Set.of(),
+            java.util.Set.of()
+        ))) {
+            if (runtime.loadedPlugins().isEmpty()) {
+                out.println("No plugins loaded.");
+            } else {
+                runtime.loadedPlugins().forEach(plugin -> out.println(
+                    plugin.id() + " " + plugin.version() + " (" + plugin.source() + ", "
+                        + (plugin.enabled() ? "enabled" : "disabled") + ")"
+                ));
+            }
+            runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
+            return 0;
+        }
+    }
+
+    private int runRules(String[] args) {
+        if (args.length == 0) {
+            out.println("Usage: rules list|validate|conflicts");
+            return 1;
+        }
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        switch (sub) {
+            case "list" -> {
+                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
+                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+                    Paths.get("plugins"),
+                    rulesDir,
+                    true,
+                    java.util.Set.of(),
+                    java.util.Set.of()
+                ))) {
+                    if (runtime.registeredRules().isEmpty()) {
+                        out.println("No plugin or rule-file rules loaded.");
+                    } else {
+                        runtime.registeredRules().forEach(rule -> out.println(rule.type() + " "
+                            + rule.id() + " (" + rule.source() + ", "
+                            + (rule.enabled() ? "enabled" : "disabled") + ")"));
+                    }
+                    if (!runtime.macroRegistry().registrations().isEmpty()) {
+                        runtime.macroRegistry().registrations()
+                            .forEach(macro -> out.println("macro " + macro.id() + " (" + macro.source() + ")"));
+                    }
+                    runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
+                    return 0;
+                }
+            }
+            case "validate" -> {
+                if (args.length < 2) {
+                    out.println("Usage: rules validate <file.regelsuche>");
+                    return 1;
+                }
+                Path file = Paths.get(args[1]);
+                try {
+                    new PluginRuntime.RuleFileLoader().load(file, new de.regelsuche.plugin.RuleRegistry(),
+                        new de.regelsuche.plugin.MacroRegistry());
+                    out.println("Rule file is valid: " + file.toAbsolutePath());
+                    return 0;
+                } catch (RuleFileParseException ex) {
+                    ex.diagnostics().forEach(diagnostic -> out.println(diagnostic.format()));
+                    return 2;
+                }
+            }
+            case "conflicts" -> {
+                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
+                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+                    Paths.get("plugins"),
+                    rulesDir,
+                    true,
+                    java.util.Set.of(),
+                    java.util.Set.of()
+                ))) {
+                    if (runtime.conflicts().isEmpty()) {
+                        out.println("No rule conflicts detected.");
+                    } else {
+                        runtime.conflicts().forEach(conflict -> out.println(
+                            "CONFLICT competing rules share source pattern: "
+                                + String.join(", ", conflict.ruleIds())));
+                    }
+                    return 0;
+                }
+            }
+            default -> {
+                out.println("Unknown rules command: " + sub);
+                return 1;
+            }
+        }
     }
 
     private int runInventory(String[] args) {
