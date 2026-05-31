@@ -40,6 +40,35 @@ restored.restore(Path.of("jobs.json"));        // restauriert als PAUSED
 * Keine Job-Prioritäten / Slots: alle Jobs konkurrieren im jeweils erzeugten Executor; für globale Drosselung muss die Factory einen geteilten Executor injizieren.
 * Keine Live-Subscriptions: Fortschritts-Updates werden erst beim Abschluss (`finalizeRun`) eingetragen. Streaming-Updates wären eine sinnvolle Erweiterung.
 
+## Suchraumabschätzung
+
+`de.regelsuche.search.estimate.SearchSpaceEstimator` schätzt fortlaufend die Größe
+des Suchraums aus den pro Tiefe entdeckten Zustandszahlen (den Frontier-Größen).
+Die Schätzung ist bewusst approximativ und soll dem Benutzer helfen, die
+Komplexität einer Anfrage einzuschätzen und früh vor einer möglichen Explosion zu
+warnen.
+
+```java
+SearchSpaceEstimator estimator = new SearchSpaceEstimator();
+// statesPerDepth: Anzahl Zustände bei Tiefe 0, 1, 2, …
+SearchSpaceEstimate estimate = estimator.estimate(
+    List.of(1L, 2L, 4L, 8L), heuristic.maxDepth(), heuristic.maxVisitedExpressions());
+
+estimate.knownStateCount();           // aktuelle Anzahl bekannter Zustände
+estimate.estimatedBranchingFactor();  // geschätzte Wachstumsrate
+estimate.projectedStateCount();       // erwartete Suchraumgröße (gesättigt, kein Überlauf)
+estimate.risk();                      // LOW | MODERATE | HIGH | EXPLOSIVE
+estimate.warning();                   // Klartext-Warnung oder null
+```
+
+Die Wachstumsrate ist das geometrische Mittel der Verhältnisse aufeinanderfolgender
+nicht-leerer Frontier-Größen; leere Tiefen (z.B. vollständig geprunte) werden dabei
+übersprungen. Die erwartete Größe projiziert die tiefste beobachtete Frontier mit
+dieser Rate bis zur Tiefengrenze und sättigt statt zu überlaufen. `risk` und
+`warning` ergeben sich aus Wachstumsrate und projizierter Größe relativ zum
+Besuchsbudget (`SearchHeuristic.maxVisitedExpressions()`), sodass die GUI/CLI vor
+einer Suchraumexplosion warnen kann.
+
 ## Tests
 
 Die Tests `SearchJobManagerTest` decken Start/Done, Cancel und Checkpoint/Restore ab.
