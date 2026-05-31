@@ -1,5 +1,6 @@
 package de.regelsuche.discovery;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,6 +40,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -97,6 +99,21 @@ class ConvergentSophieGermainGalleryTest {
             && (node.isOnDidacticPath() || node.isOnMacroPath())), searchSpace.nodes().toString());
         assertTrue(searchSpace.nodes().stream().anyMatch(SearchSpaceSubgraph.Node::notSelected), searchSpace.nodes().toString());
         assertTrue(searchSpace.nodes().stream().anyMatch(SearchSpaceSubgraph.Node::isDeadEnd), searchSpace.nodes().toString());
+        assertTrue(searchSpace.nodes().stream().map(SearchSpaceSubgraph.Node::id)
+            .allMatch(id -> id.matches("space_[0-9a-f]{64}")), searchSpace.nodes().toString());
+        Map<String, Integer> depthByNodeId = searchSpace.nodes().stream()
+            .collect(Collectors.toMap(SearchSpaceSubgraph.Node::id, SearchSpaceSubgraph.Node::depth));
+        assertTrue(searchSpace.edges().stream()
+            .filter(SearchSpaceSubgraph.Edge::notSelected)
+            .allMatch(edge -> depthByNodeId.get(edge.toId()) == depthByNodeId.get(edge.fromId()) + 1),
+            searchSpace.edges().toString());
+        Map<String, Set<RuleFamily>> incomingFamiliesByNodeId = searchSpace.edges().stream().collect(Collectors.groupingBy(
+            SearchSpaceSubgraph.Edge::toId,
+            Collectors.mapping(SearchSpaceSubgraph.Edge::ruleFamily, Collectors.toSet())
+        ));
+        for (SearchSpaceSubgraph.Node node : searchSpace.nodes()) {
+            assertEquals(incomingFamiliesByNodeId.getOrDefault(node.id(), Set.of()), node.ruleFamilies(), node.toString());
+        }
 
         String mermaid = new ConvergentDiscoveryMermaidWriter().render(report);
         assertTrue(mermaid.contains(DifferenceOfSquaresPreparationOperator.RULE_ID), mermaid);

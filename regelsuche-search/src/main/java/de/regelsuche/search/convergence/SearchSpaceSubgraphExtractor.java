@@ -8,6 +8,9 @@ import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -32,11 +35,16 @@ public final class SearchSpaceSubgraphExtractor {
     ) {
         int maxDepth = Math.min(problem.heuristic().maxDepth(), MAX_RENDERED_DEPTH);
         Map<String, SearchState> selectedStates = selectStates(problem, exploredStates, report, maxDepth);
+        List<EdgeDraft> edgeDrafts = collectEdges(problem, selectedStates, report, maxDepth);
+        Set<String> nodeIds = Set.copyOf(selectedStates.keySet());
+        List<EdgeDraft> renderedEdgeDrafts = edgeDrafts.stream()
+            .filter(edge -> nodeIds.contains(edge.fromId()) && nodeIds.contains(edge.toId()))
+            .toList();
         Map<String, Set<RuleFamily>> incomingFamilies = new HashMap<>();
-        List<EdgeDraft> edgeDrafts = collectEdges(problem, selectedStates, report, maxDepth, incomingFamilies);
         Set<String> sources = new HashSet<>();
-        for (EdgeDraft edge : edgeDrafts) {
+        for (EdgeDraft edge : renderedEdgeDrafts) {
             sources.add(edge.fromId());
+            incomingFamilies.computeIfAbsent(edge.toId(), ignored -> new LinkedHashSet<>()).add(edge.family());
         }
 
         List<Node> nodes = selectedStates.values().stream()
@@ -45,9 +53,7 @@ public final class SearchSpaceSubgraphExtractor {
                 incomingFamilies.getOrDefault(idForExpression(state.expression()), Set.of()),
                 sources.contains(idForExpression(state.expression()))))
             .toList();
-        Set<String> nodeIds = nodes.stream().map(Node::id).collect(java.util.stream.Collectors.toSet());
-        List<Edge> edges = edgeDrafts.stream()
-            .filter(edge -> nodeIds.contains(edge.fromId()) && nodeIds.contains(edge.toId()))
+        List<Edge> edges = renderedEdgeDrafts.stream()
             .map(edge -> edge(edge, selectedStates, report))
             .toList();
         return new SearchSpaceSubgraph(problem.rootExpression(), nodes, edges, maxDepth);
@@ -100,8 +106,7 @@ public final class SearchSpaceSubgraphExtractor {
         SearchProblem problem,
         Map<String, SearchState> states,
         ConvergentDiscoveryReport report,
-        int maxDepth,
-        Map<String, Set<RuleFamily>> incomingFamilies
+        int maxDepth
     ) {
         List<EdgeDraft> edges = new ArrayList<>();
         Set<String> edgeKeys = new HashSet<>();
@@ -109,14 +114,14 @@ public final class SearchSpaceSubgraphExtractor {
             if (state.parentExpression() != null && state.appliedRuleId() != null) {
                 String from = idForExpression(state.parentExpression());
                 String to = idForExpression(state.expression());
-                addEdge(edges, edgeKeys, incomingFamilies, from, to, state.appliedRuleId(), state.depth());
+                addEdge(edges, edgeKeys, from, to, state.appliedRuleId(), state.depth());
             }
         }
         for (ConvergentPath path : report.pathsToTarget()) {
             for (int index = 1; index < path.expressions().size(); index++) {
                 String from = idForExpression(path.expressions().get(index - 1));
                 String to = idForExpression(path.expressions().get(index));
-                addEdge(edges, edgeKeys, incomingFamilies, from, to, path.ruleIds().get(index - 1), index);
+                addEdge(edges, edgeKeys, from, to, path.ruleIds().get(index - 1), index);
             }
         }
         for (SearchState state : states.values()) {
@@ -125,8 +130,9 @@ public final class SearchSpaceSubgraphExtractor {
             }
             for (Transformation transformation : problem.engine().transform(state.expression())) {
                 String to = idForExpression(transformation.transformedExpression());
-                if (states.containsKey(to)) {
-                    addEdge(edges, edgeKeys, incomingFamilies, idForExpression(state.expression()), to,
+                SearchState toState = states.get(to);
+                if (toState != null && toState.depth() == state.depth() + 1) {
+                    addEdge(edges, edgeKeys, idForExpression(state.expression()), to,
                         transformation.rule(), state.depth() + 1);
                 }
             }
@@ -137,7 +143,6 @@ public final class SearchSpaceSubgraphExtractor {
     private void addEdge(
         List<EdgeDraft> edges,
         Set<String> edgeKeys,
-        Map<String, Set<RuleFamily>> incomingFamilies,
         String from,
         String to,
         String ruleId,
@@ -147,7 +152,6 @@ public final class SearchSpaceSubgraphExtractor {
         String key = from + "->" + to + "|" + ruleId;
         if (edgeKeys.add(key)) {
             edges.add(new EdgeDraft("edge_" + edgeKeys.size(), from, to, ruleId, family, depth));
-            incomingFamilies.computeIfAbsent(to, ignored -> new LinkedHashSet<>()).add(family);
         }
     }
 
@@ -335,7 +339,22 @@ public final class SearchSpaceSubgraphExtractor {
     }
 
     private String idForExpression(String expression) {
-        return "space_" + Integer.toUnsignedString((expression == null ? "" : expression).hashCode(), 16);
+        String normalized = (expression == null ? "" : expression).trim().replaceAll("\\s+", " ");
+        return "space_" + sha256(normalized);
+    }
+
+    private String sha256(String expression) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(expression.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     private record EdgeDraft(String id, String fromId, String toId, String ruleId, RuleFamily family, int depth) {
