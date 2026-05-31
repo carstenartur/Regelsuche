@@ -255,7 +255,8 @@ public class CliRouter {
                     }
                     if (!runtime.macroRegistry().registrations().isEmpty()) {
                         runtime.macroRegistry().registrations()
-                            .forEach(macro -> out.println("macro " + macro.id() + " (" + macro.source() + ")"));
+                            .forEach(macro -> out.println("macro " + macro.id() + " (" + macro.source() + ", "
+                                + (macro.enabled() ? "enabled" : "disabled") + ")"));
                     }
                     runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
                     return 0;
@@ -303,21 +304,27 @@ public class CliRouter {
             case "profiles" -> {
                 CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
                 Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+                String activeProfile = options.getOrDefault("profile", "");
                 try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
                     Paths.get("plugins"),
                     rulesDir,
                     true,
                     java.util.Set.of(),
-                    java.util.Set.of()
+                    java.util.Set.of(),
+                    activeProfile
                 ))) {
                     if (runtime.profiles().isEmpty()) {
                         out.println("No activation profiles loaded.");
                     } else {
                         runtime.profiles().forEach(profile -> out.println(
                             "profile " + profile.id()
+                                + (profile.id().equals(runtime.activeProfile()) ? " [active]" : "")
                                 + " (enable: " + String.join(", ", profile.enableTags())
-                                + "; disable: " + String.join(", ", profile.disableTags()) + ")"));
+                                + "; disable: " + String.join(", ", profile.disableTags())
+                                + "; whitelist: " + String.join(", ", profile.whitelist())
+                                + "; blacklist: " + String.join(", ", profile.blacklist()) + ")"));
                     }
+                    runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
                     return 0;
                 }
             }

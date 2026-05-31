@@ -174,12 +174,22 @@ public final class RuleFileParser {
     ) {
         List<String> enableTags = listProperty("enable_tags", properties);
         List<String> disableTags = listProperty("disable_tags", properties);
-        validateKnownProperties(path, lineNumber, properties, Set.of("enable_tags", "disable_tags"), diagnostics);
-        if (enableTags.isEmpty() && disableTags.isEmpty()) {
-            diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,
-                "Profile '" + id + "' has neither 'enable_tags' nor 'disable_tags' and has no effect"));
+        List<String> whitelist = combinedListProperty(properties, "whitelist", "enable_rules");
+        List<String> blacklist = combinedListProperty(properties, "blacklist", "disable_rules");
+        validateKnownProperties(path, lineNumber, properties,
+            Set.of("enable_tags", "disable_tags", "whitelist", "blacklist", "enable_rules", "disable_rules"),
+            diagnostics);
+        for (String ruleId : whitelist) {
+            if (blacklist.contains(ruleId)) {
+                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,
+                    "Profile '" + id + "' lists '" + ruleId + "' in both whitelist and blacklist; blacklist wins"));
+            }
         }
-        return new ProfileDefinition(id, lineNumber, enableTags, disableTags);
+        if (enableTags.isEmpty() && disableTags.isEmpty() && whitelist.isEmpty() && blacklist.isEmpty()) {
+            diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,
+                "Profile '" + id + "' has no tag or rule-id filters and has no effect"));
+        }
+        return new ProfileDefinition(id, lineNumber, enableTags, disableTags, whitelist, blacklist);
     }
 
     private void validateKnownProperties(
@@ -256,6 +266,14 @@ public final class RuleFileParser {
             return List.of(stripQuotes(string));
         }
         return List.of();
+    }
+
+    private List<String> combinedListProperty(Map<String, Object> properties, String... keys) {
+        List<String> values = new ArrayList<>();
+        for (String key : keys) {
+            values.addAll(listProperty(key, properties));
+        }
+        return List.copyOf(values);
     }
 
     @SuppressWarnings("unchecked")
@@ -376,11 +394,15 @@ public final class RuleFileParser {
         String id,
         int line,
         List<String> enableTags,
-        List<String> disableTags
+        List<String> disableTags,
+        List<String> whitelist,
+        List<String> blacklist
     ) implements Entry {
         public ProfileDefinition {
             enableTags = List.copyOf(enableTags);
             disableTags = List.copyOf(disableTags);
+            whitelist = List.copyOf(whitelist);
+            blacklist = List.copyOf(blacklist);
         }
     }
 

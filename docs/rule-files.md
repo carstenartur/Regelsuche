@@ -61,7 +61,8 @@ conditions:
 
 ## Aktivierungsprofile
 
-Profile aktivieren oder deaktivieren Regeln, Transformationen und Makros anhand ihrer `tags`.
+Profile aktivieren oder deaktivieren Regeln, Transformationen und Makros anhand ihrer `tags`
+und können einzelne Regel-/Makro-IDs explizit erlauben oder sperren.
 
 ```text
 profile school_algebra:
@@ -70,14 +71,22 @@ profile school_algebra:
     - factorization
   disable_tags:
     - complex_analysis
+  whitelist:
+    - difference_of_squares
+  blacklist:
+    - unsafe_expand
 ```
 
 - `enable_tags`: Whitelist. Ist sie nicht leer, bleibt ein Eintrag nur aktiv, wenn er
   mindestens einen dieser Tags trägt.
 - `disable_tags`: Blacklist. Ein Eintrag mit einem dieser Tags wird immer deaktiviert.
+- `whitelist`/`enable_rules`: explizite IDs, die trotz Tag-Filter aktiv bleiben.
+- `blacklist`/`disable_rules`: explizite IDs, die immer deaktiviert werden. Bei
+  Konflikten mit `whitelist` gewinnt die Blacklist.
 
 Ein Profil wird über `PluginRuntimeConfig#activeProfile` bzw. `rules list --profile <id>`
-aktiviert. Geladene Profile lassen sich mit `rules profiles` anzeigen.
+aktiviert. Geladene Profile lassen sich mit `rules profiles` anzeigen; `rules profiles
+--profile <id>` markiert zusätzlich das aktive Profil.
 
 Beim Laden werden die DSL-Einträge in ein typisiertes internes Modell (`RuleFileParser`) überführt und anschließend als `PatternRewriteRule`/`RuleMacro`/`RuleProfile` registriert.
 

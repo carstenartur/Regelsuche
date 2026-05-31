@@ -176,6 +176,10 @@ public final class PluginRuntime implements AutoCloseable {
         return profiles;
     }
 
+    public String activeProfile() {
+        return config.activeProfile();
+    }
+
     public List<LoadedRuleFile> loadedRuleFiles() {
         return loadedRuleFiles;
     }
@@ -375,19 +379,25 @@ public final class PluginRuntime implements AutoCloseable {
             return;
         }
         for (RuleRegistry.RuleRegistration registration : ruleRegistry.registrations()) {
-            if (registration.enabled() && !profile.includes(registration.tags())) {
+            if (registration.enabled() && !profile.includes(registration.id(), registration.tags())) {
                 ruleRegistry.disable(registration.id());
             }
         }
         for (TransformationRegistry.TransformationRegistration registration : transformationRegistry.registrations()) {
-            if (registration.enabled() && !profile.includes(registration.tags())) {
+            if (registration.enabled() && !profile.includes(registration.id(), registration.tags())) {
                 transformationRegistry.disable(registration.id());
             }
         }
         for (MacroRegistry.MacroRegistration registration : macroRegistry.registrations()) {
-            if (registration.enabled() && !profile.includes(registration.macro().tags())) {
+            if (registration.enabled() && !profile.includes(registration.id(), registration.macro().tags())) {
                 macroRegistry.disable(registration.id());
             }
+        }
+        for (String conflict : profile.conflictingIds()) {
+            discoveredDiagnostics.add(new RuntimeDiagnostic(
+                "profile:" + activeProfile,
+                "Rule id '" + conflict + "' is both whitelisted and blacklisted; blacklist wins"
+            ));
         }
         discoveredDiagnostics.add(new RuntimeDiagnostic(
             "profile:" + activeProfile,
@@ -515,6 +525,8 @@ public final class PluginRuntime implements AutoCloseable {
                         profile.id(),
                         profile.enableTags(),
                         profile.disableTags(),
+                        profile.whitelist(),
+                        profile.blacklist(),
                         file.toString()
                     ));
                 }

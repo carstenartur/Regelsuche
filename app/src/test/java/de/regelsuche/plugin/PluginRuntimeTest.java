@@ -291,17 +291,42 @@ class PluginRuntimeTest {
               tags:
                 - complex_analysis
 
+            rule keep_whitelisted:
+              pattern: A * 1
+              replace: A
+              direction: forward
+              tags:
+                - trigonometry
+
+            rule drop_blacklisted:
+              pattern: A - 0
+              replace: A
+              direction: forward
+              tags:
+                - factorization
+
             macro drop_complex_macro:
               input: A * 1
               output: A
               tags:
                 - complex_analysis
 
+            macro drop_blacklisted_macro:
+              input: A / 1
+              output: A
+              tags:
+                - factorization
+
             profile school_algebra:
               enable_tags:
                 - factorization
               disable_tags:
                 - complex_analysis
+              whitelist:
+                - keep_whitelisted
+              blacklist:
+                - drop_blacklisted
+                - drop_blacklisted_macro
             """);
 
         try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
@@ -317,8 +342,16 @@ class PluginRuntimeTest {
                 .anyMatch(rule -> rule.id().equals("keep_factorization") && rule.enabled()));
             assertTrue(runtime.ruleRegistry().registrations().stream()
                 .anyMatch(rule -> rule.id().equals("drop_complex") && !rule.enabled()));
+            assertTrue(runtime.ruleRegistry().registrations().stream()
+                .anyMatch(rule -> rule.id().equals("keep_whitelisted") && rule.enabled()));
+            assertTrue(runtime.ruleRegistry().registrations().stream()
+                .anyMatch(rule -> rule.id().equals("drop_blacklisted") && !rule.enabled()));
+            assertTrue(runtime.macroRegistry().registrations().stream()
+                .anyMatch(macro -> macro.id().equals("drop_blacklisted_macro") && !macro.enabled()));
             assertFalse(runtime.macroTransformations().stream()
                 .anyMatch(transformation -> transformation.id().equals("macro.drop_complex_macro")));
+            assertFalse(runtime.macroTransformations().stream()
+                .anyMatch(transformation -> transformation.id().equals("macro.drop_blacklisted_macro")));
             assertTrue(runtime.diagnostics().stream()
                 .anyMatch(diagnostic -> diagnostic.message().contains("Activation profile 'school_algebra' applied")));
         }

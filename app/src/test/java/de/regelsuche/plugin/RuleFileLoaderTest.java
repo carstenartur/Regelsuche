@@ -62,6 +62,10 @@ class RuleFileLoaderTest {
                 - factorization
               disable_tags:
                 - complex_analysis
+              whitelist:
+                - difference_of_squares
+              blacklist:
+                - unsafe_expand
             """);
 
         PluginRuntime.RuleFileLoadResult result =
@@ -73,6 +77,27 @@ class RuleFileLoaderTest {
         assertTrue(profile.includes(List.of("binomial")));
         assertFalse(profile.includes(List.of("complex_analysis")));
         assertFalse(profile.includes(List.of("trigonometry")));
+        assertTrue(profile.includes("difference_of_squares", List.of("trigonometry")));
+        assertFalse(profile.includes("unsafe_expand", List.of("binomial")));
+    }
+
+    @Test
+    void conflictingProfileWhitelistAndBlacklistProduceDiagnostic(@TempDir Path tempDir) throws Exception {
+        Path file = tempDir.resolve("profiles.regelsuche");
+        Files.writeString(file, """
+            profile school_algebra:
+              whitelist:
+                - keep_rule
+              blacklist:
+                - keep_rule
+            """);
+
+        PluginRuntime.RuleFileLoadResult result =
+            new PluginRuntime.RuleFileLoader().load(file, new RuleRegistry(), new MacroRegistry());
+
+        assertEquals(1, result.profiles().size());
+        assertTrue(result.diagnostics().stream()
+            .anyMatch(diagnostic -> diagnostic.message().contains("both whitelist and blacklist")));
     }
 
     @Test

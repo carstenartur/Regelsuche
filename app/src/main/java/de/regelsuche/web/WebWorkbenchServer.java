@@ -33,6 +33,8 @@ import de.regelsuche.mining.RuleCandidateMiner;
 import de.regelsuche.mining.RuleDiscoveryService;
 import de.regelsuche.notify.NoOpNotifier;
 import de.regelsuche.notify.SimplificationNotifier;
+import de.regelsuche.plugin.PluginRuntime;
+import de.regelsuche.plugin.PluginRuntimeConfig;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchProfile;
 import de.regelsuche.search.TransformationSearchService;
@@ -70,6 +72,7 @@ public class WebWorkbenchServer {
     private final RuleInventoryRepository inventoryRepository;
     private final TransformationExportService exportService;
     private final WebSecurityConfig securityConfig;
+    private final PluginRuntimeConfig pluginRuntimeConfig;
 
     private final TransformationQueryService transformationQuery;
     private final RuleInventoryQueryService inventoryQuery;
@@ -105,7 +108,21 @@ public class WebWorkbenchServer {
         TransformationExportService exportService,
         WebSecurityConfig securityConfig
     ) {
-        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, null);
+        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, PluginRuntimeConfig.defaults());
+    }
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        PluginRuntimeConfig pluginRuntimeConfig
+    ) {
+        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, null,
+            defaultProofBridgeService(new de.regelsuche.proof.LeanProofBridge()),
+            defaultProofBridgeService(new de.regelsuche.proof.SmtProofBridge()), null, pluginRuntimeConfig);
     }
 
     public WebWorkbenchServer(
@@ -134,7 +151,8 @@ public class WebWorkbenchServer {
         de.regelsuche.proof.ProofBridgeService smtProofBridgeService
     ) {
         this(host, port, graphStore, inventoryRepository, exportService,
-            securityConfig, searchMemory, leanProofBridgeService, smtProofBridgeService, null);
+            securityConfig, searchMemory, leanProofBridgeService, smtProofBridgeService, null,
+            PluginRuntimeConfig.defaults());
     }
 
     public WebWorkbenchServer(
@@ -149,12 +167,30 @@ public class WebWorkbenchServer {
         de.regelsuche.proof.ProofBridgeService smtProofBridgeService,
         de.regelsuche.proof.ProofWorkbenchService proofWorkbenchService
     ) {
+        this(host, port, graphStore, inventoryRepository, exportService, securityConfig, searchMemory,
+            leanProofBridgeService, smtProofBridgeService, proofWorkbenchService, PluginRuntimeConfig.defaults());
+    }
+
+    public WebWorkbenchServer(
+        String host,
+        int port,
+        ExpressionGraphStore graphStore,
+        RuleInventoryRepository inventoryRepository,
+        TransformationExportService exportService,
+        WebSecurityConfig securityConfig,
+        de.regelsuche.search.memory.SearchMemory searchMemory,
+        de.regelsuche.proof.ProofBridgeService leanProofBridgeService,
+        de.regelsuche.proof.ProofBridgeService smtProofBridgeService,
+        de.regelsuche.proof.ProofWorkbenchService proofWorkbenchService,
+        PluginRuntimeConfig pluginRuntimeConfig
+    ) {
         this.host = host;
         this.port = port;
         this.graphStore = graphStore;
         this.inventoryRepository = inventoryRepository;
         this.exportService = exportService;
         this.securityConfig = securityConfig == null ? WebSecurityConfig.none() : securityConfig;
+        this.pluginRuntimeConfig = pluginRuntimeConfig == null ? PluginRuntimeConfig.defaults() : pluginRuntimeConfig;
         this.searchMemory = searchMemory == null ? new de.regelsuche.search.memory.SearchMemory() : searchMemory;
         this.leanProofBridgeService = leanProofBridgeService == null
             ? defaultProofBridgeService(new de.regelsuche.proof.LeanProofBridge())
@@ -232,6 +268,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/explain", this::handleExplain));
         secure(server.createContext("/api/analyze", this::handleAnalyze));
         secure(server.createContext("/api/demo", this::handleDemo));
+        secure(server.createContext("/api/plugins", this::handlePlugins));
         secure(server.createContext("/api/memory", this::handleMemory));
         secure(server.createContext("/api/proof-status", this::handleProofStatus));
         secure(server.createContext("/api/proof-bridge", this::handleProofBridge));
@@ -917,6 +954,104 @@ public class WebWorkbenchServer {
             return;
         }
         sendStatus(exchange, 405, "method not allowed");
+    }
+
+    private void handlePlugins(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        String suffix = exchange.getRequestURI().getPath().substring("/api/plugins".length()).replaceFirst("^/", "");
+        String activeProfile = queryParam(exchange, "profile",
+            pluginRuntimeConfig.activeProfile() == null ? "" : pluginRuntimeConfig.activeProfile());
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            pluginRuntimeConfig.pluginsDirectory(),
+            pluginRuntimeConfig.rulesDirectory(),
+            pluginRuntimeConfig.loadClasspathPlugins(),
+            pluginRuntimeConfig.disabledPluginIds(),
+            pluginRuntimeConfig.disabledRuleIds(),
+            activeProfile
+        ))) {
+            if (suffix.isEmpty()) {
+                sendJson(exchange, 200, renderPluginRuntimeJson(runtime));
+                return;
+            }
+            switch (suffix) {
+                case "rules" -> sendJson(exchange, 200, renderPluginRulesJson(runtime));
+                case "profiles" -> sendJson(exchange, 200, renderPluginProfilesJson(runtime));
+                default -> sendStatus(exchange, 404, "unknown plugin endpoint: " + suffix);
+            }
+        }
+    }
+
+    private String renderPluginRuntimeJson(PluginRuntime runtime) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("activeProfile", runtime.activeProfile() == null ? "" : runtime.activeProfile());
+        writer.array("plugins", array -> runtime.loadedPlugins().forEach(plugin -> array.objectValue(inner -> {
+            inner.property("id", plugin.id());
+            inner.property("name", plugin.name());
+            inner.property("version", plugin.version());
+            inner.property("source", plugin.source());
+            inner.property("enabled", plugin.enabled());
+        })));
+        writer.array("rules", array -> writePluginRules(runtime, array));
+        writer.array("profiles", array -> writePluginProfiles(runtime, array));
+        writer.array("diagnostics", array -> runtime.diagnostics().forEach(diagnostic -> array.objectValue(inner -> {
+            inner.property("source", diagnostic.source());
+            inner.property("message", diagnostic.message());
+        })));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    private String renderPluginRulesJson(PluginRuntime runtime) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("activeProfile", runtime.activeProfile() == null ? "" : runtime.activeProfile());
+        writer.array("rules", array -> writePluginRules(runtime, array));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    private String renderPluginProfilesJson(PluginRuntime runtime) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("activeProfile", runtime.activeProfile() == null ? "" : runtime.activeProfile());
+        writer.array("profiles", array -> writePluginProfiles(runtime, array));
+        writer.endObject();
+        return writer.toString();
+    }
+
+    private void writePluginRules(PluginRuntime runtime, JsonWriter array) {
+        runtime.registeredRules().forEach(rule -> array.objectValue(inner -> {
+            inner.property("id", rule.id());
+            inner.property("type", rule.type());
+            inner.property("source", rule.source());
+            inner.property("enabled", rule.enabled());
+            inner.property("explanation", rule.explanation());
+            inner.stringArray("tags", rule.tags());
+        }));
+        runtime.macroRegistry().registrations().forEach(macro -> array.objectValue(inner -> {
+            inner.property("id", macro.id());
+            inner.property("type", "macro");
+            inner.property("source", macro.source());
+            inner.property("enabled", macro.enabled());
+            inner.property("explanation", macro.macro().explanation());
+            inner.stringArray("tags", macro.macro().tags());
+        }));
+    }
+
+    private void writePluginProfiles(PluginRuntime runtime, JsonWriter array) {
+        runtime.profiles().forEach(profile -> array.objectValue(inner -> {
+            inner.property("id", profile.id());
+            inner.property("source", profile.source());
+            inner.property("active", profile.id().equals(runtime.activeProfile()));
+            inner.stringArray("enableTags", profile.enableTags());
+            inner.stringArray("disableTags", profile.disableTags());
+            inner.stringArray("whitelist", profile.whitelist());
+            inner.stringArray("blacklist", profile.blacklist());
+        }));
     }
 
     private void handleExports(HttpExchange exchange) throws IOException {
