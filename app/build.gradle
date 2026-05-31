@@ -193,10 +193,17 @@ tasks.register('installPlaywrightBrowsers', JavaExec) {
     group = 'verification'
     classpath = sourceSets.e2eTest.runtimeClasspath
     mainClass = 'com.microsoft.playwright.CLI'
-    args 'install', '--with-deps', 'chromium'
-    // The Playwright CLI tries to invoke sudo for apt deps; the --with-deps
-    // call no-ops cleanly on systems where the deps are already present.
-    ignoreExitValue = true
+    args 'install', 'chromium'
+    // Fail fast in CI/local runs when browser install fails, so the error is
+    // surfaced at this step.
+}
+
+tasks.register('installPlaywrightHostDependencies', JavaExec) {
+    description = 'Installs Linux host libraries required by Playwright Chromium.'
+    group = 'verification'
+    classpath = sourceSets.e2eTest.runtimeClasspath
+    mainClass = 'com.microsoft.playwright.CLI'
+    args 'install-deps', 'chromium'
 }
 
 tasks.register('benchmarkReport', JavaExec) {

@@ -305,6 +305,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-v1
+      - name: Install Playwright host dependencies
+        run: ./gradlew installPlaywrightHostDependencies
       - name: Install Playwright browsers
         run: ./gradlew installPlaywrightBrowsers
       - name: Run browser E2E flows
@@ -346,8 +348,12 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-v1
+      - name: Install Playwright host dependencies
+        run: ./gradlew installPlaywrightHostDependencies
+      - name: Install Playwright browsers
+        run: ./gradlew installPlaywrightBrowsers
       - name: Record screenshots and videos
-        run: ./gradlew test e2eTest -Pregelsuche.recordDocs=true
+        run: ./gradlew test e2eTest -Pregelsuche.recordDocs=true -Pregelsuche.skipPlaywrightInstall=true
       - name: Detect screenshot changes
         id: screenshot_changes
         run: |
@@ -476,6 +482,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-v1
+      - name: Install Playwright host dependencies
+        run: ./gradlew installPlaywrightHostDependencies
       - name: Install Playwright browsers
         run: ./gradlew installPlaywrightBrowsers
       - name: Run Docker-image E2E tests
