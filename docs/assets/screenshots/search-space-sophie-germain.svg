@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1902" height="1696" viewBox="0 0 1902 1696" role="img" aria-labelledby="title desc" data-source="search-space-sophie-germain.svg" data-generated-by="SearchSpaceSvgWriter" data-generated-from="SearchSpaceSubgraph">
   <title id="title">Generated Sophie-Germain search-space subgraph</title>
-  <desc id="desc">Generated from SearchSpaceSubgraph: explored alternatives, selected paths and convergence.</desc>
+  <desc id="desc">Bounded replay of an explored search space (reconstructed subgraph): explored alternatives, selected paths and convergence.</desc>
   <defs>
     <marker id="spaceArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
     </marker>
   </defs>
   <rect width="100%" height="100%" fill="#f8fafc"/>
-  <text x="951" y="48" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="25" font-weight="700" fill="#0f172a">Generated search space: x^4 + 4*y^4</text>
-  <text x="951" y="78" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" fill="#475569">25 states, 72 rule edges; alternatives stay visible.</text>
+  <text x="951" y="48" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="25" font-weight="700" fill="#0f172a">Reconstructed search space: x^4 + 4*y^4</text>
+  <text x="951" y="78" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" fill="#475569">25 states (25 explored, 0 reconstructed), 30 rule edges; limits maxStates=25, maxDepth=4.</text>
   <text x="176" y="112" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700" fill="#64748b">depth 0</text>
   <text x="486" y="112" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700" fill="#64748b">depth 1</text>
   <text x="796" y="112" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700" fill="#64748b">depth 2</text>
@@ -54,257 +54,173 @@
   <text x="641" y="466" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
   <path data-edge-id="edge_20" data-rule-family="OTHER" data-not-selected="true" d="M 916 887 C 951 887, 951 533, 986 533" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
   <text x="951" y="702" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_power_two_to_product</text>
-  <path data-edge-id="edge_21" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1241 C 951 1241, 951 1005, 986 1005" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="1115" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_22" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1241 C 951 1241, 951 887, 986 887" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="1056" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_23" data-rule-family="OTHER" data-not-selected="true" d="M 916 1123 C 951 1123, 951 769, 986 769" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
+  <path data-edge-id="edge_21" data-rule-family="OTHER" data-not-selected="true" d="M 916 1123 C 951 1123, 951 769, 986 769" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
   <text x="951" y="938" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_power_two_to_product</text>
-  <path data-edge-id="edge_24" data-rule-family="OTHER" data-not-selected="true" d="M 916 1123 C 951 1123, 951 651, 986 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
+  <path data-edge-id="edge_22" data-rule-family="OTHER" data-not-selected="true" d="M 916 1123 C 951 1123, 951 651, 986 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
   <text x="951" y="879" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_power_two_to_product</text>
+  <path data-edge-id="edge_23" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1241 C 951 1241, 951 1005, 986 1005" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
+  <text x="951" y="1115" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
+  <path data-edge-id="edge_24" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1241 C 951 1241, 951 887, 986 887" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
+  <text x="951" y="1056" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
   <path data-edge-id="edge_25" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 916 533 C 796 533, 796 651, 676 651" fill="none" stroke="#d97706" stroke-width="4" opacity="1.0" marker-end="url(#spaceArrow)"/>
   <text x="796" y="584" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#92400e" opacity="1.0">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_26" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 887 C 796 887, 796 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="1115" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_27" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 887 C 641 887, 641 297, 366 297" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="641" y="584" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_28" data-rule-family="OTHER" data-not-selected="true" d="M 916 887 C 641 887, 641 297, 366 297" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="641" y="584" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_product_to_power_two</text>
-  <path data-edge-id="edge_29" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 887 C 951 887, 951 651, 986 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
+  <path data-edge-id="edge_26" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 887 C 951 887, 951 651, 986 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
   <text x="951" y="761" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_30" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1005 C 796 1005, 796 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="1174" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_31" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1005 C 641 1005, 641 297, 366 297" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="641" y="643" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_32" data-rule-family="OTHER" data-not-selected="true" d="M 916 1005 C 951 1005, 951 533, 986 533" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
+  <path data-edge-id="edge_27" data-rule-family="OTHER" data-not-selected="true" d="M 916 1005 C 951 1005, 951 533, 986 533" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
   <text x="951" y="761" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_power_two_to_product</text>
-  <path data-edge-id="edge_33" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1005 C 951 1005, 951 769, 986 769" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
+  <path data-edge-id="edge_28" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1005 C 951 1005, 951 769, 986 769" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
   <text x="951" y="879" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_34" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 916 297 C 796 297, 796 651, 676 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="466" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_35" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 916 297 C 796 297, 796 179, 676 179" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="230" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_36" data-rule-family="OTHER" data-not-selected="false" d="M 916 297 C 641 297, 641 179, 366 179" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="641" y="230" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_product_to_power_two</text>
-  <path data-edge-id="edge_37" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 916 297 C 641 297, 641 179, 366 179" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="641" y="230" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_38" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 916 415 C 796 415, 796 651, 676 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="525" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_39" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 916 415 C 796 415, 796 179, 676 179" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="289" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_40" data-rule-family="OTHER" data-not-selected="false" d="M 916 415 C 951 415, 951 179, 986 179" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
+  <path data-edge-id="edge_29" data-rule-family="OTHER" data-not-selected="false" d="M 916 415 C 951 415, 951 179, 986 179" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
   <text x="951" y="289" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_power_two_to_product</text>
-  <path data-edge-id="edge_41" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 916 415 C 641 415, 641 179, 366 179" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="641" y="289" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_42" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 1226 297 C 951 297, 951 651, 676 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="466" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_43" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 1226 415 C 951 415, 951 651, 676 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="525" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_44" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 1226 179 C 951 179, 951 651, 676 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="407" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_45" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 1226 179 C 951 179, 951 179, 676 179" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="171" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_46" data-rule-family="OTHER" data-not-selected="false" d="M 1226 179 C 951 179, 951 415, 676 415" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="289" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_product_to_power_two</text>
-  <path data-edge-id="edge_47" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 1226 179 C 951 179, 951 415, 676 415" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="289" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_48" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 1226 179 C 951 179, 951 297, 676 297" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="230" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_49" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1123 C 796 1123, 796 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="1233" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_50" data-rule-family="OTHER" data-not-selected="true" d="M 916 1123 C 951 1123, 951 1005, 986 1005" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
+  <path data-edge-id="edge_30" data-rule-family="OTHER" data-not-selected="true" d="M 916 1123 C 951 1123, 951 1005, 986 1005" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
   <text x="951" y="1056" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_power_two_to_product</text>
-  <path data-edge-id="edge_51" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1241 C 796 1241, 796 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="1292" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_52" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1241 C 796 1241, 796 1123, 676 1123" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="1174" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_53" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1477 C 796 1477, 796 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="1410" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_54" data-rule-family="OTHER" data-not-selected="true" d="M 916 1477 C 641 1477, 641 297, 366 297" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="641" y="879" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_product_to_power_two</text>
-  <path data-edge-id="edge_55" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 916 1477 C 641 1477, 641 297, 366 297" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="641" y="879" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_56" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 916 179 C 796 179, 796 651, 676 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="407" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_57" data-rule-family="NORMALIZATION" data-not-selected="false" d="M 916 769 C 796 769, 796 651, 676 651" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="702" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_58" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 533 C 951 533, 951 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="938" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_59" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 533 C 796 533, 796 297, 366 297" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="796" y="407" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_60" data-rule-family="OTHER" data-not-selected="true" d="M 1226 533 C 951 533, 951 1005, 676 1005" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="761" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_product_to_power_two</text>
-  <path data-edge-id="edge_61" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 533 C 951 533, 951 1005, 676 1005" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="761" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_62" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 533 C 951 533, 951 887, 676 887" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="702" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_63" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 1005 C 951 1005, 951 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="1174" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_64" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 1005 C 951 1005, 951 1123, 676 1123" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="1056" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_65" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 887 C 951 887, 951 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="1115" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_66" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 887 C 951 887, 951 1123, 676 1123" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="997" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_67" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 887 C 1106 887, 1106 1005, 986 1005" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="1106" y="938" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_68" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 769 C 951 769, 951 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="1056" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_69" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 769 C 951 769, 951 1123, 676 1123" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="938" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_70" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 651 C 951 651, 951 1359, 676 1359" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="997" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_71" data-rule-family="NORMALIZATION" data-not-selected="true" d="M 1226 651 C 951 651, 951 1123, 676 1123" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="879" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">NORMALIZATION: ast_canonical_normalize</text>
-  <path data-edge-id="edge_72" data-rule-family="OTHER" data-not-selected="true" d="M 1226 651 C 951 651, 951 1123, 676 1123" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.55" marker-end="url(#spaceArrow)"/>
-  <text x="951" y="879" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#475569" opacity="0.55">OTHER: ast_product_to_power_two</text>
-  <g data-node-id="space_b4703352" data-depth="0" data-score="22" data-target="false" data-didactic="true" data-macro="true" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_105204db6ee288c6eab367fb0c3c3cd8cab556cd18c2006872ecc95611bafd9c" data-role="ROOT" data-canonical-key="x ^ 4 + 4 * y ^ 4" data-convergence="false" data-originally-explored="true" data-depth="0" data-score="22" data-target="false" data-didactic="true" data-macro="true" data-dead-end="false" data-not-selected="false">
     <rect x="56" y="140" width="240" height="78" rx="14" fill="#eef2ff" stroke="#4338ca" stroke-width="3" opacity="1.0"/>
-    <text x="176" y="165" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#312e81">root/input</text>
+    <text x="176" y="165" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#312e81">search root</text>
     <text x="176" y="191" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">x^4 + 4*y^4</text>
     <text x="176" y="208" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 22</text>
   </g>
-  <g data-node-id="space_ed13d16" data-depth="1" data-score="82" data-target="true" data-didactic="false" data-macro="true" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_350b64e96a9598d616aa1efcd3dda54aa26821f027a2c5f6b36dea17d36ea055" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="1" data-score="82" data-target="true" data-didactic="false" data-macro="true" data-dead-end="false" data-not-selected="false">
     <rect x="366" y="140" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="486" y="165" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="486" y="165" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="486" y="191" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * x * y + 2 * y ^ 2) *…</text>
     <text x="486" y="208" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 82</text>
   </g>
-  <g data-node-id="space_5504b880" data-depth="1" data-score="46" data-target="false" data-didactic="true" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_48633b713e48c7fcaf10c4aea1172496918ccdd21015e7570116e25739b7e3f4" data-role="EQUIVALENT_STATE" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="false" data-originally-explored="true" data-depth="1" data-score="46" data-target="false" data-didactic="true" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="366" y="258" width="240" height="78" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="3" opacity="1.0"/>
-    <text x="486" y="283" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#92400e">hidden-structure path</text>
+    <text x="486" y="283" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#92400e">selected path state</text>
     <text x="486" y="309" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x …</text>
     <text x="486" y="326" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 46</text>
   </g>
-  <g data-node-id="space_fb275a96" data-depth="2" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_1b6f768cb3923ed97c3b7255a6c285b8e4236f5aadf91620b43676999dad5a43" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="676" y="140" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="796" y="165" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="796" y="165" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="796" y="191" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(2 * x * y + x ^ 2 + 2 * y ^ 2) *…</text>
     <text x="796" y="208" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 82</text>
   </g>
-  <g data-node-id="space_972c2cc4" data-depth="2" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_4092890ba9864a7e08089c3e19ac375dcdca2dd3544620af00a7abdc3764b438" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="676" y="258" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="796" y="283" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="796" y="283" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="796" y="309" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x * x + 2 * x * y + 2 * y ^ 2) *…</text>
     <text x="796" y="326" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 82</text>
   </g>
-  <g data-node-id="space_87920f23" data-depth="2" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_225530ccf1262fd1ba88f081c101df1568265449029eef8011a3e0d1f0adfcd4" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="676" y="376" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="796" y="401" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="796" y="401" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="796" y="427" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * x * y + 2 * y * y) *…</text>
     <text x="796" y="444" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 82</text>
   </g>
-  <g data-node-id="space_d85f2496" data-depth="2" data-score="82" data-target="true" data-didactic="true" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_a52a3346324cf50b928d191d01667337eb75c294871c54eaa7c2f78560ecb693" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="82" data-target="true" data-didactic="true" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="676" y="494" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="796" y="519" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="796" y="519" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="796" y="545" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y ^ 2 - 2 * x * y) *…</text>
     <text x="796" y="562" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 82</text>
   </g>
-  <g data-node-id="space_90a61ddb" data-depth="2" data-score="87" data-target="true" data-didactic="true" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_fe0ec698da6ceb5137cf1f5c821e94decf358dc6184bf2911e9d2356644b3ead" data-role="CONVERGENCE_TARGET" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="true" data-originally-explored="true" data-depth="2" data-score="87" data-target="true" data-didactic="true" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="676" y="612" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
     <text x="796" y="637" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
     <text x="796" y="663" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(0 - 2 * x * y + x ^ 2 + 2 * y ^ …</text>
     <text x="796" y="680" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 87</text>
   </g>
-  <g data-node-id="space_47fe889b" data-depth="2" data-score="87" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_a8d3e69877a8835b5bb25f41762b434d2720c86e1dab243ac46b8515ae7b9b2c" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="87" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="676" y="730" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="796" y="755" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="796" y="755" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="796" y="781" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * x * y + 2 * y ^ 2) *…</text>
     <text x="796" y="798" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 87</text>
   </g>
-  <g data-node-id="space_5986522e" data-depth="2" data-score="46" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
+  <g data-node-id="space_5b4293a8604e212f5d7c767eeca97f52c38ef4090b3b7140e8a87131ce083b5a" data-role="EQUIVALENT_STATE" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="46" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
     <rect x="676" y="848" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="796" y="873" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+    <text x="796" y="873" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">equivalence-class member</text>
     <text x="796" y="899" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x * x + 2 * y ^ 2) ^ 2 - (2 * x …</text>
     <text x="796" y="916" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 46</text>
   </g>
-  <g data-node-id="space_d94e760d" data-depth="2" data-score="46" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
+  <g data-node-id="space_cf5e92b2c63c2a3ea7de15a92c961413306f842e564923055dd708e9a0d3f0b3" data-role="EQUIVALENT_STATE" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="46" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
     <rect x="676" y="966" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="796" y="991" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+    <text x="796" y="991" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">equivalence-class member</text>
     <text x="796" y="1017" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y * y) ^ 2 - (2 * x …</text>
     <text x="796" y="1034" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 46</text>
   </g>
-  <g data-node-id="space_24be840f" data-depth="2" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
+  <g data-node-id="space_70d453c2eb0a0657e2b4914d71b32a1f99c72c7991388e26b80413d02b9767d5" data-role="EQUIVALENT_STATE" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
     <rect x="676" y="1084" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="796" y="1109" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+    <text x="796" y="1109" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">equivalence-class member</text>
     <text x="796" y="1135" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^…</text>
     <text x="796" y="1152" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 49</text>
   </g>
-  <g data-node-id="space_cd6dface" data-depth="2" data-score="54" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
+  <g data-node-id="space_bec066258024a186b5b334cc520b8deaccad9d7726e764e2f63ee6d677275fac" data-role="EQUIVALENT_STATE" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="54" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
     <rect x="676" y="1202" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="796" y="1227" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+    <text x="796" y="1227" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">equivalence-class member</text>
     <text x="796" y="1253" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y ^ 2) ^ 2 - 2 * x *…</text>
     <text x="796" y="1270" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 54</text>
   </g>
-  <g data-node-id="space_96c3522a" data-depth="2" data-score="60" data-target="false" data-didactic="false" data-macro="false" data-dead-end="true" data-not-selected="true">
+  <g data-node-id="space_538f5444824d8c2ca7eeca0c6ccac924eed71088004ee9a353d52598e57ea776" data-role="EQUIVALENT_STATE" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="60" data-target="false" data-didactic="false" data-macro="false" data-dead-end="true" data-not-selected="true">
     <rect x="676" y="1320" width="240" height="78" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" opacity="0.58"/>
     <text x="796" y="1345" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">dead-end alternative</text>
     <text x="796" y="1371" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + …</text>
     <text x="796" y="1388" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 60</text>
   </g>
-  <g data-node-id="space_59701213" data-depth="2" data-score="74" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
-    <rect x="676" y="1438" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="796" y="1463" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+  <g data-node-id="space_75983dcdaadf0e39956f4161ea563add313e298956bde9aa6e61cc04421b33c9" data-role="EQUIVALENT_STATE" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="false" data-originally-explored="true" data-depth="2" data-score="74" data-target="false" data-didactic="false" data-macro="false" data-dead-end="true" data-not-selected="true">
+    <rect x="676" y="1438" width="240" height="78" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" opacity="0.58"/>
+    <text x="796" y="1463" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">dead-end alternative</text>
     <text x="796" y="1489" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 …</text>
     <text x="796" y="1506" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 74</text>
   </g>
-  <g data-node-id="space_fecfed1" data-depth="3" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_b2bd4a045f5e02cfd4785110c8990a18ab40a5a4e362c233125cafbe3dc9bfb0" data-role="CONVERGENCE_TARGET" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="true" data-originally-explored="true" data-depth="3" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="986" y="140" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
     <text x="1106" y="165" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
     <text x="1106" y="191" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x * x + 2 * x * y + 2 * y * y) *…</text>
     <text x="1106" y="208" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 82</text>
   </g>
-  <g data-node-id="space_f7b14f72" data-depth="3" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_b1bd6b22f8f08f4e945b078182973c6e05c39b9d266098f83ac949e6519cb30c" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="3" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="986" y="258" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="1106" y="283" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="1106" y="283" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="1106" y="309" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x * x + 2 * y ^ 2 - 2 * x * y) *…</text>
     <text x="1106" y="326" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 82</text>
   </g>
-  <g data-node-id="space_9bfe24f0" data-depth="3" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_dee31f88db9286c0e9fe69256aa393e774866181ec757e15bcb9ea466ff960ec" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="3" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="986" y="376" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="1106" y="401" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="1106" y="401" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="1106" y="427" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y * y - 2 * x * y) *…</text>
     <text x="1106" y="444" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 82</text>
   </g>
-  <g data-node-id="space_ddd00fbb" data-depth="3" data-score="46" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
-    <rect x="986" y="494" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="1106" y="519" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+  <g data-node-id="space_7b876ab4d31d80d776efcee70c4bf35c352eed20079fd5f51c6afdd4ae65c6cd" data-role="CONVERGENCE_TARGET" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="true" data-originally-explored="true" data-depth="3" data-score="46" data-target="false" data-didactic="false" data-macro="false" data-dead-end="true" data-not-selected="true">
+    <rect x="986" y="494" width="240" height="78" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" opacity="0.58"/>
+    <text x="1106" y="519" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">convergence target</text>
     <text x="1106" y="545" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x * x + 2 * y * y) ^ 2 - (2 * x …</text>
     <text x="1106" y="562" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 46</text>
   </g>
-  <g data-node-id="space_f406a3d" data-depth="3" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
-    <rect x="986" y="612" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="1106" y="637" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+  <g data-node-id="space_2b7c8bd1aae3499812fc66a3191fec187df60c305c348b4db5f75d733d7df434" data-role="CONVERGENCE_TARGET" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="true" data-originally-explored="true" data-depth="3" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="true" data-not-selected="true">
+    <rect x="986" y="612" width="240" height="78" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" opacity="0.58"/>
+    <text x="1106" y="637" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">convergence target</text>
     <text x="1106" y="663" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x * x + 2 * y ^ 2) ^ 2 - 4 * x ^…</text>
     <text x="1106" y="680" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 49</text>
   </g>
-  <g data-node-id="space_bd8f125c" data-depth="3" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
-    <rect x="986" y="730" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="1106" y="755" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+  <g data-node-id="space_161912ea57242c89e14cdcdd83c3e41a354f110f38f0c323a5c7e1150aeb16fc" data-role="CONVERGENCE_TARGET" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="true" data-originally-explored="true" data-depth="3" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="true" data-not-selected="true">
+    <rect x="986" y="730" width="240" height="78" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" opacity="0.58"/>
+    <text x="1106" y="755" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">convergence target</text>
     <text x="1106" y="781" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y * y) ^ 2 - 4 * x ^…</text>
     <text x="1106" y="798" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 49</text>
   </g>
-  <g data-node-id="space_53623b4" data-depth="3" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
-    <rect x="986" y="848" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="1106" y="873" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+  <g data-node-id="space_a1e73dc53e5621f62dcce9061264efafb3581d81b566c4b2148735ea541126a5" data-role="EQUIVALENT_STATE" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="false" data-originally-explored="true" data-depth="3" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="true" data-not-selected="true">
+    <rect x="986" y="848" width="240" height="78" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" opacity="0.58"/>
+    <text x="1106" y="873" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">dead-end alternative</text>
     <text x="1106" y="899" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x *…</text>
     <text x="1106" y="916" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 49</text>
   </g>
-  <g data-node-id="space_24bdc122" data-depth="3" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="true">
-    <rect x="986" y="966" width="240" height="78" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" opacity="0.68"/>
-    <text x="1106" y="991" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">alternative branch</text>
+  <g data-node-id="space_72b7cb03e409ef81c6e347b84fa286122cc840bfc19f8d4d6f7a05ec9e674306" data-role="CONVERGENCE_TARGET" data-canonical-key="0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2" data-convergence="true" data-originally-explored="true" data-depth="3" data-score="49" data-target="false" data-didactic="false" data-macro="false" data-dead-end="true" data-not-selected="true">
+    <rect x="986" y="966" width="240" height="78" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" opacity="0.58"/>
+    <text x="1106" y="991" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#475569">convergence target</text>
     <text x="1106" y="1017" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^…</text>
     <text x="1106" y="1034" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 49</text>
   </g>
-  <g data-node-id="space_e86e75ff" data-depth="4" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_b855072987088ad62e23d9948a9ef73c6dcf8a542524365d761f659d1f4c4c8b" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="4" data-score="82" data-target="true" data-didactic="false" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="1296" y="140" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="1416" y="165" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="1416" y="165" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="1416" y="191" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(x * x + 2 * y * y - 2 * x * y) *…</text>
     <text x="1416" y="208" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 82</text>
   </g>
-  <g data-node-id="space_4798a289" data-depth="4" data-score="87" data-target="true" data-didactic="true" data-macro="false" data-dead-end="false" data-not-selected="false">
+  <g data-node-id="space_011a885e5156d61b0383050db6d198a6f89596dd9db80e2e536044dff45a8519" data-role="CANONICAL_REPRESENTATIVE" data-canonical-key="(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)" data-convergence="false" data-originally-explored="true" data-depth="4" data-score="87" data-target="true" data-didactic="true" data-macro="false" data-dead-end="false" data-not-selected="false">
     <rect x="1296" y="258" width="240" height="78" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="4" opacity="1.0"/>
-    <text x="1416" y="283" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">convergence target</text>
+    <text x="1416" y="283" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#14532d">canonical representative</text>
     <text x="1416" y="309" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#111827">(0 - 2 * x * y + x * x + 2 * y ^ …</text>
     <text x="1416" y="326" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" fill="#64748b">score 87</text>
   </g>

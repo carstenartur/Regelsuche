@@ -3,7 +3,7 @@
 - input: `x^4 + 4*y^4`
 - target: `(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)`
 - number of distinct paths: 7
-- path families: [FACTORIZATION, HIDDEN_STRUCTURE, LEARNED_MACRO]
+- path families: [LEARNED_MACRO, HIDDEN_STRUCTURE, FACTORIZATION]
 - shortest path: learned macro shortcut
 - most didactic path: expanded hidden-structure variant
 - macro shortcut path: learned macro shortcut

@@ -19,7 +19,12 @@ public final class SearchSpaceSvgWriter {
     private static final int NODE_HEIGHT = 78;
 
     public String render(SearchSpaceSubgraph graph, ArtifactMetadata metadata) {
+        return render(graph, metadata, SearchSpaceSvgOptions.detailed());
+    }
+
+    public String render(SearchSpaceSubgraph graph, ArtifactMetadata metadata, SearchSpaceSvgOptions options) {
         ArtifactMetadata safeMetadata = metadata == null ? new ArtifactMetadata("", "") : metadata;
+        SearchSpaceSvgOptions safeOptions = options == null ? SearchSpaceSvgOptions.detailed() : options;
         Map<String, PositionedNode> layout = layout(graph);
         int maxDepth = graph.nodes().stream().mapToInt(Node::depth).max().orElse(0);
         int maxRows = graph.nodes().stream().collect(Collectors.groupingBy(Node::depth, Collectors.counting()))
@@ -35,7 +40,8 @@ public final class SearchSpaceSvgWriter {
             .append("\" data-generated-by=\"").append(GENERATED_BY)
             .append("\" data-generated-from=\"SearchSpaceSubgraph\">\n");
         out.append("  <title id=\"title\">").append(escapeXml(title(graph, safeMetadata))).append("</title>\n");
-        out.append("  <desc id=\"desc\">Generated from SearchSpaceSubgraph: explored alternatives, selected paths and convergence.</desc>\n");
+        out.append("  <desc id=\"desc\">Bounded replay of an explored search space (reconstructed subgraph): "
+            + "explored alternatives, selected paths and convergence.</desc>\n");
         out.append("  <defs>\n");
         out.append("    <marker id=\"spaceArrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"8\" markerHeight=\"8\" orient=\"auto-start-reverse\">\n");
         out.append("      <path d=\"M 0 0 L 10 5 L 0 10 z\" fill=\"#334155\"/>\n");
@@ -44,11 +50,10 @@ public final class SearchSpaceSvgWriter {
         out.append("  <rect width=\"100%\" height=\"100%\" fill=\"#f8fafc\"/>\n");
         out.append("  <text x=\"").append(width / 2).append("\" y=\"48\" text-anchor=\"middle\" ")
             .append("font-family=\"Inter,Segoe UI,Arial,sans-serif\" font-size=\"25\" font-weight=\"700\" fill=\"#0f172a\">")
-            .append(escapeXml("Generated search space: " + graph.inputExpression())).append("</text>\n");
+            .append(escapeXml("Reconstructed search space: " + graph.inputExpression())).append("</text>\n");
         out.append("  <text x=\"").append(width / 2).append("\" y=\"78\" text-anchor=\"middle\" ")
             .append("font-family=\"Inter,Segoe UI,Arial,sans-serif\" font-size=\"14\" fill=\"#475569\">")
-            .append(escapeXml(graph.nodes().size() + " states, " + graph.edges().size()
-                + " rule edges; alternatives stay visible.")).append("</text>\n");
+            .append(escapeXml(subtitle(graph))).append("</text>\n");
         for (int depth = 0; depth <= maxDepth; depth++) {
             out.append("  <text x=\"").append(MARGIN_X + COLUMN_WIDTH * depth + NODE_WIDTH / 2)
                 .append("\" y=\"112\" text-anchor=\"middle\" font-family=\"Inter,Segoe UI,Arial,sans-serif\" ")
@@ -59,14 +64,22 @@ public final class SearchSpaceSvgWriter {
             PositionedNode from = layout.get(edge.fromId());
             PositionedNode to = layout.get(edge.toId());
             if (from != null && to != null && !from.node().id().equals(to.node().id())) {
-                edge(out, from, to, edge);
+                edge(out, from, to, edge, safeOptions);
             }
         }
         for (PositionedNode node : layout.values()) {
-            node(out, node);
+            node(out, node, safeOptions);
         }
         out.append("</svg>\n");
         return out.toString();
+    }
+
+    private String subtitle(SearchSpaceSubgraph graph) {
+        return graph.nodes().size() + " states ("
+            + graph.originallyExploredCount() + " explored, "
+            + graph.reconstructedCount() + " reconstructed), "
+            + graph.edges().size() + " rule edges; limits maxStates="
+            + graph.maxStates() + ", maxDepth=" + graph.maxDepth() + ".";
     }
 
     public String render(SearchSpaceSubgraph graph) {
@@ -94,7 +107,8 @@ public final class SearchSpaceSvgWriter {
         return positioned;
     }
 
-    private void edge(StringBuilder out, PositionedNode from, PositionedNode to, Edge edge) {
+    private void edge(StringBuilder out, PositionedNode from, PositionedNode to, Edge edge,
+            SearchSpaceSvgOptions options) {
         int startX = from.x() + NODE_WIDTH;
         int startY = from.y() + NODE_HEIGHT / 2;
         int endX = to.x();
@@ -113,16 +127,22 @@ public final class SearchSpaceSvgWriter {
             .append("\" stroke-width=\"").append(style.width())
             .append("\" opacity=\"").append(style.opacity())
             .append("\" marker-end=\"url(#spaceArrow)\"/>\n");
-        out.append("  <text x=\"").append(midX).append("\" y=\"").append(midY)
-            .append("\" text-anchor=\"middle\" font-family=\"Inter,Segoe UI,Arial,sans-serif\" font-size=\"11\" ")
-            .append("font-weight=\"700\" fill=\"").append(style.labelFill()).append("\" opacity=\"")
-            .append(style.opacity()).append("\">").append(escapeXml(shortRule(edge))).append("</text>\n");
+        if (options.showEdgeLabels()) {
+            out.append("  <text x=\"").append(midX).append("\" y=\"").append(midY)
+                .append("\" text-anchor=\"middle\" font-family=\"Inter,Segoe UI,Arial,sans-serif\" font-size=\"11\" ")
+                .append("font-weight=\"700\" fill=\"").append(style.labelFill()).append("\" opacity=\"")
+                .append(style.opacity()).append("\">").append(escapeXml(shortRule(edge, options))).append("</text>\n");
+        }
     }
 
-    private void node(StringBuilder out, PositionedNode positioned) {
+    private void node(StringBuilder out, PositionedNode positioned, SearchSpaceSvgOptions options) {
         Node node = positioned.node();
         NodeStyle style = NodeStyle.of(node);
         out.append("  <g data-node-id=\"").append(escapeXml(node.id()))
+            .append("\" data-role=\"").append(node.role())
+            .append("\" data-canonical-key=\"").append(escapeXml(node.canonicalKey()))
+            .append("\" data-convergence=\"").append(node.isConvergencePoint())
+            .append("\" data-originally-explored=\"").append(node.originallyExplored())
             .append("\" data-depth=\"").append(node.depth())
             .append("\" data-score=\"").append(node.score())
             .append("\" data-target=\"").append(node.isTarget())
@@ -135,41 +155,62 @@ public final class SearchSpaceSvgWriter {
             .append("\" rx=\"14\" fill=\"").append(style.fill()).append("\" stroke=\"")
             .append(style.stroke()).append("\" stroke-width=\"").append(style.strokeWidth())
             .append("\" opacity=\"").append(style.opacity()).append("\"/>\n");
-        out.append("    <text x=\"").append(positioned.x() + NODE_WIDTH / 2).append("\" y=\"")
-            .append(positioned.y() + 25)
-            .append("\" text-anchor=\"middle\" font-family=\"Inter,Segoe UI,Arial,sans-serif\" ")
-            .append("font-size=\"12\" font-weight=\"700\" fill=\"").append(style.labelFill())
-            .append("\">").append(escapeXml(nodeLabel(node))).append("</text>\n");
+        if (options.showLabels()) {
+            out.append("    <text x=\"").append(positioned.x() + NODE_WIDTH / 2).append("\" y=\"")
+                .append(positioned.y() + 25)
+                .append("\" text-anchor=\"middle\" font-family=\"Inter,Segoe UI,Arial,sans-serif\" ")
+                .append("font-size=\"12\" font-weight=\"700\" fill=\"").append(style.labelFill())
+                .append("\">").append(escapeXml(nodeLabel(node))).append("</text>\n");
+        }
         out.append("    <text x=\"").append(positioned.x() + NODE_WIDTH / 2).append("\" y=\"")
             .append(positioned.y() + 51)
             .append("\" text-anchor=\"middle\" font-family=\"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace\" ")
             .append("font-size=\"12\" fill=\"#111827\">").append(escapeXml(shortExpression(node.expression())))
             .append("</text>\n");
-        out.append("    <text x=\"").append(positioned.x() + NODE_WIDTH / 2).append("\" y=\"")
-            .append(positioned.y() + 68)
-            .append("\" text-anchor=\"middle\" font-family=\"Inter,Segoe UI,Arial,sans-serif\" ")
-            .append("font-size=\"10\" fill=\"#64748b\">score ").append(node.score()).append("</text>\n");
+        if (options.showNodeIds()) {
+            out.append("    <text x=\"").append(positioned.x() + NODE_WIDTH / 2).append("\" y=\"")
+                .append(positioned.y() + 68)
+                .append("\" text-anchor=\"middle\" font-family=\"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace\" ")
+                .append("font-size=\"10\" fill=\"#94a3b8\">").append(escapeXml(shortId(node.id())))
+                .append("</text>\n");
+        } else {
+            out.append("    <text x=\"").append(positioned.x() + NODE_WIDTH / 2).append("\" y=\"")
+                .append(positioned.y() + 68)
+                .append("\" text-anchor=\"middle\" font-family=\"Inter,Segoe UI,Arial,sans-serif\" ")
+                .append("font-size=\"10\" fill=\"#64748b\">score ").append(node.score()).append("</text>\n");
+        }
         out.append("  </g>\n");
     }
 
+    private String shortId(String id) {
+        String suffix = id.startsWith("space_") ? id.substring("space_".length()) : id;
+        return "#" + suffix.substring(0, Math.min(8, suffix.length()));
+    }
+
     private String nodeLabel(Node node) {
-        if (node.depth() == 0) {
-            return "root/input";
+        if (node.role() == SearchSpaceSubgraph.StateRole.ROOT) {
+            return "search root";
         }
-        if (node.isTarget()) {
+        if (node.role() == SearchSpaceSubgraph.StateRole.CONVERGENCE_TARGET) {
             return "convergence target";
+        }
+        if (node.role() == SearchSpaceSubgraph.StateRole.CANONICAL_REPRESENTATIVE) {
+            return "canonical representative";
         }
         if (node.isOnDidacticPath() && node.isOnMacroPath()) {
             return "shared selected state";
         }
         if (node.isOnDidacticPath()) {
-            return "hidden-structure path";
+            return "selected path state";
         }
         if (node.isOnMacroPath()) {
-            return "learned macro shortcut";
+            return "macro-shortcut state";
         }
         if (node.isDeadEnd()) {
             return "dead-end alternative";
+        }
+        if (node.role() == SearchSpaceSubgraph.StateRole.EQUIVALENT_STATE) {
+            return "equivalence-class member";
         }
         return "alternative branch";
     }
@@ -178,8 +219,11 @@ public final class SearchSpaceSvgWriter {
         return shorten(expression, 34);
     }
 
-    private String shortRule(Edge edge) {
-        return edge.ruleFamily() + ": " + shorten(edge.ruleId(), 26);
+    private String shortRule(Edge edge, SearchSpaceSvgOptions options) {
+        if (options.showRuleNames()) {
+            return edge.ruleFamily() + ": " + shorten(edge.ruleId(), 26);
+        }
+        return edge.ruleFamily().toString();
     }
 
     private String shorten(String value, int max) {

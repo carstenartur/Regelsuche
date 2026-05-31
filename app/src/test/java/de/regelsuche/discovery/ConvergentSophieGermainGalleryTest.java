@@ -24,6 +24,7 @@ import de.regelsuche.search.convergence.ConvergentDiscoverySvgWriter;
 import de.regelsuche.search.convergence.RuleFamily;
 import de.regelsuche.search.convergence.SearchSpaceSubgraph;
 import de.regelsuche.search.convergence.SearchSpaceSubgraphExtractor;
+import de.regelsuche.search.convergence.SearchSpaceSvgOptions;
 import de.regelsuche.search.convergence.SearchSpaceSvgWriter;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
@@ -54,32 +55,9 @@ class ConvergentSophieGermainGalleryTest {
 
     @Test
     void learnsMacroRerunsSearchAndGeneratesConvergentGraph() throws Exception {
-        String input = "x^4 + 4*y^4";
-        SuccessfulTransformationPath discoveryPath = hiddenStructureReplayPath(input);
-        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
-        MacroLearningResult learning = new MacroLearningPipeline(inventory).learn(List.of(discoveryPath));
-        assertFalse(learning.newlyActivated().isEmpty(), learning.stageEvidence().toString());
-        ReusableRule learned = learning.newlyActivated().getFirst();
-
-        MacroMoveTransformationEngine engine = new MacroMoveTransformationEngine(
-            new HypothesisTransformationEngine(
-                new AstRewriteTransformationEngine(),
-                List.of(new DifferenceOfSquaresPreparationOperator())
-            ),
-            new GoalAwareMacroMoveSelector(inventory),
-            discoveryPath.targetExpression(),
-            Map.of(learned.id(), atomicSteps(discoveryPath)),
-            learned.assumptions()
-        );
-        SearchProblem problem = new SearchProblem(
-            input,
-            engine,
-            scorer,
-            canonicalizer,
-            new SearchHeuristic(4, 240, 1, 20, 240, 240)
-        );
-        List<SearchState> states = new BestFirstSearchStrategy().search(problem);
-        ConvergentDiscoveryReport report = new ConvergentDiscoveryAnalysis().analyze(problem, states);
+        Fixture fixture = buildFixture();
+        String input = fixture.input();
+        ConvergentDiscoveryReport report = fixture.report();
 
         assertTrue(report.isGalleryEligible(), "Expected hidden-structure and learned-macro paths: " + report);
         assertTrue(report.ruleFamiliesUsed().contains(RuleFamily.HIDDEN_STRUCTURE), report.ruleFamiliesUsed().toString());
@@ -89,7 +67,7 @@ class ConvergentSophieGermainGalleryTest {
         assertTrue(report.pathsToTarget().stream().anyMatch(path ->
             path.ruleIds().stream().anyMatch(rule -> rule.startsWith("macro_"))), report.pathsToTarget().toString());
         assertTrue(equivalence.areEquivalent(input, report.canonicalTargetExpression()), report.canonicalTargetExpression());
-        SearchSpaceSubgraph searchSpace = new SearchSpaceSubgraphExtractor().extract(problem, states, report);
+        SearchSpaceSubgraph searchSpace = fixture.searchSpace();
         assertTrue(searchSpace.nodes().size() > 8, "Expected a visible search space: " + searchSpace.nodes());
         assertTrue(searchSpace.edges().size() > 10, "Expected branched rule edges: " + searchSpace.edges());
         assertTrue(searchSpace.edges().stream().map(SearchSpaceSubgraph.Edge::ruleFamily).distinct().count() >= 2,
@@ -130,6 +108,16 @@ class ConvergentSophieGermainGalleryTest {
         assertTrue(searchSpaceSvg.contains("data-generated-from=\"SearchSpaceSubgraph\""), searchSpaceSvg);
         assertTrue(searchSpaceSvg.contains("alternative branch")
             || searchSpaceSvg.contains("dead-end alternative"), searchSpaceSvg);
+        SearchSpaceSubgraph compactSpace = searchSpace.compact(12);
+        assertTrue(compactSpace.nodes().size() <= 12, compactSpace.nodes().toString());
+        assertTrue(compactSpace.nodes().size() >= 6, compactSpace.nodes().toString());
+        assertTrue(compactSpace.nodes().stream().anyMatch(SearchSpaceSubgraph.Node::isTarget),
+            compactSpace.nodes().toString());
+        String compactSvg = new SearchSpaceSvgWriter().render(compactSpace,
+            new ArtifactMetadata("search-space-sophie-germain-compact.svg",
+                "Compact Sophie-Germain convergence demonstration"),
+            SearchSpaceSvgOptions.compact());
+        assertTrue(compactSvg.contains("data-generated-from=\"SearchSpaceSubgraph\""), compactSvg);
         String snippet = new ConvergentDiscoveryGallerySnippetWriter().render(report);
         assertTrue(snippet.contains("number of distinct paths"), snippet);
         assertTrue(snippet.contains("macro shortcut path"), snippet);
@@ -137,17 +125,21 @@ class ConvergentSophieGermainGalleryTest {
         Path graph = tempDir.resolve("convergent-sophie-germain.mmd");
         Path svgFile = tempDir.resolve("convergent-sophie-germain.svg");
         Path searchSpaceSvgFile = tempDir.resolve("search-space-sophie-germain.svg");
+        Path compactSvgFile = tempDir.resolve("search-space-sophie-germain-compact.svg");
         Path snippetFile = tempDir.resolve("convergent-sophie-germain-gallery-snippet.md");
         Files.writeString(graph, mermaid);
         Files.writeString(svgFile, svg);
         Files.writeString(searchSpaceSvgFile, searchSpaceSvg);
+        Files.writeString(compactSvgFile, compactSvg);
         Files.writeString(snippetFile, snippet);
         assertTrue(Files.exists(graph));
         assertTrue(Files.exists(svgFile));
         assertTrue(Files.exists(searchSpaceSvgFile));
+        assertTrue(Files.exists(compactSvgFile));
         assertTrue(Files.size(graph) > 0);
         assertTrue(Files.size(svgFile) > 0);
         assertTrue(Files.size(searchSpaceSvgFile) > 0);
+        assertTrue(Files.size(compactSvgFile) > 0);
         assertTrue(Files.size(snippetFile) > 0);
         assertGeneratedOrProvenancePresent(graph, svgFile, svg);
 
@@ -157,15 +149,18 @@ class ConvergentSophieGermainGalleryTest {
             Files.writeString(screenshots.resolve("convergent-sophie-germain.mmd"), mermaid);
             Files.writeString(screenshots.resolve("convergent-sophie-germain.svg"), svg);
             Files.writeString(screenshots.resolve("search-space-sophie-germain.svg"), searchSpaceSvg);
+            Files.writeString(screenshots.resolve("search-space-sophie-germain-compact.svg"), compactSvg);
             Files.writeString(screenshots.resolve("convergent-sophie-germain-gallery-snippet.md"), snippet);
         }
         Path screenshots = locateRepoRoot().resolve("docs/assets/screenshots");
         Path docsMmd = screenshots.resolve("convergent-sophie-germain.mmd");
         Path docsSvg = screenshots.resolve("convergent-sophie-germain.svg");
         Path docsSearchSpaceSvg = screenshots.resolve("search-space-sophie-germain.svg");
+        Path docsCompactSvg = screenshots.resolve("search-space-sophie-germain-compact.svg");
         assertTrue(Files.exists(docsMmd), "Missing generated Mermaid asset");
         assertTrue(Files.exists(docsSvg), "Missing generated SVG asset");
         assertTrue(Files.exists(docsSearchSpaceSvg), "Missing generated search-space SVG asset");
+        assertTrue(Files.exists(docsCompactSvg), "Missing generated compact search-space SVG asset");
         String docsSvgContent = Files.readString(docsSvg);
         String docsSearchSpaceSvgContent = Files.readString(docsSearchSpaceSvg);
         assertTrue(Boolean.getBoolean("regelsuche.recordDocs")
@@ -176,10 +171,128 @@ class ConvergentSophieGermainGalleryTest {
             "Search-space SVG must be generated from SearchSpaceSubgraph");
         String readme = Files.readString(locateRepoRoot().resolve("README.md"));
         String gallery = Files.readString(locateRepoRoot().resolve("docs/demo-gallery.md"));
-        assertTrue(readme.contains("search-space-sophie-germain.svg"), "README must show the search-space SVG");
+        assertTrue(readme.contains("search-space-sophie-germain-compact.svg"),
+            "README must show the compact search-space SVG");
         assertTrue(gallery.contains("search-space-sophie-germain.svg"), "Gallery must show the search-space SVG");
         assertTrue(gallery.contains("Regelsuche does not only output the factorization.\n"
             + "It records the explored transformation space and shows which different ideas converge."));
+    }
+
+    @Test
+    void searchSpaceGraphIsStructurallyConsistent() throws Exception {
+        SearchSpaceSubgraph searchSpace = buildFixture().searchSpace();
+        Set<String> nodeIds = searchSpace.nodes().stream()
+            .map(SearchSpaceSubgraph.Node::id).collect(Collectors.toSet());
+        assertEquals(searchSpace.nodes().size(), nodeIds.size(), "Node ids must be unique");
+
+        Set<String> edgeKeys = new LinkedHashSet<>();
+        for (SearchSpaceSubgraph.Edge edge : searchSpace.edges()) {
+            assertTrue(nodeIds.contains(edge.fromId()), "Edge from unknown node: " + edge);
+            assertTrue(nodeIds.contains(edge.toId()), "Edge to unknown node: " + edge);
+            assertFalse(edge.fromId().equals(edge.toId()), "Self-edge is not allowed: " + edge);
+            assertTrue(edgeKeys.add(edge.fromId() + "->" + edge.toId() + "|" + edge.ruleId()),
+                "Duplicate edge: " + edge);
+        }
+    }
+
+    @Test
+    void convergenceTargetsAreReachedFromDistinctPredecessors() throws Exception {
+        SearchSpaceSubgraph searchSpace = buildFixture().searchSpace();
+        assertFalse(searchSpace.convergenceTargets().isEmpty(),
+            "At least one true convergence target expected: " + searchSpace.nodes());
+        Map<String, Set<String>> predecessors = searchSpace.edges().stream().collect(Collectors.groupingBy(
+            SearchSpaceSubgraph.Edge::toId,
+            Collectors.mapping(SearchSpaceSubgraph.Edge::fromId, Collectors.toSet())));
+        for (SearchSpaceSubgraph.Node target : searchSpace.convergenceTargets()) {
+            assertTrue(predecessors.getOrDefault(target.id(), Set.of()).size() >= 2,
+                "Convergence target must have >= 2 distinct predecessors: " + target);
+            assertEquals(SearchSpaceSubgraph.StateRole.CONVERGENCE_TARGET, target.role(), target.toString());
+        }
+    }
+
+    @Test
+    void equivalentStatesAreGroupedByCanonicalKey() throws Exception {
+        SearchSpaceSubgraph searchSpace = buildFixture().searchSpace();
+        for (SearchSpaceSubgraph.Node node : searchSpace.nodes()) {
+            assertEquals(canonicalizer.canonicalize(node.expression()), node.canonicalKey(),
+                "Canonical key must match canonicalized expression: " + node);
+        }
+        searchSpace.equivalenceClasses().forEach((key, ids) -> {
+            assertTrue(ids.size() > 1, "Equivalence class must group more than one state: " + key);
+            Set<String> canonicalKeys = searchSpace.nodes().stream()
+                .filter(node -> ids.contains(node.id()))
+                .map(SearchSpaceSubgraph.Node::canonicalKey)
+                .collect(Collectors.toSet());
+            assertEquals(Set.of(key), canonicalKeys, "All grouped states must share the canonical key");
+        });
+    }
+
+    @Test
+    void compactGraphKeepsConvergenceStoryWithinNodeBudget() throws Exception {
+        SearchSpaceSubgraph compact = buildFixture().searchSpace().compact(12);
+        assertTrue(compact.nodes().size() <= 12, compact.nodes().toString());
+        assertTrue(compact.nodes().stream().anyMatch(SearchSpaceSubgraph.Node::isTarget),
+            "Compact graph must keep a target: " + compact.nodes());
+        assertTrue(compact.nodes().stream().anyMatch(node -> node.depth() == 0),
+            "Compact graph must keep the root: " + compact.nodes());
+        Set<String> ids = compact.nodes().stream()
+            .map(SearchSpaceSubgraph.Node::id).collect(Collectors.toSet());
+        for (SearchSpaceSubgraph.Edge edge : compact.edges()) {
+            assertTrue(ids.contains(edge.fromId()) && ids.contains(edge.toId()),
+                "Compact graph must not contain dangling edges: " + edge);
+        }
+    }
+
+    @Test
+    void svgOptionsControlLabelDensity() throws Exception {
+        SearchSpaceSubgraph searchSpace = buildFixture().searchSpace();
+        SearchSpaceSvgWriter writer = new SearchSpaceSvgWriter();
+        String detailed = writer.render(searchSpace, new ArtifactMetadata("d", "d"),
+            SearchSpaceSvgOptions.detailed());
+        String minimal = writer.render(searchSpace, new ArtifactMetadata("m", "m"),
+            SearchSpaceSvgOptions.minimal());
+        assertTrue(detailed.contains("convergence target") || detailed.contains("canonical representative"),
+            "Detailed SVG should carry role labels");
+        assertFalse(minimal.contains("convergence target"),
+            "Minimal SVG should omit role labels");
+        assertTrue(minimal.contains("data-convergence="),
+            "Minimal SVG should still expose convergence metadata for clustering");
+        assertTrue(minimal.contains("data-canonical-key="),
+            "Minimal SVG should still expose equivalence-class metadata for clustering");
+    }
+
+    private Fixture buildFixture() throws Exception {
+        String input = "x^4 + 4*y^4";
+        SuccessfulTransformationPath discoveryPath = hiddenStructureReplayPath(input);
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        MacroLearningResult learning = new MacroLearningPipeline(inventory).learn(List.of(discoveryPath));
+        assertFalse(learning.newlyActivated().isEmpty(), learning.stageEvidence().toString());
+        ReusableRule learned = learning.newlyActivated().getFirst();
+
+        MacroMoveTransformationEngine engine = new MacroMoveTransformationEngine(
+            new HypothesisTransformationEngine(
+                new AstRewriteTransformationEngine(),
+                List.of(new DifferenceOfSquaresPreparationOperator())
+            ),
+            new GoalAwareMacroMoveSelector(inventory),
+            discoveryPath.targetExpression(),
+            Map.of(learned.id(), atomicSteps(discoveryPath)),
+            learned.assumptions()
+        );
+        SearchProblem problem = new SearchProblem(
+            input,
+            engine,
+            scorer,
+            canonicalizer,
+            new SearchHeuristic(4, 240, 1, 20, 240, 240)
+        );
+        List<SearchState> states = new BestFirstSearchStrategy().search(problem);
+        ConvergentDiscoveryReport report = new ConvergentDiscoveryAnalysis().analyze(problem, states);
+        SearchSpaceSubgraph searchSpace = new SearchSpaceSubgraphExtractor().extract(problem, states, report);
+        return new Fixture(input, report, searchSpace);
+    }
+
+    private record Fixture(String input, ConvergentDiscoveryReport report, SearchSpaceSubgraph searchSpace) {
     }
 
     private void assertMermaidLabelsAppearInSvg(String mermaid, String svg) {

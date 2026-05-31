@@ -20,6 +20,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Extracts a bounded real search-space subgraph from a {@link SearchProblem}. */
 public final class SearchSpaceSubgraphExtractor {
@@ -41,22 +42,51 @@ public final class SearchSpaceSubgraphExtractor {
             .filter(edge -> nodeIds.contains(edge.fromId()) && nodeIds.contains(edge.toId()))
             .toList();
         Map<String, Set<RuleFamily>> incomingFamilies = new HashMap<>();
+        Map<String, Set<String>> incomingPredecessors = new HashMap<>();
         Set<String> sources = new HashSet<>();
         for (EdgeDraft edge : renderedEdgeDrafts) {
             sources.add(edge.fromId());
             incomingFamilies.computeIfAbsent(edge.toId(), ignored -> new LinkedHashSet<>()).add(edge.family());
+            incomingPredecessors.computeIfAbsent(edge.toId(), ignored -> new HashSet<>()).add(edge.fromId());
         }
+        Set<String> originallyExplored = new HashSet<>();
+        for (SearchState state : exploredStates) {
+            if (state.depth() <= maxDepth) {
+                originallyExplored.add(idForExpression(state.expression()));
+            }
+        }
+        Map<String, String> canonicalKeys = new HashMap<>();
+        for (SearchState state : selectedStates.values()) {
+            canonicalKeys.put(idForExpression(state.expression()), canonicalKey(state.expression()));
+        }
+        Set<String> sharedCanonicalKeys = canonicalKeys.values().stream()
+            .collect(Collectors.groupingBy(key -> key, Collectors.counting()))
+            .entrySet().stream()
+            .filter(entry -> entry.getValue() > 1)
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toSet());
 
         List<Node> nodes = selectedStates.values().stream()
             .sorted(Comparator.comparingInt(SearchState::depth).thenComparing(SearchState::expression))
-            .map(state -> node(problem, state, report,
-                incomingFamilies.getOrDefault(idForExpression(state.expression()), Set.of()),
-                sources.contains(idForExpression(state.expression()))))
+            .map(state -> {
+                String id = idForExpression(state.expression());
+                return node(problem, state, report,
+                    incomingFamilies.getOrDefault(id, Set.of()),
+                    sources.contains(id),
+                    incomingPredecessors.getOrDefault(id, Set.of()).size() >= 2,
+                    originallyExplored.contains(id),
+                    canonicalKeys.getOrDefault(id, canonicalKey(state.expression())),
+                    sharedCanonicalKeys);
+            })
             .toList();
         List<Edge> edges = renderedEdgeDrafts.stream()
             .map(edge -> edge(edge, selectedStates, report))
             .toList();
-        return new SearchSpaceSubgraph(problem.rootExpression(), nodes, edges, maxDepth);
+        return new SearchSpaceSubgraph(problem.rootExpression(), nodes, edges, maxDepth, MAX_NODES);
+    }
+
+    private String canonicalKey(String expression) {
+        return new de.regelsuche.canonical.ExpressionCanonicalizer().canonicalize(expression);
     }
 
     private Map<String, SearchState> selectStates(
@@ -160,7 +190,11 @@ public final class SearchSpaceSubgraphExtractor {
         SearchState state,
         ConvergentDiscoveryReport report,
         Set<RuleFamily> ruleFamilies,
-        boolean hasOutgoingEdge
+        boolean hasOutgoingEdge,
+        boolean isConvergencePoint,
+        boolean originallyExplored,
+        String canonicalKey,
+        Set<String> sharedCanonicalKeys
     ) {
         Set<PathMembership> membership = pathMembership(problem, state.expression(), report);
         boolean isTarget = membership.contains(PathMembership.TARGET);
@@ -168,19 +202,46 @@ public final class SearchSpaceSubgraphExtractor {
         boolean macro = membership.contains(PathMembership.MACRO);
         boolean notSelected = !isTarget && !didactic && !macro;
         boolean isDeadEnd = notSelected && !hasOutgoingEdge;
+        SearchSpaceSubgraph.StateRole role = role(state.depth(), isTarget, isConvergencePoint,
+            sharedCanonicalKeys.contains(canonicalKey));
         return new Node(
             idForExpression(state.expression()),
             state.expression(),
+            canonicalKey,
             membership,
             ruleFamilies,
+            role,
             state.depth(),
             state.score().weightedTotal(),
             isTarget,
+            isConvergencePoint,
+            originallyExplored,
             didactic,
             macro,
             isDeadEnd,
             notSelected
         );
+    }
+
+    private SearchSpaceSubgraph.StateRole role(
+        int depth,
+        boolean isTarget,
+        boolean isConvergencePoint,
+        boolean sharesEquivalenceClass
+    ) {
+        if (depth == 0) {
+            return SearchSpaceSubgraph.StateRole.ROOT;
+        }
+        if (isConvergencePoint) {
+            return SearchSpaceSubgraph.StateRole.CONVERGENCE_TARGET;
+        }
+        if (isTarget) {
+            return SearchSpaceSubgraph.StateRole.CANONICAL_REPRESENTATIVE;
+        }
+        if (sharesEquivalenceClass) {
+            return SearchSpaceSubgraph.StateRole.EQUIVALENT_STATE;
+        }
+        return SearchSpaceSubgraph.StateRole.SEARCH_STATE;
     }
 
     private Edge edge(EdgeDraft edge, Map<String, SearchState> states, ConvergentDiscoveryReport report) {
