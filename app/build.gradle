@@ -193,9 +193,9 @@ tasks.register('installPlaywrightBrowsers', JavaExec) {
     group = 'verification'
     classpath = sourceSets.e2eTest.runtimeClasspath
     mainClass = 'com.microsoft.playwright.CLI'
-    args 'install', '--with-deps', 'chromium'
-    // Fail fast in CI/local runs when browser install or host dependency
-    // validation fails, so the error is surfaced at this step.
+    args 'install', 'chromium'
+    // Fail fast in CI/local runs when browser install fails, so the error is
+    // surfaced at this step.
 }
 
 tasks.register('installPlaywrightHostDependencies', JavaExec) {
