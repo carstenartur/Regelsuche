@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransformationRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">TransformationRegistry.java</span></div><h1>TransformationRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+<span class="fc" id="L9">public final class TransformationRegistry {</span>
+<span class="fc" id="L10">    private final Map&lt;String, MutableTransformationRegistration&gt; transformations = new LinkedHashMap&lt;&gt;();</span>
+
+    public void register(PatternTransformation transformation) {
+<span class="nc" id="L13">        register(transformation, &quot;plugin&quot;, &quot;&quot;, List.of());</span>
+<span class="nc" id="L14">    }</span>
+
+    public void register(PatternTransformation transformation, String source, String explanation, List&lt;String&gt; tags) {
+<span class="fc" id="L17">        Objects.requireNonNull(transformation, &quot;transformation&quot;);</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        if (transformations.containsKey(transformation.id())) {</span>
+<span class="nc" id="L19">            throw new IllegalArgumentException(&quot;Duplicate transformation id: &quot; + transformation.id());</span>
+        }
+<span class="fc" id="L21">        transformations.put(transformation.id(),</span>
+            new MutableTransformationRegistration(transformation, source, explanation, tags));
+<span class="fc" id="L23">    }</span>
+
+    public void disable(String id) {
+<span class="fc" id="L26">        MutableTransformationRegistration registration = transformations.get(id);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (registration != null) {</span>
+<span class="fc" id="L28">            registration.enabled = false;</span>
+        }
+<span class="fc" id="L30">    }</span>
+
+    public List&lt;PatternTransformation&gt; enabledTransformations() {
+<span class="fc" id="L33">        List&lt;PatternTransformation&gt; enabled = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (MutableTransformationRegistration registration : transformations.values()) {</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            if (registration.enabled) {</span>
+<span class="fc" id="L36">                enabled.add(registration.transformation);</span>
+            }
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        return List.copyOf(enabled);</span>
+    }
+
+    public List&lt;TransformationRegistration&gt; registrations() {
+<span class="fc" id="L43">        List&lt;TransformationRegistration&gt; registrations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (MutableTransformationRegistration registration : transformations.values()) {</span>
+<span class="fc" id="L45">            registrations.add(registration.snapshot());</span>
+<span class="fc" id="L46">        }</span>
+<span class="fc" id="L47">        return List.copyOf(registrations);</span>
+    }
+
+    public record TransformationRegistration(
+        String id,
+        PatternTransformation transformation,
+        String source,
+        String explanation,
+        List&lt;String&gt; tags,
+        boolean enabled
+    ) {
+<span class="fc" id="L58">        public TransformationRegistration {</span>
+<span class="fc" id="L59">            tags = List.copyOf(tags);</span>
+<span class="fc" id="L60">        }</span>
+    }
+
+    private static final class MutableTransformationRegistration {
+        private final PatternTransformation transformation;
+        private final String source;
+        private final String explanation;
+        private final List&lt;String&gt; tags;
+<span class="fc" id="L68">        private boolean enabled = true;</span>
+
+        private MutableTransformationRegistration(
+            PatternTransformation transformation,
+            String source,
+            String explanation,
+            List&lt;String&gt; tags
+<span class="fc" id="L75">        ) {</span>
+<span class="fc" id="L76">            this.transformation = transformation;</span>
+<span class="fc" id="L77">            this.source = source;</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            this.explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L79">            this.tags = List.copyOf(tags);</span>
+<span class="fc" id="L80">        }</span>
+
+        private TransformationRegistration snapshot() {
+<span class="fc" id="L83">            return new TransformationRegistration(transformation.id(), transformation, source, explanation, tags, enabled);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

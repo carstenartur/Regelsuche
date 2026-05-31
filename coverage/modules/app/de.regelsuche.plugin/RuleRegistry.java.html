@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">RuleRegistry.java</span></div><h1>RuleRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+<span class="fc" id="L10">public final class RuleRegistry {</span>
+<span class="fc" id="L11">    private final Map&lt;String, MutableRuleRegistration&gt; rules = new LinkedHashMap&lt;&gt;();</span>
+
+    public void register(RewriteRule rule) {
+<span class="nc" id="L14">        register(rule, &quot;plugin&quot;, &quot;&quot;, List.of());</span>
+<span class="nc" id="L15">    }</span>
+
+    public void register(RewriteRule rule, String source, String explanation, List&lt;String&gt; tags) {
+<span class="fc" id="L18">        Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (rules.containsKey(rule.id())) {</span>
+<span class="nc" id="L20">            throw new IllegalArgumentException(&quot;Duplicate rule id: &quot; + rule.id());</span>
+        }
+<span class="fc" id="L22">        rules.put(rule.id(), new MutableRuleRegistration(rule, source, explanation, tags));</span>
+<span class="fc" id="L23">    }</span>
+
+    public void disable(String id) {
+<span class="fc" id="L26">        MutableRuleRegistration registration = rules.get(id);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (registration != null) {</span>
+<span class="nc" id="L28">            registration.enabled = false;</span>
+        }
+<span class="fc" id="L30">    }</span>
+
+    public List&lt;RewriteRule&gt; enabledRules() {
+<span class="fc" id="L33">        List&lt;RewriteRule&gt; enabled = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (MutableRuleRegistration registration : rules.values()) {</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            if (registration.enabled) {</span>
+<span class="fc" id="L36">                enabled.add(registration.rule);</span>
+            }
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        return List.copyOf(enabled);</span>
+    }
+
+    public List&lt;RuleRegistration&gt; registrations() {
+<span class="fc" id="L43">        List&lt;RuleRegistration&gt; registrations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (MutableRuleRegistration registration : rules.values()) {</span>
+<span class="fc" id="L45">            registrations.add(registration.snapshot());</span>
+<span class="fc" id="L46">        }</span>
+<span class="fc" id="L47">        return List.copyOf(registrations);</span>
+    }
+
+    public record RuleRegistration(
+        String id,
+        RewriteRule rule,
+        String source,
+        String explanation,
+        List&lt;String&gt; tags,
+        boolean enabled
+    ) {
+<span class="fc" id="L58">        public RuleRegistration {</span>
+<span class="fc" id="L59">            tags = List.copyOf(tags);</span>
+<span class="fc" id="L60">        }</span>
+    }
+
+    private static final class MutableRuleRegistration {
+        private final RewriteRule rule;
+        private final String source;
+        private final String explanation;
+        private final List&lt;String&gt; tags;
+<span class="fc" id="L68">        private boolean enabled = true;</span>
+
+<span class="fc" id="L70">        private MutableRuleRegistration(RewriteRule rule, String source, String explanation, List&lt;String&gt; tags) {</span>
+<span class="fc" id="L71">            this.rule = rule;</span>
+<span class="fc" id="L72">            this.source = source;</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            this.explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L74">            this.tags = List.copyOf(tags);</span>
+<span class="fc" id="L75">        }</span>
+
+        private RuleRegistration snapshot() {
+<span class="fc" id="L78">            return new RuleRegistration(rule.id(), rule, source, explanation, tags, enabled);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

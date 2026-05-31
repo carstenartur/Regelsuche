@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinomialFormulaPlugin.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin.example</a> &gt; <span class="el_source">BinomialFormulaPlugin.java</span></div><h1>BinomialFormulaPlugin.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin.example;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.plugin.AstVisitorContext;
+import de.regelsuche.plugin.AstVisitorPhase;
+import de.regelsuche.plugin.AstVisitorPlugin;
+import de.regelsuche.plugin.AstVisitorRegistry;
+import de.regelsuche.plugin.MacroRegistry;
+import de.regelsuche.plugin.PatternBasedTransformation;
+import de.regelsuche.plugin.RegelsuchePlugin;
+import de.regelsuche.plugin.RuleMacro;
+import de.regelsuche.plugin.RuleRegistry;
+import de.regelsuche.plugin.TransformationRegistry;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteKind;
+import java.util.List;
+
+<span class="fc" id="L21">public final class BinomialFormulaPlugin implements RegelsuchePlugin {</span>
+<span class="fc" id="L22">    private static final PatternExpr A = PatternExpr.var(&quot;A&quot;);</span>
+<span class="fc" id="L23">    private static final PatternExpr B = PatternExpr.var(&quot;B&quot;);</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L27">        return &quot;binomial-formulas&quot;;</span>
+    }
+
+    @Override
+    public String name() {
+<span class="fc" id="L32">        return &quot;Binomial Formulas&quot;;</span>
+    }
+
+    @Override
+    public String version() {
+<span class="fc" id="L37">        return &quot;1.0.0&quot;;</span>
+    }
+
+    @Override
+    public void registerRules(RuleRegistry registry) {
+<span class="fc" id="L42">        registry.register(new PatternRewriteRule(</span>
+            &quot;binomial_difference_of_squares&quot;,
+<span class="fc" id="L44">            PatternExpr.op(BinaryOperator.SUB, PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
+<span class="fc" id="L45">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
+<span class="fc" id="L46">            PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L47">                PatternExpr.op(BinaryOperator.SUB, A, B),</span>
+<span class="fc" id="L48">                PatternExpr.op(BinaryOperator.ADD, A, B)),</span>
+            RewriteKind.FACTOR,
+            false,
+            -4,
+            true
+<span class="fc" id="L53">        ), id(), &quot;Erkennt die Differenz zweier Quadrate.&quot;, List.of(&quot;binomial&quot;, &quot;factorization&quot;));</span>
+<span class="fc" id="L54">    }</span>
+
+    @Override
+    public void registerTransformations(TransformationRegistry registry) {
+<span class="fc" id="L58">        registry.register(new PatternBasedTransformation(</span>
+            &quot;binomial_square_forward&quot;,
+<span class="fc" id="L60">            PatternExpr.op(BinaryOperator.POW,</span>
+<span class="fc" id="L61">                PatternExpr.op(BinaryOperator.ADD, A, B),</span>
+<span class="fc" id="L62">                PatternExpr.num(2)),</span>
+<span class="fc" id="L63">            PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L64">                PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L65">                    PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
+<span class="fc" id="L66">                    PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L67">                        PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), A),</span>
+                        B)),
+<span class="fc" id="L69">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
+            RewriteKind.EXPAND,
+            true,
+            4,
+            true,
+            &quot;Erweitert die erste binomische Formel.&quot;
+<span class="fc" id="L75">        ), id(), &quot;Erweitert (A + B)^2.&quot;, List.of(&quot;binomial&quot;, &quot;expansion&quot;));</span>
+<span class="fc" id="L76">        registry.register(new PatternBasedTransformation(</span>
+            &quot;binomial_square_backward&quot;,
+<span class="fc" id="L78">            PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L79">                PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L80">                    PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
+<span class="fc" id="L81">                    PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L82">                        PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), A),</span>
+                        B)),
+<span class="fc" id="L84">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
+<span class="fc" id="L85">            PatternExpr.op(BinaryOperator.POW,</span>
+<span class="fc" id="L86">                PatternExpr.op(BinaryOperator.ADD, A, B),</span>
+<span class="fc" id="L87">                PatternExpr.num(2)),</span>
+            RewriteKind.FACTOR,
+            false,
+            -4,
+            true,
+            &quot;Faktorisiert die erste binomische Formel.&quot;
+<span class="fc" id="L93">        ), id(), &quot;Faktorisiert A^2 + 2AB + B^2.&quot;, List.of(&quot;binomial&quot;, &quot;factorization&quot;));</span>
+<span class="fc" id="L94">        registry.register(new PatternBasedTransformation(</span>
+            &quot;binomial_square_minus_forward&quot;,
+<span class="fc" id="L96">            PatternExpr.op(BinaryOperator.POW,</span>
+<span class="fc" id="L97">                PatternExpr.op(BinaryOperator.SUB, A, B),</span>
+<span class="fc" id="L98">                PatternExpr.num(2)),</span>
+<span class="fc" id="L99">            PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L100">                PatternExpr.op(BinaryOperator.SUB,</span>
+<span class="fc" id="L101">                    PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
+<span class="fc" id="L102">                    PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L103">                        PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), A),</span>
+                        B)),
+<span class="fc" id="L105">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
+            RewriteKind.EXPAND,
+            true,
+            4,
+            true,
+            &quot;Erweitert die zweite binomische Formel.&quot;
+<span class="fc" id="L111">        ), id(), &quot;Erweitert (A - B)^2.&quot;, List.of(&quot;binomial&quot;, &quot;expansion&quot;));</span>
+<span class="fc" id="L112">    }</span>
+
+    @Override
+    public void registerVisitors(AstVisitorRegistry registry) {
+<span class="fc" id="L116">        registry.register(new BinomialPatternVisitor(), id());</span>
+<span class="fc" id="L117">    }</span>
+
+    @Override
+    public void registerMacros(MacroRegistry registry) {
+<span class="fc" id="L121">        registry.register(new RuleMacro(</span>
+            &quot;expand_square&quot;,
+            &quot;(A + B)^2&quot;,
+            &quot;A^2 + 2*A*B + B^2&quot;,
+            &quot;Makro für die erste binomische Formel.&quot;,
+<span class="fc" id="L126">            List.of(&quot;binomial&quot;, &quot;macro&quot;)</span>
+<span class="fc" id="L127">        ), id());</span>
+<span class="fc" id="L128">    }</span>
+
+    private static final class BinomialPatternVisitor implements AstVisitorPlugin {
+        @Override
+        public String id() {
+<span class="fc" id="L133">            return &quot;binomial-pattern-visitor&quot;;</span>
+        }
+
+        @Override
+        public AstVisitorPhase phase() {
+<span class="fc" id="L138">            return AstVisitorPhase.BEFORE_SEARCH;</span>
+        }
+
+        @Override
+        public void visit(Expr root, AstVisitorContext context) {
+<span class="fc" id="L143">            inspect(root, context);</span>
+<span class="fc" id="L144">        }</span>
+
+        private void inspect(Expr node, AstVisitorContext context) {
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (isBinomialSquare(node)) {</span>
+<span class="fc" id="L148">                context.mark(&quot;binomial-square&quot;);</span>
+<span class="fc" id="L149">                context.putMetadata(node, &quot;binomial&quot;, true);</span>
+<span class="fc" id="L150">                context.report(id(), &quot;Detected a binomial square candidate.&quot;);</span>
+            }
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (node instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc" id="L153">                inspect(binaryExpr.left(), context);</span>
+<span class="fc" id="L154">                inspect(binaryExpr.right(), context);</span>
+            }
+<span class="fc" id="L156">        }</span>
+
+        private boolean isBinomialSquare(Expr node) {
+<span class="fc bfc" id="L159" title="All 4 branches covered.">            if (!(node instanceof BinaryExpr outer) || outer.operator() != BinaryOperator.POW) {</span>
+<span class="fc" id="L160">                return false;</span>
+            }
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">            if (!(outer.right() instanceof de.regelsuche.ast.NumberExpr exponent) || exponent.value() != 2) {</span>
+<span class="nc" id="L163">                return false;</span>
+            }
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            return outer.left() instanceof BinaryExpr inner</span>
+<span class="pc bpc" id="L166" title="3 of 4 branches missed.">                &amp;&amp; (inner.operator() == BinaryOperator.ADD || inner.operator() == BinaryOperator.SUB);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

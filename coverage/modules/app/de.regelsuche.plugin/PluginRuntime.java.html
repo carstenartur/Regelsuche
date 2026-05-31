@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginRuntime.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginRuntime.java</span></div><h1>PluginRuntime.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.mining.RulePatternParser;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.logging.Logger;
+
+public final class PluginRuntime implements AutoCloseable {
+<span class="fc" id="L25">    private static final Logger LOGGER = Logger.getLogger(PluginRuntime.class.getName());</span>
+
+    private final PluginRuntimeConfig config;
+<span class="fc" id="L28">    private final RuleFileLoader ruleFileLoader = new RuleFileLoader();</span>
+<span class="fc" id="L29">    private RuleRegistry ruleRegistry = new RuleRegistry();</span>
+<span class="fc" id="L30">    private TransformationRegistry transformationRegistry = new TransformationRegistry();</span>
+<span class="fc" id="L31">    private AstVisitorRegistry astVisitorRegistry = new AstVisitorRegistry();</span>
+<span class="fc" id="L32">    private MacroRegistry macroRegistry = new MacroRegistry();</span>
+<span class="fc" id="L33">    private List&lt;LoadedPlugin&gt; loadedPlugins = List.of();</span>
+<span class="fc" id="L34">    private List&lt;RuntimeDiagnostic&gt; diagnostics = List.of();</span>
+<span class="fc" id="L35">    private List&lt;PatternTransformation&gt; macroTransformations = List.of();</span>
+<span class="fc" id="L36">    private List&lt;RuleConflictDetector.RuleConflict&gt; conflicts = List.of();</span>
+    private URLClassLoader externalPluginClassLoader;
+
+    public PluginRuntime() {
+<span class="nc" id="L40">        this(PluginRuntimeConfig.defaults());</span>
+<span class="nc" id="L41">    }</span>
+
+<span class="fc" id="L43">    public PluginRuntime(PluginRuntimeConfig config) {</span>
+<span class="fc" id="L44">        this.config = config;</span>
+<span class="fc" id="L45">        reload();</span>
+<span class="fc" id="L46">    }</span>
+
+    public void reload() {
+<span class="fc" id="L49">        closeQuietly();</span>
+<span class="fc" id="L50">        this.ruleRegistry = new RuleRegistry();</span>
+<span class="fc" id="L51">        this.transformationRegistry = new TransformationRegistry();</span>
+<span class="fc" id="L52">        this.astVisitorRegistry = new AstVisitorRegistry();</span>
+<span class="fc" id="L53">        this.macroRegistry = new MacroRegistry();</span>
+<span class="fc" id="L54">        List&lt;LoadedPlugin&gt; discoveredPlugins = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L55">        List&lt;RuntimeDiagnostic&gt; discoveredDiagnostics = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (config.loadClasspathPlugins()) {</span>
+<span class="fc" id="L57">            loadPlugins(ServiceLoader.load(RegelsuchePlugin.class), &quot;classpath&quot;, discoveredPlugins, discoveredDiagnostics);</span>
+        }
+<span class="fc" id="L59">        loadExternalPlugins(discoveredPlugins, discoveredDiagnostics);</span>
+<span class="fc" id="L60">        loadRuleFiles(discoveredDiagnostics);</span>
+<span class="fc" id="L61">        disableConfiguredRules();</span>
+<span class="fc" id="L62">        this.macroTransformations = buildMacroTransformations(discoveredDiagnostics);</span>
+<span class="fc" id="L63">        this.conflicts = detectConflicts();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (RuleConflictDetector.RuleConflict conflict : conflicts) {</span>
+<span class="fc" id="L65">            discoveredDiagnostics.add(new RuntimeDiagnostic(</span>
+                &quot;rule-conflict&quot;,
+<span class="fc" id="L67">                &quot;Competing rules share the same source pattern: &quot; + String.join(&quot;, &quot;, conflict.ruleIds())</span>
+            ));
+<span class="fc" id="L69">        }</span>
+<span class="fc" id="L70">        loadedPlugins = List.copyOf(discoveredPlugins);</span>
+<span class="fc" id="L71">        diagnostics = List.copyOf(discoveredDiagnostics);</span>
+<span class="fc" id="L72">    }</span>
+
+    public RuleRegistry ruleRegistry() {
+<span class="fc" id="L75">        return ruleRegistry;</span>
+    }
+
+    public TransformationRegistry transformationRegistry() {
+<span class="fc" id="L79">        return transformationRegistry;</span>
+    }
+
+    public AstVisitorRegistry astVisitorRegistry() {
+<span class="fc" id="L83">        return astVisitorRegistry;</span>
+    }
+
+    public MacroRegistry macroRegistry() {
+<span class="nc" id="L87">        return macroRegistry;</span>
+    }
+
+    public List&lt;LoadedPlugin&gt; loadedPlugins() {
+<span class="fc" id="L91">        return loadedPlugins;</span>
+    }
+
+    public List&lt;RuntimeDiagnostic&gt; diagnostics() {
+<span class="fc" id="L95">        return diagnostics;</span>
+    }
+
+    public PluginAwareAstRewriteTransformationEngine createTransformationEngine() {
+<span class="fc" id="L99">        List&lt;RewriteRule&gt; combined = new ArrayList&lt;&gt;(de.regelsuche.transform.AstRewriteTransformationEngine.defaultRules());</span>
+<span class="fc" id="L100">        combined.addAll(ruleRegistry.enabledRules());</span>
+<span class="fc" id="L101">        combined.addAll(transformationRegistry.enabledTransformations());</span>
+<span class="fc" id="L102">        combined.addAll(macroTransformations);</span>
+<span class="fc" id="L103">        return new PluginAwareAstRewriteTransformationEngine(combined, astVisitorRegistry);</span>
+    }
+
+    public List&lt;PatternTransformation&gt; macroTransformations() {
+<span class="fc" id="L107">        return macroTransformations;</span>
+    }
+
+    public List&lt;RuleConflictDetector.RuleConflict&gt; conflicts() {
+<span class="fc" id="L111">        return conflicts;</span>
+    }
+
+    public List&lt;RegisteredRuleView&gt; registeredRules() {
+<span class="nc" id="L115">        Map&lt;String, RegisteredRuleView&gt; all = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        for (RuleRegistry.RuleRegistration registration : ruleRegistry.registrations()) {</span>
+<span class="nc" id="L117">            all.put(registration.id(), new RegisteredRuleView(</span>
+<span class="nc" id="L118">                registration.id(),</span>
+<span class="nc" id="L119">                registration.source(),</span>
+<span class="nc" id="L120">                registration.explanation(),</span>
+<span class="nc" id="L121">                registration.tags(),</span>
+<span class="nc" id="L122">                registration.enabled(),</span>
+                &quot;rule&quot;
+            ));
+<span class="nc" id="L125">        }</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        for (TransformationRegistry.TransformationRegistration registration : transformationRegistry.registrations()) {</span>
+<span class="nc" id="L127">            all.put(registration.id(), new RegisteredRuleView(</span>
+<span class="nc" id="L128">                registration.id(),</span>
+<span class="nc" id="L129">                registration.source(),</span>
+<span class="nc" id="L130">                registration.explanation(),</span>
+<span class="nc" id="L131">                registration.tags(),</span>
+<span class="nc" id="L132">                registration.enabled(),</span>
+                &quot;transformation&quot;
+            ));
+<span class="nc" id="L135">        }</span>
+<span class="nc" id="L136">        return List.copyOf(all.values());</span>
+    }
+
+    @Override
+    public void close() {
+<span class="fc" id="L141">        closeQuietly();</span>
+<span class="fc" id="L142">    }</span>
+
+    private void loadExternalPlugins(List&lt;LoadedPlugin&gt; discoveredPlugins, List&lt;RuntimeDiagnostic&gt; discoveredDiagnostics) {
+        try {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (!Files.isDirectory(config.pluginsDirectory())) {</span>
+<span class="fc" id="L147">                return;</span>
+            }
+            List&lt;URL&gt; urls;
+<span class="nc" id="L150">            try (var stream = Files.list(config.pluginsDirectory())) {</span>
+<span class="nc" id="L151">                urls = stream</span>
+<span class="nc" id="L152">                    .filter(path -&gt; path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(&quot;.jar&quot;))</span>
+<span class="nc" id="L153">                    .sorted(Comparator.comparing(Path::toString))</span>
+<span class="nc" id="L154">                    .map(this::toUrl)</span>
+<span class="nc" id="L155">                    .toList();</span>
+            }
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (urls.isEmpty()) {</span>
+<span class="nc" id="L158">                return;</span>
+            }
+<span class="nc" id="L160">            externalPluginClassLoader = new URLClassLoader(urls.toArray(URL[]::new),</span>
+<span class="nc" id="L161">                Thread.currentThread().getContextClassLoader());</span>
+<span class="nc" id="L162">            loadPlugins(ServiceLoader.load(RegelsuchePlugin.class, externalPluginClassLoader),</span>
+<span class="nc" id="L163">                config.pluginsDirectory().toString(), discoveredPlugins, discoveredDiagnostics);</span>
+<span class="nc" id="L164">        } catch (IOException ex) {</span>
+<span class="nc" id="L165">            discoveredDiagnostics.add(new RuntimeDiagnostic(</span>
+                &quot;plugin-runtime&quot;,
+<span class="nc" id="L167">                &quot;Could not scan plugin directory &quot; + config.pluginsDirectory() + &quot;: &quot; + ex.getMessage()</span>
+            ));
+<span class="nc" id="L169">        }</span>
+<span class="nc" id="L170">    }</span>
+
+    private void loadPlugins(
+        ServiceLoader&lt;RegelsuchePlugin&gt; loader,
+        String source,
+        List&lt;LoadedPlugin&gt; discoveredPlugins,
+        List&lt;RuntimeDiagnostic&gt; discoveredDiagnostics
+    ) {
+        try {
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            for (RegelsuchePlugin plugin : loader) {</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                boolean enabled = !config.disabledPluginIds().contains(plugin.id());</span>
+<span class="fc" id="L181">                discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, enabled));</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                if (!enabled) {</span>
+<span class="nc" id="L183">                    discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(), &quot;Plugin disabled by configuration&quot;));</span>
+<span class="nc" id="L184">                    continue;</span>
+                }
+<span class="fc" id="L186">                registerPlugin(plugin, source, discoveredDiagnostics);</span>
+<span class="fc" id="L187">            }</span>
+<span class="nc" id="L188">        } catch (ServiceConfigurationError error) {</span>
+<span class="nc" id="L189">            discoveredDiagnostics.add(new RuntimeDiagnostic(</span>
+                &quot;plugin-runtime&quot;,
+<span class="nc" id="L191">                &quot;Failed to instantiate plugin from &quot; + source + &quot;: &quot; + error.getMessage()</span>
+            ));
+<span class="fc" id="L193">        }</span>
+<span class="fc" id="L194">    }</span>
+
+    private void registerPlugin(RegelsuchePlugin plugin, String source, List&lt;RuntimeDiagnostic&gt; discoveredDiagnostics) {
+        try {
+<span class="fc" id="L198">            plugin.registerRules(ruleRegistry);</span>
+<span class="fc" id="L199">            plugin.registerTransformations(transformationRegistry);</span>
+<span class="fc" id="L200">            plugin.registerVisitors(astVisitorRegistry);</span>
+<span class="fc" id="L201">            plugin.registerMacros(macroRegistry);</span>
+<span class="nc" id="L202">        } catch (RuntimeException ex) {</span>
+<span class="nc" id="L203">            LOGGER.warning(() -&gt; &quot;Plugin &quot; + plugin.id() + &quot; failed: &quot; + ex.getMessage());</span>
+<span class="nc" id="L204">            discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(),</span>
+<span class="nc" id="L205">                &quot;Failed to register plugin contributions from &quot; + source + &quot;: &quot; + ex.getMessage()));</span>
+<span class="fc" id="L206">        }</span>
+<span class="fc" id="L207">    }</span>
+
+    private void loadRuleFiles(List&lt;RuntimeDiagnostic&gt; discoveredDiagnostics) {
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (!Files.isDirectory(config.rulesDirectory())) {</span>
+<span class="fc" id="L211">            return;</span>
+        }
+        List&lt;Path&gt; files;
+<span class="fc" id="L214">        try (var stream = Files.list(config.rulesDirectory())) {</span>
+<span class="fc" id="L215">            files = stream</span>
+<span class="fc" id="L216">                .filter(Files::isRegularFile)</span>
+<span class="fc" id="L217">                .filter(this::isRuleFile)</span>
+<span class="fc" id="L218">                .sorted(Comparator.comparing(Path::toString))</span>
+<span class="fc" id="L219">                .toList();</span>
+<span class="nc" id="L220">        } catch (IOException ex) {</span>
+<span class="nc" id="L221">            discoveredDiagnostics.add(new RuntimeDiagnostic(</span>
+                &quot;rule-runtime&quot;,
+<span class="nc" id="L223">                &quot;Could not scan rule directory &quot; + config.rulesDirectory() + &quot;: &quot; + ex.getMessage()</span>
+            ));
+<span class="nc" id="L225">            return;</span>
+<span class="fc" id="L226">        }</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (Path file : files) {</span>
+            try {
+<span class="nc" id="L229">                RuleFileLoadResult result = ruleFileLoader.load(file, ruleRegistry, macroRegistry);</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                for (RuleFileParser.RuleFileDiagnostic diagnostic : result.diagnostics()) {</span>
+<span class="nc" id="L231">                    discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));</span>
+<span class="nc" id="L232">                }</span>
+<span class="fc" id="L233">            } catch (RuleFileParseException ex) {</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">                for (RuleFileParser.RuleFileDiagnostic diagnostic : ex.diagnostics()) {</span>
+<span class="fc" id="L235">                    discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));</span>
+<span class="fc" id="L236">                }</span>
+<span class="nc" id="L237">            } catch (RuntimeException ex) {</span>
+<span class="nc" id="L238">                discoveredDiagnostics.add(new RuntimeDiagnostic(</span>
+<span class="nc" id="L239">                    file.toString(),</span>
+<span class="nc" id="L240">                    &quot;Failed to load rule file: &quot; + ex.getMessage()</span>
+                ));
+<span class="pc" id="L242">            }</span>
+<span class="fc" id="L243">        }</span>
+<span class="fc" id="L244">    }</span>
+
+    private void disableConfiguredRules() {
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (String disabledRuleId : config.disabledRuleIds()) {</span>
+<span class="fc" id="L248">            ruleRegistry.disable(disabledRuleId);</span>
+            // Also disable .forward/.backward variants generated for `direction: both` rules
+<span class="fc" id="L250">            ruleRegistry.disable(disabledRuleId + &quot;.forward&quot;);</span>
+<span class="fc" id="L251">            ruleRegistry.disable(disabledRuleId + &quot;.backward&quot;);</span>
+<span class="fc" id="L252">            transformationRegistry.disable(disabledRuleId);</span>
+            // Macro edges are named &quot;macro.&lt;id&gt;&quot; but the registry stores them as &quot;&lt;id&gt;&quot;
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            String macroId = disabledRuleId.startsWith(&quot;macro.&quot;)</span>
+<span class="nc" id="L255">                ? disabledRuleId.substring(&quot;macro.&quot;.length())</span>
+<span class="fc" id="L256">                : disabledRuleId;</span>
+<span class="fc" id="L257">            macroRegistry.disable(macroId);</span>
+<span class="fc" id="L258">        }</span>
+<span class="fc" id="L259">    }</span>
+
+    private List&lt;PatternTransformation&gt; buildMacroTransformations(List&lt;RuntimeDiagnostic&gt; discoveredDiagnostics) {
+<span class="fc" id="L262">        RulePatternParser patternParser = new RulePatternParser();</span>
+<span class="fc" id="L263">        List&lt;PatternTransformation&gt; built = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        for (RuleMacro macro : macroRegistry.enabledMacros()) {</span>
+            try {
+<span class="fc" id="L266">                PatternExpr source = PatternExprMapper.toPatternExpr(patternParser.parse(macro.input()));</span>
+<span class="fc" id="L267">                PatternExpr target = PatternExprMapper.toPatternExpr(patternParser.parse(macro.output()));</span>
+<span class="fc" id="L268">                built.add(new PatternBasedTransformation(</span>
+<span class="fc" id="L269">                    &quot;macro.&quot; + macro.id(),</span>
+                    source,
+                    target,
+                    RewriteKind.NORMALIZE,
+                    false,
+                    0,
+                    true,
+<span class="fc" id="L276">                    macro.explanation()</span>
+                ));
+<span class="nc" id="L278">            } catch (RuntimeException ex) {</span>
+<span class="nc" id="L279">                discoveredDiagnostics.add(new RuntimeDiagnostic(</span>
+<span class="nc" id="L280">                    &quot;macro:&quot; + macro.id(),</span>
+<span class="nc" id="L281">                    &quot;Could not compile macro into a transformation: &quot; + ex.getMessage()</span>
+                ));
+<span class="fc" id="L283">            }</span>
+<span class="fc" id="L284">        }</span>
+<span class="fc" id="L285">        return List.copyOf(built);</span>
+    }
+
+    private List&lt;RuleConflictDetector.RuleConflict&gt; detectConflicts() {
+<span class="fc" id="L289">        List&lt;RuleConflictDetector.ConflictCandidate&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        for (RewriteRule rule : ruleRegistry.enabledRules()) {</span>
+<span class="fc" id="L291">            candidates.add(new RuleConflictDetector.ConflictCandidate(rule.id(), rule));</span>
+<span class="fc" id="L292">        }</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        for (PatternTransformation transformation : transformationRegistry.enabledTransformations()) {</span>
+<span class="fc" id="L294">            candidates.add(new RuleConflictDetector.ConflictCandidate(transformation.id(), transformation));</span>
+<span class="fc" id="L295">        }</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        for (PatternTransformation macroTransformation : macroTransformations) {</span>
+<span class="fc" id="L297">            candidates.add(new RuleConflictDetector.ConflictCandidate(macroTransformation.id(), macroTransformation));</span>
+<span class="fc" id="L298">        }</span>
+<span class="fc" id="L299">        return RuleConflictDetector.detect(candidates);</span>
+    }
+
+    private boolean isRuleFile(Path path) {
+<span class="fc" id="L303">        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L304" title="3 of 4 branches missed.">        return name.endsWith(&quot;.regelsuche&quot;) || name.endsWith(&quot;.rules&quot;);</span>
+    }
+
+    private URL toUrl(Path path) {
+        try {
+<span class="nc" id="L309">            return path.toUri().toURL();</span>
+<span class="nc" id="L310">        } catch (IOException ex) {</span>
+<span class="nc" id="L311">            throw new IllegalArgumentException(&quot;Invalid plugin path: &quot; + path, ex);</span>
+        }
+    }
+
+    private void closeQuietly() {
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        if (externalPluginClassLoader != null) {</span>
+            try {
+<span class="nc" id="L318">                externalPluginClassLoader.close();</span>
+<span class="nc" id="L319">            } catch (IOException ignored) {</span>
+                // ignore close noise during reload
+<span class="nc" id="L321">            }</span>
+<span class="nc" id="L322">            externalPluginClassLoader = null;</span>
+        }
+<span class="fc" id="L324">    }</span>
+
+<span class="fc" id="L326">    public record LoadedPlugin(String id, String name, String version, String source, boolean enabled) {</span>
+    }
+
+<span class="fc" id="L329">    public record RuntimeDiagnostic(String source, String message) {</span>
+    }
+
+    public record RegisteredRuleView(
+        String id,
+        String source,
+        String explanation,
+        List&lt;String&gt; tags,
+        boolean enabled,
+        String type
+    ) {
+<span class="nc" id="L340">        public RegisteredRuleView {</span>
+<span class="nc" id="L341">            tags = List.copyOf(tags);</span>
+<span class="nc" id="L342">        }</span>
+    }
+
+<span class="fc" id="L345">    public static final class RuleFileLoader {</span>
+<span class="fc" id="L346">        private final RuleFileParser parser = new RuleFileParser();</span>
+<span class="fc" id="L347">        private final RulePatternParser patternParser = new RulePatternParser();</span>
+
+        public RuleFileLoadResult load(Path file, RuleRegistry ruleRegistry, MacroRegistry macroRegistry) {
+<span class="fc" id="L350">            RuleFileParser.RulePackage rulePackage = parser.parse(file);</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">            if (rulePackage.hasErrors()) {</span>
+<span class="fc" id="L352">                throw new RuleFileParseException(rulePackage.diagnostics());</span>
+            }
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            for (RuleFileParser.Entry entry : rulePackage.entries()) {</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">                if (entry instanceof RuleFileParser.RuleDefinition rule) {</span>
+<span class="fc" id="L356">                    registerRule(file, ruleRegistry, rule);</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                } else if (entry instanceof RuleFileParser.MacroDefinition macro) {</span>
+<span class="fc" id="L358">                    macroRegistry.register(new RuleMacro(</span>
+<span class="fc" id="L359">                        macro.id(),</span>
+<span class="fc" id="L360">                        macro.input(),</span>
+<span class="fc" id="L361">                        macro.output(),</span>
+<span class="fc" id="L362">                        macro.explanation(),</span>
+<span class="fc" id="L363">                        macro.tags()</span>
+<span class="fc" id="L364">                    ), file.toString());</span>
+                }
+<span class="fc" id="L366">            }</span>
+<span class="fc" id="L367">            return new RuleFileLoadResult(rulePackage.entries().size(), rulePackage.diagnostics());</span>
+        }
+
+        private void registerRule(Path file, RuleRegistry ruleRegistry, RuleFileParser.RuleDefinition rule) {
+<span class="fc" id="L371">            PatternExpr source = PatternExprMapper.toPatternExpr(patternParser.parse(rule.pattern()));</span>
+<span class="fc" id="L372">            PatternExpr target = PatternExprMapper.toPatternExpr(patternParser.parse(rule.replace()));</span>
+<span class="fc" id="L373">            String explanation = rule.explanation();</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">            if (rule.direction() == RuleFileParser.RuleDirection.BOTH) {</span>
+<span class="nc" id="L375">                ruleRegistry.register(new PatternRewriteRule(</span>
+<span class="nc" id="L376">                    rule.id() + &quot;.forward&quot;, source, target, RewriteKind.NORMALIZE, false, 0, true</span>
+<span class="nc" id="L377">                ), file.toString(), explanation, rule.tags());</span>
+<span class="nc" id="L378">                ruleRegistry.register(new PatternRewriteRule(</span>
+<span class="nc" id="L379">                    rule.id() + &quot;.backward&quot;, target, source, RewriteKind.NORMALIZE, false, 0, true</span>
+<span class="nc" id="L380">                ), file.toString(), explanation, rule.tags());</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">            } else if (rule.direction() == RuleFileParser.RuleDirection.BACKWARD) {</span>
+<span class="nc" id="L382">                ruleRegistry.register(new PatternRewriteRule(</span>
+<span class="nc" id="L383">                    rule.id(), target, source, RewriteKind.NORMALIZE, false, 0, true</span>
+<span class="nc" id="L384">                ), file.toString(), explanation, rule.tags());</span>
+            } else {
+<span class="fc" id="L386">                ruleRegistry.register(new PatternRewriteRule(</span>
+<span class="fc" id="L387">                    rule.id(), source, target, RewriteKind.NORMALIZE, false, 0, true</span>
+<span class="fc" id="L388">                ), file.toString(), explanation, rule.tags());</span>
+            }
+<span class="fc" id="L390">        }</span>
+    }
+
+    public record RuleFileLoadResult(int loadedEntries, List&lt;RuleFileParser.RuleFileDiagnostic&gt; diagnostics) {
+<span class="fc" id="L394">        public RuleFileLoadResult {</span>
+<span class="fc" id="L395">            diagnostics = List.copyOf(diagnostics);</span>
+<span class="fc" id="L396">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

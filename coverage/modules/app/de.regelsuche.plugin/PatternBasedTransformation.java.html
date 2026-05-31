@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PatternBasedTransformation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PatternBasedTransformation.java</span></div><h1>PatternBasedTransformation.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RewriteKind;
+import java.util.HashMap;
+import java.util.Map;
+
+public final class PatternBasedTransformation implements PatternTransformation {
+    private final String id;
+    private final PatternExpr source;
+    private final PatternExpr target;
+    private final RewriteKind kind;
+    private final boolean mayIncreaseComplexity;
+    private final int estimatedCostDelta;
+    private final boolean equivalencePreservingByConstruction;
+    private final String explanation;
+
+    public PatternBasedTransformation(
+        String id,
+        PatternExpr source,
+        PatternExpr target,
+        RewriteKind kind,
+        boolean mayIncreaseComplexity,
+        int estimatedCostDelta,
+        boolean equivalencePreservingByConstruction,
+        String explanation
+<span class="fc" id="L28">    ) {</span>
+<span class="fc" id="L29">        this.id = id;</span>
+<span class="fc" id="L30">        this.source = source;</span>
+<span class="fc" id="L31">        this.target = target;</span>
+<span class="fc" id="L32">        this.kind = kind;</span>
+<span class="fc" id="L33">        this.mayIncreaseComplexity = mayIncreaseComplexity;</span>
+<span class="fc" id="L34">        this.estimatedCostDelta = estimatedCostDelta;</span>
+<span class="fc" id="L35">        this.equivalencePreservingByConstruction = equivalencePreservingByConstruction;</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">        this.explanation = explanation == null || explanation.isBlank() ? id : explanation;</span>
+<span class="fc" id="L37">    }</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L41">        return id;</span>
+    }
+
+    public PatternExpr source() {
+<span class="fc" id="L45">        return source;</span>
+    }
+
+    public PatternExpr target() {
+<span class="nc" id="L49">        return target;</span>
+    }
+
+    @Override
+    public RewriteKind kind() {
+<span class="fc" id="L54">        return kind;</span>
+    }
+
+    @Override
+    public boolean mayIncreaseComplexity() {
+<span class="fc" id="L59">        return mayIncreaseComplexity;</span>
+    }
+
+    @Override
+    public int estimatedCostDelta() {
+<span class="fc" id="L64">        return estimatedCostDelta;</span>
+    }
+
+    @Override
+    public boolean isEquivalencePreservingByConstruction() {
+<span class="fc" id="L69">        return equivalencePreservingByConstruction;</span>
+    }
+
+    @Override
+    public boolean matches(Expr node, TransformationMatchContext context) {
+<span class="fc" id="L74">        return source.match(node, new HashMap&lt;&gt;());</span>
+    }
+
+    @Override
+    public Expr transform(Expr node, TransformationContext context) {
+<span class="fc" id="L79">        Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (!source.match(node, bindings)) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;Transformation does not match subtree&quot;);</span>
+        }
+<span class="fc" id="L83">        return target.instantiate(bindings);</span>
+    }
+
+    @Override
+    public String explain(Expr before, Expr after) {
+<span class="nc" id="L88">        return explanation;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

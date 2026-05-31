@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleConflictDetector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">RuleConflictDetector.java</span></div><h1>RuleConflictDetector.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Detects competing rules and transformations that share the same source
+ * (left-hand side) pattern. Two distinct rules with structurally identical
+ * source patterns compete for the same matches and can cause redundant or
+ * conflicting search edges, so the runtime surfaces them as diagnostics.
+ *
+ * &lt;p&gt;Placeholder names are normalised to their first-appearance order, so
+ * {@code A^2 - B^2} and {@code X^2 - Y^2} are recognised as the same shape.&lt;/p&gt;
+ */
+public final class RuleConflictDetector {
+    private RuleConflictDetector() {
+    }
+
+    /**
+     * @param items rules and transformations to analyse, in registration order
+     * @return one conflict per group of two or more items that share a source
+     *         pattern signature, in deterministic order
+     */
+    public static List&lt;RuleConflict&gt; detect(List&lt;ConflictCandidate&gt; items) {
+<span class="fc" id="L31">        Map&lt;String, List&lt;String&gt;&gt; bySignature = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (ConflictCandidate item : items) {</span>
+<span class="fc" id="L33">            Optional&lt;PatternExpr&gt; source = sourcePattern(item.rule());</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            if (source.isEmpty()) {</span>
+<span class="nc" id="L35">                continue;</span>
+            }
+<span class="fc" id="L37">            String signature = canonicalSignature(source.get());</span>
+<span class="fc" id="L38">            bySignature.computeIfAbsent(signature, key -&gt; new ArrayList&lt;&gt;()).add(item.id());</span>
+<span class="fc" id="L39">        }</span>
+<span class="fc" id="L40">        List&lt;RuleConflict&gt; conflicts = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : bySignature.entrySet()) {</span>
+<span class="fc" id="L42">            List&lt;String&gt; ids = entry.getValue();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (ids.size() &gt; 1) {</span>
+<span class="fc" id="L44">                conflicts.add(new RuleConflict(entry.getKey(), List.copyOf(ids)));</span>
+            }
+<span class="fc" id="L46">        }</span>
+<span class="fc" id="L47">        return List.copyOf(conflicts);</span>
+    }
+
+    private static Optional&lt;PatternExpr&gt; sourcePattern(RewriteRule rule) {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (rule instanceof PatternRewriteRule patternRule) {</span>
+<span class="fc" id="L52">            return Optional.of(patternRule.source());</span>
+        }
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (rule instanceof PatternBasedTransformation transformation) {</span>
+<span class="fc" id="L55">            return Optional.of(transformation.source());</span>
+        }
+<span class="nc" id="L57">        return Optional.empty();</span>
+    }
+
+    private static String canonicalSignature(PatternExpr pattern) {
+<span class="fc" id="L61">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L62">        appendSignature(pattern, builder, new LinkedHashMap&lt;&gt;());</span>
+<span class="fc" id="L63">        return builder.toString();</span>
+    }
+
+    private static void appendSignature(PatternExpr pattern, StringBuilder builder, Map&lt;String, Integer&gt; placeholders) {
+<span class="pc bpc" id="L67" title="1 of 4 branches missed.">        switch (pattern) {</span>
+<span class="fc" id="L68">            case PatternExpr.Placeholder placeholder -&gt; {</span>
+<span class="fc" id="L69">                int index = placeholders.computeIfAbsent(placeholder.name(), key -&gt; placeholders.size());</span>
+<span class="fc" id="L70">                builder.append('?').append(index);</span>
+<span class="fc" id="L71">            }</span>
+<span class="fc" id="L72">            case PatternExpr.LiteralNumber literal -&gt; builder.append('#').append(literal.value());</span>
+<span class="fc" id="L73">            case PatternExpr.Operation operation -&gt; {</span>
+<span class="fc" id="L74">                builder.append('(');</span>
+<span class="fc" id="L75">                appendSignature(operation.left(), builder, placeholders);</span>
+<span class="fc" id="L76">                builder.append(operation.operator().symbol());</span>
+<span class="fc" id="L77">                appendSignature(operation.right(), builder, placeholders);</span>
+<span class="fc" id="L78">                builder.append(')');</span>
+<span class="fc" id="L79">            }</span>
+<span class="nc" id="L80">            case PatternExpr.Function function -&gt; {</span>
+<span class="nc" id="L81">                builder.append(function.name()).append('(');</span>
+<span class="nc" id="L82">                List&lt;PatternExpr&gt; arguments = function.arguments();</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                for (int i = 0; i &lt; arguments.size(); i++) {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                    if (i &gt; 0) {</span>
+<span class="nc" id="L85">                        builder.append(',');</span>
+                    }
+<span class="nc" id="L87">                    appendSignature(arguments.get(i), builder, placeholders);</span>
+                }
+<span class="nc" id="L89">                builder.append(')');</span>
+            }
+        }
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * A rule or transformation that can participate in conflict detection.
+     */
+<span class="fc" id="L97">    public record ConflictCandidate(String id, RewriteRule rule) {</span>
+    }
+
+    /**
+     * A group of two or more rule ids that share the same source pattern.
+     */
+    public record RuleConflict(String patternSignature, List&lt;String&gt; ruleIds) {
+<span class="fc" id="L104">        public RuleConflict {</span>
+<span class="fc" id="L105">            ruleIds = List.copyOf(ruleIds);</span>
+<span class="fc" id="L106">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
