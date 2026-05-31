@@ -18,6 +18,7 @@ rule difference_of_squares:
 
 - `rule <id>:`
 - `macro <id>:`
+- `profile <id>:`
 
 ## Unterstützte Regel-Felder
 
@@ -36,4 +37,24 @@ rule difference_of_squares:
 - `tags`
 - `explanation`
 
-Beim Laden werden die DSL-Einträge in ein typisiertes internes Modell (`RuleFileParser`) überführt und anschließend als `PatternRewriteRule`/`RuleMacro` registriert.
+## Aktivierungsprofile
+
+Profile aktivieren oder deaktivieren Regeln, Transformationen und Makros anhand ihrer `tags`.
+
+```text
+profile school_algebra:
+  enable_tags:
+    - binomial
+    - factorization
+  disable_tags:
+    - complex_analysis
+```
+
+- `enable_tags`: Whitelist. Ist sie nicht leer, bleibt ein Eintrag nur aktiv, wenn er
+  mindestens einen dieser Tags trägt.
+- `disable_tags`: Blacklist. Ein Eintrag mit einem dieser Tags wird immer deaktiviert.
+
+Ein Profil wird über `PluginRuntimeConfig#activeProfile` bzw. `rules list --profile <id>`
+aktiviert. Geladene Profile lassen sich mit `rules profiles` anzeigen.
+
+Beim Laden werden die DSL-Einträge in ein typisiertes internes Modell (`RuleFileParser`) überführt und anschließend als `PatternRewriteRule`/`RuleMacro`/`RuleProfile` registriert.

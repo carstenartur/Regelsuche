@@ -34,6 +34,7 @@ public final class PluginRuntime implements AutoCloseable {
     private List<RuntimeDiagnostic> diagnostics = List.of();
     private List<PatternTransformation> macroTransformations = List.of();
     private List<RuleConflictDetector.RuleConflict> conflicts = List.of();
+    private List<RuleProfile> profiles = List.of();
     private URLClassLoader externalPluginClassLoader;
 
     public PluginRuntime() {
@@ -57,8 +58,10 @@ public final class PluginRuntime implements AutoCloseable {
             loadPlugins(ServiceLoader.load(RegelsuchePlugin.class), "classpath", discoveredPlugins, discoveredDiagnostics);
         }
         loadExternalPlugins(discoveredPlugins, discoveredDiagnostics);
+        this.profiles = List.of();
         loadRuleFiles(discoveredDiagnostics);
         disableConfiguredRules();
+        applyActiveProfile(discoveredDiagnostics);
         this.macroTransformations = buildMacroTransformations(discoveredDiagnostics);
         this.conflicts = detectConflicts();
         for (RuleConflictDetector.RuleConflict conflict : conflicts) {
@@ -109,6 +112,10 @@ public final class PluginRuntime implements AutoCloseable {
 
     public List<RuleConflictDetector.RuleConflict> conflicts() {
         return conflicts;
+    }
+
+    public List<RuleProfile> profiles() {
+        return profiles;
     }
 
     public List<RegisteredRuleView> registeredRules() {
@@ -227,6 +234,11 @@ public final class PluginRuntime implements AutoCloseable {
         for (Path file : files) {
             try {
                 RuleFileLoadResult result = ruleFileLoader.load(file, ruleRegistry, macroRegistry);
+                if (!result.profiles().isEmpty()) {
+                    List<RuleProfile> merged = new ArrayList<>(this.profiles);
+                    merged.addAll(result.profiles());
+                    this.profiles = List.copyOf(merged);
+                }
                 for (RuleFileParser.RuleFileDiagnostic diagnostic : result.diagnostics()) {
                     discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
                 }
@@ -256,6 +268,43 @@ public final class PluginRuntime implements AutoCloseable {
                 : disabledRuleId;
             macroRegistry.disable(macroId);
         }
+    }
+
+    private void applyActiveProfile(List<RuntimeDiagnostic> discoveredDiagnostics) {
+        String activeProfile = config.activeProfile();
+        if (activeProfile == null) {
+            return;
+        }
+        RuleProfile profile = profiles.stream()
+            .filter(candidate -> candidate.id().equals(activeProfile))
+            .findFirst()
+            .orElse(null);
+        if (profile == null) {
+            discoveredDiagnostics.add(new RuntimeDiagnostic(
+                "profile:" + activeProfile,
+                "Unknown activation profile '" + activeProfile + "'"
+            ));
+            return;
+        }
+        for (RuleRegistry.RuleRegistration registration : ruleRegistry.registrations()) {
+            if (registration.enabled() && !profile.includes(registration.tags())) {
+                ruleRegistry.disable(registration.id());
+            }
+        }
+        for (TransformationRegistry.TransformationRegistration registration : transformationRegistry.registrations()) {
+            if (registration.enabled() && !profile.includes(registration.tags())) {
+                transformationRegistry.disable(registration.id());
+            }
+        }
+        for (MacroRegistry.MacroRegistration registration : macroRegistry.registrations()) {
+            if (registration.enabled() && !profile.includes(registration.macro().tags())) {
+                macroRegistry.disable(registration.id());
+            }
+        }
+        discoveredDiagnostics.add(new RuntimeDiagnostic(
+            "profile:" + activeProfile,
+            "Activation profile '" + activeProfile + "' applied"
+        ));
     }
 
     private List<PatternTransformation> buildMacroTransformations(List<RuntimeDiagnostic> discoveredDiagnostics) {
@@ -351,6 +400,7 @@ public final class PluginRuntime implements AutoCloseable {
             if (rulePackage.hasErrors()) {
                 throw new RuleFileParseException(rulePackage.diagnostics());
             }
+            List<RuleProfile> profiles = new ArrayList<>();
             for (RuleFileParser.Entry entry : rulePackage.entries()) {
                 if (entry instanceof RuleFileParser.RuleDefinition rule) {
                     registerRule(file, ruleRegistry, rule);
@@ -362,9 +412,16 @@ public final class PluginRuntime implements AutoCloseable {
                         macro.explanation(),
                         macro.tags()
                     ), file.toString());
+                } else if (entry instanceof RuleFileParser.ProfileDefinition profile) {
+                    profiles.add(new RuleProfile(
+                        profile.id(),
+                        profile.enableTags(),
+                        profile.disableTags(),
+                        file.toString()
+                    ));
                 }
             }
-            return new RuleFileLoadResult(rulePackage.entries().size(), rulePackage.diagnostics());
+            return new RuleFileLoadResult(rulePackage.entries().size(), rulePackage.diagnostics(), profiles);
         }
 
         private void registerRule(Path file, RuleRegistry ruleRegistry, RuleFileParser.RuleDefinition rule) {
@@ -390,9 +447,14 @@ public final class PluginRuntime implements AutoCloseable {
         }
     }
 
-    public record RuleFileLoadResult(int loadedEntries, List<RuleFileParser.RuleFileDiagnostic> diagnostics) {
+    public record RuleFileLoadResult(
+        int loadedEntries,
+        List<RuleFileParser.RuleFileDiagnostic> diagnostics,
+        List<RuleProfile> profiles
+    ) {
         public RuleFileLoadResult {
             diagnostics = List.copyOf(diagnostics);
+            profiles = List.copyOf(profiles);
         }
     }
 }

@@ -21,9 +21,18 @@ Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/exa
 ## Sichtbarkeit und Debugging
 
 - `plugins list` zeigt geladene Plugins
-- `rules list` zeigt geladene Regeln, Transformationen und Makros
+- `rules list` zeigt geladene Regeln, Transformationen und Makros (`--profile <id>` wendet ein Aktivierungsprofil an)
 - `rules validate <datei>` prüft DSL-Dateien mit verständlichen Diagnosen
 - `rules conflicts` zeigt konkurrierende Regeln, die dasselbe Quellmuster verwenden
+- `rules profiles` zeigt geladene Aktivierungsprofile
+
+## Aktivierungsprofile
+
+Aktivierungsprofile bündeln Regeln, Transformationen und Makros über ihre `tags` zu
+Profilen (z. B. `school_algebra`). Ein aktives Profil deaktiviert alle Einträge, deren Tags
+nicht zur `enable_tags`-Whitelist passen oder in der `disable_tags`-Blacklist stehen. So
+lässt sich der Suchraum gezielt auf eine Domäne einschränken. Details zur Syntax stehen in
+`docs/rule-files.md`.
 
 ## Konflikterkennung
 
