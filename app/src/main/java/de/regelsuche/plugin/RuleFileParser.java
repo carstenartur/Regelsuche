@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class RuleFileParser {
-    private static final Pattern HEADER = Pattern.compile("^(rule|macro)\\s+([A-Za-z0-9_.-]+):\\s*$");
+    private static final Pattern HEADER = Pattern.compile("^(rule|macro|profile)\\s+([A-Za-z0-9_.-]+):\\s*$");
     private static final Pattern PROPERTY = Pattern.compile("^([A-Za-z][A-Za-z0-9_-]*):\\s*(.*)$");
 
     public RulePackage parse(Path path) {
@@ -40,7 +40,7 @@ public final class RuleFileParser {
             Matcher header = HEADER.matcher(line);
             if (!header.matches()) {
                 diagnostics.add(new RuleFileDiagnostic(path, index + 1, Severity.ERROR,
-                    "Expected 'rule <id>:' or 'macro <id>:'"));
+                    "Expected 'rule <id>:', 'macro <id>:' or 'profile <id>:'"));
                 index++;
                 continue;
             }
@@ -105,10 +105,15 @@ public final class RuleFileParser {
                             "Rule '" + rule.id() + "' has the same source pattern as '" + existing + "'"));
                     }
                 }
-            } else {
+            } else if ("macro".equals(kind)) {
                 MacroDefinition macro = buildMacro(path, lineNumber, id, properties, diagnostics);
                 if (macro != null) {
                     entries.add(macro);
+                }
+            } else {
+                ProfileDefinition profile = buildProfile(path, lineNumber, id, properties, diagnostics);
+                if (profile != null) {
+                        entries.add(profile);
                 }
             }
         }
@@ -153,6 +158,23 @@ public final class RuleFileParser {
         String explanation = stringOrDefault("explanation", properties, "");
         validateKnownProperties(path, lineNumber, properties, Set.of("input", "output", "tags", "explanation"), diagnostics);
         return new MacroDefinition(id, lineNumber, input, output, explanation, tags);
+    }
+
+    private ProfileDefinition buildProfile(
+        Path path,
+        int lineNumber,
+        String id,
+        Map<String, Object> properties,
+        List<RuleFileDiagnostic> diagnostics
+    ) {
+        List<String> enableTags = listProperty("enable_tags", properties);
+        List<String> disableTags = listProperty("disable_tags", properties);
+        validateKnownProperties(path, lineNumber, properties, Set.of("enable_tags", "disable_tags"), diagnostics);
+        if (enableTags.isEmpty() && disableTags.isEmpty()) {
+            diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,
+                "Profile '" + id + "' has neither 'enable_tags' nor 'disable_tags' and has no effect"));
+        }
+        return new ProfileDefinition(id, lineNumber, enableTags, disableTags);
     }
 
     private void validateKnownProperties(
@@ -226,7 +248,7 @@ public final class RuleFileParser {
         return value;
     }
 
-    public sealed interface Entry permits RuleDefinition, MacroDefinition {
+    public sealed interface Entry permits RuleDefinition, MacroDefinition, ProfileDefinition {
         String id();
 
         int line();
@@ -270,6 +292,18 @@ public final class RuleFileParser {
     ) implements Entry {
         public MacroDefinition {
             tags = List.copyOf(tags);
+        }
+    }
+
+    public record ProfileDefinition(
+        String id,
+        int line,
+        List<String> enableTags,
+        List<String> disableTags
+    ) implements Entry {
+        public ProfileDefinition {
+            enableTags = List.copyOf(enableTags);
+            disableTags = List.copyOf(disableTags);
         }
     }
 

@@ -8,16 +8,28 @@ public record PluginRuntimeConfig(
     Path rulesDirectory,
     boolean loadClasspathPlugins,
     Set<String> disabledPluginIds,
-    Set<String> disabledRuleIds
+    Set<String> disabledRuleIds,
+    String activeProfile
 ) {
     public PluginRuntimeConfig {
         pluginsDirectory = pluginsDirectory == null ? Path.of("plugins") : pluginsDirectory;
         rulesDirectory = rulesDirectory == null ? Path.of("rules") : rulesDirectory;
         disabledPluginIds = Set.copyOf(disabledPluginIds == null ? Set.of() : disabledPluginIds);
         disabledRuleIds = Set.copyOf(disabledRuleIds == null ? Set.of() : disabledRuleIds);
+        activeProfile = activeProfile == null || activeProfile.isBlank() ? null : activeProfile;
+    }
+
+    public PluginRuntimeConfig(
+        Path pluginsDirectory,
+        Path rulesDirectory,
+        boolean loadClasspathPlugins,
+        Set<String> disabledPluginIds,
+        Set<String> disabledRuleIds
+    ) {
+        this(pluginsDirectory, rulesDirectory, loadClasspathPlugins, disabledPluginIds, disabledRuleIds, null);
     }
 
     public static PluginRuntimeConfig defaults() {
-        return new PluginRuntimeConfig(Path.of("plugins"), Path.of("rules"), true, Set.of(), Set.of());
+        return new PluginRuntimeConfig(Path.of("plugins"), Path.of("rules"), true, Set.of(), Set.of(), null);
     }
 }

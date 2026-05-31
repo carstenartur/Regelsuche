@@ -1,6 +1,7 @@
 package de.regelsuche.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,6 +42,29 @@ class RuleFileLoaderTest {
     }
 
     @Test
+    void parsesProfileEntriesWithEnableAndDisableTags(@TempDir Path tempDir) throws Exception {
+        Path file = tempDir.resolve("profiles.regelsuche");
+        Files.writeString(file, """
+            profile school_algebra:
+              enable_tags:
+                - binomial
+                - factorization
+              disable_tags:
+                - complex_analysis
+            """);
+
+        PluginRuntime.RuleFileLoadResult result =
+            new PluginRuntime.RuleFileLoader().load(file, new RuleRegistry(), new MacroRegistry());
+
+        assertEquals(1, result.profiles().size());
+        RuleProfile profile = result.profiles().get(0);
+        assertEquals("school_algebra", profile.id());
+        assertTrue(profile.includes(List.of("binomial")));
+        assertFalse(profile.includes(List.of("complex_analysis")));
+        assertFalse(profile.includes(List.of("trigonometry")));
+    }
+
+    @Test
     void invalidRuleFilesProduceReadableDiagnostics(@TempDir Path tempDir) throws Exception {
         Path file = tempDir.resolve("invalid.regelsuche");
         Files.write(file, List.of(
@@ -56,6 +80,21 @@ class RuleFileLoaderTest {
     }
 
     @Test
+    void invalidHeadersMentionProfilesInDiagnostics(@TempDir Path tempDir) throws Exception {
+        Path file = tempDir.resolve("invalid-header.regelsuche");
+        Files.write(file, List.of(
+            "profil school_algebra:",
+            "  enable_tags:",
+            "    - factorization"
+        ));
+
+        RuleFileParseException exception = assertThrows(RuleFileParseException.class,
+            () -> new PluginRuntime.RuleFileLoader().load(file, new RuleRegistry(), new MacroRegistry()));
+
+        assertTrue(exception.getMessage().contains("Expected 'rule <id>:', 'macro <id>:' or 'profile <id>:'"));
+    }
+
+    @Test
     void bundledExampleRulePackageLoadsSuccessfully() {
         Path file = locateRepoRoot().resolve("examples/binomial-formulas.regelsuche");
 
@@ -63,9 +102,54 @@ class RuleFileLoaderTest {
         MacroRegistry macroRegistry = new MacroRegistry();
         PluginRuntime.RuleFileLoadResult result = new PluginRuntime.RuleFileLoader().load(file, ruleRegistry, macroRegistry);
 
-        assertEquals(5, result.loadedEntries());
+        assertEquals(6, result.loadedEntries());
         assertTrue(ruleRegistry.registrations().stream().anyMatch(rule -> rule.id().equals("dsl_difference_of_squares")));
         assertTrue(macroRegistry.registrations().stream().anyMatch(macro -> macro.id().equals("expand_square")));
+        assertTrue(result.profiles().stream().anyMatch(profile -> profile.id().equals("school_algebra")));
+    }
+
+    @Test
+    void bundledFactorizationPackageLoadsSuccessfully() {
+        Path file = locateRepoRoot().resolve("examples/factorization.regelsuche");
+
+        RuleRegistry ruleRegistry = new RuleRegistry();
+        MacroRegistry macroRegistry = new MacroRegistry();
+        PluginRuntime.RuleFileLoadResult result = new PluginRuntime.RuleFileLoader().load(file, ruleRegistry, macroRegistry);
+
+        assertTrue(result.diagnostics().isEmpty());
+        // direction: both expands into .forward/.backward variants for both rules
+        assertTrue(ruleRegistry.registrations().stream()
+            .anyMatch(rule -> rule.id().equals("extract_common_factor.forward")));
+        assertTrue(ruleRegistry.registrations().stream()
+            .anyMatch(rule -> rule.id().equals("difference_of_squares.backward")));
+        assertTrue(result.profiles().stream().anyMatch(profile -> profile.id().equals("factorization_basics")));
+    }
+
+    @Test
+    void bundledPowerLawsPackageLoadsSuccessfully() {
+        Path file = locateRepoRoot().resolve("examples/power-laws.regelsuche");
+
+        RuleRegistry ruleRegistry = new RuleRegistry();
+        PluginRuntime.RuleFileLoadResult result =
+            new PluginRuntime.RuleFileLoader().load(file, ruleRegistry, new MacroRegistry());
+
+        assertTrue(result.diagnostics().isEmpty());
+        assertTrue(ruleRegistry.registrations().stream().anyMatch(rule -> rule.id().equals("product_of_powers")));
+        assertTrue(ruleRegistry.registrations().stream().anyMatch(rule -> rule.id().equals("power_of_power")));
+        assertTrue(result.profiles().stream().anyMatch(profile -> profile.id().equals("power_laws")));
+    }
+
+    @Test
+    void bundledTrigonometryPackageLoadsSuccessfully() {
+        Path file = locateRepoRoot().resolve("examples/trig-identities.regelsuche");
+
+        RuleRegistry ruleRegistry = new RuleRegistry();
+        PluginRuntime.RuleFileLoadResult result =
+            new PluginRuntime.RuleFileLoader().load(file, ruleRegistry, new MacroRegistry());
+
+        assertTrue(result.diagnostics().isEmpty());
+        assertTrue(ruleRegistry.registrations().stream().anyMatch(rule -> rule.id().equals("pythagorean_identity")));
+        assertTrue(result.profiles().stream().anyMatch(profile -> profile.id().equals("school_trigonometry")));
     }
 
     private Path locateRepoRoot() {

@@ -1,0 +1,23 @@
+rule pythagorean_identity:
+  pattern: sin(A)^2 + cos(A)^2
+  replace: 1
+  direction: forward
+  tags:
+    - trigonometry
+    - simplification
+  explanation: "Trigonometrischer Pythagoras: sin^2 + cos^2 = 1."
+
+rule double_angle_sine:
+  pattern: 2*sin(A)*cos(A)
+  replace: sin(2*A)
+  direction: both
+  tags:
+    - trigonometry
+  explanation: "Doppelwinkelformel des Sinus."
+
+profile school_trigonometry:
+  enable_tags:
+    - trigonometry
+    - simplification
+  disable_tags:
+    - complex_analysis

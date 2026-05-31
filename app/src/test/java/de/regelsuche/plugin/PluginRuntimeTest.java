@@ -134,6 +134,25 @@ class PluginRuntimeTest {
     }
 
     @Test
+    void inverseBinomialRulesAreReportedAsCyclicConflicts(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of(),
+            Set.of()
+        ))) {
+            assertTrue(runtime.cyclicConflicts().stream().anyMatch(cycle ->
+                cycle.ruleIds().contains("binomial_square_forward")
+                    && cycle.ruleIds().contains("binomial_square_backward")));
+            assertTrue(runtime.diagnostics().stream().anyMatch(diagnostic ->
+                diagnostic.source().equals("rule-cycle")
+                    && diagnostic.message().contains("binomial_square_forward")
+                    && diagnostic.message().contains("binomial_square_backward")));
+        }
+    }
+
+    @Test
     void disabledRulesAreNotApplied(@TempDir Path tempDir) {
         try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
             tempDir.resolve("plugins"),
@@ -146,6 +165,73 @@ class PluginRuntimeTest {
 
             assertFalse(transformations.stream().anyMatch(transformation ->
                 transformation.rule().equals("binomial_square_forward")));
+        }
+    }
+
+    @Test
+    void activeProfileDisablesRulesAndMacrosOutsideEnabledTags(@TempDir Path tempDir) throws Exception {
+        Path rulesDir = tempDir.resolve("rules");
+        Files.createDirectories(rulesDir);
+        Files.writeString(rulesDir.resolve("algebra.regelsuche"), """
+            rule keep_factorization:
+              pattern: A^2 - B^2
+              replace: (A - B) * (A + B)
+              direction: forward
+              tags:
+                - factorization
+
+            rule drop_complex:
+              pattern: A + 0
+              replace: A
+              direction: forward
+              tags:
+                - complex_analysis
+
+            macro drop_complex_macro:
+              input: A * 1
+              output: A
+              tags:
+                - complex_analysis
+
+            profile school_algebra:
+              enable_tags:
+                - factorization
+              disable_tags:
+                - complex_analysis
+            """);
+
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            rulesDir,
+            false,
+            Set.of(),
+            Set.of(),
+            "school_algebra"
+        ))) {
+            assertTrue(runtime.profiles().stream().anyMatch(profile -> profile.id().equals("school_algebra")));
+            assertTrue(runtime.ruleRegistry().registrations().stream()
+                .anyMatch(rule -> rule.id().equals("keep_factorization") && rule.enabled()));
+            assertTrue(runtime.ruleRegistry().registrations().stream()
+                .anyMatch(rule -> rule.id().equals("drop_complex") && !rule.enabled()));
+            assertFalse(runtime.macroTransformations().stream()
+                .anyMatch(transformation -> transformation.id().equals("macro.drop_complex_macro")));
+            assertTrue(runtime.diagnostics().stream()
+                .anyMatch(diagnostic -> diagnostic.message().contains("Activation profile 'school_algebra' applied")));
+        }
+    }
+
+    @Test
+    void unknownActiveProfileIsReportedAsDiagnostic(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            false,
+            Set.of(),
+            Set.of(),
+            "does_not_exist"
+        ))) {
+            assertTrue(runtime.diagnostics().stream()
+                .anyMatch(diagnostic -> diagnostic.message().contains("Unknown activation profile 'does_not_exist'")));
         }
     }
 
