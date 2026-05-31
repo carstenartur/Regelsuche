@@ -18,6 +18,26 @@ Ein Plugin implementiert `de.regelsuche.plugin.RegelsuchePlugin` und kann vier R
 
 Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/example/BinomialFormulaPlugin.java`.
 
+## Umsetzungsstand zu Issue 74
+
+- [x] Stabile Plugin-Schnittstelle (`RegelsuchePlugin`)
+- [x] Plugin-Discovery über `ServiceLoader`
+- [x] Vorbereitung für Reload über `PluginRuntime#reload()`
+- [x] Erweiterbare zentrale Registries: `RuleRegistry`, `TransformationRegistry`, `AstVisitorRegistry`, `MacroRegistry`
+- [x] Eigene AST-Visitor mit allen dokumentierten Hook-Phasen
+- [x] Plugin-Transformationen erscheinen als Suchgraph-Kanten
+- [x] Textbasierte Regeldateien werden geladen
+- [x] DSL-Regeln werden in ein typisiertes Java-Modell überführt
+- [x] Beispiel-Regelpakete unter `examples/`
+- [x] Java-Beispielplugin für binomische Formeln
+- [x] Geladene Plugins, Regeln, Profile und Konflikte sind per CLI sichtbar
+- [x] Fehlerhafte Regeldateien liefern verständliche Diagnosen
+- [x] Regel-Deaktivierung über Laufzeitkonfiguration und Aktivierungsprofile
+- [x] Prioritäten werden als Suchkosten berücksichtigt
+- [x] Konflikte und zyklische Regelpaare werden erkannt
+- [x] Dokumentation für Plugins, Plugin-API, Regeldateien und Makros
+- [x] Tests für Discovery, Registry-Erweiterung, Regeldateien, Visitor, Suchgraph-Integration, deaktivierte Regeln, Konflikte und Beispielpakete
+
 ## Sichtbarkeit und Debugging
 
 - `plugins list` zeigt geladene Plugins
