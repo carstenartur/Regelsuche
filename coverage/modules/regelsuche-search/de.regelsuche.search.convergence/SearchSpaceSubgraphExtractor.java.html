@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceSubgraphExtractor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.convergence</a> &gt; <span class="el_source">SearchSpaceSubgraphExtractor.java</span></div><h1>SearchSpaceSubgraphExtractor.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.convergence;
+
+import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.search.convergence.SearchSpaceSubgraph.Edge;
+import de.regelsuche.search.convergence.SearchSpaceSubgraph.Node;
+import de.regelsuche.search.convergence.SearchSpaceSubgraph.PathMembership;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.Transformation;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/** Extracts a bounded real search-space subgraph from a {@link SearchProblem}. */
+<span class="nc" id="L26">public final class SearchSpaceSubgraphExtractor {</span>
+    private static final int MAX_RENDERED_DEPTH = 4;
+    private static final int MAX_NODES = 25;
+
+<span class="nc" id="L30">    private final RuleFamilyClassifier classifier = new RuleFamilyClassifier();</span>
+
+    public SearchSpaceSubgraph extract(
+        SearchProblem problem,
+        List&lt;SearchState&gt; exploredStates,
+        ConvergentDiscoveryReport report
+    ) {
+<span class="nc" id="L37">        int maxDepth = Math.min(problem.heuristic().maxDepth(), MAX_RENDERED_DEPTH);</span>
+<span class="nc" id="L38">        Map&lt;String, SearchState&gt; selectedStates = selectStates(problem, exploredStates, report, maxDepth);</span>
+<span class="nc" id="L39">        List&lt;EdgeDraft&gt; edgeDrafts = collectEdges(problem, selectedStates, report, maxDepth);</span>
+<span class="nc" id="L40">        Set&lt;String&gt; nodeIds = Set.copyOf(selectedStates.keySet());</span>
+<span class="nc" id="L41">        List&lt;EdgeDraft&gt; renderedEdgeDrafts = edgeDrafts.stream()</span>
+<span class="nc bnc" id="L42" title="All 4 branches missed.">            .filter(edge -&gt; nodeIds.contains(edge.fromId()) &amp;&amp; nodeIds.contains(edge.toId()))</span>
+<span class="nc" id="L43">            .toList();</span>
+<span class="nc" id="L44">        Map&lt;String, Set&lt;RuleFamily&gt;&gt; incomingFamilies = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L45">        Map&lt;String, Set&lt;String&gt;&gt; incomingPredecessors = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L46">        Set&lt;String&gt; sources = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        for (EdgeDraft edge : renderedEdgeDrafts) {</span>
+<span class="nc" id="L48">            sources.add(edge.fromId());</span>
+<span class="nc" id="L49">            incomingFamilies.computeIfAbsent(edge.toId(), ignored -&gt; new LinkedHashSet&lt;&gt;()).add(edge.family());</span>
+<span class="nc" id="L50">            incomingPredecessors.computeIfAbsent(edge.toId(), ignored -&gt; new HashSet&lt;&gt;()).add(edge.fromId());</span>
+<span class="nc" id="L51">        }</span>
+<span class="nc" id="L52">        Set&lt;String&gt; originallyExplored = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        for (SearchState state : exploredStates) {</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            if (state.depth() &lt;= maxDepth) {</span>
+<span class="nc" id="L55">                originallyExplored.add(idForExpression(state.expression()));</span>
+            }
+<span class="nc" id="L57">        }</span>
+<span class="nc" id="L58">        Map&lt;String, String&gt; canonicalKeys = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        for (SearchState state : selectedStates.values()) {</span>
+<span class="nc" id="L60">            canonicalKeys.put(idForExpression(state.expression()), canonicalKey(state.expression()));</span>
+<span class="nc" id="L61">        }</span>
+<span class="nc" id="L62">        Set&lt;String&gt; sharedCanonicalKeys = canonicalKeys.values().stream()</span>
+<span class="nc" id="L63">            .collect(Collectors.groupingBy(key -&gt; key, Collectors.counting()))</span>
+<span class="nc" id="L64">            .entrySet().stream()</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            .filter(entry -&gt; entry.getValue() &gt; 1)</span>
+<span class="nc" id="L66">            .map(Map.Entry::getKey)</span>
+<span class="nc" id="L67">            .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L69">        List&lt;Node&gt; nodes = selectedStates.values().stream()</span>
+<span class="nc" id="L70">            .sorted(Comparator.comparingInt(SearchState::depth).thenComparing(SearchState::expression))</span>
+<span class="nc" id="L71">            .map(state -&gt; {</span>
+<span class="nc" id="L72">                String id = idForExpression(state.expression());</span>
+<span class="nc" id="L73">                return node(problem, state, report,</span>
+<span class="nc" id="L74">                    incomingFamilies.getOrDefault(id, Set.of()),</span>
+<span class="nc" id="L75">                    sources.contains(id),</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                    incomingPredecessors.getOrDefault(id, Set.of()).size() &gt;= 2,</span>
+<span class="nc" id="L77">                    originallyExplored.contains(id),</span>
+<span class="nc" id="L78">                    canonicalKeys.getOrDefault(id, canonicalKey(state.expression())),</span>
+                    sharedCanonicalKeys);
+            })
+<span class="nc" id="L81">            .toList();</span>
+<span class="nc" id="L82">        List&lt;Edge&gt; edges = renderedEdgeDrafts.stream()</span>
+<span class="nc" id="L83">            .map(edge -&gt; edge(edge, selectedStates, report))</span>
+<span class="nc" id="L84">            .toList();</span>
+<span class="nc" id="L85">        return new SearchSpaceSubgraph(problem.rootExpression(), nodes, edges, maxDepth, MAX_NODES);</span>
+    }
+
+    private String canonicalKey(String expression) {
+<span class="nc" id="L89">        return new de.regelsuche.canonical.ExpressionCanonicalizer().canonicalize(expression);</span>
+    }
+
+    private Map&lt;String, SearchState&gt; selectStates(
+        SearchProblem problem,
+        List&lt;SearchState&gt; exploredStates,
+        ConvergentDiscoveryReport report,
+        int maxDepth
+    ) {
+<span class="nc" id="L98">        Map&lt;String, SearchState&gt; byHash = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        for (SearchState state : exploredStates) {</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (state.depth() &lt;= maxDepth) {</span>
+<span class="nc" id="L101">                byHash.putIfAbsent(idForExpression(state.expression()), state);</span>
+            }
+<span class="nc" id="L103">        }</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (byHash.isEmpty()) {</span>
+<span class="nc" id="L105">            SearchState root = rootState(problem);</span>
+<span class="nc" id="L106">            byHash.put(idForExpression(root.expression()), root);</span>
+        }
+<span class="nc" id="L108">        expandBounded(problem, byHash, maxDepth);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        for (ConvergentPath path : report.pathsToTarget()) {</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">            for (int depth = 0; depth &lt; path.expressions().size() &amp;&amp; depth &lt;= maxDepth; depth++) {</span>
+<span class="nc" id="L111">                String expression = path.expressions().get(depth);</span>
+<span class="nc" id="L112">                String hash = problem.canonicalizer().stableHash(expression);</span>
+<span class="nc" id="L113">                byHash.putIfAbsent(idForExpression(expression), syntheticState(problem, path, depth, expression, hash));</span>
+            }
+<span class="nc" id="L115">        }</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (byHash.size() &lt;= MAX_NODES) {</span>
+<span class="nc" id="L117">            return byHash;</span>
+        }
+<span class="nc" id="L119">        Set&lt;String&gt; protectedIds = protectedNodeIds(problem, report);</span>
+<span class="nc" id="L120">        Map&lt;String, SearchState&gt; limited = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L121">        byHash.entrySet().stream()</span>
+<span class="nc" id="L122">            .filter(entry -&gt; protectedIds.contains(entry.getKey()))</span>
+<span class="nc" id="L123">            .forEach(entry -&gt; limited.put(entry.getKey(), entry.getValue()));</span>
+<span class="nc" id="L124">        byHash.entrySet().stream()</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            .filter(entry -&gt; !limited.containsKey(entry.getKey()))</span>
+<span class="nc" id="L126">            .sorted(Comparator</span>
+<span class="nc" id="L127">                .comparingInt((Map.Entry&lt;String, SearchState&gt; entry) -&gt; entry.getValue().depth())</span>
+<span class="nc" id="L128">                .thenComparingInt(entry -&gt; entry.getValue().score().weightedTotal())</span>
+<span class="nc" id="L129">                .thenComparing(Map.Entry::getKey))</span>
+<span class="nc" id="L130">            .limit(Math.max(0, MAX_NODES - limited.size()))</span>
+<span class="nc" id="L131">            .forEach(entry -&gt; limited.put(entry.getKey(), entry.getValue()));</span>
+<span class="nc" id="L132">        return limited;</span>
+    }
+
+    private List&lt;EdgeDraft&gt; collectEdges(
+        SearchProblem problem,
+        Map&lt;String, SearchState&gt; states,
+        ConvergentDiscoveryReport report,
+        int maxDepth
+    ) {
+<span class="nc" id="L141">        List&lt;EdgeDraft&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L142">        Set&lt;String&gt; edgeKeys = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        for (SearchState state : states.values()) {</span>
+<span class="nc bnc" id="L144" title="All 4 branches missed.">            if (state.parentExpression() != null &amp;&amp; state.appliedRuleId() != null) {</span>
+<span class="nc" id="L145">                String from = idForExpression(state.parentExpression());</span>
+<span class="nc" id="L146">                String to = idForExpression(state.expression());</span>
+<span class="nc" id="L147">                addEdge(edges, edgeKeys, from, to, state.appliedRuleId(), state.depth());</span>
+            }
+<span class="nc" id="L149">        }</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        for (ConvergentPath path : report.pathsToTarget()) {</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            for (int index = 1; index &lt; path.expressions().size(); index++) {</span>
+<span class="nc" id="L152">                String from = idForExpression(path.expressions().get(index - 1));</span>
+<span class="nc" id="L153">                String to = idForExpression(path.expressions().get(index));</span>
+<span class="nc" id="L154">                addEdge(edges, edgeKeys, from, to, path.ruleIds().get(index - 1), index);</span>
+            }
+<span class="nc" id="L156">        }</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        for (SearchState state : states.values()) {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">            if (state.depth() &gt;= maxDepth) {</span>
+<span class="nc" id="L159">                continue;</span>
+            }
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            for (Transformation transformation : problem.engine().transform(state.expression())) {</span>
+<span class="nc" id="L162">                String to = idForExpression(transformation.transformedExpression());</span>
+<span class="nc" id="L163">                SearchState toState = states.get(to);</span>
+<span class="nc bnc" id="L164" title="All 4 branches missed.">                if (toState != null &amp;&amp; toState.depth() == state.depth() + 1) {</span>
+<span class="nc" id="L165">                    addEdge(edges, edgeKeys, idForExpression(state.expression()), to,</span>
+<span class="nc" id="L166">                        transformation.rule(), state.depth() + 1);</span>
+                }
+<span class="nc" id="L168">            }</span>
+<span class="nc" id="L169">        }</span>
+<span class="nc" id="L170">        return edges;</span>
+    }
+
+    private void addEdge(
+        List&lt;EdgeDraft&gt; edges,
+        Set&lt;String&gt; edgeKeys,
+        String from,
+        String to,
+        String ruleId,
+        int depth
+    ) {
+<span class="nc" id="L181">        RuleFamily family = classifier.classify(ruleId);</span>
+<span class="nc" id="L182">        String key = from + &quot;-&gt;&quot; + to + &quot;|&quot; + ruleId;</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (edgeKeys.add(key)) {</span>
+<span class="nc" id="L184">            edges.add(new EdgeDraft(&quot;edge_&quot; + edgeKeys.size(), from, to, ruleId, family, depth));</span>
+        }
+<span class="nc" id="L186">    }</span>
+
+    private Node node(
+        SearchProblem problem,
+        SearchState state,
+        ConvergentDiscoveryReport report,
+        Set&lt;RuleFamily&gt; ruleFamilies,
+        boolean hasOutgoingEdge,
+        boolean isConvergencePoint,
+        boolean originallyExplored,
+        String canonicalKey,
+        Set&lt;String&gt; sharedCanonicalKeys
+    ) {
+<span class="nc" id="L199">        Set&lt;PathMembership&gt; membership = pathMembership(problem, state.expression(), report);</span>
+<span class="nc" id="L200">        boolean isTarget = membership.contains(PathMembership.TARGET);</span>
+<span class="nc" id="L201">        boolean didactic = membership.contains(PathMembership.DIDACTIC);</span>
+<span class="nc" id="L202">        boolean macro = membership.contains(PathMembership.MACRO);</span>
+<span class="nc bnc" id="L203" title="All 6 branches missed.">        boolean notSelected = !isTarget &amp;&amp; !didactic &amp;&amp; !macro;</span>
+<span class="nc bnc" id="L204" title="All 4 branches missed.">        boolean isDeadEnd = notSelected &amp;&amp; !hasOutgoingEdge;</span>
+<span class="nc" id="L205">        SearchSpaceSubgraph.StateRole role = role(state.depth(), isTarget, isConvergencePoint,</span>
+<span class="nc" id="L206">            sharedCanonicalKeys.contains(canonicalKey));</span>
+<span class="nc" id="L207">        return new Node(</span>
+<span class="nc" id="L208">            idForExpression(state.expression()),</span>
+<span class="nc" id="L209">            state.expression(),</span>
+            canonicalKey,
+            membership,
+            ruleFamilies,
+            role,
+<span class="nc" id="L214">            state.depth(),</span>
+<span class="nc" id="L215">            state.score().weightedTotal(),</span>
+            isTarget,
+            isConvergencePoint,
+            originallyExplored,
+            didactic,
+            macro,
+            isDeadEnd,
+            notSelected
+        );
+    }
+
+    private SearchSpaceSubgraph.StateRole role(
+        int depth,
+        boolean isTarget,
+        boolean isConvergencePoint,
+        boolean sharesEquivalenceClass
+    ) {
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (depth == 0) {</span>
+<span class="nc" id="L233">            return SearchSpaceSubgraph.StateRole.ROOT;</span>
+        }
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (isConvergencePoint) {</span>
+<span class="nc" id="L236">            return SearchSpaceSubgraph.StateRole.CONVERGENCE_TARGET;</span>
+        }
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (isTarget) {</span>
+<span class="nc" id="L239">            return SearchSpaceSubgraph.StateRole.CANONICAL_REPRESENTATIVE;</span>
+        }
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (sharesEquivalenceClass) {</span>
+<span class="nc" id="L242">            return SearchSpaceSubgraph.StateRole.EQUIVALENT_STATE;</span>
+        }
+<span class="nc" id="L244">        return SearchSpaceSubgraph.StateRole.SEARCH_STATE;</span>
+    }
+
+    private Edge edge(EdgeDraft edge, Map&lt;String, SearchState&gt; states, ConvergentDiscoveryReport report) {
+<span class="nc" id="L248">        SearchState to = states.get(edge.toId());</span>
+<span class="nc bnc" id="L249" title="All 4 branches missed.">        boolean isTarget = to != null &amp;&amp; isTarget(to.expression(), report);</span>
+<span class="nc" id="L250">        boolean didactic = isPathEdge(edge, report, false);</span>
+<span class="nc" id="L251">        boolean macro = isPathEdge(edge, report, true);</span>
+<span class="nc bnc" id="L252" title="All 6 branches missed.">        boolean notSelected = !isTarget &amp;&amp; !didactic &amp;&amp; !macro;</span>
+<span class="nc" id="L253">        return new Edge(</span>
+<span class="nc" id="L254">            edge.id(),</span>
+<span class="nc" id="L255">            edge.fromId(),</span>
+<span class="nc" id="L256">            edge.toId(),</span>
+<span class="nc" id="L257">            edge.ruleId(),</span>
+<span class="nc" id="L258">            edge.family(),</span>
+<span class="nc" id="L259">            edge.depth(),</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            to == null ? 0 : to.score().weightedTotal(),</span>
+            isTarget,
+            didactic,
+            macro,
+            false,
+            notSelected
+        );
+    }
+
+    private Set&lt;PathMembership&gt; pathMembership(SearchProblem problem, String expression, ConvergentDiscoveryReport report) {
+<span class="nc" id="L270">        Set&lt;PathMembership&gt; membership = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (isTarget(expression, report)) {</span>
+<span class="nc" id="L272">            membership.add(PathMembership.TARGET);</span>
+        }
+<span class="nc" id="L274">        selectedPath(report, false).ifPresent(path -&gt; {</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            if (path.expressions().contains(expression)) {</span>
+<span class="nc" id="L276">                membership.add(PathMembership.DIDACTIC);</span>
+            }
+<span class="nc" id="L278">        });</span>
+<span class="nc" id="L279">        selectedPath(report, true).ifPresent(path -&gt; {</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            if (path.expressions().contains(expression)) {</span>
+<span class="nc" id="L281">                membership.add(PathMembership.MACRO);</span>
+            }
+<span class="nc" id="L283">        });</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        if (membership.isEmpty()) {</span>
+<span class="nc" id="L285">            membership.add(PathMembership.ALTERNATIVE);</span>
+        }
+<span class="nc" id="L287">        return membership;</span>
+    }
+
+    private java.util.Optional&lt;ConvergentPath&gt; selectedPath(ConvergentDiscoveryReport report, boolean macro) {
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (report.convergentStates().isEmpty()) {</span>
+<span class="nc" id="L292">            return java.util.Optional.empty();</span>
+        }
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        String pathId = macro</span>
+<span class="nc" id="L295">            ? report.convergentStates().getFirst().macroPathId().orElse(null)</span>
+<span class="nc" id="L296">            : report.convergentStates().getFirst().mostDidacticPathId();</span>
+<span class="nc" id="L297">        return report.pathsToTarget().stream().filter(path -&gt; path.pathId().equals(pathId)).findFirst();</span>
+    }
+
+    private boolean isTarget(String expression, ConvergentDiscoveryReport report) {
+<span class="nc" id="L301">        String canonical = new de.regelsuche.canonical.ExpressionCanonicalizer().canonicalize(expression);</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        return canonical.equals(report.canonicalTargetExpression())</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            || report.convergentStates().stream().anyMatch(state -&gt; state.expression().equals(expression));</span>
+    }
+
+    private boolean isPathEdge(EdgeDraft edge, ConvergentDiscoveryReport report, boolean macro) {
+<span class="nc" id="L307">        return selectedPath(report, macro).stream().anyMatch(path -&gt; {</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            for (int index = 1; index &lt; path.expressions().size(); index++) {</span>
+<span class="nc" id="L309">                String rule = path.ruleIds().get(index - 1);</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                if (rule.equals(edge.ruleId())</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                    &amp;&amp; idForExpression(path.expressions().get(index - 1)).equals(edge.fromId())</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                    &amp;&amp; idForExpression(path.expressions().get(index)).equals(edge.toId())) {</span>
+<span class="nc" id="L313">                    return true;</span>
+                }
+            }
+<span class="nc" id="L316">            return false;</span>
+        });
+    }
+
+    private Set&lt;String&gt; protectedNodeIds(SearchProblem problem, ConvergentDiscoveryReport report) {
+<span class="nc" id="L321">        Set&lt;String&gt; ids = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L322">        ids.add(idForExpression(problem.rootExpression()));</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">        for (ConvergentPath path : report.pathsToTarget()) {</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">            for (String expression : path.expressions()) {</span>
+<span class="nc" id="L325">                ids.add(idForExpression(expression));</span>
+<span class="nc" id="L326">            }</span>
+<span class="nc" id="L327">        }</span>
+<span class="nc" id="L328">        return ids;</span>
+    }
+
+    private SearchState rootState(SearchProblem problem) {
+<span class="nc" id="L332">        String root = problem.rootExpression().trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="nc" id="L333">        return new SearchState(root, 0, problem.scorer().score(root), List.of(root), List.of(), Set.of(), 0,</span>
+<span class="nc" id="L334">            problem.canonicalizer().stableHash(root), null, null, RewriteKind.NORMALIZE, false, 0, true, 0);</span>
+    }
+
+    private SearchState syntheticState(SearchProblem problem, ConvergentPath path, int depth, String expression, String hash) {
+<span class="nc" id="L338">        ExpressionScore score = problem.scorer().score(expression);</span>
+<span class="nc" id="L339">        List&lt;String&gt; expressions = path.expressions().subList(0, depth + 1);</span>
+<span class="nc" id="L340">        List&lt;String&gt; rules = path.ruleIds().subList(0, Math.min(depth, path.ruleIds().size()));</span>
+<span class="nc" id="L341">        return new SearchState(expression, depth, score, expressions, rules, Set.copyOf(rules), 0, hash,</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">            depth == 0 ? null : path.expressions().get(depth - 1),</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            depth == 0 ? null : path.ruleIds().get(depth - 1),</span>
+            RewriteKind.NORMALIZE, false, 0, true, 0);
+    }
+
+    private void expandBounded(SearchProblem problem, Map&lt;String, SearchState&gt; states, int maxDepth) {
+<span class="nc" id="L348">        int cursor = 0;</span>
+<span class="nc bnc" id="L349" title="All 4 branches missed.">        while (cursor &lt; states.size() &amp;&amp; states.size() &lt; MAX_NODES) {</span>
+<span class="nc" id="L350">            SearchState current = new ArrayList&lt;&gt;(states.values()).get(cursor++);</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">            if (current.depth() &gt;= maxDepth) {</span>
+<span class="nc" id="L352">                continue;</span>
+            }
+<span class="nc" id="L354">            int generated = 0;</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">            for (Transformation transformation : problem.engine().transform(current.expression())) {</span>
+<span class="nc bnc" id="L356" title="All 4 branches missed.">                if (generated &gt;= problem.heuristic().maxCandidatesPerState() || states.size() &gt;= MAX_NODES) {</span>
+<span class="nc" id="L357">                    break;</span>
+                }
+<span class="nc" id="L359">                String nextExpression = transformation.transformedExpression();</span>
+<span class="nc" id="L360">                String nextId = idForExpression(nextExpression);</span>
+<span class="nc bnc" id="L361" title="All 4 branches missed.">                if (nextExpression.equals(current.expression()) || states.containsKey(nextId)) {</span>
+<span class="nc" id="L362">                    continue;</span>
+                }
+<span class="nc" id="L364">                ExpressionScore nextScore = problem.scorer().score(nextExpression);</span>
+<span class="nc" id="L365">                List&lt;String&gt; path = new ArrayList&lt;&gt;(current.path());</span>
+<span class="nc" id="L366">                path.add(nextExpression);</span>
+<span class="nc" id="L367">                List&lt;String&gt; rules = new ArrayList&lt;&gt;(current.appliedRuleIds());</span>
+<span class="nc" id="L368">                rules.add(transformation.rule());</span>
+<span class="nc" id="L369">                Set&lt;String&gt; applications = new LinkedHashSet&lt;&gt;(current.appliedRuleApplications());</span>
+<span class="nc" id="L370">                applications.add(transformation.applicationKey());</span>
+<span class="nc" id="L371">                List&lt;RewriteKind&gt; kinds = new ArrayList&lt;&gt;(current.appliedRuleKinds());</span>
+<span class="nc" id="L372">                kinds.add(transformation.kind());</span>
+<span class="nc" id="L373">                List&lt;Boolean&gt; flags = new ArrayList&lt;&gt;(current.equivalencePreservingFlags());</span>
+<span class="nc" id="L374">                flags.add(transformation.equivalencePreservingByConstruction());</span>
+<span class="nc" id="L375">                List&lt;String&gt; assumptions = new ArrayList&lt;&gt;(current.assumptions());</span>
+<span class="nc" id="L376">                assumptions.addAll(transformation.assumptions());</span>
+<span class="nc" id="L377">                states.put(nextId, new SearchState(</span>
+                    nextExpression,
+<span class="nc" id="L379">                    current.depth() + 1,</span>
+                    nextScore,
+                    path,
+                    rules,
+                    applications,
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                    current.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0),</span>
+<span class="nc" id="L385">                    problem.canonicalizer().stableHash(nextExpression),</span>
+<span class="nc" id="L386">                    current.expression(),</span>
+<span class="nc" id="L387">                    transformation.rule(),</span>
+<span class="nc" id="L388">                    transformation.kind(),</span>
+<span class="nc" id="L389">                    transformation.mayIncreaseComplexity(),</span>
+<span class="nc" id="L390">                    transformation.estimatedCostDelta(),</span>
+<span class="nc" id="L391">                    transformation.equivalencePreservingByConstruction(),</span>
+<span class="nc" id="L392">                    current.score().weightedTotal() - nextScore.weightedTotal(),</span>
+                    kinds,
+                    flags,
+                    assumptions
+                ));
+<span class="nc" id="L397">                generated++;</span>
+<span class="nc" id="L398">            }</span>
+<span class="nc" id="L399">        }</span>
+<span class="nc" id="L400">    }</span>
+
+    private String idForExpression(String expression) {
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        String normalized = (expression == null ? &quot;&quot; : expression).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="nc" id="L404">        return &quot;space_&quot; + sha256(normalized);</span>
+    }
+
+    private String sha256(String expression) {
+        try {
+<span class="nc" id="L409">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="nc" id="L410">            byte[] hash = digest.digest(expression.getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L411">            StringBuilder builder = new StringBuilder();</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            for (byte b : hash) {</span>
+<span class="nc" id="L413">                builder.append(String.format(&quot;%02x&quot;, b));</span>
+            }
+<span class="nc" id="L415">            return builder.toString();</span>
+<span class="nc" id="L416">        } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L417">            throw new IllegalStateException(ex);</span>
+        }
+    }
+
+<span class="nc" id="L421">    private record EdgeDraft(String id, String fromId, String toId, String ruleId, RuleFamily family, int depth) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

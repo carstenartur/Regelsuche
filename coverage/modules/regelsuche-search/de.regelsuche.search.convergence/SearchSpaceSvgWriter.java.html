@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceSvgWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.convergence</a> &gt; <span class="el_source">SearchSpaceSvgWriter.java</span></div><h1>SearchSpaceSvgWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.convergence;
+
+import de.regelsuche.search.convergence.SearchSpaceSubgraph.Edge;
+import de.regelsuche.search.convergence.SearchSpaceSubgraph.Node;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/** Renders a generated bounded search-space subgraph as SVG. */
+<span class="nc" id="L12">public final class SearchSpaceSvgWriter {</span>
+    private static final String GENERATED_BY = &quot;SearchSpaceSvgWriter&quot;;
+    private static final int MARGIN_X = 56;
+    private static final int MARGIN_Y = 140;
+    private static final int COLUMN_WIDTH = 310;
+    private static final int ROW_HEIGHT = 118;
+    private static final int NODE_WIDTH = 240;
+    private static final int NODE_HEIGHT = 78;
+
+    public String render(SearchSpaceSubgraph graph, ArtifactMetadata metadata) {
+<span class="nc" id="L22">        return render(graph, metadata, SearchSpaceSvgOptions.detailed());</span>
+    }
+
+    public String render(SearchSpaceSubgraph graph, ArtifactMetadata metadata, SearchSpaceSvgOptions options) {
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        ArtifactMetadata safeMetadata = metadata == null ? new ArtifactMetadata(&quot;&quot;, &quot;&quot;) : metadata;</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        SearchSpaceSvgOptions safeOptions = options == null ? SearchSpaceSvgOptions.detailed() : options;</span>
+<span class="nc" id="L28">        Map&lt;String, PositionedNode&gt; layout = layout(graph);</span>
+<span class="nc" id="L29">        int maxDepth = graph.nodes().stream().mapToInt(Node::depth).max().orElse(0);</span>
+<span class="nc" id="L30">        int maxRows = graph.nodes().stream().collect(Collectors.groupingBy(Node::depth, Collectors.counting()))</span>
+<span class="nc" id="L31">            .values().stream().mapToInt(Long::intValue).max().orElse(1);</span>
+<span class="nc" id="L32">        int width = MARGIN_X * 2 + COLUMN_WIDTH * (maxDepth + 1) + NODE_WIDTH;</span>
+<span class="nc" id="L33">        int height = MARGIN_Y * 2 + ROW_HEIGHT * Math.max(1, maxRows);</span>
+<span class="nc" id="L34">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L35">        out.append(&quot;&lt;svg xmlns=\&quot;http://www.w3.org/2000/svg\&quot; width=\&quot;&quot;).append(width)</span>
+<span class="nc" id="L36">            .append(&quot;\&quot; height=\&quot;&quot;).append(height).append(&quot;\&quot; viewBox=\&quot;0 0 &quot;)</span>
+<span class="nc" id="L37">            .append(width).append(' ').append(height)</span>
+<span class="nc" id="L38">            .append(&quot;\&quot; role=\&quot;img\&quot; aria-labelledby=\&quot;title desc\&quot; data-source=\&quot;&quot;)</span>
+<span class="nc" id="L39">            .append(escapeXml(safeMetadata.dataSource()))</span>
+<span class="nc" id="L40">            .append(&quot;\&quot; data-generated-by=\&quot;&quot;).append(GENERATED_BY)</span>
+<span class="nc" id="L41">            .append(&quot;\&quot; data-generated-from=\&quot;SearchSpaceSubgraph\&quot;&gt;\n&quot;);</span>
+<span class="nc" id="L42">        out.append(&quot;  &lt;title id=\&quot;title\&quot;&gt;&quot;).append(escapeXml(title(graph, safeMetadata))).append(&quot;&lt;/title&gt;\n&quot;);</span>
+<span class="nc" id="L43">        out.append(&quot;  &lt;desc id=\&quot;desc\&quot;&gt;Bounded replay of an explored search space (reconstructed subgraph): &quot;</span>
+            + &quot;explored alternatives, selected paths and convergence.&lt;/desc&gt;\n&quot;);
+<span class="nc" id="L45">        out.append(&quot;  &lt;defs&gt;\n&quot;);</span>
+<span class="nc" id="L46">        out.append(&quot;    &lt;marker id=\&quot;spaceArrow\&quot; viewBox=\&quot;0 0 10 10\&quot; refX=\&quot;9\&quot; refY=\&quot;5\&quot; markerWidth=\&quot;8\&quot; markerHeight=\&quot;8\&quot; orient=\&quot;auto-start-reverse\&quot;&gt;\n&quot;);</span>
+<span class="nc" id="L47">        out.append(&quot;      &lt;path d=\&quot;M 0 0 L 10 5 L 0 10 z\&quot; fill=\&quot;#334155\&quot;/&gt;\n&quot;);</span>
+<span class="nc" id="L48">        out.append(&quot;    &lt;/marker&gt;\n&quot;);</span>
+<span class="nc" id="L49">        out.append(&quot;  &lt;/defs&gt;\n&quot;);</span>
+<span class="nc" id="L50">        out.append(&quot;  &lt;rect width=\&quot;100%\&quot; height=\&quot;100%\&quot; fill=\&quot;#f8fafc\&quot;/&gt;\n&quot;);</span>
+<span class="nc" id="L51">        out.append(&quot;  &lt;text x=\&quot;&quot;).append(width / 2).append(&quot;\&quot; y=\&quot;48\&quot; text-anchor=\&quot;middle\&quot; &quot;)</span>
+<span class="nc" id="L52">            .append(&quot;font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; font-size=\&quot;25\&quot; font-weight=\&quot;700\&quot; fill=\&quot;#0f172a\&quot;&gt;&quot;)</span>
+<span class="nc" id="L53">            .append(escapeXml(&quot;Reconstructed search space: &quot; + graph.inputExpression())).append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="nc" id="L54">        out.append(&quot;  &lt;text x=\&quot;&quot;).append(width / 2).append(&quot;\&quot; y=\&quot;78\&quot; text-anchor=\&quot;middle\&quot; &quot;)</span>
+<span class="nc" id="L55">            .append(&quot;font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; font-size=\&quot;14\&quot; fill=\&quot;#475569\&quot;&gt;&quot;)</span>
+<span class="nc" id="L56">            .append(escapeXml(subtitle(graph))).append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        for (int depth = 0; depth &lt;= maxDepth; depth++) {</span>
+<span class="nc" id="L58">            out.append(&quot;  &lt;text x=\&quot;&quot;).append(MARGIN_X + COLUMN_WIDTH * depth + NODE_WIDTH / 2)</span>
+<span class="nc" id="L59">                .append(&quot;\&quot; y=\&quot;112\&quot; text-anchor=\&quot;middle\&quot; font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; &quot;)</span>
+<span class="nc" id="L60">                .append(&quot;font-size=\&quot;13\&quot; font-weight=\&quot;700\&quot; fill=\&quot;#64748b\&quot;&gt;depth &quot;)</span>
+<span class="nc" id="L61">                .append(depth).append(&quot;&lt;/text&gt;\n&quot;);</span>
+        }
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        for (Edge edge : graph.edges()) {</span>
+<span class="nc" id="L64">            PositionedNode from = layout.get(edge.fromId());</span>
+<span class="nc" id="L65">            PositionedNode to = layout.get(edge.toId());</span>
+<span class="nc bnc" id="L66" title="All 6 branches missed.">            if (from != null &amp;&amp; to != null &amp;&amp; !from.node().id().equals(to.node().id())) {</span>
+<span class="nc" id="L67">                edge(out, from, to, edge, safeOptions);</span>
+            }
+<span class="nc" id="L69">        }</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        for (PositionedNode node : layout.values()) {</span>
+<span class="nc" id="L71">            node(out, node, safeOptions);</span>
+<span class="nc" id="L72">        }</span>
+<span class="nc" id="L73">        out.append(&quot;&lt;/svg&gt;\n&quot;);</span>
+<span class="nc" id="L74">        return out.toString();</span>
+    }
+
+    private String subtitle(SearchSpaceSubgraph graph) {
+<span class="nc" id="L78">        return graph.nodes().size() + &quot; states (&quot;</span>
+<span class="nc" id="L79">            + graph.originallyExploredCount() + &quot; explored, &quot;</span>
+<span class="nc" id="L80">            + graph.reconstructedCount() + &quot; reconstructed), &quot;</span>
+<span class="nc" id="L81">            + graph.edges().size() + &quot; rule edges; limits maxStates=&quot;</span>
+<span class="nc" id="L82">            + graph.maxStates() + &quot;, maxDepth=&quot; + graph.maxDepth() + &quot;.&quot;;</span>
+    }
+
+    public String render(SearchSpaceSubgraph graph) {
+<span class="nc" id="L86">        return render(graph, new ArtifactMetadata(&quot;&quot;, &quot;&quot;));</span>
+    }
+
+    private Map&lt;String, PositionedNode&gt; layout(SearchSpaceSubgraph graph) {
+<span class="nc" id="L90">        Map&lt;Integer, List&lt;Node&gt;&gt; byDepth = graph.nodes().stream()</span>
+<span class="nc" id="L91">            .sorted(Comparator.comparingInt(Node::depth)</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                .thenComparing((Node node) -&gt; node.isTarget() ? 0 : 1)</span>
+<span class="nc" id="L93">                .thenComparing(Node::score)</span>
+<span class="nc" id="L94">                .thenComparing(Node::expression))</span>
+<span class="nc" id="L95">            .collect(Collectors.groupingBy(Node::depth, LinkedHashMap::new, Collectors.toList()));</span>
+<span class="nc" id="L96">        Map&lt;String, PositionedNode&gt; positioned = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        for (Map.Entry&lt;Integer, List&lt;Node&gt;&gt; entry : byDepth.entrySet()) {</span>
+<span class="nc" id="L98">            int depth = entry.getKey();</span>
+<span class="nc" id="L99">            List&lt;Node&gt; nodes = entry.getValue();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            for (int row = 0; row &lt; nodes.size(); row++) {</span>
+<span class="nc" id="L101">                Node node = nodes.get(row);</span>
+<span class="nc" id="L102">                positioned.put(node.id(), new PositionedNode(node,</span>
+                    MARGIN_X + depth * COLUMN_WIDTH,
+                    MARGIN_Y + row * ROW_HEIGHT));
+            }
+<span class="nc" id="L106">        }</span>
+<span class="nc" id="L107">        return positioned;</span>
+    }
+
+    private void edge(StringBuilder out, PositionedNode from, PositionedNode to, Edge edge,
+            SearchSpaceSvgOptions options) {
+<span class="nc" id="L112">        int startX = from.x() + NODE_WIDTH;</span>
+<span class="nc" id="L113">        int startY = from.y() + NODE_HEIGHT / 2;</span>
+<span class="nc" id="L114">        int endX = to.x();</span>
+<span class="nc" id="L115">        int endY = to.y() + NODE_HEIGHT / 2;</span>
+<span class="nc" id="L116">        int midX = (startX + endX) / 2;</span>
+<span class="nc" id="L117">        int midY = (startY + endY) / 2 - 8;</span>
+<span class="nc" id="L118">        EdgeStyle style = EdgeStyle.of(edge);</span>
+<span class="nc" id="L119">        out.append(&quot;  &lt;path data-edge-id=\&quot;&quot;).append(escapeXml(edge.id()))</span>
+<span class="nc" id="L120">            .append(&quot;\&quot; data-rule-family=\&quot;&quot;).append(edge.ruleFamily())</span>
+<span class="nc" id="L121">            .append(&quot;\&quot; data-not-selected=\&quot;&quot;).append(edge.notSelected())</span>
+<span class="nc" id="L122">            .append(&quot;\&quot; d=\&quot;M &quot;).append(startX).append(' ').append(startY)</span>
+<span class="nc" id="L123">            .append(&quot; C &quot;).append(midX).append(' ').append(startY)</span>
+<span class="nc" id="L124">            .append(&quot;, &quot;).append(midX).append(' ').append(endY)</span>
+<span class="nc" id="L125">            .append(&quot;, &quot;).append(endX).append(' ').append(endY)</span>
+<span class="nc" id="L126">            .append(&quot;\&quot; fill=\&quot;none\&quot; stroke=\&quot;&quot;).append(style.stroke())</span>
+<span class="nc" id="L127">            .append(&quot;\&quot; stroke-width=\&quot;&quot;).append(style.width())</span>
+<span class="nc" id="L128">            .append(&quot;\&quot; opacity=\&quot;&quot;).append(style.opacity())</span>
+<span class="nc" id="L129">            .append(&quot;\&quot; marker-end=\&quot;url(#spaceArrow)\&quot;/&gt;\n&quot;);</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (options.showEdgeLabels()) {</span>
+<span class="nc" id="L131">            out.append(&quot;  &lt;text x=\&quot;&quot;).append(midX).append(&quot;\&quot; y=\&quot;&quot;).append(midY)</span>
+<span class="nc" id="L132">                .append(&quot;\&quot; text-anchor=\&quot;middle\&quot; font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; font-size=\&quot;11\&quot; &quot;)</span>
+<span class="nc" id="L133">                .append(&quot;font-weight=\&quot;700\&quot; fill=\&quot;&quot;).append(style.labelFill()).append(&quot;\&quot; opacity=\&quot;&quot;)</span>
+<span class="nc" id="L134">                .append(style.opacity()).append(&quot;\&quot;&gt;&quot;).append(escapeXml(shortRule(edge, options))).append(&quot;&lt;/text&gt;\n&quot;);</span>
+        }
+<span class="nc" id="L136">    }</span>
+
+    private void node(StringBuilder out, PositionedNode positioned, SearchSpaceSvgOptions options) {
+<span class="nc" id="L139">        Node node = positioned.node();</span>
+<span class="nc" id="L140">        NodeStyle style = NodeStyle.of(node);</span>
+<span class="nc" id="L141">        out.append(&quot;  &lt;g data-node-id=\&quot;&quot;).append(escapeXml(node.id()))</span>
+<span class="nc" id="L142">            .append(&quot;\&quot; data-role=\&quot;&quot;).append(node.role())</span>
+<span class="nc" id="L143">            .append(&quot;\&quot; data-canonical-key=\&quot;&quot;).append(escapeXml(node.canonicalKey()))</span>
+<span class="nc" id="L144">            .append(&quot;\&quot; data-convergence=\&quot;&quot;).append(node.isConvergencePoint())</span>
+<span class="nc" id="L145">            .append(&quot;\&quot; data-originally-explored=\&quot;&quot;).append(node.originallyExplored())</span>
+<span class="nc" id="L146">            .append(&quot;\&quot; data-depth=\&quot;&quot;).append(node.depth())</span>
+<span class="nc" id="L147">            .append(&quot;\&quot; data-score=\&quot;&quot;).append(node.score())</span>
+<span class="nc" id="L148">            .append(&quot;\&quot; data-target=\&quot;&quot;).append(node.isTarget())</span>
+<span class="nc" id="L149">            .append(&quot;\&quot; data-didactic=\&quot;&quot;).append(node.isOnDidacticPath())</span>
+<span class="nc" id="L150">            .append(&quot;\&quot; data-macro=\&quot;&quot;).append(node.isOnMacroPath())</span>
+<span class="nc" id="L151">            .append(&quot;\&quot; data-dead-end=\&quot;&quot;).append(node.isDeadEnd())</span>
+<span class="nc" id="L152">            .append(&quot;\&quot; data-not-selected=\&quot;&quot;).append(node.notSelected()).append(&quot;\&quot;&gt;\n&quot;);</span>
+<span class="nc" id="L153">        out.append(&quot;    &lt;rect x=\&quot;&quot;).append(positioned.x()).append(&quot;\&quot; y=\&quot;&quot;).append(positioned.y())</span>
+<span class="nc" id="L154">            .append(&quot;\&quot; width=\&quot;&quot;).append(NODE_WIDTH).append(&quot;\&quot; height=\&quot;&quot;).append(NODE_HEIGHT)</span>
+<span class="nc" id="L155">            .append(&quot;\&quot; rx=\&quot;14\&quot; fill=\&quot;&quot;).append(style.fill()).append(&quot;\&quot; stroke=\&quot;&quot;)</span>
+<span class="nc" id="L156">            .append(style.stroke()).append(&quot;\&quot; stroke-width=\&quot;&quot;).append(style.strokeWidth())</span>
+<span class="nc" id="L157">            .append(&quot;\&quot; opacity=\&quot;&quot;).append(style.opacity()).append(&quot;\&quot;/&gt;\n&quot;);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (options.showLabels()) {</span>
+<span class="nc" id="L159">            out.append(&quot;    &lt;text x=\&quot;&quot;).append(positioned.x() + NODE_WIDTH / 2).append(&quot;\&quot; y=\&quot;&quot;)</span>
+<span class="nc" id="L160">                .append(positioned.y() + 25)</span>
+<span class="nc" id="L161">                .append(&quot;\&quot; text-anchor=\&quot;middle\&quot; font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; &quot;)</span>
+<span class="nc" id="L162">                .append(&quot;font-size=\&quot;12\&quot; font-weight=\&quot;700\&quot; fill=\&quot;&quot;).append(style.labelFill())</span>
+<span class="nc" id="L163">                .append(&quot;\&quot;&gt;&quot;).append(escapeXml(nodeLabel(node))).append(&quot;&lt;/text&gt;\n&quot;);</span>
+        }
+<span class="nc" id="L165">        out.append(&quot;    &lt;text x=\&quot;&quot;).append(positioned.x() + NODE_WIDTH / 2).append(&quot;\&quot; y=\&quot;&quot;)</span>
+<span class="nc" id="L166">            .append(positioned.y() + 51)</span>
+<span class="nc" id="L167">            .append(&quot;\&quot; text-anchor=\&quot;middle\&quot; font-family=\&quot;ui-monospace,SFMono-Regular,Menlo,Consolas,monospace\&quot; &quot;)</span>
+<span class="nc" id="L168">            .append(&quot;font-size=\&quot;12\&quot; fill=\&quot;#111827\&quot;&gt;&quot;).append(escapeXml(shortExpression(node.expression())))</span>
+<span class="nc" id="L169">            .append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (options.showNodeIds()) {</span>
+<span class="nc" id="L171">            out.append(&quot;    &lt;text x=\&quot;&quot;).append(positioned.x() + NODE_WIDTH / 2).append(&quot;\&quot; y=\&quot;&quot;)</span>
+<span class="nc" id="L172">                .append(positioned.y() + 68)</span>
+<span class="nc" id="L173">                .append(&quot;\&quot; text-anchor=\&quot;middle\&quot; font-family=\&quot;ui-monospace,SFMono-Regular,Menlo,Consolas,monospace\&quot; &quot;)</span>
+<span class="nc" id="L174">                .append(&quot;font-size=\&quot;10\&quot; fill=\&quot;#94a3b8\&quot;&gt;&quot;).append(escapeXml(shortId(node.id())))</span>
+<span class="nc" id="L175">                .append(&quot;&lt;/text&gt;\n&quot;);</span>
+        } else {
+<span class="nc" id="L177">            out.append(&quot;    &lt;text x=\&quot;&quot;).append(positioned.x() + NODE_WIDTH / 2).append(&quot;\&quot; y=\&quot;&quot;)</span>
+<span class="nc" id="L178">                .append(positioned.y() + 68)</span>
+<span class="nc" id="L179">                .append(&quot;\&quot; text-anchor=\&quot;middle\&quot; font-family=\&quot;Inter,Segoe UI,Arial,sans-serif\&quot; &quot;)</span>
+<span class="nc" id="L180">                .append(&quot;font-size=\&quot;10\&quot; fill=\&quot;#64748b\&quot;&gt;score &quot;).append(node.score()).append(&quot;&lt;/text&gt;\n&quot;);</span>
+        }
+<span class="nc" id="L182">        out.append(&quot;  &lt;/g&gt;\n&quot;);</span>
+<span class="nc" id="L183">    }</span>
+
+    private String shortId(String id) {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        String suffix = id.startsWith(&quot;space_&quot;) ? id.substring(&quot;space_&quot;.length()) : id;</span>
+<span class="nc" id="L187">        return &quot;#&quot; + suffix.substring(0, Math.min(8, suffix.length()));</span>
+    }
+
+    private String nodeLabel(Node node) {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (node.role() == SearchSpaceSubgraph.StateRole.ROOT) {</span>
+<span class="nc" id="L192">            return &quot;search root&quot;;</span>
+        }
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (node.role() == SearchSpaceSubgraph.StateRole.CONVERGENCE_TARGET) {</span>
+<span class="nc" id="L195">            return &quot;convergence target&quot;;</span>
+        }
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (node.role() == SearchSpaceSubgraph.StateRole.CANONICAL_REPRESENTATIVE) {</span>
+<span class="nc" id="L198">            return &quot;canonical representative&quot;;</span>
+        }
+<span class="nc bnc" id="L200" title="All 4 branches missed.">        if (node.isOnDidacticPath() &amp;&amp; node.isOnMacroPath()) {</span>
+<span class="nc" id="L201">            return &quot;shared selected state&quot;;</span>
+        }
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (node.isOnDidacticPath()) {</span>
+<span class="nc" id="L204">            return &quot;selected path state&quot;;</span>
+        }
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (node.isOnMacroPath()) {</span>
+<span class="nc" id="L207">            return &quot;macro-shortcut state&quot;;</span>
+        }
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (node.isDeadEnd()) {</span>
+<span class="nc" id="L210">            return &quot;dead-end alternative&quot;;</span>
+        }
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (node.role() == SearchSpaceSubgraph.StateRole.EQUIVALENT_STATE) {</span>
+<span class="nc" id="L213">            return &quot;equivalence-class member&quot;;</span>
+        }
+<span class="nc" id="L215">        return &quot;alternative branch&quot;;</span>
+    }
+
+    private String shortExpression(String expression) {
+<span class="nc" id="L219">        return shorten(expression, 34);</span>
+    }
+
+    private String shortRule(Edge edge, SearchSpaceSvgOptions options) {
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (options.showRuleNames()) {</span>
+<span class="nc" id="L224">            return edge.ruleFamily() + &quot;: &quot; + shorten(edge.ruleId(), 26);</span>
+        }
+<span class="nc" id="L226">        return edge.ruleFamily().toString();</span>
+    }
+
+    private String shorten(String value, int max) {
+<span class="nc bnc" id="L230" title="All 4 branches missed.">        if (value == null || value.length() &lt;= max) {</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            return value == null ? &quot;&quot; : value;</span>
+        }
+<span class="nc" id="L233">        return value.substring(0, Math.max(0, max - 1)) + &quot;…&quot;;</span>
+    }
+
+    private String title(SearchSpaceSubgraph graph, ArtifactMetadata metadata) {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (!metadata.title().isBlank()) {</span>
+<span class="nc" id="L238">            return metadata.title();</span>
+        }
+<span class="nc" id="L240">        return &quot;Generated search-space subgraph: &quot; + graph.inputExpression();</span>
+    }
+
+    private String escapeXml(String value) {
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        return (value == null ? &quot;&quot; : value)</span>
+<span class="nc" id="L245">            .replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
+<span class="nc" id="L246">            .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;)</span>
+<span class="nc" id="L247">            .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="nc" id="L248">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;);</span>
+    }
+
+<span class="nc" id="L251">    private record PositionedNode(Node node, int x, int y) {</span>
+    }
+
+<span class="nc" id="L254">    private record NodeStyle(String fill, String stroke, String labelFill, int strokeWidth, double opacity) {</span>
+        private static NodeStyle of(Node node) {
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            if (node.isTarget()) {</span>
+<span class="nc" id="L257">                return new NodeStyle(&quot;#dcfce7&quot;, &quot;#15803d&quot;, &quot;#14532d&quot;, 4, 1.0);</span>
+            }
+<span class="nc bnc" id="L259" title="All 2 branches missed.">            if (node.depth() == 0) {</span>
+<span class="nc" id="L260">                return new NodeStyle(&quot;#eef2ff&quot;, &quot;#4338ca&quot;, &quot;#312e81&quot;, 3, 1.0);</span>
+            }
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            if (node.isOnDidacticPath()) {</span>
+<span class="nc" id="L263">                return new NodeStyle(&quot;#fef3c7&quot;, &quot;#d97706&quot;, &quot;#92400e&quot;, 3, 1.0);</span>
+            }
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            if (node.isOnMacroPath()) {</span>
+<span class="nc" id="L266">                return new NodeStyle(&quot;#e0f2fe&quot;, &quot;#0284c7&quot;, &quot;#075985&quot;, 3, 1.0);</span>
+            }
+<span class="nc bnc" id="L268" title="All 2 branches missed.">            if (node.isDeadEnd()) {</span>
+<span class="nc" id="L269">                return new NodeStyle(&quot;#f1f5f9&quot;, &quot;#94a3b8&quot;, &quot;#475569&quot;, 1, 0.58);</span>
+            }
+<span class="nc" id="L271">            return new NodeStyle(&quot;#f8fafc&quot;, &quot;#cbd5e1&quot;, &quot;#475569&quot;, 1, 0.68);</span>
+        }
+    }
+
+<span class="nc" id="L275">    private record EdgeStyle(String stroke, String labelFill, int width, double opacity) {</span>
+        private static EdgeStyle of(Edge edge) {
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            if (edge.isOnDidacticPath()) {</span>
+<span class="nc" id="L278">                return new EdgeStyle(&quot;#d97706&quot;, &quot;#92400e&quot;, 4, 1.0);</span>
+            }
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            if (edge.isOnMacroPath()) {</span>
+<span class="nc" id="L281">                return new EdgeStyle(&quot;#0284c7&quot;, &quot;#075985&quot;, 4, 1.0);</span>
+            }
+<span class="nc" id="L283">            return new EdgeStyle(&quot;#94a3b8&quot;, &quot;#475569&quot;, 2, 0.55);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

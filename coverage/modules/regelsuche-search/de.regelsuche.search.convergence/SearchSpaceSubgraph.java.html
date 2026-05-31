@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceSubgraph.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.convergence</a> &gt; <span class="el_source">SearchSpaceSubgraph.java</span></div><h1>SearchSpaceSubgraph.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.convergence;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Bounded, reconstructed search-space subgraph around a convergent discovery.
+ *
+ * &lt;p&gt;The graph is a &lt;em&gt;bounded replay&lt;/em&gt; of an explored search space: some nodes were
+ * originally explored by the search ({@link Node#originallyExplored()} is {@code true}),
+ * while others are reconstructed for visualization through a bounded expansion of the
+ * problem (limited by {@link #maxDepth()} and {@link #maxStates()}). It is therefore a
+ * reconstructed subgraph rather than a complete record of the search.
+ */
+public record SearchSpaceSubgraph(
+    String inputExpression,
+    List&lt;Node&gt; nodes,
+    List&lt;Edge&gt; edges,
+    int maxDepth,
+    int maxStates
+) {
+<span class="nc" id="L26">    public SearchSpaceSubgraph {</span>
+<span class="nc" id="L27">        nodes = List.copyOf(nodes);</span>
+<span class="nc" id="L28">        edges = List.copyOf(edges);</span>
+<span class="nc" id="L29">    }</span>
+
+    /** Backwards-compatible constructor that infers {@code maxStates} from the node count. */
+    public SearchSpaceSubgraph(String inputExpression, List&lt;Node&gt; nodes, List&lt;Edge&gt; edges, int maxDepth) {
+<span class="nc" id="L33">        this(inputExpression, nodes, edges, maxDepth, nodes.size());</span>
+<span class="nc" id="L34">    }</span>
+
+    /**
+     * Roles describing how a state relates to the explored equivalence classes.
+     *
+     * &lt;p&gt;The role is intentionally neutral: a state is only labelled a
+     * {@link #CONVERGENCE_TARGET} when several distinct transformation paths actually
+     * converge on it. Otherwise canonical states stay {@link #CANONICAL_REPRESENTATIVE}
+     * or {@link #EQUIVALENT_STATE} so readers do not over-interpret the diagram.
+     */
+<span class="nc" id="L44">    public enum StateRole {</span>
+        /** The root/input expression the search started from. */
+<span class="nc" id="L46">        ROOT,</span>
+        /** An ordinary explored or reconstructed search state. */
+<span class="nc" id="L48">        SEARCH_STATE,</span>
+        /** A canonical representative of an equivalence class (no proven convergence). */
+<span class="nc" id="L50">        CANONICAL_REPRESENTATIVE,</span>
+        /** A non-canonical member of an equivalence class shared with another node. */
+<span class="nc" id="L52">        EQUIVALENT_STATE,</span>
+        /** A state where several distinct transformation paths actually converge. */
+<span class="nc" id="L54">        CONVERGENCE_TARGET</span>
+    }
+
+    public record Node(
+        String id,
+        String expression,
+        String canonicalKey,
+        Set&lt;PathMembership&gt; pathMembership,
+        Set&lt;RuleFamily&gt; ruleFamilies,
+        StateRole role,
+        int depth,
+        int score,
+        boolean isTarget,
+        boolean isConvergencePoint,
+        boolean originallyExplored,
+        boolean isOnDidacticPath,
+        boolean isOnMacroPath,
+        boolean isDeadEnd,
+        boolean notSelected
+    ) {
+<span class="nc" id="L74">        public Node {</span>
+<span class="nc" id="L75">            pathMembership = Set.copyOf(pathMembership);</span>
+<span class="nc" id="L76">            ruleFamilies = Set.copyOf(ruleFamilies);</span>
+<span class="nc" id="L77">        }</span>
+    }
+
+<span class="nc" id="L80">    public record Edge(</span>
+        String id,
+        String fromId,
+        String toId,
+        String ruleId,
+        RuleFamily ruleFamily,
+        int depth,
+        int score,
+        boolean isTarget,
+        boolean isOnDidacticPath,
+        boolean isOnMacroPath,
+        boolean isDeadEnd,
+        boolean notSelected
+    ) {
+    }
+
+<span class="nc" id="L96">    public enum PathMembership {</span>
+<span class="nc" id="L97">        DIDACTIC,</span>
+<span class="nc" id="L98">        MACRO,</span>
+<span class="nc" id="L99">        TARGET,</span>
+<span class="nc" id="L100">        ALTERNATIVE</span>
+    }
+
+    /** Number of states that were originally explored by the search (not reconstructed). */
+    public long originallyExploredCount() {
+<span class="nc" id="L105">        return nodes.stream().filter(Node::originallyExplored).count();</span>
+    }
+
+    /** Number of states added only to reconstruct the bounded visualization. */
+    public long reconstructedCount() {
+<span class="nc" id="L110">        return nodes.size() - originallyExploredCount();</span>
+    }
+
+    /** States that several distinct transformation paths actually converge on. */
+    public List&lt;Node&gt; convergenceTargets() {
+<span class="nc" id="L115">        return nodes.stream().filter(Node::isConvergencePoint).toList();</span>
+    }
+
+    /**
+     * Groups node ids by their canonical equivalence-class key, keeping only classes that
+     * contain more than one rendered state.
+     */
+    public Map&lt;String, List&lt;String&gt;&gt; equivalenceClasses() {
+<span class="nc" id="L123">        Map&lt;String, List&lt;String&gt;&gt; byKey = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        for (Node node : nodes) {</span>
+<span class="nc" id="L125">            byKey.computeIfAbsent(node.canonicalKey(), ignored -&gt; new ArrayList&lt;&gt;()).add(node.id());</span>
+<span class="nc" id="L126">        }</span>
+<span class="nc" id="L127">        Map&lt;String, List&lt;String&gt;&gt; classes = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L128">        byKey.forEach((key, ids) -&gt; {</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (ids.size() &gt; 1) {</span>
+<span class="nc" id="L130">                classes.put(key, List.copyOf(ids));</span>
+            }
+<span class="nc" id="L132">        });</span>
+<span class="nc" id="L133">        return classes;</span>
+    }
+
+    /**
+     * Returns a compact subgraph limited to at most {@code maxNodes} states (unless the
+     * essential root/target/convergence states alone already exceed that budget). Essential
+     * states are kept first, then as many selected-path states and alternatives as fit, so the
+     * core convergence story stays intact. Edges that would dangle after pruning are dropped.
+     */
+    public SearchSpaceSubgraph compact(int maxNodes) {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (nodes.size() &lt;= maxNodes) {</span>
+<span class="nc" id="L144">            return this;</span>
+        }
+<span class="nc" id="L146">        Set&lt;String&gt; keep = new LinkedHashSet&lt;&gt;();</span>
+        // 1. Essential states: root, targets and true convergence points.
+<span class="nc" id="L148">        addUntilBudget(keep, maxNodes, nodes.stream()</span>
+<span class="nc bnc" id="L149" title="All 6 branches missed.">            .filter(node -&gt; node.depth() == 0 || node.isTarget() || node.isConvergencePoint()));</span>
+        // 2. Selected-path states (didactic first, then macro) closest to the root.
+<span class="nc" id="L151">        addUntilBudget(keep, maxNodes, nodes.stream()</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">            .filter(node -&gt; node.isOnDidacticPath() || node.isOnMacroPath())</span>
+<span class="nc" id="L153">            .sorted((a, b) -&gt; Integer.compare(a.depth(), b.depth())));</span>
+        // 3. Remaining alternatives by depth then score.
+<span class="nc" id="L155">        addUntilBudget(keep, maxNodes, nodes.stream()</span>
+<span class="nc" id="L156">            .sorted((a, b) -&gt; {</span>
+<span class="nc" id="L157">                int byDepth = Integer.compare(a.depth(), b.depth());</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                if (byDepth != 0) {</span>
+<span class="nc" id="L159">                    return byDepth;</span>
+                }
+<span class="nc" id="L161">                int byScore = Integer.compare(a.score(), b.score());</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                return byScore != 0 ? byScore : a.id().compareTo(b.id());</span>
+            }));
+<span class="nc" id="L164">        List&lt;Node&gt; keptNodes = nodes.stream().filter(node -&gt; keep.contains(node.id())).toList();</span>
+<span class="nc" id="L165">        List&lt;Edge&gt; keptEdges = edges.stream()</span>
+<span class="nc bnc" id="L166" title="All 4 branches missed.">            .filter(edge -&gt; keep.contains(edge.fromId()) &amp;&amp; keep.contains(edge.toId()))</span>
+<span class="nc" id="L167">            .toList();</span>
+<span class="nc" id="L168">        int compactMaxDepth = keptNodes.stream().mapToInt(Node::depth).max().orElse(0);</span>
+<span class="nc" id="L169">        return new SearchSpaceSubgraph(inputExpression, keptNodes, keptEdges, compactMaxDepth, maxNodes);</span>
+    }
+
+    private void addUntilBudget(Set&lt;String&gt; keep, int maxNodes, java.util.stream.Stream&lt;Node&gt; candidates) {
+<span class="nc" id="L173">        candidates.forEachOrdered(node -&gt; {</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">            if (keep.size() &lt; maxNodes || keep.contains(node.id())) {</span>
+<span class="nc" id="L175">                keep.add(node.id());</span>
+            }
+<span class="nc" id="L177">        });</span>
+<span class="nc" id="L178">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
