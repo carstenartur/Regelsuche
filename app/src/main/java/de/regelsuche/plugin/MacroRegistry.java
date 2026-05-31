@@ -28,6 +28,16 @@ public final class MacroRegistry {
         }
     }
 
+    public List<RuleMacro> enabledMacros() {
+        List<RuleMacro> enabled = new ArrayList<>();
+        for (MutableMacroRegistration registration : macros.values()) {
+            if (registration.enabled) {
+                enabled.add(registration.macro);
+            }
+        }
+        return List.copyOf(enabled);
+    }
+
     public List<MacroRegistration> registrations() {
         List<MacroRegistration> registrations = new ArrayList<>();
         for (MutableMacroRegistration registration : macros.values()) {

@@ -77,6 +77,45 @@ class PluginRuntimeTest {
     }
 
     @Test
+    void enabledMacrosAppearAsTransformationEdgesInSearch(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of(),
+            Set.of()
+        ))) {
+            assertTrue(runtime.macroTransformations().stream()
+                .anyMatch(transformation -> transformation.id().equals("macro.expand_square")));
+
+            List<Transformation> transformations = runtime.createTransformationEngine().transform("(a + b)^2");
+            assertTrue(transformations.stream().anyMatch(transformation ->
+                transformation.rule().equals("macro.expand_square")
+                    && canonicalizer.canonicalize(transformation.transformedExpression())
+                    .equals(canonicalizer.canonicalize("a^2 + 2*a*b + b^2"))
+            ));
+        }
+    }
+
+    @Test
+    void disabledMacrosDoNotProduceTransformationEdges(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of(),
+            Set.of("expand_square")
+        ))) {
+            assertFalse(runtime.macroTransformations().stream()
+                .anyMatch(transformation -> transformation.id().equals("macro.expand_square")));
+
+            List<Transformation> transformations = runtime.createTransformationEngine().transform("(a + b)^2");
+            assertFalse(transformations.stream().anyMatch(transformation ->
+                transformation.rule().equals("macro.expand_square")));
+        }
+    }
+
+    @Test
     void disabledRulesAreNotApplied(@TempDir Path tempDir) {
         try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
             tempDir.resolve("plugins"),

@@ -33,6 +33,7 @@ public final class PluginRuntime implements AutoCloseable {
     private MacroRegistry macroRegistry = new MacroRegistry();
     private List<LoadedPlugin> loadedPlugins = List.of();
     private List<RuntimeDiagnostic> diagnostics = List.of();
+    private List<PatternTransformation> macroTransformations = List.of();
     private URLClassLoader externalPluginClassLoader;
 
     public PluginRuntime() {
@@ -58,6 +59,7 @@ public final class PluginRuntime implements AutoCloseable {
         loadExternalPlugins(discoveredPlugins, discoveredDiagnostics);
         loadRuleFiles(discoveredDiagnostics);
         disableConfiguredRules();
+        this.macroTransformations = buildMacroTransformations(discoveredDiagnostics);
         loadedPlugins = List.copyOf(discoveredPlugins);
         diagnostics = List.copyOf(discoveredDiagnostics);
     }
@@ -90,7 +92,12 @@ public final class PluginRuntime implements AutoCloseable {
         List<RewriteRule> combined = new ArrayList<>(de.regelsuche.transform.AstRewriteTransformationEngine.defaultRules());
         combined.addAll(ruleRegistry.enabledRules());
         combined.addAll(transformationRegistry.enabledTransformations());
+        combined.addAll(macroTransformations);
         return new PluginAwareAstRewriteTransformationEngine(combined, astVisitorRegistry);
+    }
+
+    public List<PatternTransformation> macroTransformations() {
+        return macroTransformations;
     }
 
     public List<RegisteredRuleView> registeredRules() {
@@ -220,7 +227,35 @@ public final class PluginRuntime implements AutoCloseable {
         for (String disabledRuleId : disabledRuleIds) {
             ruleRegistry.disable(disabledRuleId);
             transformationRegistry.disable(disabledRuleId);
+            macroRegistry.disable(disabledRuleId);
         }
+    }
+
+    private List<PatternTransformation> buildMacroTransformations(List<RuntimeDiagnostic> discoveredDiagnostics) {
+        RulePatternParser patternParser = new RulePatternParser();
+        List<PatternTransformation> built = new ArrayList<>();
+        for (RuleMacro macro : macroRegistry.enabledMacros()) {
+            try {
+                PatternExpr source = PatternExprMapper.toPatternExpr(patternParser.parse(macro.input()));
+                PatternExpr target = PatternExprMapper.toPatternExpr(patternParser.parse(macro.output()));
+                built.add(new PatternBasedTransformation(
+                    "macro." + macro.id(),
+                    source,
+                    target,
+                    RewriteKind.NORMALIZE,
+                    false,
+                    0,
+                    true,
+                    macro.explanation()
+                ));
+            } catch (RuntimeException ex) {
+                discoveredDiagnostics.add(new RuntimeDiagnostic(
+                    "macro:" + macro.id(),
+                    "Could not compile macro into a transformation: " + ex.getMessage()
+                ));
+            }
+        }
+        return List.copyOf(built);
     }
 
     private boolean isRuleFile(Path path) {

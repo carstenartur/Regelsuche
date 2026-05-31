@@ -16,4 +16,4 @@ macro expand_square:
     - macro
 ```
 
-Makros werden aktuell geladen, gelistet und deaktivierbar verwaltet. Die Such- und UI-Integration kann darauf aufbauend in weiteren Phasen erweitert werden.
+Makros werden geladen, gelistet und deaktivierbar verwaltet. Aktivierte Makros werden zusätzlich als einstufige Transformationskanten (`macro.<id>`) in den Suchgraphen eingebunden, sodass sie wie reguläre Umformungen während der Suche angewendet werden. Ein über `--disable-rule <id>` oder die Konfiguration deaktiviertes Makro erzeugt keine solche Kante.
