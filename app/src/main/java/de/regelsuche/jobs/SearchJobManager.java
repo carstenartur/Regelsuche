@@ -5,8 +5,13 @@ import de.regelsuche.checkpoint.SearchCheckpoint;
 import de.regelsuche.checkpoint.SearchCheckpointRepository;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.SimplificationSuccess;
 import de.regelsuche.search.TransformationSearchService;
+import de.regelsuche.search.estimate.SearchSpaceEstimate;
+import de.regelsuche.search.estimate.SearchSpaceEstimator;
+import de.regelsuche.graph.GraphEdge;
+import de.regelsuche.graph.GraphSnapshot;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -21,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,6 +64,7 @@ public class SearchJobManager {
     private final Map<String, JobHandle> jobs = new ConcurrentHashMap<>();
     private final Function<SearchJob, TransformationSearchService> serviceFactory;
     private final SearchCheckpointRepository checkpointRepository;
+    private final SearchSpaceEstimator searchSpaceEstimator = new SearchSpaceEstimator();
 
     public SearchJobManager(Function<SearchJob, TransformationSearchService> serviceFactory) {
         this(serviceFactory, new InMemorySearchCheckpointRepository());
@@ -82,12 +89,20 @@ public class SearchJobManager {
             inputType.name(),
             profile,
             SearchJob.State.QUEUED,
+            "queued",
             null,
             null,
             0,
             0,
             null,
             0,
+            expression,
+            false,
+            0L,
+            1.0,
+            0L,
+            "LOW",
+            null,
             notes == null ? List.of() : notes
         );
         JobHandle handle = new JobHandle(job);
@@ -154,12 +169,20 @@ public class SearchJobManager {
             builder.append(",\"inputType\":").append(quote(job.inputType()));
             builder.append(",\"profile\":").append(quote(job.profile()));
             builder.append(",\"state\":").append(quote(job.state().name()));
+            builder.append(",\"activePhase\":").append(quote(job.activePhase()));
             builder.append(",\"createdAt\":").append(quote(job.createdAt().toString()));
             builder.append(",\"updatedAt\":").append(quote(job.updatedAt().toString()));
             builder.append(",\"exploredStates\":").append(job.exploredStates());
             builder.append(",\"discoveredSuccesses\":").append(job.discoveredSuccesses());
             builder.append(",\"bestExpression\":").append(quote(job.bestExpression()));
             builder.append(",\"bestImprovement\":").append(job.bestImprovement());
+            builder.append(",\"lastProcessedExpression\":").append(quote(job.lastProcessedExpression()));
+            builder.append(",\"resumable\":").append(job.resumable());
+            builder.append(",\"knownStateCount\":").append(job.knownStateCount());
+            builder.append(",\"estimatedBranchingFactor\":").append(job.estimatedBranchingFactor());
+            builder.append(",\"projectedStateCount\":").append(job.projectedStateCount());
+            builder.append(",\"searchSpaceRisk\":").append(quote(job.searchSpaceRisk()));
+            builder.append(",\"searchSpaceWarning\":").append(quote(job.searchSpaceWarning()));
             builder.append('}');
             if (i < all.size() - 1) {
                 builder.append(',');
@@ -207,12 +230,20 @@ public class SearchJobManager {
                 raw.getOrDefault("inputType", "TERM"),
                 raw.getOrDefault("profile", "FAST_SIMPLIFY"),
                 SearchJob.State.valueOf(raw.getOrDefault("state", "QUEUED")),
+                raw.getOrDefault("activePhase", null),
                 raw.containsKey("createdAt") ? java.time.Instant.parse(raw.get("createdAt")) : null,
                 raw.containsKey("updatedAt") ? java.time.Instant.parse(raw.get("updatedAt")) : null,
                 parseInt(raw.get("discoveredSuccesses")),
                 parseInt(raw.get("exploredStates")),
                 raw.getOrDefault("bestExpression", null),
                 parseInt(raw.get("bestImprovement")),
+                raw.getOrDefault("lastProcessedExpression", raw.getOrDefault("expression", null)),
+                parseBoolean(raw.get("resumable")),
+                parseLong(raw.get("knownStateCount")),
+                parseDouble(raw.get("estimatedBranchingFactor"), 1.0),
+                parseLong(raw.get("projectedStateCount")),
+                raw.getOrDefault("searchSpaceRisk", "LOW"),
+                raw.getOrDefault("searchSpaceWarning", null),
                 List.of()
             );
             jobs.put(job.id(), new JobHandle(job).pausedFromRestore());
@@ -320,6 +351,32 @@ public class SearchJobManager {
         }
     }
 
+    private static long parseLong(String raw) {
+        if (raw == null || raw.isBlank() || raw.equals("null")) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(raw.trim());
+        } catch (NumberFormatException ex) {
+            return 0L;
+        }
+    }
+
+    private static double parseDouble(String raw, double defaultValue) {
+        if (raw == null || raw.isBlank() || raw.equals("null")) {
+            return defaultValue;
+        }
+        try {
+            return Double.parseDouble(raw.trim());
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
+    private static boolean parseBoolean(String raw) {
+        return raw != null && Boolean.parseBoolean(raw.trim());
+    }
+
     private static String quote(String value) {
         if (value == null) {
             return "null";
@@ -357,7 +414,7 @@ public class SearchJobManager {
         }
 
         JobHandle pausedFromRestore() {
-            state.updateAndGet(current -> current.withState(SearchJob.State.PAUSED));
+            state.updateAndGet(current -> current.withState(SearchJob.State.PAUSED).withActivePhase("paused"));
             return this;
         }
 
@@ -401,12 +458,20 @@ public class SearchJobManager {
                     current.inputType(),
                     current.profile(),
                     SearchJob.State.RUNNING,
+                    "searching",
                     current.createdAt(),
                     Instant.now(),
                     current.discoveredSuccesses(),
                     current.exploredStates(),
                     current.bestExpression(),
                     current.bestImprovement(),
+                    cp.resumeSeed(),
+                    false,
+                    current.knownStateCount(),
+                    current.estimatedBranchingFactor(),
+                    current.projectedStateCount(),
+                    current.searchSpaceRisk(),
+                    current.searchSpaceWarning(),
                     current.notes()
                 );
                 state.set(resumed);
@@ -438,6 +503,7 @@ public class SearchJobManager {
         private void launch(SearchJob current) {
             TransformationSearchService service = serviceFactory.apply(current);
             activeService = service;
+            state.updateAndGet(snapshot -> snapshot.withActivePhase("searching"));
             CompletableFuture<Void> future = service.submit(
                 new InputRequest(InputType.valueOf(current.inputType()), current.expression())
             );
@@ -447,13 +513,30 @@ public class SearchJobManager {
 
         private void finalizeRun(TransformationSearchService service, Throwable error) {
             try {
+                state.updateAndGet(current -> current.withActivePhase("finalizing"));
                 List<SimplificationSuccess> successes = service.getSuccesses();
-                int explored = service.getGraphSnapshot().nodes().size();
+                GraphSnapshot snapshot = service.getGraphSnapshot();
+                int explored = snapshot.nodes().size();
                 Optional<SimplificationSuccess> best = service.getBestSolution();
                 String bestExpr = best.map(SimplificationSuccess::simplifiedExpression).orElse(null);
                 int improvement = best.map(SimplificationSuccess::improvement).orElse(0);
+                String lastProcessed = lastProcessedExpression(snapshot, bestExpr, state.get().expression());
                 state.updateAndGet(current ->
-                    current.withProgress(explored, successes.size(), bestExpr, improvement));
+                    current.withProgress(explored, successes.size(), bestExpr, improvement, lastProcessed));
+
+                SearchHeuristic heuristic = service.heuristic();
+                SearchSpaceEstimate estimate = searchSpaceEstimator.estimate(
+                    statesPerDepth(snapshot),
+                    heuristic.maxDepth(),
+                    heuristic.maxVisitedExpressions()
+                );
+                state.updateAndGet(current -> current.withSearchSpaceEstimate(
+                    estimate.knownStateCount(),
+                    estimate.estimatedBranchingFactor(),
+                    estimate.projectedStateCount(),
+                    estimate.risk().name(),
+                    estimate.warning()
+                ));
 
                 // Always persist a checkpoint so a later resume can pick up.
                 writeCheckpoint(service, successes);
@@ -463,7 +546,7 @@ public class SearchJobManager {
                 } else if (pauseRequested && state.get().state() != SearchJob.State.CANCELLED) {
                     state.updateAndGet(current -> current.withState(SearchJob.State.PAUSED));
                 } else if (state.get().state() == SearchJob.State.CANCELLED) {
-                    // keep cancelled
+                    state.updateAndGet(current -> current.withState(SearchJob.State.CANCELLED));
                 } else {
                     state.updateAndGet(current -> current.withState(SearchJob.State.DONE));
                 }
@@ -503,6 +586,45 @@ public class SearchJobManager {
                 Instant.now()
             );
             checkpointRepository.save(checkpoint);
+        }
+
+        private String lastProcessedExpression(GraphSnapshot snapshot, String bestExpression, String fallback) {
+            if (bestExpression != null && !bestExpression.isBlank()) {
+                return bestExpression;
+            }
+            if (!snapshot.nodes().isEmpty()) {
+                return snapshot.nodes().get(snapshot.nodes().size() - 1);
+            }
+            return fallback;
+        }
+
+        private List<Long> statesPerDepth(GraphSnapshot snapshot) {
+            if (snapshot.nodes().isEmpty()) {
+                return List.of();
+            }
+            Map<Integer, Set<String>> perDepth = new TreeMap<>();
+            Set<String> targets = new LinkedHashSet<>();
+            for (GraphEdge edge : snapshot.edges()) {
+                targets.add(edge.toExpression());
+                perDepth.computeIfAbsent(Math.max(edge.depth(), 0), ignored -> new LinkedHashSet<>())
+                    .add(edge.toExpression());
+            }
+            Set<String> roots = new LinkedHashSet<>();
+            for (GraphEdge edge : snapshot.edges()) {
+                if (!targets.contains(edge.fromExpression())) {
+                    roots.add(edge.fromExpression());
+                }
+            }
+            if (roots.isEmpty()) {
+                roots.add(snapshot.nodes().get(0));
+            }
+            perDepth.computeIfAbsent(0, ignored -> new LinkedHashSet<>()).addAll(roots);
+            List<Long> result = new ArrayList<>();
+            int maxDepth = perDepth.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+            for (int depth = 0; depth <= maxDepth; depth++) {
+                result.add((long) perDepth.getOrDefault(depth, Set.of()).size());
+            }
+            return result;
         }
     }
 

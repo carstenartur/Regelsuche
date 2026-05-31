@@ -1,6 +1,7 @@
 package de.regelsuche.jobs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,6 +44,11 @@ class SearchJobManagerTest {
         }
         SearchJob result = manager.get(job.id()).orElseThrow();
         assertEquals(SearchJob.State.DONE, result.state(), "job did not finish: " + result);
+        assertEquals("completed", result.activePhase());
+        assertNotNull(result.lastProcessedExpression());
+        assertTrue(result.knownStateCount() >= 1);
+        assertTrue(result.projectedStateCount() >= result.knownStateCount());
+        assertNotNull(result.searchSpaceRisk());
         manager.shutdown();
     }
 
@@ -66,6 +72,8 @@ class SearchJobManagerTest {
         SearchJob recovered = restored.get(job.id()).orElseThrow();
         assertEquals(job.id(), recovered.id());
         assertEquals(SearchJob.State.PAUSED, recovered.state());
+        assertEquals("paused", recovered.activePhase());
+        assertTrue(recovered.resumable());
         manager.shutdown();
         restored.shutdown();
     }
@@ -78,6 +86,8 @@ class SearchJobManagerTest {
         Thread.sleep(50);
         SearchJob result = manager.get(job.id()).orElseThrow();
         assertEquals(SearchJob.State.CANCELLED, result.state());
+        assertEquals("cancelled", result.activePhase());
+        assertFalse(result.resumable());
         manager.shutdown();
     }
 }
