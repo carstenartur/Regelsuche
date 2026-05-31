@@ -29,9 +29,10 @@ Treibt den Web-Workbench mit echten Browser-Flows an. Jeder Test:
 Vor dem ersten Lauf zieht der Sub-Task `installPlaywrightBrowsers`
 Chromium ins lokale `~/.cache/ms-playwright/`. Dieser Schritt ist
 idempotent.
-CI trennt Installation und Testausführung: erst `./gradlew installPlaywrightBrowsers`,
-dann `./gradlew e2eTest -Pregelsuche.skipPlaywrightInstall=true`, damit während
-der eigentlichen Browser-Tests keine externen Downloads stattfinden.
+CI trennt Installation und Testausführung: erst
+`./gradlew installPlaywrightHostDependencies installPlaywrightBrowsers`, dann
+`./gradlew e2eTest -Pregelsuche.skipPlaywrightInstall=true`, damit während der
+eigentlichen Browser-Tests keine externen Downloads stattfinden.
 
 Die Browser-Tests verwenden bewusst eine in-Process-Server-Variante statt
 Testcontainers für schnelle Feedback-Loops — ein In-Process-Start ist eine
