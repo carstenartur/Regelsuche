@@ -358,7 +358,7 @@ class PluginRuntimeTest {
     }
 
     @Test
-    void activeProfileFiltersAllPluginExtensionRegistries(@TempDir Path tempDir) throws Exception {
+    void activeProfileFiltersAllPluginRegistries(@TempDir Path tempDir) throws Exception {
         Path rulesDir = tempDir.resolve("rules");
         Files.createDirectories(rulesDir);
         Files.writeString(rulesDir.resolve("profiles.regelsuche"), """
@@ -389,6 +389,8 @@ class PluginRuntimeTest {
                 .anyMatch(parser -> parser.id().equals("unicode-square-parser") && !parser.enabled()));
             assertTrue(runtime.exampleRegistry().registrations().stream()
                 .anyMatch(examples -> examples.id().equals("binomial-examples") && !examples.enabled()));
+            assertTrue(runtime.astVisitorRegistry().registrations().stream()
+                .anyMatch(visitor -> visitor.id().equals("binomial-pattern-visitor") && !visitor.enabled()));
         }
     }
 

@@ -400,6 +400,7 @@ public final class PluginRuntime implements AutoCloseable {
         applyProfileToExtensions(profile, explanationRegistry);
         applyProfileToExtensions(profile, parserExtensionRegistry);
         applyProfileToExtensions(profile, exampleRegistry);
+        applyProfileToVisitors(profile, astVisitorRegistry);
         for (String conflict : profile.conflictingIds()) {
             discoveredDiagnostics.add(new RuntimeDiagnostic(
                 "profile:" + activeProfile,
@@ -418,6 +419,14 @@ public final class PluginRuntime implements AutoCloseable {
     ) {
         for (PluginExtensionRegistry.ExtensionRegistration<T> registration : registry.registrations()) {
             if (registration.enabled() && !profile.includes(registration.id(), registration.extension().tags())) {
+                registry.disable(registration.id());
+            }
+        }
+    }
+
+    private void applyProfileToVisitors(RuleProfile profile, AstVisitorRegistry registry) {
+        for (AstVisitorRegistry.VisitorRegistration registration : registry.registrations()) {
+            if (registration.enabled() && !profile.includes(registration.id(), List.of())) {
                 registry.disable(registration.id());
             }
         }
