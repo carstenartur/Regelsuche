@@ -2,6 +2,7 @@ package de.regelsuche.docs;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -17,7 +18,9 @@ import java.util.Map;
 
 public final class DocsDiscoveryGalleryGenerator {
     public static final String GENERATED_BY = "DocsDiscoveryGalleryGenerator";
-    private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper JSON = new ObjectMapper()
+            .findAndRegisterModules()
+            .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
     private static final List<String> PUBLIC_SCENARIO_IDS = List.of("complete-square-factorization", "sophie-germain");
 
     private final DiscoveryBenchmarkScenarioLoader scenarioLoader = new DiscoveryBenchmarkScenarioLoader();
