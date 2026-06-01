@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryBenchmarkScenario.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryBenchmarkScenario.java</span></div><h1>DiscoveryBenchmarkScenario.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.benchmark.DiscoveryExpectation;
+import de.regelsuche.knowledge.SearchEffect;
+import java.util.List;
+
+public record DiscoveryBenchmarkScenario(
+        String id,
+        String displayName,
+        String inputExpression,
+        String targetExpression,
+        List&lt;DiscoveryExpectation&gt; expectations,
+        List&lt;String&gt; enabledOperators,
+        List&lt;String&gt; enabledRulePacks,
+        List&lt;SearchEffect&gt; requiredBridgeEffects,
+        List&lt;String&gt; requiredRuleFamilies,
+        List&lt;String&gt; requiredBridgeRules,
+        MacroLearning macroLearning,
+        Budgets budgets,
+        Gallery gallery) {
+<span class="fc" id="L21">    public DiscoveryBenchmarkScenario {</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        expectations = expectations == null ? List.of() : List.copyOf(expectations);</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        enabledOperators = enabledOperators == null ? List.of() : List.copyOf(enabledOperators);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        enabledRulePacks = enabledRulePacks == null ? List.of() : List.copyOf(enabledRulePacks);</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        requiredBridgeEffects = requiredBridgeEffects == null ? List.of() : List.copyOf(requiredBridgeEffects);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        requiredRuleFamilies = requiredRuleFamilies == null ? List.of() : List.copyOf(requiredRuleFamilies);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        requiredBridgeRules = requiredBridgeRules == null ? List.of() : List.copyOf(requiredBridgeRules);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        macroLearning = macroLearning == null ? new MacroLearning(false, null, null) : macroLearning;</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        gallery = gallery == null ? new Gallery(false, 1, 1) : gallery;</span>
+<span class="fc" id="L30">    }</span>
+
+<span class="fc" id="L32">    public record MacroLearning(boolean enabled, String reuseInputExpression, String expectedMacroRule) {</span>
+    }
+
+<span class="fc" id="L35">    public record Budgets(int maxDepth, int maxStates, long timeoutMillis) {</span>
+    }
+
+<span class="fc" id="L38">    public record Gallery(boolean generateSvg, int preferredPathCount, int minVisibleNodes) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

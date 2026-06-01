@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryBenchmarkScenarioLoader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryBenchmarkScenarioLoader.java</span></div><h1>DiscoveryBenchmarkScenarioLoader.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import de.regelsuche.benchmark.DiscoveryExpectation;
+import de.regelsuche.knowledge.SearchEffect;
+import de.regelsuche.transform.RewriteKind;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.net.JarURLConnection;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.Enumeration;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+
+<span class="fc" id="L28">public final class DiscoveryBenchmarkScenarioLoader {</span>
+<span class="fc" id="L29">    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory()).findAndRegisterModules();</span>
+
+    public DiscoveryBenchmarkScenario load(String resourceName) {
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        String path = resourceName.startsWith(&quot;/&quot;) ? resourceName.substring(1) : resourceName;</span>
+<span class="fc" id="L33">        try (InputStream input = Thread.currentThread().getContextClassLoader().getResourceAsStream(path)) {</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            if (input == null) {</span>
+<span class="nc" id="L35">                throw new IllegalArgumentException(&quot;Scenario resource not found: &quot; + path);</span>
+            }
+<span class="fc" id="L37">            ScenarioYaml yaml = YAML.readValue(input, ScenarioYaml.class);</span>
+<span class="fc" id="L38">            DiscoveryBenchmarkScenario scenario = toScenario(yaml);</span>
+<span class="fc" id="L39">            validate(scenario);</span>
+<span class="fc" id="L40">            return scenario;</span>
+<span class="nc" id="L41">        } catch (IOException exception) {</span>
+<span class="nc" id="L42">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    public List&lt;DiscoveryBenchmarkScenario&gt; loadAll(String resourceDirectory) {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        String directory = resourceDirectory.endsWith(&quot;/&quot;) ? resourceDirectory.substring(0, resourceDirectory.length() - 1) : resourceDirectory;</span>
+<span class="fc" id="L48">        return listScenarioResources(directory).stream()</span>
+<span class="fc" id="L49">                .sorted(Comparator.naturalOrder())</span>
+<span class="fc" id="L50">                .map(resource -&gt; load(directory + &quot;/&quot; + resource))</span>
+<span class="fc" id="L51">                .toList();</span>
+    }
+
+    private List&lt;String&gt; listScenarioResources(String directory) {
+        try {
+<span class="fc" id="L56">            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();</span>
+<span class="fc" id="L57">            Enumeration&lt;URL&gt; resources = classLoader.getResources(directory);</span>
+<span class="fc" id="L58">            LinkedHashSet&lt;String&gt; names = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            while (resources.hasMoreElements()) {</span>
+<span class="fc" id="L60">                URL url = resources.nextElement();</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                if (&quot;jar&quot;.equals(url.getProtocol())) {</span>
+<span class="nc" id="L62">                    names.addAll(listFromJar(directory, url));</span>
+                } else {
+<span class="fc" id="L64">                    names.addAll(listFromFile(url, directory));</span>
+                }
+<span class="fc" id="L66">            }</span>
+<span class="pc bpc" id="L67" title="1 of 4 branches missed.">            if (names.isEmpty() &amp;&amp; classLoader instanceof URLClassLoader urlClassLoader) {</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                for (URL url : urlClassLoader.getURLs()) {</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                    if (url.getPath().endsWith(&quot;.jar&quot;)) {</span>
+<span class="fc" id="L70">                        names.addAll(listFromJarFile(Path.of(url.toURI()), directory));</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (names.isEmpty()) {</span>
+<span class="nc" id="L75">                throw new IllegalArgumentException(&quot;Scenario directory not found: &quot; + directory);</span>
+            }
+<span class="fc" id="L77">            return List.copyOf(names);</span>
+<span class="nc" id="L78">        } catch (IOException exception) {</span>
+<span class="nc" id="L79">            throw new UncheckedIOException(exception);</span>
+<span class="nc" id="L80">        } catch (URISyntaxException exception) {</span>
+<span class="nc" id="L81">            throw new IllegalStateException(&quot;Unable to list scenario resources for &quot; + directory, exception);</span>
+        }
+    }
+
+    private List&lt;String&gt; listFromFile(URL url, String directory) {
+        try {
+<span class="fc" id="L87">            return Files.list(Path.of(url.toURI()))</span>
+<span class="fc" id="L88">                    .filter(path -&gt; path.getFileName().toString().endsWith(&quot;.yaml&quot;))</span>
+<span class="fc" id="L89">                    .map(path -&gt; path.getFileName().toString())</span>
+<span class="fc" id="L90">                    .toList();</span>
+<span class="nc" id="L91">        } catch (IOException exception) {</span>
+<span class="nc" id="L92">            throw new UncheckedIOException(exception);</span>
+<span class="nc" id="L93">        } catch (URISyntaxException exception) {</span>
+<span class="nc" id="L94">            throw new IllegalStateException(&quot;Scenario directory is not addressable as a file: &quot; + directory, exception);</span>
+        }
+    }
+
+    private List&lt;String&gt; listFromJar(String directory, URL url) throws IOException {
+<span class="nc" id="L99">        JarURLConnection connection = (JarURLConnection) url.openConnection();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        String entryName = connection.getEntryName() == null ? directory : connection.getEntryName();</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        String prefix = entryName.endsWith(&quot;/&quot;) ? entryName : entryName + &quot;/&quot;;</span>
+<span class="nc" id="L102">        LinkedHashSet&lt;String&gt; names = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc" id="L103">        try (JarFile jar = connection.getJarFile()) {</span>
+<span class="nc" id="L104">            Enumeration&lt;JarEntry&gt; entries = jar.entries();</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            while (entries.hasMoreElements()) {</span>
+<span class="nc" id="L106">                JarEntry entry = entries.nextElement();</span>
+<span class="nc" id="L107">                String name = entry.getName();</span>
+<span class="nc bnc" id="L108" title="All 6 branches missed.">                if (!entry.isDirectory() &amp;&amp; name.startsWith(prefix) &amp;&amp; name.endsWith(&quot;.yaml&quot;)) {</span>
+<span class="nc" id="L109">                    String relative = name.substring(prefix.length());</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">                    if (!relative.contains(&quot;/&quot;)) {</span>
+<span class="nc" id="L111">                        names.add(relative);</span>
+                    }
+                }
+<span class="nc" id="L114">            }</span>
+        }
+<span class="nc" id="L116">        return List.copyOf(names);</span>
+    }
+
+    private List&lt;String&gt; listFromJarFile(Path jarPath, String directory) throws IOException {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        String prefix = directory.endsWith(&quot;/&quot;) ? directory : directory + &quot;/&quot;;</span>
+<span class="fc" id="L121">        LinkedHashSet&lt;String&gt; names = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L122">        try (JarFile jar = new JarFile(jarPath.toFile())) {</span>
+<span class="fc" id="L123">            Enumeration&lt;JarEntry&gt; entries = jar.entries();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            while (entries.hasMoreElements()) {</span>
+<span class="fc" id="L125">                JarEntry entry = entries.nextElement();</span>
+<span class="fc" id="L126">                String name = entry.getName();</span>
+<span class="pc bpc" id="L127" title="2 of 6 branches missed.">                if (!entry.isDirectory() &amp;&amp; name.startsWith(prefix) &amp;&amp; name.endsWith(&quot;.yaml&quot;)) {</span>
+<span class="fc" id="L128">                    String relative = name.substring(prefix.length());</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                    if (!relative.contains(&quot;/&quot;)) {</span>
+<span class="fc" id="L130">                        names.add(relative);</span>
+                    }
+                }
+<span class="fc" id="L133">            }</span>
+        }
+<span class="fc" id="L135">        return List.copyOf(names);</span>
+    }
+
+    List&lt;ScenarioRulePack&gt; loadRulePacks(DiscoveryBenchmarkScenario scenario) {
+<span class="fc" id="L139">        List&lt;ScenarioRulePack&gt; packs = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (String packId : scenario.enabledRulePacks()) {</span>
+<span class="fc" id="L141">            String path = &quot;discovery-scenario-rules/&quot; + packId + &quot;.yaml&quot;;</span>
+<span class="fc" id="L142">            try (InputStream input = Thread.currentThread().getContextClassLoader().getResourceAsStream(path)) {</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                if (input == null) {</span>
+<span class="fc" id="L144">                    continue;</span>
+                }
+<span class="fc" id="L146">                RulePackYaml yaml = YAML.readValue(input, RulePackYaml.class);</span>
+<span class="fc" id="L147">                ScenarioRulePack pack = toRulePack(yaml);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (!packId.equals(pack.id())) {</span>
+<span class="nc" id="L149">                    throw new IllegalArgumentException(&quot;Rule pack id mismatch for &quot; + packId + &quot;: &quot; + pack.id());</span>
+                }
+<span class="fc" id="L151">                packs.add(pack);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            } catch (IOException exception) {</span>
+<span class="nc" id="L153">                throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L154">            }</span>
+<span class="fc" id="L155">        }</span>
+<span class="fc" id="L156">        return List.copyOf(packs);</span>
+    }
+
+    private DiscoveryBenchmarkScenario toScenario(ScenarioYaml yaml) {
+<span class="fc" id="L160">        return new DiscoveryBenchmarkScenario(</span>
+                yaml.id,
+                yaml.displayName,
+                yaml.inputExpression,
+                yaml.targetExpression,
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                yaml.expectations == null ? List.of() : yaml.expectations.stream().map(DiscoveryExpectation::valueOf).toList(),</span>
+                yaml.enabledOperators,
+                yaml.enabledRulePacks,
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                yaml.requiredBridgeEffects == null ? List.of() : yaml.requiredBridgeEffects.stream().map(SearchEffect::fromExternal).toList(),</span>
+                yaml.requiredRuleFamilies,
+                yaml.requiredBridgeRules,
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                yaml.macroLearning == null ? null : new DiscoveryBenchmarkScenario.MacroLearning(</span>
+                        yaml.macroLearning.enabled,
+                        yaml.macroLearning.reuseInputExpression,
+                        yaml.macroLearning.expectedMacroRule),
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                yaml.budgets == null ? null : new DiscoveryBenchmarkScenario.Budgets(</span>
+                        yaml.budgets.maxDepth,
+                        yaml.budgets.maxStates,
+                        yaml.budgets.timeoutMillis),
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                yaml.gallery == null ? null : new DiscoveryBenchmarkScenario.Gallery(</span>
+                        yaml.gallery.generateSvg,
+                        yaml.gallery.preferredPathCount,
+                        yaml.gallery.minVisibleNodes));
+    }
+
+    private ScenarioRulePack toRulePack(RulePackYaml yaml) {
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        List&lt;ScenarioRule&gt; rules = yaml.rules == null ? List.of() : yaml.rules.stream()</span>
+<span class="fc" id="L187">                .map(rule -&gt; new ScenarioRule(</span>
+                        rule.id,
+                        rule.from,
+                        rule.to,
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                        rule.kind == null ? RewriteKind.NORMALIZE : RewriteKind.valueOf(rule.kind.toUpperCase(Locale.ROOT)),</span>
+                        rule.costDelta,
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                        rule.effects == null ? List.of() : rule.effects.stream().map(SearchEffect::fromExternal).toList(),</span>
+                        rule.family))
+<span class="fc" id="L195">                .toList();</span>
+<span class="fc" id="L196">        return new ScenarioRulePack(yaml.id, rules);</span>
+    }
+
+    private void validate(DiscoveryBenchmarkScenario scenario) {
+<span class="fc" id="L200">        requireText(scenario.id(), &quot;id&quot;);</span>
+<span class="fc" id="L201">        requireText(scenario.inputExpression(), &quot;inputExpression&quot;);</span>
+<span class="fc" id="L202">        requireText(scenario.targetExpression(), &quot;targetExpression&quot;);</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (scenario.expectations().isEmpty()) {</span>
+<span class="nc" id="L204">            throw new IllegalArgumentException(&quot;Scenario must declare expectations: &quot; + scenario.id());</span>
+        }
+<span class="pc bpc" id="L206" title="3 of 6 branches missed.">        if (scenario.budgets() == null || scenario.budgets().maxDepth() &lt;= 0 || scenario.budgets().maxStates() &lt;= 0) {</span>
+<span class="nc" id="L207">            throw new IllegalArgumentException(&quot;Scenario must declare positive budgets: &quot; + scenario.id());</span>
+        }
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (scenario.enabledRulePacks().isEmpty()) {</span>
+<span class="nc" id="L210">            throw new IllegalArgumentException(&quot;Scenario must declare enabledRulePacks: &quot; + scenario.id());</span>
+        }
+<span class="fc" id="L212">        loadRulePacks(scenario);</span>
+<span class="fc" id="L213">    }</span>
+
+    private void requireText(String value, String field) {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (!hasText(value)) {</span>
+<span class="nc" id="L217">            throw new IllegalArgumentException(&quot;Scenario must declare &quot; + field);</span>
+        }
+<span class="fc" id="L219">    }</span>
+
+    private boolean hasText(String value) {
+<span class="pc bpc" id="L222" title="2 of 4 branches missed.">        return value != null &amp;&amp; !value.isBlank();</span>
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L226">    public static final class ScenarioYaml {</span>
+        public String id;
+        public String displayName;
+        public String inputExpression;
+        public String targetExpression;
+<span class="fc" id="L231">        public List&lt;String&gt; expectations = List.of();</span>
+<span class="fc" id="L232">        public List&lt;String&gt; enabledOperators = List.of();</span>
+<span class="fc" id="L233">        public List&lt;String&gt; enabledRulePacks = List.of();</span>
+<span class="fc" id="L234">        public List&lt;String&gt; requiredBridgeEffects = List.of();</span>
+<span class="fc" id="L235">        public List&lt;String&gt; requiredRuleFamilies = List.of();</span>
+<span class="fc" id="L236">        public List&lt;String&gt; requiredBridgeRules = List.of();</span>
+        public MacroLearningYaml macroLearning;
+        public BudgetsYaml budgets;
+        public GalleryYaml gallery;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L243">    public static final class MacroLearningYaml {</span>
+        public boolean enabled;
+        public String reuseInputExpression;
+        public String expectedMacroRule;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L250">    public static final class BudgetsYaml {</span>
+        public int maxDepth;
+        public int maxStates;
+        public long timeoutMillis;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L257">    public static final class GalleryYaml {</span>
+        public boolean generateSvg;
+        public int preferredPathCount;
+        public int minVisibleNodes;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L264">    public static final class RulePackYaml {</span>
+        public String id;
+<span class="fc" id="L266">        public List&lt;RuleYaml&gt; rules = List.of();</span>
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L270">    public static final class RuleYaml {</span>
+        public String id;
+        public String from;
+        public String to;
+        public String kind;
+        public int costDelta;
+<span class="fc" id="L276">        public List&lt;String&gt; effects = List.of();</span>
+        public String family;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

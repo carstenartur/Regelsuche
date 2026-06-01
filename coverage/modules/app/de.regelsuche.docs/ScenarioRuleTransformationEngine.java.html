@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScenarioRuleTransformationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">ScenarioRuleTransformationEngine.java</span></div><h1>ScenarioRuleTransformationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayList;
+import java.util.List;
+
+final class ScenarioRuleTransformationEngine implements TransformationEngine {
+    private final List&lt;ScenarioRule&gt; rules;
+
+<span class="fc" id="L11">    ScenarioRuleTransformationEngine(List&lt;ScenarioRulePack&gt; packs) {</span>
+<span class="fc" id="L12">        this.rules = packs.stream().flatMap(pack -&gt; pack.rules().stream()).toList();</span>
+<span class="fc" id="L13">    }</span>
+
+    @Override
+    public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc" id="L17">        String canonical = canonical(expression);</span>
+<span class="fc" id="L18">        List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        for (ScenarioRule rule : rules) {</span>
+<span class="nc bnc" id="L20" title="All 2 branches missed.">            if (canonical(rule.from()).equals(canonical)) {</span>
+<span class="nc" id="L21">                transformations.add(new Transformation(</span>
+<span class="nc" id="L22">                        rule.id(),</span>
+<span class="nc" id="L23">                        rule.to(),</span>
+<span class="nc" id="L24">                        rule.kind(),</span>
+<span class="nc bnc" id="L25" title="All 2 branches missed.">                        rule.costDelta() &gt; 0,</span>
+<span class="nc" id="L26">                        rule.costDelta(),</span>
+                        true,
+<span class="nc" id="L28">                        rule.id() + &quot;:&quot; + rule.to()));</span>
+            }
+<span class="nc" id="L30">        }</span>
+<span class="fc" id="L31">        return transformations;</span>
+    }
+
+    private String canonical(String expression) {
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

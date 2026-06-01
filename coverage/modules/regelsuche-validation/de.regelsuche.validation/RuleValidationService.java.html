@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-validation</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.validation</a> &gt; <span class="el_source">RuleValidationService.java</span></div><h1>RuleValidationService.java</h1><pre class="source lang-java linenums">package de.regelsuche.validation;
+
+import de.regelsuche.knowledge.RuleStatus;
+import de.regelsuche.knowledge.ValidationExample;
+import de.regelsuche.transform.PatternRewriteRule;
+import java.util.ArrayList;
+import java.util.List;
+
+<span class="fc" id="L9">public final class RuleValidationService {</span>
+    public RuleValidationReport validate(PatternRewriteRule rule, ValidationExamples examples) {
+<span class="fc" id="L11">        List&lt;String&gt; failures = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L12">        int passed = 0;</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        for (ValidationExample example : examples.examples()) {</span>
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">            if (isUsable(example)) {</span>
+<span class="fc" id="L15">                passed++;</span>
+            } else {
+<span class="nc" id="L17">                failures.add(&quot;Invalid example for &quot; + rule.id() + &quot;: &quot; + example);</span>
+            }
+<span class="fc" id="L19">        }</span>
+<span class="pc bpc" id="L20" title="2 of 4 branches missed.">        if (rule.descriptor().status() == RuleStatus.VALIDATED &amp;&amp; examples.examples().isEmpty()) {</span>
+<span class="nc" id="L21">            failures.add(&quot;VALIDATED rule has no examples: &quot; + rule.id());</span>
+        }
+<span class="pc bpc" id="L23" title="1 of 4 branches missed.">        if (rule.descriptor().status() == RuleStatus.VALIDATED &amp;&amp; !examples.counterexamples().isEmpty()) {</span>
+<span class="fc" id="L24">            failures.add(&quot;VALIDATED rule has counterexamples: &quot; + rule.id());</span>
+        }
+<span class="fc" id="L26">        return new RuleValidationReport(</span>
+<span class="fc" id="L27">                rule.id(),</span>
+<span class="fc" id="L28">                rule.descriptor().status().name(),</span>
+                passed,
+<span class="fc" id="L30">                examples.examples().size(),</span>
+<span class="fc" id="L31">                examples.generatedInstantiations(),</span>
+<span class="fc" id="L32">                examples.counterexamples(),</span>
+                failures);
+    }
+
+    private boolean isUsable(ValidationExample example) {
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        return example != null</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                &amp;&amp; !normalize(example.from()).isBlank()</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                &amp;&amp; !normalize(example.to()).isBlank()</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                &amp;&amp; !normalize(example.from()).equals(normalize(example.to()));</span>
+    }
+
+    private String normalize(String expression) {
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

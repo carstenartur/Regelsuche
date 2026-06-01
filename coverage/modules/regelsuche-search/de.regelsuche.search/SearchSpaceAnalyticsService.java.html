@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceAnalyticsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search</a> &gt; <span class="el_source">SearchSpaceAnalyticsService.java</span></div><h1>SearchSpaceAnalyticsService.java</h1><pre class="source lang-java linenums">package de.regelsuche.search;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+<span class="fc" id="L9">public final class SearchSpaceAnalyticsService {</span>
+    public SearchSpaceAnalytics analyze(List&lt;ProofStep&gt; transitions) {
+<span class="fc" id="L11">        Set&lt;String&gt; states = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L12">        Map&lt;String, Integer&gt; outgoing = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L13">        Map&lt;String, Integer&gt; incoming = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L14">        int macroUsage = 0;</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        for (ProofStep step : transitions) {</span>
+<span class="fc" id="L16">            states.add(canonical(step.from()));</span>
+<span class="fc" id="L17">            states.add(canonical(step.to()));</span>
+<span class="fc" id="L18">            outgoing.merge(canonical(step.from()), 1, Integer::sum);</span>
+<span class="fc" id="L19">            incoming.merge(canonical(step.to()), 1, Integer::sum);</span>
+<span class="pc bpc" id="L20" title="1 of 4 branches missed.">            if (step.ruleId().startsWith(&quot;macro.&quot;) || step.ruleId().contains(&quot;macro&quot;)) {</span>
+<span class="fc" id="L21">                macroUsage++;</span>
+            }
+<span class="fc" id="L23">        }</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        long convergent = incoming.values().stream().filter(count -&gt; count &gt; 1).count();</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        double branching = outgoing.isEmpty() ? 0.0d : outgoing.values().stream().mapToInt(Integer::intValue).average().orElse(0.0d);</span>
+<span class="fc" id="L26">        return new SearchSpaceAnalytics(transitions.size(), states.size(), (int) convergent, macroUsage, branching);</span>
+    }
+
+    private String canonical(String state) {
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        return state == null ? &quot;&quot; : state.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

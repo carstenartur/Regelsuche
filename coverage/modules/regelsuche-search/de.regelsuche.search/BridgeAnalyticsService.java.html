@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BridgeAnalyticsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search</a> &gt; <span class="el_source">BridgeAnalyticsService.java</span></div><h1>BridgeAnalyticsService.java</h1><pre class="source lang-java linenums">package de.regelsuche.search;
+
+import de.regelsuche.knowledge.SearchEffect;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+<span class="fc" id="L8">public final class BridgeAnalyticsService {</span>
+    public Map&lt;String, Long&gt; bridgeUsage(
+            Map&lt;String, Long&gt; ruleUsage,
+            Map&lt;String, Set&lt;SearchEffect&gt;&gt; ruleEffects) {
+<span class="fc" id="L12">        return ruleUsage.entrySet().stream()</span>
+<span class="fc" id="L13">                .filter(entry -&gt; ruleEffects.getOrDefault(entry.getKey(), Set.of()).contains(SearchEffect.BRIDGING))</span>
+<span class="fc" id="L14">                .sorted(Map.Entry.&lt;String, Long&gt;comparingByValue().reversed())</span>
+<span class="fc" id="L15">                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,</span>
+<span class="nc" id="L16">                        (left, right) -&gt; left, java.util.LinkedHashMap::new));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -124,15 +124,15 @@ public sealed interface PatternExpr
 
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (!(expression instanceof FunctionExpr functionExpr)) {</span>
-<span class="nc" id="L128">                return false;</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (!(expression instanceof FunctionExpr functionExpr)) {</span>
+<span class="fc" id="L128">                return false;</span>
             }
-<span class="pc bpc" id="L130" title="2 of 4 branches missed.">            if (!functionExpr.name().equals(name) || functionExpr.arguments().size() != arguments.size()) {</span>
-<span class="nc" id="L131">                return false;</span>
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">            if (!functionExpr.name().equals(name) || functionExpr.arguments().size() != arguments.size()) {</span>
+<span class="fc" id="L131">                return false;</span>
             }
 <span class="fc bfc" id="L133" title="All 2 branches covered.">            for (int i = 0; i &lt; arguments.size(); i++) {</span>
-<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                if (!arguments.get(i).match(functionExpr.arguments().get(i), bindings)) {</span>
-<span class="nc" id="L135">                    return false;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                if (!arguments.get(i).match(functionExpr.arguments().get(i), bindings)) {</span>
+<span class="fc" id="L135">                    return false;</span>
                 }
             }
 <span class="fc" id="L138">            return true;</span>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceGallerySvgWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">SearchSpaceGallerySvgWriter.java</span></div><h1>SearchSpaceGallerySvgWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import java.util.List;
+
+<span class="fc" id="L5">public final class SearchSpaceGallerySvgWriter {</span>
+    public String write(DiscoveryBenchmarkEvidence evidence, String evidenceFileName) {
+<span class="fc" id="L7">        StringBuilder nodes = new StringBuilder();</span>
+<span class="fc" id="L8">        StringBuilder edges = new StringBuilder();</span>
+<span class="fc" id="L9">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; graphNodes = evidence.nodes();</span>
+<span class="fc bfc" id="L10" title="All 2 branches covered.">        for (int i = 0; i &lt; graphNodes.size(); i++) {</span>
+<span class="fc" id="L11">            DiscoveryBenchmarkEvidence.EvidenceNode node = graphNodes.get(i);</span>
+<span class="fc" id="L12">            int x = 80 + (i % 5) * 165;</span>
+<span class="fc" id="L13">            int y = 90 + (i / 5) * 125;</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">            String fill = &quot;target&quot;.equals(node.kind()) ? &quot;#dcfce7&quot; : &quot;#e0f2fe&quot;;</span>
+<span class="fc" id="L15">            nodes.append(&quot;&lt;circle id=\&quot;&quot;).append(escapeXml(node.id())).append(&quot;\&quot; cx=\&quot;&quot;).append(x).append(&quot;\&quot; cy=\&quot;&quot;).append(y)</span>
+<span class="fc" id="L16">                    .append(&quot;\&quot; r=\&quot;34\&quot; fill=\&quot;&quot;).append(fill).append(&quot;\&quot; stroke=\&quot;#334155\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L17">            nodes.append(&quot;&lt;text x=\&quot;&quot;).append(x - 60).append(&quot;\&quot; y=\&quot;&quot;).append(y + 5)</span>
+<span class="fc" id="L18">                    .append(&quot;\&quot; font-size=\&quot;10\&quot;&gt;&quot;).append(escapeXml(node.label())).append(&quot;&lt;/text&gt;\n&quot;);</span>
+        }
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges()) {</span>
+<span class="fc" id="L21">            int from = indexOf(graphNodes, edge.from());</span>
+<span class="fc" id="L22">            int to = indexOf(graphNodes, edge.to());</span>
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">            if (from &lt; 0 || to &lt; 0) {</span>
+<span class="nc" id="L24">                continue;</span>
+            }
+<span class="fc" id="L26">            int x1 = 80 + (from % 5) * 165;</span>
+<span class="fc" id="L27">            int y1 = 90 + (from / 5) * 125;</span>
+<span class="fc" id="L28">            int x2 = 80 + (to % 5) * 165;</span>
+<span class="fc" id="L29">            int y2 = 90 + (to / 5) * 125;</span>
+<span class="fc bfc" id="L30" title="All 3 branches covered.">            String stroke = switch (edge.kind()) {</span>
+<span class="fc" id="L31">                case &quot;bridge&quot; -&gt; &quot;#d97706&quot;;</span>
+<span class="fc" id="L32">                case &quot;macro&quot; -&gt; &quot;#7c3aed&quot;;</span>
+<span class="fc" id="L33">                default -&gt; &quot;#475569&quot;;</span>
+            };
+<span class="fc" id="L35">            edges.append(&quot;&lt;line x1=\&quot;&quot;).append(x1 + 34).append(&quot;\&quot; y1=\&quot;&quot;).append(y1)</span>
+<span class="fc" id="L36">                    .append(&quot;\&quot; x2=\&quot;&quot;).append(x2 - 34).append(&quot;\&quot; y2=\&quot;&quot;).append(y2)</span>
+<span class="fc" id="L37">                    .append(&quot;\&quot; stroke=\&quot;&quot;).append(stroke).append(&quot;\&quot; marker-end=\&quot;url(#arrow)\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L38">            edges.append(&quot;&lt;text x=\&quot;&quot;).append((x1 + x2) / 2 - 45).append(&quot;\&quot; y=\&quot;&quot;).append((y1 + y2) / 2 - 8)</span>
+<span class="fc" id="L39">                    .append(&quot;\&quot; font-size=\&quot;9\&quot;&gt;&quot;).append(escapeXml(edge.ruleId())).append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="fc" id="L40">        }</span>
+<span class="fc" id="L41">        int rows = Math.max(1, (graphNodes.size() + 4) / 5);</span>
+<span class="fc" id="L42">        int height = Math.max(260, rows * 125 + 95);</span>
+<span class="pc bpc" id="L43" title="2 of 4 branches missed.">        String smallGraphMessage = evidence.smallGraphMessage() == null || evidence.smallGraphMessage().isBlank()</span>
+<span class="nc" id="L44">                ? &quot;&quot;</span>
+<span class="fc" id="L45">                : &quot;&lt;text x=\&quot;40\&quot; y=\&quot;&quot; + (height - 20) + &quot;\&quot; font-size=\&quot;12\&quot;&gt;&quot; + escapeXml(evidence.smallGraphMessage()) + &quot;&lt;/text&gt;&quot;;</span>
+<span class="fc" id="L46">        return &quot;&quot;&quot;</span>
+                &lt;svg xmlns=\&quot;http://www.w3.org/2000/svg\&quot; width=\&quot;900\&quot; height=\&quot;${height}\&quot; viewBox=\&quot;0 0 900 ${height}\&quot; data-generated-by=\&quot;SearchSpaceGallerySvgWriter\&quot; data-scenario-id=\&quot;${scenarioId}\&quot; data-evidence=\&quot;${evidenceFile}\&quot; data-node-count=\&quot;${nodeCount}\&quot; data-edge-count=\&quot;${edgeCount}\&quot;&gt;
+                  &lt;rect width=\&quot;100%\&quot; height=\&quot;100%\&quot; fill=\&quot;#f8fafc\&quot;/&gt;
+                  &lt;defs&gt;&lt;marker id=\&quot;arrow\&quot; markerWidth=\&quot;10\&quot; markerHeight=\&quot;10\&quot; refX=\&quot;10\&quot; refY=\&quot;3\&quot; orient=\&quot;auto\&quot;&gt;&lt;path d=\&quot;M0,0 L0,6 L9,3 z\&quot; fill=\&quot;#475569\&quot;/&gt;&lt;/marker&gt;&lt;/defs&gt;
+                  ${edges}
+                  ${nodes}
+                  &lt;text x=\&quot;40\&quot; y=\&quot;${legendY}\&quot; font-size=\&quot;12\&quot;&gt;Bridge rules: amber · Macro rules: purple · Target: green&lt;/text&gt;
+                  ${smallGraphMessage}
+                &lt;/svg&gt;
+                &quot;&quot;&quot;
+<span class="fc" id="L56">                .replace(&quot;${height}&quot;, Integer.toString(height))</span>
+<span class="fc" id="L57">                .replace(&quot;${scenarioId}&quot;, escapeXml(evidence.scenarioId()))</span>
+<span class="fc" id="L58">                .replace(&quot;${evidenceFile}&quot;, escapeXml(evidenceFileName))</span>
+<span class="fc" id="L59">                .replace(&quot;${nodeCount}&quot;, Integer.toString(evidence.nodeCount()))</span>
+<span class="fc" id="L60">                .replace(&quot;${edgeCount}&quot;, Integer.toString(evidence.edgeCount()))</span>
+<span class="fc" id="L61">                .replace(&quot;${edges}&quot;, edges.toString())</span>
+<span class="fc" id="L62">                .replace(&quot;${nodes}&quot;, nodes.toString())</span>
+<span class="fc" id="L63">                .replace(&quot;${legendY}&quot;, Integer.toString(height - 40))</span>
+<span class="fc" id="L64">                .replace(&quot;${smallGraphMessage}&quot;, smallGraphMessage);</span>
+    }
+
+    private int indexOf(List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; nodes, String id) {
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (nodes.get(i).id().equals(id)) {</span>
+<span class="fc" id="L70">                return i;</span>
+            }
+        }
+<span class="nc" id="L73">        return -1;</span>
+    }
+
+    private String escapeXml(String text) {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        return text == null ? &quot;&quot; : text.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;).replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

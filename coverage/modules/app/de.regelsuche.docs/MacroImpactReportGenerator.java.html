@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MacroImpactReportGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">MacroImpactReportGenerator.java</span></div><h1>MacroImpactReportGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.benchmark.DiscoveryBenchmarkCase;
+import de.regelsuche.benchmark.DiscoveryBenchmarkResult;
+import de.regelsuche.benchmark.DiscoveryBenchmarkRunner;
+import de.regelsuche.benchmark.DiscoveryExpectation;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+public final class MacroImpactReportGenerator {
+    private final DiscoveryBenchmarkExecutor executor;
+    private final DiscoveryBenchmarkScenarioLoader scenarioLoader;
+
+    public MacroImpactReportGenerator() {
+<span class="fc" id="L16">        this(new DiscoveryBenchmarkExecutor(), new DiscoveryBenchmarkScenarioLoader());</span>
+<span class="fc" id="L17">    }</span>
+
+<span class="fc" id="L19">    MacroImpactReportGenerator(DiscoveryBenchmarkExecutor executor, DiscoveryBenchmarkScenarioLoader scenarioLoader) {</span>
+<span class="fc" id="L20">        this.executor = executor;</span>
+<span class="fc" id="L21">        this.scenarioLoader = scenarioLoader;</span>
+<span class="fc" id="L22">    }</span>
+
+    public MacroImpactReport generate() {
+<span class="nc" id="L25">        return generate(scenarioLoader.load(&quot;discovery-scenarios/complete-square.yaml&quot;));</span>
+    }
+
+    public MacroImpactReport generate(DiscoveryBenchmarkScenario scenario) {
+<span class="fc" id="L29">        DiscoveryBenchmarkEvidence evidence = executor.execute(scenario);</span>
+<span class="fc" id="L30">        DiscoveryBenchmarkResult withoutBenchmark = benchmark(</span>
+<span class="fc" id="L31">                scenario.id() + &quot;-without-macro&quot;,</span>
+                scenario,
+<span class="fc" id="L33">                evidence.withoutMacroRun().appliedRuleIds(),</span>
+<span class="fc" id="L34">                evidence.bridgeRulesUsed(),</span>
+<span class="fc" id="L35">                Set.of(),</span>
+<span class="fc" id="L36">                Set.of(),</span>
+<span class="fc" id="L37">                Set.of(DiscoveryExpectation.BRIDGE_REQUIRED));</span>
+<span class="fc" id="L38">        DiscoveryBenchmarkResult withBenchmark = benchmark(</span>
+<span class="fc" id="L39">                scenario.id() + &quot;-with-macro&quot;,</span>
+                scenario,
+<span class="fc" id="L41">                evidence.withMacroRun().appliedRuleIds(),</span>
+<span class="fc" id="L42">                List.of(),</span>
+<span class="fc" id="L43">                new LinkedHashSet&lt;&gt;(evidence.learnedMacros()),</span>
+<span class="fc" id="L44">                new LinkedHashSet&lt;&gt;(evidence.learnedMacros()),</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                scenario.macroLearning().enabled() ? Set.of(DiscoveryExpectation.MACRO_REUSE_REQUIRED) : Set.of());</span>
+<span class="fc" id="L46">        return new MacroImpactReport(</span>
+<span class="fc" id="L47">                scenario.id(),</span>
+<span class="fc" id="L48">                scenario.displayName(),</span>
+<span class="fc" id="L49">                evidence.withoutMacroRun().analytics().statesExplored(),</span>
+<span class="fc" id="L50">                evidence.withMacroRun().analytics().statesExplored(),</span>
+<span class="fc" id="L51">                withoutBenchmark.pathCount() + withBenchmark.pathCount(),</span>
+<span class="fc" id="L52">                evidence.convergentStates().size(),</span>
+<span class="fc" id="L53">                evidence.bridgeRulesUsed().size(),</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                !evidence.bridgeRulesUsed().isEmpty(),</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                !evidence.reusedMacros().isEmpty(),</span>
+<span class="fc" id="L56">                evidence.inputExpression(),</span>
+<span class="fc" id="L57">                evidence.targetExpression(),</span>
+<span class="fc" id="L58">                evidence.withoutMacroRun().path(),</span>
+<span class="fc" id="L59">                evidence.withMacroRun().path(),</span>
+<span class="fc" id="L60">                evidence.withoutMacroRun().analytics(),</span>
+<span class="fc" id="L61">                evidence.withMacroRun().analytics(),</span>
+                withoutBenchmark,
+                withBenchmark,
+                evidence);
+    }
+
+    public String renderText(MacroImpactReport report) {
+<span class="fc" id="L68">        return &quot;&quot;&quot;</span>
+                Without macro: %d states
+                With macro: %d states
+                Paths explored: %d
+                Convergences: %d
+                Bridge usage: %d
+                Bridge discovered: %s
+                Macro reused: %s
+                Improvement: %.2fx
+<span class="fc" id="L77">                &quot;&quot;&quot;.formatted(</span>
+<span class="fc" id="L78">                report.withoutMacroStates(),</span>
+<span class="fc" id="L79">                report.withMacroStates(),</span>
+<span class="fc" id="L80">                report.pathsExplored(),</span>
+<span class="fc" id="L81">                report.convergenceCount(),</span>
+<span class="fc" id="L82">                report.bridgeUsage(),</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                report.bridgeDiscovered() ? &quot;yes&quot; : &quot;no&quot;,</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                report.macroReused() ? &quot;yes&quot; : &quot;no&quot;,</span>
+<span class="fc" id="L85">                report.improvementFactor());</span>
+    }
+
+    private DiscoveryBenchmarkResult benchmark(
+            String id,
+            DiscoveryBenchmarkScenario scenario,
+            List&lt;String&gt; appliedRuleIds,
+            List&lt;String&gt; bridgeRules,
+            Set&lt;String&gt; learnedMacros,
+            Set&lt;String&gt; reusableMacros,
+            Set&lt;DiscoveryExpectation&gt; expectations) {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (appliedRuleIds.isEmpty()) {</span>
+<span class="fc" id="L97">            return new DiscoveryBenchmarkResult(false, 0, 0, 0, 0, 0, List.of());</span>
+        }
+<span class="fc" id="L99">        return new DiscoveryBenchmarkRunner().run(new DiscoveryBenchmarkCase(</span>
+                id,
+<span class="fc" id="L101">                scenario.inputExpression(),</span>
+<span class="fc" id="L102">                appliedRuleIds.get(appliedRuleIds.size() - 1),</span>
+<span class="fc" id="L103">                List.of(appliedRuleIds),</span>
+                expectations,
+                bridgeRules,
+                learnedMacros,
+                reusableMacros));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

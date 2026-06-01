@@ -34,7 +34,7 @@ import java.util.Locale;
 <span class="pc bpc" id="L34" title="1 of 4 branches missed.">        if (rule.contains(&quot;expand&quot;) || rule.contains(&quot;distribute&quot;)) {</span>
 <span class="fc" id="L35">            return RuleFamily.EXPANSION;</span>
         }
-<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        if (rule.contains(&quot;normalize&quot;) || rule.contains(&quot;canonical&quot;)) {</span>
+<span class="pc bpc" id="L37" title="2 of 6 branches missed.">        if (rule.contains(&quot;normalize&quot;) || rule.contains(&quot;canonical&quot;) || rule.contains(&quot;linear_offset_simplify&quot;)) {</span>
 <span class="fc" id="L38">            return RuleFamily.NORMALIZATION;</span>
         }
 <span class="fc" id="L40">        return RuleFamily.OTHER;</span>

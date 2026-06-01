@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryBenchmarkEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryBenchmarkEvidence.java</span></div><h1>DiscoveryBenchmarkEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.search.SearchSpaceAnalytics;
+import java.util.List;
+import java.util.Map;
+
+public record DiscoveryBenchmarkEvidence(
+        String scenarioId,
+        String inputExpression,
+        String targetExpression,
+        boolean success,
+        String failureReason,
+        SearchRunEvidence withoutMacroRun,
+        SearchRunEvidence withMacroRun,
+        List&lt;List&lt;String&gt;&gt; foundPaths,
+        List&lt;String&gt; bridgeRulesUsed,
+        List&lt;String&gt; ruleFamiliesUsed,
+        List&lt;String&gt; convergentStates,
+        List&lt;String&gt; learnedMacros,
+        List&lt;String&gt; reusedMacros,
+        SearchSpaceAnalytics analytics,
+        String validationStatus,
+        List&lt;EvidenceNode&gt; nodes,
+        List&lt;EvidenceEdge&gt; edges,
+        String smallGraphMessage) {
+<span class="fc" id="L26">    public DiscoveryBenchmarkEvidence {</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        foundPaths = foundPaths == null ? List.of() : foundPaths.stream().map(List::copyOf).toList();</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        bridgeRulesUsed = bridgeRulesUsed == null ? List.of() : List.copyOf(bridgeRulesUsed);</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        ruleFamiliesUsed = ruleFamiliesUsed == null ? List.of() : List.copyOf(ruleFamiliesUsed);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        convergentStates = convergentStates == null ? List.of() : List.copyOf(convergentStates);</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        learnedMacros = learnedMacros == null ? List.of() : List.copyOf(learnedMacros);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        reusedMacros = reusedMacros == null ? List.of() : List.copyOf(reusedMacros);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        edges = edges == null ? List.of() : List.copyOf(edges);</span>
+<span class="fc" id="L35">    }</span>
+
+    public int nodeCount() {
+<span class="fc" id="L38">        return nodes.size();</span>
+    }
+
+    public int edgeCount() {
+<span class="fc" id="L42">        return edges.size();</span>
+    }
+
+    public record SearchRunEvidence(
+            boolean success,
+            String failureReason,
+            List&lt;String&gt; path,
+            List&lt;String&gt; appliedRuleIds,
+            SearchSpaceAnalytics analytics) {
+<span class="fc" id="L51">        public SearchRunEvidence {</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
+<span class="fc" id="L54">        }</span>
+    }
+
+<span class="fc" id="L57">    public record EvidenceNode(String id, String label, String kind) {</span>
+    }
+
+    public record EvidenceEdge(
+            String from,
+            String to,
+            String ruleId,
+            String kind,
+            String source,
+            String packId,
+            List&lt;de.regelsuche.knowledge.SearchEffect&gt; searchEffect) {
+<span class="fc" id="L68">        public EvidenceEdge {</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            searchEffect = searchEffect == null ? List.of() : List.copyOf(searchEffect);</span>
+<span class="fc" id="L70">        }</span>
+    }
+
+    public Map&lt;String, Object&gt; summary() {
+<span class="nc" id="L74">        return Map.of(</span>
+                &quot;scenarioId&quot;, scenarioId,
+<span class="nc" id="L76">                &quot;success&quot;, success,</span>
+<span class="nc" id="L77">                &quot;nodeCount&quot;, nodeCount(),</span>
+<span class="nc" id="L78">                &quot;edgeCount&quot;, edgeCount(),</span>
+                &quot;bridgeRulesUsed&quot;, bridgeRulesUsed,
+                &quot;learnedMacros&quot;, learnedMacros,
+                &quot;reusedMacros&quot;, reusedMacros);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

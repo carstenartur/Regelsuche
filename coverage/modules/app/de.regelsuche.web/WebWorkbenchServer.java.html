@@ -365,8 +365,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L365">                ? profile.defaultGoal()</span>
 <span class="fc" id="L366">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L367">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L368">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="nc" id="L369">            return;</span>
+<span class="fc" id="L368">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="fc" id="L369">            return;</span>
 <span class="fc" id="L370">        }</span>
 <span class="fc" id="L371">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1629,8 +1629,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1629">            default          -&gt; null;</span>
         };
 <span class="fc bfc" id="L1631" title="All 2 branches covered.">        if (body == null) {</span>
-<span class="nc" id="L1632">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
-<span class="nc" id="L1633">            return;</span>
+<span class="fc" id="L1632">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
+<span class="fc" id="L1633">            return;</span>
         }
 <span class="fc" id="L1635">        send(exchange, 200, &quot;text/markdown; charset=utf-8&quot;, body);</span>
 <span class="fc" id="L1636">    }</span>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryBenchmarkRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">DiscoveryBenchmarkRunner.java</span></div><h1>DiscoveryBenchmarkRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+<span class="fc" id="L8">public final class DiscoveryBenchmarkRunner {</span>
+    public DiscoveryBenchmarkResult run(DiscoveryBenchmarkCase benchmarkCase) {
+<span class="fc" id="L10">        Set&lt;String&gt; bridgeRules = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L11">        int macroReuse = 0;</span>
+<span class="fc" id="L12">        boolean targetReached = false;</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        for (List&lt;String&gt; path : benchmarkCase.candidatePaths()) {</span>
+<span class="pc bpc" id="L14" title="2 of 4 branches missed.">            if (!path.isEmpty() &amp;&amp; path.get(path.size() - 1).equals(benchmarkCase.target())) {</span>
+<span class="fc" id="L15">                targetReached = true;</span>
+            }
+<span class="fc bfc" id="L17" title="All 2 branches covered.">            for (String step : path) {</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">                if (benchmarkCase.bridgeRules().contains(step)) {</span>
+<span class="fc" id="L19">                    bridgeRules.add(step);</span>
+                }
+<span class="fc bfc" id="L21" title="All 2 branches covered.">                if (benchmarkCase.reusableMacros().contains(step)) {</span>
+<span class="fc" id="L22">                    macroReuse++;</span>
+                }
+<span class="fc" id="L24">            }</span>
+<span class="fc" id="L25">        }</span>
+<span class="fc" id="L26">        int convergences = benchmarkCase.candidatePaths().stream()</span>
+<span class="fc" id="L27">                .flatMap(List::stream)</span>
+<span class="fc" id="L28">                .collect(Collectors.groupingBy(node -&gt; node, Collectors.counting()))</span>
+<span class="fc" id="L29">                .values().stream()</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">                .filter(count -&gt; count &gt; 1)</span>
+<span class="fc" id="L31">                .mapToInt(Long::intValue)</span>
+<span class="fc" id="L32">                .sum();</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        boolean success = targetReached</span>
+<span class="fc bfc" id="L34" title="All 6 branches covered.">                &amp;&amp; expectationSatisfied(benchmarkCase, DiscoveryExpectation.BRIDGE_REQUIRED, !bridgeRules.isEmpty())</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                &amp;&amp; expectationSatisfied(benchmarkCase, DiscoveryExpectation.CONVERGENCE_REQUIRED, convergences &gt; 0)</span>
+<span class="pc bpc" id="L36" title="1 of 6 branches missed.">                &amp;&amp; expectationSatisfied(benchmarkCase, DiscoveryExpectation.MACRO_LEARNING_REQUIRED, !benchmarkCase.learnedMacros().isEmpty())</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                &amp;&amp; expectationSatisfied(benchmarkCase, DiscoveryExpectation.MACRO_REUSE_REQUIRED, macroReuse &gt; 0);</span>
+<span class="fc" id="L38">        return new DiscoveryBenchmarkResult(</span>
+                success,
+<span class="fc" id="L40">                benchmarkCase.candidatePaths().stream().mapToInt(List::size).sum(),</span>
+<span class="fc" id="L41">                benchmarkCase.candidatePaths().size(),</span>
+                convergences,
+<span class="fc" id="L43">                bridgeRules.size(),</span>
+                macroReuse,
+<span class="fc" id="L45">                List.copyOf(bridgeRules));</span>
+    }
+
+    private boolean expectationSatisfied(DiscoveryBenchmarkCase benchmarkCase, DiscoveryExpectation expectation, boolean actual) {
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        return !benchmarkCase.expectations().contains(expectation) || actual;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceAnalytics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search</a> &gt; <span class="el_source">SearchSpaceAnalytics.java</span></div><h1>SearchSpaceAnalytics.java</h1><pre class="source lang-java linenums">package de.regelsuche.search;
+
+import de.regelsuche.knowledge.SearchEffect;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+public record SearchSpaceAnalytics(
+        int statesExplored,
+        int uniqueCanonicalStates,
+        int convergentStates,
+        int learnedMacroUsage,
+        double averageBranchingFactor,
+        Map&lt;String, Long&gt; ruleUsage,
+        Map&lt;String, Long&gt; topBridgeRules,
+        Map&lt;String, Long&gt; topFactorizationRules,
+        Map&lt;String, Long&gt; topSimplificationRules,
+        Map&lt;String, Long&gt; topConvergentNodes) {
+
+    public SearchSpaceAnalytics(
+            int statesExplored,
+            int uniqueCanonicalStates,
+            int convergentStates,
+            int learnedMacroUsage,
+            double averageBranchingFactor) {
+<span class="fc" id="L26">        this(statesExplored, uniqueCanonicalStates, convergentStates, learnedMacroUsage, averageBranchingFactor,</span>
+<span class="fc" id="L27">                Map.of(), Map.of(), Map.of(), Map.of(), Map.of());</span>
+<span class="fc" id="L28">    }</span>
+
+<span class="fc" id="L30">    public SearchSpaceAnalytics {</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        ruleUsage = ruleUsage == null ? Map.of() : Map.copyOf(ruleUsage);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        topBridgeRules = topBridgeRules == null ? Map.of() : Map.copyOf(topBridgeRules);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        topFactorizationRules = topFactorizationRules == null ? Map.of() : Map.copyOf(topFactorizationRules);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        topSimplificationRules = topSimplificationRules == null ? Map.of() : Map.copyOf(topSimplificationRules);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        topConvergentNodes = topConvergentNodes == null ? Map.of() : Map.copyOf(topConvergentNodes);</span>
+<span class="fc" id="L36">    }</span>
+
+    public static SearchSpaceAnalytics from(Map&lt;String, Long&gt; generatedStateCounts,
+                                            Map&lt;String, Long&gt; ruleUsage,
+                                            long macroApplications) {
+<span class="fc" id="L41">        return from(generatedStateCounts, ruleUsage, macroApplications, Map.of());</span>
+    }
+
+    public static SearchSpaceAnalytics from(Map&lt;String, Long&gt; generatedStateCounts,
+                                            Map&lt;String, Long&gt; ruleUsage,
+                                            long macroApplications,
+                                            Map&lt;String, Set&lt;SearchEffect&gt;&gt; ruleEffects) {
+<span class="fc" id="L48">        int generated = (int) generatedStateCounts.values().stream().mapToLong(Long::longValue).sum();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        int repeated = (int) generatedStateCounts.values().stream().filter(count -&gt; count &gt; 1).count();</span>
+<span class="fc" id="L50">        return new SearchSpaceAnalytics(</span>
+                generated,
+<span class="fc" id="L52">                generatedStateCounts.size(),</span>
+                repeated,
+                (int) macroApplications,
+                0.0d,
+                ruleUsage,
+<span class="fc" id="L57">                topRulesByEffect(ruleUsage, ruleEffects, SearchEffect.BRIDGING),</span>
+<span class="fc" id="L58">                topRulesByEffect(ruleUsage, ruleEffects, SearchEffect.FACTORIZING),</span>
+<span class="fc" id="L59">                topRulesByEffect(ruleUsage, ruleEffects, SearchEffect.SIMPLIFYING),</span>
+<span class="fc" id="L60">                generatedStateCounts.entrySet().stream()</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                        .filter(entry -&gt; entry.getValue() &gt; 1)</span>
+<span class="fc" id="L62">                        .sorted(Map.Entry.&lt;String, Long&gt;comparingByValue().reversed())</span>
+<span class="fc" id="L63">                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,</span>
+<span class="nc" id="L64">                                (left, right) -&gt; left, java.util.LinkedHashMap::new)));</span>
+    }
+
+    public Map&lt;String, Long&gt; topRules(int limit) {
+<span class="fc" id="L68">        return ruleUsage.entrySet().stream()</span>
+<span class="fc" id="L69">                .sorted(Map.Entry.&lt;String, Long&gt;comparingByValue().reversed())</span>
+<span class="fc" id="L70">                .limit(limit)</span>
+<span class="fc" id="L71">                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,</span>
+<span class="nc" id="L72">                        (left, right) -&gt; left, java.util.LinkedHashMap::new));</span>
+    }
+
+    public long generatedStates() {
+<span class="fc" id="L76">        return statesExplored;</span>
+    }
+
+    public long repeatedStates() {
+<span class="fc" id="L80">        return convergentStates;</span>
+    }
+
+    public long macroApplications() {
+<span class="fc" id="L84">        return learnedMacroUsage;</span>
+    }
+
+    private static Map&lt;String, Long&gt; topRulesByEffect(
+            Map&lt;String, Long&gt; ruleUsage,
+            Map&lt;String, Set&lt;SearchEffect&gt;&gt; ruleEffects,
+            SearchEffect effect) {
+<span class="fc" id="L91">        return ruleUsage.entrySet().stream()</span>
+<span class="fc" id="L92">                .filter(entry -&gt; ruleEffects.getOrDefault(entry.getKey(), Set.of()).contains(effect))</span>
+<span class="fc" id="L93">                .sorted(Map.Entry.&lt;String, Long&gt;comparingByValue().reversed())</span>
+<span class="fc" id="L94">                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,</span>
+<span class="nc" id="L95">                        (left, right) -&gt; left, java.util.LinkedHashMap::new));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

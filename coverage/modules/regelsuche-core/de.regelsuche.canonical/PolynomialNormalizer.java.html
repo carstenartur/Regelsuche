@@ -208,9 +208,9 @@ public final class PolynomialNormalizer {
 <span class="fc" id="L208">            BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();</span>
 <span class="fc" id="L209">            BigInteger numerator = decimal.unscaledValue();</span>
 <span class="fc" id="L210">            int scale = decimal.scale();</span>
-<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (scale &lt; 0) {</span>
-<span class="nc" id="L212">                numerator = numerator.multiply(BigInteger.TEN.pow(-scale));</span>
-<span class="nc" id="L213">                return new Rational(numerator, BigInteger.ONE);</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (scale &lt; 0) {</span>
+<span class="fc" id="L212">                numerator = numerator.multiply(BigInteger.TEN.pow(-scale));</span>
+<span class="fc" id="L213">                return new Rational(numerator, BigInteger.ONE);</span>
             }
 <span class="fc" id="L215">            return new Rational(numerator, BigInteger.TEN.pow(scale));</span>
         }

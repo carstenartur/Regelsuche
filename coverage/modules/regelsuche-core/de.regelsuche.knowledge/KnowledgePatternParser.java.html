@@ -78,7 +78,7 @@ final class KnowledgePatternParser {
 <span class="pc bpc" id="L78" title="1 of 2 branches missed.">                if (!match(')')) {</span>
                     do {
 <span class="fc" id="L80">                        arguments.add(parseExpression());</span>
-<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                    } while (match(','));</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                    } while (match(','));</span>
 <span class="fc" id="L82">                    expect(')');</span>
                 }
 <span class="fc" id="L84">                return PatternExpr.fn(identifier, arguments.toArray(PatternExpr[]::new));</span>
