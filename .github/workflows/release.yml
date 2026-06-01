@@ -118,7 +118,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v6.1.0
 
       - name: Gradle build
         run: |
