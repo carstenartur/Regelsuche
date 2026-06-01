@@ -8,32 +8,37 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DocsAssetGeneratorTest {
     @Test
-    void writesBridgeAnalysisGalleryAssets() throws Exception {
+    void writesBenchmarkEvidenceGalleryAssets() throws Exception {
         java.nio.file.Path output = Files.createTempDirectory("regelsuche-docs");
 
         new DocsAssetGenerator().generate(output);
 
         java.nio.file.Path gallery = output.resolve("gallery");
         assertTrue(Files.exists(gallery.resolve("index.html")));
-        assertTrue(Files.exists(gallery.resolve("bridge-analysis.svg")));
-        assertTrue(Files.readString(gallery.resolve("index.html")).contains("bridge-analysis.svg"));
-        String svg = Files.readString(gallery.resolve("bridge-analysis.svg"));
-        MacroImpactReport report = new MacroImpactReportGenerator().generate();
-        assertTrue(svg.contains("case: " + report.caseName()));
-        assertTrue(report.withoutMacroBenchmark().bridgeRules().stream().anyMatch(svg::contains));
-        assertTrue(report.withMacroAnalytics().ruleUsage().keySet().stream()
-                .filter(rule -> rule.contains("macro"))
-                .anyMatch(svg::contains));
-        assertTrue(svg.contains("without states: " + report.withoutMacroAnalytics().statesExplored()));
-        assertTrue(svg.contains("target: " + report.targetExpression()));
+        assertTrue(Files.exists(gallery.resolve("complete-square.svg")));
+        assertTrue(Files.exists(gallery.resolve("sophie-germain.svg")));
+        assertTrue(Files.exists(output.resolve("complete-square-evidence.json")));
+        assertTrue(Files.exists(output.resolve("sophie-germain-evidence.json")));
+        String index = Files.readString(gallery.resolve("index.html"));
+        assertTrue(index.contains("Discovery benchmark evidence"));
+        assertTrue(index.contains("complete-square-evidence.json"));
+        assertTrue(index.contains("sophie-germain-evidence.json"));
+        String svg = Files.readString(gallery.resolve("complete-square.svg"));
+        assertTrue(svg.contains("data-generated-by=\"SearchSpaceGallerySvgWriter\""));
+        assertTrue(svg.contains("data-scenario-id=\"complete-square-factorization\""));
+        assertTrue(svg.contains("data-evidence=\"../complete-square-evidence.json\""));
+        assertTrue(svg.contains("data-node-count="));
+        assertTrue(svg.contains("data-edge-count="));
         String macroImpact = Files.readString(output.resolve("macro-impact.json"));
-        assertTrue(macroImpact.contains("\"caseName\": \"complete-square factorization\""));
-        assertTrue(macroImpact.contains("\"inputExpression\": \"x ^ 2 + 6 * x + 5\""));
-        assertTrue(macroImpact.contains("\"withoutMacroPath\""));
-        assertTrue(macroImpact.contains("\"withMacroPath\""));
-        assertTrue(macroImpact.contains("bridge_complete_square_decomposition"));
-        assertTrue(macroImpact.contains("macro_learned_complete_square_factorization"));
-        assertTrue(macroImpact.contains("bridgeDiscovered"));
-        assertTrue(macroImpact.contains("macroReused"));
+        assertTrue(macroImpact.contains("\"scenarioId\" : \"complete-square-factorization\""));
+        assertTrue(macroImpact.contains("\"scenarioId\" : \"sophie-germain\""));
+        assertTrue(macroImpact.contains("complete-square-evidence.json"));
+        assertTrue(macroImpact.contains("sophie-germain-evidence.json"));
+        String evidence = Files.readString(output.resolve("complete-square-evidence.json"));
+        assertTrue(evidence.contains("bridge_complete_square_decomposition"));
+        assertTrue(evidence.contains("macro_learned_complete_square_factorization"));
+        String sophieEvidence = Files.readString(output.resolve("sophie-germain-evidence.json"));
+        assertTrue(sophieEvidence.contains("macro_learned_sophie_germain_factorization"));
+        assertTrue(sophieEvidence.contains("\"success\" : true"));
     }
 }

@@ -42,7 +42,7 @@ public final class DocsAssetGenerator {
         StringBuilder sections = new StringBuilder();
         for (MacroImpactReport report : reports) {
             String evidenceFile = evidenceFileName(report.scenarioId());
-            String svgFile = report.scenarioId() + ".svg";
+            String svgFile = scenarioAssetName(report.scenarioId()) + ".svg";
             Files.writeString(gallery.resolve(svgFile), svgWriter.write(report.evidence(), "../" + evidenceFile), StandardCharsets.UTF_8);
             sections.append("<section><h2>").append(escapeHtml(report.caseName())).append("</h2>")
                     .append("<p>Evidence: <a href=\"../").append(evidenceFile).append("\">").append(evidenceFile).append("</a></p>")
@@ -107,8 +107,11 @@ public final class DocsAssetGenerator {
     }
 
     private String evidenceFileName(String scenarioId) {
-        String shortName = scenarioId.toLowerCase(Locale.ROOT).replace("-factorization", "");
-        return shortName + "-evidence.json";
+        return scenarioAssetName(scenarioId) + "-evidence.json";
+    }
+
+    private String scenarioAssetName(String scenarioId) {
+        return scenarioId.toLowerCase(Locale.ROOT).replace("-factorization", "");
     }
 
     private String escapeHtml(String text) {
