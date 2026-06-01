@@ -5,8 +5,13 @@ import de.regelsuche.checkpoint.SearchCheckpoint;
 import de.regelsuche.checkpoint.SearchCheckpointRepository;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.SimplificationSuccess;
 import de.regelsuche.search.TransformationSearchService;
+import de.regelsuche.search.estimate.SearchSpaceEstimate;
+import de.regelsuche.search.estimate.SearchSpaceEstimator;
+import de.regelsuche.graph.GraphEdge;
+import de.regelsuche.graph.GraphSnapshot;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -21,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,120 +61,137 @@ import java.util.function.Function;
  * fits within the existing minimal-dependency style of the project.&lt;/p&gt;
  */
 public class SearchJobManager {
-<span class="fc" id="L58">    private final Map&lt;String, JobHandle&gt; jobs = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L64">    private final Map&lt;String, JobHandle&gt; jobs = new ConcurrentHashMap&lt;&gt;();</span>
     private final Function&lt;SearchJob, TransformationSearchService&gt; serviceFactory;
     private final SearchCheckpointRepository checkpointRepository;
+<span class="fc" id="L67">    private final SearchSpaceEstimator searchSpaceEstimator = new SearchSpaceEstimator();</span>
 
     public SearchJobManager(Function&lt;SearchJob, TransformationSearchService&gt; serviceFactory) {
-<span class="fc" id="L63">        this(serviceFactory, new InMemorySearchCheckpointRepository());</span>
-<span class="fc" id="L64">    }</span>
+<span class="fc" id="L70">        this(serviceFactory, new InMemorySearchCheckpointRepository());</span>
+<span class="fc" id="L71">    }</span>
 
     public SearchJobManager(
         Function&lt;SearchJob, TransformationSearchService&gt; serviceFactory,
         SearchCheckpointRepository checkpointRepository
-<span class="fc" id="L69">    ) {</span>
-<span class="fc" id="L70">        this.serviceFactory = serviceFactory;</span>
-<span class="fc" id="L71">        this.checkpointRepository = checkpointRepository;</span>
-<span class="fc" id="L72">    }</span>
+<span class="fc" id="L76">    ) {</span>
+<span class="fc" id="L77">        this.serviceFactory = serviceFactory;</span>
+<span class="fc" id="L78">        this.checkpointRepository = checkpointRepository;</span>
+<span class="fc" id="L79">    }</span>
 
     public SearchCheckpointRepository checkpointRepository() {
-<span class="nc" id="L75">        return checkpointRepository;</span>
+<span class="nc" id="L82">        return checkpointRepository;</span>
     }
 
     public SearchJob submit(String expression, InputType inputType, String profile, List&lt;String&gt; notes) {
-<span class="fc" id="L79">        SearchJob job = new SearchJob(</span>
-<span class="fc" id="L80">            UUID.randomUUID().toString(),</span>
+<span class="fc" id="L86">        SearchJob job = new SearchJob(</span>
+<span class="fc" id="L87">            UUID.randomUUID().toString(),</span>
             expression,
-<span class="fc" id="L82">            inputType.name(),</span>
+<span class="fc" id="L89">            inputType.name(),</span>
             profile,
             SearchJob.State.QUEUED,
+            &quot;queued&quot;,
             null,
             null,
             0,
             0,
             null,
             0,
-<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            notes == null ? List.of() : notes</span>
+            expression,
+            false,
+            0L,
+            1.0,
+            0L,
+            &quot;LOW&quot;,
+            null,
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            notes == null ? List.of() : notes</span>
         );
-<span class="fc" id="L93">        JobHandle handle = new JobHandle(job);</span>
-<span class="fc" id="L94">        jobs.put(job.id(), handle);</span>
-<span class="fc" id="L95">        handle.start();</span>
-<span class="fc" id="L96">        return handle.snapshot();</span>
+<span class="fc" id="L108">        JobHandle handle = new JobHandle(job);</span>
+<span class="fc" id="L109">        jobs.put(job.id(), handle);</span>
+<span class="fc" id="L110">        handle.start();</span>
+<span class="fc" id="L111">        return handle.snapshot();</span>
     }
 
     public List&lt;SearchJob&gt; list() {
-<span class="fc" id="L100">        return jobs.values().stream()</span>
-<span class="fc" id="L101">            .map(JobHandle::snapshot)</span>
-<span class="fc" id="L102">            .sorted(Comparator.comparing(SearchJob::createdAt))</span>
-<span class="fc" id="L103">            .toList();</span>
+<span class="fc" id="L115">        return jobs.values().stream()</span>
+<span class="fc" id="L116">            .map(JobHandle::snapshot)</span>
+<span class="fc" id="L117">            .sorted(Comparator.comparing(SearchJob::createdAt))</span>
+<span class="fc" id="L118">            .toList();</span>
     }
 
     public Optional&lt;SearchJob&gt; get(String id) {
-<span class="fc" id="L107">        JobHandle handle = jobs.get(id);</span>
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        return handle == null ? Optional.empty() : Optional.of(handle.snapshot());</span>
+<span class="fc" id="L122">        JobHandle handle = jobs.get(id);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        return handle == null ? Optional.empty() : Optional.of(handle.snapshot());</span>
     }
 
     public Optional&lt;SearchJob&gt; pause(String id) {
-<span class="nc" id="L112">        JobHandle handle = jobs.get(id);</span>
-<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (handle == null) {</span>
-<span class="nc" id="L114">            return Optional.empty();</span>
+<span class="nc" id="L127">        JobHandle handle = jobs.get(id);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (handle == null) {</span>
+<span class="nc" id="L129">            return Optional.empty();</span>
         }
-<span class="nc" id="L116">        handle.requestPause();</span>
-<span class="nc" id="L117">        return Optional.of(handle.snapshot());</span>
+<span class="nc" id="L131">        handle.requestPause();</span>
+<span class="nc" id="L132">        return Optional.of(handle.snapshot());</span>
     }
 
     public Optional&lt;SearchJob&gt; resume(String id) {
-<span class="nc" id="L121">        JobHandle handle = jobs.get(id);</span>
-<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (handle == null) {</span>
-<span class="nc" id="L123">            return Optional.empty();</span>
+<span class="nc" id="L136">        JobHandle handle = jobs.get(id);</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (handle == null) {</span>
+<span class="nc" id="L138">            return Optional.empty();</span>
         }
-<span class="nc" id="L125">        handle.resumeFromCheckpoint();</span>
-<span class="nc" id="L126">        return Optional.of(handle.snapshot());</span>
+<span class="nc" id="L140">        handle.resumeFromCheckpoint();</span>
+<span class="nc" id="L141">        return Optional.of(handle.snapshot());</span>
     }
 
     public Optional&lt;SearchJob&gt; cancel(String id) {
-<span class="fc" id="L130">        JobHandle handle = jobs.get(id);</span>
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (handle == null) {</span>
-<span class="nc" id="L132">            return Optional.empty();</span>
+<span class="fc" id="L145">        JobHandle handle = jobs.get(id);</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (handle == null) {</span>
+<span class="nc" id="L147">            return Optional.empty();</span>
         }
-<span class="fc" id="L134">        handle.cancel();</span>
-<span class="fc" id="L135">        return Optional.of(handle.snapshot());</span>
+<span class="fc" id="L149">        handle.cancel();</span>
+<span class="fc" id="L150">        return Optional.of(handle.snapshot());</span>
     }
 
     public void shutdown() {
-<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (JobHandle handle : jobs.values()) {</span>
-<span class="fc" id="L140">            handle.cancel();</span>
-<span class="fc" id="L141">        }</span>
-<span class="fc" id="L142">    }</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (JobHandle handle : jobs.values()) {</span>
+<span class="fc" id="L155">            handle.cancel();</span>
+<span class="fc" id="L156">        }</span>
+<span class="fc" id="L157">    }</span>
 
     /** Persist all job snapshots to {@code file} as JSON. */
     public synchronized void checkpoint(Path file) throws IOException {
-<span class="fc" id="L146">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc" id="L147">        builder.append(&quot;{\n  \&quot;jobs\&quot;: [\n&quot;);</span>
-<span class="fc" id="L148">        List&lt;SearchJob&gt; all = list();</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (int i = 0; i &lt; all.size(); i++) {</span>
-<span class="fc" id="L150">            SearchJob job = all.get(i);</span>
-<span class="fc" id="L151">            builder.append(&quot;    {&quot;);</span>
-<span class="fc" id="L152">            builder.append(&quot;\&quot;id\&quot;:&quot;).append(quote(job.id()));</span>
-<span class="fc" id="L153">            builder.append(&quot;,\&quot;expression\&quot;:&quot;).append(quote(job.expression()));</span>
-<span class="fc" id="L154">            builder.append(&quot;,\&quot;inputType\&quot;:&quot;).append(quote(job.inputType()));</span>
-<span class="fc" id="L155">            builder.append(&quot;,\&quot;profile\&quot;:&quot;).append(quote(job.profile()));</span>
-<span class="fc" id="L156">            builder.append(&quot;,\&quot;state\&quot;:&quot;).append(quote(job.state().name()));</span>
-<span class="fc" id="L157">            builder.append(&quot;,\&quot;createdAt\&quot;:&quot;).append(quote(job.createdAt().toString()));</span>
-<span class="fc" id="L158">            builder.append(&quot;,\&quot;updatedAt\&quot;:&quot;).append(quote(job.updatedAt().toString()));</span>
-<span class="fc" id="L159">            builder.append(&quot;,\&quot;exploredStates\&quot;:&quot;).append(job.exploredStates());</span>
-<span class="fc" id="L160">            builder.append(&quot;,\&quot;discoveredSuccesses\&quot;:&quot;).append(job.discoveredSuccesses());</span>
-<span class="fc" id="L161">            builder.append(&quot;,\&quot;bestExpression\&quot;:&quot;).append(quote(job.bestExpression()));</span>
-<span class="fc" id="L162">            builder.append(&quot;,\&quot;bestImprovement\&quot;:&quot;).append(job.bestImprovement());</span>
-<span class="fc" id="L163">            builder.append('}');</span>
-<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            if (i &lt; all.size() - 1) {</span>
-<span class="nc" id="L165">                builder.append(',');</span>
+<span class="fc" id="L161">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L162">        builder.append(&quot;{\n  \&quot;jobs\&quot;: [\n&quot;);</span>
+<span class="fc" id="L163">        List&lt;SearchJob&gt; all = list();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (int i = 0; i &lt; all.size(); i++) {</span>
+<span class="fc" id="L165">            SearchJob job = all.get(i);</span>
+<span class="fc" id="L166">            builder.append(&quot;    {&quot;);</span>
+<span class="fc" id="L167">            builder.append(&quot;\&quot;id\&quot;:&quot;).append(quote(job.id()));</span>
+<span class="fc" id="L168">            builder.append(&quot;,\&quot;expression\&quot;:&quot;).append(quote(job.expression()));</span>
+<span class="fc" id="L169">            builder.append(&quot;,\&quot;inputType\&quot;:&quot;).append(quote(job.inputType()));</span>
+<span class="fc" id="L170">            builder.append(&quot;,\&quot;profile\&quot;:&quot;).append(quote(job.profile()));</span>
+<span class="fc" id="L171">            builder.append(&quot;,\&quot;state\&quot;:&quot;).append(quote(job.state().name()));</span>
+<span class="fc" id="L172">            builder.append(&quot;,\&quot;activePhase\&quot;:&quot;).append(quote(job.activePhase()));</span>
+<span class="fc" id="L173">            builder.append(&quot;,\&quot;createdAt\&quot;:&quot;).append(quote(job.createdAt().toString()));</span>
+<span class="fc" id="L174">            builder.append(&quot;,\&quot;updatedAt\&quot;:&quot;).append(quote(job.updatedAt().toString()));</span>
+<span class="fc" id="L175">            builder.append(&quot;,\&quot;exploredStates\&quot;:&quot;).append(job.exploredStates());</span>
+<span class="fc" id="L176">            builder.append(&quot;,\&quot;discoveredSuccesses\&quot;:&quot;).append(job.discoveredSuccesses());</span>
+<span class="fc" id="L177">            builder.append(&quot;,\&quot;bestExpression\&quot;:&quot;).append(quote(job.bestExpression()));</span>
+<span class="fc" id="L178">            builder.append(&quot;,\&quot;bestImprovement\&quot;:&quot;).append(job.bestImprovement());</span>
+<span class="fc" id="L179">            builder.append(&quot;,\&quot;lastProcessedExpression\&quot;:&quot;).append(quote(job.lastProcessedExpression()));</span>
+<span class="fc" id="L180">            builder.append(&quot;,\&quot;resumable\&quot;:&quot;).append(job.resumable());</span>
+<span class="fc" id="L181">            builder.append(&quot;,\&quot;knownStateCount\&quot;:&quot;).append(job.knownStateCount());</span>
+<span class="fc" id="L182">            builder.append(&quot;,\&quot;estimatedBranchingFactor\&quot;:&quot;).append(job.estimatedBranchingFactor());</span>
+<span class="fc" id="L183">            builder.append(&quot;,\&quot;projectedStateCount\&quot;:&quot;).append(job.projectedStateCount());</span>
+<span class="fc" id="L184">            builder.append(&quot;,\&quot;searchSpaceRisk\&quot;:&quot;).append(quote(job.searchSpaceRisk()));</span>
+<span class="fc" id="L185">            builder.append(&quot;,\&quot;searchSpaceWarning\&quot;:&quot;).append(quote(job.searchSpaceWarning()));</span>
+<span class="fc" id="L186">            builder.append('}');</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (i &lt; all.size() - 1) {</span>
+<span class="nc" id="L188">                builder.append(',');</span>
             }
-<span class="fc" id="L167">            builder.append('\n');</span>
+<span class="fc" id="L190">            builder.append('\n');</span>
         }
-<span class="fc" id="L169">        builder.append(&quot;  ]\n}\n&quot;);</span>
-<span class="fc" id="L170">        Files.writeString(file, builder.toString(), StandardCharsets.UTF_8);</span>
-<span class="fc" id="L171">    }</span>
+<span class="fc" id="L192">        builder.append(&quot;  ]\n}\n&quot;);</span>
+<span class="fc" id="L193">        Files.writeString(file, builder.toString(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L194">    }</span>
 
     /**
      * Re-hydrate jobs from a checkpoint file written by
@@ -177,173 +200,207 @@ public class SearchJobManager {
      * want to continue.
      */
     public synchronized void restore(Path file) throws IOException {
-<span class="fc" id="L180">        String json = Files.readString(file, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L203">        String json = Files.readString(file, StandardCharsets.UTF_8);</span>
         // Hand-rolled minimal parsing matching the checkpoint format.
-<span class="fc" id="L182">        int arrayStart = json.indexOf(&quot;\&quot;jobs\&quot;&quot;);</span>
-<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (arrayStart &lt; 0) {</span>
-<span class="nc" id="L184">            return;</span>
+<span class="fc" id="L205">        int arrayStart = json.indexOf(&quot;\&quot;jobs\&quot;&quot;);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (arrayStart &lt; 0) {</span>
+<span class="nc" id="L207">            return;</span>
         }
-<span class="fc" id="L186">        int bracket = json.indexOf('[', arrayStart);</span>
-<span class="fc" id="L187">        int close = json.lastIndexOf(']');</span>
-<span class="pc bpc" id="L188" title="2 of 4 branches missed.">        if (bracket &lt; 0 || close &lt; bracket) {</span>
-<span class="nc" id="L189">            return;</span>
+<span class="fc" id="L209">        int bracket = json.indexOf('[', arrayStart);</span>
+<span class="fc" id="L210">        int close = json.lastIndexOf(']');</span>
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">        if (bracket &lt; 0 || close &lt; bracket) {</span>
+<span class="nc" id="L212">            return;</span>
         }
-<span class="fc" id="L191">        String body = json.substring(bracket + 1, close);</span>
-<span class="fc" id="L192">        int position = 0;</span>
-<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        while (position &lt; body.length()) {</span>
-<span class="fc" id="L194">            int braceStart = body.indexOf('{', position);</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">            if (braceStart &lt; 0) {</span>
-<span class="fc" id="L196">                break;</span>
+<span class="fc" id="L214">        String body = json.substring(bracket + 1, close);</span>
+<span class="fc" id="L215">        int position = 0;</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        while (position &lt; body.length()) {</span>
+<span class="fc" id="L217">            int braceStart = body.indexOf('{', position);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (braceStart &lt; 0) {</span>
+<span class="fc" id="L219">                break;</span>
             }
-<span class="fc" id="L198">            int braceEnd = matchingBrace(body, braceStart);</span>
-<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (braceEnd &lt; 0) {</span>
-<span class="nc" id="L200">                break;</span>
+<span class="fc" id="L221">            int braceEnd = matchingBrace(body, braceStart);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (braceEnd &lt; 0) {</span>
+<span class="nc" id="L223">                break;</span>
             }
-<span class="fc" id="L202">            String entry = body.substring(braceStart, braceEnd + 1);</span>
-<span class="fc" id="L203">            Map&lt;String, String&gt; raw = parseFlat(entry);</span>
-<span class="fc" id="L204">            SearchJob job = new SearchJob(</span>
-<span class="fc" id="L205">                raw.get(&quot;id&quot;),</span>
-<span class="fc" id="L206">                raw.getOrDefault(&quot;expression&quot;, &quot;&quot;),</span>
-<span class="fc" id="L207">                raw.getOrDefault(&quot;inputType&quot;, &quot;TERM&quot;),</span>
-<span class="fc" id="L208">                raw.getOrDefault(&quot;profile&quot;, &quot;FAST_SIMPLIFY&quot;),</span>
-<span class="fc" id="L209">                SearchJob.State.valueOf(raw.getOrDefault(&quot;state&quot;, &quot;QUEUED&quot;)),</span>
-<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                raw.containsKey(&quot;createdAt&quot;) ? java.time.Instant.parse(raw.get(&quot;createdAt&quot;)) : null,</span>
-<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                raw.containsKey(&quot;updatedAt&quot;) ? java.time.Instant.parse(raw.get(&quot;updatedAt&quot;)) : null,</span>
-<span class="fc" id="L212">                parseInt(raw.get(&quot;discoveredSuccesses&quot;)),</span>
-<span class="fc" id="L213">                parseInt(raw.get(&quot;exploredStates&quot;)),</span>
-<span class="fc" id="L214">                raw.getOrDefault(&quot;bestExpression&quot;, null),</span>
-<span class="fc" id="L215">                parseInt(raw.get(&quot;bestImprovement&quot;)),</span>
-<span class="fc" id="L216">                List.of()</span>
+<span class="fc" id="L225">            String entry = body.substring(braceStart, braceEnd + 1);</span>
+<span class="fc" id="L226">            Map&lt;String, String&gt; raw = parseFlat(entry);</span>
+<span class="fc" id="L227">            SearchJob job = new SearchJob(</span>
+<span class="fc" id="L228">                raw.get(&quot;id&quot;),</span>
+<span class="fc" id="L229">                raw.getOrDefault(&quot;expression&quot;, &quot;&quot;),</span>
+<span class="fc" id="L230">                raw.getOrDefault(&quot;inputType&quot;, &quot;TERM&quot;),</span>
+<span class="fc" id="L231">                raw.getOrDefault(&quot;profile&quot;, &quot;FAST_SIMPLIFY&quot;),</span>
+<span class="fc" id="L232">                SearchJob.State.valueOf(raw.getOrDefault(&quot;state&quot;, &quot;QUEUED&quot;)),</span>
+<span class="fc" id="L233">                raw.getOrDefault(&quot;activePhase&quot;, null),</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                raw.containsKey(&quot;createdAt&quot;) ? java.time.Instant.parse(raw.get(&quot;createdAt&quot;)) : null,</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                raw.containsKey(&quot;updatedAt&quot;) ? java.time.Instant.parse(raw.get(&quot;updatedAt&quot;)) : null,</span>
+<span class="fc" id="L236">                parseInt(raw.get(&quot;discoveredSuccesses&quot;)),</span>
+<span class="fc" id="L237">                parseInt(raw.get(&quot;exploredStates&quot;)),</span>
+<span class="fc" id="L238">                raw.getOrDefault(&quot;bestExpression&quot;, null),</span>
+<span class="fc" id="L239">                parseInt(raw.get(&quot;bestImprovement&quot;)),</span>
+<span class="fc" id="L240">                raw.getOrDefault(&quot;lastProcessedExpression&quot;, raw.getOrDefault(&quot;expression&quot;, null)),</span>
+<span class="fc" id="L241">                parseBoolean(raw.get(&quot;resumable&quot;)),</span>
+<span class="fc" id="L242">                parseLong(raw.get(&quot;knownStateCount&quot;)),</span>
+<span class="fc" id="L243">                parseDouble(raw.get(&quot;estimatedBranchingFactor&quot;), 1.0),</span>
+<span class="fc" id="L244">                parseLong(raw.get(&quot;projectedStateCount&quot;)),</span>
+<span class="fc" id="L245">                raw.getOrDefault(&quot;searchSpaceRisk&quot;, &quot;LOW&quot;),</span>
+<span class="fc" id="L246">                raw.getOrDefault(&quot;searchSpaceWarning&quot;, null),</span>
+<span class="fc" id="L247">                List.of()</span>
             );
-<span class="fc" id="L218">            jobs.put(job.id(), new JobHandle(job).pausedFromRestore());</span>
-<span class="fc" id="L219">            position = braceEnd + 1;</span>
-<span class="fc" id="L220">        }</span>
-<span class="fc" id="L221">    }</span>
+<span class="fc" id="L249">            jobs.put(job.id(), new JobHandle(job).pausedFromRestore());</span>
+<span class="fc" id="L250">            position = braceEnd + 1;</span>
+<span class="fc" id="L251">        }</span>
+<span class="fc" id="L252">    }</span>
 
     private static int matchingBrace(String text, int openIndex) {
-<span class="fc" id="L224">        int depth = 0;</span>
-<span class="fc" id="L225">        boolean inString = false;</span>
-<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        for (int i = openIndex; i &lt; text.length(); i++) {</span>
-<span class="fc" id="L227">            char c = text.charAt(i);</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">            if (inString) {</span>
-<span class="pc bpc" id="L229" title="1 of 2 branches missed.">                if (c == '\\') {</span>
-<span class="nc" id="L230">                    i++;</span>
-<span class="fc bfc" id="L231" title="All 2 branches covered.">                } else if (c == '&quot;') {</span>
-<span class="fc" id="L232">                    inString = false;</span>
+<span class="fc" id="L255">        int depth = 0;</span>
+<span class="fc" id="L256">        boolean inString = false;</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        for (int i = openIndex; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L258">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (inString) {</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                if (c == '\\') {</span>
+<span class="nc" id="L261">                    i++;</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                } else if (c == '&quot;') {</span>
+<span class="fc" id="L263">                    inString = false;</span>
                 }
                 continue;
             }
-<span class="fc bfc" id="L236" title="All 2 branches covered.">            if (c == '&quot;') {</span>
-<span class="fc" id="L237">                inString = true;</span>
-<span class="fc bfc" id="L238" title="All 2 branches covered.">            } else if (c == '{') {</span>
-<span class="fc" id="L239">                depth++;</span>
-<span class="fc bfc" id="L240" title="All 2 branches covered.">            } else if (c == '}') {</span>
-<span class="fc" id="L241">                depth--;</span>
-<span class="pc bpc" id="L242" title="1 of 2 branches missed.">                if (depth == 0) {</span>
-<span class="fc" id="L243">                    return i;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L268">                inString = true;</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            } else if (c == '{') {</span>
+<span class="fc" id="L270">                depth++;</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            } else if (c == '}') {</span>
+<span class="fc" id="L272">                depth--;</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                if (depth == 0) {</span>
+<span class="fc" id="L274">                    return i;</span>
                 }
             }
         }
-<span class="nc" id="L247">        return -1;</span>
+<span class="nc" id="L278">        return -1;</span>
     }
 
     private static Map&lt;String, String&gt; parseFlat(String entry) {
-<span class="fc" id="L251">        Map&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L252">        int position = 1; // skip leading '{'</span>
-<span class="fc bfc" id="L253" title="All 2 branches covered.">        while (position &lt; entry.length() - 1) {</span>
-<span class="fc" id="L254">            position = skipWhitespaceAndCommas(entry, position);</span>
-<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            if (position &gt;= entry.length() - 1) {</span>
-<span class="nc" id="L256">                break;</span>
+<span class="fc" id="L282">        Map&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L283">        int position = 1; // skip leading '{'</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        while (position &lt; entry.length() - 1) {</span>
+<span class="fc" id="L285">            position = skipWhitespaceAndCommas(entry, position);</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">            if (position &gt;= entry.length() - 1) {</span>
+<span class="nc" id="L287">                break;</span>
             }
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (entry.charAt(position) != '&quot;') {</span>
-<span class="nc" id="L259">                break;</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            if (entry.charAt(position) != '&quot;') {</span>
+<span class="nc" id="L290">                break;</span>
             }
-<span class="fc" id="L261">            int keyEnd = findStringEnd(entry, position + 1);</span>
-<span class="fc" id="L262">            String key = entry.substring(position + 1, keyEnd);</span>
-<span class="fc" id="L263">            position = keyEnd + 1;</span>
-<span class="pc bpc" id="L264" title="2 of 4 branches missed.">            while (position &lt; entry.length() &amp;&amp; entry.charAt(position) != ':') {</span>
-<span class="nc" id="L265">                position++;</span>
+<span class="fc" id="L292">            int keyEnd = findStringEnd(entry, position + 1);</span>
+<span class="fc" id="L293">            String key = entry.substring(position + 1, keyEnd);</span>
+<span class="fc" id="L294">            position = keyEnd + 1;</span>
+<span class="pc bpc" id="L295" title="2 of 4 branches missed.">            while (position &lt; entry.length() &amp;&amp; entry.charAt(position) != ':') {</span>
+<span class="nc" id="L296">                position++;</span>
             }
-<span class="fc" id="L267">            position++;</span>
-<span class="fc" id="L268">            position = skipWhitespaceAndCommas(entry, position);</span>
-<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            if (position &gt;= entry.length()) {</span>
-<span class="nc" id="L270">                break;</span>
+<span class="fc" id="L298">            position++;</span>
+<span class="fc" id="L299">            position = skipWhitespaceAndCommas(entry, position);</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            if (position &gt;= entry.length()) {</span>
+<span class="nc" id="L301">                break;</span>
             }
             String value;
-<span class="fc bfc" id="L273" title="All 2 branches covered.">            if (entry.charAt(position) == '&quot;') {</span>
-<span class="fc" id="L274">                int valueEnd = findStringEnd(entry, position + 1);</span>
-<span class="fc" id="L275">                value = entry.substring(position + 1, valueEnd);</span>
-<span class="fc" id="L276">                position = valueEnd + 1;</span>
-<span class="fc" id="L277">            } else {</span>
-<span class="fc" id="L278">                int valueStart = position;</span>
-<span class="pc bpc" id="L279" title="1 of 4 branches missed.">                while (position &lt; entry.length() &amp;&amp; &quot;,}\n\r&quot;.indexOf(entry.charAt(position)) &lt; 0) {</span>
-<span class="fc" id="L280">                    position++;</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (entry.charAt(position) == '&quot;') {</span>
+<span class="fc" id="L305">                int valueEnd = findStringEnd(entry, position + 1);</span>
+<span class="fc" id="L306">                value = entry.substring(position + 1, valueEnd);</span>
+<span class="fc" id="L307">                position = valueEnd + 1;</span>
+<span class="fc" id="L308">            } else {</span>
+<span class="fc" id="L309">                int valueStart = position;</span>
+<span class="pc bpc" id="L310" title="1 of 4 branches missed.">                while (position &lt; entry.length() &amp;&amp; &quot;,}\n\r&quot;.indexOf(entry.charAt(position)) &lt; 0) {</span>
+<span class="fc" id="L311">                    position++;</span>
                 }
-<span class="fc" id="L282">                value = entry.substring(valueStart, position).trim();</span>
+<span class="fc" id="L313">                value = entry.substring(valueStart, position).trim();</span>
             }
-<span class="fc" id="L284">            result.put(key, value);</span>
-<span class="fc" id="L285">        }</span>
-<span class="fc" id="L286">        return result;</span>
+<span class="fc" id="L315">            result.put(key, value);</span>
+<span class="fc" id="L316">        }</span>
+<span class="fc" id="L317">        return result;</span>
     }
 
     private static int skipWhitespaceAndCommas(String entry, int position) {
-<span class="pc bpc" id="L290" title="2 of 6 branches missed.">        while (position &lt; entry.length() &amp;&amp; (Character.isWhitespace(entry.charAt(position)) || entry.charAt(position) == ',')) {</span>
-<span class="fc" id="L291">            position++;</span>
+<span class="pc bpc" id="L321" title="2 of 6 branches missed.">        while (position &lt; entry.length() &amp;&amp; (Character.isWhitespace(entry.charAt(position)) || entry.charAt(position) == ',')) {</span>
+<span class="fc" id="L322">            position++;</span>
         }
-<span class="fc" id="L293">        return position;</span>
+<span class="fc" id="L324">        return position;</span>
     }
 
     private static int findStringEnd(String entry, int start) {
-<span class="fc" id="L297">        int position = start;</span>
-<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        while (position &lt; entry.length()) {</span>
-<span class="fc" id="L299">            char c = entry.charAt(position);</span>
-<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            if (c == '\\') {</span>
-<span class="nc" id="L301">                position += 2;</span>
-<span class="nc" id="L302">                continue;</span>
+<span class="fc" id="L328">        int position = start;</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        while (position &lt; entry.length()) {</span>
+<span class="fc" id="L330">            char c = entry.charAt(position);</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc" id="L332">                position += 2;</span>
+<span class="nc" id="L333">                continue;</span>
             }
-<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (c == '&quot;') {</span>
-<span class="fc" id="L305">                return position;</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L336">                return position;</span>
             }
-<span class="fc" id="L307">            position++;</span>
-<span class="fc" id="L308">        }</span>
-<span class="nc" id="L309">        return entry.length();</span>
+<span class="fc" id="L338">            position++;</span>
+<span class="fc" id="L339">        }</span>
+<span class="nc" id="L340">        return entry.length();</span>
     }
 
     private static int parseInt(String raw) {
-<span class="pc bpc" id="L313" title="3 of 6 branches missed.">        if (raw == null || raw.isBlank() || raw.equals(&quot;null&quot;)) {</span>
-<span class="nc" id="L314">            return 0;</span>
+<span class="pc bpc" id="L344" title="3 of 6 branches missed.">        if (raw == null || raw.isBlank() || raw.equals(&quot;null&quot;)) {</span>
+<span class="nc" id="L345">            return 0;</span>
         }
         try {
-<span class="fc" id="L317">            return Integer.parseInt(raw.trim());</span>
-<span class="nc" id="L318">        } catch (NumberFormatException ex) {</span>
-<span class="nc" id="L319">            return 0;</span>
+<span class="fc" id="L348">            return Integer.parseInt(raw.trim());</span>
+<span class="nc" id="L349">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L350">            return 0;</span>
         }
     }
 
-    private static String quote(String value) {
-<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (value == null) {</span>
-<span class="nc" id="L325">            return &quot;null&quot;;</span>
+    private static long parseLong(String raw) {
+<span class="pc bpc" id="L355" title="3 of 6 branches missed.">        if (raw == null || raw.isBlank() || raw.equals(&quot;null&quot;)) {</span>
+<span class="nc" id="L356">            return 0L;</span>
         }
-<span class="fc" id="L327">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
-<span class="fc bfc" id="L328" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
-<span class="fc" id="L329">            char c = value.charAt(i);</span>
-<span class="pc bpc" id="L330" title="5 of 6 branches missed.">            switch (c) {</span>
-<span class="nc" id="L331">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
-<span class="nc" id="L332">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
-<span class="nc" id="L333">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
-<span class="nc" id="L334">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
-<span class="nc" id="L335">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+        try {
+<span class="fc" id="L359">            return Long.parseLong(raw.trim());</span>
+<span class="nc" id="L360">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L361">            return 0L;</span>
+        }
+    }
+
+    private static double parseDouble(String raw, double defaultValue) {
+<span class="pc bpc" id="L366" title="3 of 6 branches missed.">        if (raw == null || raw.isBlank() || raw.equals(&quot;null&quot;)) {</span>
+<span class="nc" id="L367">            return defaultValue;</span>
+        }
+        try {
+<span class="fc" id="L370">            return Double.parseDouble(raw.trim());</span>
+<span class="nc" id="L371">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L372">            return defaultValue;</span>
+        }
+    }
+
+    private static boolean parseBoolean(String raw) {
+<span class="pc bpc" id="L377" title="2 of 4 branches missed.">        return raw != null &amp;&amp; Boolean.parseBoolean(raw.trim());</span>
+    }
+
+    private static String quote(String value) {
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L382">            return &quot;null&quot;;</span>
+        }
+<span class="fc" id="L384">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L386">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L387" title="5 of 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L388">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L389">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L390">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L391">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L392">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
                 default -&gt; {
-<span class="pc bpc" id="L337" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
-<span class="nc" id="L338">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L395">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
                     } else {
-<span class="fc" id="L340">                        builder.append(c);</span>
+<span class="fc" id="L397">                        builder.append(c);</span>
                     }
                 }
             }
         }
-<span class="fc" id="L345">        builder.append('&quot;');</span>
-<span class="fc" id="L346">        return builder.toString();</span>
+<span class="fc" id="L402">        builder.append('&quot;');</span>
+<span class="fc" id="L403">        return builder.toString();</span>
     }
 
     private final class JobHandle {
@@ -352,33 +409,33 @@ public class SearchJobManager {
         private volatile CompletableFuture&lt;Void&gt; activeFuture;
         private volatile boolean pauseRequested;
 
-<span class="fc" id="L355">        JobHandle(SearchJob initial) {</span>
-<span class="fc" id="L356">            this.state = new AtomicReference&lt;&gt;(initial);</span>
-<span class="fc" id="L357">        }</span>
+<span class="fc" id="L412">        JobHandle(SearchJob initial) {</span>
+<span class="fc" id="L413">            this.state = new AtomicReference&lt;&gt;(initial);</span>
+<span class="fc" id="L414">        }</span>
 
         JobHandle pausedFromRestore() {
-<span class="fc" id="L360">            state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED));</span>
-<span class="fc" id="L361">            return this;</span>
+<span class="fc" id="L417">            state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED).withActivePhase(&quot;paused&quot;));</span>
+<span class="fc" id="L418">            return this;</span>
         }
 
         SearchJob snapshot() {
-<span class="fc" id="L365">            return state.get();</span>
+<span class="fc" id="L422">            return state.get();</span>
         }
 
         void start() {
-<span class="fc" id="L369">            SearchJob current = state.updateAndGet(snapshot -&gt; snapshot.withState(SearchJob.State.RUNNING));</span>
-<span class="fc" id="L370">            launch(current);</span>
-<span class="fc" id="L371">        }</span>
+<span class="fc" id="L426">            SearchJob current = state.updateAndGet(snapshot -&gt; snapshot.withState(SearchJob.State.RUNNING));</span>
+<span class="fc" id="L427">            launch(current);</span>
+<span class="fc" id="L428">        }</span>
 
         void resume() {
-<span class="nc" id="L374">            SearchJob current = state.get();</span>
-<span class="nc bnc" id="L375" title="All 2 branches missed.">            if (current.state() == SearchJob.State.RUNNING) {</span>
-<span class="nc" id="L376">                return;</span>
+<span class="nc" id="L431">            SearchJob current = state.get();</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">            if (current.state() == SearchJob.State.RUNNING) {</span>
+<span class="nc" id="L433">                return;</span>
             }
-<span class="nc" id="L378">            pauseRequested = false;</span>
-<span class="nc" id="L379">            SearchJob running = state.updateAndGet(snapshot -&gt; snapshot.withState(SearchJob.State.RUNNING));</span>
-<span class="nc" id="L380">            launch(running);</span>
-<span class="nc" id="L381">        }</span>
+<span class="nc" id="L435">            pauseRequested = false;</span>
+<span class="nc" id="L436">            SearchJob running = state.updateAndGet(snapshot -&gt; snapshot.withState(SearchJob.State.RUNNING));</span>
+<span class="nc" id="L437">            launch(running);</span>
+<span class="nc" id="L438">        }</span>
 
         /**
          * Resume from the latest stored {@link SearchCheckpoint} if any. The
@@ -387,144 +444,209 @@ public class SearchJobManager {
          * resumed search continues from progress instead of starting over.
          */
         void resumeFromCheckpoint() {
-<span class="nc" id="L390">            SearchJob current = state.get();</span>
-<span class="nc bnc" id="L391" title="All 2 branches missed.">            if (current.state() == SearchJob.State.RUNNING) {</span>
-<span class="nc" id="L392">                return;</span>
+<span class="nc" id="L447">            SearchJob current = state.get();</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">            if (current.state() == SearchJob.State.RUNNING) {</span>
+<span class="nc" id="L449">                return;</span>
             }
-<span class="nc" id="L394">            pauseRequested = false;</span>
-<span class="nc" id="L395">            Optional&lt;SearchCheckpoint&gt; checkpoint = checkpointRepository.findByJobId(current.id());</span>
-<span class="nc bnc" id="L396" title="All 2 branches missed.">            if (checkpoint.isPresent()) {</span>
-<span class="nc" id="L397">                SearchCheckpoint cp = checkpoint.get();</span>
-<span class="nc" id="L398">                SearchJob resumed = new SearchJob(</span>
-<span class="nc" id="L399">                    current.id(),</span>
-<span class="nc" id="L400">                    cp.resumeSeed(),</span>
-<span class="nc" id="L401">                    current.inputType(),</span>
-<span class="nc" id="L402">                    current.profile(),</span>
+<span class="nc" id="L451">            pauseRequested = false;</span>
+<span class="nc" id="L452">            Optional&lt;SearchCheckpoint&gt; checkpoint = checkpointRepository.findByJobId(current.id());</span>
+<span class="nc bnc" id="L453" title="All 2 branches missed.">            if (checkpoint.isPresent()) {</span>
+<span class="nc" id="L454">                SearchCheckpoint cp = checkpoint.get();</span>
+<span class="nc" id="L455">                SearchJob resumed = new SearchJob(</span>
+<span class="nc" id="L456">                    current.id(),</span>
+<span class="nc" id="L457">                    cp.resumeSeed(),</span>
+<span class="nc" id="L458">                    current.inputType(),</span>
+<span class="nc" id="L459">                    current.profile(),</span>
                     SearchJob.State.RUNNING,
-<span class="nc" id="L404">                    current.createdAt(),</span>
-<span class="nc" id="L405">                    Instant.now(),</span>
-<span class="nc" id="L406">                    current.discoveredSuccesses(),</span>
-<span class="nc" id="L407">                    current.exploredStates(),</span>
-<span class="nc" id="L408">                    current.bestExpression(),</span>
-<span class="nc" id="L409">                    current.bestImprovement(),</span>
-<span class="nc" id="L410">                    current.notes()</span>
+                    &quot;searching&quot;,
+<span class="nc" id="L462">                    current.createdAt(),</span>
+<span class="nc" id="L463">                    Instant.now(),</span>
+<span class="nc" id="L464">                    current.discoveredSuccesses(),</span>
+<span class="nc" id="L465">                    current.exploredStates(),</span>
+<span class="nc" id="L466">                    current.bestExpression(),</span>
+<span class="nc" id="L467">                    current.bestImprovement(),</span>
+<span class="nc" id="L468">                    cp.resumeSeed(),</span>
+                    false,
+<span class="nc" id="L470">                    current.knownStateCount(),</span>
+<span class="nc" id="L471">                    current.estimatedBranchingFactor(),</span>
+<span class="nc" id="L472">                    current.projectedStateCount(),</span>
+<span class="nc" id="L473">                    current.searchSpaceRisk(),</span>
+<span class="nc" id="L474">                    current.searchSpaceWarning(),</span>
+<span class="nc" id="L475">                    current.notes()</span>
                 );
-<span class="nc" id="L412">                state.set(resumed);</span>
-<span class="nc" id="L413">                launch(resumed);</span>
-<span class="nc" id="L414">            } else {</span>
-<span class="nc" id="L415">                SearchJob running = state.updateAndGet(snapshot -&gt; snapshot.withState(SearchJob.State.RUNNING));</span>
-<span class="nc" id="L416">                launch(running);</span>
+<span class="nc" id="L477">                state.set(resumed);</span>
+<span class="nc" id="L478">                launch(resumed);</span>
+<span class="nc" id="L479">            } else {</span>
+<span class="nc" id="L480">                SearchJob running = state.updateAndGet(snapshot -&gt; snapshot.withState(SearchJob.State.RUNNING));</span>
+<span class="nc" id="L481">                launch(running);</span>
             }
-<span class="nc" id="L418">        }</span>
+<span class="nc" id="L483">        }</span>
 
         void requestPause() {
-<span class="nc" id="L421">            pauseRequested = true;</span>
-<span class="nc" id="L422">            TransformationSearchService service = activeService;</span>
-<span class="nc bnc" id="L423" title="All 2 branches missed.">            if (service != null) {</span>
-<span class="nc" id="L424">                service.shutdown();</span>
+<span class="nc" id="L486">            pauseRequested = true;</span>
+<span class="nc" id="L487">            TransformationSearchService service = activeService;</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">            if (service != null) {</span>
+<span class="nc" id="L489">                service.shutdown();</span>
             }
-<span class="nc" id="L426">            state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED));</span>
-<span class="nc" id="L427">        }</span>
+<span class="nc" id="L491">            state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED));</span>
+<span class="nc" id="L492">        }</span>
 
         void cancel() {
-<span class="fc" id="L430">            pauseRequested = true;</span>
-<span class="fc" id="L431">            TransformationSearchService service = activeService;</span>
-<span class="fc bfc" id="L432" title="All 2 branches covered.">            if (service != null) {</span>
-<span class="fc" id="L433">                service.shutdown();</span>
+<span class="fc" id="L495">            pauseRequested = true;</span>
+<span class="fc" id="L496">            TransformationSearchService service = activeService;</span>
+<span class="fc bfc" id="L497" title="All 2 branches covered.">            if (service != null) {</span>
+<span class="fc" id="L498">                service.shutdown();</span>
             }
-<span class="fc" id="L435">            state.updateAndGet(current -&gt; current.withState(SearchJob.State.CANCELLED));</span>
-<span class="fc" id="L436">        }</span>
+<span class="fc" id="L500">            state.updateAndGet(current -&gt; current.withState(SearchJob.State.CANCELLED));</span>
+<span class="fc" id="L501">        }</span>
 
         private void launch(SearchJob current) {
-<span class="fc" id="L439">            TransformationSearchService service = serviceFactory.apply(current);</span>
-<span class="fc" id="L440">            activeService = service;</span>
-<span class="fc" id="L441">            CompletableFuture&lt;Void&gt; future = service.submit(</span>
-<span class="fc" id="L442">                new InputRequest(InputType.valueOf(current.inputType()), current.expression())</span>
+<span class="fc" id="L504">            TransformationSearchService service = serviceFactory.apply(current);</span>
+<span class="fc" id="L505">            activeService = service;</span>
+<span class="fc" id="L506">            state.updateAndGet(snapshot -&gt; snapshot.withActivePhase(&quot;searching&quot;));</span>
+<span class="fc" id="L507">            CompletableFuture&lt;Void&gt; future = service.submit(</span>
+<span class="fc" id="L508">                new InputRequest(InputType.valueOf(current.inputType()), current.expression())</span>
             );
-<span class="fc" id="L444">            activeFuture = future;</span>
-<span class="fc" id="L445">            future.whenComplete((ignored, error) -&gt; finalizeRun(service, error));</span>
-<span class="fc" id="L446">        }</span>
+<span class="fc" id="L510">            activeFuture = future;</span>
+<span class="fc" id="L511">            future.whenComplete((ignored, error) -&gt; finalizeRun(service, error));</span>
+<span class="fc" id="L512">        }</span>
 
         private void finalizeRun(TransformationSearchService service, Throwable error) {
             try {
-<span class="fc" id="L450">                List&lt;SimplificationSuccess&gt; successes = service.getSuccesses();</span>
-<span class="fc" id="L451">                int explored = service.getGraphSnapshot().nodes().size();</span>
-<span class="fc" id="L452">                Optional&lt;SimplificationSuccess&gt; best = service.getBestSolution();</span>
-<span class="fc" id="L453">                String bestExpr = best.map(SimplificationSuccess::simplifiedExpression).orElse(null);</span>
-<span class="fc" id="L454">                int improvement = best.map(SimplificationSuccess::improvement).orElse(0);</span>
-<span class="fc" id="L455">                state.updateAndGet(current -&gt;</span>
-<span class="fc" id="L456">                    current.withProgress(explored, successes.size(), bestExpr, improvement));</span>
+<span class="fc" id="L516">                state.updateAndGet(current -&gt; current.withActivePhase(&quot;finalizing&quot;));</span>
+<span class="fc" id="L517">                List&lt;SimplificationSuccess&gt; successes = service.getSuccesses();</span>
+<span class="fc" id="L518">                GraphSnapshot snapshot = service.getGraphSnapshot();</span>
+<span class="fc" id="L519">                int explored = snapshot.nodes().size();</span>
+<span class="fc" id="L520">                Optional&lt;SimplificationSuccess&gt; best = service.getBestSolution();</span>
+<span class="fc" id="L521">                String bestExpr = best.map(SimplificationSuccess::simplifiedExpression).orElse(null);</span>
+<span class="fc" id="L522">                int improvement = best.map(SimplificationSuccess::improvement).orElse(0);</span>
+<span class="fc" id="L523">                String lastProcessed = lastProcessedExpression(snapshot, bestExpr, state.get().expression());</span>
+<span class="fc" id="L524">                state.updateAndGet(current -&gt;</span>
+<span class="fc" id="L525">                    current.withProgress(explored, successes.size(), bestExpr, improvement, lastProcessed));</span>
+
+<span class="fc" id="L527">                SearchHeuristic heuristic = service.heuristic();</span>
+<span class="fc" id="L528">                SearchSpaceEstimate estimate = searchSpaceEstimator.estimate(</span>
+<span class="fc" id="L529">                    statesPerDepth(snapshot),</span>
+<span class="fc" id="L530">                    heuristic.maxDepth(),</span>
+<span class="fc" id="L531">                    heuristic.maxVisitedExpressions()</span>
+                );
+<span class="fc" id="L533">                state.updateAndGet(current -&gt; current.withSearchSpaceEstimate(</span>
+<span class="fc" id="L534">                    estimate.knownStateCount(),</span>
+<span class="fc" id="L535">                    estimate.estimatedBranchingFactor(),</span>
+<span class="fc" id="L536">                    estimate.projectedStateCount(),</span>
+<span class="fc" id="L537">                    estimate.risk().name(),</span>
+<span class="fc" id="L538">                    estimate.warning()</span>
+                ));
 
                 // Always persist a checkpoint so a later resume can pick up.
-<span class="fc" id="L459">                writeCheckpoint(service, successes);</span>
+<span class="fc" id="L542">                writeCheckpoint(service, successes);</span>
 
-<span class="pc bpc" id="L461" title="1 of 2 branches missed.">                if (error != null) {</span>
-<span class="nc" id="L462">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.FAILED));</span>
-<span class="pc bpc" id="L463" title="1 of 4 branches missed.">                } else if (pauseRequested &amp;&amp; state.get().state() != SearchJob.State.CANCELLED) {</span>
-<span class="nc" id="L464">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED));</span>
-<span class="fc bfc" id="L465" title="All 2 branches covered.">                } else if (state.get().state() == SearchJob.State.CANCELLED) {</span>
-                    // keep cancelled
+<span class="pc bpc" id="L544" title="1 of 2 branches missed.">                if (error != null) {</span>
+<span class="nc" id="L545">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.FAILED));</span>
+<span class="pc bpc" id="L546" title="1 of 4 branches missed.">                } else if (pauseRequested &amp;&amp; state.get().state() != SearchJob.State.CANCELLED) {</span>
+<span class="nc" id="L547">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED));</span>
+<span class="fc bfc" id="L548" title="All 2 branches covered.">                } else if (state.get().state() == SearchJob.State.CANCELLED) {</span>
+<span class="fc" id="L549">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.CANCELLED));</span>
                 } else {
-<span class="fc" id="L468">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.DONE));</span>
+<span class="fc" id="L551">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.DONE));</span>
                 }
             } finally {
-<span class="fc" id="L471">                service.shutdown();</span>
+<span class="fc" id="L554">                service.shutdown();</span>
             }
-<span class="fc" id="L473">        }</span>
+<span class="fc" id="L556">        }</span>
 
         private void writeCheckpoint(TransformationSearchService service, List&lt;SimplificationSuccess&gt; successes) {
-<span class="fc" id="L476">            SearchJob current = state.get();</span>
+<span class="fc" id="L559">            SearchJob current = state.get();</span>
             // Use the visited node set from the graph snapshot as a proxy for
             // already-explored states. The frontier is the best successes (sorted
             // by improvement descending) so resume can re-seed from the most
             // promising state.
-<span class="fc" id="L481">            Set&lt;String&gt; visited = new LinkedHashSet&lt;&gt;(service.getGraphSnapshot().nodes());</span>
-<span class="fc" id="L482">            List&lt;SearchCheckpoint.BestPath&gt; bestPaths = successes.stream()</span>
-<span class="fc" id="L483">                .sorted(Comparator.comparingInt(SimplificationSuccess::improvement).reversed())</span>
-<span class="fc" id="L484">                .limit(16)</span>
-<span class="fc" id="L485">                .map(success -&gt; new SearchCheckpoint.BestPath(</span>
-<span class="fc" id="L486">                    success.simplifiedExpression(),</span>
-<span class="fc" id="L487">                    success.improvement(),</span>
-<span class="pc bpc" id="L488" title="1 of 2 branches missed.">                    success.transformationRule() == null ? &quot;&quot; : success.transformationRule()))</span>
-<span class="fc" id="L489">                .toList();</span>
-<span class="fc" id="L490">            List&lt;String&gt; frontier = bestPaths.stream()</span>
-<span class="fc" id="L491">                .map(SearchCheckpoint.BestPath::expression)</span>
-<span class="fc" id="L492">                .toList();</span>
-<span class="fc" id="L493">            SearchCheckpoint checkpoint = new SearchCheckpoint(</span>
-<span class="fc" id="L494">                current.id(),</span>
-<span class="fc" id="L495">                current.expression(),</span>
-<span class="fc" id="L496">                current.profile(),</span>
+<span class="fc" id="L564">            Set&lt;String&gt; visited = new LinkedHashSet&lt;&gt;(service.getGraphSnapshot().nodes());</span>
+<span class="fc" id="L565">            List&lt;SearchCheckpoint.BestPath&gt; bestPaths = successes.stream()</span>
+<span class="fc" id="L566">                .sorted(Comparator.comparingInt(SimplificationSuccess::improvement).reversed())</span>
+<span class="fc" id="L567">                .limit(16)</span>
+<span class="fc" id="L568">                .map(success -&gt; new SearchCheckpoint.BestPath(</span>
+<span class="fc" id="L569">                    success.simplifiedExpression(),</span>
+<span class="fc" id="L570">                    success.improvement(),</span>
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">                    success.transformationRule() == null ? &quot;&quot; : success.transformationRule()))</span>
+<span class="fc" id="L572">                .toList();</span>
+<span class="fc" id="L573">            List&lt;String&gt; frontier = bestPaths.stream()</span>
+<span class="fc" id="L574">                .map(SearchCheckpoint.BestPath::expression)</span>
+<span class="fc" id="L575">                .toList();</span>
+<span class="fc" id="L576">            SearchCheckpoint checkpoint = new SearchCheckpoint(</span>
+<span class="fc" id="L577">                current.id(),</span>
+<span class="fc" id="L578">                current.expression(),</span>
+<span class="fc" id="L579">                current.profile(),</span>
                 &quot;default&quot;,
                 frontier,
-<span class="fc" id="L499">                List.copyOf(visited),</span>
+<span class="fc" id="L582">                List.copyOf(visited),</span>
                 bestPaths,
-<span class="fc" id="L501">                current.id().hashCode(),</span>
-<span class="fc" id="L502">                current.createdAt(),</span>
-<span class="fc" id="L503">                Instant.now()</span>
+<span class="fc" id="L584">                current.id().hashCode(),</span>
+<span class="fc" id="L585">                current.createdAt(),</span>
+<span class="fc" id="L586">                Instant.now()</span>
             );
-<span class="fc" id="L505">            checkpointRepository.save(checkpoint);</span>
-<span class="fc" id="L506">        }</span>
+<span class="fc" id="L588">            checkpointRepository.save(checkpoint);</span>
+<span class="fc" id="L589">        }</span>
+
+        private String lastProcessedExpression(GraphSnapshot snapshot, String bestExpression, String fallback) {
+<span class="pc bpc" id="L592" title="2 of 4 branches missed.">            if (bestExpression != null &amp;&amp; !bestExpression.isBlank()) {</span>
+<span class="fc" id="L593">                return bestExpression;</span>
+            }
+<span class="nc bnc" id="L595" title="All 2 branches missed.">            if (!snapshot.nodes().isEmpty()) {</span>
+<span class="nc" id="L596">                return snapshot.nodes().get(snapshot.nodes().size() - 1);</span>
+            }
+<span class="nc" id="L598">            return fallback;</span>
+        }
+
+        private List&lt;Long&gt; statesPerDepth(GraphSnapshot snapshot) {
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">            if (snapshot.nodes().isEmpty()) {</span>
+<span class="nc" id="L603">                return List.of();</span>
+            }
+<span class="fc" id="L605">            Map&lt;Integer, Set&lt;String&gt;&gt; perDepth = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L606">            Set&lt;String&gt; targets = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">            for (GraphEdge edge : snapshot.edges()) {</span>
+<span class="fc" id="L608">                targets.add(edge.toExpression());</span>
+<span class="fc" id="L609">                perDepth.computeIfAbsent(Math.max(edge.depth(), 0), ignored -&gt; new LinkedHashSet&lt;&gt;())</span>
+<span class="fc" id="L610">                    .add(edge.toExpression());</span>
+<span class="fc" id="L611">            }</span>
+<span class="fc" id="L612">            Set&lt;String&gt; roots = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L613" title="All 2 branches covered.">            for (GraphEdge edge : snapshot.edges()) {</span>
+<span class="fc bfc" id="L614" title="All 2 branches covered.">                if (!targets.contains(edge.fromExpression())) {</span>
+<span class="fc" id="L615">                    roots.add(edge.fromExpression());</span>
+                }
+<span class="fc" id="L617">            }</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">            if (roots.isEmpty()) {</span>
+<span class="fc" id="L619">                roots.add(snapshot.nodes().get(0));</span>
+            }
+<span class="fc" id="L621">            perDepth.computeIfAbsent(0, ignored -&gt; new LinkedHashSet&lt;&gt;()).addAll(roots);</span>
+<span class="fc" id="L622">            List&lt;Long&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L623">            int maxDepth = perDepth.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);</span>
+<span class="fc bfc" id="L624" title="All 2 branches covered.">            for (int depth = 0; depth &lt;= maxDepth; depth++) {</span>
+<span class="fc" id="L625">                result.add((long) perDepth.getOrDefault(depth, Set.of()).size());</span>
+            }
+<span class="fc" id="L627">            return result;</span>
+        }
     }
 
     /** Convenience: render an unmodifiable snapshot map for diagnostic UIs. */
     public Map&lt;String, SearchJob&gt; snapshotMap() {
-<span class="nc" id="L511">        Map&lt;String, SearchJob&gt; map = new LinkedHashMap&lt;&gt;();</span>
-<span class="nc bnc" id="L512" title="All 2 branches missed.">        for (Map.Entry&lt;String, JobHandle&gt; entry : jobs.entrySet()) {</span>
-<span class="nc" id="L513">            map.put(entry.getKey(), entry.getValue().snapshot());</span>
-<span class="nc" id="L514">        }</span>
-<span class="nc" id="L515">        return Collections.unmodifiableMap(map);</span>
+<span class="nc" id="L633">        Map&lt;String, SearchJob&gt; map = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L634" title="All 2 branches missed.">        for (Map.Entry&lt;String, JobHandle&gt; entry : jobs.entrySet()) {</span>
+<span class="nc" id="L635">            map.put(entry.getKey(), entry.getValue().snapshot());</span>
+<span class="nc" id="L636">        }</span>
+<span class="nc" id="L637">        return Collections.unmodifiableMap(map);</span>
     }
 
     /** Compare two job lists by id for diff-based UIs. */
     public static List&lt;String&gt; diffIds(List&lt;SearchJob&gt; previous, List&lt;SearchJob&gt; current) {
-<span class="nc" id="L520">        List&lt;String&gt; diff = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L521" title="All 2 branches missed.">        for (SearchJob job : current) {</span>
-<span class="nc" id="L522">            boolean exists = previous.stream().anyMatch(other -&gt; other.id().equals(job.id()));</span>
-<span class="nc bnc" id="L523" title="All 2 branches missed.">            if (!exists) {</span>
-<span class="nc" id="L524">                diff.add(job.id());</span>
+<span class="nc" id="L642">        List&lt;String&gt; diff = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L643" title="All 2 branches missed.">        for (SearchJob job : current) {</span>
+<span class="nc" id="L644">            boolean exists = previous.stream().anyMatch(other -&gt; other.id().equals(job.id()));</span>
+<span class="nc bnc" id="L645" title="All 2 branches missed.">            if (!exists) {</span>
+<span class="nc" id="L646">                diff.add(job.id());</span>
             }
-<span class="nc" id="L526">        }</span>
-<span class="nc" id="L527">        return diff;</span>
+<span class="nc" id="L648">        }</span>
+<span class="nc" id="L649">        return diff;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

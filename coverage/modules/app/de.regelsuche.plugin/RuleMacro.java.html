@@ -7,10 +7,17 @@ public record RuleMacro(
     String input,
     String output,
     String explanation,
-    List&lt;String&gt; tags
+    List&lt;String&gt; tags,
+    int priority,
+    String difficulty
 ) {
-<span class="fc" id="L12">    public RuleMacro {</span>
-<span class="fc" id="L13">        tags = List.copyOf(tags);</span>
-<span class="fc" id="L14">    }</span>
+<span class="fc" id="L14">    public RuleMacro {</span>
+<span class="fc" id="L15">        tags = List.copyOf(tags);</span>
+<span class="pc bpc" id="L16" title="2 of 4 branches missed.">        difficulty = difficulty == null || difficulty.isBlank() ? &quot;unspecified&quot; : difficulty;</span>
+<span class="fc" id="L17">    }</span>
+
+    public RuleMacro(String id, String input, String output, String explanation, List&lt;String&gt; tags) {
+<span class="fc" id="L20">        this(id, input, output, explanation, tags, 0, &quot;unspecified&quot;);</span>
+<span class="fc" id="L21">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

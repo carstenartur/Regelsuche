@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">SearchStrategy.java</span></div><h1>SearchStrategy.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import java.util.List;
+
+/**
+ * Plugin extension that contributes a named search strategy.
+ *
+ * &lt;p&gt;Implementations must override {@link #search(SearchProblem)} to steer
+ * runtime search behaviour.  The default implementation returns an empty list,
+ * which effectively disables candidate exploration for this strategy.
+ */
+public interface SearchStrategy extends PluginExtension, de.regelsuche.search.strategy.SearchStrategy {
+    default String description() {
+<span class="nc" id="L16">        return &quot;&quot;;</span>
+    }
+
+    @Override
+    default List&lt;SearchState&gt; search(SearchProblem problem) {
+<span class="nc" id="L21">        return List.of();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

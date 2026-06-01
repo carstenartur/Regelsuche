@@ -15,30 +15,77 @@ import java.util.List;
  *   &lt;li&gt;Otherwise the entry is included.&lt;/li&gt;
  * &lt;/ul&gt;
  */
-public record RuleProfile(String id, List&lt;String&gt; enableTags, List&lt;String&gt; disableTags, String source) {
-<span class="fc" id="L19">    public RuleProfile {</span>
-<span class="fc" id="L20">        enableTags = List.copyOf(enableTags);</span>
-<span class="fc" id="L21">        disableTags = List.copyOf(disableTags);</span>
-<span class="fc" id="L22">    }</span>
+public record RuleProfile(
+    String id,
+    List&lt;String&gt; enableTags,
+    List&lt;String&gt; disableTags,
+    List&lt;String&gt; whitelist,
+    List&lt;String&gt; blacklist,
+    String source
+) {
+<span class="fc" id="L26">    public RuleProfile {</span>
+<span class="fc" id="L27">        enableTags = List.copyOf(enableTags);</span>
+<span class="fc" id="L28">        disableTags = List.copyOf(disableTags);</span>
+<span class="fc" id="L29">        whitelist = List.copyOf(whitelist);</span>
+<span class="fc" id="L30">        blacklist = List.copyOf(blacklist);</span>
+<span class="fc" id="L31">    }</span>
+
+    public RuleProfile(String id, List&lt;String&gt; enableTags, List&lt;String&gt; disableTags, String source) {
+<span class="nc" id="L34">        this(id, enableTags, disableTags, List.of(), List.of(), source);</span>
+<span class="nc" id="L35">    }</span>
 
     /**
      * Decides whether an entry with the given tags should remain enabled under this profile.
      */
     public boolean includes(List&lt;String&gt; tags) {
-<span class="fc bfc" id="L28" title="All 2 branches covered.">        for (String tag : tags) {</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">            if (disableTags.contains(tag)) {</span>
-<span class="fc" id="L30">                return false;</span>
-            }
-<span class="fc" id="L32">        }</span>
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (enableTags.isEmpty()) {</span>
-<span class="nc" id="L34">            return true;</span>
+<span class="fc" id="L41">        return includes(&quot;&quot;, tags);</span>
+    }
+
+    /**
+     * Decides whether an entry with the given id and tags should remain enabled under this profile.
+     */
+    public boolean includes(String entryId, List&lt;String&gt; tags) {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (matchesId(blacklist, entryId)) {</span>
+<span class="fc" id="L49">            return false;</span>
         }
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (String tag : tags) {</span>
-<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (enableTags.contains(tag)) {</span>
-<span class="fc" id="L38">                return true;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (matchesId(whitelist, entryId)) {</span>
+<span class="fc" id="L52">            return true;</span>
+        }
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (String tag : tags) {</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            if (disableTags.contains(tag)) {</span>
+<span class="fc" id="L56">                return false;</span>
             }
-<span class="fc" id="L40">        }</span>
-<span class="fc" id="L41">        return false;</span>
+<span class="fc" id="L58">        }</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (enableTags.isEmpty()) {</span>
+<span class="nc" id="L60">            return true;</span>
+        }
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (String tag : tags) {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (enableTags.contains(tag)) {</span>
+<span class="fc" id="L64">                return true;</span>
+            }
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        return false;</span>
+    }
+
+    public List&lt;String&gt; conflictingIds() {
+<span class="fc" id="L71">        return whitelist.stream()</span>
+<span class="fc" id="L72">            .filter(blacklist::contains)</span>
+<span class="fc" id="L73">            .toList();</span>
+    }
+
+    private boolean matchesId(List&lt;String&gt; ids, String entryId) {
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">        if (entryId == null || entryId.isBlank()) {</span>
+<span class="fc" id="L78">            return false;</span>
+        }
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (ids.contains(entryId)) {</span>
+<span class="fc" id="L81">            return true;</span>
+        }
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (String id : ids) {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (entryId.startsWith(id + &quot;.&quot;)) {</span>
+<span class="nc" id="L85">                return true;</span>
+            }
+<span class="fc" id="L87">        }</span>
+<span class="fc" id="L88">        return false;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

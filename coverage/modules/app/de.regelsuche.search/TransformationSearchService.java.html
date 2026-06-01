@@ -102,77 +102,81 @@ public class TransformationSearchService {
 <span class="fc" id="L102">        return graphStore.snapshot();</span>
     }
 
+    public SearchHeuristic heuristic() {
+<span class="fc" id="L106">        return heuristic;</span>
+    }
+
     public void shutdown() {
-<span class="fc" id="L106">        executorService.shutdown();</span>
-<span class="fc" id="L107">    }</span>
+<span class="fc" id="L110">        executorService.shutdown();</span>
+<span class="fc" id="L111">    }</span>
 
     private List&lt;String&gt; collectRoots(ParsedInput parsed) {
-<span class="fc" id="L110">        List&lt;String&gt; roots = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (Expr expr : parsed.terms()) {</span>
-<span class="fc" id="L112">            roots.add(ExpressionFormatter.format(expr));</span>
-<span class="fc" id="L113">        }</span>
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        for (Equation equation : parsed.equations()) {</span>
-<span class="nc" id="L115">            roots.add(ExpressionFormatter.format(equation));</span>
-<span class="nc" id="L116">        }</span>
-<span class="fc" id="L117">        return roots;</span>
+<span class="fc" id="L114">        List&lt;String&gt; roots = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (Expr expr : parsed.terms()) {</span>
+<span class="fc" id="L116">            roots.add(ExpressionFormatter.format(expr));</span>
+<span class="fc" id="L117">        }</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        for (Equation equation : parsed.equations()) {</span>
+<span class="nc" id="L119">            roots.add(ExpressionFormatter.format(equation));</span>
+<span class="nc" id="L120">        }</span>
+<span class="fc" id="L121">        return roots;</span>
     }
 
     private void explore(String root, TransformationGoal goal) {
-<span class="fc" id="L121">        SearchProblem problem = new SearchProblem(root, engine, scorer, canonicalizer, heuristic)</span>
-<span class="fc" id="L122">            .withGoal(goal);</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (SearchState state : searchStrategy.search(problem)) {</span>
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            boolean alreadyVisited = !globallyVisited.add(state.canonicalHash() + &quot;:&quot; + state.appliedRuleApplications());</span>
-<span class="pc bpc" id="L125" title="3 of 4 branches missed.">            if (alreadyVisited &amp;&amp; state.improvement() &lt;= 0) {</span>
-<span class="nc" id="L126">                continue;</span>
+<span class="fc" id="L125">        SearchProblem problem = new SearchProblem(root, engine, scorer, canonicalizer, heuristic)</span>
+<span class="fc" id="L126">            .withGoal(goal);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (SearchState state : searchStrategy.search(problem)) {</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            boolean alreadyVisited = !globallyVisited.add(state.canonicalHash() + &quot;:&quot; + state.appliedRuleApplications());</span>
+<span class="pc bpc" id="L129" title="3 of 4 branches missed.">            if (alreadyVisited &amp;&amp; state.improvement() &lt;= 0) {</span>
+<span class="nc" id="L130">                continue;</span>
             }
-<span class="fc" id="L128">            graphStore.saveNode(state.expression(), state.score().weightedTotal());</span>
-<span class="pc bpc" id="L129" title="1 of 4 branches missed.">            if (state.parentExpression() != null &amp;&amp; state.appliedRuleId() != null) {</span>
-<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                MacroMoveExpansion macroExpansion = engine instanceof MacroMoveTransformationEngine macroEngine</span>
-<span class="nc" id="L131">                    ? macroEngine.expansionFor(</span>
-<span class="nc" id="L132">                        state.parentExpression(),</span>
-<span class="nc" id="L133">                        state.expression(),</span>
-<span class="nc" id="L134">                        state.appliedRuleId()</span>
-<span class="nc" id="L135">                    ).orElse(null)</span>
-<span class="fc" id="L136">                    : null;</span>
-<span class="fc" id="L137">                graphStore.saveEdge(new GraphEdge(</span>
-<span class="fc" id="L138">                    state.parentExpression(),</span>
-<span class="fc" id="L139">                    state.expression(),</span>
-<span class="fc" id="L140">                    state.appliedRuleId(),</span>
-<span class="fc" id="L141">                    state.depth(),</span>
-<span class="fc" id="L142">                    state.improvement(),</span>
-<span class="fc" id="L143">                    root + &quot;#&quot; + state.depth(),</span>
-<span class="fc" id="L144">                    state.canonicalHash(),</span>
-<span class="fc" id="L145">                    scorer.score(state.parentExpression()).weightedTotal(),</span>
-<span class="fc" id="L146">                    state.score().weightedTotal(),</span>
-<span class="fc" id="L147">                    state.appliedRuleKind(),</span>
-<span class="fc" id="L148">                    state.mayIncreaseComplexity(),</span>
-<span class="fc" id="L149">                    state.estimatedCostDelta(),</span>
-<span class="fc" id="L150">                    state.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L132">            graphStore.saveNode(state.expression(), state.score().weightedTotal());</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">            if (state.parentExpression() != null &amp;&amp; state.appliedRuleId() != null) {</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                MacroMoveExpansion macroExpansion = engine instanceof MacroMoveTransformationEngine macroEngine</span>
+<span class="nc" id="L135">                    ? macroEngine.expansionFor(</span>
+<span class="nc" id="L136">                        state.parentExpression(),</span>
+<span class="nc" id="L137">                        state.expression(),</span>
+<span class="nc" id="L138">                        state.appliedRuleId()</span>
+<span class="nc" id="L139">                    ).orElse(null)</span>
+<span class="fc" id="L140">                    : null;</span>
+<span class="fc" id="L141">                graphStore.saveEdge(new GraphEdge(</span>
+<span class="fc" id="L142">                    state.parentExpression(),</span>
+<span class="fc" id="L143">                    state.expression(),</span>
+<span class="fc" id="L144">                    state.appliedRuleId(),</span>
+<span class="fc" id="L145">                    state.depth(),</span>
+<span class="fc" id="L146">                    state.improvement(),</span>
+<span class="fc" id="L147">                    root + &quot;#&quot; + state.depth(),</span>
+<span class="fc" id="L148">                    state.canonicalHash(),</span>
+<span class="fc" id="L149">                    scorer.score(state.parentExpression()).weightedTotal(),</span>
+<span class="fc" id="L150">                    state.score().weightedTotal(),</span>
+<span class="fc" id="L151">                    state.appliedRuleKind(),</span>
+<span class="fc" id="L152">                    state.mayIncreaseComplexity(),</span>
+<span class="fc" id="L153">                    state.estimatedCostDelta(),</span>
+<span class="fc" id="L154">                    state.equivalencePreservingByConstruction(),</span>
                     CandidateProofStatus.OBSERVED,
                     macroExpansion
                 ));
             }
-<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (state.improvement() &gt; 0) {</span>
-<span class="fc" id="L156">                SimplificationSuccess success = new SimplificationSuccess(</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (state.improvement() &gt; 0) {</span>
+<span class="fc" id="L160">                SimplificationSuccess success = new SimplificationSuccess(</span>
                     root,
-<span class="fc" id="L158">                    state.expression(),</span>
-<span class="fc" id="L159">                    state.appliedRuleId(),</span>
-<span class="fc" id="L160">                    state.depth(),</span>
-<span class="fc" id="L161">                    state.improvement(),</span>
-<span class="fc" id="L162">                    Instant.now()</span>
+<span class="fc" id="L162">                    state.expression(),</span>
+<span class="fc" id="L163">                    state.appliedRuleId(),</span>
+<span class="fc" id="L164">                    state.depth(),</span>
+<span class="fc" id="L165">                    state.improvement(),</span>
+<span class="fc" id="L166">                    Instant.now()</span>
                 );
-<span class="fc" id="L164">                successes.add(success);</span>
-<span class="fc" id="L165">                int oldComplexity = scorer.score(state.parentExpression()).weightedTotal();</span>
-<span class="fc" id="L166">                int newComplexity = state.score().weightedTotal();</span>
-<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                if (heuristic.shouldNotify(oldComplexity, newComplexity)) {</span>
-<span class="fc" id="L168">                    notifier.onSignificantSimplification(state.parentExpression(), state.expression());</span>
+<span class="fc" id="L168">                successes.add(success);</span>
+<span class="fc" id="L169">                int oldComplexity = scorer.score(state.parentExpression()).weightedTotal();</span>
+<span class="fc" id="L170">                int newComplexity = state.score().weightedTotal();</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                if (heuristic.shouldNotify(oldComplexity, newComplexity)) {</span>
+<span class="fc" id="L172">                    notifier.onSignificantSimplification(state.parentExpression(), state.expression());</span>
                 }
             }
-<span class="fc" id="L171">        }</span>
-<span class="fc" id="L172">    }</span>
+<span class="fc" id="L175">        }</span>
+<span class="fc" id="L176">    }</span>
 
     static int complexity(String expression) {
-<span class="nc" id="L175">        return new ExpressionScorer().score(expression).weightedTotal();</span>
+<span class="nc" id="L179">        return new ExpressionScorer().score(expression).weightedTotal();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

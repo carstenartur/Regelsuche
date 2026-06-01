@@ -11,8 +11,8 @@ import java.util.Objects;
 <span class="fc" id="L11">    private final Map&lt;String, MutableVisitorRegistration&gt; visitors = new LinkedHashMap&lt;&gt;();</span>
 
     public void register(AstVisitorPlugin visitor) {
-<span class="nc" id="L14">        register(visitor, &quot;plugin&quot;);</span>
-<span class="nc" id="L15">    }</span>
+<span class="fc" id="L14">        register(visitor, &quot;plugin&quot;);</span>
+<span class="fc" id="L15">    }</span>
 
     public void register(AstVisitorPlugin visitor, String source) {
 <span class="fc" id="L18">        Objects.requireNonNull(visitor, &quot;visitor&quot;);</span>
@@ -23,11 +23,11 @@ import java.util.Objects;
 <span class="fc" id="L23">    }</span>
 
     public void disable(String id) {
-<span class="nc" id="L26">        MutableVisitorRegistration registration = visitors.get(id);</span>
-<span class="nc bnc" id="L27" title="All 2 branches missed.">        if (registration != null) {</span>
-<span class="nc" id="L28">            registration.enabled = false;</span>
+<span class="fc" id="L26">        MutableVisitorRegistration registration = visitors.get(id);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (registration != null) {</span>
+<span class="fc" id="L28">            registration.enabled = false;</span>
         }
-<span class="nc" id="L30">    }</span>
+<span class="fc" id="L30">    }</span>
 
     public AstVisitorContext execute(AstVisitorPhase phase, Expr root, AstVisitorContext context) {
 <span class="fc bfc" id="L33" title="All 2 branches covered.">        for (MutableVisitorRegistration registration : visitors.values()) {</span>

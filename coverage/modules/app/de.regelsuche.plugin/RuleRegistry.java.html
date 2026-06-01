@@ -11,40 +11,50 @@ import java.util.Objects;
 <span class="fc" id="L11">    private final Map&lt;String, MutableRuleRegistration&gt; rules = new LinkedHashMap&lt;&gt;();</span>
 
     public void register(RewriteRule rule) {
-<span class="nc" id="L14">        register(rule, &quot;plugin&quot;, &quot;&quot;, List.of());</span>
+<span class="nc" id="L14">        register(rule, &quot;plugin&quot;, &quot;&quot;, List.of(), List.of());</span>
 <span class="nc" id="L15">    }</span>
 
     public void register(RewriteRule rule, String source, String explanation, List&lt;String&gt; tags) {
-<span class="fc" id="L18">        Objects.requireNonNull(rule, &quot;rule&quot;);</span>
-<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (rules.containsKey(rule.id())) {</span>
-<span class="nc" id="L20">            throw new IllegalArgumentException(&quot;Duplicate rule id: &quot; + rule.id());</span>
+<span class="fc" id="L18">        register(rule, source, explanation, tags, List.of());</span>
+<span class="fc" id="L19">    }</span>
+
+    public void register(
+        RewriteRule rule,
+        String source,
+        String explanation,
+        List&lt;String&gt; tags,
+        List&lt;RuleFileParser.RuleCondition&gt; conditions
+    ) {
+<span class="fc" id="L28">        Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (rules.containsKey(rule.id())) {</span>
+<span class="nc" id="L30">            throw new IllegalArgumentException(&quot;Duplicate rule id: &quot; + rule.id());</span>
         }
-<span class="fc" id="L22">        rules.put(rule.id(), new MutableRuleRegistration(rule, source, explanation, tags));</span>
-<span class="fc" id="L23">    }</span>
+<span class="fc" id="L32">        rules.put(rule.id(), new MutableRuleRegistration(rule, source, explanation, tags, conditions));</span>
+<span class="fc" id="L33">    }</span>
 
     public void disable(String id) {
-<span class="fc" id="L26">        MutableRuleRegistration registration = rules.get(id);</span>
-<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (registration != null) {</span>
-<span class="fc" id="L28">            registration.enabled = false;</span>
+<span class="fc" id="L36">        MutableRuleRegistration registration = rules.get(id);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (registration != null) {</span>
+<span class="fc" id="L38">            registration.enabled = false;</span>
         }
-<span class="fc" id="L30">    }</span>
+<span class="fc" id="L40">    }</span>
 
     public List&lt;RewriteRule&gt; enabledRules() {
-<span class="fc" id="L33">        List&lt;RewriteRule&gt; enabled = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (MutableRuleRegistration registration : rules.values()) {</span>
-<span class="fc bfc" id="L35" title="All 2 branches covered.">            if (registration.enabled) {</span>
-<span class="fc" id="L36">                enabled.add(registration.rule);</span>
+<span class="fc" id="L43">        List&lt;RewriteRule&gt; enabled = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (MutableRuleRegistration registration : rules.values()) {</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            if (registration.enabled) {</span>
+<span class="fc" id="L46">                enabled.add(registration.rule);</span>
             }
-<span class="fc" id="L38">        }</span>
-<span class="fc" id="L39">        return List.copyOf(enabled);</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        return List.copyOf(enabled);</span>
     }
 
     public List&lt;RuleRegistration&gt; registrations() {
-<span class="fc" id="L43">        List&lt;RuleRegistration&gt; registrations = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (MutableRuleRegistration registration : rules.values()) {</span>
-<span class="fc" id="L45">            registrations.add(registration.snapshot());</span>
-<span class="fc" id="L46">        }</span>
-<span class="fc" id="L47">        return List.copyOf(registrations);</span>
+<span class="fc" id="L53">        List&lt;RuleRegistration&gt; registrations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (MutableRuleRegistration registration : rules.values()) {</span>
+<span class="fc" id="L55">            registrations.add(registration.snapshot());</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        return List.copyOf(registrations);</span>
     }
 
     public record RuleRegistration(
@@ -53,11 +63,13 @@ import java.util.Objects;
         String source,
         String explanation,
         List&lt;String&gt; tags,
+        List&lt;RuleFileParser.RuleCondition&gt; conditions,
         boolean enabled
     ) {
-<span class="fc" id="L58">        public RuleRegistration {</span>
-<span class="fc" id="L59">            tags = List.copyOf(tags);</span>
-<span class="fc" id="L60">        }</span>
+<span class="fc" id="L69">        public RuleRegistration {</span>
+<span class="fc" id="L70">            tags = List.copyOf(tags);</span>
+<span class="fc" id="L71">            conditions = List.copyOf(conditions);</span>
+<span class="fc" id="L72">        }</span>
     }
 
     private static final class MutableRuleRegistration {
@@ -65,17 +77,25 @@ import java.util.Objects;
         private final String source;
         private final String explanation;
         private final List&lt;String&gt; tags;
-<span class="fc" id="L68">        private boolean enabled = true;</span>
+        private final List&lt;RuleFileParser.RuleCondition&gt; conditions;
+<span class="fc" id="L81">        private boolean enabled = true;</span>
 
-<span class="fc" id="L70">        private MutableRuleRegistration(RewriteRule rule, String source, String explanation, List&lt;String&gt; tags) {</span>
-<span class="fc" id="L71">            this.rule = rule;</span>
-<span class="fc" id="L72">            this.source = source;</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            this.explanation = explanation == null ? &quot;&quot; : explanation;</span>
-<span class="fc" id="L74">            this.tags = List.copyOf(tags);</span>
-<span class="fc" id="L75">        }</span>
+        private MutableRuleRegistration(
+            RewriteRule rule,
+            String source,
+            String explanation,
+            List&lt;String&gt; tags,
+            List&lt;RuleFileParser.RuleCondition&gt; conditions
+<span class="fc" id="L89">        ) {</span>
+<span class="fc" id="L90">            this.rule = rule;</span>
+<span class="fc" id="L91">            this.source = source;</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            this.explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L93">            this.tags = List.copyOf(tags);</span>
+<span class="fc" id="L94">            this.conditions = List.copyOf(conditions);</span>
+<span class="fc" id="L95">        }</span>
 
         private RuleRegistration snapshot() {
-<span class="fc" id="L78">            return new RuleRegistration(rule.id(), rule, source, explanation, tags, enabled);</span>
+<span class="fc" id="L98">            return new RuleRegistration(rule.id(), rule, source, explanation, tags, conditions, enabled);</span>
         }
     }
 }

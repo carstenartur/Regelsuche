@@ -13,43 +13,175 @@ public record SearchJob(
     String inputType,
     String profile,
     State state,
+    String activePhase,
     Instant createdAt,
     Instant updatedAt,
     int discoveredSuccesses,
     int exploredStates,
     String bestExpression,
     int bestImprovement,
+    String lastProcessedExpression,
+    boolean resumable,
+    long knownStateCount,
+    double estimatedBranchingFactor,
+    long projectedStateCount,
+    String searchSpaceRisk,
+    String searchSpaceWarning,
     List&lt;String&gt; notes
 ) {
-<span class="fc" id="L24">    public SearchJob {</span>
-<span class="pc bpc" id="L25" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) {</span>
-<span class="nc" id="L26">            throw new IllegalArgumentException(&quot;id must not be blank&quot;);</span>
+<span class="fc" id="L32">    public SearchJob {</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;id must not be blank&quot;);</span>
         }
-<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        notes = notes == null ? List.of() : List.copyOf(notes);</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">        createdAt = createdAt == null ? Instant.now() : createdAt;</span>
-<span class="fc bfc" id="L30" title="All 2 branches covered.">        updatedAt = updatedAt == null ? createdAt : updatedAt;</span>
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        state = state == null ? State.QUEUED : state;</span>
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        inputType = inputType == null ? &quot;TERM&quot; : inputType;</span>
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        profile = profile == null ? &quot;FAST_SIMPLIFY&quot; : profile;</span>
-<span class="fc" id="L34">    }</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        notes = notes == null ? List.of() : List.copyOf(notes);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        updatedAt = updatedAt == null ? createdAt : updatedAt;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        state = state == null ? State.QUEUED : state;</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        inputType = inputType == null ? &quot;TERM&quot; : inputType;</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        profile = profile == null ? &quot;FAST_SIMPLIFY&quot; : profile;</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        activePhase = activePhase == null ? defaultPhase(state) : activePhase;</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        lastProcessedExpression = lastProcessedExpression == null ? expression : lastProcessedExpression;</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (knownStateCount &lt; 0) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(&quot;knownStateCount must not be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (projectedStateCount &lt; 0) {</span>
+<span class="nc" id="L48">            throw new IllegalArgumentException(&quot;projectedStateCount must not be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">        if (Double.isNaN(estimatedBranchingFactor) || estimatedBranchingFactor &lt; 0.0) {</span>
+<span class="nc" id="L51">            throw new IllegalArgumentException(&quot;estimatedBranchingFactor must be non-negative&quot;);</span>
+        }
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        searchSpaceRisk = searchSpaceRisk == null || searchSpaceRisk.isBlank() ? &quot;LOW&quot; : searchSpaceRisk;</span>
+<span class="fc" id="L54">    }</span>
 
     public SearchJob withState(State newState) {
-<span class="fc" id="L37">        return new SearchJob(id, expression, inputType, profile, newState, createdAt, Instant.now(),</span>
-            discoveredSuccesses, exploredStates, bestExpression, bestImprovement, notes);
+<span class="fc bfc" id="L57" title="All 3 branches covered.">        boolean newResumable = switch (newState) {</span>
+<span class="fc" id="L58">            case PAUSED -&gt; true;</span>
+<span class="fc" id="L59">            case RUNNING -&gt; resumable;</span>
+<span class="fc" id="L60">            default -&gt; false;</span>
+        };
+<span class="fc" id="L62">        return new SearchJob(</span>
+            id,
+            expression,
+            inputType,
+            profile,
+            newState,
+<span class="fc" id="L68">            defaultPhase(newState),</span>
+            createdAt,
+<span class="fc" id="L70">            Instant.now(),</span>
+            discoveredSuccesses,
+            exploredStates,
+            bestExpression,
+            bestImprovement,
+            lastProcessedExpression,
+            newResumable,
+            knownStateCount,
+            estimatedBranchingFactor,
+            projectedStateCount,
+            searchSpaceRisk,
+            searchSpaceWarning,
+            notes
+        );
     }
 
-    public SearchJob withProgress(int explored, int successes, String best, int improvement) {
-<span class="fc" id="L42">        return new SearchJob(id, expression, inputType, profile, state, createdAt, Instant.now(),</span>
-            successes, explored, best, improvement, notes);
+    public SearchJob withActivePhase(String phase) {
+<span class="fc" id="L87">        return new SearchJob(</span>
+            id,
+            expression,
+            inputType,
+            profile,
+            state,
+            phase,
+            createdAt,
+<span class="fc" id="L95">            Instant.now(),</span>
+            discoveredSuccesses,
+            exploredStates,
+            bestExpression,
+            bestImprovement,
+            lastProcessedExpression,
+            resumable,
+            knownStateCount,
+            estimatedBranchingFactor,
+            projectedStateCount,
+            searchSpaceRisk,
+            searchSpaceWarning,
+            notes
+        );
     }
 
-<span class="fc" id="L46">    public enum State {</span>
-<span class="fc" id="L47">        QUEUED,</span>
-<span class="fc" id="L48">        RUNNING,</span>
-<span class="fc" id="L49">        PAUSED,</span>
-<span class="fc" id="L50">        DONE,</span>
-<span class="fc" id="L51">        CANCELLED,</span>
-<span class="fc" id="L52">        FAILED</span>
+    public SearchJob withProgress(int explored, int successes, String best, int improvement, String lastProcessed) {
+<span class="fc" id="L112">        return new SearchJob(</span>
+            id,
+            expression,
+            inputType,
+            profile,
+            state,
+            activePhase,
+            createdAt,
+<span class="fc" id="L120">            Instant.now(),</span>
+            successes,
+            explored,
+            best,
+            improvement,
+            lastProcessed,
+            resumable,
+            knownStateCount,
+            estimatedBranchingFactor,
+            projectedStateCount,
+            searchSpaceRisk,
+            searchSpaceWarning,
+            notes
+        );
+    }
+
+    public SearchJob withSearchSpaceEstimate(
+        long knownStates,
+        double branchingFactor,
+        long projectedStates,
+        String risk,
+        String warning
+    ) {
+<span class="fc" id="L143">        return new SearchJob(</span>
+            id,
+            expression,
+            inputType,
+            profile,
+            state,
+            activePhase,
+            createdAt,
+<span class="fc" id="L151">            Instant.now(),</span>
+            discoveredSuccesses,
+            exploredStates,
+            bestExpression,
+            bestImprovement,
+            lastProcessedExpression,
+            resumable,
+            knownStates,
+            branchingFactor,
+            projectedStates,
+            risk,
+            warning,
+            notes
+        );
+    }
+
+    private static String defaultPhase(State state) {
+<span class="pc bpc" id="L168" title="2 of 6 branches missed.">        return switch (state) {</span>
+<span class="nc" id="L169">            case QUEUED -&gt; &quot;queued&quot;;</span>
+<span class="fc" id="L170">            case RUNNING -&gt; &quot;searching&quot;;</span>
+<span class="fc" id="L171">            case PAUSED -&gt; &quot;paused&quot;;</span>
+<span class="fc" id="L172">            case DONE -&gt; &quot;completed&quot;;</span>
+<span class="fc" id="L173">            case CANCELLED -&gt; &quot;cancelled&quot;;</span>
+<span class="nc" id="L174">            case FAILED -&gt; &quot;failed&quot;;</span>
+        };
+    }
+
+<span class="fc" id="L178">    public enum State {</span>
+<span class="fc" id="L179">        QUEUED,</span>
+<span class="fc" id="L180">        RUNNING,</span>
+<span class="fc" id="L181">        PAUSED,</span>
+<span class="fc" id="L182">        DONE,</span>
+<span class="fc" id="L183">        CANCELLED,</span>
+<span class="fc" id="L184">        FAILED</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
