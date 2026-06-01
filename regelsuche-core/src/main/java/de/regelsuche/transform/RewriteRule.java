@@ -2,6 +2,7 @@ package de.regelsuche.transform;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.knowledge.RuleDescriptor;
 import java.util.List;
 
 public interface RewriteRule {
@@ -32,5 +33,9 @@ public interface RewriteRule {
      */
     default List<Assumption> assumptions(Expr subtree) {
         return List.of();
+    }
+
+    default RuleDescriptor descriptor() {
+        return RuleDescriptor.core(id(), List.of());
     }
 }

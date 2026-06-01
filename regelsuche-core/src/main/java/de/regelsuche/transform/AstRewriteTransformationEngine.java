@@ -81,7 +81,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 rule.estimatedCostDelta(),
                 rule.isEquivalencePreservingByConstruction(),
                 rule.id() + ":" + result.sourceSubtreeHash(),
-                rule.assumptions().stream().toList(),
+                rule.assumptions(root).stream().map(de.regelsuche.assumption.Assumption::expression).toList(),
                 rule.descriptor().packId(),
                 rule.descriptor().license()
             ));

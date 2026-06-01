@@ -70,7 +70,7 @@ final class KnowledgePatternParser {
         }
         String identifier = readPlainIdentifier();
         if (!identifier.isBlank()) {
-            return PatternExpr.symbol(identifier);
+            return PatternExpr.variable(identifier);
         }
         String number = readNumber();
         if (!number.isBlank()) {
