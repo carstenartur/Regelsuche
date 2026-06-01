@@ -144,6 +144,7 @@ public final class RuleConflictDetector {
                 builder.append('?').append(index);
             }
             case PatternExpr.LiteralNumber literal -> builder.append('#').append(literal.value());
+            case PatternExpr.LiteralVariable variable -> builder.append('$').append(variable.name());
             case PatternExpr.Operation operation -> {
                 builder.append('(');
                 appendSignature(operation.left(), builder, placeholders);
