@@ -1,0 +1,30 @@
+id: sophie-germain
+rules:
+  - id: bridge_sophie_germain_hidden_square
+    from: "x ^ 4 + 4 * y ^ 4"
+    to: "x ^ 4 + 4 * x ^ 2 * y ^ 2 + 4 * y ^ 4 - 4 * x ^ 2 * y ^ 2"
+    kind: EXPAND
+    costDelta: 5
+    effects: [BRIDGING, EXPANDING]
+    family: hidden_structure
+  - id: bridge_sophie_germain_square_rewrite
+    from: "x ^ 4 + 4 * x ^ 2 * y ^ 2 + 4 * y ^ 4 - 4 * x ^ 2 * y ^ 2"
+    to: "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"
+    kind: NORMALIZE
+    costDelta: -2
+    effects: [BRIDGING, NORMALIZING]
+    family: hidden_structure
+  - id: ast_square_difference_factor
+    from: "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"
+    to: "((x ^ 2 + 2 * y ^ 2) - 2 * x * y) * ((x ^ 2 + 2 * y ^ 2) + 2 * x * y)"
+    kind: FACTOR
+    costDelta: -4
+    effects: [FACTORIZING]
+    family: factor
+  - id: bridge_sophie_germain_linear_factor_order
+    from: "((x ^ 2 + 2 * y ^ 2) - 2 * x * y) * ((x ^ 2 + 2 * y ^ 2) + 2 * x * y)"
+    to: "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)"
+    kind: SIMPLIFY
+    costDelta: -2
+    effects: [BRIDGING, SIMPLIFYING]
+    family: factor

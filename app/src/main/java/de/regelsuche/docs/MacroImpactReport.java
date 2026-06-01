@@ -5,6 +5,7 @@ import de.regelsuche.search.SearchSpaceAnalytics;
 import java.util.List;
 
 public record MacroImpactReport(
+        String scenarioId,
         String caseName,
         int withoutMacroStates,
         int withMacroStates,
@@ -20,13 +21,14 @@ public record MacroImpactReport(
         SearchSpaceAnalytics withoutMacroAnalytics,
         SearchSpaceAnalytics withMacroAnalytics,
         DiscoveryBenchmarkResult withoutMacroBenchmark,
-        DiscoveryBenchmarkResult withMacroBenchmark) {
+        DiscoveryBenchmarkResult withMacroBenchmark,
+        DiscoveryBenchmarkEvidence evidence) {
     public MacroImpactReport {
         withoutMacroPath = withoutMacroPath == null ? List.of() : List.copyOf(withoutMacroPath);
         withMacroPath = withMacroPath == null ? List.of() : List.copyOf(withMacroPath);
     }
 
     public double improvementFactor() {
-        return withoutMacroStates / (double) withMacroStates;
+        return withMacroStates == 0 ? 0.0d : withoutMacroStates / (double) withMacroStates;
     }
 }

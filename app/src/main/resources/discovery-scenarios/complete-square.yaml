@@ -1,0 +1,28 @@
+id: complete-square-factorization
+displayName: Complete-square factorization
+inputExpression: "x ^ 2 + 6 * x + 5"
+targetExpression: "(x + 1) * (x + 5)"
+expectations:
+  - BRIDGE_REQUIRED
+  - CONVERGENCE_REQUIRED
+enabledRulePacks:
+  - complete-square
+requiredBridgeEffects:
+  - BRIDGING
+requiredRuleFamilies:
+  - complete_square
+  - factor
+requiredBridgeRules:
+  - bridge_complete_square_decomposition
+  - ast_square_difference_factor
+macroLearning:
+  enabled: true
+  expectedMacroRule: macro_learned_complete_square_factorization
+budgets:
+  maxDepth: 6
+  maxStates: 120
+  timeoutMillis: 5000
+gallery:
+  generateSvg: true
+  preferredPathCount: 2
+  minVisibleNodes: 8

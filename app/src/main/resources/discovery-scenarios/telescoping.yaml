@@ -1,0 +1,24 @@
+id: telescoping
+displayName: Telescoping rational identity
+inputExpression: "1 / (n * (n + 1))"
+targetExpression: "1 / n - 1 / (n + 1)"
+expectations:
+  - BRIDGE_REQUIRED
+enabledRulePacks:
+  - telescoping
+requiredBridgeEffects:
+  - BRIDGING
+requiredRuleFamilies:
+  - telescoping
+requiredBridgeRules:
+  - bridge_telescoping_partial_fraction
+macroLearning:
+  enabled: false
+budgets:
+  maxDepth: 3
+  maxStates: 40
+  timeoutMillis: 5000
+gallery:
+  generateSvg: false
+  preferredPathCount: 1
+  minVisibleNodes: 3

@@ -1,0 +1,9 @@
+id: telescoping
+rules:
+  - id: bridge_telescoping_partial_fraction
+    from: "1 / (n * (n + 1))"
+    to: "1 / n - 1 / (n + 1)"
+    kind: NORMALIZE
+    costDelta: -3
+    effects: [BRIDGING, NORMALIZING]
+    family: telescoping
