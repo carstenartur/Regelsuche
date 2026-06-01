@@ -13,13 +13,17 @@ import java.util.Objects;
 import java.util.Optional;
 
 public sealed interface PatternExpr
-    permits PatternExpr.Placeholder, PatternExpr.LiteralNumber, PatternExpr.Operation, PatternExpr.Function {
+    permits PatternExpr.Placeholder, PatternExpr.LiteralNumber, PatternExpr.LiteralVariable, PatternExpr.Operation, PatternExpr.Function {
     static PatternExpr var(String name) {
         return new Placeholder(name);
     }
 
     static PatternExpr num(double value) {
         return new LiteralNumber(value);
+    }
+
+    static PatternExpr variable(String name) {
+        return new LiteralVariable(name);
     }
 
     static PatternExpr op(BinaryOperator operator, PatternExpr left, PatternExpr right) {
@@ -67,6 +71,18 @@ public sealed interface PatternExpr
         @Override
         public Expr instantiate(Map<String, Expr> bindings) {
             return new NumberExpr(value);
+        }
+    }
+
+    record LiteralVariable(String name) implements PatternExpr {
+        @Override
+        public boolean match(Expr expression, Map<String, Expr> bindings) {
+            return expression instanceof VariableExpr variableExpr && variableExpr.name().equals(name);
+        }
+
+        @Override
+        public Expr instantiate(Map<String, Expr> bindings) {
+            return new VariableExpr(name);
         }
     }
 

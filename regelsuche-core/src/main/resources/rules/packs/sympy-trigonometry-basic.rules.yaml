@@ -1,0 +1,51 @@
+packId: sympy-trigonometry-basic
+displayName: SymPy trigonometry candidate knowledge pack
+sourceProject: SymPy
+license: BSD-3-Clause
+sourceUrl: https://docs.sympy.org/latest/modules/simplify/fu.html
+sourceVersion: SymPy 1.14.0 documentation
+sourceReference: Manually reviewed trigonometric identities from SymPy simplification documentation; independently reimplemented for Regelsuche as inactive candidates.
+enabledByDefault: false
+categories:
+  - trigonometry
+rules:
+  - id: sympy.trig.pythagorean_identity
+    sourceReference: Standard Pythagorean trigonometric identity, retained as candidate pending applicability review.
+    derivationType: REIMPLEMENTED_RULE
+    status: CANDIDATE
+    riskLevel: medium
+    rule:
+      from: "sin(?A)^2 + cos(?A)^2"
+      to: "1"
+  - id: sympy.trig.double_angle_sin
+    sourceReference: Standard sine double-angle identity, retained as candidate pending applicability review.
+    derivationType: REIMPLEMENTED_RULE
+    status: CANDIDATE
+    riskLevel: medium
+    rule:
+      from: "sin(2*?A)"
+      to: "2*sin(?A)*cos(?A)"
+  - id: sympy.trig.double_angle_cos_difference
+    sourceReference: Standard cosine double-angle identity, retained as candidate pending applicability review.
+    derivationType: REIMPLEMENTED_RULE
+    status: CANDIDATE
+    riskLevel: medium
+    rule:
+      from: "cos(2*?A)"
+      to: "cos(?A)^2 - sin(?A)^2"
+  - id: sympy.trig.double_angle_cos_cosine
+    sourceReference: Standard cosine double-angle identity, retained as candidate pending applicability review.
+    derivationType: REIMPLEMENTED_RULE
+    status: CANDIDATE
+    riskLevel: medium
+    rule:
+      from: "cos(2*?A)"
+      to: "2*cos(?A)^2 - 1"
+  - id: sympy.trig.double_angle_cos_sine
+    sourceReference: Standard cosine double-angle identity, retained as candidate pending applicability review.
+    derivationType: REIMPLEMENTED_RULE
+    status: CANDIDATE
+    riskLevel: medium
+    rule:
+      from: "cos(2*?A)"
+      to: "1 - 2*sin(?A)^2"
