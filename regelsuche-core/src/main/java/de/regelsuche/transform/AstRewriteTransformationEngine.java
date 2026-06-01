@@ -7,6 +7,8 @@ import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.input.InputRequest;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
@@ -27,6 +29,12 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
     public AstRewriteTransformationEngine() {
         this(defaultRules());
+    }
+
+    public static AstRewriteTransformationEngine withKnowledgePacks(KnowledgePackSelection selection) {
+        List<RewriteRule> selectedRules = new ArrayList<>(defaultRules());
+        selectedRules.addAll(new KnowledgePackRegistry().enabledRules(selection));
+        return new AstRewriteTransformationEngine(selectedRules);
     }
 
     public AstRewriteTransformationEngine(List<RewriteRule> rules) {
@@ -72,7 +80,10 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 rule.mayIncreaseComplexity(),
                 rule.estimatedCostDelta(),
                 rule.isEquivalencePreservingByConstruction(),
-                rule.id() + ":" + result.sourceSubtreeHash()
+                rule.id() + ":" + result.sourceSubtreeHash(),
+                rule.assumptions().stream().toList(),
+                rule.descriptor().packId(),
+                rule.descriptor().license()
             ));
             if (transformations.size() >= maxCandidatesPerState) {
                 break;

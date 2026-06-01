@@ -1,0 +1,51 @@
+packId: sympy-polynomial-basic
+displayName: SymPy polynomial basic knowledge pack
+sourceProject: SymPy
+license: BSD-3-Clause
+sourceUrl: https://www.sympy.org/
+enabledByDefault: false
+categories:
+  - polynomial-factorization
+rules:
+  - id: sympy.poly.factor.difference_of_squares
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "?A^2 - ?B^2"
+      to: "(?A - ?B) * (?A + ?B)"
+  - id: sympy.poly.factor.binomial_square_plus
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "?A^2 + 2*?A*?B + ?B^2"
+      to: "(?A + ?B)^2"
+  - id: sympy.poly.factor.binomial_square_minus
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "?A^2 - 2*?A*?B + ?B^2"
+      to: "(?A - ?B)^2"
+  - id: sympy.poly.factor.sum_of_cubes
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "?A^3 + ?B^3"
+      to: "(?A + ?B) * (?A^2 - ?A*?B + ?B^2)"
+  - id: sympy.poly.factor.difference_of_cubes
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "?A^3 - ?B^3"
+      to: "(?A - ?B) * (?A^2 + ?A*?B + ?B^2)"
+  - id: sympy.poly.factor.sophie_germain
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: medium
+    rule:
+      from: "?A^4 + 4*?B^4"
+      to: "(?A^2 - 2*?A*?B + 2*?B^2) * (?A^2 + 2*?A*?B + 2*?B^2)"

@@ -1,6 +1,7 @@
 package de.regelsuche.transform;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.knowledge.RuleDescriptor;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,9 +13,14 @@ public class PatternRewriteRule implements RewriteRule {
     private final boolean mayIncreaseComplexity;
     private final int estimatedCostDelta;
     private final boolean equivalencePreservingByConstruction;
+    private final RuleDescriptor descriptor;
 
     public PatternRewriteRule(String id, PatternExpr source, PatternExpr target) {
         this(id, source, target, RewriteKind.NORMALIZE, false, 0, true);
+    }
+
+    public PatternRewriteRule(String id, PatternExpr source, PatternExpr target, RuleDescriptor descriptor) {
+        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor);
     }
 
     public PatternRewriteRule(
@@ -26,6 +32,20 @@ public class PatternRewriteRule implements RewriteRule {
         int estimatedCostDelta,
         boolean equivalencePreservingByConstruction
     ) {
+        this(id, source, target, kind, mayIncreaseComplexity, estimatedCostDelta, equivalencePreservingByConstruction,
+            RuleDescriptor.core(id, java.util.List.of()));
+    }
+
+    public PatternRewriteRule(
+        String id,
+        PatternExpr source,
+        PatternExpr target,
+        RewriteKind kind,
+        boolean mayIncreaseComplexity,
+        int estimatedCostDelta,
+        boolean equivalencePreservingByConstruction,
+        RuleDescriptor descriptor
+    ) {
         if (id == null || id.isBlank() || source == null || target == null) {
             throw new IllegalArgumentException("id, source and target are required");
         }
@@ -36,11 +56,17 @@ public class PatternRewriteRule implements RewriteRule {
         this.mayIncreaseComplexity = mayIncreaseComplexity;
         this.estimatedCostDelta = estimatedCostDelta;
         this.equivalencePreservingByConstruction = equivalencePreservingByConstruction;
+        this.descriptor = descriptor == null ? RuleDescriptor.core(id, java.util.List.of()) : descriptor;
     }
 
     @Override
     public String id() {
         return id;
+    }
+
+    @Override
+    public RuleDescriptor descriptor() {
+        return descriptor;
     }
 
     /**
