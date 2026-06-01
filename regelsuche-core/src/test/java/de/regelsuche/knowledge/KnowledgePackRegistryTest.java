@@ -18,6 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KnowledgePackRegistryTest {
     private static final String SYMPY_PACK = "sympy-polynomial-basic";
+    private static final String SYMPY_TRIG_PACK = "sympy-trigonometry-basic";
+    private static final String SYMPY_RATIONAL_PACK = "sympy-rational-basic";
+    private static final List<String> CANDIDATE_PACKS = List.of(SYMPY_TRIG_PACK, SYMPY_RATIONAL_PACK);
 
     @Test
     void externalRulesRequireProvenance(@TempDir Path tempDir) throws Exception {
@@ -78,6 +81,74 @@ class KnowledgePackRegistryTest {
                 .flatMap(pack -> pack.rules().stream())
                 .filter(rule -> rule.descriptor().status() == RuleStatus.VALIDATED)
                 .allMatch(rule -> !rule.descriptor().validationExamples().isEmpty()));
+    }
+
+    @Test
+    void validatedExternalRuleWithoutExamplesIsRejected(@TempDir Path tempDir) throws Exception {
+        Path pack = tempDir.resolve("missing-examples.rules.yaml");
+        Files.writeString(pack, """
+                packId: missing-examples
+                displayName: Missing Examples
+                sourceProject: External
+                license: BSD-3-Clause
+                sourceUrl: https://example.invalid/missing-examples
+                sourceVersion: reviewed-test-fixture
+                sourceReference: test fixture
+                rules:
+                  - id: missing.examples.rule
+                    derivationType: REIMPLEMENTED_RULE
+                    status: VALIDATED
+                    rule:
+                      from: "?A^2"
+                      to: "?A*?A"
+                """);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> new KnowledgePackLoader().load(pack));
+        assertTrue(ex.getMessage().contains("validation.examples"));
+    }
+
+    @Test
+    void candidatePacksLoadButDoNotRegisterRules() {
+        KnowledgePackRegistry registry = new KnowledgePackRegistry();
+
+        List<KnowledgePack> candidatePacks = registry.allPacks().stream()
+                .filter(pack -> CANDIDATE_PACKS.contains(pack.packId()))
+                .toList();
+
+        assertEquals(CANDIDATE_PACKS.size(), candidatePacks.size());
+        assertTrue(candidatePacks.stream().noneMatch(KnowledgePack::enabledByDefault));
+        assertEquals(7, candidatePacks.stream().mapToInt(pack -> pack.rules().size()).sum());
+        assertTrue(candidatePacks.stream()
+                .flatMap(pack -> pack.rules().stream())
+                .allMatch(rule -> rule.descriptor().status() == RuleStatus.CANDIDATE));
+        for (String candidatePack : CANDIDATE_PACKS) {
+            assertTrue(registry.enabledRules(KnowledgePackSelection.CORE.enablePack(candidatePack)).isEmpty());
+        }
+    }
+
+    @Test
+    void candidateRulesStayOutOfAllProfileAndReplay() {
+        KnowledgePackRegistry registry = new KnowledgePackRegistry();
+        List<String> candidateRuleIds = registry.allPacks().stream()
+                .filter(pack -> CANDIDATE_PACKS.contains(pack.packId()))
+                .flatMap(pack -> pack.rules().stream())
+                .map(RewriteRule::id)
+                .toList();
+
+        assertTrue(registry.enabledRules(KnowledgePackSelection.profile(RuleProfile.ALL)).stream()
+                .map(RewriteRule::id)
+                .noneMatch(candidateRuleIds::contains));
+
+        AstRewriteTransformationEngine engine = AstRewriteTransformationEngine.withKnowledgePacks(
+                KnowledgePackSelection.profile(RuleProfile.ALL));
+        assertTrue(engine.rules().stream().map(RewriteRule::id).noneMatch(candidateRuleIds::contains));
+        assertTrue(engine.transform("sin(x)^2 + cos(x)^2").stream()
+                .map(Transformation::rule)
+                .noneMatch(candidateRuleIds::contains));
+        assertTrue(engine.transform("1/(x*(x+1))").stream()
+                .map(Transformation::rule)
+                .noneMatch(candidateRuleIds::contains));
     }
 
     @Test

@@ -4,7 +4,7 @@ A knowledge pack is an optional bundle of rewrite rules with explicit provenance
 
 ## Enabling and disabling packs
 
-Use the core profile for default behavior. Packs with `enabledByDefault: true` are included unless explicitly disabled. Select `core+sympy-polynomial`, `exploratory`, `all`, or a custom selection to enable additional external packs such as `sympy-polynomial-basic`. Custom selections can also disable a pack to ensure its rules are not registered.
+Use the core profile for default behavior. Packs with `enabledByDefault: true` are included unless explicitly disabled. Select `core+sympy-polynomial`, `exploratory`, `all`, or a custom selection to enable additional external packs such as `sympy-polynomial-basic`. Custom selections can also disable a pack to ensure its rules are not registered. Rules marked `CANDIDATE` are loaded as metadata only and are never registered for replay/search, even when their pack is explicitly enabled or the `all` profile is selected.
 
 ## Provenance in replay and reports
 
@@ -13,6 +13,17 @@ Rules loaded from a knowledge pack keep their `packId`, origin project, license,
 ## SymPy-derived rules
 
 The initial SymPy polynomial pack is disabled by default and contains reviewed declarative identities only. It is manually reviewed and independently reimplemented for Regelsuche; it is not generated from SymPy source code and does not claim a direct code-level origin for the identities. SymPy-referenced identities are marked `REIMPLEMENTED_RULE`, carry `BSD-3-Clause` license metadata, and include YAML-local `validation.examples` for each validated rule.
+
+### Validated packs
+
+- `sympy-polynomial-basic` — disabled by default; contains reviewed polynomial factorization identities with `VALIDATED` status and validation examples.
+
+### Imported candidate packs
+
+The following seed packs are imported for review, but all included rules currently have `CANDIDATE` status. They are disabled by default and remain unavailable to replay/search until individual rules gain validation examples and safe applicability constraints.
+
+- `sympy-trigonometry-basic` — trigonometric identities such as Pythagorean and double-angle rewrites.
+- `sympy-rational-basic` — rational and radical simplification identities that require denominator/nonzero assumption review.
 
 ## Copied code vs. reimplemented identities
 

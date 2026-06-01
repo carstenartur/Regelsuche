@@ -3,6 +3,9 @@ package de.regelsuche.knowledge;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.transform.PatternExpr;
 
+import java.util.ArrayList;
+import java.util.List;
+
 final class KnowledgePatternParser {
     private final String input;
     private int pos;
@@ -70,6 +73,16 @@ final class KnowledgePatternParser {
         }
         String identifier = readPlainIdentifier();
         if (!identifier.isBlank()) {
+            if (match('(')) {
+                List<PatternExpr> arguments = new ArrayList<>();
+                if (!match(')')) {
+                    do {
+                        arguments.add(parseExpression());
+                    } while (match(','));
+                    expect(')');
+                }
+                return PatternExpr.fn(identifier, arguments.toArray(PatternExpr[]::new));
+            }
             return PatternExpr.variable(identifier);
         }
         String number = readNumber();
