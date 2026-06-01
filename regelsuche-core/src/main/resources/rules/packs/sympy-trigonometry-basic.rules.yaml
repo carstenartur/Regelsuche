@@ -13,6 +13,8 @@ rules:
     sourceReference: Standard Pythagorean trigonometric identity, retained as candidate pending applicability review.
     derivationType: REIMPLEMENTED_RULE
     status: CANDIDATE
+    searchEffects:
+      - SIMPLIFYING
     riskLevel: medium
     rule:
       from: "sin(?A)^2 + cos(?A)^2"
@@ -21,6 +23,8 @@ rules:
     sourceReference: Standard sine double-angle identity, retained as candidate pending applicability review.
     derivationType: REIMPLEMENTED_RULE
     status: CANDIDATE
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "sin(2*?A)"
@@ -29,6 +33,8 @@ rules:
     sourceReference: Standard cosine double-angle identity, retained as candidate pending applicability review.
     derivationType: REIMPLEMENTED_RULE
     status: CANDIDATE
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "cos(2*?A)"
@@ -37,6 +43,8 @@ rules:
     sourceReference: Standard cosine double-angle identity, retained as candidate pending applicability review.
     derivationType: REIMPLEMENTED_RULE
     status: CANDIDATE
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "cos(2*?A)"
@@ -45,6 +53,8 @@ rules:
     sourceReference: Standard cosine double-angle identity, retained as candidate pending applicability review.
     derivationType: REIMPLEMENTED_RULE
     status: CANDIDATE
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "cos(2*?A)"

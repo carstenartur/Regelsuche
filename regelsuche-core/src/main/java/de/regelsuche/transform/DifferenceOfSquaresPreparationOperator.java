@@ -87,7 +87,7 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
                     formatted,
                     RewriteKind.NORMALIZE,
                     true,
-                    Math.max(1, growth),
+                    -3,
                     true,
                     RULE_ID + ":" + canonicalizer.stableHash(formattedInput) + "->" + key
                 )));

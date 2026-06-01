@@ -361,6 +361,7 @@ public final class Neo4jSearchGraphRepository implements SearchGraphRepository {
 
     private static String labelFor(ProvenanceNodeType type) {
         return switch (type) {
+            case RULE -> "Rule";
             case HYPOTHESIS -> "Hypothesis";
             case COUNTEREXAMPLE_SEARCH_ATTEMPT -> "CounterexampleSearchAttempt";
             case COUNTEREXAMPLE -> "Counterexample";

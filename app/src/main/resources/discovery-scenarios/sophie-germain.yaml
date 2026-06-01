@@ -1,0 +1,30 @@
+id: sophie-germain
+displayName: Sophie-Germain hidden structure
+inputExpression: "x ^ 4 + 4 * y ^ 4"
+targetExpression: "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)"
+expectations:
+  - BRIDGE_REQUIRED
+  - MACRO_LEARNING_REQUIRED
+  - MACRO_REUSE_REQUIRED
+enabledOperators:
+  - sophie_germain_bridge
+enabledRulePacks:
+  - sympy-polynomial-basic
+requiredBridgeEffects:
+  - BRIDGING
+requiredRuleFamilies:
+  - hidden_structure
+  - factor
+requiredBridgeRules:
+  - hypothesis_difference_of_squares_preparation
+  - ast_square_difference_factor
+macroLearning:
+  enabled: true
+budgets:
+  maxDepth: 6
+  maxStates: 240
+  timeoutMillis: 5000
+gallery:
+  generateSvg: true
+  preferredPathCount: 2
+  minVisibleNodes: 8

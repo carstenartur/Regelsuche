@@ -84,7 +84,9 @@ public class KnowledgePackLoader {
                         ruleYaml.status,
                         firstNonBlank(ruleYaml.riskLevel, "medium"),
                         ruleCategories,
-                        validationExamples(ruleYaml.validation));
+                        searchEffects(ruleYaml),
+                        validationExamples(ruleYaml.validation),
+                        counterExamples(ruleYaml.validation));
                 rules.add(new PatternRewriteRule(ruleId,
                         KnowledgePatternParser.parse(require(ruleYaml.rule.from, "rule.from", path)),
                         KnowledgePatternParser.parse(require(ruleYaml.rule.to, "rule.to", path)),
@@ -126,6 +128,9 @@ public class KnowledgePackLoader {
         if (rule.status == null) {
             throw new IllegalArgumentException("Rule " + rule.id + " is missing status in " + path);
         }
+        if (rule.status == RuleStatus.CANDIDATE && searchEffects(rule).contains(SearchEffect.BRIDGING)) {
+            rule.status = RuleStatus.DISCOVERY_CANDIDATE;
+        }
         require(firstNonBlank(rule.sourceVersion, pack.sourceVersion), "sourceVersion", path);
         require(firstNonBlank(rule.sourceReference, pack.sourceReference), "sourceReference", path);
         if (rule.status == RuleStatus.VALIDATED && validationExamples(rule.validation).isEmpty()) {
@@ -138,6 +143,15 @@ public class KnowledgePackLoader {
             return List.of();
         }
         return validation.examples.stream()
+                .map(example -> new ValidationExample(example.from, example.to))
+                .toList();
+    }
+
+    private static List<ValidationExample> counterExamples(ValidationYaml validation) {
+        if (validation == null || validation.counterexamples == null) {
+            return List.of();
+        }
+        return validation.counterexamples.stream()
                 .map(example -> new ValidationExample(example.from, example.to))
                 .toList();
     }
@@ -155,6 +169,12 @@ public class KnowledgePackLoader {
 
     private static <T> List<T> nonNull(List<T> values) {
         return values == null ? List.of() : List.copyOf(values);
+    }
+
+    private static List<SearchEffect> searchEffects(RuleYaml rule) {
+        return rule.searchEffects == null || rule.searchEffects.isEmpty()
+                ? List.of()
+                : List.copyOf(rule.searchEffects);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -181,6 +201,7 @@ public class KnowledgePackLoader {
         public DerivationType derivationType;
         public RuleStatus status;
         public String riskLevel;
+        public List<SearchEffect> searchEffects;
         public List<String> categories;
         public RuleBodyYaml rule;
         public ValidationYaml validation;
@@ -195,6 +216,7 @@ public class KnowledgePackLoader {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ValidationYaml {
         public List<ValidationExampleYaml> examples;
+        public List<ValidationExampleYaml> counterexamples;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

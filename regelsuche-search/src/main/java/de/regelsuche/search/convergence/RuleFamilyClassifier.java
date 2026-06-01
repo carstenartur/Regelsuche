@@ -34,7 +34,7 @@ public final class RuleFamilyClassifier {
         if (rule.contains("expand") || rule.contains("distribute")) {
             return RuleFamily.EXPANSION;
         }
-        if (rule.contains("normalize") || rule.contains("canonical")) {
+        if (rule.contains("normalize") || rule.contains("canonical") || rule.contains("linear_offset_simplify")) {
             return RuleFamily.NORMALIZATION;
         }
         return RuleFamily.OTHER;

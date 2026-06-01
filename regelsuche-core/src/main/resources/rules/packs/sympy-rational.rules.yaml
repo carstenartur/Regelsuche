@@ -1,0 +1,89 @@
+packId: sympy-rational
+displayName: SymPy Rational
+sourceProject: SymPy
+sourceUrl: https://github.com/sympy/sympy
+sourceVersion: "1.14"
+sourceReference: sympy/simplify/radsimp.py
+license: BSD-3-Clause
+enabledByDefault: false
+categories:
+  - rational
+rules:
+  - id: sympy.rational.partial_fraction.telescoping
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - BRIDGING
+    riskLevel: low
+    rule:
+      from: "div(1, mul(?A, add(?A, 1)))"
+      to: "sub(div(1, ?A), div(1, add(?A, 1)))"
+    validation:
+      examples:
+        - from: "div(1, mul(n, add(n, 1)))"
+          to: "sub(div(1, n), div(1, add(n, 1)))"
+  - id: sympy.rational.rationalize.sqrt_plus
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    searchEffects:
+      - BRIDGING
+    riskLevel: medium
+    rule:
+      from: "div(1, add(sqrt(?A), ?B))"
+      to: "div(sub(sqrt(?A), ?B), sub(?A, pow(?B, 2)))"
+    validation:
+      examples:
+        - from: "div(1, add(sqrt(x), y))"
+          to: "div(sub(sqrt(x), y), sub(x, pow(y, 2)))"
+  - id: sympy.rational.common_denominator.add
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    searchEffects:
+      - EXPANDING
+    riskLevel: medium
+    rule:
+      from: "add(div(?A, ?B), div(?C, ?D))"
+      to: "div(add(mul(?A, ?D), mul(?B, ?C)), mul(?B, ?D))"
+    validation:
+      examples:
+        - from: "add(div(x, y), div(z, w))"
+          to: "div(add(mul(x, w), mul(y, z)), mul(y, w))"
+  - id: sympy.rational.common_denominator.sub
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    searchEffects:
+      - EXPANDING
+    riskLevel: medium
+    rule:
+      from: "sub(div(?A, ?B), div(?C, ?D))"
+      to: "div(sub(mul(?A, ?D), mul(?B, ?C)), mul(?B, ?D))"
+    validation:
+      examples:
+        - from: "sub(div(x, y), div(z, w))"
+          to: "div(sub(mul(x, w), mul(y, z)), mul(y, w))"
+  - id: sympy.rational.multiply
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - EXPANDING
+    riskLevel: low
+    rule:
+      from: "mul(div(?A, ?B), div(?C, ?D))"
+      to: "div(mul(?A, ?C), mul(?B, ?D))"
+    validation:
+      examples:
+        - from: "mul(div(x, y), div(z, w))"
+          to: "div(mul(x, z), mul(y, w))"
+  - id: sympy.rational.divide
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - EXPANDING
+    riskLevel: low
+    rule:
+      from: "div(div(?A, ?B), div(?C, ?D))"
+      to: "div(mul(?A, ?D), mul(?B, ?C))"
+    validation:
+      examples:
+        - from: "div(div(x, y), div(z, w))"
+          to: "div(mul(x, w), mul(y, z))"

@@ -6,6 +6,7 @@ public enum ProvenanceNodeType {
     COUNTEREXAMPLE_SEARCH_ATTEMPT,
     COUNTEREXAMPLE,
     PROOF_ATTEMPT,
+    RULE,
     SEARCH_RUN,
     MACRO_MOVE,
     SEED_EXPRESSION,

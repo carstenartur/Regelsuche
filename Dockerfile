@@ -21,6 +21,7 @@ COPY regelsuche-learning/build.gradle ./regelsuche-learning/build.gradle
 COPY regelsuche-experiments/build.gradle ./regelsuche-experiments/build.gradle
 COPY regelsuche-cli/build.gradle ./regelsuche-cli/build.gradle
 COPY regelsuche-discovery/build.gradle ./regelsuche-discovery/build.gradle
+COPY regelsuche-benchmarks/build.gradle ./regelsuche-benchmarks/build.gradle
 
 # Pre-warm the Gradle distribution and dependency cache. The build itself
 # fails (no sources yet), but the wrapper, distribution and dependencies are
@@ -42,6 +43,7 @@ COPY regelsuche-learning ./regelsuche-learning
 COPY regelsuche-experiments ./regelsuche-experiments
 COPY regelsuche-cli ./regelsuche-cli
 COPY regelsuche-discovery ./regelsuche-discovery
+COPY regelsuche-benchmarks ./regelsuche-benchmarks
 
 # Build the runnable distribution.
 RUN ./gradlew --no-daemon :app:installDist -x test

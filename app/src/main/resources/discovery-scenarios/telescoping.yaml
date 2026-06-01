@@ -1,0 +1,26 @@
+id: telescoping
+displayName: Telescoping rational identity
+inputExpression: "1 / (n * (n + 1))"
+targetExpression: "1 / n - 1 / (n + 1)"
+expectations:
+  - BRIDGE_REQUIRED
+enabledOperators:
+  - telescoping_fraction
+enabledRulePacks:
+  - sympy-rational-basic
+requiredBridgeEffects:
+  - BRIDGING
+requiredRuleFamilies:
+  - telescoping
+requiredBridgeRules:
+  - hypothesis_telescoping_fraction
+macroLearning:
+  enabled: false
+budgets:
+  maxDepth: 3
+  maxStates: 40
+  timeoutMillis: 5000
+gallery:
+  generateSvg: false
+  preferredPathCount: 1
+  minVisibleNodes: 3

@@ -13,7 +13,9 @@ public record RuleDescriptor(
         RuleStatus status,
         String riskLevel,
         List<String> categories,
-        List<ValidationExample> validationExamples) {
+        List<SearchEffect> searchEffects,
+        List<ValidationExample> validationExamples,
+        List<ValidationExample> counterExamples) {
 
     public RuleDescriptor {
         if (isBlank(ruleId)) {
@@ -42,12 +44,17 @@ public record RuleDescriptor(
         }
         riskLevel = isBlank(riskLevel) ? "low" : riskLevel;
         categories = categories == null ? List.of() : List.copyOf(categories);
+        searchEffects = searchEffects == null ? List.of() : List.copyOf(searchEffects);
+        if (!"core".equals(packId) && searchEffects.isEmpty()) {
+            throw new IllegalArgumentException("External rule " + ruleId + " must declare at least one SearchEffect");
+        }
         validationExamples = validationExamples == null ? List.of() : List.copyOf(validationExamples);
+        counterExamples = counterExamples == null ? List.of() : List.copyOf(counterExamples);
     }
 
     public static RuleDescriptor core(String ruleId, List<String> categories) {
         return new RuleDescriptor(ruleId, "core", "Regelsuche", "PROJECT", "local", "built-in core rule",
-                DerivationType.ORIGINAL, RuleStatus.VALIDATED, "low", categories, List.of());
+                DerivationType.ORIGINAL, RuleStatus.VALIDATED, "low", categories, List.of(), List.of(), List.of());
     }
 
     public boolean eligibleForRegistration() {

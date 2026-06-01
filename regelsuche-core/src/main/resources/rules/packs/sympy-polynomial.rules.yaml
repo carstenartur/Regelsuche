@@ -1,0 +1,141 @@
+packId: sympy-polynomial
+displayName: SymPy Polynomial
+sourceProject: SymPy
+sourceUrl: https://github.com/sympy/sympy
+sourceVersion: "1.14"
+sourceReference: sympy/polys/polytools.py
+license: BSD-3-Clause
+enabledByDefault: false
+categories:
+  - polynomial
+rules:
+  - id: sympy.poly.factor.diff_squares
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - FACTORIZING
+    riskLevel: low
+    rule:
+      from: "sub(pow(?A, 2), pow(?B, 2))"
+      to: "mul(sub(?A, ?B), add(?A, ?B))"
+    validation:
+      examples:
+        - from: "sub(pow(x, 2), pow(y, 2))"
+          to: "mul(sub(x, y), add(x, y))"
+  - id: sympy.poly.factor.diff_cubes
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - FACTORIZING
+    riskLevel: low
+    rule:
+      from: "sub(pow(?A, 3), pow(?B, 3))"
+      to: "mul(sub(?A, ?B), add(add(pow(?A, 2), mul(?A, ?B)), pow(?B, 2)))"
+    validation:
+      examples:
+        - from: "sub(pow(x, 3), pow(y, 3))"
+          to: "mul(sub(x, y), add(add(pow(x, 2), mul(x, y)), pow(y, 2)))"
+  - id: sympy.poly.factor.sum_cubes
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - FACTORIZING
+    riskLevel: low
+    rule:
+      from: "add(pow(?A, 3), pow(?B, 3))"
+      to: "mul(add(?A, ?B), add(sub(pow(?A, 2), mul(?A, ?B)), pow(?B, 2)))"
+    validation:
+      examples:
+        - from: "add(pow(x, 3), pow(y, 3))"
+          to: "mul(add(x, y), add(sub(pow(x, 2), mul(x, y)), pow(y, 2)))"
+  - id: sympy.poly.expand.square_sum
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - EXPANDING
+    riskLevel: low
+    rule:
+      from: "pow(add(?A, ?B), 2)"
+      to: "add(add(pow(?A, 2), mul(2, mul(?A, ?B))), pow(?B, 2))"
+    validation:
+      examples:
+        - from: "pow(add(x, y), 2)"
+          to: "add(add(pow(x, 2), mul(2, mul(x, y))), pow(y, 2))"
+  - id: sympy.poly.expand.square_difference
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - EXPANDING
+    riskLevel: low
+    rule:
+      from: "pow(sub(?A, ?B), 2)"
+      to: "add(sub(pow(?A, 2), mul(2, mul(?A, ?B))), pow(?B, 2))"
+    validation:
+      examples:
+        - from: "pow(sub(x, y), 2)"
+          to: "add(sub(pow(x, 2), mul(2, mul(x, y))), pow(y, 2))"
+  - id: sympy.poly.factor.sophie_germain
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - BRIDGING
+    riskLevel: medium
+    rule:
+      from: "add(pow(?A, 4), mul(4, pow(?B, 4)))"
+      to: "mul(add(sub(pow(?A, 2), mul(2, mul(?A, ?B))), mul(2, pow(?B, 2))), add(add(pow(?A, 2), mul(2, mul(?A, ?B))), mul(2, pow(?B, 2))))"
+    validation:
+      examples:
+        - from: "add(pow(x, 4), mul(4, pow(y, 4)))"
+          to: "mul(add(sub(pow(x, 2), mul(2, mul(x, y))), mul(2, pow(y, 2))), add(add(pow(x, 2), mul(2, mul(x, y))), mul(2, pow(y, 2))))"
+  - id: sympy.poly.factor.diff_fifth
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    searchEffects:
+      - FACTORIZING
+    riskLevel: medium
+    rule:
+      from: "sub(pow(?A, 5), pow(?B, 5))"
+      to: "mul(sub(?A, ?B), add(add(add(pow(?A, 4), mul(pow(?A, 3), ?B)), mul(pow(?A, 2), pow(?B, 2))), add(mul(?A, pow(?B, 3)), pow(?B, 4))))"
+    validation:
+      examples:
+        - from: "sub(pow(x, 5), pow(y, 5))"
+          to: "mul(sub(x, y), add(add(add(pow(x, 4), mul(pow(x, 3), y)), mul(pow(x, 2), pow(y, 2))), add(mul(x, pow(y, 3)), pow(y, 4))))"
+  - id: sympy.poly.factor.sum_fifth
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    searchEffects:
+      - FACTORIZING
+    riskLevel: medium
+    rule:
+      from: "add(pow(?A, 5), pow(?B, 5))"
+      to: "mul(add(?A, ?B), add(sub(add(pow(?A, 4), mul(pow(?A, 2), pow(?B, 2))), mul(pow(?A, 3), ?B)), sub(pow(?B, 4), mul(?A, pow(?B, 3)))))"
+    validation:
+      examples:
+        - from: "add(pow(x, 5), pow(y, 5))"
+          to: "mul(add(x, y), add(sub(add(pow(x, 4), mul(pow(x, 2), pow(y, 2))), mul(pow(x, 3), y)), sub(pow(y, 4), mul(x, pow(y, 3)))))"
+  - id: sympy.poly.factor.diff_sixth
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    searchEffects:
+      - FACTORIZING
+    riskLevel: medium
+    rule:
+      from: "sub(pow(?A, 6), pow(?B, 6))"
+      to: "mul(mul(sub(?A, ?B), add(?A, ?B)), mul(add(sub(pow(?A, 2), mul(?A, ?B)), pow(?B, 2)), add(add(pow(?A, 2), mul(?A, ?B)), pow(?B, 2))))"
+    validation:
+      examples:
+        - from: "sub(pow(x, 6), pow(y, 6))"
+          to: "mul(mul(sub(x, y), add(x, y)), mul(add(sub(pow(x, 2), mul(x, y)), pow(y, 2)), add(add(pow(x, 2), mul(x, y)), pow(y, 2))))"
+  - id: sympy.poly.factor.diff_fourth
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    searchEffects:
+      - FACTORIZING
+    riskLevel: medium
+    rule:
+      from: "sub(pow(?A, 4), pow(?B, 4))"
+      to: "mul(mul(sub(?A, ?B), add(?A, ?B)), add(pow(?A, 2), pow(?B, 2)))"
+    validation:
+      examples:
+        - from: "sub(pow(x, 4), pow(y, 4))"
+          to: "mul(mul(sub(x, y), add(x, y)), add(pow(x, 2), pow(y, 2)))"
