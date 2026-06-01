@@ -18,4 +18,25 @@ public interface RegelsuchePlugin {
 
     default void registerMacros(MacroRegistry registry) {
     }
+
+    default void registerSearchStrategies(SearchStrategyRegistry registry) {
+    }
+
+    default void registerHeuristics(HeuristicRegistry registry) {
+    }
+
+    default void registerCostFunctions(CostFunctionRegistry registry) {
+    }
+
+    default void registerRenderers(RendererRegistry registry) {
+    }
+
+    default void registerExplanations(ExplanationRegistry registry) {
+    }
+
+    default void registerParserExtensions(ParserExtensionRegistry registry) {
+    }
+
+    default void registerExamples(ExampleRegistry registry) {
+    }
 }

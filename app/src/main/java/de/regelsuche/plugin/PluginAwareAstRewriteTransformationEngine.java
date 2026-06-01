@@ -62,6 +62,8 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
         }
         AstVisitorContext context = new AstVisitorContext();
         visitorRegistry.execute(AstVisitorPhase.AFTER_PARSE, root, context);
+        visitorRegistry.execute(AstVisitorPhase.BEFORE_NORMALIZATION, root, context);
+        visitorRegistry.execute(AstVisitorPhase.AFTER_NORMALIZATION, root, context);
         visitorRegistry.execute(AstVisitorPhase.BEFORE_SEARCH, root, context);
         String formattedInput = ExpressionFormatter.format(root);
         int originalSize = canonicalizer.astNodeCount(formattedInput);
@@ -92,6 +94,7 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
             }
         }
         visitorRegistry.execute(AstVisitorPhase.BEFORE_OUTPUT, root, context);
+        visitorRegistry.execute(AstVisitorPhase.EXPLAIN_PATH, root, context);
         lastVisitorDiagnostics = context.diagnostics();
         return new ArrayList<>(transformations);
     }
@@ -100,6 +103,7 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
         List<RewriteResult> results = new ArrayList<>();
         String subtreeHash = canonicalizer.stableHash(ExpressionFormatter.format(subtree));
         for (RewriteRule rule : rules) {
+            visitorRegistry.execute(AstVisitorPhase.DURING_SEARCH, subtree, visitorContext);
             Expr rewritten = applyRule(rule, subtree, visitorContext);
             if (rewritten != null && !rewritten.equals(subtree)) {
                 results.add(new RewriteResult(rule, rewritten, subtreeHash));

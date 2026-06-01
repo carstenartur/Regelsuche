@@ -23,6 +23,9 @@ class RuleFileLoaderTest {
               tags:
                 - factorization
                 - binomial
+              conditions:
+                - A: expression
+                - commutative_multiplication: true
               explanation: "Erkennt die Differenz zweier Quadrate."
             
             macro expand_square:
@@ -38,6 +41,14 @@ class RuleFileLoaderTest {
 
         assertEquals(2, result.loadedEntries());
         assertTrue(ruleRegistry.registrations().stream().anyMatch(rule -> rule.id().equals("dsl_difference_of_squares")));
+        RuleRegistry.RuleRegistration registration = ruleRegistry.registrations().stream()
+            .filter(rule -> rule.id().equals("dsl_difference_of_squares"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(List.of(
+            new RuleFileParser.RuleCondition("A", "expression"),
+            new RuleFileParser.RuleCondition("commutative_multiplication", "true")
+        ), registration.conditions());
         assertTrue(macroRegistry.registrations().stream().anyMatch(macro -> macro.id().equals("expand_square")));
     }
 
@@ -51,6 +62,10 @@ class RuleFileLoaderTest {
                 - factorization
               disable_tags:
                 - complex_analysis
+              whitelist:
+                - difference_of_squares
+              blacklist:
+                - unsafe_expand
             """);
 
         PluginRuntime.RuleFileLoadResult result =
@@ -62,6 +77,27 @@ class RuleFileLoaderTest {
         assertTrue(profile.includes(List.of("binomial")));
         assertFalse(profile.includes(List.of("complex_analysis")));
         assertFalse(profile.includes(List.of("trigonometry")));
+        assertTrue(profile.includes("difference_of_squares", List.of("trigonometry")));
+        assertFalse(profile.includes("unsafe_expand", List.of("binomial")));
+    }
+
+    @Test
+    void conflictingProfileWhitelistAndBlacklistProduceDiagnostic(@TempDir Path tempDir) throws Exception {
+        Path file = tempDir.resolve("profiles.regelsuche");
+        Files.writeString(file, """
+            profile school_algebra:
+              whitelist:
+                - keep_rule
+              blacklist:
+                - keep_rule
+            """);
+
+        PluginRuntime.RuleFileLoadResult result =
+            new PluginRuntime.RuleFileLoader().load(file, new RuleRegistry(), new MacroRegistry());
+
+        assertEquals(1, result.profiles().size());
+        assertTrue(result.diagnostics().stream()
+            .anyMatch(diagnostic -> diagnostic.message().contains("both whitelist and blacklist")));
     }
 
     @Test
@@ -92,6 +128,24 @@ class RuleFileLoaderTest {
             () -> new PluginRuntime.RuleFileLoader().load(file, new RuleRegistry(), new MacroRegistry()));
 
         assertTrue(exception.getMessage().contains("Expected 'rule <id>:', 'macro <id>:' or 'profile <id>:'"));
+    }
+
+    @Test
+    void invalidConditionsProduceReadableDiagnostics(@TempDir Path tempDir) throws Exception {
+        Path file = tempDir.resolve("invalid-conditions.regelsuche");
+        Files.write(file, List.of(
+            "rule broken_conditions:",
+            "  pattern: A + 0",
+            "  replace: A",
+            "  conditions:",
+            "    - commutative_addition"
+        ));
+
+        RuleFileParseException exception = assertThrows(RuleFileParseException.class,
+            () -> new PluginRuntime.RuleFileLoader().load(file, new RuleRegistry(), new MacroRegistry()));
+
+        assertTrue(exception.getMessage().contains("Condition 'commutative_addition' must use '<name>: <value>'"));
+        assertTrue(exception.getMessage().contains("invalid-conditions.regelsuche:5"));
     }
 
     @Test

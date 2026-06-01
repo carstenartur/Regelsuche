@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 public final class RuleFileParser {
     private static final Pattern HEADER = Pattern.compile("^(rule|macro|profile)\\s+([A-Za-z0-9_.-]+):\\s*$");
     private static final Pattern PROPERTY = Pattern.compile("^([A-Za-z][A-Za-z0-9_-]*):\\s*(.*)$");
+    private static final Pattern CONDITION = Pattern.compile("^([A-Za-z][A-Za-z0-9_.-]*)\\s*:\\s*(\\S.*)$");
 
     public RulePackage parse(Path path) {
         try {
@@ -73,7 +74,7 @@ public final class RuleFileParser {
                 String key = property.group(1);
                 String value = property.group(2).trim();
                 if (value.isEmpty()) {
-                    List<String> items = new ArrayList<>();
+                    List<LineItem> items = new ArrayList<>();
                     int listIndex = index + 1;
                     while (listIndex < lines.size()) {
                         String listLine = lines.get(listIndex).trim();
@@ -84,7 +85,7 @@ public final class RuleFileParser {
                         if (!listLine.startsWith("-")) {
                             break;
                         }
-                        items.add(stripQuotes(listLine.substring(1).trim()));
+                        items.add(new LineItem(listIndex + 1, stripQuotes(listLine.substring(1).trim())));
                         listIndex++;
                     }
                     properties.put(key, List.copyOf(items));
@@ -133,13 +134,14 @@ public final class RuleFileParser {
             return null;
         }
         List<String> tags = listProperty("tags", properties);
-        List<String> conditions = listProperty("conditions", properties);
+        List<RuleCondition> conditions = conditionProperty("conditions", properties, path, lineNumber, diagnostics);
         String explanation = stringOrDefault("explanation", properties, "");
         String difficulty = stringOrDefault("difficulty", properties, "unspecified");
         RuleDirection direction = parseDirection(path, lineNumber, stringOrDefault("direction", properties, "forward"), diagnostics);
+        int priority = intOrDefault(path, lineNumber, "priority", properties, 0, diagnostics);
         validateKnownProperties(path, lineNumber, properties,
-            Set.of("pattern", "replace", "tags", "conditions", "explanation", "difficulty", "direction"), diagnostics);
-        return new RuleDefinition(id, lineNumber, pattern, replace, direction, tags, conditions, explanation, difficulty);
+            Set.of("pattern", "replace", "tags", "conditions", "explanation", "difficulty", "direction", "priority"), diagnostics);
+        return new RuleDefinition(id, lineNumber, pattern, replace, direction, priority, tags, conditions, explanation, difficulty);
     }
 
     private MacroDefinition buildMacro(
@@ -156,8 +158,11 @@ public final class RuleFileParser {
         }
         List<String> tags = listProperty("tags", properties);
         String explanation = stringOrDefault("explanation", properties, "");
-        validateKnownProperties(path, lineNumber, properties, Set.of("input", "output", "tags", "explanation"), diagnostics);
-        return new MacroDefinition(id, lineNumber, input, output, explanation, tags);
+        int priority = intOrDefault(path, lineNumber, "priority", properties, 0, diagnostics);
+        String difficulty = stringOrDefault("difficulty", properties, "unspecified");
+        validateKnownProperties(path, lineNumber, properties,
+            Set.of("input", "output", "tags", "explanation", "priority", "difficulty"), diagnostics);
+        return new MacroDefinition(id, lineNumber, input, output, explanation, tags, priority, difficulty);
     }
 
     private ProfileDefinition buildProfile(
@@ -169,12 +174,22 @@ public final class RuleFileParser {
     ) {
         List<String> enableTags = listProperty("enable_tags", properties);
         List<String> disableTags = listProperty("disable_tags", properties);
-        validateKnownProperties(path, lineNumber, properties, Set.of("enable_tags", "disable_tags"), diagnostics);
-        if (enableTags.isEmpty() && disableTags.isEmpty()) {
-            diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,
-                "Profile '" + id + "' has neither 'enable_tags' nor 'disable_tags' and has no effect"));
+        List<String> whitelist = combinedListProperty(properties, "whitelist", "enable_rules");
+        List<String> blacklist = combinedListProperty(properties, "blacklist", "disable_rules");
+        validateKnownProperties(path, lineNumber, properties,
+            Set.of("enable_tags", "disable_tags", "whitelist", "blacklist", "enable_rules", "disable_rules"),
+            diagnostics);
+        for (String ruleId : whitelist) {
+            if (blacklist.contains(ruleId)) {
+                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,
+                    "Profile '" + id + "' lists '" + ruleId + "' in both whitelist and blacklist; blacklist wins"));
+            }
         }
-        return new ProfileDefinition(id, lineNumber, enableTags, disableTags);
+        if (enableTags.isEmpty() && disableTags.isEmpty() && whitelist.isEmpty() && blacklist.isEmpty()) {
+            diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,
+                "Profile '" + id + "' has no tag or rule-id filters and has no effect"));
+        }
+        return new ProfileDefinition(id, lineNumber, enableTags, disableTags, whitelist, blacklist);
     }
 
     private void validateKnownProperties(
@@ -213,16 +228,87 @@ public final class RuleFileParser {
         return value instanceof String string ? string : defaultValue;
     }
 
+    private int intOrDefault(
+        Path path,
+        int lineNumber,
+        String key,
+        Map<String, Object> properties,
+        int defaultValue,
+        List<RuleFileDiagnostic> diagnostics
+    ) {
+        Object value = properties.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof String string) {
+            try {
+                return Integer.parseInt(string);
+            } catch (NumberFormatException ex) {
+                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,
+                    "Property '" + key + "' must be an integer"));
+                return defaultValue;
+            }
+        }
+        diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,
+            "Property '" + key + "' must be an integer"));
+        return defaultValue;
+    }
+
     @SuppressWarnings("unchecked")
     private List<String> listProperty(String key, Map<String, Object> properties) {
         Object value = properties.get(key);
         if (value instanceof List<?> list) {
-            return (List<String>) list;
+            return list.stream()
+                .map(item -> item instanceof LineItem li ? li.value() : (String) item)
+                .toList();
         }
         if (value instanceof String string && !string.isBlank()) {
             return List.of(stripQuotes(string));
         }
         return List.of();
+    }
+
+    private List<String> combinedListProperty(Map<String, Object> properties, String... keys) {
+        List<String> values = new ArrayList<>();
+        for (String key : keys) {
+            values.addAll(listProperty(key, properties));
+        }
+        return List.copyOf(values);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<LineItem> lineItemsProperty(String key, Map<String, Object> properties, int defaultLine) {
+        Object value = properties.get(key);
+        if (value instanceof List<?> list) {
+            return list.stream()
+                .map(item -> item instanceof LineItem li ? li : new LineItem(defaultLine, (String) item))
+                .toList();
+        }
+        if (value instanceof String string && !string.isBlank()) {
+            return List.of(new LineItem(defaultLine, stripQuotes(string)));
+        }
+        return List.of();
+    }
+
+    private List<RuleCondition> conditionProperty(
+        String key,
+        Map<String, Object> properties,
+        Path path,
+        int lineNumber,
+        List<RuleFileDiagnostic> diagnostics
+    ) {
+        List<LineItem> items = lineItemsProperty(key, properties, lineNumber);
+        List<RuleCondition> conditions = new ArrayList<>();
+        for (LineItem item : items) {
+            Matcher matcher = CONDITION.matcher(item.value());
+            if (!matcher.matches()) {
+                diagnostics.add(new RuleFileDiagnostic(path, item.line(), Severity.ERROR,
+                    "Condition '" + item.value() + "' must use '<name>: <value>'"));
+                continue;
+            }
+            conditions.add(new RuleCondition(matcher.group(1), matcher.group(2)));
+        }
+        return List.copyOf(conditions);
     }
 
     private RuleDirection parseDirection(
@@ -248,6 +334,9 @@ public final class RuleFileParser {
         return value;
     }
 
+    /** Pairs a source-file line number with a parsed string value. */
+    private record LineItem(int line, String value) {}
+
     public sealed interface Entry permits RuleDefinition, MacroDefinition, ProfileDefinition {
         String id();
 
@@ -271,8 +360,9 @@ public final class RuleFileParser {
         String pattern,
         String replace,
         RuleDirection direction,
+        int priority,
         List<String> tags,
-        List<String> conditions,
+        List<RuleCondition> conditions,
         String explanation,
         String difficulty
     ) implements Entry {
@@ -282,13 +372,18 @@ public final class RuleFileParser {
         }
     }
 
+    public record RuleCondition(String name, String value) {
+    }
+
     public record MacroDefinition(
         String id,
         int line,
         String input,
         String output,
         String explanation,
-        List<String> tags
+        List<String> tags,
+        int priority,
+        String difficulty
     ) implements Entry {
         public MacroDefinition {
             tags = List.copyOf(tags);
@@ -299,11 +394,15 @@ public final class RuleFileParser {
         String id,
         int line,
         List<String> enableTags,
-        List<String> disableTags
+        List<String> disableTags,
+        List<String> whitelist,
+        List<String> blacklist
     ) implements Entry {
         public ProfileDefinition {
             enableTags = List.copyOf(enableTags);
             disableTags = List.copyOf(disableTags);
+            whitelist = List.copyOf(whitelist);
+            blacklist = List.copyOf(blacklist);
         }
     }
 

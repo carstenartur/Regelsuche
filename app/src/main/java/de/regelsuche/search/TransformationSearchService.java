@@ -102,6 +102,10 @@ public class TransformationSearchService {
         return graphStore.snapshot();
     }
 
+    public SearchHeuristic heuristic() {
+        return heuristic;
+    }
+
     public void shutdown() {
         executorService.shutdown();
     }

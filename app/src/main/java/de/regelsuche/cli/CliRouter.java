@@ -24,6 +24,7 @@ import de.regelsuche.mining.RuleDiscoveryService;
 import de.regelsuche.notify.ConsoleNotifier;
 import de.regelsuche.plugin.PluginRuntime;
 import de.regelsuche.plugin.PluginRuntimeConfig;
+import de.regelsuche.plugin.PluginExtensionRegistry;
 import de.regelsuche.plugin.RuleFileParseException;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
@@ -255,8 +256,16 @@ public class CliRouter {
                     }
                     if (!runtime.macroRegistry().registrations().isEmpty()) {
                         runtime.macroRegistry().registrations()
-                            .forEach(macro -> out.println("macro " + macro.id() + " (" + macro.source() + ")"));
+                            .forEach(macro -> out.println("macro " + macro.id() + " (" + macro.source() + ", "
+                                + (macro.enabled() ? "enabled" : "disabled") + ")"));
                     }
+                    printExtensions("search-strategy", runtime.searchStrategyRegistry().registrations());
+                    printExtensions("heuristic", runtime.heuristicRegistry().registrations());
+                    printExtensions("cost-function", runtime.costFunctionRegistry().registrations());
+                    printExtensions("renderer", runtime.rendererRegistry().registrations());
+                    printExtensions("explanation", runtime.explanationRegistry().registrations());
+                    printExtensions("parser-extension", runtime.parserExtensionRegistry().registrations());
+                    printExtensions("example", runtime.exampleRegistry().registrations());
                     runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
                     return 0;
                 }
@@ -303,21 +312,27 @@ public class CliRouter {
             case "profiles" -> {
                 CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
                 Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+                String activeProfile = options.getOrDefault("profile", "");
                 try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
                     Paths.get("plugins"),
                     rulesDir,
                     true,
                     java.util.Set.of(),
-                    java.util.Set.of()
+                    java.util.Set.of(),
+                    activeProfile
                 ))) {
                     if (runtime.profiles().isEmpty()) {
                         out.println("No activation profiles loaded.");
                     } else {
                         runtime.profiles().forEach(profile -> out.println(
                             "profile " + profile.id()
+                                + (profile.id().equals(runtime.activeProfile()) ? " [active]" : "")
                                 + " (enable: " + String.join(", ", profile.enableTags())
-                                + "; disable: " + String.join(", ", profile.disableTags()) + ")"));
+                                + "; disable: " + String.join(", ", profile.disableTags())
+                                + "; whitelist: " + String.join(", ", profile.whitelist())
+                                + "; blacklist: " + String.join(", ", profile.blacklist()) + ")"));
                     }
+                    runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
                     return 0;
                 }
             }
@@ -428,6 +443,14 @@ public class CliRouter {
                 return 1;
             }
         }
+    }
+
+    private void printExtensions(
+        String type,
+        java.util.List<? extends PluginExtensionRegistry.ExtensionRegistration<?>> registrations
+    ) {
+        registrations.forEach(registration -> out.println(type + " " + registration.id() + " ("
+            + registration.source() + ", " + (registration.enabled() ? "enabled" : "disabled") + ")"));
     }
 
     private int runBenchmark(String[] args) {

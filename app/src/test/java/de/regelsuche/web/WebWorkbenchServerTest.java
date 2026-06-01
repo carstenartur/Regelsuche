@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.plugin.PluginRuntimeConfig;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.proof.ProofBridge;
 import de.regelsuche.proof.ProofBridgeService;
@@ -18,6 +19,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
@@ -25,6 +28,7 @@ import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class WebWorkbenchServerTest {
 
@@ -69,6 +73,52 @@ class WebWorkbenchServerTest {
         assertEquals(200, connection.getResponseCode());
         String body = new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertEquals("{\"rules\":[]}", body);
+    }
+
+    @Test
+    void pluginsApiExposesProfileFilteredRuleStatus(@TempDir Path tempDir) throws IOException {
+        Path rulesDir = tempDir.resolve("rules");
+        Files.createDirectories(rulesDir);
+        Files.writeString(rulesDir.resolve("profiles.regelsuche"), """
+            rule keep_rule:
+              pattern: A + 0
+              replace: A
+              tags:
+                - algebra
+
+            rule blocked_rule:
+              pattern: A * 1
+              replace: A
+              tags:
+                - algebra
+
+            profile school_algebra:
+              enable_tags:
+                - algebra
+              blacklist:
+                - blocked_rule
+            """);
+
+        server.stop();
+        server = new WebWorkbenchServer(
+            "127.0.0.1",
+            0,
+            new InMemoryExpressionGraphStore(),
+            new InMemoryRuleInventoryRepository(),
+            new DefaultTransformationExportService(),
+            WebSecurityConfig.none(),
+            new PluginRuntimeConfig(tempDir.resolve("plugins"), rulesDir, false, Set.of(), Set.of())
+        );
+        server.start();
+
+        HttpURLConnection connection = open("/api/plugins/rules?profile=school_algebra");
+        assertEquals(200, connection.getResponseCode());
+        String body = new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+        assertTrue(body.contains("\"activeProfile\":\"school_algebra\""), body);
+        assertTrue(body.contains("\"id\":\"keep_rule\""), body);
+        assertTrue(body.contains("\"id\":\"blocked_rule\""), body);
+        assertTrue(body.contains("\"enabled\":false"), body);
     }
 
     @Test

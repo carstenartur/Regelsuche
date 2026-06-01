@@ -35,9 +35,31 @@ Registrierung über `META-INF/services/de.regelsuche.plugin.RegelsuchePlugin`.
 - `BEFORE_OUTPUT`
 - `EXPLAIN_PATH`
 
+`PluginAwareAstRewriteTransformationEngine` ruft alle Phasen während eines
+Transformationsdurchlaufs auf. Visitor können Diagnosen, Marker und knotengebundene
+Metadaten über `AstVisitorContext` ablegen.
+
 ### Makros
 
 `MacroRegistry` nimmt `RuleMacro`-Beiträge auf.
+
+### Laufzeit-Erweiterungspunkte
+
+Plugins können weitere steuerbare Erweiterungen registrieren:
+
+- `SearchStrategyRegistry` für benannte Suchstrategien
+- `HeuristicRegistry` für heuristische Bewertungen
+- `CostFunctionRegistry` für Kostenfunktionen auf Transformationen
+- `RendererRegistry` für Ausgabe-Renderer
+- `ExplanationRegistry` für regelbezogene Erklärungen
+- `ParserExtensionRegistry` für benannte Parser-Erweiterungen (Registry-only; der
+  Aufrufer muss `supports()`/`normalize()` aus den aktivierten Erweiterungen selbst
+  aufrufen – die Erweiterungen werden nicht automatisch in den Parsing-Pfad eingehängt)
+- `ExampleRegistry` für Beispielpakete
+
+Alle diese Registries unterstützen `register`, `disable`, `registrations` und
+`enabledExtensions`, sodass Laufzeitkonfigurationen Beiträge gezielt abschalten
+und UI/CLI-Komponenten nur aktive Erweiterungen verwenden können.
 
 ## Beispielplugin
 
@@ -47,3 +69,4 @@ Registrierung über `META-INF/services/de.regelsuche.plugin.RegelsuchePlugin`.
 - AST-Visitor für Binomialmuster
 - Transformationen für binomische Formeln
 - Makro-Registrierung
+- Laufzeit-Erweiterungen für Heuristik, Kosten, Renderer, Erklärungen, Parser-Normalisierung und Beispiele

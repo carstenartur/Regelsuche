@@ -7,15 +7,30 @@ import de.regelsuche.plugin.AstVisitorContext;
 import de.regelsuche.plugin.AstVisitorPhase;
 import de.regelsuche.plugin.AstVisitorPlugin;
 import de.regelsuche.plugin.AstVisitorRegistry;
+import de.regelsuche.plugin.CostFunction;
+import de.regelsuche.plugin.CostFunctionRegistry;
+import de.regelsuche.plugin.ExamplePackage;
+import de.regelsuche.plugin.ExampleRegistry;
+import de.regelsuche.plugin.ExplanationProvider;
+import de.regelsuche.plugin.ExplanationRegistry;
+import de.regelsuche.plugin.Heuristic;
+import de.regelsuche.plugin.HeuristicRegistry;
 import de.regelsuche.plugin.MacroRegistry;
+import de.regelsuche.plugin.ParserExtension;
+import de.regelsuche.plugin.ParserExtensionRegistry;
 import de.regelsuche.plugin.PatternBasedTransformation;
 import de.regelsuche.plugin.RegelsuchePlugin;
+import de.regelsuche.plugin.Renderer;
+import de.regelsuche.plugin.RendererRegistry;
 import de.regelsuche.plugin.RuleMacro;
 import de.regelsuche.plugin.RuleRegistry;
+import de.regelsuche.plugin.SearchStrategy;
+import de.regelsuche.plugin.SearchStrategyRegistry;
 import de.regelsuche.plugin.TransformationRegistry;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.Transformation;
 import java.util.List;
 
 public final class BinomialFormulaPlugin implements RegelsuchePlugin {
@@ -124,6 +139,159 @@ public final class BinomialFormulaPlugin implements RegelsuchePlugin {
             "A^2 + 2*A*B + B^2",
             "Makro für die erste binomische Formel.",
             List.of("binomial", "macro")
+        ), id());
+    }
+
+    @Override
+    public void registerSearchStrategies(SearchStrategyRegistry registry) {
+        registry.register(new SearchStrategy() {
+            @Override
+            public String id() {
+                return "binomial-guided-search";
+            }
+
+            @Override
+            public String name() {
+                return "Binomial guided search";
+            }
+
+            @Override
+            public String description() {
+                return "Prioritises binomial expansion and factorisation examples.";
+            }
+
+            @Override
+            public List<String> tags() {
+                return List.of("binomial", "search");
+            }
+        }, id());
+    }
+
+    @Override
+    public void registerHeuristics(HeuristicRegistry registry) {
+        registry.register(new Heuristic() {
+            @Override
+            public String id() {
+                return "binomial-pattern-heuristic";
+            }
+
+            @Override
+            public int score(String expression) {
+                return expression.contains("^2") ? 10 : 0;
+            }
+
+            @Override
+            public List<String> tags() {
+                return List.of("binomial", "heuristic");
+            }
+        }, id());
+    }
+
+    @Override
+    public void registerCostFunctions(CostFunctionRegistry registry) {
+        registry.register(new CostFunction() {
+            @Override
+            public String id() {
+                return "binomial-cost-delta";
+            }
+
+            @Override
+            public int cost(Transformation transformation) {
+                return transformation.estimatedCostDelta();
+            }
+
+            @Override
+            public List<String> tags() {
+                return List.of("binomial", "cost");
+            }
+        }, id());
+    }
+
+    @Override
+    public void registerRenderers(RendererRegistry registry) {
+        registry.register(new Renderer() {
+            @Override
+            public String id() {
+                return "binomial-text-renderer";
+            }
+
+            @Override
+            public boolean supports(String format) {
+                return "text".equalsIgnoreCase(format);
+            }
+
+            @Override
+            public String render(String expression) {
+                return expression;
+            }
+
+            @Override
+            public List<String> tags() {
+                return List.of("binomial", "renderer");
+            }
+        }, id());
+    }
+
+    @Override
+    public void registerExplanations(ExplanationRegistry registry) {
+        registry.register(new ExplanationProvider() {
+            @Override
+            public String id() {
+                return "binomial-explanations";
+            }
+
+            @Override
+            public boolean supportsRule(String ruleId) {
+                return ruleId.startsWith("binomial_") || ruleId.startsWith("macro.expand_square");
+            }
+
+            @Override
+            public String explain(String ruleId, String expression) {
+                return "Binomial rule '" + ruleId + "' applies to " + expression + ".";
+            }
+
+            @Override
+            public List<String> tags() {
+                return List.of("binomial", "explanation");
+            }
+        }, id());
+    }
+
+    @Override
+    public void registerParserExtensions(ParserExtensionRegistry registry) {
+        registry.register(new ParserExtension() {
+            @Override
+            public String id() {
+                return "unicode-square-parser";
+            }
+
+            @Override
+            public boolean supports(String input) {
+                return input.contains("²");
+            }
+
+            @Override
+            public String normalize(String input) {
+                return input.replace("²", "^2");
+            }
+
+            @Override
+            public List<String> tags() {
+                return List.of("binomial", "parser");
+            }
+        }, id());
+    }
+
+    @Override
+    public void registerExamples(ExampleRegistry registry) {
+        registry.register(new ExamplePackage(
+            "binomial-examples",
+            "Binomial formula examples",
+            List.of(
+                new ExamplePackage.ExampleEntry("(a+b)^2 expansion", "(a + b)^2", "a^2 + 2*a*b + b^2"),
+                new ExamplePackage.ExampleEntry("difference of squares", "a^2 - b^2", "(a - b)*(a + b)")
+            ),
+            List.of("binomial", "examples")
         ), id());
     }
 
