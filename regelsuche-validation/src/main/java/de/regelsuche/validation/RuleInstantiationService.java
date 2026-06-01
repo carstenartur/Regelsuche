@@ -17,7 +17,7 @@ public final class RuleInstantiationService {
 
     public static List<ValidationExample> generate(PatternRewriteRule rule) {
         return SAMPLES.stream()
-                .map(sample -> new ValidationExample(substitute(rule.from().toString(), sample), substitute(rule.to().toString(), sample)))
+                .map(sample -> new ValidationExample(substitute(rule.source().toString(), sample), substitute(rule.target().toString(), sample)))
                 .distinct()
                 .toList();
     }

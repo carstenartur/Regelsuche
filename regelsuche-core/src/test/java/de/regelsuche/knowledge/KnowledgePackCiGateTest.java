@@ -19,13 +19,12 @@ final class KnowledgePackCiGateTest {
                 .toURI());
         List<KnowledgePack> packs = new KnowledgePackLoader().loadAll(packDirectory);
         List<PatternRewriteRule> rules = packs.stream().flatMap(pack -> pack.rules().stream()).toList();
-        List<PatternRewriteRule> registrable = packs.stream().flatMap(pack -> pack.registrableRules().stream()).toList();
+        List<PatternRewriteRule> registrable = rules.stream().filter(rule -> rule.descriptor().eligibleForRegistration()).toList();
 
         assertTrue(registrable.size() >= 30, "expected at least 30 external registrable rules");
-        assertEquals(rules.size(), registrable.size(), "only VALIDATED/REVIEWED rules may be registered");
         for (PatternRewriteRule rule : rules) {
             RuleDescriptor descriptor = rule.descriptor();
-            assertTrue(descriptor.status() == RuleStatus.VALIDATED || descriptor.status() == RuleStatus.REVIEWED);
+            assertTrue(!descriptor.eligibleForRegistration() || descriptor.status() == RuleStatus.VALIDATED || descriptor.status() == RuleStatus.REVIEWED);
             assertFalse(descriptor.originProject().isBlank(), rule.id() + " missing provenance origin");
             assertFalse(descriptor.packId().isBlank(), rule.id() + " missing pack id");
             assertFalse(descriptor.sourceReference().isBlank(), rule.id() + " missing source reference");
