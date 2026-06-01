@@ -62,16 +62,16 @@ public final class DiscoveryBenchmarkExecutor {
                 ? learnMacros(scenario, baseEngine, withoutMacro)
                 : new MacroLearningRun(List.of(), Map.of(), new InMemoryRuleInventoryRepository());
         List<String> learnedMacros = macroLearningRun.learnedMacros().stream().map(ReusableRule::id).toList();
-        SearchRun withMacro = scenario.macroLearning().enabled() && !learnedMacros.isEmpty()
-                ? run(scenario, new MacroMoveTransformationEngine(
-                        baseEngine,
-                        new GoalAwareMacroMoveSelector(macroLearningRun.inventory()),
-                        scenario.targetExpression(),
-                        macroLearningRun.atomicStepsByRuleId(),
-                        macroLearningRun.learnedMacros().getFirst().assumptions()))
-                : scenario.expectations().contains(DiscoveryExpectation.CONVERGENCE_REQUIRED)
-                        ? withoutMacro
-                        : new SearchRun(false, "Macro learning disabled", List.of(), List.of(), List.of());
+        SearchRun withMacro = scenario.macroLearning().enabled()
+                ? (!learnedMacros.isEmpty()
+                        ? run(scenario, new MacroMoveTransformationEngine(
+                                baseEngine,
+                                new GoalAwareMacroMoveSelector(macroLearningRun.inventory()),
+                                scenario.targetExpression(),
+                                macroLearningRun.atomicStepsByRuleId(),
+                                macroLearningRun.learnedMacros().getFirst().assumptions()))
+                        : new SearchRun(false, "Macro learning required but no macro was learned", List.of(), List.of(), List.of()))
+                : new SearchRun(false, "Macro learning disabled", List.of(), List.of(), List.of());
         List<String> bridgeRules = bridgeRules(withoutMacro.appliedRuleIds(), scenario, rulesById);
         List<String> ruleFamilies = ruleFamilies(withoutMacro.appliedRuleIds(), rulesById);
         SearchSpaceAnalytics withoutAnalytics = analyticsFor(withoutMacro.steps(), bridgeRules, rulesById);
@@ -89,11 +89,12 @@ public final class DiscoveryBenchmarkExecutor {
         List<DiscoveryBenchmarkEvidence.EvidenceNode> nodes = evidenceNodes(scenario, paths);
         List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges = evidenceEdges(withoutMacro, withMacro, learnedMacros, bridgeRules, rulesById);
         boolean success = withoutMacro.success()
+                && (!scenario.macroLearning().enabled() || withMacro.success())
                 && expectationSatisfied(scenario, DiscoveryExpectation.BRIDGE_REQUIRED, !bridgeRules.isEmpty())
                 && expectationSatisfied(scenario, DiscoveryExpectation.CONVERGENCE_REQUIRED, !convergentStates.isEmpty())
                 && expectationSatisfied(scenario, DiscoveryExpectation.MACRO_LEARNING_REQUIRED, !learnedMacros.isEmpty())
                 && expectationSatisfied(scenario, DiscoveryExpectation.MACRO_REUSE_REQUIRED, !reusedMacros.isEmpty());
-        String failureReason = success ? "" : failureReason(scenario, withoutMacro, bridgeRules, convergentStates, learnedMacros, reusedMacros);
+        String failureReason = success ? "" : failureReason(scenario, withoutMacro, withMacro, bridgeRules, convergentStates, learnedMacros, reusedMacros);
         String smallGraphMessage = nodes.size() < scenario.gallery().minVisibleNodes()
                 ? "Search produced only " + nodes.size() + " visible states under this budget."
                 : "";
@@ -408,6 +409,7 @@ public final class DiscoveryBenchmarkExecutor {
     private String failureReason(
             DiscoveryBenchmarkScenario scenario,
             SearchRun withoutMacro,
+            SearchRun withMacro,
             List<String> bridgeRules,
             List<String> convergentStates,
             List<String> learnedMacros,
@@ -415,6 +417,9 @@ public final class DiscoveryBenchmarkExecutor {
         List<String> reasons = new ArrayList<>();
         if (!withoutMacro.success()) {
             reasons.add(withoutMacro.failureReason());
+        }
+        if (scenario.macroLearning().enabled() && !withMacro.success()) {
+            reasons.add(withMacro.failureReason());
         }
         if (!expectationSatisfied(scenario, DiscoveryExpectation.BRIDGE_REQUIRED, !bridgeRules.isEmpty())) {
             reasons.add("No bridge rule was used");
