@@ -26,14 +26,15 @@ import java.util.Map;
 import java.util.Set;
 
 public final class MacroImpactReportGenerator {
-    private static final String INPUT_EXPRESSION = "( x + 0 ) * ( x + 0 )";
+    private static final String INPUT_EXPRESSION = "( x * 1 ) * ( x * 1 )";
     private static final String TARGET_EXPRESSION = "x ^ 2";
     private static final String MACRO_RULE_ID = "macro_square_after_zero_simplification";
 
     public MacroImpactReport generate() {
         ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
-        SearchRun withoutMacro = run(new AstRewriteTransformationEngine(), canonicalizer);
-        SearchRun withMacro = run(new MacroTransformationEngine(new AstRewriteTransformationEngine()), canonicalizer);
+        TransformationEngine baseEngine = new FilteredTransformationEngine(new AstRewriteTransformationEngine());
+        SearchRun withoutMacro = run(baseEngine, canonicalizer);
+        SearchRun withMacro = run(new MacroTransformationEngine(baseEngine), canonicalizer);
         String bridgeRule = bridgeRule(withoutMacro.appliedRuleIds());
         SearchSpaceAnalytics withoutAnalytics = analyticsFor(withoutMacro.steps(), Set.of(bridgeRule));
         SearchSpaceAnalytics withAnalytics = analyticsFor(withMacro.steps(), Set.of(MACRO_RULE_ID));
@@ -101,9 +102,9 @@ public final class MacroImpactReportGenerator {
                 new ExpressionScorer(),
                 canonicalizer,
                 new SearchHeuristic(4, 80, 1, 4, 80, 12));
-        String targetHash = canonicalizer.stableHash(TARGET_EXPRESSION);
+        String normalizedTarget = normalizeExpression(TARGET_EXPRESSION);
         return new BestFirstSearchStrategy().search(problem).stream()
-                .filter(state -> state.canonicalHash().equals(targetHash))
+                .filter(state -> state.depth() > 0 && normalizeExpression(state.expression()).equals(normalizedTarget))
                 .findFirst()
                 .map(this::toRun)
                 .orElseThrow(() -> new IllegalStateException("Target expression was not reached: " + TARGET_EXPRESSION));
@@ -160,6 +161,10 @@ public final class MacroImpactReportGenerator {
         return state == null ? "" : state.replaceAll("\\s+", "");
     }
 
+    private String normalizeExpression(String expression) {
+        return expression == null ? "" : expression.trim().replaceAll("\\s+", " ");
+    }
+
     private record SearchRun(List<String> expressionPath, List<String> appliedRuleIds, List<ProofStep> steps) {
         private SearchRun {
             expressionPath = List.copyOf(expressionPath);
@@ -194,6 +199,21 @@ public final class MacroImpactReportGenerator {
 
         private static String canonicalInput(String expression) {
             return expression == null ? "" : expression.replaceAll("\\s+", "");
+        }
+    }
+
+    private static final class FilteredTransformationEngine implements TransformationEngine {
+        private final TransformationEngine delegate;
+
+        private FilteredTransformationEngine(TransformationEngine delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public List<Transformation> transform(String expression) {
+            return delegate.transform(expression).stream()
+                    .filter(transformation -> !transformation.rule().equals("ast_canonical_normalize"))
+                    .toList();
         }
     }
 }
