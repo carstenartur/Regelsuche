@@ -12,6 +12,8 @@ rules:
   - id: sympy.rational.partial_fraction.telescoping
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - BRIDGING
     riskLevel: low
     rule:
       from: "div(1, mul(?A, add(?A, 1)))"
@@ -23,6 +25,8 @@ rules:
   - id: sympy.rational.rationalize.sqrt_plus
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - BRIDGING
     riskLevel: medium
     rule:
       from: "div(1, add(sqrt(?A), ?B))"
@@ -34,6 +38,8 @@ rules:
   - id: sympy.rational.common_denominator.add
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "add(div(?A, ?B), div(?C, ?D))"
@@ -45,6 +51,8 @@ rules:
   - id: sympy.rational.common_denominator.sub
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "sub(div(?A, ?B), div(?C, ?D))"
@@ -56,6 +64,8 @@ rules:
   - id: sympy.rational.multiply
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: low
     rule:
       from: "mul(div(?A, ?B), div(?C, ?D))"
@@ -67,6 +77,8 @@ rules:
   - id: sympy.rational.divide
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: low
     rule:
       from: "div(div(?A, ?B), div(?C, ?D))"

@@ -13,6 +13,8 @@ rules:
     sourceReference: Standard adjacent-factor partial fraction identity, retained as candidate pending denominator assumptions.
     derivationType: REIMPLEMENTED_RULE
     status: CANDIDATE
+    searchEffects:
+      - BRIDGING
     riskLevel: high
     rule:
       from: "1/(?A*(?A+1))"
@@ -21,6 +23,8 @@ rules:
     sourceReference: Standard radical-denominator rationalization identity, retained as candidate pending nonzero denominator assumptions.
     derivationType: REIMPLEMENTED_RULE
     status: CANDIDATE
+    searchEffects:
+      - BRIDGING
     riskLevel: high
     rule:
       from: "1/(sqrt(?A)+?B)"

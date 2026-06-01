@@ -12,6 +12,8 @@ rules:
   - id: sympy.trig.pythagorean
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - SIMPLIFYING
     riskLevel: low
     rule:
       from: "add(pow(sin(?X), 2), pow(cos(?X), 2))"
@@ -23,6 +25,8 @@ rules:
   - id: sympy.trig.sin_double
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: low
     rule:
       from: "sin(mul(2, ?X))"
@@ -34,6 +38,8 @@ rules:
   - id: sympy.trig.cos_double
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: low
     rule:
       from: "cos(mul(2, ?X))"
@@ -45,6 +51,8 @@ rules:
   - id: sympy.trig.tan_def
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: low
     rule:
       from: "tan(?X)"
@@ -56,6 +64,8 @@ rules:
   - id: sympy.trig.sin_sum
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "sin(add(?A, ?B))"
@@ -67,6 +77,8 @@ rules:
   - id: sympy.trig.sin_diff
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "sin(sub(?A, ?B))"
@@ -78,6 +90,8 @@ rules:
   - id: sympy.trig.cos_sum
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "cos(add(?A, ?B))"
@@ -89,6 +103,8 @@ rules:
   - id: sympy.trig.cos_diff
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "cos(sub(?A, ?B))"

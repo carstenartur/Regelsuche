@@ -12,6 +12,8 @@ rules:
   - id: sympy.log.product
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "log(mul(?A, ?B))"
@@ -23,6 +25,8 @@ rules:
   - id: sympy.log.quotient
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "log(div(?A, ?B))"
@@ -34,6 +38,8 @@ rules:
   - id: sympy.log.power
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: medium
     rule:
       from: "log(pow(?A, ?n))"
@@ -45,6 +51,8 @@ rules:
   - id: sympy.log.exp
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - SIMPLIFYING
     riskLevel: medium
     rule:
       from: "log(exp(?A))"
@@ -56,6 +64,8 @@ rules:
   - id: sympy.log.one
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - SIMPLIFYING
     riskLevel: low
     rule:
       from: "log(1)"
@@ -67,6 +77,8 @@ rules:
   - id: sympy.log.inverse_exp
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - SIMPLIFYING
     riskLevel: medium
     rule:
       from: "exp(log(?A))"

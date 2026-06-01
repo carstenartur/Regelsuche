@@ -6,6 +6,7 @@ import de.regelsuche.api.searchgraph.SearchGraphEdgeDto;
 import de.regelsuche.api.searchgraph.SearchGraphNodeDto;
 import de.regelsuche.api.searchgraph.SearchGraphRecord;
 import de.regelsuche.mining.MacroRuleCandidate;
+import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.ArrayList;
@@ -16,6 +17,23 @@ import java.util.Optional;
 
 /** Builds a typed mathematical discovery provenance graph from a persisted search run. */
 public final class ProvenanceGraphAssembler {
+    public ProvenanceGraph forExternalRule(PatternRewriteRule rule) {
+        Map<String, String> properties = new LinkedHashMap<>();
+        properties.put("ruleId", rule.id());
+        properties.put("pack", rule.descriptor().packId());
+        properties.put("sourceSystem", rule.descriptor().originProject());
+        properties.put("status", rule.descriptor().status().name());
+        properties.put("searchEffect", rule.descriptor().searchEffects().stream()
+            .map(Enum::name)
+            .collect(java.util.stream.Collectors.joining(",")));
+        ProvenanceNode ruleNode = new ProvenanceNode(
+            "rule:" + rule.id(),
+            ProvenanceNodeType.RULE,
+            rule.id(),
+            properties);
+        return new ProvenanceGraph(List.of(ruleNode), List.of());
+    }
+
     public ProvenanceGraph assemble(SearchGraphRecord record) {
         Map<String, ProvenanceNode> nodes = new LinkedHashMap<>();
         List<ProvenanceEdge> edges = new ArrayList<>();

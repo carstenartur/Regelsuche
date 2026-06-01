@@ -13,6 +13,8 @@ import de.regelsuche.api.searchgraph.SearchGraphRecord;
 import de.regelsuche.api.searchgraph.SearchGraphStatsDto;
 import de.regelsuche.mining.MacroRuleCandidate;
 import de.regelsuche.mining.RuleStatus;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.SearchEffect;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.time.Instant;
@@ -21,6 +23,23 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class ProvenanceGraphAssemblerTest {
+    @Test
+    void externalRuleReplayShowsSearchEffectAndPackProvenance() {
+        var rule = new KnowledgePackRegistry().allPacks().stream()
+            .flatMap(pack -> pack.rules().stream())
+            .filter(candidate -> candidate.descriptor().searchEffects().contains(SearchEffect.BRIDGING))
+            .findFirst()
+            .orElseThrow();
+
+        ProvenanceGraph graph = new ProvenanceGraphAssembler().forExternalRule(rule);
+        ProvenanceNode node = graph.nodes().getFirst();
+
+        assertEquals(rule.id(), node.properties().get("ruleId"));
+        assertEquals(rule.descriptor().packId(), node.properties().get("pack"));
+        assertTrue(node.properties().get("searchEffect").contains("BRIDGING"));
+        assertEquals(rule.descriptor().status().name(), node.properties().get("status"));
+    }
+
     @Test
     void assemblesTypedDiscoveryProvenanceGraph() {
         ProvenanceGraph graph = new ProvenanceGraphAssembler().assemble(sampleRecord());

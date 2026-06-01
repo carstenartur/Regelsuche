@@ -12,6 +12,8 @@ rules:
   - id: sympy.poly.factor.diff_squares
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - FACTORIZING
     riskLevel: low
     rule:
       from: "sub(pow(?A, 2), pow(?B, 2))"
@@ -23,6 +25,8 @@ rules:
   - id: sympy.poly.factor.diff_cubes
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - FACTORIZING
     riskLevel: low
     rule:
       from: "sub(pow(?A, 3), pow(?B, 3))"
@@ -34,6 +38,8 @@ rules:
   - id: sympy.poly.factor.sum_cubes
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - FACTORIZING
     riskLevel: low
     rule:
       from: "add(pow(?A, 3), pow(?B, 3))"
@@ -45,6 +51,8 @@ rules:
   - id: sympy.poly.expand.square_sum
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: low
     rule:
       from: "pow(add(?A, ?B), 2)"
@@ -56,6 +64,8 @@ rules:
   - id: sympy.poly.expand.square_difference
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - EXPANDING
     riskLevel: low
     rule:
       from: "pow(sub(?A, ?B), 2)"
@@ -67,6 +77,8 @@ rules:
   - id: sympy.poly.factor.sophie_germain
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
+    searchEffects:
+      - BRIDGING
     riskLevel: medium
     rule:
       from: "add(pow(?A, 4), mul(4, pow(?B, 4)))"
@@ -78,6 +90,8 @@ rules:
   - id: sympy.poly.factor.diff_fifth
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - FACTORIZING
     riskLevel: medium
     rule:
       from: "sub(pow(?A, 5), pow(?B, 5))"
@@ -89,6 +103,8 @@ rules:
   - id: sympy.poly.factor.sum_fifth
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - FACTORIZING
     riskLevel: medium
     rule:
       from: "add(pow(?A, 5), pow(?B, 5))"
@@ -100,6 +116,8 @@ rules:
   - id: sympy.poly.factor.diff_sixth
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - FACTORIZING
     riskLevel: medium
     rule:
       from: "sub(pow(?A, 6), pow(?B, 6))"
@@ -111,6 +129,8 @@ rules:
   - id: sympy.poly.factor.diff_fourth
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
+    searchEffects:
+      - FACTORIZING
     riskLevel: medium
     rule:
       from: "sub(pow(?A, 4), pow(?B, 4))"

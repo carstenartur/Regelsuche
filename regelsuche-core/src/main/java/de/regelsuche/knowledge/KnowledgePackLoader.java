@@ -84,6 +84,7 @@ public class KnowledgePackLoader {
                         ruleYaml.status,
                         firstNonBlank(ruleYaml.riskLevel, "medium"),
                         ruleCategories,
+                        nonNull(ruleYaml.searchEffects),
                         validationExamples(ruleYaml.validation),
                         counterExamples(ruleYaml.validation));
                 rules.add(new PatternRewriteRule(ruleId,
@@ -126,6 +127,12 @@ public class KnowledgePackLoader {
         }
         if (rule.status == null) {
             throw new IllegalArgumentException("Rule " + rule.id + " is missing status in " + path);
+        }
+        if (rule.searchEffects == null || rule.searchEffects.isEmpty()) {
+            throw new IllegalArgumentException("Rule " + rule.id + " is missing searchEffects in " + path);
+        }
+        if (rule.status == RuleStatus.CANDIDATE && rule.searchEffects.contains(SearchEffect.BRIDGING)) {
+            rule.status = RuleStatus.DISCOVERY_CANDIDATE;
         }
         require(firstNonBlank(rule.sourceVersion, pack.sourceVersion), "sourceVersion", path);
         require(firstNonBlank(rule.sourceReference, pack.sourceReference), "sourceReference", path);
@@ -191,6 +198,7 @@ public class KnowledgePackLoader {
         public DerivationType derivationType;
         public RuleStatus status;
         public String riskLevel;
+        public List<SearchEffect> searchEffects;
         public List<String> categories;
         public RuleBodyYaml rule;
         public ValidationYaml validation;
