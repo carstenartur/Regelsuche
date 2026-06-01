@@ -35,6 +35,7 @@ COPY regelsuche-learning/build.gradle ./regelsuche-learning/build.gradle
 COPY regelsuche-experiments/build.gradle ./regelsuche-experiments/build.gradle
 COPY regelsuche-cli/build.gradle ./regelsuche-cli/build.gradle
 COPY regelsuche-discovery/build.gradle ./regelsuche-discovery/build.gradle
+COPY regelsuche-benchmarks/build.gradle ./regelsuche-benchmarks/build.gradle
 
 RUN chmod +x ./gradlew \
     && ./gradlew --no-daemon --version
@@ -52,6 +53,7 @@ COPY regelsuche-learning ./regelsuche-learning
 COPY regelsuche-experiments ./regelsuche-experiments
 COPY regelsuche-cli ./regelsuche-cli
 COPY regelsuche-discovery ./regelsuche-discovery
+COPY regelsuche-benchmarks ./regelsuche-benchmarks
 
 RUN ./gradlew --no-daemon :app:installDist -x test
 
