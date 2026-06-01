@@ -13,7 +13,8 @@ public record RuleDescriptor(
         RuleStatus status,
         String riskLevel,
         List<String> categories,
-        List<ValidationExample> validationExamples) {
+        List<ValidationExample> validationExamples,
+        List<ValidationExample> counterExamples) {
 
     public RuleDescriptor {
         if (isBlank(ruleId)) {
@@ -43,11 +44,12 @@ public record RuleDescriptor(
         riskLevel = isBlank(riskLevel) ? "low" : riskLevel;
         categories = categories == null ? List.of() : List.copyOf(categories);
         validationExamples = validationExamples == null ? List.of() : List.copyOf(validationExamples);
+        counterExamples = counterExamples == null ? List.of() : List.copyOf(counterExamples);
     }
 
     public static RuleDescriptor core(String ruleId, List<String> categories) {
         return new RuleDescriptor(ruleId, "core", "Regelsuche", "PROJECT", "local", "built-in core rule",
-                DerivationType.ORIGINAL, RuleStatus.VALIDATED, "low", categories, List.of());
+                DerivationType.ORIGINAL, RuleStatus.VALIDATED, "low", categories, List.of(), List.of());
     }
 
     public boolean eligibleForRegistration() {

@@ -84,7 +84,8 @@ public class KnowledgePackLoader {
                         ruleYaml.status,
                         firstNonBlank(ruleYaml.riskLevel, "medium"),
                         ruleCategories,
-                        validationExamples(ruleYaml.validation));
+                        validationExamples(ruleYaml.validation),
+                        counterExamples(ruleYaml.validation));
                 rules.add(new PatternRewriteRule(ruleId,
                         KnowledgePatternParser.parse(require(ruleYaml.rule.from, "rule.from", path)),
                         KnowledgePatternParser.parse(require(ruleYaml.rule.to, "rule.to", path)),
@@ -142,6 +143,15 @@ public class KnowledgePackLoader {
                 .toList();
     }
 
+    private static List<ValidationExample> counterExamples(ValidationYaml validation) {
+        if (validation == null || validation.counterexamples == null) {
+            return List.of();
+        }
+        return validation.counterexamples.stream()
+                .map(example -> new ValidationExample(example.from, example.to))
+                .toList();
+    }
+
     private static String require(String value, String field, Path path) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("Missing required field " + field + " in " + path);
@@ -195,6 +205,7 @@ public class KnowledgePackLoader {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ValidationYaml {
         public List<ValidationExampleYaml> examples;
+        public List<ValidationExampleYaml> counterexamples;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

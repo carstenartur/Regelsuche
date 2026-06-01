@@ -1,0 +1,77 @@
+packId: sympy-logarithms
+displayName: SymPy Logarithms
+sourceProject: SymPy
+sourceUrl: https://github.com/sympy/sympy
+sourceVersion: "1.14"
+sourceReference: sympy/simplify/powsimp.py
+license: BSD-3-Clause
+enabledByDefault: true
+categories:
+  - logarithms
+rules:
+  - id: sympy.log.product
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: medium
+    rule:
+      from: "log(mul(?A, ?B))"
+      to: "add(log(?A), log(?B))"
+    validation:
+      examples:
+        - from: "log(mul(x, y))"
+          to: "add(log(x), log(y))"
+  - id: sympy.log.quotient
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: medium
+    rule:
+      from: "log(div(?A, ?B))"
+      to: "sub(log(?A), log(?B))"
+    validation:
+      examples:
+        - from: "log(div(x, y))"
+          to: "sub(log(x), log(y))"
+  - id: sympy.log.power
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: medium
+    rule:
+      from: "log(pow(?A, ?n))"
+      to: "mul(?n, log(?A))"
+    validation:
+      examples:
+        - from: "log(pow(x, 3))"
+          to: "mul(3, log(x))"
+  - id: sympy.log.exp
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    riskLevel: medium
+    rule:
+      from: "log(exp(?A))"
+      to: "?A"
+    validation:
+      examples:
+        - from: "log(exp(x))"
+          to: "x"
+  - id: sympy.log.one
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "log(1)"
+      to: "0"
+    validation:
+      examples:
+        - from: "log(1)"
+          to: "0"
+  - id: sympy.log.inverse_exp
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    riskLevel: medium
+    rule:
+      from: "exp(log(?A))"
+      to: "?A"
+    validation:
+      examples:
+        - from: "exp(log(x))"
+          to: "x"

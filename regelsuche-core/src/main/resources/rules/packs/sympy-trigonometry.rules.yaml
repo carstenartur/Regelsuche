@@ -1,0 +1,99 @@
+packId: sympy-trigonometry
+displayName: SymPy Trigonometry
+sourceProject: SymPy
+sourceUrl: https://github.com/sympy/sympy
+sourceVersion: "1.14"
+sourceReference: sympy/simplify/trigsimp.py
+license: BSD-3-Clause
+enabledByDefault: true
+categories:
+  - trigonometry
+rules:
+  - id: sympy.trig.pythagorean
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "add(pow(sin(?X), 2), pow(cos(?X), 2))"
+      to: "1"
+    validation:
+      examples:
+        - from: "add(pow(sin(t), 2), pow(cos(t), 2))"
+          to: "1"
+  - id: sympy.trig.sin_double
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "sin(mul(2, ?X))"
+      to: "mul(2, mul(sin(?X), cos(?X)))"
+    validation:
+      examples:
+        - from: "sin(mul(2, t))"
+          to: "mul(2, mul(sin(t), cos(t)))"
+  - id: sympy.trig.cos_double
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "cos(mul(2, ?X))"
+      to: "sub(pow(cos(?X), 2), pow(sin(?X), 2))"
+    validation:
+      examples:
+        - from: "cos(mul(2, t))"
+          to: "sub(pow(cos(t), 2), pow(sin(t), 2))"
+  - id: sympy.trig.tan_def
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    riskLevel: low
+    rule:
+      from: "tan(?X)"
+      to: "div(sin(?X), cos(?X))"
+    validation:
+      examples:
+        - from: "tan(t)"
+          to: "div(sin(t), cos(t))"
+  - id: sympy.trig.sin_sum
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    riskLevel: medium
+    rule:
+      from: "sin(add(?A, ?B))"
+      to: "add(mul(sin(?A), cos(?B)), mul(cos(?A), sin(?B)))"
+    validation:
+      examples:
+        - from: "sin(add(u, v))"
+          to: "add(mul(sin(u), cos(v)), mul(cos(u), sin(v)))"
+  - id: sympy.trig.sin_diff
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    riskLevel: medium
+    rule:
+      from: "sin(sub(?A, ?B))"
+      to: "sub(mul(sin(?A), cos(?B)), mul(cos(?A), sin(?B)))"
+    validation:
+      examples:
+        - from: "sin(sub(u, v))"
+          to: "sub(mul(sin(u), cos(v)), mul(cos(u), sin(v)))"
+  - id: sympy.trig.cos_sum
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    riskLevel: medium
+    rule:
+      from: "cos(add(?A, ?B))"
+      to: "sub(mul(cos(?A), cos(?B)), mul(sin(?A), sin(?B)))"
+    validation:
+      examples:
+        - from: "cos(add(u, v))"
+          to: "sub(mul(cos(u), cos(v)), mul(sin(u), sin(v)))"
+  - id: sympy.trig.cos_diff
+    derivationType: REIMPLEMENTED_RULE
+    status: REVIEWED
+    riskLevel: medium
+    rule:
+      from: "cos(sub(?A, ?B))"
+      to: "add(mul(cos(?A), cos(?B)), mul(sin(?A), sin(?B)))"
+    validation:
+      examples:
+        - from: "cos(sub(u, v))"
+          to: "add(mul(cos(u), cos(v)), mul(sin(u), sin(v)))"
