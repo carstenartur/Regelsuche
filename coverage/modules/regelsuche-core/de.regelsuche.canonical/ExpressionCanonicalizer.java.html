@@ -194,9 +194,9 @@ import java.util.Optional;
 <span class="fc" id="L194">        buckets.values().stream()</span>
 <span class="pc bpc" id="L195" title="1 of 2 branches missed.">            .filter(bucket -&gt; bucket.exponent() != 0)</span>
 <span class="fc" id="L196">            .sorted((left, right) -&gt; ExpressionFormatter.format(left.base()).compareTo(ExpressionFormatter.format(right.base())))</span>
-<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            .forEach(bucket -&gt; ordered.add(bucket.exponent() == 1</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            .forEach(bucket -&gt; ordered.add(bucket.exponent() == 1</span>
 <span class="fc" id="L198">                ? bucket.base()</span>
-<span class="nc" id="L199">                : new BinaryExpr(bucket.base(), BinaryOperator.POW, new NumberExpr(bucket.exponent()))));</span>
+<span class="fc" id="L199">                : new BinaryExpr(bucket.base(), BinaryOperator.POW, new NumberExpr(bucket.exponent()))));</span>
 <span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (ordered.isEmpty()) {</span>
 <span class="nc" id="L201">            return new NumberExpr(1);</span>
         }
@@ -389,12 +389,12 @@ import java.util.Optional;
 <span class="fc bfc" id="L389" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
 <span class="fc" id="L390">            return 1 + count(binaryExpr.left()) + count(binaryExpr.right());</span>
         }
-<span class="pc bpc" id="L392" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr functionExpr) {</span>
-<span class="nc" id="L393">            int total = 1;</span>
-<span class="nc bnc" id="L394" title="All 2 branches missed.">            for (Expr argument : functionExpr.arguments()) {</span>
-<span class="nc" id="L395">                total += count(argument);</span>
-<span class="nc" id="L396">            }</span>
-<span class="nc" id="L397">            return total;</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="fc" id="L393">            int total = 1;</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="fc" id="L395">                total += count(argument);</span>
+<span class="fc" id="L396">            }</span>
+<span class="fc" id="L397">            return total;</span>
         }
 <span class="fc" id="L399">        return 1;</span>
     }

@@ -2,6 +2,7 @@
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.knowledge.RuleDescriptor;
 import java.util.List;
 
 public interface RewriteRule {
@@ -31,7 +32,11 @@ public interface RewriteRule {
      *         assumption should reference those sub-expressions.&lt;/p&gt;
      */
     default List&lt;Assumption&gt; assumptions(Expr subtree) {
-<span class="fc" id="L34">        return List.of();</span>
+<span class="fc" id="L35">        return List.of();</span>
+    }
+
+    default RuleDescriptor descriptor() {
+<span class="fc" id="L39">        return RuleDescriptor.core(id(), List.of());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnowledgePackLoader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.knowledge</a> &gt; <span class="el_source">KnowledgePackLoader.java</span></div><h1>KnowledgePackLoader.java</h1><pre class="source lang-java linenums">package de.regelsuche.knowledge;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import de.regelsuche.transform.PatternRewriteRule;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
+
+<span class="fc" id="L24">public class KnowledgePackLoader {</span>
+<span class="fc" id="L25">    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory()).findAndRegisterModules();</span>
+
+    public List&lt;KnowledgePack&gt; loadClasspathPacks() {
+<span class="fc" id="L28">        List&lt;KnowledgePack&gt; packs = new ArrayList&lt;&gt;();</span>
+        try {
+<span class="fc" id="L30">            var resources = Thread.currentThread().getContextClassLoader().getResources(&quot;rules/packs&quot;);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            while (resources.hasMoreElements()) {</span>
+<span class="fc" id="L32">                URL resource = resources.nextElement();</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">                if (&quot;file&quot;.equals(resource.getProtocol())) {</span>
+<span class="fc" id="L34">                    packs.addAll(loadAll(Path.of(resource.toURI())));</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">                } else if (&quot;jar&quot;.equals(resource.getProtocol())) {</span>
+<span class="nc" id="L36">                    URI jarUri = resource.toURI();</span>
+<span class="nc" id="L37">                    try (FileSystem jarFs = FileSystems.newFileSystem(jarUri, Map.of())) {</span>
+<span class="nc" id="L38">                        String spec = jarUri.getSchemeSpecificPart();</span>
+<span class="nc" id="L39">                        int bang = spec.lastIndexOf('!');</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">                        String entryPath = bang &gt;= 0 ? spec.substring(bang + 1) : &quot;/rules/packs&quot;;</span>
+<span class="nc" id="L41">                        packs.addAll(loadAll(jarFs.getPath(entryPath)));</span>
+                    }
+                }
+<span class="fc" id="L44">            }</span>
+<span class="nc" id="L45">        } catch (IOException | URISyntaxException ex) {</span>
+<span class="nc" id="L46">            throw new IllegalStateException(&quot;Unable to load knowledge packs&quot;, ex);</span>
+<span class="fc" id="L47">        }</span>
+<span class="fc" id="L48">        return packs;</span>
+    }
+
+    public List&lt;KnowledgePack&gt; loadAll(Path baseDirectory) {
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        if (baseDirectory == null || !Files.exists(baseDirectory)) {</span>
+<span class="nc" id="L53">            return List.of();</span>
+        }
+<span class="fc" id="L55">        try (Stream&lt;Path&gt; paths = Files.walk(baseDirectory)) {</span>
+<span class="fc" id="L56">            return paths</span>
+<span class="fc" id="L57">                    .filter(path -&gt; path.getFileName().toString().endsWith(&quot;.rules.yaml&quot;))</span>
+<span class="fc" id="L58">                    .sorted(Comparator.comparing(Path::toString))</span>
+<span class="fc" id="L59">                    .map(this::load)</span>
+<span class="fc" id="L60">                    .toList();</span>
+<span class="nc" id="L61">        } catch (IOException ex) {</span>
+<span class="nc" id="L62">            throw new IllegalStateException(&quot;Unable to load knowledge packs from &quot; + baseDirectory, ex);</span>
+        }
+    }
+
+    public KnowledgePack load(Path path) {
+<span class="fc" id="L67">        try (InputStream in = Files.newInputStream(path)) {</span>
+<span class="fc" id="L68">            PackYaml yaml = YAML.readValue(in, PackYaml.class);</span>
+<span class="fc" id="L69">            validatePack(yaml, path);</span>
+<span class="fc" id="L70">            List&lt;String&gt; packCategories = nonNull(yaml.categories);</span>
+<span class="fc" id="L71">            List&lt;PatternRewriteRule&gt; rules = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (RuleYaml ruleYaml : nonNull(yaml.rules)) {</span>
+<span class="fc" id="L73">                validateRule(yaml, ruleYaml, path);</span>
+<span class="fc" id="L74">                String ruleId = require(ruleYaml.id, &quot;rule id&quot;, path);</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                List&lt;String&gt; ruleCategories = ruleYaml.categories == null ? packCategories : nonNull(ruleYaml.categories);</span>
+<span class="fc" id="L76">                RuleDescriptor descriptor = new RuleDescriptor(</span>
+                        ruleId,
+                        yaml.packId,
+<span class="fc" id="L79">                        firstNonBlank(ruleYaml.originProject, yaml.sourceProject),</span>
+<span class="fc" id="L80">                        firstNonBlank(ruleYaml.license, yaml.license),</span>
+<span class="fc" id="L81">                        firstNonBlank(ruleYaml.sourceVersion, yaml.sourceVersion),</span>
+<span class="fc" id="L82">                        firstNonBlank(ruleYaml.sourceReference, yaml.sourceReference),</span>
+                        ruleYaml.derivationType,
+                        ruleYaml.status,
+<span class="fc" id="L85">                        firstNonBlank(ruleYaml.riskLevel, &quot;medium&quot;),</span>
+                        ruleCategories,
+<span class="fc" id="L87">                        validationExamples(ruleYaml.validation));</span>
+<span class="fc" id="L88">                rules.add(new PatternRewriteRule(ruleId,</span>
+<span class="fc" id="L89">                        KnowledgePatternParser.parse(require(ruleYaml.rule.from, &quot;rule.from&quot;, path)),</span>
+<span class="fc" id="L90">                        KnowledgePatternParser.parse(require(ruleYaml.rule.to, &quot;rule.to&quot;, path)),</span>
+                        descriptor));
+<span class="fc" id="L92">            }</span>
+<span class="fc" id="L93">            return new KnowledgePack(yaml.packId, yaml.displayName, yaml.sourceProject, yaml.license,</span>
+                    yaml.sourceUrl, yaml.sourceVersion, yaml.sourceReference, yaml.enabledByDefault, packCategories, rules);
+<span class="nc" id="L95">        } catch (IOException ex) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(&quot;Invalid knowledge pack YAML: &quot; + path, ex);</span>
+        }
+    }
+
+    private void validatePack(PackYaml yaml, Path path) {
+<span class="fc" id="L101">        Objects.requireNonNull(yaml, &quot;Knowledge pack YAML must not be empty&quot;);</span>
+<span class="fc" id="L102">        require(yaml.packId, &quot;packId&quot;, path);</span>
+<span class="fc" id="L103">        require(yaml.displayName, &quot;displayName&quot;, path);</span>
+<span class="fc" id="L104">        require(yaml.sourceProject, &quot;sourceProject&quot;, path);</span>
+<span class="fc" id="L105">        require(yaml.license, &quot;license&quot;, path);</span>
+<span class="fc" id="L106">        require(yaml.sourceUrl, &quot;sourceUrl&quot;, path);</span>
+<span class="fc" id="L107">        require(yaml.sourceVersion, &quot;sourceVersion&quot;, path);</span>
+<span class="fc" id="L108">        require(yaml.sourceReference, &quot;sourceReference&quot;, path);</span>
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">        if (yaml.rules == null || yaml.rules.isEmpty()) {</span>
+<span class="nc" id="L110">            throw new IllegalArgumentException(&quot;Knowledge pack must declare at least one rule: &quot; + path);</span>
+        }
+<span class="fc" id="L112">    }</span>
+
+    private void validateRule(PackYaml pack, RuleYaml rule, Path path) {
+<span class="fc" id="L115">        require(rule.id, &quot;rule id&quot;, path);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (rule.rule == null) {</span>
+<span class="nc" id="L117">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing rule.from/rule.to in &quot; + path);</span>
+        }
+<span class="fc" id="L119">        require(rule.rule.from, &quot;rule.from&quot;, path);</span>
+<span class="fc" id="L120">        require(rule.rule.to, &quot;rule.to&quot;, path);</span>
+<span class="fc" id="L121">        require(firstNonBlank(rule.originProject, pack.sourceProject), &quot;originProject&quot;, path);</span>
+<span class="fc" id="L122">        require(firstNonBlank(rule.license, pack.license), &quot;license&quot;, path);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (rule.derivationType == null) {</span>
+<span class="fc" id="L124">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing derivationType in &quot; + path);</span>
+        }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (rule.status == null) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing status in &quot; + path);</span>
+        }
+<span class="fc" id="L129">        require(firstNonBlank(rule.sourceVersion, pack.sourceVersion), &quot;sourceVersion&quot;, path);</span>
+<span class="fc" id="L130">        require(firstNonBlank(rule.sourceReference, pack.sourceReference), &quot;sourceReference&quot;, path);</span>
+<span class="fc bfc" id="L131" title="All 4 branches covered.">        if (rule.status == RuleStatus.VALIDATED &amp;&amp; validationExamples(rule.validation).isEmpty()) {</span>
+<span class="fc" id="L132">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing validation.examples in &quot; + path);</span>
+        }
+<span class="fc" id="L134">    }</span>
+
+    private static List&lt;ValidationExample&gt; validationExamples(ValidationYaml validation) {
+<span class="pc bpc" id="L137" title="1 of 4 branches missed.">        if (validation == null || validation.examples == null) {</span>
+<span class="fc" id="L138">            return List.of();</span>
+        }
+<span class="fc" id="L140">        return validation.examples.stream()</span>
+<span class="fc" id="L141">                .map(example -&gt; new ValidationExample(example.from, example.to))</span>
+<span class="fc" id="L142">                .toList();</span>
+    }
+
+    private static String require(String value, String field, Path path) {
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L147">            throw new IllegalArgumentException(&quot;Missing required field &quot; + field + &quot; in &quot; + path);</span>
+        }
+<span class="fc" id="L149">        return value;</span>
+    }
+
+    private static String firstNonBlank(String first, String fallback) {
+<span class="pc bpc" id="L153" title="1 of 4 branches missed.">        return first == null || first.isBlank() ? fallback : first;</span>
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; nonNull(List&lt;T&gt; values) {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        return values == null ? List.of() : List.copyOf(values);</span>
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L161">    public static class PackYaml {</span>
+        public String packId;
+        public String displayName;
+        public String sourceProject;
+        public String license;
+        public String sourceUrl;
+        public String sourceVersion;
+        public String sourceReference;
+        public boolean enabledByDefault;
+        public List&lt;String&gt; categories;
+        public List&lt;RuleYaml&gt; rules;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L175">    public static class RuleYaml {</span>
+        public String id;
+        public String originProject;
+        public String license;
+        public String sourceVersion;
+        public String sourceReference;
+        public DerivationType derivationType;
+        public RuleStatus status;
+        public String riskLevel;
+        public List&lt;String&gt; categories;
+        public RuleBodyYaml rule;
+        public ValidationYaml validation;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L190">    public static class RuleBodyYaml {</span>
+        public String from;
+        public String to;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L196">    public static class ValidationYaml {</span>
+        public List&lt;ValidationExampleYaml&gt; examples;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+<span class="fc" id="L201">    public static class ValidationExampleYaml {</span>
+        public String from;
+        public String to;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

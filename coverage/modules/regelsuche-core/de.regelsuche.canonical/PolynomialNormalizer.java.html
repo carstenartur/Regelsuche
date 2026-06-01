@@ -77,8 +77,8 @@ public final class PolynomialNormalizer {
     private Polynomial multiply(Expr left, Expr right) {
 <span class="fc" id="L78">        Polynomial leftPolynomial = toPolynomial(left);</span>
 <span class="fc" id="L79">        Polynomial rightPolynomial = toPolynomial(right);</span>
-<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        if (leftPolynomial == null || rightPolynomial == null) {</span>
-<span class="nc" id="L81">            return null;</span>
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">        if (leftPolynomial == null || rightPolynomial == null) {</span>
+<span class="fc" id="L81">            return null;</span>
         }
 <span class="fc bfc" id="L83" title="All 6 branches covered.">        if (!expandCompositePolynomials &amp;&amp; (!leftPolynomial.isMonomial() || !rightPolynomial.isMonomial())) {</span>
 <span class="fc" id="L84">            return null;</span>
@@ -92,8 +92,8 @@ public final class PolynomialNormalizer {
         }
 <span class="fc" id="L93">        int exponentValue = (int) number.value();</span>
 <span class="fc" id="L94">        Polynomial basePolynomial = toPolynomial(base);</span>
-<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (basePolynomial == null) {</span>
-<span class="nc" id="L96">            return null;</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (basePolynomial == null) {</span>
+<span class="fc" id="L96">            return null;</span>
         }
 <span class="fc bfc" id="L98" title="All 4 branches covered.">        if (!expandCompositePolynomials &amp;&amp; !basePolynomial.isMonomial()) {</span>
 <span class="fc" id="L99">            return null;</span>
@@ -349,8 +349,8 @@ public final class PolynomialNormalizer {
 <span class="nc" id="L349">                    return null;</span>
                 }
 <span class="fc bfc" id="L351" title="All 2 branches covered.">                if (result == null) {</span>
-<span class="pc bpc" id="L352" title="1 of 2 branches missed.">                    result = coefficient.signum() &lt; 0</span>
-<span class="nc" id="L353">                        ? new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, term)</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">                    result = coefficient.signum() &lt; 0</span>
+<span class="fc" id="L353">                        ? new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, term)</span>
 <span class="fc" id="L354">                        : term;</span>
 <span class="fc bfc" id="L355" title="All 2 branches covered.">                } else if (coefficient.signum() &lt; 0) {</span>
 <span class="fc" id="L356">                    result = new BinaryExpr(result, BinaryOperator.SUB, term);</span>

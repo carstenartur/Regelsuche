@@ -11,11 +11,13 @@ public record Transformation(
     int estimatedCostDelta,
     boolean equivalencePreservingByConstruction,
     String applicationKey,
-    List&lt;String&gt; assumptions
+    List&lt;String&gt; assumptions,
+    String packId,
+    String license
 ) {
     public Transformation(String rule, String transformedExpression) {
-<span class="nc" id="L17">        this(rule, transformedExpression, RewriteKind.NORMALIZE, false, 0, true, rule + &quot;:&quot; + transformedExpression);</span>
-<span class="nc" id="L18">    }</span>
+<span class="nc" id="L19">        this(rule, transformedExpression, RewriteKind.NORMALIZE, false, 0, true, rule + &quot;:&quot; + transformedExpression);</span>
+<span class="nc" id="L20">    }</span>
 
     public Transformation(
         String rule,
@@ -26,16 +28,32 @@ public record Transformation(
         boolean equivalencePreservingByConstruction,
         String applicationKey
     ) {
-<span class="fc" id="L29">        this(rule, transformedExpression, kind, mayIncreaseComplexity, estimatedCostDelta,</span>
-<span class="fc" id="L30">            equivalencePreservingByConstruction, applicationKey, List.of());</span>
-<span class="fc" id="L31">    }</span>
+<span class="fc" id="L31">        this(rule, transformedExpression, kind, mayIncreaseComplexity, estimatedCostDelta,</span>
+<span class="fc" id="L32">            equivalencePreservingByConstruction, applicationKey, List.of());</span>
+<span class="fc" id="L33">    }</span>
 
-<span class="fc" id="L33">    public Transformation {</span>
-<span class="pc bpc" id="L34" title="6 of 12 branches missed.">        if (rule == null || rule.isBlank() || transformedExpression == null || transformedExpression.isBlank()</span>
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            || kind == null || applicationKey == null || applicationKey.isBlank()) {</span>
-<span class="nc" id="L36">            throw new IllegalArgumentException(&quot;rule, kind, applicationKey and transformedExpression must not be blank&quot;);</span>
+    public Transformation(
+        String rule,
+        String transformedExpression,
+        RewriteKind kind,
+        boolean mayIncreaseComplexity,
+        int estimatedCostDelta,
+        boolean equivalencePreservingByConstruction,
+        String applicationKey,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L45">        this(rule, transformedExpression, kind, mayIncreaseComplexity, estimatedCostDelta,</span>
+            equivalencePreservingByConstruction, applicationKey, assumptions, &quot;core&quot;, &quot;PROJECT&quot;);
+<span class="fc" id="L47">    }</span>
+
+<span class="fc" id="L49">    public Transformation {</span>
+<span class="pc bpc" id="L50" title="6 of 12 branches missed.">        if (rule == null || rule.isBlank() || transformedExpression == null || transformedExpression.isBlank()</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            || kind == null || applicationKey == null || applicationKey.isBlank()) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(&quot;rule, kind, applicationKey and transformedExpression must not be blank&quot;);</span>
         }
-<span class="fc" id="L38">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
-<span class="fc" id="L39">    }</span>
+<span class="fc" id="L54">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        packId = packId == null || packId.isBlank() ? &quot;core&quot; : packId;</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">        license = license == null || license.isBlank() ? &quot;PROJECT&quot; : license;</span>
+<span class="fc" id="L57">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

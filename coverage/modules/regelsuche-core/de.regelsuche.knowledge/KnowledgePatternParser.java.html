@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnowledgePatternParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.knowledge</a> &gt; <span class="el_source">KnowledgePatternParser.java</span></div><h1>KnowledgePatternParser.java</h1><pre class="source lang-java linenums">package de.regelsuche.knowledge;
+
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.transform.PatternExpr;
+
+import java.util.ArrayList;
+import java.util.List;
+
+final class KnowledgePatternParser {
+    private final String input;
+    private int pos;
+
+<span class="fc" id="L13">    private KnowledgePatternParser(String input) {</span>
+<span class="fc" id="L14">        this.input = input.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+<span class="fc" id="L15">    }</span>
+
+    static PatternExpr parse(String input) {
+<span class="fc" id="L18">        KnowledgePatternParser parser = new KnowledgePatternParser(input);</span>
+<span class="fc" id="L19">        PatternExpr expr = parser.parseExpression();</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        if (!parser.isAtEnd()) {</span>
+<span class="nc" id="L21">            throw new IllegalArgumentException(&quot;Unexpected token at position &quot; + parser.pos + &quot; in &quot; + input);</span>
+        }
+<span class="fc" id="L23">        return expr;</span>
+    }
+
+    private PatternExpr parseExpression() {
+<span class="fc" id="L27">        PatternExpr expr = parseTerm();</span>
+<span class="fc bfc" id="L28" title="All 4 branches covered.">        while (match('+') || match('-')) {</span>
+<span class="fc" id="L29">            char op = input.charAt(pos - 1);</span>
+<span class="fc" id="L30">            PatternExpr right = parseTerm();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            expr = PatternExpr.op(op == '+' ? BinaryOperator.ADD : BinaryOperator.SUB, expr, right);</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">        return expr;</span>
+    }
+
+    private PatternExpr parseTerm() {
+<span class="fc" id="L37">        PatternExpr expr = parseUnary();</span>
+<span class="fc bfc" id="L38" title="All 4 branches covered.">        while (match('*') || match('/')) {</span>
+<span class="fc" id="L39">            char op = input.charAt(pos - 1);</span>
+<span class="fc" id="L40">            PatternExpr right = parseUnary();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            expr = PatternExpr.op(op == '*' ? BinaryOperator.MUL : BinaryOperator.DIV, expr, right);</span>
+<span class="fc" id="L42">        }</span>
+<span class="fc" id="L43">        return expr;</span>
+    }
+
+    private PatternExpr parseUnary() {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (match('-')) {</span>
+<span class="nc" id="L48">            return PatternExpr.op(BinaryOperator.SUB, PatternExpr.num(0), parseUnary());</span>
+        }
+<span class="fc" id="L50">        return parsePower();</span>
+    }
+
+    private PatternExpr parsePower() {
+<span class="fc" id="L54">        PatternExpr expr = parsePrimary();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (match('^')) {</span>
+<span class="fc" id="L56">            return PatternExpr.op(BinaryOperator.POW, expr, parseUnary());</span>
+        }
+<span class="fc" id="L58">        return expr;</span>
+    }
+
+    private PatternExpr parsePrimary() {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (match('(')) {</span>
+<span class="fc" id="L63">            PatternExpr expr = parseExpression();</span>
+<span class="fc" id="L64">            expect(')');</span>
+<span class="fc" id="L65">            return expr;</span>
+        }
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (match('?')) {</span>
+<span class="fc" id="L68">            String name = readPlainIdentifier();</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (name.isBlank()) {</span>
+<span class="nc" id="L70">                throw new IllegalArgumentException(&quot;Expected pattern variable at position &quot; + pos);</span>
+            }
+<span class="fc" id="L72">            return PatternExpr.var(name);</span>
+        }
+<span class="fc" id="L74">        String identifier = readPlainIdentifier();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (!identifier.isBlank()) {</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (match('(')) {</span>
+<span class="fc" id="L77">                List&lt;PatternExpr&gt; arguments = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                if (!match(')')) {</span>
+                    do {
+<span class="fc" id="L80">                        arguments.add(parseExpression());</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                    } while (match(','));</span>
+<span class="fc" id="L82">                    expect(')');</span>
+                }
+<span class="fc" id="L84">                return PatternExpr.fn(identifier, arguments.toArray(PatternExpr[]::new));</span>
+            }
+<span class="nc" id="L86">            return PatternExpr.variable(identifier);</span>
+        }
+<span class="fc" id="L88">        String number = readNumber();</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (!number.isBlank()) {</span>
+<span class="fc" id="L90">            return PatternExpr.num(Double.parseDouble(number));</span>
+        }
+<span class="nc" id="L92">        throw new IllegalArgumentException(&quot;Expected expression at position &quot; + pos + &quot; in &quot; + input);</span>
+    }
+
+    private String readPlainIdentifier() {
+<span class="fc" id="L96">        int start = pos;</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">        if (!isAtEnd() &amp;&amp; Character.isLetter(input.charAt(pos))) {</span>
+<span class="fc" id="L98">            pos++;</span>
+<span class="fc bfc" id="L99" title="All 4 branches covered.">            while (!isAtEnd() &amp;&amp; Character.isLetterOrDigit(input.charAt(pos))) {</span>
+<span class="fc" id="L100">                pos++;</span>
+            }
+        }
+<span class="fc" id="L103">        return input.substring(start, pos);</span>
+    }
+
+    private String readNumber() {
+<span class="fc" id="L107">        int start = pos;</span>
+<span class="pc bpc" id="L108" title="1 of 6 branches missed.">        while (!isAtEnd() &amp;&amp; (Character.isDigit(input.charAt(pos)) || input.charAt(pos) == '.')) {</span>
+<span class="fc" id="L109">            pos++;</span>
+        }
+<span class="fc" id="L111">        return input.substring(start, pos);</span>
+    }
+
+    private boolean match(char expected) {
+<span class="fc bfc" id="L115" title="All 4 branches covered.">        if (!isAtEnd() &amp;&amp; input.charAt(pos) == expected) {</span>
+<span class="fc" id="L116">            pos++;</span>
+<span class="fc" id="L117">            return true;</span>
+        }
+<span class="fc" id="L119">        return false;</span>
+    }
+
+    private void expect(char expected) {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (!match(expected)) {</span>
+<span class="nc" id="L124">            throw new IllegalArgumentException(&quot;Expected '&quot; + expected + &quot;' at position &quot; + pos + &quot; in &quot; + input);</span>
+        }
+<span class="fc" id="L126">    }</span>
+
+    private boolean isAtEnd() {
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        return pos &gt;= input.length();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

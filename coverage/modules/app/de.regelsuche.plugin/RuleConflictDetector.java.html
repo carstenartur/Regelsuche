@@ -138,46 +138,47 @@ public final class RuleConflictDetector {
     }
 
     private static void appendSignature(PatternExpr pattern, StringBuilder builder, Map&lt;String, Integer&gt; placeholders) {
-<span class="pc bpc" id="L141" title="1 of 4 branches missed.">        switch (pattern) {</span>
+<span class="pc bpc" id="L141" title="2 of 5 branches missed.">        switch (pattern) {</span>
 <span class="fc" id="L142">            case PatternExpr.Placeholder placeholder -&gt; {</span>
 <span class="fc" id="L143">                int index = placeholders.computeIfAbsent(placeholder.name(), key -&gt; placeholders.size());</span>
 <span class="fc" id="L144">                builder.append('?').append(index);</span>
 <span class="fc" id="L145">            }</span>
 <span class="fc" id="L146">            case PatternExpr.LiteralNumber literal -&gt; builder.append('#').append(literal.value());</span>
-<span class="fc" id="L147">            case PatternExpr.Operation operation -&gt; {</span>
-<span class="fc" id="L148">                builder.append('(');</span>
-<span class="fc" id="L149">                appendSignature(operation.left(), builder, placeholders);</span>
-<span class="fc" id="L150">                builder.append(operation.operator().symbol());</span>
-<span class="fc" id="L151">                appendSignature(operation.right(), builder, placeholders);</span>
-<span class="fc" id="L152">                builder.append(')');</span>
-<span class="fc" id="L153">            }</span>
-<span class="nc" id="L154">            case PatternExpr.Function function -&gt; {</span>
-<span class="nc" id="L155">                builder.append(function.name()).append('(');</span>
-<span class="nc" id="L156">                List&lt;PatternExpr&gt; arguments = function.arguments();</span>
-<span class="nc bnc" id="L157" title="All 2 branches missed.">                for (int i = 0; i &lt; arguments.size(); i++) {</span>
-<span class="nc bnc" id="L158" title="All 2 branches missed.">                    if (i &gt; 0) {</span>
-<span class="nc" id="L159">                        builder.append(',');</span>
+<span class="nc" id="L147">            case PatternExpr.LiteralVariable variable -&gt; builder.append('$').append(variable.name());</span>
+<span class="fc" id="L148">            case PatternExpr.Operation operation -&gt; {</span>
+<span class="fc" id="L149">                builder.append('(');</span>
+<span class="fc" id="L150">                appendSignature(operation.left(), builder, placeholders);</span>
+<span class="fc" id="L151">                builder.append(operation.operator().symbol());</span>
+<span class="fc" id="L152">                appendSignature(operation.right(), builder, placeholders);</span>
+<span class="fc" id="L153">                builder.append(')');</span>
+<span class="fc" id="L154">            }</span>
+<span class="nc" id="L155">            case PatternExpr.Function function -&gt; {</span>
+<span class="nc" id="L156">                builder.append(function.name()).append('(');</span>
+<span class="nc" id="L157">                List&lt;PatternExpr&gt; arguments = function.arguments();</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                for (int i = 0; i &lt; arguments.size(); i++) {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                    if (i &gt; 0) {</span>
+<span class="nc" id="L160">                        builder.append(',');</span>
                     }
-<span class="nc" id="L161">                    appendSignature(arguments.get(i), builder, placeholders);</span>
+<span class="nc" id="L162">                    appendSignature(arguments.get(i), builder, placeholders);</span>
                 }
-<span class="nc" id="L163">                builder.append(')');</span>
+<span class="nc" id="L164">                builder.append(')');</span>
             }
         }
-<span class="fc" id="L166">    }</span>
+<span class="fc" id="L167">    }</span>
 
     /**
      * A rule or transformation that can participate in conflict detection.
      */
-<span class="fc" id="L171">    public record ConflictCandidate(String id, RewriteRule rule) {</span>
+<span class="fc" id="L172">    public record ConflictCandidate(String id, RewriteRule rule) {</span>
     }
 
     /**
      * A group of two or more rule ids that share the same source pattern.
      */
     public record RuleConflict(String patternSignature, List&lt;String&gt; ruleIds) {
-<span class="fc" id="L178">        public RuleConflict {</span>
-<span class="fc" id="L179">            ruleIds = List.copyOf(ruleIds);</span>
-<span class="fc" id="L180">        }</span>
+<span class="fc" id="L179">        public RuleConflict {</span>
+<span class="fc" id="L180">            ruleIds = List.copyOf(ruleIds);</span>
+<span class="fc" id="L181">        }</span>
     }
 
     /**
@@ -185,9 +186,9 @@ public final class RuleConflictDetector {
      * form a two-step cycle (a potential infinite loop) in the search graph.
      */
     public record CyclicConflict(List&lt;String&gt; ruleIds) {
-<span class="fc" id="L188">        public CyclicConflict {</span>
-<span class="fc" id="L189">            ruleIds = List.copyOf(ruleIds);</span>
-<span class="fc" id="L190">        }</span>
+<span class="fc" id="L189">        public CyclicConflict {</span>
+<span class="fc" id="L190">            ruleIds = List.copyOf(ruleIds);</span>
+<span class="fc" id="L191">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

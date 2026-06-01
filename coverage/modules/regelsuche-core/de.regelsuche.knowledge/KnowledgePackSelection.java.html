@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnowledgePackSelection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.knowledge</a> &gt; <span class="el_source">KnowledgePackSelection.java</span></div><h1>KnowledgePackSelection.java</h1><pre class="source lang-java linenums">package de.regelsuche.knowledge;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+public record KnowledgePackSelection(RuleProfile profile, Set&lt;String&gt; enabledPacks, Set&lt;String&gt; disabledPacks) {
+<span class="fc" id="L7">    public static final KnowledgePackSelection CORE = new KnowledgePackSelection(RuleProfile.CORE, Set.of(), Set.of());</span>
+
+<span class="fc" id="L9">    public KnowledgePackSelection {</span>
+<span class="pc bpc" id="L10" title="1 of 2 branches missed.">        profile = profile == null ? RuleProfile.CORE : profile;</span>
+<span class="pc bpc" id="L11" title="1 of 2 branches missed.">        enabledPacks = enabledPacks == null ? Set.of() : Set.copyOf(enabledPacks);</span>
+<span class="pc bpc" id="L12" title="1 of 2 branches missed.">        disabledPacks = disabledPacks == null ? Set.of() : Set.copyOf(disabledPacks);</span>
+<span class="fc" id="L13">    }</span>
+
+    public static KnowledgePackSelection profile(RuleProfile profile) {
+<span class="fc" id="L16">        return new KnowledgePackSelection(profile, Set.of(), Set.of());</span>
+    }
+
+    public KnowledgePackSelection enablePack(String packId) {
+<span class="fc" id="L20">        Set&lt;String&gt; enabled = new LinkedHashSet&lt;&gt;(enabledPacks);</span>
+<span class="fc" id="L21">        Set&lt;String&gt; disabled = new LinkedHashSet&lt;&gt;(disabledPacks);</span>
+<span class="fc" id="L22">        enabled.add(packId);</span>
+<span class="fc" id="L23">        disabled.remove(packId);</span>
+<span class="fc" id="L24">        return new KnowledgePackSelection(profile, enabled, disabled);</span>
+    }
+
+    public KnowledgePackSelection disablePack(String packId) {
+<span class="fc" id="L28">        Set&lt;String&gt; enabled = new LinkedHashSet&lt;&gt;(enabledPacks);</span>
+<span class="fc" id="L29">        Set&lt;String&gt; disabled = new LinkedHashSet&lt;&gt;(disabledPacks);</span>
+<span class="fc" id="L30">        disabled.add(packId);</span>
+<span class="fc" id="L31">        enabled.remove(packId);</span>
+<span class="fc" id="L32">        return new KnowledgePackSelection(profile, enabled, disabled);</span>
+    }
+
+    public Set&lt;String&gt; effectiveEnabledPacks(Set&lt;String&gt; availablePacks) {
+<span class="nc" id="L36">        return effectiveEnabledPacks(availablePacks, Set.of());</span>
+    }
+
+    public Set&lt;String&gt; effectiveEnabledPacks(Set&lt;String&gt; availablePacks, Set&lt;String&gt; defaultEnabledPacks) {
+<span class="fc" id="L40">        Set&lt;String&gt; effective = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (profile.enableAllPacks()) {</span>
+<span class="fc" id="L42">            effective.addAll(availablePacks);</span>
+        } else {
+<span class="fc" id="L44">            effective.addAll(defaultEnabledPacks);</span>
+<span class="fc" id="L45">            effective.addAll(profile.enabledPackIds());</span>
+        }
+<span class="fc" id="L47">        effective.addAll(enabledPacks);</span>
+<span class="fc" id="L48">        effective.removeAll(disabledPacks);</span>
+<span class="fc" id="L49">        effective.retainAll(availablePacks);</span>
+<span class="fc" id="L50">        return Set.copyOf(effective);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

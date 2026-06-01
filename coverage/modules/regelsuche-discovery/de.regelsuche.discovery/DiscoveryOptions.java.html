@@ -1,29 +1,74 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryOptions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery</a> &gt; <span class="el_source">DiscoveryOptions.java</span></div><h1>DiscoveryOptions.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery;
 
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.knowledge.RuleProfile;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 /** Aggregate configuration for discovery engine composition, orchestration learning and generated gallery output. */
 public record DiscoveryOptions(
     DiscoveryProfile profile,
     DiscoveryEngineOptions engine,
     DiscoveryLearningOptions learning,
-    boolean enableGeneratedGallery
+    boolean enableGeneratedGallery,
+    RuleProfile ruleProfile,
+    Set&lt;String&gt; enabledPacks,
+    Set&lt;String&gt; disabledPacks
 ) {
-<span class="fc" id="L10">    public DiscoveryOptions {</span>
-<span class="pc bpc" id="L11" title="1 of 2 branches missed.">        profile = profile == null ? DiscoveryProfile.PURE_REWRITE : profile;</span>
-<span class="pc bpc" id="L12" title="1 of 2 branches missed.">        engine = engine == null ? DiscoveryEngineOptions.forProfile(profile) : engine;</span>
-<span class="pc bpc" id="L13" title="1 of 2 branches missed.">        learning = learning == null ? DiscoveryLearningOptions.disabled() : learning;</span>
-<span class="fc" id="L14">    }</span>
+    public DiscoveryOptions(
+        DiscoveryProfile profile,
+        DiscoveryEngineOptions engine,
+        DiscoveryLearningOptions learning,
+        boolean enableGeneratedGallery
+    ) {
+<span class="fc" id="L25">        this(profile, engine, learning, enableGeneratedGallery, RuleProfile.CORE, Set.of(), Set.of());</span>
+<span class="fc" id="L26">    }</span>
+
+<span class="fc" id="L28">    public DiscoveryOptions {</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        profile = profile == null ? DiscoveryProfile.PURE_REWRITE : profile;</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        engine = engine == null ? DiscoveryEngineOptions.forProfile(profile) : engine;</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        learning = learning == null ? DiscoveryLearningOptions.disabled() : learning;</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        ruleProfile = ruleProfile == null ? RuleProfile.CORE : ruleProfile;</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        enabledPacks = enabledPacks == null ? Set.of() : Set.copyOf(enabledPacks);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        disabledPacks = disabledPacks == null ? Set.of() : Set.copyOf(disabledPacks);</span>
+<span class="fc" id="L35">    }</span>
 
     public static DiscoveryOptions forProfile(DiscoveryProfile profile) {
-<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        DiscoveryProfile resolved = profile == null ? DiscoveryProfile.PURE_REWRITE : profile;</span>
-<span class="fc bfc" id="L18" title="All 2 branches covered.">        DiscoveryLearningOptions learning = resolved == DiscoveryProfile.RESEARCH_DISCOVERY_PIPELINE</span>
-<span class="fc" id="L19">            ? DiscoveryLearningOptions.researchDefaults()</span>
-<span class="fc" id="L20">            : DiscoveryLearningOptions.disabled();</span>
-<span class="fc bfc" id="L21" title="All 2 branches covered.">        return new DiscoveryOptions(resolved, DiscoveryEngineOptions.forProfile(resolved), learning,</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        DiscoveryProfile resolved = profile == null ? DiscoveryProfile.PURE_REWRITE : profile;</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        DiscoveryLearningOptions learning = resolved == DiscoveryProfile.RESEARCH_DISCOVERY_PIPELINE</span>
+<span class="fc" id="L40">            ? DiscoveryLearningOptions.researchDefaults()</span>
+<span class="fc" id="L41">            : DiscoveryLearningOptions.disabled();</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        return new DiscoveryOptions(resolved, DiscoveryEngineOptions.forProfile(resolved), learning,</span>
             resolved == DiscoveryProfile.RESEARCH_DISCOVERY_PIPELINE);
     }
 
     public static DiscoveryOptions researchDiscoveryPipeline() {
-<span class="nc" id="L26">        return forProfile(DiscoveryProfile.RESEARCH_DISCOVERY_PIPELINE);</span>
+<span class="nc" id="L47">        return forProfile(DiscoveryProfile.RESEARCH_DISCOVERY_PIPELINE);</span>
+    }
+
+    public DiscoveryOptions enablePack(String packId) {
+<span class="fc" id="L51">        Set&lt;String&gt; enabled = new LinkedHashSet&lt;&gt;(enabledPacks);</span>
+<span class="fc" id="L52">        Set&lt;String&gt; disabled = new LinkedHashSet&lt;&gt;(disabledPacks);</span>
+<span class="fc" id="L53">        enabled.add(packId);</span>
+<span class="fc" id="L54">        disabled.remove(packId);</span>
+<span class="fc" id="L55">        return new DiscoveryOptions(profile, engine, learning, enableGeneratedGallery, ruleProfile, enabled, disabled);</span>
+    }
+
+    public DiscoveryOptions disablePack(String packId) {
+<span class="fc" id="L59">        Set&lt;String&gt; enabled = new LinkedHashSet&lt;&gt;(enabledPacks);</span>
+<span class="fc" id="L60">        Set&lt;String&gt; disabled = new LinkedHashSet&lt;&gt;(disabledPacks);</span>
+<span class="fc" id="L61">        disabled.add(packId);</span>
+<span class="fc" id="L62">        enabled.remove(packId);</span>
+<span class="fc" id="L63">        return new DiscoveryOptions(profile, engine, learning, enableGeneratedGallery, ruleProfile, enabled, disabled);</span>
+    }
+
+    public DiscoveryOptions withRuleProfile(RuleProfile ruleProfile) {
+<span class="fc" id="L67">        return new DiscoveryOptions(profile, engine, learning, enableGeneratedGallery, ruleProfile, enabledPacks, disabledPacks);</span>
+    }
+
+    public KnowledgePackSelection knowledgePackSelection() {
+<span class="fc" id="L71">        return new KnowledgePackSelection(ruleProfile, enabledPacks, disabledPacks);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

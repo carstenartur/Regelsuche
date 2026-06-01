@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleProfile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.knowledge</a> &gt; <span class="el_source">RuleProfile.java</span></div><h1>RuleProfile.java</h1><pre class="source lang-java linenums">package de.regelsuche.knowledge;
+
+import java.util.Set;
+
+<span class="fc" id="L5">public enum RuleProfile {</span>
+<span class="fc" id="L6">    CORE(&quot;core&quot;, Set.of(), false),</span>
+<span class="fc" id="L7">    CORE_PLUS_SYMPY_POLYNOMIAL(&quot;core+sympy-polynomial&quot;, Set.of(&quot;sympy-polynomial-basic&quot;), false),</span>
+<span class="fc" id="L8">    EXPLORATORY(&quot;exploratory&quot;, Set.of(&quot;sympy-polynomial-basic&quot;), false),</span>
+<span class="fc" id="L9">    ALL(&quot;all&quot;, Set.of(), true);</span>
+
+    private final String id;
+    private final Set&lt;String&gt; enabledPackIds;
+    private final boolean enableAllPacks;
+
+<span class="fc" id="L15">    RuleProfile(String id, Set&lt;String&gt; enabledPackIds, boolean enableAllPacks) {</span>
+<span class="fc" id="L16">        this.id = id;</span>
+<span class="fc" id="L17">        this.enabledPackIds = Set.copyOf(enabledPackIds);</span>
+<span class="fc" id="L18">        this.enableAllPacks = enableAllPacks;</span>
+<span class="fc" id="L19">    }</span>
+
+    public String id() {
+<span class="nc" id="L22">        return id;</span>
+    }
+
+    public Set&lt;String&gt; enabledPackIds() {
+<span class="fc" id="L26">        return enabledPackIds;</span>
+    }
+
+    public boolean enableAllPacks() {
+<span class="fc" id="L30">        return enableAllPacks;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
