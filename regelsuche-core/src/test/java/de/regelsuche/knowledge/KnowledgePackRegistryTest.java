@@ -181,6 +181,7 @@ class KnowledgePackRegistryTest {
                   - id: default.enabled.rule
                     derivationType: REIMPLEMENTED_RULE
                     status: VALIDATED
+                    searchEffects: [NORMALIZING]
                     rule:
                       from: "?A^2"
                       to: "?A*?A"

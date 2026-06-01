@@ -295,9 +295,10 @@ public final class DiscoveryBenchmarkExecutor {
         right.topSimplificationRules().forEach((key, value) -> simplifyRules.merge(key, value, Long::sum));
         Map<String, Long> convergentNodes = new LinkedHashMap<>(left.topConvergentNodes());
         right.topConvergentNodes().forEach((key, value) -> convergentNodes.merge(key, value, Long::sum));
+        int overlappingStartState = left.statesExplored() > 0 && right.statesExplored() > 0 ? 1 : 0;
         return new SearchSpaceAnalytics(
-                left.statesExplored() + right.statesExplored(),
-                left.uniqueCanonicalStates() + right.uniqueCanonicalStates(),
+                left.statesExplored() + right.statesExplored() - overlappingStartState,
+                left.uniqueCanonicalStates() + right.uniqueCanonicalStates() - overlappingStartState,
                 left.convergentStates() + right.convergentStates(),
                 left.learnedMacroUsage() + right.learnedMacroUsage(),
                 0.0d,

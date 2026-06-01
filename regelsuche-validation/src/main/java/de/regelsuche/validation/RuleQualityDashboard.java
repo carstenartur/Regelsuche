@@ -5,7 +5,7 @@ import java.util.Locale;
 
 public final class RuleQualityDashboard {
     public String renderMarkdown(List<RuleValidationReport> reports) {
-        StringBuilder markdown = new StringBuilder("| Rule | Status | Examples | Counterexamples | Pass rate |\n");
+        StringBuilder markdown = new StringBuilder("| Rule | Result | Examples | Counterexamples | Pass rate |\n");
         markdown.append("| --- | --- | ---: | ---: | ---: |\n");
         for (RuleValidationReport report : reports) {
             markdown.append("| ").append(report.ruleId())

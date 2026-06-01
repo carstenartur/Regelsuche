@@ -9,15 +9,21 @@ import de.regelsuche.transform.RewriteKind;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.JarURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.Enumeration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 public final class DiscoveryBenchmarkScenarioLoader {
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory()).findAndRegisterModules();
@@ -39,21 +45,94 @@ public final class DiscoveryBenchmarkScenarioLoader {
 
     public List<DiscoveryBenchmarkScenario> loadAll(String resourceDirectory) {
         String directory = resourceDirectory.endsWith("/") ? resourceDirectory.substring(0, resourceDirectory.length() - 1) : resourceDirectory;
-        URL url = Thread.currentThread().getContextClassLoader().getResource(directory);
-        if (url == null) {
-            throw new IllegalArgumentException("Scenario directory not found: " + directory);
+        return listScenarioResources(directory).stream()
+                .sorted(Comparator.naturalOrder())
+                .map(resource -> load(directory + "/" + resource))
+                .toList();
+    }
+
+    private List<String> listScenarioResources(String directory) {
+        try {
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+            Enumeration<URL> resources = classLoader.getResources(directory);
+            LinkedHashSet<String> names = new LinkedHashSet<>();
+            while (resources.hasMoreElements()) {
+                URL url = resources.nextElement();
+                if ("jar".equals(url.getProtocol())) {
+                    names.addAll(listFromJar(directory, url));
+                } else {
+                    names.addAll(listFromFile(url, directory));
+                }
+            }
+            if (names.isEmpty() && classLoader instanceof URLClassLoader urlClassLoader) {
+                for (URL url : urlClassLoader.getURLs()) {
+                    if (url.getPath().endsWith(".jar")) {
+                        names.addAll(listFromJarFile(Path.of(url.toURI()), directory));
+                    }
+                }
+            }
+            if (names.isEmpty()) {
+                throw new IllegalArgumentException("Scenario directory not found: " + directory);
+            }
+            return List.copyOf(names);
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
+        } catch (URISyntaxException exception) {
+            throw new IllegalStateException("Unable to list scenario resources for " + directory, exception);
         }
+    }
+
+    private List<String> listFromFile(URL url, String directory) {
         try {
             return Files.list(Path.of(url.toURI()))
                     .filter(path -> path.getFileName().toString().endsWith(".yaml"))
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
-                    .map(path -> load(directory + "/" + path.getFileName()))
+                    .map(path -> path.getFileName().toString())
                     .toList();
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         } catch (URISyntaxException exception) {
             throw new IllegalStateException("Scenario directory is not addressable as a file: " + directory, exception);
         }
+    }
+
+    private List<String> listFromJar(String directory, URL url) throws IOException {
+        JarURLConnection connection = (JarURLConnection) url.openConnection();
+        String entryName = connection.getEntryName() == null ? directory : connection.getEntryName();
+        String prefix = entryName.endsWith("/") ? entryName : entryName + "/";
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        try (JarFile jar = connection.getJarFile()) {
+            Enumeration<JarEntry> entries = jar.entries();
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (!entry.isDirectory() && name.startsWith(prefix) && name.endsWith(".yaml")) {
+                    String relative = name.substring(prefix.length());
+                    if (!relative.contains("/")) {
+                        names.add(relative);
+                    }
+                }
+            }
+        }
+        return List.copyOf(names);
+    }
+
+    private List<String> listFromJarFile(Path jarPath, String directory) throws IOException {
+        String prefix = directory.endsWith("/") ? directory : directory + "/";
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        try (JarFile jar = new JarFile(jarPath.toFile())) {
+            Enumeration<JarEntry> entries = jar.entries();
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (!entry.isDirectory() && name.startsWith(prefix) && name.endsWith(".yaml")) {
+                    String relative = name.substring(prefix.length());
+                    if (!relative.contains("/")) {
+                        names.add(relative);
+                    }
+                }
+            }
+        }
+        return List.copyOf(names);
     }
 
     List<ScenarioRulePack> loadRulePacks(DiscoveryBenchmarkScenario scenario) {

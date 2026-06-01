@@ -22,6 +22,12 @@ class ScenarioDrivenReportTest {
         assertEquals(scenario.targetExpression(), report.targetExpression());
         assertTrue(report.evidence().success(), report.evidence().failureReason());
         assertTrue(report.evidence().reusedMacros().stream().anyMatch(rule -> rule.startsWith("macro_")));
+        long withoutStates = report.evidence().withoutMacroRun().analytics().statesExplored();
+        long withStates = report.evidence().withMacroRun().analytics().statesExplored();
+        long withoutUnique = report.evidence().withoutMacroRun().analytics().uniqueCanonicalStates();
+        long withUnique = report.evidence().withMacroRun().analytics().uniqueCanonicalStates();
+        assertEquals(withoutStates + withStates - 1, report.evidence().analytics().statesExplored());
+        assertEquals(withoutUnique + withUnique - 1, report.evidence().analytics().uniqueCanonicalStates());
     }
 
     @Test

@@ -173,7 +173,7 @@ public class KnowledgePackLoader {
 
     private static List<SearchEffect> searchEffects(RuleYaml rule) {
         return rule.searchEffects == null || rule.searchEffects.isEmpty()
-                ? List.of(SearchEffect.NORMALIZING)
+                ? List.of()
                 : List.copyOf(rule.searchEffects);
     }
 
