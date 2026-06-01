@@ -67,7 +67,7 @@ public final class DiscoveryBenchmarkExecutor {
                         ? run(scenario, new MacroMoveTransformationEngine(
                                 baseEngine,
                                 new GoalAwareMacroMoveSelector(macroLearningRun.inventory()),
-                                scenario.targetExpression(),
+                                null,
                                 macroLearningRun.atomicStepsByRuleId(),
                                 macroLearningRun.learnedMacros().getFirst().assumptions()))
                         : new SearchRun(false, "Macro learning required but no macro was learned", List.of(), List.of(), List.of()))
@@ -215,7 +215,10 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     private int pathPreference(List<String> appliedRuleIds) {
-        return appliedRuleIds.contains("ast_linear_offset_simplify") ? 0 : 1;
+        if (appliedRuleIds.stream().anyMatch(rule -> rule.toLowerCase(Locale.ROOT).contains("macro"))) {
+            return 0;
+        }
+        return appliedRuleIds.contains("ast_linear_offset_simplify") ? 1 : 2;
     }
 
     private SearchRun toRun(SearchState targetState, boolean success, String failureReason) {

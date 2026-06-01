@@ -14,32 +14,25 @@
 
 **Navigation:** [Demo Gallery](docs/demo-gallery.md) ·
 [Discovery Engine](docs/discovery-engine.md) ·
-[Macro Rules](docs/macro-rules.md) ·
-[Recent discovery milestone](#recent-discovery-milestone)
+[Macro Rules](docs/macro-rules.md)
 
 > **Regelsuche macht mathematische Umformungsräume sichtbar.**
 > Knoten sind Ausdrücke, Kanten sind Umformungen, Pfade sind Rechenwege —
 > mit Replay, Proof-Bridge und einem klickbaren Web-Workbench.
 
-## Recent discovery milestone
+## Discovery evidence
 
-<img src="docs/assets/screenshots/search-space-sophie-germain-compact.svg" alt="Compact Sophie-Germain convergence demonstration: a few alternative transformation paths converge on one canonical result." width="760">
+Regelsuche records mathematical transformation searches as replayable evidence.
+Generated examples:
+- Complete-square factorization: bridge discovery + learned macro reuse
+- Sophie-Germain: hidden-structure bridge + learned macro reuse
 
-*A compact, reconstructed search-space subgraph: a handful of alternative rewrite paths
-converge on one canonical result. (The full bounded graph lives in the gallery.)*
+<a href="docs/demo-gallery.md">Open the generated Discovery Gallery</a>
 
-Regelsuche does not only output the factorization.
-It records and replays a bounded slice of the explored transformation space and shows
-which different ideas converge. For `x^4 + 4*y^4`, the reconstructed graph keeps a few
-alternative branches visible while highlighting the selected path through
-`(x^2 + 2*y^2)^2 - (2xy)^2`, the learned macro shortcut, and the shared canonical target.
-
-The picture is a *bounded replay of the explored search space*, not a complete trace:
-some states were originally explored by the search, others are reconstructed for the
-visualization through a bounded expansion (limited by `maxStates` and `maxDepth`).
-
-See the full [Demo Gallery](docs/demo-gallery.md#convergent-discovery-multiple-paths-to-one-result)
-for the larger reconstructed search space and the generated evidence links.
+| Scenario | Bridge | Macro learned | Macro reused | Evidence |
+|---|---:|---:|---:|---|
+| Complete square | yes | yes | yes | [link](docs/generated/discovery/complete-square/evidence.json) |
+| Sophie-Germain | yes | yes | yes | [link](docs/generated/discovery/sophie-germain/evidence.json) |
 
 ## 30 Sekunden (Demo Standard)
 

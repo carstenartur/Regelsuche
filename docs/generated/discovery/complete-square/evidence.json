@@ -1,0 +1,140 @@
+{
+  "generatedBy" : "DocsDiscoveryGalleryGenerator",
+  "scenarioId" : "complete-square-factorization",
+  "inputExpression" : "x ^ 2 + 6 * x + 5",
+  "targetExpression" : "(x + 1) * (x + 5)",
+  "nodeCount" : 4,
+  "edgeCount" : 4,
+  "bridgeRulesUsed" : [ "complete_square_bridge", "ast_square_difference_factor" ],
+  "learnedMacros" : [ "macro_3bbfed5b" ],
+  "reusedMacros" : [ "macro_3bbfed5b" ],
+  "sourceCommit" : "d74c79c66a68bcf23833c6c6d537392abac5a84a",
+  "success" : true,
+  "failureReason" : "",
+  "withoutMacroRun" : {
+    "success" : true,
+    "failureReason" : "",
+    "path" : [ "x ^ 2 + 6 * x + 5", "(x + 3) ^ 2 - 2 ^ 2", "(x + 3 - 2) * (x + 3 + 2)", "(x + 1) * (x + 3 + 2)" ],
+    "appliedRuleIds" : [ "complete_square_bridge", "ast_square_difference_factor", "ast_linear_offset_simplify" ],
+    "analytics" : {
+      "statesExplored" : 4,
+      "uniqueCanonicalStates" : 4,
+      "convergentStates" : 0,
+      "learnedMacroUsage" : 0,
+      "averageBranchingFactor" : 0.0,
+      "ruleUsage" : {
+        "complete_square_bridge" : 1,
+        "ast_square_difference_factor" : 1,
+        "ast_linear_offset_simplify" : 1
+      },
+      "topBridgeRules" : {
+        "complete_square_bridge" : 1
+      },
+      "topFactorizationRules" : {
+        "ast_square_difference_factor" : 1
+      },
+      "topSimplificationRules" : {
+        "ast_linear_offset_simplify" : 1
+      },
+      "topConvergentNodes" : { }
+    }
+  },
+  "withMacroRun" : {
+    "success" : true,
+    "failureReason" : "",
+    "path" : [ "x ^ 2 + 6 * x + 5", "(x + 1) * (x + 3 + 2)" ],
+    "appliedRuleIds" : [ "macro_3bbfed5b" ],
+    "analytics" : {
+      "statesExplored" : 2,
+      "uniqueCanonicalStates" : 2,
+      "convergentStates" : 0,
+      "learnedMacroUsage" : 1,
+      "averageBranchingFactor" : 0.0,
+      "ruleUsage" : {
+        "macro_3bbfed5b" : 1
+      },
+      "topBridgeRules" : { },
+      "topFactorizationRules" : { },
+      "topSimplificationRules" : { },
+      "topConvergentNodes" : { }
+    }
+  },
+  "foundPaths" : [ [ "x ^ 2 + 6 * x + 5", "(x + 3) ^ 2 - 2 ^ 2", "(x + 3 - 2) * (x + 3 + 2)", "(x + 1) * (x + 3 + 2)" ], [ "x ^ 2 + 6 * x + 5", "(x + 1) * (x + 3 + 2)" ] ],
+  "ruleFamiliesUsed" : [ ],
+  "convergentStates" : [ "x^2+6*x+5", "(x+1)*(x+3+2)" ],
+  "analytics" : {
+    "statesExplored" : 5,
+    "uniqueCanonicalStates" : 5,
+    "convergentStates" : 0,
+    "learnedMacroUsage" : 1,
+    "averageBranchingFactor" : 0.0,
+    "ruleUsage" : {
+      "macro_3bbfed5b" : 1,
+      "ast_square_difference_factor" : 1,
+      "complete_square_bridge" : 1,
+      "ast_linear_offset_simplify" : 1
+    },
+    "topBridgeRules" : {
+      "complete_square_bridge" : 1
+    },
+    "topFactorizationRules" : {
+      "ast_square_difference_factor" : 1
+    },
+    "topSimplificationRules" : {
+      "ast_linear_offset_simplify" : 1
+    },
+    "topConvergentNodes" : { }
+  },
+  "validationStatus" : "PASS",
+  "nodes" : [ {
+    "id" : "x^2+6*x+5",
+    "label" : "x ^ 2 + 6 * x + 5",
+    "kind" : "state"
+  }, {
+    "id" : "(x+3)^2-2^2",
+    "label" : "(x + 3) ^ 2 - 2 ^ 2",
+    "kind" : "state"
+  }, {
+    "id" : "(x+3-2)*(x+3+2)",
+    "label" : "(x + 3 - 2) * (x + 3 + 2)",
+    "kind" : "target"
+  }, {
+    "id" : "(x+1)*(x+3+2)",
+    "label" : "(x + 1) * (x + 3 + 2)",
+    "kind" : "target"
+  } ],
+  "edges" : [ {
+    "from" : "x^2+6*x+5",
+    "to" : "(x+3)^2-2^2",
+    "ruleId" : "complete_square_bridge",
+    "kind" : "bridge",
+    "source" : "operator",
+    "packId" : "core",
+    "searchEffect" : [ "BRIDGING" ]
+  }, {
+    "from" : "(x+3)^2-2^2",
+    "to" : "(x+3-2)*(x+3+2)",
+    "ruleId" : "ast_square_difference_factor",
+    "kind" : "bridge",
+    "source" : "core",
+    "packId" : "core",
+    "searchEffect" : [ "FACTORIZING" ]
+  }, {
+    "from" : "(x+3-2)*(x+3+2)",
+    "to" : "(x+1)*(x+3+2)",
+    "ruleId" : "ast_linear_offset_simplify",
+    "kind" : "rule",
+    "source" : "core",
+    "packId" : "core",
+    "searchEffect" : [ "SIMPLIFYING" ]
+  }, {
+    "from" : "x^2+6*x+5",
+    "to" : "(x+1)*(x+3+2)",
+    "ruleId" : "macro_3bbfed5b",
+    "kind" : "macro",
+    "source" : "macro",
+    "packId" : "core",
+    "searchEffect" : [ "NORMALIZING" ]
+  } ],
+  "smallGraphMessage" : "Search produced only 4 visible states under this budget."
+}

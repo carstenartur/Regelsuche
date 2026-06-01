@@ -221,6 +221,15 @@ tasks.register('benchmarkReport', JavaExec) {
         '--quiet'
 }
 
+tasks.register('generateDiscoveryGallery', JavaExec) {
+    description = 'Generates public discovery evidence gallery assets under docs/generated/discovery.'
+    group = 'documentation'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.docs.DocsDiscoveryGalleryGenerator'
+    args rootProject.projectDir.absolutePath
+}
+
 tasks.register('e2eTest', Test) {
     description = 'Browser-driven end-to-end demo flows (Playwright). Use ' +
         '-Pregelsuche.recordDocs=true to refresh docs/assets/{screenshots,videos}.'
