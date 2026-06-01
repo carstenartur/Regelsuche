@@ -13,6 +13,7 @@ import de.regelsuche.mining.GoalAwareMacroMoveSelector;
 import de.regelsuche.mining.MacroMoveTransformationEngine;
 import de.regelsuche.mining.SuccessfulTransformationPath;
 import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.ProofStep;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.SearchSpaceAnalytics;
@@ -25,9 +26,11 @@ import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -66,7 +69,9 @@ public final class DiscoveryBenchmarkExecutor {
                         scenario.targetExpression(),
                         macroLearningRun.atomicStepsByRuleId(),
                         macroLearningRun.learnedMacros().getFirst().assumptions()))
-                : new SearchRun(false, "Macro learning disabled", List.of(), List.of(), List.of());
+                : scenario.expectations().contains(DiscoveryExpectation.CONVERGENCE_REQUIRED)
+                        ? withoutMacro
+                        : new SearchRun(false, "Macro learning disabled", List.of(), List.of(), List.of());
         List<String> bridgeRules = bridgeRules(withoutMacro.appliedRuleIds(), scenario, rulesById);
         List<String> ruleFamilies = ruleFamilies(withoutMacro.appliedRuleIds(), rulesById);
         SearchSpaceAnalytics withoutAnalytics = analyticsFor(withoutMacro.steps(), bridgeRules, rulesById);
@@ -134,6 +139,9 @@ public final class DiscoveryBenchmarkExecutor {
             if (scenario.enabledRulePacks().contains("complete-square")) {
                 ids.add("complete_square_bridge");
             }
+            if (scenario.enabledRulePacks().contains("telescoping")) {
+                ids.add("telescoping_fraction");
+            }
         }
         List<HypothesisOperator> operators = new ArrayList<>();
         for (String id : ids) {
@@ -141,6 +149,8 @@ public final class DiscoveryBenchmarkExecutor {
                 operators.add(new CompleteSquareBridgeOperator());
             } else if ("sophie_germain_bridge".equals(id) || "hidden_structure_bridge".equals(id)) {
                 operators.add(new DifferenceOfSquaresPreparationOperator());
+            } else if ("telescoping_fraction".equals(id)) {
+                operators.add(new TelescopingFractionHypothesisOperator());
             }
         }
         return List.copyOf(operators);
@@ -195,11 +205,16 @@ public final class DiscoveryBenchmarkExecutor {
                 new ExpressionCanonicalizer(),
                 new SearchHeuristic(scenario.budgets().maxDepth(), scenario.budgets().maxStates(), 1, 4, 80, 12));
         String normalizedTarget = normalizeExpression(scenario.targetExpression());
-        return new BestFirstSearchStrategy().search(problem).stream()
+        return new BestFirstSearchStrategy().search(problem.withGoal(TransformationGoal.FACTORIZE)).stream()
                 .filter(state -> state.depth() > 0 && normalizeExpression(state.expression()).equals(normalizedTarget))
+                .sorted(Comparator.comparingInt(state -> pathPreference(state.appliedRuleIds())))
                 .findFirst()
                 .map(state -> toRun(state, true, ""))
                 .orElse(new SearchRun(false, "Target expression was not reached: " + scenario.targetExpression(), List.of(), List.of(), List.of()));
+    }
+
+    private int pathPreference(List<String> appliedRuleIds) {
+        return appliedRuleIds.contains("ast_linear_offset_simplify") ? 0 : 1;
     }
 
     private SearchRun toRun(SearchState targetState, boolean success, String failureReason) {
@@ -221,6 +236,7 @@ public final class DiscoveryBenchmarkExecutor {
                     || ruleId.toLowerCase(Locale.ROOT).contains("bridge")
                     || CompleteSquareBridgeOperator.RULE_ID.equals(ruleId)
                     || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
+                    || TelescopingFractionHypothesisOperator.RULE_ID.equals(ruleId)
                     || (rule != null && rule.effects().contains(SearchEffect.BRIDGING))) {
                 bridgeRules.add(ruleId);
             }
@@ -349,7 +365,9 @@ public final class DiscoveryBenchmarkExecutor {
         if (learnedMacros.contains(ruleId)) {
             return "macro";
         }
-        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId) || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)) {
+        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId)
+                || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
+                || TelescopingFractionHypothesisOperator.RULE_ID.equals(ruleId)) {
             return "operator";
         }
         return rulesById.containsKey(ruleId) ? "scenario-generic" : "core";
@@ -362,7 +380,9 @@ public final class DiscoveryBenchmarkExecutor {
     private Set<SearchEffect> inferredEffects(String ruleId) {
         LinkedHashSet<SearchEffect> effects = new LinkedHashSet<>();
         String lower = ruleId.toLowerCase(Locale.ROOT);
-        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId) || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
+        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId)
+                || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
+                || TelescopingFractionHypothesisOperator.RULE_ID.equals(ruleId)
                 || lower.contains("bridge")) {
             effects.add(SearchEffect.BRIDGING);
         }
@@ -416,7 +436,14 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     private String normalizeExpression(String expression) {
-        return expression == null ? "" : expression.trim().replaceAll("\\s+", " ");
+        if (expression == null) {
+            return "";
+        }
+        try {
+            return new ExpressionCanonicalizer().canonicalize(expression);
+        } catch (IllegalArgumentException exception) {
+            return expression.trim().replaceAll("\\s+", " ");
+        }
     }
 
     private record SearchRun(boolean success, String failureReason, List<String> path, List<String> appliedRuleIds, List<ProofStep> steps) {

@@ -4,14 +4,16 @@ inputExpression: "1 / (n * (n + 1))"
 targetExpression: "1 / n - 1 / (n + 1)"
 expectations:
   - BRIDGE_REQUIRED
+enabledOperators:
+  - telescoping_fraction
 enabledRulePacks:
-  - telescoping
+  - sympy-rational-basic
 requiredBridgeEffects:
   - BRIDGING
 requiredRuleFamilies:
   - telescoping
 requiredBridgeRules:
-  - bridge_telescoping_partial_fraction
+  - hypothesis_telescoping_fraction
 macroLearning:
   enabled: false
 budgets:

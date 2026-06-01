@@ -117,7 +117,7 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
         }
         int candidateSize = canonicalizer.astNodeCount(formatted);
         int growth = candidateSize - originalSize;
-        String key = canonicalizer.stableHash(formatted);
+        String key = formatted;
         candidates.putIfAbsent(key, new ScoredCandidate(growth + candidateSize, new Transformation(
             RULE_ID,
             formatted,

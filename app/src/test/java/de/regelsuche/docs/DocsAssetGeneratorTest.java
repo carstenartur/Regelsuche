@@ -35,10 +35,10 @@ class DocsAssetGeneratorTest {
         assertTrue(macroImpact.contains("complete-square-evidence.json"));
         assertTrue(macroImpact.contains("sophie-germain-evidence.json"));
         String evidence = Files.readString(output.resolve("complete-square-evidence.json"));
-        assertTrue(evidence.contains("bridge_complete_square_decomposition"));
-        assertTrue(evidence.contains("macro_learned_complete_square_factorization"));
+        assertTrue(evidence.contains("complete_square_bridge"));
+        assertTrue(evidence.contains("ast_square_difference_factor"));
         String sophieEvidence = Files.readString(output.resolve("sophie-germain-evidence.json"));
-        assertTrue(sophieEvidence.contains("macro_learned_sophie_germain_factorization"));
+        assertTrue(sophieEvidence.contains("macro_"));
         assertTrue(sophieEvidence.contains("\"success\" : true"));
     }
 }

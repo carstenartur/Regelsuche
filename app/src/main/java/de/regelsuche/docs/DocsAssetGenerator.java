@@ -43,11 +43,15 @@ public final class DocsAssetGenerator {
         for (MacroImpactReport report : reports) {
             String evidenceFile = evidenceFileName(report.scenarioId());
             String svgFile = scenarioAssetName(report.scenarioId()) + ".svg";
-            Files.writeString(gallery.resolve(svgFile), svgWriter.write(report.evidence(), "../" + evidenceFile), StandardCharsets.UTF_8);
             sections.append("<section><h2>").append(escapeHtml(report.caseName())).append("</h2>")
-                    .append("<p>Evidence: <a href=\"../").append(evidenceFile).append("\">").append(evidenceFile).append("</a></p>")
-                    .append("<img src=\"").append(svgFile).append("\" alt=\"").append(escapeHtml(report.caseName())).append(" evidence graph\">")
-                    .append("</section>\n");
+                    .append("<p>Evidence: <a href=\"../").append(evidenceFile).append("\">").append(evidenceFile).append("</a></p>");
+            if (eligibleForGallery(report.evidence())) {
+                Files.writeString(gallery.resolve(svgFile), svgWriter.write(report.evidence(), "../" + evidenceFile), StandardCharsets.UTF_8);
+                sections.append("<img src=\"").append(svgFile).append("\" alt=\"").append(escapeHtml(report.caseName())).append(" evidence graph\">");
+            } else {
+                sections.append("<p class=\"validation-failed\">Evidence validation failed; SVG was not generated.</p>");
+            }
+            sections.append("</section>\n");
         }
         String html = """
                 <!doctype html>
@@ -59,6 +63,13 @@ public final class DocsAssetGenerator {
                 </body></html>
                 """.replace("${sections}", sections.toString()).replace("${metrics}", metricsTable(reports));
         Files.writeString(gallery.resolve("index.html"), html, StandardCharsets.UTF_8);
+    }
+
+    private boolean eligibleForGallery(DiscoveryBenchmarkEvidence evidence) {
+        return evidence.success()
+                && !evidence.bridgeRulesUsed().isEmpty()
+                && (evidence.learnedMacros().isEmpty() || !evidence.reusedMacros().isEmpty())
+                && evidence.edges().stream().noneMatch(edge -> edge.source().equals("hardcoded") || edge.source().equals("scenario"));
     }
 
     private String metricsTable(List<MacroImpactReport> reports) {

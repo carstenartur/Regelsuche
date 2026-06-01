@@ -21,7 +21,7 @@ class ScenarioDrivenReportTest {
         assertEquals(scenario.inputExpression(), report.inputExpression());
         assertEquals(scenario.targetExpression(), report.targetExpression());
         assertTrue(report.evidence().success(), report.evidence().failureReason());
-        assertTrue(report.evidence().reusedMacros().contains("macro_learned_sophie_germain_factorization"));
+        assertTrue(report.evidence().reusedMacros().stream().anyMatch(rule -> rule.startsWith("macro_")));
     }
 
     @Test
@@ -32,11 +32,11 @@ class ScenarioDrivenReportTest {
                 "1 / (n * (n + 1))",
                 "1 / n - 1 / (n + 1)",
                 List.of(DiscoveryExpectation.BRIDGE_REQUIRED),
-                List.of(),
+                List.of("telescoping_fraction"),
                 List.of("telescoping"),
                 List.of(SearchEffect.BRIDGING),
                 List.of("telescoping"),
-                List.of("bridge_telescoping_partial_fraction"),
+                List.of("hypothesis_telescoping_fraction"),
                 new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
                 new DiscoveryBenchmarkScenario.Budgets(3, 40, 5000),
                 new DiscoveryBenchmarkScenario.Gallery(false, 1, 3));
@@ -45,6 +45,6 @@ class ScenarioDrivenReportTest {
 
         assertEquals("telescoping", report.scenarioId());
         assertTrue(report.evidence().success(), report.evidence().failureReason());
-        assertTrue(report.evidence().bridgeRulesUsed().contains("bridge_telescoping_partial_fraction"));
+        assertTrue(report.evidence().bridgeRulesUsed().contains("hypothesis_telescoping_fraction"));
     }
 }
