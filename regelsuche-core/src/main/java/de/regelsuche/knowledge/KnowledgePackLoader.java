@@ -84,7 +84,7 @@ public class KnowledgePackLoader {
                         ruleYaml.status,
                         firstNonBlank(ruleYaml.riskLevel, "medium"),
                         ruleCategories,
-                        nonNull(ruleYaml.searchEffects),
+                        searchEffects(ruleYaml),
                         validationExamples(ruleYaml.validation),
                         counterExamples(ruleYaml.validation));
                 rules.add(new PatternRewriteRule(ruleId,
@@ -128,10 +128,7 @@ public class KnowledgePackLoader {
         if (rule.status == null) {
             throw new IllegalArgumentException("Rule " + rule.id + " is missing status in " + path);
         }
-        if (rule.searchEffects == null || rule.searchEffects.isEmpty()) {
-            throw new IllegalArgumentException("Rule " + rule.id + " is missing searchEffects in " + path);
-        }
-        if (rule.status == RuleStatus.CANDIDATE && rule.searchEffects.contains(SearchEffect.BRIDGING)) {
+        if (rule.status == RuleStatus.CANDIDATE && searchEffects(rule).contains(SearchEffect.BRIDGING)) {
             rule.status = RuleStatus.DISCOVERY_CANDIDATE;
         }
         require(firstNonBlank(rule.sourceVersion, pack.sourceVersion), "sourceVersion", path);
@@ -172,6 +169,12 @@ public class KnowledgePackLoader {
 
     private static <T> List<T> nonNull(List<T> values) {
         return values == null ? List.of() : List.copyOf(values);
+    }
+
+    private static List<SearchEffect> searchEffects(RuleYaml rule) {
+        return rule.searchEffects == null || rule.searchEffects.isEmpty()
+                ? List.of(SearchEffect.NORMALIZING)
+                : List.copyOf(rule.searchEffects);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.Set;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class BridgeAnalyticsTest {
     @Test
@@ -18,6 +18,6 @@ class BridgeAnalyticsTest {
                         "Complete Square", Set.of(SearchEffect.BRIDGING),
                         "sin²+cos²", Set.of(SearchEffect.SIMPLIFYING)));
 
-        assertThat(usage).containsExactly(Map.entry("Sophie-Germain", 7L), Map.entry("Complete Square", 3L));
+        assertEquals(Map.of("Sophie-Germain", 7L, "Complete Square", 3L), usage);
     }
 }

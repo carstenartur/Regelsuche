@@ -5,7 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MacroImpactBenchmarkTest {
     @Test
@@ -25,8 +26,8 @@ class MacroImpactBenchmarkTest {
                 Set.of("macro_sophie"),
                 Set.of("macro_sophie")));
 
-        assertThat(withoutMacro.bridgeCount()).isEqualTo(1);
-        assertThat(withMacro.macroReuseCount()).isEqualTo(1);
-        assertThat(withMacro.statesExplored()).isLessThan(withoutMacro.statesExplored());
+        assertEquals(1, withoutMacro.bridgeCount());
+        assertEquals(1, withMacro.macroReuseCount());
+        assertTrue(withMacro.statesExplored() < withoutMacro.statesExplored());
     }
 }

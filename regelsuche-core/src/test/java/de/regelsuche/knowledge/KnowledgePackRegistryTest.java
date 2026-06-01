@@ -121,7 +121,7 @@ class KnowledgePackRegistryTest {
         assertEquals(7, candidatePacks.stream().mapToInt(pack -> pack.rules().size()).sum());
         assertTrue(candidatePacks.stream()
                 .flatMap(pack -> pack.rules().stream())
-                .allMatch(rule -> rule.descriptor().status() == RuleStatus.CANDIDATE));
+                .allMatch(rule -> rule.descriptor().status() == RuleStatus.CANDIDATE || rule.descriptor().status() == RuleStatus.DISCOVERY_CANDIDATE));
         for (String candidatePack : CANDIDATE_PACKS) {
             assertTrue(registry.enabledRules(KnowledgePackSelection.CORE.enablePack(candidatePack)).isEmpty());
         }

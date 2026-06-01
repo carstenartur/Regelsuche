@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DiscoveryExpectationTest {
     @Test
@@ -22,8 +24,8 @@ class DiscoveryExpectationTest {
 
         DiscoveryBenchmarkResult result = new DiscoveryBenchmarkRunner().run(benchmark);
 
-        assertThat(result.success()).isFalse();
-        assertThat(result.bridgeCount()).isZero();
+        assertFalse(result.success());
+        assertEquals(0, result.bridgeCount());
     }
 
     @Test
@@ -45,9 +47,9 @@ class DiscoveryExpectationTest {
 
         DiscoveryBenchmarkResult result = new DiscoveryBenchmarkRunner().run(benchmark);
 
-        assertThat(result.success()).isTrue();
-        assertThat(result.bridgeRules()).containsExactly("sophie_germain_bridge");
-        assertThat(result.macroReuseCount()).isEqualTo(1);
+        assertTrue(result.success());
+        assertEquals(List.of("sophie_germain_bridge"), result.bridgeRules());
+        assertEquals(1, result.macroReuseCount());
     }
 
     @Test
@@ -62,6 +64,6 @@ class DiscoveryExpectationTest {
                 Set.of(),
                 Set.of());
 
-        assertThat(new DiscoveryBenchmarkRunner().run(benchmark).success()).isTrue();
+        assertTrue(new DiscoveryBenchmarkRunner().run(benchmark).success());
     }
 }

@@ -2,7 +2,7 @@ package de.regelsuche.docs;
 
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MacroImpactReportGeneratorTest {
     @Test
@@ -10,7 +10,9 @@ class MacroImpactReportGeneratorTest {
         MacroImpactReport report = new MacroImpactReportGenerator().generate();
         String text = new MacroImpactReportGenerator().renderText(report);
 
-        assertThat(report.improvementFactor()).isGreaterThan(1.0);
-        assertThat(text).contains("Without macro: 82 states", "Bridge discovered: yes", "Macro reused: yes");
+        assertTrue(report.improvementFactor() > 1.0);
+        assertTrue(text.contains("Without macro: 82 states"));
+        assertTrue(text.contains("Bridge discovered: yes"));
+        assertTrue(text.contains("Macro reused: yes"));
     }
 }

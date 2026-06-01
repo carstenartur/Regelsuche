@@ -67,11 +67,11 @@ public final class DocsAssetGenerator {
                 <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"860\" height=\"300\">
                   <rect width=\"100%\" height=\"100%\" fill=\"#f8fafc\"/>
                   <defs><marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"10\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L9,3 z\" fill=\"#475569\"/></marker></defs>
-                  %s
-                  %s
+                  ${edges}
+                  ${nodes}
                   <text x=\"40\" y=\"280\" font-size=\"12\">Bridge rules: amber · Macro rules: purple · Target: green</text>
                 </svg>
-                """.formatted(edges, nodes);
+                """.replace("${edges}", edges.toString()).replace("${nodes}", nodes.toString());
     }
 
     private void writeMacroImpact(Path path) throws IOException {
