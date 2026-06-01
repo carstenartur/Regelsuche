@@ -1300,8 +1300,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1300">            level = de.regelsuche.didactic.DifficultyLevel.valueOf(</span>
 <span class="fc" id="L1301">                difficulty.toUpperCase(Locale.ROOT));</span>
 <span class="fc" id="L1302">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L1303">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
-<span class="nc" id="L1304">            return;</span>
+<span class="fc" id="L1303">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
+<span class="fc" id="L1304">            return;</span>
 <span class="fc" id="L1305">        }</span>
 <span class="fc" id="L1306">        de.regelsuche.didactic.StudentStepValidator.Result result =</span>
 <span class="fc" id="L1307">            didacticStepValidator.validate(currentExpression, studentStep, level);</span>
@@ -1433,8 +1433,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1433">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1434">            .findFirst();</span>
 <span class="fc bfc" id="L1435" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="nc" id="L1436">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="nc" id="L1437">            return;</span>
+<span class="fc" id="L1436">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="fc" id="L1437">            return;</span>
         }
 <span class="fc" id="L1439">        var derivation = match.get();</span>
 <span class="fc" id="L1440">        JsonWriter writer = new JsonWriter();</span>
