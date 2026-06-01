@@ -6,13 +6,18 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import de.regelsuche.transform.PatternRewriteRule;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
@@ -27,6 +32,14 @@ public class KnowledgePackLoader {
                 URL resource = resources.nextElement();
                 if ("file".equals(resource.getProtocol())) {
                     packs.addAll(loadAll(Path.of(resource.toURI())));
+                } else if ("jar".equals(resource.getProtocol())) {
+                    URI jarUri = resource.toURI();
+                    try (FileSystem jarFs = FileSystems.newFileSystem(jarUri, Map.of())) {
+                        String spec = jarUri.getSchemeSpecificPart();
+                        int bang = spec.lastIndexOf('!');
+                        String entryPath = bang >= 0 ? spec.substring(bang + 1) : "/rules/packs";
+                        packs.addAll(loadAll(jarFs.getPath(entryPath)));
+                    }
                 }
             }
         } catch (IOException | URISyntaxException ex) {
@@ -51,8 +64,8 @@ public class KnowledgePackLoader {
     }
 
     public KnowledgePack load(Path path) {
-        try {
-            PackYaml yaml = YAML.readValue(path.toFile(), PackYaml.class);
+        try (InputStream in = Files.newInputStream(path)) {
+            PackYaml yaml = YAML.readValue(in, PackYaml.class);
             validatePack(yaml, path);
             List<String> packCategories = nonNull(yaml.categories);
             List<PatternRewriteRule> rules = new ArrayList<>();

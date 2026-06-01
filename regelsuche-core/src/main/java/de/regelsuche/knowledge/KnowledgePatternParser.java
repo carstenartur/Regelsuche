@@ -34,28 +34,28 @@ final class KnowledgePatternParser {
     }
 
     private PatternExpr parseTerm() {
-        PatternExpr expr = parsePower();
+        PatternExpr expr = parseUnary();
         while (match('*') || match('/')) {
             char op = input.charAt(pos - 1);
-            PatternExpr right = parsePower();
+            PatternExpr right = parseUnary();
             expr = PatternExpr.op(op == '*' ? BinaryOperator.MUL : BinaryOperator.DIV, expr, right);
-        }
-        return expr;
-    }
-
-    private PatternExpr parsePower() {
-        PatternExpr expr = parseUnary();
-        while (match('^')) {
-            expr = PatternExpr.op(BinaryOperator.POW, expr, parseUnary());
         }
         return expr;
     }
 
     private PatternExpr parseUnary() {
         if (match('-')) {
-            return PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(-1), parseUnary());
+            return PatternExpr.op(BinaryOperator.SUB, PatternExpr.num(0), parseUnary());
         }
-        return parsePrimary();
+        return parsePower();
+    }
+
+    private PatternExpr parsePower() {
+        PatternExpr expr = parsePrimary();
+        if (match('^')) {
+            return PatternExpr.op(BinaryOperator.POW, expr, parseUnary());
+        }
+        return expr;
     }
 
     private PatternExpr parsePrimary() {
