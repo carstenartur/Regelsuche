@@ -24,6 +24,7 @@ import de.regelsuche.mining.RuleDiscoveryService;
 import de.regelsuche.notify.ConsoleNotifier;
 import de.regelsuche.plugin.PluginRuntime;
 import de.regelsuche.plugin.PluginRuntimeConfig;
+import de.regelsuche.plugin.PluginExtensionRegistry;
 import de.regelsuche.plugin.RuleFileParseException;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
@@ -258,6 +259,13 @@ public class CliRouter {
                             .forEach(macro -> out.println("macro " + macro.id() + " (" + macro.source() + ", "
                                 + (macro.enabled() ? "enabled" : "disabled") + ")"));
                     }
+                    printExtensions("search-strategy", runtime.searchStrategyRegistry().registrations());
+                    printExtensions("heuristic", runtime.heuristicRegistry().registrations());
+                    printExtensions("cost-function", runtime.costFunctionRegistry().registrations());
+                    printExtensions("renderer", runtime.rendererRegistry().registrations());
+                    printExtensions("explanation", runtime.explanationRegistry().registrations());
+                    printExtensions("parser-extension", runtime.parserExtensionRegistry().registrations());
+                    printExtensions("example", runtime.exampleRegistry().registrations());
                     runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
                     return 0;
                 }
@@ -435,6 +443,14 @@ public class CliRouter {
                 return 1;
             }
         }
+    }
+
+    private void printExtensions(
+        String type,
+        java.util.List<? extends PluginExtensionRegistry.ExtensionRegistration<?>> registrations
+    ) {
+        registrations.forEach(registration -> out.println(type + " " + registration.id() + " ("
+            + registration.source() + ", " + (registration.enabled() ? "enabled" : "disabled") + ")"));
     }
 
     private int runBenchmark(String[] args) {

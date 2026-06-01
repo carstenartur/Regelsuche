@@ -117,6 +117,20 @@ class PluginCliRouterTest {
         assertTrue(output.toString().contains("rule blocked_rule"), output::toString);
         assertTrue(output.toString().contains("blocked_rule") && output.toString().contains("disabled"), output::toString);
         assertTrue(output.toString().contains("macro blocked_macro") && output.toString().contains("disabled"), output::toString);
+        assertTrue(output.toString().contains("search-strategy binomial-guided-search")
+            && output.toString().contains("disabled"), output::toString);
+        assertTrue(output.toString().contains("heuristic binomial-pattern-heuristic")
+            && output.toString().contains("disabled"), output::toString);
+        assertTrue(output.toString().contains("cost-function binomial-cost-delta")
+            && output.toString().contains("disabled"), output::toString);
+        assertTrue(output.toString().contains("renderer binomial-text-renderer")
+            && output.toString().contains("disabled"), output::toString);
+        assertTrue(output.toString().contains("explanation binomial-explanations")
+            && output.toString().contains("disabled"), output::toString);
+        assertTrue(output.toString().contains("parser-extension unicode-square-parser")
+            && output.toString().contains("disabled"), output::toString);
+        assertTrue(output.toString().contains("example binomial-examples")
+            && output.toString().contains("disabled"), output::toString);
     }
 
     @Test

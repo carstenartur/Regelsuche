@@ -393,6 +393,13 @@ public final class PluginRuntime implements AutoCloseable {
                 macroRegistry.disable(registration.id());
             }
         }
+        applyProfileToExtensions(profile, searchStrategyRegistry);
+        applyProfileToExtensions(profile, heuristicRegistry);
+        applyProfileToExtensions(profile, costFunctionRegistry);
+        applyProfileToExtensions(profile, rendererRegistry);
+        applyProfileToExtensions(profile, explanationRegistry);
+        applyProfileToExtensions(profile, parserExtensionRegistry);
+        applyProfileToExtensions(profile, exampleRegistry);
         for (String conflict : profile.conflictingIds()) {
             discoveredDiagnostics.add(new RuntimeDiagnostic(
                 "profile:" + activeProfile,
@@ -403,6 +410,17 @@ public final class PluginRuntime implements AutoCloseable {
             "profile:" + activeProfile,
             "Activation profile '" + activeProfile + "' applied"
         ));
+    }
+
+    private <T extends PluginExtension> void applyProfileToExtensions(
+        RuleProfile profile,
+        PluginExtensionRegistry<T> registry
+    ) {
+        for (PluginExtensionRegistry.ExtensionRegistration<T> registration : registry.registrations()) {
+            if (registration.enabled() && !profile.includes(registration.id(), registration.extension().tags())) {
+                registry.disable(registration.id());
+            }
+        }
     }
 
     private List<PatternTransformation> buildMacroTransformations(List<RuntimeDiagnostic> discoveredDiagnostics) {

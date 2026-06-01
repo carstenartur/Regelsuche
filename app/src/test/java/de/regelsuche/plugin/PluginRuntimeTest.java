@@ -358,6 +358,41 @@ class PluginRuntimeTest {
     }
 
     @Test
+    void activeProfileFiltersAllPluginExtensionRegistries(@TempDir Path tempDir) throws Exception {
+        Path rulesDir = tempDir.resolve("rules");
+        Files.createDirectories(rulesDir);
+        Files.writeString(rulesDir.resolve("profiles.regelsuche"), """
+            profile school_algebra:
+              enable_tags:
+                - algebra
+            """);
+
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            rulesDir,
+            true,
+            Set.of(),
+            Set.of(),
+            "school_algebra"
+        ))) {
+            assertTrue(runtime.searchStrategyRegistry().registrations().stream()
+                .anyMatch(strategy -> strategy.id().equals("binomial-guided-search") && !strategy.enabled()));
+            assertTrue(runtime.heuristicRegistry().registrations().stream()
+                .anyMatch(heuristic -> heuristic.id().equals("binomial-pattern-heuristic") && !heuristic.enabled()));
+            assertTrue(runtime.costFunctionRegistry().registrations().stream()
+                .anyMatch(costFunction -> costFunction.id().equals("binomial-cost-delta") && !costFunction.enabled()));
+            assertTrue(runtime.rendererRegistry().registrations().stream()
+                .anyMatch(renderer -> renderer.id().equals("binomial-text-renderer") && !renderer.enabled()));
+            assertTrue(runtime.explanationRegistry().registrations().stream()
+                .anyMatch(explanation -> explanation.id().equals("binomial-explanations") && !explanation.enabled()));
+            assertTrue(runtime.parserExtensionRegistry().registrations().stream()
+                .anyMatch(parser -> parser.id().equals("unicode-square-parser") && !parser.enabled()));
+            assertTrue(runtime.exampleRegistry().registrations().stream()
+                .anyMatch(examples -> examples.id().equals("binomial-examples") && !examples.enabled()));
+        }
+    }
+
+    @Test
     void unknownActiveProfileIsReportedAsDiagnostic(@TempDir Path tempDir) {
         try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
             tempDir.resolve("plugins"),
