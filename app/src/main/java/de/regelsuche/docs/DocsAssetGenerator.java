@@ -82,6 +82,7 @@ public final class DocsAssetGenerator {
 
     private List<SvgNode> bridgeAnalysisNodes(MacroImpactReport report) {
         List<SvgNode> nodes = new ArrayList<>();
+        nodes.add(new SvgNode("case: " + report.caseName(), "state"));
         nodes.add(new SvgNode("input: " + report.inputExpression(), "state"));
         nodes.add(new SvgNode("without states: " + report.withoutMacroAnalytics().statesExplored(), "state"));
         report.withoutMacroBenchmark().bridgeRules()
@@ -101,6 +102,9 @@ public final class DocsAssetGenerator {
     private void writeMacroImpact(Path path, MacroImpactReport report) throws IOException {
         String json = """
                 {
+                  "caseName": "%s",
+                  "inputExpression": "%s",
+                  "targetExpression": "%s",
                   "withoutMacroStates": %d,
                   "withMacroStates": %d,
                   "pathsExplored": %d,
@@ -108,12 +112,38 @@ public final class DocsAssetGenerator {
                   "bridgeUsage": %d,
                   "bridgeDiscovered": %s,
                   "macroReused": %s,
-                  "improvementFactor": %.2f
+                  "improvementFactor": %.2f,
+                  "withoutMacroPath": %s,
+                  "withMacroPath": %s,
+                  "bridgeRules": %s,
+                  "macroRules": %s
                 }
-                """.formatted(report.withoutMacroStates(), report.withMacroStates(), report.pathsExplored(),
+                """.formatted(escapeJson(report.caseName()), escapeJson(report.inputExpression()),
+                escapeJson(report.targetExpression()), report.withoutMacroStates(), report.withMacroStates(), report.pathsExplored(),
                 report.convergenceCount(), report.bridgeUsage(), report.bridgeDiscovered(), report.macroReused(),
-                report.improvementFactor());
+                report.improvementFactor(), jsonArray(report.withoutMacroPath()), jsonArray(report.withMacroPath()),
+                jsonArray(report.withoutMacroBenchmark().bridgeRules()), jsonArray(report.withMacroAnalytics().ruleUsage().keySet()
+                        .stream()
+                        .filter(rule -> rule.toLowerCase(Locale.ROOT).contains("macro"))
+                        .toList()));
         Files.writeString(path, json, StandardCharsets.UTF_8);
+    }
+
+    private String jsonArray(Iterable<String> values) {
+        StringBuilder builder = new StringBuilder("[");
+        boolean first = true;
+        for (String value : values) {
+            if (!first) {
+                builder.append(", ");
+            }
+            builder.append('"').append(escapeJson(value)).append('"');
+            first = false;
+        }
+        return builder.append(']').toString();
+    }
+
+    private String escapeJson(String text) {
+        return text.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private record SvgNode(String label, String kind) {

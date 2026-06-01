@@ -19,6 +19,7 @@ class DocsAssetGeneratorTest {
         assertTrue(Files.readString(gallery.resolve("index.html")).contains("bridge-analysis.svg"));
         String svg = Files.readString(gallery.resolve("bridge-analysis.svg"));
         MacroImpactReport report = new MacroImpactReportGenerator().generate();
+        assertTrue(svg.contains("case: " + report.caseName()));
         assertTrue(report.withoutMacroBenchmark().bridgeRules().stream().anyMatch(svg::contains));
         assertTrue(report.withMacroAnalytics().ruleUsage().keySet().stream()
                 .filter(rule -> rule.contains("macro"))
@@ -26,6 +27,12 @@ class DocsAssetGeneratorTest {
         assertTrue(svg.contains("without states: " + report.withoutMacroAnalytics().statesExplored()));
         assertTrue(svg.contains("target: " + report.targetExpression()));
         String macroImpact = Files.readString(output.resolve("macro-impact.json"));
+        assertTrue(macroImpact.contains("\"caseName\": \"complete-square factorization\""));
+        assertTrue(macroImpact.contains("\"inputExpression\": \"x ^ 2 + 6 * x + 5\""));
+        assertTrue(macroImpact.contains("\"withoutMacroPath\""));
+        assertTrue(macroImpact.contains("\"withMacroPath\""));
+        assertTrue(macroImpact.contains("bridge_complete_square_decomposition"));
+        assertTrue(macroImpact.contains("macro_learned_complete_square_factorization"));
         assertTrue(macroImpact.contains("bridgeDiscovered"));
         assertTrue(macroImpact.contains("macroReused"));
     }

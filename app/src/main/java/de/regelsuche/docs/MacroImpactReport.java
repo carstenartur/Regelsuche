@@ -5,6 +5,7 @@ import de.regelsuche.search.SearchSpaceAnalytics;
 import java.util.List;
 
 public record MacroImpactReport(
+        String caseName,
         int withoutMacroStates,
         int withMacroStates,
         int pathsExplored,

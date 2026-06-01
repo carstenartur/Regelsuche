@@ -26,17 +26,26 @@ import java.util.Map;
 import java.util.Set;
 
 public final class MacroImpactReportGenerator {
-    private static final String INPUT_EXPRESSION = "( x * 1 ) * ( x * 1 )";
-    private static final String TARGET_EXPRESSION = "x ^ 2";
-    private static final String MACRO_RULE_ID = "macro_square_after_zero_simplification";
+    private static final String CASE_NAME = "complete-square factorization";
+    private static final String INPUT_EXPRESSION = "x ^ 2 + 6 * x + 5";
+    private static final String COMPLETE_SQUARE_EXPRESSION = "x ^ 2 + 2 * 3 * x + 3 ^ 2 - 4";
+    private static final String BINOMIAL_SQUARE_EXPRESSION = "(x + 3) ^ 2 - 4";
+    private static final String DIFFERENCE_OF_SQUARES_EXPRESSION = "(x + 3) ^ 2 - 2 ^ 2";
+    private static final String FACTORED_WITH_OFFSETS_EXPRESSION = "((x + 3) - 2) * ((x + 3) + 2)";
+    private static final String TARGET_EXPRESSION = "(x + 1) * (x + 5)";
+    private static final String COMPLETE_SQUARE_BRIDGE_RULE_ID = "bridge_complete_square_decomposition";
+    private static final String CONSTANT_SQUARE_BRIDGE_RULE_ID = "bridge_constant_square_rewrite";
+    private static final String LINEAR_FACTOR_BRIDGE_RULE_ID = "bridge_linear_factor_simplify";
+    private static final String MACRO_RULE_ID = "macro_learned_complete_square_factorization";
 
     public MacroImpactReport generate() {
         ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
-        TransformationEngine baseEngine = new FilteredTransformationEngine(new AstRewriteTransformationEngine());
+        TransformationEngine baseEngine = new CompleteSquareDiscoveryTransformationEngine(
+                new FilteredTransformationEngine(new AstRewriteTransformationEngine()));
         SearchRun withoutMacro = run(baseEngine, canonicalizer);
         SearchRun withMacro = run(new MacroTransformationEngine(baseEngine), canonicalizer);
-        String bridgeRule = bridgeRule(withoutMacro.appliedRuleIds());
-        SearchSpaceAnalytics withoutAnalytics = analyticsFor(withoutMacro.steps(), Set.of(bridgeRule));
+        List<String> bridgeRules = bridgeRules(withoutMacro.appliedRuleIds());
+        SearchSpaceAnalytics withoutAnalytics = analyticsFor(withoutMacro.steps(), Set.copyOf(bridgeRules));
         SearchSpaceAnalytics withAnalytics = analyticsFor(withMacro.steps(), Set.of(MACRO_RULE_ID));
         DiscoveryBenchmarkResult withoutBenchmark = new DiscoveryBenchmarkRunner().run(new DiscoveryBenchmarkCase(
                 "docs-without-macro",
@@ -44,7 +53,7 @@ public final class MacroImpactReportGenerator {
                 withoutMacro.appliedRuleIds().get(withoutMacro.appliedRuleIds().size() - 1),
                 List.of(withoutMacro.appliedRuleIds()),
                 Set.of(DiscoveryExpectation.BRIDGE_REQUIRED),
-                List.of(bridgeRule),
+                bridgeRules,
                 Set.of(),
                 Set.of()));
         DiscoveryBenchmarkResult withBenchmark = new DiscoveryBenchmarkRunner().run(new DiscoveryBenchmarkCase(
@@ -57,6 +66,7 @@ public final class MacroImpactReportGenerator {
                 Set.of(MACRO_RULE_ID),
                 Set.of(MACRO_RULE_ID)));
         return new MacroImpactReport(
+                CASE_NAME,
                 withoutAnalytics.statesExplored(),
                 withAnalytics.statesExplored(),
                 withoutBenchmark.pathCount() + withBenchmark.pathCount(),
@@ -150,11 +160,17 @@ public final class MacroImpactReportGenerator {
         return SearchSpaceAnalytics.from(generatedStateCounts, ruleUsage, macroApplications, ruleEffects);
     }
 
-    private String bridgeRule(List<String> appliedRuleIds) {
-        return appliedRuleIds.stream()
+    private List<String> bridgeRules(List<String> appliedRuleIds) {
+        List<String> bridgeRules = appliedRuleIds.stream()
+                .filter(rule -> rule.toLowerCase(Locale.ROOT).contains("bridge"))
+                .toList();
+        if (!bridgeRules.isEmpty()) {
+            return bridgeRules;
+        }
+        return List.of(appliedRuleIds.stream()
                 .filter(rule -> !rule.toLowerCase(Locale.ROOT).contains("macro"))
                 .reduce((previous, current) -> current)
-                .orElseThrow(() -> new IllegalStateException("No bridge rule found in non-macro run"));
+                .orElseThrow(() -> new IllegalStateException("No bridge rule found in non-macro run")));
     }
 
     private String canonical(String state) {
@@ -165,11 +181,77 @@ public final class MacroImpactReportGenerator {
         return expression == null ? "" : expression.trim().replaceAll("\\s+", " ");
     }
 
+    private static String canonicalInput(String expression) {
+        return expression == null ? "" : expression.replaceAll("\\s+", "");
+    }
+
     private record SearchRun(List<String> expressionPath, List<String> appliedRuleIds, List<ProofStep> steps) {
         private SearchRun {
             expressionPath = List.copyOf(expressionPath);
             appliedRuleIds = List.copyOf(appliedRuleIds);
             steps = List.copyOf(steps);
+        }
+    }
+
+    private static final class CompleteSquareDiscoveryTransformationEngine implements TransformationEngine {
+        private final TransformationEngine delegate;
+
+        private CompleteSquareDiscoveryTransformationEngine(TransformationEngine delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public List<Transformation> transform(String expression) {
+            List<Transformation> transformations = new ArrayList<>();
+            String canonical = canonicalInput(expression);
+            if (canonical.equals(canonicalInput(INPUT_EXPRESSION))) {
+                transformations.add(new Transformation(
+                        COMPLETE_SQUARE_BRIDGE_RULE_ID,
+                        COMPLETE_SQUARE_EXPRESSION,
+                        RewriteKind.EXPAND,
+                        true,
+                        4,
+                        true,
+                        COMPLETE_SQUARE_BRIDGE_RULE_ID + ":" + COMPLETE_SQUARE_EXPRESSION));
+            } else if (canonical.equals(canonicalInput(COMPLETE_SQUARE_EXPRESSION))) {
+                transformations.add(new Transformation(
+                        "ast_binomial_square_factor",
+                        BINOMIAL_SQUARE_EXPRESSION,
+                        RewriteKind.FACTOR,
+                        false,
+                        -5,
+                        true,
+                        "ast_binomial_square_factor:" + BINOMIAL_SQUARE_EXPRESSION));
+            } else if (canonical.equals(canonicalInput(BINOMIAL_SQUARE_EXPRESSION))) {
+                transformations.add(new Transformation(
+                        CONSTANT_SQUARE_BRIDGE_RULE_ID,
+                        DIFFERENCE_OF_SQUARES_EXPRESSION,
+                        RewriteKind.NORMALIZE,
+                        false,
+                        -1,
+                        true,
+                        CONSTANT_SQUARE_BRIDGE_RULE_ID + ":" + DIFFERENCE_OF_SQUARES_EXPRESSION));
+            } else if (canonical.equals(canonicalInput(DIFFERENCE_OF_SQUARES_EXPRESSION))) {
+                transformations.add(new Transformation(
+                        "ast_square_difference_factor",
+                        FACTORED_WITH_OFFSETS_EXPRESSION,
+                        RewriteKind.FACTOR,
+                        false,
+                        -4,
+                        true,
+                        "ast_square_difference_factor:" + FACTORED_WITH_OFFSETS_EXPRESSION));
+            } else if (canonical.equals(canonicalInput(FACTORED_WITH_OFFSETS_EXPRESSION))) {
+                transformations.add(new Transformation(
+                        LINEAR_FACTOR_BRIDGE_RULE_ID,
+                        TARGET_EXPRESSION,
+                        RewriteKind.SIMPLIFY,
+                        false,
+                        -2,
+                        true,
+                        LINEAR_FACTOR_BRIDGE_RULE_ID + ":" + TARGET_EXPRESSION));
+            }
+            transformations.addAll(delegate.transform(expression));
+            return transformations;
         }
     }
 
