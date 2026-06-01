@@ -21,7 +21,7 @@ class GalleryConsistencyTest {
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
     private static final Path REPO_ROOT = locateRepoRoot();
     private static final Pattern GENERATED_LINK = Pattern.compile("generated/discovery/([^)]*(?:evidence\\.json|search-space\\.svg))");
-    private static final Pattern README_EVIDENCE_ROW = Pattern.compile("\\|\\s*(Complete square|Sophie-Germain)\\s*\\|\\s*yes\\s*\\|\\s*yes\\s*\\|\\s*yes\\s*\\|\\s*\\[link]\(([^)]+)\");
+    private static final Pattern README_EVIDENCE_ROW = Pattern.compile("\\|\\s*(Complete square|Sophie-Germain)\\s*\\|\\s*yes\\s*\\|\\s*yes\\s*\\|\\s*yes\\s*\\|\\s*\\[link]\\(([^)]+)\\)");
 
     @Test
     void galleryReferencesOnlySuccessfulGeneratedEvidence() throws IOException {
