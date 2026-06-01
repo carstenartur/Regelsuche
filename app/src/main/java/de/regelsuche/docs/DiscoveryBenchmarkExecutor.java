@@ -2,7 +2,16 @@ package de.regelsuche.docs;
 
 import de.regelsuche.benchmark.DiscoveryExpectation;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.knowledge.SearchEffect;
+import de.regelsuche.learning.MacroLearningPipeline;
+import de.regelsuche.learning.MacroLearningResult;
+import de.regelsuche.mining.GoalAwareMacroMoveSelector;
+import de.regelsuche.mining.MacroMoveTransformationEngine;
+import de.regelsuche.mining.SuccessfulTransformationPath;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.ProofStep;
 import de.regelsuche.search.SearchHeuristic;
@@ -10,6 +19,11 @@ import de.regelsuche.search.SearchSpaceAnalytics;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.CompleteSquareBridgeOperator;
+import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
@@ -39,13 +53,19 @@ public final class DiscoveryBenchmarkExecutor {
         Map<String, ScenarioRule> rulesById = packs.stream()
                 .flatMap(pack -> pack.rules().stream())
                 .collect(Collectors.toMap(ScenarioRule::id, Function.identity(), (left, right) -> left, LinkedHashMap::new));
-        TransformationEngine baseEngine = new ScenarioRuleTransformationEngine(packs);
+        TransformationEngine baseEngine = engineFor(scenario, packs);
         SearchRun withoutMacro = run(scenario, baseEngine);
-        List<String> learnedMacros = scenario.macroLearning().enabled()
-                ? List.of(scenario.macroLearning().expectedMacroRule())
-                : List.of();
-        SearchRun withMacro = scenario.macroLearning().enabled()
-                ? run(scenario, new LearnedMacroTransformationEngine(baseEngine, scenario))
+        MacroLearningRun macroLearningRun = scenario.macroLearning().enabled() && withoutMacro.success()
+                ? learnMacros(scenario, baseEngine, withoutMacro)
+                : new MacroLearningRun(List.of(), Map.of(), new InMemoryRuleInventoryRepository());
+        List<String> learnedMacros = macroLearningRun.learnedMacros().stream().map(ReusableRule::id).toList();
+        SearchRun withMacro = scenario.macroLearning().enabled() && !learnedMacros.isEmpty()
+                ? run(scenario, new MacroMoveTransformationEngine(
+                        baseEngine,
+                        new GoalAwareMacroMoveSelector(macroLearningRun.inventory()),
+                        scenario.targetExpression(),
+                        macroLearningRun.atomicStepsByRuleId(),
+                        macroLearningRun.learnedMacros().getFirst().assumptions()))
                 : new SearchRun(false, "Macro learning disabled", List.of(), List.of(), List.of());
         List<String> bridgeRules = bridgeRules(withoutMacro.appliedRuleIds(), scenario, rulesById);
         List<String> ruleFamilies = ruleFamilies(withoutMacro.appliedRuleIds(), rulesById);
@@ -62,7 +82,7 @@ public final class DiscoveryBenchmarkExecutor {
         }
         List<String> convergentStates = convergentStates(paths);
         List<DiscoveryBenchmarkEvidence.EvidenceNode> nodes = evidenceNodes(scenario, paths);
-        List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges = evidenceEdges(withoutMacro, withMacro, learnedMacros, bridgeRules);
+        List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges = evidenceEdges(withoutMacro, withMacro, learnedMacros, bridgeRules, rulesById);
         boolean success = withoutMacro.success()
                 && expectationSatisfied(scenario, DiscoveryExpectation.BRIDGE_REQUIRED, !bridgeRules.isEmpty())
                 && expectationSatisfied(scenario, DiscoveryExpectation.CONVERGENCE_REQUIRED, !convergentStates.isEmpty())
@@ -93,6 +113,78 @@ public final class DiscoveryBenchmarkExecutor {
                 nodes,
                 edges,
                 smallGraphMessage);
+    }
+
+    private TransformationEngine engineFor(DiscoveryBenchmarkScenario scenario, List<ScenarioRulePack> scenarioPacks) {
+        KnowledgePackSelection selection = new KnowledgePackSelection(null, Set.copyOf(scenario.enabledRulePacks()), Set.of());
+        TransformationEngine astEngine = AstRewriteTransformationEngine.withKnowledgePacks(selection);
+        TransformationEngine ruleEngine = scenarioPacks.isEmpty()
+                ? astEngine
+                : new CompositeTransformationEngine(List.of(astEngine, new ScenarioRuleTransformationEngine(scenarioPacks)));
+        List<HypothesisOperator> operators = operatorsFor(scenario);
+        return operators.isEmpty() ? ruleEngine : new HypothesisTransformationEngine(ruleEngine, operators, 16);
+    }
+
+    private List<HypothesisOperator> operatorsFor(DiscoveryBenchmarkScenario scenario) {
+        LinkedHashSet<String> ids = new LinkedHashSet<>(scenario.enabledOperators());
+        if (ids.isEmpty()) {
+            if (scenario.enabledRulePacks().contains("sophie-germain")) {
+                ids.add("sophie_germain_bridge");
+            }
+            if (scenario.enabledRulePacks().contains("complete-square")) {
+                ids.add("complete_square_bridge");
+            }
+        }
+        List<HypothesisOperator> operators = new ArrayList<>();
+        for (String id : ids) {
+            if ("complete_square_bridge".equals(id)) {
+                operators.add(new CompleteSquareBridgeOperator());
+            } else if ("sophie_germain_bridge".equals(id) || "hidden_structure_bridge".equals(id)) {
+                operators.add(new DifferenceOfSquaresPreparationOperator());
+            }
+        }
+        return List.copyOf(operators);
+    }
+
+    private MacroLearningRun learnMacros(DiscoveryBenchmarkScenario scenario, TransformationEngine baseEngine, SearchRun withoutMacro) {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        SuccessfulTransformationPath path = new SuccessfulTransformationPath(
+                scenario.id() + "-discovered-path",
+                withoutMacro.path().getFirst(),
+                withoutMacro.path().getLast(),
+                withoutMacro.path(),
+                withoutMacro.appliedRuleIds(),
+                new ExpressionScorer().score(withoutMacro.path().getFirst()),
+                new ExpressionScorer().score(withoutMacro.path().getLast()),
+                true,
+                "scenario-driven discovery path",
+                Map.of("source", "DiscoveryBenchmarkExecutor"));
+        MacroLearningResult result = new MacroLearningPipeline(inventory).learn(List.of(path));
+        List<ReusableRule> learned = result.newlyActivated();
+        Map<String, List<TransformationStep>> atomicSteps = learned.stream()
+                .collect(Collectors.toMap(ReusableRule::id, rule -> atomicSteps(withoutMacro), (left, right) -> left, LinkedHashMap::new));
+        return new MacroLearningRun(learned, atomicSteps, inventory);
+    }
+
+    private List<TransformationStep> atomicSteps(SearchRun run) {
+        List<TransformationStep> steps = new ArrayList<>();
+        ExpressionScorer scorer = new ExpressionScorer();
+        for (int index = 0; index < run.appliedRuleIds().size(); index++) {
+            String before = run.path().get(index);
+            String after = run.path().get(index + 1);
+            steps.add(new TransformationStep(
+                    index,
+                    before,
+                    after,
+                    run.appliedRuleIds().get(index),
+                    RewriteKind.NORMALIZE,
+                    scorer.score(before).weightedTotal(),
+                    scorer.score(after).weightedTotal(),
+                    true,
+                    run.appliedRuleIds().get(index),
+                    List.of()));
+        }
+        return List.copyOf(steps);
     }
 
     private SearchRun run(DiscoveryBenchmarkScenario scenario, TransformationEngine engine) {
@@ -127,6 +219,8 @@ public final class DiscoveryBenchmarkExecutor {
             ScenarioRule rule = rulesById.get(ruleId);
             if (scenario.requiredBridgeRules().contains(ruleId)
                     || ruleId.toLowerCase(Locale.ROOT).contains("bridge")
+                    || CompleteSquareBridgeOperator.RULE_ID.equals(ruleId)
+                    || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
                     || (rule != null && rule.effects().contains(SearchEffect.BRIDGING))) {
                 bridgeRules.add(ruleId);
             }
@@ -160,6 +254,7 @@ public final class DiscoveryBenchmarkExecutor {
             if (rule != null) {
                 effects.addAll(rule.effects());
             }
+            effects.addAll(inferredEffects(step.ruleId()));
             if (specialRules.contains(step.ruleId()) && step.ruleId().toLowerCase(Locale.ROOT).contains("macro")) {
                 effects.add(SearchEffect.NORMALIZING);
             }
@@ -222,14 +317,20 @@ public final class DiscoveryBenchmarkExecutor {
             SearchRun withoutMacro,
             SearchRun withMacro,
             List<String> learnedMacros,
-            List<String> bridgeRules) {
+            List<String> bridgeRules,
+            Map<String, ScenarioRule> rulesById) {
         List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges = new ArrayList<>();
-        appendEdges(edges, withoutMacro, learnedMacros, bridgeRules);
-        appendEdges(edges, withMacro, learnedMacros, bridgeRules);
+        appendEdges(edges, withoutMacro, learnedMacros, bridgeRules, rulesById);
+        appendEdges(edges, withMacro, learnedMacros, bridgeRules, rulesById);
         return List.copyOf(edges);
     }
 
-    private void appendEdges(List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges, SearchRun run, List<String> learnedMacros, List<String> bridgeRules) {
+    private void appendEdges(
+            List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges,
+            SearchRun run,
+            List<String> learnedMacros,
+            List<String> bridgeRules,
+            Map<String, ScenarioRule> rulesById) {
         for (int i = 0; i < run.appliedRuleIds().size(); i++) {
             String ruleId = run.appliedRuleIds().get(i);
             String kind = learnedMacros.contains(ruleId) ? "macro" : bridgeRules.contains(ruleId) ? "bridge" : "rule";
@@ -237,8 +338,47 @@ public final class DiscoveryBenchmarkExecutor {
                     canonical(run.path().get(i)),
                     canonical(run.path().get(i + 1)),
                     ruleId,
-                    kind));
+                    kind,
+                    sourceFor(ruleId, learnedMacros, rulesById),
+                    packIdFor(ruleId, rulesById),
+                    List.copyOf(inferredEffects(ruleId))));
         }
+    }
+
+    private String sourceFor(String ruleId, List<String> learnedMacros, Map<String, ScenarioRule> rulesById) {
+        if (learnedMacros.contains(ruleId)) {
+            return "macro";
+        }
+        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId) || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)) {
+            return "operator";
+        }
+        return rulesById.containsKey(ruleId) ? "scenario-generic" : "core";
+    }
+
+    private String packIdFor(String ruleId, Map<String, ScenarioRule> rulesById) {
+        return rulesById.containsKey(ruleId) ? "scenario-generic" : "core";
+    }
+
+    private Set<SearchEffect> inferredEffects(String ruleId) {
+        LinkedHashSet<SearchEffect> effects = new LinkedHashSet<>();
+        String lower = ruleId.toLowerCase(Locale.ROOT);
+        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId) || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
+                || lower.contains("bridge")) {
+            effects.add(SearchEffect.BRIDGING);
+        }
+        if (lower.contains("factor")) {
+            effects.add(SearchEffect.FACTORIZING);
+        }
+        if (lower.contains("simplify")) {
+            effects.add(SearchEffect.SIMPLIFYING);
+        }
+        if (lower.contains("normalize") || lower.contains("macro")) {
+            effects.add(SearchEffect.NORMALIZING);
+        }
+        if (lower.contains("expand")) {
+            effects.add(SearchEffect.EXPANDING);
+        }
+        return effects;
     }
 
     private boolean expectationSatisfied(DiscoveryBenchmarkScenario scenario, DiscoveryExpectation expectation, boolean actual) {
@@ -287,38 +427,26 @@ public final class DiscoveryBenchmarkExecutor {
         }
     }
 
-    private static final class LearnedMacroTransformationEngine implements TransformationEngine {
-        private final TransformationEngine delegate;
-        private final DiscoveryBenchmarkScenario scenario;
+    private record MacroLearningRun(
+            List<ReusableRule> learnedMacros,
+            Map<String, List<TransformationStep>> atomicStepsByRuleId,
+            InMemoryRuleInventoryRepository inventory) {
+        private MacroLearningRun {
+            learnedMacros = learnedMacros == null ? List.of() : List.copyOf(learnedMacros);
+            atomicStepsByRuleId = atomicStepsByRuleId == null ? Map.of() : Map.copyOf(atomicStepsByRuleId);
+        }
+    }
 
-        private LearnedMacroTransformationEngine(TransformationEngine delegate, DiscoveryBenchmarkScenario scenario) {
-            this.delegate = delegate;
-            this.scenario = scenario;
+    private static final class CompositeTransformationEngine implements TransformationEngine {
+        private final List<TransformationEngine> engines;
+
+        private CompositeTransformationEngine(List<TransformationEngine> engines) {
+            this.engines = List.copyOf(engines);
         }
 
         @Override
         public List<Transformation> transform(String expression) {
-            List<Transformation> transformations = new ArrayList<>();
-            String reuseInput = scenario.macroLearning().reuseInputExpression() == null
-                    ? scenario.inputExpression()
-                    : scenario.macroLearning().reuseInputExpression();
-            if (canonicalInput(expression).equals(canonicalInput(reuseInput))) {
-                String ruleId = scenario.macroLearning().expectedMacroRule();
-                transformations.add(new Transformation(
-                        ruleId,
-                        scenario.targetExpression(),
-                        RewriteKind.NORMALIZE,
-                        false,
-                        -8,
-                        true,
-                        ruleId + ":" + scenario.targetExpression()));
-            }
-            transformations.addAll(delegate.transform(expression));
-            return transformations;
-        }
-
-        private static String canonicalInput(String expression) {
-            return expression == null ? "" : expression.replaceAll("\\s+", "");
+            return engines.stream().flatMap(engine -> engine.transform(expression).stream()).toList();
         }
     }
 }

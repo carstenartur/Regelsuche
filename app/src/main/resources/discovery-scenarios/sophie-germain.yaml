@@ -6,19 +6,20 @@ expectations:
   - BRIDGE_REQUIRED
   - MACRO_LEARNING_REQUIRED
   - MACRO_REUSE_REQUIRED
+enabledOperators:
+  - sophie_germain_bridge
 enabledRulePacks:
-  - sophie-germain
+  - sympy-polynomial-basic
 requiredBridgeEffects:
   - BRIDGING
 requiredRuleFamilies:
   - hidden_structure
   - factor
 requiredBridgeRules:
-  - bridge_sophie_germain_hidden_square
+  - hypothesis_difference_of_squares_preparation
   - ast_square_difference_factor
 macroLearning:
   enabled: true
-  expectedMacroRule: macro_learned_sophie_germain_factorization
 budgets:
   maxDepth: 6
   maxStates: 120

@@ -10,6 +10,7 @@ public record DiscoveryBenchmarkScenario(
         String inputExpression,
         String targetExpression,
         List<DiscoveryExpectation> expectations,
+        List<String> enabledOperators,
         List<String> enabledRulePacks,
         List<SearchEffect> requiredBridgeEffects,
         List<String> requiredRuleFamilies,
@@ -19,6 +20,7 @@ public record DiscoveryBenchmarkScenario(
         Gallery gallery) {
     public DiscoveryBenchmarkScenario {
         expectations = expectations == null ? List.of() : List.copyOf(expectations);
+        enabledOperators = enabledOperators == null ? List.of() : List.copyOf(enabledOperators);
         enabledRulePacks = enabledRulePacks == null ? List.of() : List.copyOf(enabledRulePacks);
         requiredBridgeEffects = requiredBridgeEffects == null ? List.of() : List.copyOf(requiredBridgeEffects);
         requiredRuleFamilies = requiredRuleFamilies == null ? List.of() : List.copyOf(requiredRuleFamilies);

@@ -174,6 +174,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             ),
             new FactorCommonLeftRule(),
             new FactorCommonRightRule(),
+            new LinearOffsetSimplificationRule(),
             new CanonicalNormalizeRule()
         );
     }
@@ -498,6 +499,51 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             } catch (IllegalArgumentException ex) {
                 return null;
             }
+        }
+    }
+
+    private static final class LinearOffsetSimplificationRule extends MetadataRule {
+        private LinearOffsetSimplificationRule() {
+            super(RewriteKind.SIMPLIFY, false, -2);
+        }
+
+        @Override
+        public String id() {
+            return "ast_linear_offset_simplify";
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+            return simplified(subtree) != null;
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+            Expr simplified = simplified(subtree);
+            if (simplified == null) {
+                throw new IllegalArgumentException("Rule does not match subtree");
+            }
+            return simplified;
+        }
+
+        private Expr simplified(Expr subtree) {
+            if (!(subtree instanceof BinaryExpr outer)
+                || (outer.operator() != BinaryOperator.ADD && outer.operator() != BinaryOperator.SUB)
+                || !(outer.right() instanceof NumberExpr right)
+                || !(outer.left() instanceof BinaryExpr left)
+                || left.operator() != BinaryOperator.ADD
+                || !(left.right() instanceof NumberExpr leftOffset)) {
+                return null;
+            }
+            double offset = outer.operator() == BinaryOperator.ADD
+                ? leftOffset.value() + right.value()
+                : leftOffset.value() - right.value();
+            if (offset == 0) {
+                return left.left();
+            }
+            return offset > 0
+                ? new BinaryExpr(left.left(), BinaryOperator.ADD, new NumberExpr(offset))
+                : new BinaryExpr(left.left(), BinaryOperator.SUB, new NumberExpr(-offset));
         }
     }
 

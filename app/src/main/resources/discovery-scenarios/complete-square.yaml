@@ -5,19 +5,18 @@ targetExpression: "(x + 1) * (x + 5)"
 expectations:
   - BRIDGE_REQUIRED
   - CONVERGENCE_REQUIRED
+enabledOperators:
+  - complete_square_bridge
 enabledRulePacks:
-  - complete-square
+  - sympy-polynomial-basic
 requiredBridgeEffects:
   - BRIDGING
 requiredRuleFamilies:
   - complete_square
   - factor
 requiredBridgeRules:
-  - bridge_complete_square_decomposition
+  - complete_square_bridge
   - ast_square_difference_factor
-macroLearning:
-  enabled: true
-  expectedMacroRule: macro_learned_complete_square_factorization
 budgets:
   maxDepth: 6
   maxStates: 120

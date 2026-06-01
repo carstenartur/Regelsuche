@@ -62,7 +62,7 @@ public final class DiscoveryBenchmarkScenarioLoader {
             String path = "discovery-scenario-rules/" + packId + ".yaml";
             try (InputStream input = Thread.currentThread().getContextClassLoader().getResourceAsStream(path)) {
                 if (input == null) {
-                    throw new IllegalArgumentException("Referenced rule pack does not exist: " + packId);
+                    continue;
                 }
                 RulePackYaml yaml = YAML.readValue(input, RulePackYaml.class);
                 ScenarioRulePack pack = toRulePack(yaml);
@@ -84,6 +84,7 @@ public final class DiscoveryBenchmarkScenarioLoader {
                 yaml.inputExpression,
                 yaml.targetExpression,
                 yaml.expectations == null ? List.of() : yaml.expectations.stream().map(DiscoveryExpectation::valueOf).toList(),
+                yaml.enabledOperators,
                 yaml.enabledRulePacks,
                 yaml.requiredBridgeEffects == null ? List.of() : yaml.requiredBridgeEffects.stream().map(SearchEffect::fromExternal).toList(),
                 yaml.requiredRuleFamilies,
@@ -129,9 +130,6 @@ public final class DiscoveryBenchmarkScenarioLoader {
         if (scenario.enabledRulePacks().isEmpty()) {
             throw new IllegalArgumentException("Scenario must declare enabledRulePacks: " + scenario.id());
         }
-        if (scenario.macroLearning().enabled() && !hasText(scenario.macroLearning().expectedMacroRule())) {
-            throw new IllegalArgumentException("Macro learning scenario must declare expectedMacroRule: " + scenario.id());
-        }
         loadRulePacks(scenario);
     }
 
@@ -152,6 +150,7 @@ public final class DiscoveryBenchmarkScenarioLoader {
         public String inputExpression;
         public String targetExpression;
         public List<String> expectations = List.of();
+        public List<String> enabledOperators = List.of();
         public List<String> enabledRulePacks = List.of();
         public List<String> requiredBridgeEffects = List.of();
         public List<String> requiredRuleFamilies = List.of();

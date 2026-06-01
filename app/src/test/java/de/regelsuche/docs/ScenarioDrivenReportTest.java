@@ -32,6 +32,7 @@ class ScenarioDrivenReportTest {
                 "1 / (n * (n + 1))",
                 "1 / n - 1 / (n + 1)",
                 List.of(DiscoveryExpectation.BRIDGE_REQUIRED),
+                List.of(),
                 List.of("telescoping"),
                 List.of(SearchEffect.BRIDGING),
                 List.of("telescoping"),

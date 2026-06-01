@@ -57,7 +57,17 @@ public record DiscoveryBenchmarkEvidence(
     public record EvidenceNode(String id, String label, String kind) {
     }
 
-    public record EvidenceEdge(String from, String to, String ruleId, String kind) {
+    public record EvidenceEdge(
+            String from,
+            String to,
+            String ruleId,
+            String kind,
+            String source,
+            String packId,
+            List<de.regelsuche.knowledge.SearchEffect> searchEffect) {
+        public EvidenceEdge {
+            searchEffect = searchEffect == null ? List.of() : List.copyOf(searchEffect);
+        }
     }
 
     public Map<String, Object> summary() {

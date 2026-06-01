@@ -32,7 +32,7 @@ class SearchSpaceGallerySvgWriterTest {
                 "PASS",
                 List.of(new DiscoveryBenchmarkEvidence.EvidenceNode("a", "Node A", "state"),
                         new DiscoveryBenchmarkEvidence.EvidenceNode("b", "Node B", "target")),
-                List.of(new DiscoveryBenchmarkEvidence.EvidenceEdge("a", "b", "rule_alpha", "bridge")),
+                List.of(new DiscoveryBenchmarkEvidence.EvidenceEdge("a", "b", "rule_alpha", "bridge", "core", "core", List.of())),
                 "Search produced only 2 visible states under this budget.");
 
         String svg = new SearchSpaceGallerySvgWriter().write(evidence, "synthetic-evidence.json");
