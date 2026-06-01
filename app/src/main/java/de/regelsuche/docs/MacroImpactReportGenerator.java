@@ -111,7 +111,7 @@ public final class MacroImpactReportGenerator {
                 engine,
                 new ExpressionScorer(),
                 canonicalizer,
-                new SearchHeuristic(4, 80, 1, 4, 80, 12));
+                new SearchHeuristic(6, 120, 1, 4, 80, 12));
         String normalizedTarget = normalizeExpression(TARGET_EXPRESSION);
         return new BestFirstSearchStrategy().search(problem).stream()
                 .filter(state -> state.depth() > 0 && normalizeExpression(state.expression()).equals(normalizedTarget))
