@@ -374,7 +374,7 @@ jobs:
       - name: Create or update screenshot refresh PR
         id: screenshot_pr
         if: steps.screenshot_changes.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/docs-screenshots-refresh
           delete-branch: false
