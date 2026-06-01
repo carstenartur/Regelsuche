@@ -2,50 +2,82 @@ packId: sympy-polynomial-basic
 displayName: SymPy polynomial basic knowledge pack
 sourceProject: SymPy
 license: BSD-3-Clause
-sourceUrl: https://www.sympy.org/
+sourceUrl: https://docs.sympy.org/latest/modules/polys/reference.html#sympy.polys.polytools.factor
+sourceVersion: SymPy 1.14.0 documentation
+sourceReference: Manually reviewed polynomial factorization identities; independently reimplemented for Regelsuche, not generated from SymPy code.
 enabledByDefault: false
 categories:
   - polynomial-factorization
 rules:
   - id: sympy.poly.factor.difference_of_squares
+    sourceReference: Standard difference-of-squares identity, manually checked against SymPy factor behavior.
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
     riskLevel: low
     rule:
       from: "?A^2 - ?B^2"
       to: "(?A - ?B) * (?A + ?B)"
+    validation:
+      examples:
+        - from: "x^2 - y^2"
+          to: "(x - y) * (x + y)"
   - id: sympy.poly.factor.binomial_square_plus
+    sourceReference: Standard square-of-sum identity, manually checked against SymPy factor behavior.
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
     riskLevel: low
     rule:
       from: "?A^2 + 2*?A*?B + ?B^2"
       to: "(?A + ?B)^2"
+    validation:
+      examples:
+        - from: "x^2 + 2*x*y + y^2"
+          to: "(x + y) ^ 2"
   - id: sympy.poly.factor.binomial_square_minus
+    sourceReference: Standard square-of-difference identity, manually checked against SymPy factor behavior.
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
     riskLevel: low
     rule:
       from: "?A^2 - 2*?A*?B + ?B^2"
       to: "(?A - ?B)^2"
+    validation:
+      examples:
+        - from: "x^2 - 2*x*y + y^2"
+          to: "(x - y) ^ 2"
   - id: sympy.poly.factor.sum_of_cubes
+    sourceReference: Standard sum-of-cubes identity, manually checked against SymPy factor behavior.
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
     riskLevel: low
     rule:
       from: "?A^3 + ?B^3"
       to: "(?A + ?B) * (?A^2 - ?A*?B + ?B^2)"
+    validation:
+      examples:
+        - from: "x^3 + y^3"
+          to: "(x + y) * (x ^ 2 - x * y + y ^ 2)"
   - id: sympy.poly.factor.difference_of_cubes
+    sourceReference: Standard difference-of-cubes identity, manually checked against SymPy factor behavior.
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
     riskLevel: low
     rule:
       from: "?A^3 - ?B^3"
       to: "(?A - ?B) * (?A^2 + ?A*?B + ?B^2)"
+    validation:
+      examples:
+        - from: "x^3 - y^3"
+          to: "(x - y) * (x ^ 2 + x * y + y ^ 2)"
   - id: sympy.poly.factor.sophie_germain
+    sourceReference: Standard Sophie Germain identity, manually checked against SymPy factor behavior.
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
     riskLevel: medium
     rule:
       from: "?A^4 + 4*?B^4"
       to: "(?A^2 - 2*?A*?B + 2*?B^2) * (?A^2 + 2*?A*?B + 2*?B^2)"
+    validation:
+      examples:
+        - from: "x^4 + 4*y^4"
+          to: "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)"

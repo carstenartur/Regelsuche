@@ -33,14 +33,20 @@ public record KnowledgePackSelection(RuleProfile profile, Set<String> enabledPac
     }
 
     public Set<String> effectiveEnabledPacks(Set<String> availablePacks) {
+        return effectiveEnabledPacks(availablePacks, Set.of());
+    }
+
+    public Set<String> effectiveEnabledPacks(Set<String> availablePacks, Set<String> defaultEnabledPacks) {
         Set<String> effective = new LinkedHashSet<>();
         if (profile.enableAllPacks()) {
             effective.addAll(availablePacks);
         } else {
+            effective.addAll(defaultEnabledPacks);
             effective.addAll(profile.enabledPackIds());
         }
         effective.addAll(enabledPacks);
         effective.removeAll(disabledPacks);
+        effective.retainAll(availablePacks);
         return Set.copyOf(effective);
     }
 }

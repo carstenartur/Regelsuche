@@ -27,6 +27,9 @@ class KnowledgePackRegistryTest {
                 displayName: Bad Pack
                 sourceProject: External
                 license: BSD-3-Clause
+                sourceUrl: https://example.invalid/bad-pack
+                sourceVersion: reviewed-test-fixture
+                sourceReference: test fixture
                 rules:
                   - id: bad.rule
                     status: VALIDATED
@@ -65,6 +68,64 @@ class KnowledgePackRegistryTest {
         assertTrue(rules.stream().allMatch(rule -> rule.descriptor().eligibleForRegistration()));
     }
 
+
+    @Test
+    void validatedExternalRulesDeclareValidationExamples() {
+        KnowledgePackRegistry registry = new KnowledgePackRegistry();
+
+        assertTrue(registry.allPacks().stream()
+                .filter(pack -> !pack.packId().equals("core"))
+                .flatMap(pack -> pack.rules().stream())
+                .filter(rule -> rule.descriptor().status() == RuleStatus.VALIDATED)
+                .allMatch(rule -> !rule.descriptor().validationExamples().isEmpty()));
+    }
+
+    @Test
+    void sourceMetadataIsLoadedForPackAndRules() {
+        KnowledgePack pack = new KnowledgePackRegistry().allPacks().stream()
+                .filter(candidate -> candidate.packId().equals(SYMPY_PACK))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("SymPy 1.14.0 documentation", pack.sourceVersion());
+        assertTrue(pack.sourceUrl().contains("sympy.polys.polytools.factor"));
+        assertTrue(pack.sourceReference().contains("independently reimplemented"));
+        assertTrue(pack.rules().stream().allMatch(rule -> !rule.descriptor().sourceVersion().isBlank()));
+        assertTrue(pack.rules().stream().allMatch(rule -> !rule.descriptor().sourceReference().isBlank()));
+    }
+
+    @Test
+    void enabledByDefaultPacksAreSelectedByCoreUnlessDisabled(@TempDir Path tempDir) throws Exception {
+        Path pack = tempDir.resolve("default-enabled.rules.yaml");
+        Files.writeString(pack, """
+                packId: default-enabled
+                displayName: Default Enabled
+                sourceProject: External
+                license: BSD-3-Clause
+                sourceUrl: https://example.invalid/rules
+                sourceVersion: reviewed-test-fixture
+                sourceReference: test fixture
+                enabledByDefault: true
+                rules:
+                  - id: default.enabled.rule
+                    derivationType: REIMPLEMENTED_RULE
+                    status: VALIDATED
+                    rule:
+                      from: "?A^2"
+                      to: "?A*?A"
+                    validation:
+                      examples:
+                        - from: "x^2"
+                          to: "x * x"
+                """);
+        KnowledgePackRegistry registry = new KnowledgePackRegistry(new KnowledgePackLoader().loadAll(tempDir));
+
+        assertTrue(registry.enabledRules(KnowledgePackSelection.CORE).stream()
+                .map(RewriteRule::id)
+                .anyMatch("default.enabled.rule"::equals));
+        assertTrue(registry.enabledRules(KnowledgePackSelection.CORE.disablePack("default-enabled")).isEmpty());
+    }
+
     @Test
     void disablingPackPreventsRuleUseEvenForAllProfile() {
         KnowledgePackSelection selection = KnowledgePackSelection.profile(RuleProfile.ALL).disablePack(SYMPY_PACK);
@@ -89,13 +150,19 @@ class KnowledgePackRegistryTest {
 
     @Test
     void importedRulesValidateEquivalenceOnExamples() {
-        AstRewriteTransformationEngine engine = engineWithSympyPack(50);
+        AstRewriteTransformationEngine engine = engineWithSympyPack(80);
+        List<RewriteRule> rules = new KnowledgePackRegistry().enabledRules(KnowledgePackSelection.CORE.enablePack(SYMPY_PACK))
+                .stream()
+                .map(rule -> (RewriteRule) rule)
+                .toList();
 
-        assertTrue(engine.transform("x^2 - y^2").stream().anyMatch(step ->
-                step.rule().equals("sympy.poly.factor.difference_of_squares")
-                        && step.transformedExpression().equals("(x - y) * (x + y)")));
-        assertTrue(engine.transform("x^4 + 4*y^4").stream().anyMatch(step ->
-                step.rule().equals("sympy.poly.factor.sophie_germain")));
+        for (RewriteRule rule : rules) {
+            for (ValidationExample example : rule.descriptor().validationExamples()) {
+                assertTrue(engine.transform(example.from()).stream().anyMatch(step ->
+                        step.rule().equals(rule.id()) && step.transformedExpression().equals(example.to())),
+                        () -> "Expected " + rule.id() + " to transform " + example.from() + " to " + example.to());
+            }
+        }
     }
 
     private AstRewriteTransformationEngine engineWithSympyPack(int maxAstSizeIncreasePerStep) {

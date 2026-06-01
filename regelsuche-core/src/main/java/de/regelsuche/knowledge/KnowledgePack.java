@@ -10,6 +10,8 @@ public record KnowledgePack(
         String sourceProject,
         String license,
         String sourceUrl,
+        String sourceVersion,
+        String sourceReference,
         boolean enabledByDefault,
         List<String> categories,
         List<PatternRewriteRule> rules) {
@@ -26,6 +28,15 @@ public record KnowledgePack(
         }
         if (isBlank(license)) {
             throw new IllegalArgumentException("license is required");
+        }
+        if (isBlank(sourceUrl)) {
+            throw new IllegalArgumentException("sourceUrl is required");
+        }
+        if (isBlank(sourceVersion)) {
+            throw new IllegalArgumentException("sourceVersion is required");
+        }
+        if (isBlank(sourceReference)) {
+            throw new IllegalArgumentException("sourceReference is required");
         }
         categories = categories == null ? List.of() : List.copyOf(categories);
         rules = rules == null ? List.of() : List.copyOf(rules);

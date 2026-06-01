@@ -65,17 +65,20 @@ public class KnowledgePackLoader {
                         yaml.packId,
                         firstNonBlank(ruleYaml.originProject, yaml.sourceProject),
                         firstNonBlank(ruleYaml.license, yaml.license),
+                        firstNonBlank(ruleYaml.sourceVersion, yaml.sourceVersion),
+                        firstNonBlank(ruleYaml.sourceReference, yaml.sourceReference),
                         ruleYaml.derivationType,
                         ruleYaml.status,
                         firstNonBlank(ruleYaml.riskLevel, "medium"),
-                        ruleCategories);
+                        ruleCategories,
+                        validationExamples(ruleYaml.validation));
                 rules.add(new PatternRewriteRule(ruleId,
                         KnowledgePatternParser.parse(require(ruleYaml.rule.from, "rule.from", path)),
                         KnowledgePatternParser.parse(require(ruleYaml.rule.to, "rule.to", path)),
                         descriptor));
             }
             return new KnowledgePack(yaml.packId, yaml.displayName, yaml.sourceProject, yaml.license,
-                    yaml.sourceUrl, yaml.enabledByDefault, packCategories, rules);
+                    yaml.sourceUrl, yaml.sourceVersion, yaml.sourceReference, yaml.enabledByDefault, packCategories, rules);
         } catch (IOException ex) {
             throw new IllegalArgumentException("Invalid knowledge pack YAML: " + path, ex);
         }
@@ -87,6 +90,9 @@ public class KnowledgePackLoader {
         require(yaml.displayName, "displayName", path);
         require(yaml.sourceProject, "sourceProject", path);
         require(yaml.license, "license", path);
+        require(yaml.sourceUrl, "sourceUrl", path);
+        require(yaml.sourceVersion, "sourceVersion", path);
+        require(yaml.sourceReference, "sourceReference", path);
         if (yaml.rules == null || yaml.rules.isEmpty()) {
             throw new IllegalArgumentException("Knowledge pack must declare at least one rule: " + path);
         }
@@ -107,6 +113,20 @@ public class KnowledgePackLoader {
         if (rule.status == null) {
             throw new IllegalArgumentException("Rule " + rule.id + " is missing status in " + path);
         }
+        require(firstNonBlank(rule.sourceVersion, pack.sourceVersion), "sourceVersion", path);
+        require(firstNonBlank(rule.sourceReference, pack.sourceReference), "sourceReference", path);
+        if (rule.status == RuleStatus.VALIDATED && validationExamples(rule.validation).isEmpty()) {
+            throw new IllegalArgumentException("Rule " + rule.id + " is missing validation.examples in " + path);
+        }
+    }
+
+    private static List<ValidationExample> validationExamples(ValidationYaml validation) {
+        if (validation == null || validation.examples == null) {
+            return List.of();
+        }
+        return validation.examples.stream()
+                .map(example -> new ValidationExample(example.from, example.to))
+                .toList();
     }
 
     private static String require(String value, String field, Path path) {
@@ -131,6 +151,8 @@ public class KnowledgePackLoader {
         public String sourceProject;
         public String license;
         public String sourceUrl;
+        public String sourceVersion;
+        public String sourceReference;
         public boolean enabledByDefault;
         public List<String> categories;
         public List<RuleYaml> rules;
@@ -141,15 +163,29 @@ public class KnowledgePackLoader {
         public String id;
         public String originProject;
         public String license;
+        public String sourceVersion;
+        public String sourceReference;
         public DerivationType derivationType;
         public RuleStatus status;
         public String riskLevel;
         public List<String> categories;
         public RuleBodyYaml rule;
+        public ValidationYaml validation;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class RuleBodyYaml {
+        public String from;
+        public String to;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ValidationYaml {
+        public List<ValidationExampleYaml> examples;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ValidationExampleYaml {
         public String from;
         public String to;
     }

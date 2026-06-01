@@ -7,10 +7,13 @@ public record RuleDescriptor(
         String packId,
         String originProject,
         String license,
+        String sourceVersion,
+        String sourceReference,
         DerivationType derivationType,
         RuleStatus status,
         String riskLevel,
-        List<String> categories) {
+        List<String> categories,
+        List<ValidationExample> validationExamples) {
 
     public RuleDescriptor {
         if (isBlank(ruleId)) {
@@ -25,6 +28,12 @@ public record RuleDescriptor(
         if (isBlank(license)) {
             throw new IllegalArgumentException("license is required");
         }
+        if (isBlank(sourceVersion)) {
+            throw new IllegalArgumentException("sourceVersion is required");
+        }
+        if (isBlank(sourceReference)) {
+            throw new IllegalArgumentException("sourceReference is required");
+        }
         if (derivationType == null) {
             throw new IllegalArgumentException("derivationType is required");
         }
@@ -33,11 +42,12 @@ public record RuleDescriptor(
         }
         riskLevel = isBlank(riskLevel) ? "low" : riskLevel;
         categories = categories == null ? List.of() : List.copyOf(categories);
+        validationExamples = validationExamples == null ? List.of() : List.copyOf(validationExamples);
     }
 
     public static RuleDescriptor core(String ruleId, List<String> categories) {
-        return new RuleDescriptor(ruleId, "core", "Regelsuche", "PROJECT", DerivationType.ORIGINAL,
-                RuleStatus.VALIDATED, "low", categories);
+        return new RuleDescriptor(ruleId, "core", "Regelsuche", "PROJECT", "local", "built-in core rule",
+                DerivationType.ORIGINAL, RuleStatus.VALIDATED, "low", categories, List.of());
     }
 
     public boolean eligibleForRegistration() {

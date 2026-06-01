@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class KnowledgePackRegistry {
     private final Map<String, KnowledgePack> packsById;
@@ -30,7 +31,11 @@ public class KnowledgePackRegistry {
     }
 
     public List<KnowledgePack> enabledPacks(KnowledgePackSelection options) {
-        Set<String> enabled = options.effectiveEnabledPacks(packsById.keySet());
+        Set<String> defaultEnabled = packsById.values().stream()
+                .filter(KnowledgePack::enabledByDefault)
+                .map(KnowledgePack::packId)
+                .collect(Collectors.toSet());
+        Set<String> enabled = options.effectiveEnabledPacks(packsById.keySet(), defaultEnabled);
         return packsById.values().stream()
                 .filter(pack -> enabled.contains(pack.packId()))
                 .toList();
