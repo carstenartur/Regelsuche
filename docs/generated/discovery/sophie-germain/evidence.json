@@ -21,7 +21,7 @@
   },
   "bridgeRulesUsed" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
   "convergentStates" : [ "x^4+4*y^4" ],
-  "edgeCount" : 113,
+  "edgeCount" : 114,
   "edges" : [ {
     "from" : "(0-2*x*y+x*x+2*y^2)*(2*x*y+x^2+2*y^2)",
     "kind" : "rule",
@@ -40,6 +40,15 @@
     "source" : "core",
     "tags" : [ "alternative-branch" ],
     "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(0-2*x*y+x*x+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x*x+2*y^2)*(2*x*y+x^2+2*y^2)"
   }, {
     "from" : "(0-2*x*y+x^2+2*y*y)*(2*x*y+x^2+2*y^2)",
     "kind" : "rule",
