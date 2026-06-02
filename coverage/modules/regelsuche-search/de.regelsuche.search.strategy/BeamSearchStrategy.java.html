@@ -54,89 +54,105 @@ import java.util.Set;
 <span class="fc" id="L54">                    continue;</span>
                 }
 <span class="fc" id="L56">                int generated = 0;</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">                for (Transformation transformation : problem.engine().transform(current.expression())) {</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                    if (generated &gt;= problem.heuristic().maxCandidatesPerState()) {</span>
-<span class="nc" id="L59">                        break;</span>
+<span class="fc" id="L57">                List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(problem.engine().transform(current.expression()));</span>
+<span class="fc" id="L58">                transformations.sort(Comparator</span>
+<span class="fc" id="L59">                    .comparing(Transformation::rule)</span>
+<span class="fc" id="L60">                    .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L61">                    .thenComparing(Transformation::applicationKey));</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                for (Transformation transformation : transformations) {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                    if (generated &gt;= problem.heuristic().maxCandidatesPerState()) {</span>
+<span class="fc" id="L64">                        break;</span>
                     }
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                    if (current.appliedRuleApplications().contains(transformation.applicationKey())) {</span>
-<span class="nc" id="L62">                        continue;</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                    if (current.appliedRuleApplications().contains(transformation.applicationKey())) {</span>
+<span class="nc" id="L67">                        continue;</span>
                     }
-<span class="fc bfc" id="L64" title="All 2 branches covered.">                    int expandedSteps = current.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);</span>
-<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                    if (expandedSteps &gt; problem.heuristic().maxExpandingSteps()) {</span>
-<span class="nc" id="L66">                        continue;</span>
-                    }
-<span class="fc" id="L68">                    String nextExpression = transformation.transformedExpression();</span>
-<span class="fc" id="L69">                    String hash = problem.canonicalizer().stableHash(nextExpression);</span>
-<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                    if (nextExpression.equals(current.expression())) {</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                    int expandedSteps = current.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                    if (expandedSteps &gt; problem.heuristic().maxExpandingSteps()) {</span>
 <span class="nc" id="L71">                        continue;</span>
                     }
-<span class="fc" id="L73">                    ExpressionScore nextScore = problem.scorer().score(nextExpression);</span>
-<span class="fc" id="L74">                    int improvement = current.score().weightedTotal() - nextScore.weightedTotal();</span>
-<span class="fc" id="L75">                    Set&lt;String&gt; applied = new HashSet&lt;&gt;(current.appliedRuleApplications());</span>
-<span class="fc" id="L76">                    applied.add(transformation.applicationKey());</span>
-<span class="fc" id="L77">                    List&lt;String&gt; path = new ArrayList&lt;&gt;(current.path());</span>
-<span class="fc" id="L78">                    path.add(nextExpression);</span>
-<span class="fc" id="L79">                    List&lt;String&gt; appliedRuleIds = new ArrayList&lt;&gt;(current.appliedRuleIds());</span>
-<span class="fc" id="L80">                    appliedRuleIds.add(transformation.rule());</span>
-<span class="fc" id="L81">                    List&lt;RewriteKind&gt; appliedRuleKinds = new ArrayList&lt;&gt;(current.appliedRuleKinds());</span>
-<span class="fc" id="L82">                    appliedRuleKinds.add(transformation.kind());</span>
-<span class="fc" id="L83">                    List&lt;Boolean&gt; equivalenceFlags = new ArrayList&lt;&gt;(current.equivalencePreservingFlags());</span>
-<span class="fc" id="L84">                    equivalenceFlags.add(transformation.equivalencePreservingByConstruction());</span>
-<span class="fc" id="L85">                    SearchState nextState = new SearchState(</span>
+<span class="fc" id="L73">                    String nextExpression = transformation.transformedExpression();</span>
+<span class="fc" id="L74">                    String hash = problem.canonicalizer().stableHash(nextExpression);</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                    if (nextExpression.equals(current.expression())) {</span>
+<span class="nc" id="L76">                        continue;</span>
+                    }
+<span class="fc" id="L78">                    ExpressionScore nextScore = problem.scorer().score(nextExpression);</span>
+<span class="fc" id="L79">                    int improvement = current.score().weightedTotal() - nextScore.weightedTotal();</span>
+<span class="fc" id="L80">                    Set&lt;String&gt; applied = new HashSet&lt;&gt;(current.appliedRuleApplications());</span>
+<span class="fc" id="L81">                    applied.add(transformation.applicationKey());</span>
+<span class="fc" id="L82">                    List&lt;String&gt; path = new ArrayList&lt;&gt;(current.path());</span>
+<span class="fc" id="L83">                    path.add(nextExpression);</span>
+<span class="fc" id="L84">                    List&lt;String&gt; appliedRuleIds = new ArrayList&lt;&gt;(current.appliedRuleIds());</span>
+<span class="fc" id="L85">                    appliedRuleIds.add(transformation.rule());</span>
+<span class="fc" id="L86">                    List&lt;RewriteKind&gt; appliedRuleKinds = new ArrayList&lt;&gt;(current.appliedRuleKinds());</span>
+<span class="fc" id="L87">                    appliedRuleKinds.add(transformation.kind());</span>
+<span class="fc" id="L88">                    List&lt;Boolean&gt; equivalenceFlags = new ArrayList&lt;&gt;(current.equivalencePreservingFlags());</span>
+<span class="fc" id="L89">                    equivalenceFlags.add(transformation.equivalencePreservingByConstruction());</span>
+<span class="fc" id="L90">                    SearchState nextState = new SearchState(</span>
                         nextExpression,
-<span class="fc" id="L87">                        current.depth() + 1,</span>
+<span class="fc" id="L92">                        current.depth() + 1,</span>
                         nextScore,
                         path,
                         appliedRuleIds,
                         applied,
                         expandedSteps,
                         hash,
-<span class="fc" id="L94">                        current.expression(),</span>
-<span class="fc" id="L95">                        transformation.rule(),</span>
-<span class="fc" id="L96">                        transformation.kind(),</span>
-<span class="fc" id="L97">                        transformation.mayIncreaseComplexity(),</span>
-<span class="fc" id="L98">                        transformation.estimatedCostDelta(),</span>
-<span class="fc" id="L99">                        transformation.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L99">                        current.expression(),</span>
+<span class="fc" id="L100">                        transformation.rule(),</span>
+<span class="fc" id="L101">                        transformation.kind(),</span>
+<span class="fc" id="L102">                        transformation.mayIncreaseComplexity(),</span>
+<span class="fc" id="L103">                        transformation.estimatedCostDelta(),</span>
+<span class="fc" id="L104">                        transformation.equivalencePreservingByConstruction(),</span>
                         improvement,
                         appliedRuleKinds,
                         equivalenceFlags
                     );
-<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                    if (visited.contains(stateKey(nextState))) {</span>
-<span class="nc" id="L105">                        continue;</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                    if (visited.contains(stateKey(nextState))) {</span>
+<span class="nc" id="L110">                        continue;</span>
                     }
-<span class="fc" id="L107">                    next.add(nextState);</span>
-<span class="fc" id="L108">                    generated++;</span>
-<span class="fc" id="L109">                }</span>
-<span class="fc" id="L110">            }</span>
-<span class="fc" id="L111">            next.sort(Comparator.comparingInt(state -&gt; priority(state, problem)));</span>
-<span class="fc" id="L112">            beam = next.stream().limit(problem.heuristic().beamWidth()).toList();</span>
+<span class="fc" id="L112">                    next.add(nextState);</span>
+<span class="fc" id="L113">                    generated++;</span>
+<span class="fc" id="L114">                }</span>
+<span class="fc" id="L115">            }</span>
+<span class="fc" id="L116">            next.sort(Comparator</span>
+<span class="fc" id="L117">                .comparingInt((SearchState state) -&gt; priority(state, problem))</span>
+<span class="fc" id="L118">                .thenComparingInt(SearchState::depth)</span>
+<span class="fc" id="L119">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds()))</span>
+<span class="fc" id="L120">                .thenComparing(SearchState::canonicalHash)</span>
+<span class="fc" id="L121">                .thenComparing(SearchState::expression)</span>
+<span class="pc" id="L122">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.path()))</span>
+<span class="pc" id="L123">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, sortedValues(state.appliedRuleApplications()))));</span>
+<span class="fc" id="L124">            beam = next.stream().limit(problem.heuristic().beamWidth()).toList();</span>
         }
-<span class="fc" id="L114">        return explored;</span>
+<span class="fc" id="L126">        return explored;</span>
     }
 
     private int priority(SearchState state) {
-<span class="fc" id="L118">        int depthPenalty = state.depth() * 2;</span>
-<span class="fc" id="L119">        int expansionPenalty = state.expandedStepCount() * 5;</span>
-<span class="pc bpc" id="L120" title="1 of 4 branches missed.">        int noImprovementPenalty = state.improvement() &lt;= 0 &amp;&amp; state.depth() &gt; 0 ? 4 : 0;</span>
-<span class="fc" id="L121">        return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;</span>
+<span class="fc" id="L130">        int depthPenalty = state.depth() * 2;</span>
+<span class="fc" id="L131">        int expansionPenalty = state.expandedStepCount() * 5;</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">        int noImprovementPenalty = state.improvement() &lt;= 0 &amp;&amp; state.depth() &gt; 0 ? 4 : 0;</span>
+<span class="fc" id="L133">        return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;</span>
     }
 
     private int priority(SearchState state, SearchProblem problem) {
-<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (problem.costModel() == null) {</span>
-<span class="fc" id="L126">            return priority(state);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (problem.costModel() == null) {</span>
+<span class="fc" id="L138">            return priority(state);</span>
         }
-<span class="nc" id="L128">        int depthPenalty = state.depth() * 2;</span>
-<span class="nc" id="L129">        int expansionPenalty = state.expandedStepCount() * 5;</span>
-<span class="nc bnc" id="L130" title="All 4 branches missed.">        int noImprovementPenalty = state.improvement() &lt;= 0 &amp;&amp; state.depth() &gt; 0 ? 4 : 0;</span>
-<span class="nc" id="L131">        int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());</span>
-<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (modelCost == Integer.MAX_VALUE) {</span>
-<span class="nc" id="L133">            return Integer.MAX_VALUE / 2;</span>
+<span class="nc" id="L140">        int depthPenalty = state.depth() * 2;</span>
+<span class="nc" id="L141">        int expansionPenalty = state.expandedStepCount() * 5;</span>
+<span class="nc bnc" id="L142" title="All 4 branches missed.">        int noImprovementPenalty = state.improvement() &lt;= 0 &amp;&amp; state.depth() &gt; 0 ? 4 : 0;</span>
+<span class="nc" id="L143">        int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (modelCost == Integer.MAX_VALUE) {</span>
+<span class="nc" id="L145">            return Integer.MAX_VALUE / 2;</span>
         }
-<span class="nc" id="L135">        return modelCost + depthPenalty + expansionPenalty + noImprovementPenalty;</span>
+<span class="nc" id="L147">        return modelCost + depthPenalty + expansionPenalty + noImprovementPenalty;</span>
     }
 
     private String stateKey(SearchState state) {
-<span class="fc" id="L139">        return state.canonicalHash() + &quot;:&quot; + state.appliedRuleApplications();</span>
+<span class="fc" id="L151">        return state.canonicalHash() + &quot;:&quot; + String.join(&quot;,&quot;, sortedValues(state.appliedRuleApplications()));</span>
+    }
+
+    private List&lt;String&gt; sortedValues(Set&lt;String&gt; values) {
+<span class="fc" id="L155">        return values.stream().sorted().toList();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

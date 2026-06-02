@@ -22,80 +22,81 @@ import java.util.Set;
 <span class="fc" id="L22">        Set&lt;String&gt; visibleNodeIds = graphNodes.stream().map(DiscoveryBenchmarkEvidence.EvidenceNode::id).collect(java.util.stream.Collectors.toSet());</span>
 <span class="fc" id="L23">        List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; visibleEdges = evidence.edges().stream()</span>
 <span class="fc bfc" id="L24" title="All 4 branches covered.">                .filter(edge -&gt; visibleNodeIds.contains(edge.from()) &amp;&amp; visibleNodeIds.contains(edge.to()))</span>
-<span class="fc" id="L25">                .toList();</span>
-<span class="fc" id="L26">        Map&lt;String, Point&gt; positions = layout(graphNodes);</span>
+<span class="fc" id="L25">                .sorted(evidenceEdgeComparator())</span>
+<span class="fc" id="L26">                .toList();</span>
+<span class="fc" id="L27">        Map&lt;String, Point&gt; positions = layout(graphNodes);</span>
 
-<span class="fc" id="L28">        StringBuilder edges = new StringBuilder();</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : visibleEdges) {</span>
-<span class="fc" id="L30">            Point from = positions.get(edge.from());</span>
-<span class="fc" id="L31">            Point to = positions.get(edge.to());</span>
-<span class="pc bpc" id="L32" title="2 of 4 branches missed.">            if (from == null || to == null) {</span>
-<span class="nc" id="L33">                continue;</span>
+<span class="fc" id="L29">        StringBuilder edges = new StringBuilder();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : visibleEdges) {</span>
+<span class="fc" id="L31">            Point from = positions.get(edge.from());</span>
+<span class="fc" id="L32">            Point to = positions.get(edge.to());</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">            if (from == null || to == null) {</span>
+<span class="nc" id="L34">                continue;</span>
             }
-<span class="fc" id="L35">            boolean selected = hasTag(edge.tags(), &quot;selected-path&quot;);</span>
-<span class="pc bpc" id="L36" title="1 of 4 branches missed.">            boolean macroShortcut = &quot;macro&quot;.equals(edge.kind()) || hasTag(edge.tags(), &quot;macro-shortcut&quot;);</span>
-<span class="fc" id="L37">            String stroke = strokeFor(edge.kind(), selected);</span>
-<span class="fc bfc" id="L38" title="All 2 branches covered.">            int yOffset = macroShortcut ? -32 : 0;</span>
-<span class="fc bfc" id="L39" title="All 2 branches covered.">            String cssClass = &quot;edge &quot; + escapeXml(edge.kind()) + (selected ? &quot; selected&quot; : &quot; alternative&quot;);</span>
-<span class="fc" id="L40">            edges.append(&quot;&lt;path class=\&quot;&quot;).append(cssClass).append(&quot;\&quot; d=\&quot;M &quot;).append(from.x() + 46).append(' ').append(from.y() + yOffset)</span>
-<span class="fc" id="L41">                    .append(&quot; C &quot;).append((from.x() + to.x()) / 2).append(' ').append(from.y() + yOffset - 24)</span>
-<span class="fc" id="L42">                    .append(&quot;, &quot;).append((from.x() + to.x()) / 2).append(' ').append(to.y() + yOffset - 24)</span>
-<span class="fc" id="L43">                    .append(&quot;, &quot;).append(to.x() - 46).append(' ').append(to.y() + yOffset)</span>
-<span class="fc" id="L44">                    .append(&quot;\&quot; fill=\&quot;none\&quot; stroke=\&quot;&quot;).append(stroke).append(&quot;\&quot; stroke-width=\&quot;&quot;)</span>
-<span class="fc bfc" id="L45" title="All 4 branches covered.">                    .append(selected ? 3.2 : macroShortcut ? 2.8 : 1.8)</span>
-<span class="fc" id="L46">                    .append(&quot;\&quot; marker-end=\&quot;url(#arrow)\&quot;&quot;);</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (macroShortcut) {</span>
-<span class="fc" id="L48">                edges.append(&quot; stroke-dasharray=\&quot;8 5\&quot;&quot;);</span>
-<span class="fc bfc" id="L49" title="All 2 branches covered.">            } else if (!selected) {</span>
-<span class="fc" id="L50">                edges.append(&quot; stroke-opacity=\&quot;0.7\&quot;&quot;);</span>
+<span class="fc" id="L36">            boolean selected = hasTag(edge.tags(), &quot;selected-path&quot;);</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">            boolean macroShortcut = &quot;macro&quot;.equals(edge.kind()) || hasTag(edge.tags(), &quot;macro-shortcut&quot;);</span>
+<span class="fc" id="L38">            String stroke = strokeFor(edge.kind(), selected);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            int yOffset = macroShortcut ? -32 : 0;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            String cssClass = &quot;edge &quot; + escapeXml(edge.kind()) + (selected ? &quot; selected&quot; : &quot; alternative&quot;);</span>
+<span class="fc" id="L41">            edges.append(&quot;&lt;path class=\&quot;&quot;).append(cssClass).append(&quot;\&quot; d=\&quot;M &quot;).append(from.x() + 46).append(' ').append(from.y() + yOffset)</span>
+<span class="fc" id="L42">                    .append(&quot; C &quot;).append((from.x() + to.x()) / 2).append(' ').append(from.y() + yOffset - 24)</span>
+<span class="fc" id="L43">                    .append(&quot;, &quot;).append((from.x() + to.x()) / 2).append(' ').append(to.y() + yOffset - 24)</span>
+<span class="fc" id="L44">                    .append(&quot;, &quot;).append(to.x() - 46).append(' ').append(to.y() + yOffset)</span>
+<span class="fc" id="L45">                    .append(&quot;\&quot; fill=\&quot;none\&quot; stroke=\&quot;&quot;).append(stroke).append(&quot;\&quot; stroke-width=\&quot;&quot;)</span>
+<span class="fc bfc" id="L46" title="All 4 branches covered.">                    .append(selected ? 3.2 : macroShortcut ? 2.8 : 1.8)</span>
+<span class="fc" id="L47">                    .append(&quot;\&quot; marker-end=\&quot;url(#arrow)\&quot;&quot;);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (macroShortcut) {</span>
+<span class="fc" id="L49">                edges.append(&quot; stroke-dasharray=\&quot;8 5\&quot;&quot;);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            } else if (!selected) {</span>
+<span class="fc" id="L51">                edges.append(&quot; stroke-opacity=\&quot;0.7\&quot;&quot;);</span>
             }
-<span class="fc" id="L52">            edges.append(&quot;&gt;&lt;title&gt;&quot;).append(escapeXml(edge.ruleId())).append(&quot; · &quot;).append(escapeXml(edge.source()))</span>
-<span class="fc" id="L53">                    .append(&quot; · &quot;).append(escapeXml(edge.packId())).append(&quot;&lt;/title&gt;&lt;/path&gt;\n&quot;);</span>
-<span class="fc" id="L54">            edges.append(&quot;&lt;text x=\&quot;&quot;).append((from.x() + to.x()) / 2 - 54).append(&quot;\&quot; y=\&quot;&quot;)</span>
-<span class="fc" id="L55">                    .append((from.y() + to.y()) / 2 + yOffset - 8)</span>
-<span class="fc" id="L56">                    .append(&quot;\&quot; font-size=\&quot;9\&quot; fill=\&quot;&quot;).append(stroke).append(&quot;\&quot;&quot;)</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">                    .append(selected ? &quot; font-weight=\&quot;700\&quot;&quot; : &quot;&quot;)</span>
-<span class="fc" id="L58">                    .append(&quot;&gt;&quot;)</span>
-<span class="fc" id="L59">                    .append(escapeXml(shorten(edge.ruleId(), 30))).append(&quot;&lt;title&gt;&quot;)</span>
-<span class="fc" id="L60">                    .append(escapeXml(edge.ruleId())).append(&quot;&lt;/title&gt;&lt;/text&gt;\n&quot;);</span>
-<span class="fc" id="L61">        }</span>
+<span class="fc" id="L53">            edges.append(&quot;&gt;&lt;title&gt;&quot;).append(escapeXml(edge.ruleId())).append(&quot; · &quot;).append(escapeXml(edge.source()))</span>
+<span class="fc" id="L54">                    .append(&quot; · &quot;).append(escapeXml(edge.packId())).append(&quot;&lt;/title&gt;&lt;/path&gt;\n&quot;);</span>
+<span class="fc" id="L55">            edges.append(&quot;&lt;text x=\&quot;&quot;).append((from.x() + to.x()) / 2 - 54).append(&quot;\&quot; y=\&quot;&quot;)</span>
+<span class="fc" id="L56">                    .append((from.y() + to.y()) / 2 + yOffset - 8)</span>
+<span class="fc" id="L57">                    .append(&quot;\&quot; font-size=\&quot;9\&quot; fill=\&quot;&quot;).append(stroke).append(&quot;\&quot;&quot;)</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                    .append(selected ? &quot; font-weight=\&quot;700\&quot;&quot; : &quot;&quot;)</span>
+<span class="fc" id="L59">                    .append(&quot;&gt;&quot;)</span>
+<span class="fc" id="L60">                    .append(escapeXml(shorten(edge.ruleId(), 30))).append(&quot;&lt;title&gt;&quot;)</span>
+<span class="fc" id="L61">                    .append(escapeXml(edge.ruleId())).append(&quot;&lt;/title&gt;&lt;/text&gt;\n&quot;);</span>
+<span class="fc" id="L62">        }</span>
 
-<span class="fc" id="L63">        StringBuilder nodes = new StringBuilder();</span>
-<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : graphNodes) {</span>
-<span class="fc" id="L65">            Point point = positions.get(node.id());</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (point == null) {</span>
-<span class="nc" id="L67">                continue;</span>
+<span class="fc" id="L64">        StringBuilder nodes = new StringBuilder();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : graphNodes) {</span>
+<span class="fc" id="L66">            Point point = positions.get(node.id());</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            if (point == null) {</span>
+<span class="nc" id="L68">                continue;</span>
             }
-<span class="pc bpc" id="L69" title="1 of 4 branches missed.">            boolean isInput = &quot;input&quot;.equals(node.kind()) || hasTag(node.tags(), &quot;input&quot;);</span>
-<span class="pc bpc" id="L70" title="1 of 4 branches missed.">            boolean isTarget = &quot;target&quot;.equals(node.kind()) || hasTag(node.tags(), &quot;target&quot;);</span>
-<span class="fc" id="L71">            boolean selected = hasTag(node.tags(), &quot;selected-path&quot;);</span>
-<span class="fc" id="L72">            boolean deadEnd = hasTag(node.tags(), &quot;dead-end&quot;);</span>
-<span class="fc bfc" id="L73" title="All 6 branches covered.">            String fill = isTarget ? &quot;#dcfce7&quot; : isInput ? &quot;#dbeafe&quot; : selected ? &quot;#ede9fe&quot; : &quot;#f8fafc&quot;;</span>
-<span class="fc bfc" id="L74" title="All 8 branches covered.">            String stroke = isTarget ? &quot;#16a34a&quot; : isInput ? &quot;#2563eb&quot; : selected ? &quot;#7c3aed&quot; : deadEnd ? &quot;#ef4444&quot; : &quot;#334155&quot;;</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">            nodes.append(&quot;&lt;g class=\&quot;node &quot;).append(escapeXml(node.kind())).append(selected ? &quot; selected&quot; : &quot; alternative&quot;)</span>
-<span class="fc bfc" id="L76" title="All 2 branches covered.">                    .append(deadEnd ? &quot; dead-end&quot; : &quot;&quot;).append(&quot;\&quot;&gt;&quot;);</span>
-<span class="fc" id="L77">            nodes.append(&quot;&lt;rect id=\&quot;&quot;).append(escapeXml(node.id())).append(&quot;\&quot; x=\&quot;&quot;).append(point.x() - 60)</span>
-<span class="fc" id="L78">                    .append(&quot;\&quot; y=\&quot;&quot;).append(point.y() - 24)</span>
-<span class="fc" id="L79">                    .append(&quot;\&quot; width=\&quot;120\&quot; height=\&quot;48\&quot; rx=\&quot;12\&quot; fill=\&quot;&quot;).append(fill)</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">                    .append(&quot;\&quot; stroke=\&quot;&quot;).append(stroke).append(&quot;\&quot; stroke-width=\&quot;&quot;).append(selected ? 2.8 : 2).append(&quot;\&quot;/&gt;&quot;);</span>
-<span class="fc" id="L81">            nodes.append(&quot;&lt;title&gt;&quot;).append(escapeXml(node.label())).append(&quot;&lt;/title&gt;&quot;);</span>
-<span class="fc" id="L82">            nodes.append(&quot;&lt;text x=\&quot;&quot;).append(point.x() - 52).append(&quot;\&quot; y=\&quot;&quot;).append(point.y() - 2)</span>
-<span class="fc" id="L83">                    .append(&quot;\&quot; font-size=\&quot;10\&quot;&gt;&quot;).append(escapeXml(shorten(node.label(), 24))).append(&quot;&lt;/text&gt;&quot;);</span>
-<span class="fc" id="L84">            nodes.append(&quot;&lt;text x=\&quot;&quot;).append(point.x() - 52).append(&quot;\&quot; y=\&quot;&quot;).append(point.y() + 13)</span>
-<span class="fc" id="L85">                    .append(&quot;\&quot; font-size=\&quot;9\&quot; fill=\&quot;#64748b\&quot;&gt;&quot;).append(escapeXml(roleLabel(node))).append(&quot;&lt;/text&gt;&quot;);</span>
-<span class="fc" id="L86">            nodes.append(&quot;&lt;/g&gt;\n&quot;);</span>
-<span class="fc" id="L87">        }</span>
+<span class="pc bpc" id="L70" title="1 of 4 branches missed.">            boolean isInput = &quot;input&quot;.equals(node.kind()) || hasTag(node.tags(), &quot;input&quot;);</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">            boolean isTarget = &quot;target&quot;.equals(node.kind()) || hasTag(node.tags(), &quot;target&quot;);</span>
+<span class="fc" id="L72">            boolean selected = hasTag(node.tags(), &quot;selected-path&quot;);</span>
+<span class="fc" id="L73">            boolean deadEnd = hasTag(node.tags(), &quot;dead-end&quot;);</span>
+<span class="fc bfc" id="L74" title="All 6 branches covered.">            String fill = isTarget ? &quot;#dcfce7&quot; : isInput ? &quot;#dbeafe&quot; : selected ? &quot;#ede9fe&quot; : &quot;#f8fafc&quot;;</span>
+<span class="fc bfc" id="L75" title="All 8 branches covered.">            String stroke = isTarget ? &quot;#16a34a&quot; : isInput ? &quot;#2563eb&quot; : selected ? &quot;#7c3aed&quot; : deadEnd ? &quot;#ef4444&quot; : &quot;#334155&quot;;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            nodes.append(&quot;&lt;g class=\&quot;node &quot;).append(escapeXml(node.kind())).append(selected ? &quot; selected&quot; : &quot; alternative&quot;)</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                    .append(deadEnd ? &quot; dead-end&quot; : &quot;&quot;).append(&quot;\&quot;&gt;&quot;);</span>
+<span class="fc" id="L78">            nodes.append(&quot;&lt;rect id=\&quot;&quot;).append(escapeXml(node.id())).append(&quot;\&quot; x=\&quot;&quot;).append(point.x() - 60)</span>
+<span class="fc" id="L79">                    .append(&quot;\&quot; y=\&quot;&quot;).append(point.y() - 24)</span>
+<span class="fc" id="L80">                    .append(&quot;\&quot; width=\&quot;120\&quot; height=\&quot;48\&quot; rx=\&quot;12\&quot; fill=\&quot;&quot;).append(fill)</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                    .append(&quot;\&quot; stroke=\&quot;&quot;).append(stroke).append(&quot;\&quot; stroke-width=\&quot;&quot;).append(selected ? 2.8 : 2).append(&quot;\&quot;/&gt;&quot;);</span>
+<span class="fc" id="L82">            nodes.append(&quot;&lt;title&gt;&quot;).append(escapeXml(node.label())).append(&quot;&lt;/title&gt;&quot;);</span>
+<span class="fc" id="L83">            nodes.append(&quot;&lt;text x=\&quot;&quot;).append(point.x() - 52).append(&quot;\&quot; y=\&quot;&quot;).append(point.y() - 2)</span>
+<span class="fc" id="L84">                    .append(&quot;\&quot; font-size=\&quot;10\&quot;&gt;&quot;).append(escapeXml(shorten(node.label(), 24))).append(&quot;&lt;/text&gt;&quot;);</span>
+<span class="fc" id="L85">            nodes.append(&quot;&lt;text x=\&quot;&quot;).append(point.x() - 52).append(&quot;\&quot; y=\&quot;&quot;).append(point.y() + 13)</span>
+<span class="fc" id="L86">                    .append(&quot;\&quot; font-size=\&quot;9\&quot; fill=\&quot;#64748b\&quot;&gt;&quot;).append(escapeXml(roleLabel(node))).append(&quot;&lt;/text&gt;&quot;);</span>
+<span class="fc" id="L87">            nodes.append(&quot;&lt;/g&gt;\n&quot;);</span>
+<span class="fc" id="L88">        }</span>
 
-<span class="fc" id="L89">        int maxY = positions.values().stream().mapToInt(Point::y).max().orElse(TOP);</span>
-<span class="fc" id="L90">        int height = Math.max(340, maxY + 170);</span>
-<span class="pc bpc" id="L91" title="1 of 4 branches missed.">        String smallGraphMessage = evidence.smallGraphMessage() == null || evidence.smallGraphMessage().isBlank()</span>
-<span class="fc" id="L92">                ? &quot;&quot;</span>
-<span class="fc" id="L93">                : &quot;&lt;text x=\&quot;40\&quot; y=\&quot;&quot; + (height - 24) + &quot;\&quot; font-size=\&quot;12\&quot;&gt;&quot; + escapeXml(evidence.smallGraphMessage()) + &quot;&lt;/text&gt;&quot;;</span>
-<span class="fc" id="L94">        String stats = &quot;&lt;text x=\&quot;40\&quot; y=\&quot;&quot; + (height - 48) + &quot;\&quot; font-size=\&quot;12\&quot; fill=\&quot;#475569\&quot;&gt;&quot;</span>
-<span class="fc" id="L95">                + &quot;Visible: &quot; + graphNodes.size() + &quot;/&quot; + evidence.nodeCount()</span>
-<span class="fc" id="L96">                + &quot; nodes · &quot; + visibleEdges.size() + &quot;/&quot; + evidence.edgeCount() + &quot; edges&lt;/text&gt;&quot;;</span>
+<span class="fc" id="L90">        int maxY = positions.values().stream().mapToInt(Point::y).max().orElse(TOP);</span>
+<span class="fc" id="L91">        int height = Math.max(340, maxY + 170);</span>
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">        String smallGraphMessage = evidence.smallGraphMessage() == null || evidence.smallGraphMessage().isBlank()</span>
+<span class="fc" id="L93">                ? &quot;&quot;</span>
+<span class="fc" id="L94">                : &quot;&lt;text x=\&quot;40\&quot; y=\&quot;&quot; + (height - 24) + &quot;\&quot; font-size=\&quot;12\&quot;&gt;&quot; + escapeXml(evidence.smallGraphMessage()) + &quot;&lt;/text&gt;&quot;;</span>
+<span class="fc" id="L95">        String stats = &quot;&lt;text x=\&quot;40\&quot; y=\&quot;&quot; + (height - 48) + &quot;\&quot; font-size=\&quot;12\&quot; fill=\&quot;#475569\&quot;&gt;&quot;</span>
+<span class="fc" id="L96">                + &quot;Visible: &quot; + graphNodes.size() + &quot;/&quot; + evidence.nodeCount()</span>
+<span class="fc" id="L97">                + &quot; nodes · &quot; + visibleEdges.size() + &quot;/&quot; + evidence.edgeCount() + &quot; edges&lt;/text&gt;&quot;;</span>
 
-<span class="fc" id="L98">        return &quot;&quot;&quot;</span>
+<span class="fc" id="L99">        return &quot;&quot;&quot;</span>
                 &lt;svg xmlns=\&quot;http://www.w3.org/2000/svg\&quot; width=\&quot;${width}\&quot; height=\&quot;${height}\&quot; viewBox=\&quot;0 0 ${width} ${height}\&quot; data-generated-by=\&quot;SearchSpaceGallerySvgWriter\&quot; data-scenario-id=\&quot;${scenarioId}\&quot; data-evidence=\&quot;${evidenceFile}\&quot; data-node-count=\&quot;${nodeCount}\&quot; data-edge-count=\&quot;${edgeCount}\&quot;&gt;
                   &lt;rect width=\&quot;100%\&quot; height=\&quot;100%\&quot; fill=\&quot;#f8fafc\&quot;/&gt;
                   &lt;defs&gt;&lt;marker id=\&quot;arrow\&quot; markerWidth=\&quot;10\&quot; markerHeight=\&quot;10\&quot; refX=\&quot;10\&quot; refY=\&quot;3\&quot; orient=\&quot;auto\&quot;&gt;&lt;path d=\&quot;M0,0 L0,6 L9,3 z\&quot; fill=\&quot;#475569\&quot;/&gt;&lt;/marker&gt;&lt;/defs&gt;
@@ -108,147 +109,162 @@ import java.util.Set;
                   ${smallGraphMessage}
                 &lt;/svg&gt;
                 &quot;&quot;&quot;
-<span class="fc" id="L111">                .replace(&quot;${width}&quot;, Integer.toString(WIDTH))</span>
-<span class="fc" id="L112">                .replace(&quot;${height}&quot;, Integer.toString(height))</span>
-<span class="fc" id="L113">                .replace(&quot;${scenarioId}&quot;, escapeXml(evidence.scenarioId()))</span>
-<span class="fc" id="L114">                .replace(&quot;${evidenceFile}&quot;, escapeXml(evidenceFileName))</span>
-<span class="fc" id="L115">                .replace(&quot;${nodeCount}&quot;, Integer.toString(evidence.nodeCount()))</span>
-<span class="fc" id="L116">                .replace(&quot;${edgeCount}&quot;, Integer.toString(evidence.edgeCount()))</span>
-<span class="fc" id="L117">                .replace(&quot;${input}&quot;, escapeXml(shorten(evidence.inputExpression(), 46)))</span>
-<span class="fc" id="L118">                .replace(&quot;${target}&quot;, escapeXml(shorten(evidence.targetExpression(), 60)))</span>
-<span class="fc" id="L119">                .replace(&quot;${targetX}&quot;, Integer.toString(WIDTH - 40))</span>
-<span class="fc" id="L120">                .replace(&quot;${edges}&quot;, edges.toString())</span>
-<span class="fc" id="L121">                .replace(&quot;${nodes}&quot;, nodes.toString())</span>
-<span class="fc" id="L122">                .replace(&quot;${legendY}&quot;, Integer.toString(height - 70))</span>
-<span class="fc" id="L123">                .replace(&quot;${stats}&quot;, stats)</span>
-<span class="fc" id="L124">                .replace(&quot;${smallGraphMessage}&quot;, smallGraphMessage);</span>
+<span class="fc" id="L112">                .replace(&quot;${width}&quot;, Integer.toString(WIDTH))</span>
+<span class="fc" id="L113">                .replace(&quot;${height}&quot;, Integer.toString(height))</span>
+<span class="fc" id="L114">                .replace(&quot;${scenarioId}&quot;, escapeXml(evidence.scenarioId()))</span>
+<span class="fc" id="L115">                .replace(&quot;${evidenceFile}&quot;, escapeXml(evidenceFileName))</span>
+<span class="fc" id="L116">                .replace(&quot;${nodeCount}&quot;, Integer.toString(evidence.nodeCount()))</span>
+<span class="fc" id="L117">                .replace(&quot;${edgeCount}&quot;, Integer.toString(evidence.edgeCount()))</span>
+<span class="fc" id="L118">                .replace(&quot;${input}&quot;, escapeXml(shorten(evidence.inputExpression(), 46)))</span>
+<span class="fc" id="L119">                .replace(&quot;${target}&quot;, escapeXml(shorten(evidence.targetExpression(), 60)))</span>
+<span class="fc" id="L120">                .replace(&quot;${targetX}&quot;, Integer.toString(WIDTH - 40))</span>
+<span class="fc" id="L121">                .replace(&quot;${edges}&quot;, edges.toString())</span>
+<span class="fc" id="L122">                .replace(&quot;${nodes}&quot;, nodes.toString())</span>
+<span class="fc" id="L123">                .replace(&quot;${legendY}&quot;, Integer.toString(height - 70))</span>
+<span class="fc" id="L124">                .replace(&quot;${stats}&quot;, stats)</span>
+<span class="fc" id="L125">                .replace(&quot;${smallGraphMessage}&quot;, smallGraphMessage);</span>
     }
 
     private List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; selectVisibleNodes(DiscoveryBenchmarkEvidence evidence) {
-<span class="fc" id="L128">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; all = evidence.nodes();</span>
-<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (all.size() &lt;= MAX_VISIBLE_NODES) {</span>
-<span class="fc" id="L130">            return all;</span>
+<span class="fc" id="L129">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; all = evidence.nodes();</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (all.size() &lt;= MAX_VISIBLE_NODES) {</span>
+<span class="fc" id="L131">            return all;</span>
         }
-<span class="fc" id="L132">        Map&lt;String, DiscoveryBenchmarkEvidence.EvidenceNode&gt; byId = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : all) {</span>
-<span class="fc" id="L134">            byId.put(node.id(), node);</span>
-<span class="fc" id="L135">        }</span>
-<span class="fc" id="L136">        LinkedHashSet&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; required = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : all) {</span>
-<span class="pc bpc" id="L138" title="1 of 6 branches missed.">            if (hasTag(node.tags(), &quot;selected-path&quot;) || &quot;input&quot;.equals(node.kind()) || &quot;target&quot;.equals(node.kind())) {</span>
-<span class="fc" id="L139">                required.add(node);</span>
+<span class="fc" id="L133">        Map&lt;String, DiscoveryBenchmarkEvidence.EvidenceNode&gt; byId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : all) {</span>
+<span class="fc" id="L135">            byId.put(node.id(), node);</span>
+<span class="fc" id="L136">        }</span>
+<span class="fc" id="L137">        LinkedHashSet&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; required = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : all) {</span>
+<span class="fc bfc" id="L139" title="All 6 branches covered.">            if (hasTag(node.tags(), &quot;selected-path&quot;) || &quot;input&quot;.equals(node.kind()) || &quot;target&quot;.equals(node.kind())) {</span>
+<span class="fc" id="L140">                required.add(node);</span>
             }
-<span class="fc" id="L141">        }</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges()) {</span>
-<span class="pc bpc" id="L143" title="1 of 4 branches missed.">            if (&quot;bridge&quot;.equals(edge.kind()) || &quot;macro&quot;.equals(edge.kind())) {</span>
-<span class="fc" id="L144">                DiscoveryBenchmarkEvidence.EvidenceNode from = byId.get(edge.from());</span>
-<span class="fc" id="L145">                DiscoveryBenchmarkEvidence.EvidenceNode to = byId.get(edge.to());</span>
-<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                if (from != null) {</span>
-<span class="fc" id="L147">                    required.add(from);</span>
-                }
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                if (to != null) {</span>
-<span class="fc" id="L150">                    required.add(to);</span>
-                }
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                if (required.size() &gt;= MIN_VISIBLE_NODES) {</span>
-<span class="fc" id="L153">                    break;</span>
-                }
+<span class="fc" id="L142">        }</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges().stream()</span>
+<span class="fc bfc" id="L144" title="All 4 branches covered.">                .filter(candidate -&gt; &quot;bridge&quot;.equals(candidate.kind()) || &quot;macro&quot;.equals(candidate.kind()))</span>
+<span class="fc" id="L145">                .sorted(evidenceEdgeComparator())</span>
+<span class="fc" id="L146">                .toList()) {</span>
+<span class="fc" id="L147">            DiscoveryBenchmarkEvidence.EvidenceNode from = byId.get(edge.from());</span>
+<span class="fc" id="L148">            DiscoveryBenchmarkEvidence.EvidenceNode to = byId.get(edge.to());</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (from != null) {</span>
+<span class="fc" id="L150">                required.add(from);</span>
             }
-<span class="fc" id="L156">        }</span>
-<span class="fc" id="L157">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; ranked = new ArrayList&lt;&gt;(all);</span>
-<span class="fc" id="L158">        ranked.sort(Comparator</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">                .comparing((DiscoveryBenchmarkEvidence.EvidenceNode node) -&gt; !hasTag(node.tags(), &quot;selected-path&quot;))</span>
-<span class="fc bfc" id="L160" title="All 4 branches covered.">                .thenComparing(node -&gt; &quot;target&quot;.equals(node.kind()) ? 0 : &quot;input&quot;.equals(node.kind()) ? 1 : 2)</span>
-<span class="fc" id="L161">                .thenComparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth)</span>
-<span class="fc" id="L162">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label));</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (to != null) {</span>
+<span class="fc" id="L153">                required.add(to);</span>
+            }
+<span class="fc" id="L155">        }</span>
+<span class="fc" id="L156">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; ranked = new ArrayList&lt;&gt;(all);</span>
+<span class="fc" id="L157">        ranked.sort(Comparator</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                .comparing((DiscoveryBenchmarkEvidence.EvidenceNode node) -&gt; !hasTag(node.tags(), &quot;selected-path&quot;))</span>
+<span class="fc bfc" id="L159" title="All 4 branches covered.">                .thenComparing(node -&gt; &quot;target&quot;.equals(node.kind()) ? 0 : &quot;input&quot;.equals(node.kind()) ? 1 : 2)</span>
+<span class="fc" id="L160">                .thenComparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth)</span>
+<span class="fc" id="L161">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label)</span>
+<span class="fc" id="L162">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::id));</span>
 <span class="fc" id="L163">        int preferredVisible = Math.max(MIN_VISIBLE_NODES, Math.min(MAX_VISIBLE_NODES, ranked.size()));</span>
 <span class="fc" id="L164">        LinkedHashSet&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; selected = new LinkedHashSet&lt;&gt;();</span>
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : ranked) {</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : ranked) {</span>
 <span class="fc bfc" id="L166" title="All 2 branches covered.">            if (selected.size() &gt;= preferredVisible) {</span>
 <span class="fc" id="L167">                break;</span>
             }
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            if (required.contains(node)) {</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (required.contains(node)) {</span>
 <span class="fc" id="L170">                selected.add(node);</span>
             }
 <span class="fc" id="L172">        }</span>
 <span class="pc bpc" id="L173" title="1 of 2 branches missed.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : ranked) {</span>
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (selected.size() &gt;= preferredVisible) {</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            if (selected.size() &gt;= preferredVisible) {</span>
 <span class="fc" id="L175">                break;</span>
             }
-<span class="nc" id="L177">            selected.add(node);</span>
-<span class="nc" id="L178">        }</span>
+<span class="fc" id="L177">            selected.add(node);</span>
+<span class="fc" id="L178">        }</span>
 <span class="fc" id="L179">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; visible = new ArrayList&lt;&gt;(selected);</span>
-<span class="fc" id="L180">        visible.sort(Comparator.comparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth).thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label));</span>
-<span class="fc" id="L181">        return visible;</span>
+<span class="fc" id="L180">        visible.sort(Comparator.comparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth)</span>
+<span class="fc" id="L181">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label)</span>
+<span class="fc" id="L182">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::id));</span>
+<span class="fc" id="L183">        return visible;</span>
     }
 
     private Map&lt;String, Point&gt; layout(List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; graphNodes) {
-<span class="fc" id="L185">        Map&lt;Integer, List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt;&gt; byLevel = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : graphNodes) {</span>
-<span class="fc" id="L187">            int level = Math.max(0, node.depth());</span>
-<span class="fc" id="L188">            byLevel.computeIfAbsent(level, ignored -&gt; new ArrayList&lt;&gt;()).add(node);</span>
-<span class="fc" id="L189">        }</span>
-<span class="fc" id="L190">        byLevel.values().forEach(nodes -&gt; nodes.sort(Comparator.comparing(DiscoveryBenchmarkEvidence.EvidenceNode::label)));</span>
-<span class="fc" id="L191">        int maxLevel = byLevel.keySet().stream().mapToInt(Integer::intValue).max().orElse(1);</span>
+<span class="fc" id="L187">        Map&lt;Integer, List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt;&gt; byLevel = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceNode node : graphNodes) {</span>
+<span class="fc" id="L189">            int level = Math.max(0, node.depth());</span>
+<span class="fc" id="L190">            byLevel.computeIfAbsent(level, ignored -&gt; new ArrayList&lt;&gt;()).add(node);</span>
+<span class="fc" id="L191">        }</span>
+<span class="fc" id="L192">        byLevel.values().forEach(nodes -&gt; nodes.sort(Comparator.comparing(DiscoveryBenchmarkEvidence.EvidenceNode::label)));</span>
+<span class="fc" id="L193">        int maxLevel = byLevel.keySet().stream().mapToInt(Integer::intValue).max().orElse(1);</span>
 
-<span class="fc" id="L193">        Map&lt;String, Point&gt; positions = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt;&gt; entry : byLevel.entrySet()) {</span>
-<span class="fc" id="L195">            int level = entry.getKey();</span>
-<span class="fc" id="L196">            int x = LEFT + (int) Math.round((RIGHT - LEFT) * (level / (double) Math.max(1, maxLevel)));</span>
-<span class="fc" id="L197">            List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; laneNodes = entry.getValue();</span>
-<span class="fc bfc" id="L198" title="All 2 branches covered.">            for (int index = 0; index &lt; laneNodes.size(); index++) {</span>
-<span class="fc" id="L199">                int y = TOP + index * LANE_GAP + (level % 2) * 14;</span>
-<span class="fc" id="L200">                positions.put(laneNodes.get(index).id(), new Point(x, y));</span>
+<span class="fc" id="L195">        Map&lt;String, Point&gt; positions = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt;&gt; entry : byLevel.entrySet()) {</span>
+<span class="fc" id="L197">            int level = entry.getKey();</span>
+<span class="fc" id="L198">            int x = LEFT + (int) Math.round((RIGHT - LEFT) * (level / (double) Math.max(1, maxLevel)));</span>
+<span class="fc" id="L199">            List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; laneNodes = entry.getValue();</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            for (int index = 0; index &lt; laneNodes.size(); index++) {</span>
+<span class="fc" id="L201">                int y = TOP + index * LANE_GAP + (level % 2) * 14;</span>
+<span class="fc" id="L202">                positions.put(laneNodes.get(index).id(), new Point(x, y));</span>
             }
-<span class="fc" id="L202">        }</span>
-<span class="fc" id="L203">        return positions;</span>
+<span class="fc" id="L204">        }</span>
+<span class="fc" id="L205">        return positions;</span>
     }
 
     private String roleLabel(DiscoveryBenchmarkEvidence.EvidenceNode node) {
-<span class="fc" id="L207">        LinkedHashSet&lt;String&gt; labels = new LinkedHashSet&lt;&gt;();</span>
-<span class="pc bpc" id="L208" title="1 of 4 branches missed.">        if (&quot;input&quot;.equals(node.kind()) || hasTag(node.tags(), &quot;input&quot;)) {</span>
-<span class="fc" id="L209">            labels.add(&quot;input&quot;);</span>
+<span class="fc" id="L209">        LinkedHashSet&lt;String&gt; labels = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">        if (&quot;input&quot;.equals(node.kind()) || hasTag(node.tags(), &quot;input&quot;)) {</span>
+<span class="fc" id="L211">            labels.add(&quot;input&quot;);</span>
         }
-<span class="pc bpc" id="L211" title="1 of 4 branches missed.">        if (&quot;target&quot;.equals(node.kind()) || hasTag(node.tags(), &quot;target&quot;)) {</span>
-<span class="fc" id="L212">            labels.add(&quot;target&quot;);</span>
+<span class="pc bpc" id="L213" title="1 of 4 branches missed.">        if (&quot;target&quot;.equals(node.kind()) || hasTag(node.tags(), &quot;target&quot;)) {</span>
+<span class="fc" id="L214">            labels.add(&quot;target&quot;);</span>
         }
-<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (hasTag(node.tags(), &quot;selected-path&quot;)) {</span>
-<span class="fc" id="L215">            labels.add(&quot;selected&quot;);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (hasTag(node.tags(), &quot;selected-path&quot;)) {</span>
+<span class="fc" id="L217">            labels.add(&quot;selected&quot;);</span>
         }
-<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (hasTag(node.tags(), &quot;dead-end&quot;)) {</span>
-<span class="fc" id="L218">            labels.add(&quot;dead-end&quot;);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (hasTag(node.tags(), &quot;dead-end&quot;)) {</span>
+<span class="fc" id="L220">            labels.add(&quot;dead-end&quot;);</span>
         }
-<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (labels.isEmpty()) {</span>
-<span class="fc" id="L221">            labels.add(&quot;alternative&quot;);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (labels.isEmpty()) {</span>
+<span class="fc" id="L223">            labels.add(&quot;alternative&quot;);</span>
         }
-<span class="fc" id="L223">        return String.join(&quot; · &quot;, labels);</span>
+<span class="fc" id="L225">        return String.join(&quot; · &quot;, labels);</span>
     }
 
     private boolean hasTag(List&lt;String&gt; tags, String tag) {
-<span class="pc bpc" id="L227" title="1 of 4 branches missed.">        return tags != null &amp;&amp; tags.contains(tag);</span>
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">        return tags != null &amp;&amp; tags.contains(tag);</span>
+    }
+
+    private Comparator&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; evidenceEdgeComparator() {
+<span class="fc" id="L233">        return Comparator.comparing(DiscoveryBenchmarkEvidence.EvidenceEdge::from)</span>
+<span class="fc" id="L234">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::to)</span>
+<span class="fc" id="L235">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::ruleId)</span>
+<span class="fc" id="L236">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::kind)</span>
+<span class="fc" id="L237">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::source)</span>
+<span class="fc" id="L238">                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::packId)</span>
+<span class="pc" id="L239">                .thenComparing(edge -&gt; edge.searchEffect().stream()</span>
+<span class="nc" id="L240">                        .map(Enum::name)</span>
+<span class="nc" id="L241">                        .sorted()</span>
+<span class="nc" id="L242">                        .collect(java.util.stream.Collectors.joining(&quot;|&quot;)))</span>
+<span class="pc" id="L243">                .thenComparing(edge -&gt; edge.tags().stream().sorted().collect(java.util.stream.Collectors.joining(&quot;|&quot;)));</span>
     }
 
     private String strokeFor(String kind, boolean selectedPath) {
-<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (&quot;bridge&quot;.equals(kind)) {</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">            return selectedPath ? &quot;#b45309&quot; : &quot;#d97706&quot;;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (&quot;bridge&quot;.equals(kind)) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            return selectedPath ? &quot;#b45309&quot; : &quot;#d97706&quot;;</span>
         }
-<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (&quot;macro&quot;.equals(kind)) {</span>
-<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            return selectedPath ? &quot;#6d28d9&quot; : &quot;#7c3aed&quot;;</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (&quot;macro&quot;.equals(kind)) {</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            return selectedPath ? &quot;#6d28d9&quot; : &quot;#7c3aed&quot;;</span>
         }
-<span class="fc bfc" id="L237" title="All 2 branches covered.">        return selectedPath ? &quot;#5b21b6&quot; : &quot;#475569&quot;;</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        return selectedPath ? &quot;#5b21b6&quot; : &quot;#475569&quot;;</span>
     }
 
     private String shorten(String text, int maxLength) {
-<span class="pc bpc" id="L241" title="1 of 4 branches missed.">        if (text == null || text.length() &lt;= maxLength) {</span>
-<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            return text == null ? &quot;&quot; : text;</span>
+<span class="pc bpc" id="L257" title="1 of 4 branches missed.">        if (text == null || text.length() &lt;= maxLength) {</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            return text == null ? &quot;&quot; : text;</span>
         }
-<span class="fc" id="L244">        return text.substring(0, Math.max(0, maxLength - 1)) + &quot;…&quot;;</span>
+<span class="fc" id="L260">        return text.substring(0, Math.max(0, maxLength - 1)) + &quot;…&quot;;</span>
     }
 
     private String escapeXml(String text) {
-<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        return text == null ? &quot;&quot; : text.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;).replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        return text == null ? &quot;&quot; : text.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;).replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
     }
 
-<span class="fc" id="L251">    private record Point(int x, int y) {</span>
+<span class="fc" id="L267">    private record Point(int x, int y) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

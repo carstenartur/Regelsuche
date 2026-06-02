@@ -26,7 +26,7 @@ public record DiscoveryBenchmarkScenario(
 <span class="pc bpc" id="L26" title="1 of 2 branches missed.">        requiredRuleFamilies = requiredRuleFamilies == null ? List.of() : List.copyOf(requiredRuleFamilies);</span>
 <span class="pc bpc" id="L27" title="1 of 2 branches missed.">        requiredBridgeRules = requiredBridgeRules == null ? List.of() : List.copyOf(requiredBridgeRules);</span>
 <span class="fc bfc" id="L28" title="All 2 branches covered.">        macroLearning = macroLearning == null ? new MacroLearning(false, null, null) : macroLearning;</span>
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        gallery = gallery == null ? new Gallery(false, 1, 1) : gallery;</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        gallery = gallery == null ? new Gallery(false, 1, 1) : gallery;</span>
 <span class="fc" id="L30">    }</span>
 
 <span class="fc" id="L32">    public record MacroLearning(boolean enabled, String reuseInputExpression, String expectedMacroRule) {</span>
