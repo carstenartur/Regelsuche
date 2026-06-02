@@ -32,7 +32,7 @@ public final class TelescopingDifferenceAstPredicate {
         if (expression instanceof BinaryExpr binary) {
             if (binary.operator() == BinaryOperator.SUB
                 && unitDenominator(binary.left()) != null
-                && isUnitStep(unitDenominator(binary.right()), unitDenominator(binary.left()))) {
+                && isPositiveIntegerStep(unitDenominator(binary.right()), unitDenominator(binary.left()))) {
                 return true;
             }
             return containsTelescopingDifference(binary.left()) || containsTelescopingDifference(binary.right());
@@ -53,7 +53,7 @@ public final class TelescopingDifferenceAstPredicate {
         return null;
     }
 
-    private static boolean isUnitStep(Expr candidate, Expr base) {
+    private static boolean isPositiveIntegerStep(Expr candidate, Expr base) {
         AdditiveOffset candidateOffset = additiveOffset(candidate);
         AdditiveOffset baseOffset = additiveOffset(base);
         if (candidateOffset != null

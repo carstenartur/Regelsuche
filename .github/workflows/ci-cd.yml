@@ -94,7 +94,8 @@ jobs:
       - name: Verify discovery gallery reproducibility
         run: |
           env -u GITHUB_SHA ./gradlew :app:generateDiscoveryGallery
-          git diff --exit-code docs/generated/discovery docs/demo-gallery.md README.md
+          git diff --exit-code -- docs/generated/discovery docs/demo-gallery.md README.md
+          if git status --porcelain -- docs/generated/discovery docs/demo-gallery.md README.md | grep -q .; then echo "Untracked generated files detected"; exit 1; fi
       - name: Generate Pages reports and badge JSON
         if: always()
         run: |
