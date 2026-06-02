@@ -19,10 +19,6 @@ public final class SearchSpaceGallerySvgWriter {
 
     public String write(DiscoveryBenchmarkEvidence evidence, String evidenceFileName) {
         List<DiscoveryBenchmarkEvidence.EvidenceNode> graphNodes = evidence.nodes();
-        Map<String, DiscoveryBenchmarkEvidence.EvidenceNode> nodesById = new LinkedHashMap<>();
-        for (DiscoveryBenchmarkEvidence.EvidenceNode node : graphNodes) {
-            nodesById.put(node.id(), node);
-        }
         Map<String, Point> positions = layout(evidence, graphNodes);
         StringBuilder edges = new StringBuilder();
         for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges()) {
