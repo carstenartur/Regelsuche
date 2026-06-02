@@ -148,7 +148,7 @@ public class BeamSearchStrategy implements SearchStrategy {
     }
 
     private String stateKey(SearchState state) {
-        return state.canonicalHash() + ":" + state.appliedRuleApplications();
+        return state.canonicalHash() + ":" + String.join(",", sortedValues(state.appliedRuleApplications()));
     }
 
     private List<String> sortedValues(Set<String> values) {
