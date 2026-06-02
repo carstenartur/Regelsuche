@@ -89,16 +89,25 @@ final class SearchTraceCollector {
         }
 
         List<DiscoveryBenchmarkEvidence.EvidenceNode> evidenceNodes = nodes.values().stream()
-                .sorted(Comparator.comparingInt((MutableNode node) -> node.depth).thenComparing(node -> node.label))
+                .sorted(Comparator.comparingInt((MutableNode node) -> node.depth)
+                        .thenComparing(node -> node.label)
+                        .thenComparing(node -> node.id))
                 .map(node -> new DiscoveryBenchmarkEvidence.EvidenceNode(
                         node.id,
                         node.label,
                         node.kind,
                         node.depth,
-                        List.copyOf(node.tags)))
+                        sortedStrings(node.tags)))
                 .toList();
         List<DiscoveryBenchmarkEvidence.EvidenceEdge> evidenceEdges = edges.values().stream()
-                .sorted(Comparator.comparing((MutableEdge edge) -> edge.from).thenComparing(edge -> edge.to).thenComparing(edge -> edge.ruleId))
+                .sorted(Comparator.comparing((MutableEdge edge) -> edge.from)
+                        .thenComparing(edge -> edge.to)
+                        .thenComparing(edge -> edge.ruleId)
+                        .thenComparing(edge -> edge.kind)
+                        .thenComparing(edge -> edge.source)
+                        .thenComparing(edge -> edge.packId)
+                        .thenComparing(edge -> searchEffectsKey(edge.searchEffects))
+                        .thenComparing(edge -> tagsKey(edge.tags)))
                 .map(edge -> new DiscoveryBenchmarkEvidence.EvidenceEdge(
                         edge.from,
                         edge.to,
@@ -106,8 +115,8 @@ final class SearchTraceCollector {
                         edge.kind,
                         edge.source,
                         edge.packId,
-                        edge.searchEffects,
-                        List.copyOf(edge.tags)))
+                        sortedSearchEffects(edge.searchEffects),
+                        sortedStrings(edge.tags)))
                 .toList();
         return new TraceGraph(evidenceNodes, evidenceEdges);
     }
@@ -214,6 +223,24 @@ final class SearchTraceCollector {
         }
     }
 
+    private List<SearchEffect> sortedSearchEffects(List<SearchEffect> effects) {
+        return effects == null ? List.of() : effects.stream()
+                .sorted(Comparator.comparing(Enum::name))
+                .toList();
+    }
+
+    private List<String> sortedStrings(Set<String> values) {
+        return values == null ? List.of() : values.stream().sorted().toList();
+    }
+
+    private String searchEffectsKey(List<SearchEffect> effects) {
+        return sortedSearchEffects(effects).stream().map(Enum::name).collect(java.util.stream.Collectors.joining("|"));
+    }
+
+    private String tagsKey(Set<String> tags) {
+        return String.join("|", sortedStrings(tags));
+    }
+
     record SearchRunTrace(boolean success, List<SearchState> exploredStates, List<String> selectedPath, List<String> selectedRuleIds) {
         SearchRunTrace {
             exploredStates = exploredStates == null ? List.of() : List.copyOf(exploredStates);
@@ -268,7 +295,8 @@ final class SearchTraceCollector {
             this.kind = kind;
             this.source = source;
             this.packId = packId;
-            this.searchEffects = List.copyOf(searchEffects == null ? List.of() : searchEffects);
+            this.searchEffects = searchEffects == null ? List.of()
+                    : searchEffects.stream().sorted(Comparator.comparing(Enum::name)).toList();
         }
     }
 }

@@ -54,7 +54,12 @@ public class BeamSearchStrategy implements SearchStrategy {
                     continue;
                 }
                 int generated = 0;
-                for (Transformation transformation : problem.engine().transform(current.expression())) {
+                List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));
+                transformations.sort(Comparator
+                    .comparing(Transformation::rule)
+                    .thenComparing(Transformation::transformedExpression)
+                    .thenComparing(Transformation::applicationKey));
+                for (Transformation transformation : transformations) {
                     if (generated >= problem.heuristic().maxCandidatesPerState()) {
                         break;
                     }
@@ -108,7 +113,14 @@ public class BeamSearchStrategy implements SearchStrategy {
                     generated++;
                 }
             }
-            next.sort(Comparator.comparingInt(state -> priority(state, problem)));
+            next.sort(Comparator
+                .comparingInt((SearchState state) -> priority(state, problem))
+                .thenComparingInt(SearchState::depth)
+                .thenComparing(state -> String.join("->", state.appliedRuleIds()))
+                .thenComparing(SearchState::canonicalHash)
+                .thenComparing(SearchState::expression)
+                .thenComparing(state -> String.join("->", state.path()))
+                .thenComparing(state -> String.join("->", sortedValues(state.appliedRuleApplications()))));
             beam = next.stream().limit(problem.heuristic().beamWidth()).toList();
         }
         return explored;
@@ -136,6 +148,10 @@ public class BeamSearchStrategy implements SearchStrategy {
     }
 
     private String stateKey(SearchState state) {
-        return state.canonicalHash() + ":" + state.appliedRuleApplications();
+        return state.canonicalHash() + ":" + String.join(",", sortedValues(state.appliedRuleApplications()));
+    }
+
+    private List<String> sortedValues(Set<String> values) {
+        return values.stream().sorted().toList();
     }
 }
