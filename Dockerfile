@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 # ---------- Stage 1: Build with Gradle ----------
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace

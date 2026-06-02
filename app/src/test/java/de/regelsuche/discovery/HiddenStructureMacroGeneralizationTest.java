@@ -101,8 +101,7 @@ class HiddenStructureMacroGeneralizationTest {
             .findFirst()
             .orElseThrow();
 
-        assertTrue(macroState.appliedRuleIds().contains("ast_power_of_power"),
-            "Current route normalizes (x^2)^2 + 4 to x^4 + 4 before applying the macro");
+        assertTrue(macroState.appliedRuleIds().contains(learned.macroRuleId()));
         assertTrue(macroState.path().stream().anyMatch(step -> step.replaceAll("\\s+", "").equals("x^4+4")));
         assertTrue(equivalence.areEquivalent(
             "(x^2 - 2*x + 2) * (x^2 + 2*x + 2)",

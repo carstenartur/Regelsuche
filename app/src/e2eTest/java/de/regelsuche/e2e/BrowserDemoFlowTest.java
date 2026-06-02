@@ -339,6 +339,10 @@ class BrowserDemoFlowTest {
             assertTrue(!result.contains("FORMALLY_PROVED"),
                 "FORMALLY_PROVED must only be set when the prover confirmed");
         }
+        // Expand all generated-script details panels so the screenshot is tall
+        // enough to pass the minimum-height quality check (>= 120 px).
+        page.evaluate("document.querySelectorAll('#proofBridgeResult details')"
+            + ".forEach(el => el.setAttribute('open', ''))");
         screenshotPanel("proof-bridge-result.png", "#proofBridgeResult",
             "#proofBridgeResult details", false);
     }

@@ -1,28 +1,30 @@
 {
   "schema": "regelsuche.semantic-graph-debug/v1",
   "fileName": "trigonometry-graph.png",
-  "requestUrl": "/api/search-graph/semantic?mode=semantic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-b1b47d0b",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showMacroSteps=didactic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-b1b47d0b",
   "requestParams": {
     "mode": "semantic",
+    "showMacroSteps": "didactic",
     "showLowSignal": false,
     "showAlternatives": false,
     "showVariants": false,
     "pathId": "demo-b1b47d0b"
   },
   "visibleNodeIds": [
-    "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
-    "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    "didactic-seed-1ynaq6c",
+    "didactic-goal-1d"
   ],
   "nodes": [
     {
-      "id": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
-      "canonicalHash": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
+      "id": "didactic-seed-1ynaq6c",
+      "canonicalHash": "didactic:didactic-seed-1ynaq6c",
       "normalizedLabel": "cos(x)^2+sin(x)^2",
       "label": "cos(x) ^ 2 + sin(x) ^ 2",
       "revisit": false,
       "cycle": false,
       "onMainPath": true,
       "explicitEndpoint": true,
+      "minDepth": 0,
       "layout": {
         "x": 0,
         "y": 80
@@ -33,14 +35,15 @@
       }
     },
     {
-      "id": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
-      "canonicalHash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "id": "didactic-goal-1d",
+      "canonicalHash": "didactic:didactic-goal-1d",
       "normalizedLabel": "1",
       "label": "1",
       "revisit": false,
       "cycle": false,
       "onMainPath": true,
       "explicitEndpoint": true,
+      "minDepth": 2,
       "layout": {
         "x": 0,
         "y": 300
@@ -53,9 +56,9 @@
   ],
   "edges": [
     {
-      "id": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b->6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b:trig_pythagorean_cos_sin",
-      "from": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
-      "to": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "id": "didactic-seed-1ynaq6c->didactic-goal-1d:trig_pythagorean_cos_sin",
+      "from": "didactic-seed-1ynaq6c",
+      "to": "didactic-goal-1d",
       "label": "trig_pythagorean_cos_sin",
       "kind": "MAIN_STEP",
       "layout": {
@@ -66,16 +69,16 @@
   ],
   "nodeLabelRects": [
     {
-      "id": "82f6790d17520ad121112d5b70b6ab828df2e453d4cf23f3040653d5bf99f92b",
+      "id": "didactic-seed-1ynaq6c",
       "x": 632.796875,
-      "y": 592.0188598632812,
+      "y": 591.8313598632812,
       "width": 134.40625,
       "height": 28.4375
     },
     {
-      "id": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "id": "didactic-goal-1d",
       "x": 689,
-      "y": 1324.957763671875,
+      "y": 1324.770263671875,
       "width": 22,
       "height": 25.734375
     }
@@ -84,7 +87,7 @@
     {
       "id": "\\text{trig pythagorean cos sin}",
       "x": 568,
-      "y": 961.328125,
+      "y": 961.140625,
       "width": 168,
       "height": 21.40625
     }
@@ -95,5 +98,6 @@
   "edgeLabelOverlapCount": 0,
   "visibleMainPathMeaningfulNodeCount": 2,
   "collapsedMainPathStepCount": 1,
+  "finalNormalizedLabel": "1",
   "mainPathMeaningfulNodeCount": 3
 }
