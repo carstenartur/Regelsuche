@@ -29,18 +29,18 @@ public final class TelescopingDifferenceAstPredicate {
     }
 
     private static boolean containsTelescopingDifference(Expr expression) {
-<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc bfc" id="L33" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.SUB</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            if (binary.operator() == BinaryOperator.SUB</span>
 <span class="pc bpc" id="L34" title="1 of 2 branches missed.">                &amp;&amp; unitDenominator(binary.left()) != null</span>
 <span class="pc bpc" id="L35" title="1 of 2 branches missed.">                &amp;&amp; isPositiveIntegerStep(unitDenominator(binary.right()), unitDenominator(binary.left()))) {</span>
 <span class="fc" id="L36">                return true;</span>
             }
-<span class="pc bpc" id="L38" title="1 of 4 branches missed.">            return containsTelescopingDifference(binary.left()) || containsTelescopingDifference(binary.right());</span>
+<span class="nc bnc" id="L38" title="All 4 branches missed.">            return containsTelescopingDifference(binary.left()) || containsTelescopingDifference(binary.right());</span>
         }
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
 <span class="nc" id="L41">            return function.arguments().stream().anyMatch(TelescopingDifferenceAstPredicate::containsTelescopingDifference);</span>
         }
-<span class="fc" id="L43">        return false;</span>
+<span class="nc" id="L43">        return false;</span>
     }
 
     private static Expr unitDenominator(Expr expression) {

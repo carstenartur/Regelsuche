@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryOperatorRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryOperatorRegistry.java</span></div><h1>DiscoveryOperatorRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.transform.HypothesisOperator;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+<span class="fc" id="L11">public final class DiscoveryOperatorRegistry {</span>
+<span class="fc" id="L12">    private final Map&lt;String, DiscoveryOperatorProvider.DiscoveryOperatorDefinition&gt; operatorsById = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L13">    private final Set&lt;String&gt; disabledOperatorIds = new LinkedHashSet&lt;&gt;();</span>
+
+    public DiscoveryOperatorRegistry register(DiscoveryOperatorProvider provider) {
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (provider == null) {</span>
+<span class="fc" id="L17">            throw new IllegalArgumentException(&quot;Provider must not be null&quot;);</span>
+        }
+<span class="fc" id="L19">        List&lt;DiscoveryOperatorProvider.DiscoveryOperatorDefinition&gt; definitions = provider.operators();</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (definitions == null) {</span>
+<span class="fc" id="L21">            throw new IllegalArgumentException(&quot;Provider '&quot; + provider.id() + &quot;' returned null operators&quot;);</span>
+        }
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        for (DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition : definitions) {</span>
+<span class="fc" id="L24">            operatorsById.put(definition.id(), definition);</span>
+<span class="fc" id="L25">        }</span>
+<span class="fc" id="L26">        return this;</span>
+    }
+
+    public DiscoveryOperatorRegistry disable(String operatorId) {
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">        if (operatorId != null &amp;&amp; !operatorId.isBlank()) {</span>
+<span class="fc" id="L31">            disabledOperatorIds.add(operatorId);</span>
+        }
+<span class="fc" id="L33">        return this;</span>
+    }
+
+    public DiscoveryOperatorRegistry enable(String operatorId) {
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">        if (operatorId != null &amp;&amp; !operatorId.isBlank()) {</span>
+<span class="fc" id="L38">            disabledOperatorIds.remove(operatorId);</span>
+        }
+<span class="fc" id="L40">        return this;</span>
+    }
+
+    public boolean isEnabled(String operatorId) {
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        return !disabledOperatorIds.contains(operatorId);</span>
+    }
+
+    public List&lt;String&gt; availableOperatorIds() {
+<span class="fc" id="L48">        return List.copyOf(operatorsById.keySet());</span>
+    }
+
+    public Set&lt;String&gt; operatorRuleIds() {
+<span class="fc" id="L52">        LinkedHashSet&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        for (DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition : operatorsById.values()) {</span>
+<span class="fc" id="L54">            ids.addAll(definition.producedRuleIds());</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        return Set.copyOf(ids);</span>
+    }
+
+    public List&lt;HypothesisOperator&gt; operatorsFor(OperatorProfile profile) {
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">        if (profile == null || profile.enabledOperatorIds().isEmpty()) {</span>
+<span class="fc" id="L61">            return List.of();</span>
+        }
+<span class="fc" id="L63">        List&lt;HypothesisOperator&gt; operators = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (String operatorId : profile.enabledOperatorIds()) {</span>
+<span class="pc bpc" id="L65" title="2 of 6 branches missed.">            if (operatorId == null || operatorId.isBlank() || disabledOperatorIds.contains(operatorId)) {</span>
+<span class="fc" id="L66">                continue;</span>
+            }
+<span class="fc" id="L68">            DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition = operatorsById.get(operatorId);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (definition == null) {</span>
+<span class="nc" id="L70">                continue;</span>
+            }
+<span class="fc" id="L72">            operators.add(definition.factory().get());</span>
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">        return List.copyOf(operators);</span>
+    }
+
+    public record OperatorProfile(List&lt;String&gt; enabledOperatorIds) {
+<span class="fc" id="L78">        public OperatorProfile {</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            enabledOperatorIds = enabledOperatorIds == null ? List.of() : List.copyOf(enabledOperatorIds);</span>
+<span class="fc" id="L80">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

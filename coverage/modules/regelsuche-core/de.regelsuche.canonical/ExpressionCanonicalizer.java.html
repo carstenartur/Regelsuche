@@ -374,9 +374,9 @@ import java.util.Optional;
     }
 
     private Power asPower(Expr expression) {
-<span class="pc bpc" id="L377" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr power &amp;&amp; power.operator() == BinaryOperator.POW</span>
-<span class="nc bnc" id="L378" title="All 2 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent) {</span>
-<span class="nc" id="L379">            return new Power(power.left(), (int) exponent.value());</span>
+<span class="fc bfc" id="L377" title="All 4 branches covered.">        if (expression instanceof BinaryExpr power &amp;&amp; power.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent) {</span>
+<span class="fc" id="L379">            return new Power(power.left(), (int) exponent.value());</span>
         }
 <span class="fc" id="L381">        return new Power(expression, 1);</span>
     }

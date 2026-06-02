@@ -16,23 +16,26 @@ final class ScenarioRuleTransformationEngine implements TransformationEngine {
     public List&lt;Transformation&gt; transform(String expression) {
 <span class="fc" id="L17">        String canonical = canonical(expression);</span>
 <span class="fc" id="L18">        List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;();</span>
-<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        for (ScenarioRule rule : rules) {</span>
-<span class="nc bnc" id="L20" title="All 2 branches missed.">            if (canonical(rule.from()).equals(canonical)) {</span>
-<span class="nc" id="L21">                transformations.add(new Transformation(</span>
-<span class="nc" id="L22">                        rule.id(),</span>
-<span class="nc" id="L23">                        rule.to(),</span>
-<span class="nc" id="L24">                        rule.kind(),</span>
-<span class="nc bnc" id="L25" title="All 2 branches missed.">                        rule.costDelta() &gt; 0,</span>
-<span class="nc" id="L26">                        rule.costDelta(),</span>
-                        true,
-<span class="nc" id="L28">                        rule.id() + &quot;:&quot; + rule.to()));</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        for (ScenarioRule rule : rules) {</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">            if (!rule.active()) {</span>
+<span class="fc" id="L21">                continue;</span>
             }
-<span class="nc" id="L30">        }</span>
-<span class="fc" id="L31">        return transformations;</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            if (canonical(rule.from()).equals(canonical)) {</span>
+<span class="fc" id="L24">                transformations.add(new Transformation(</span>
+<span class="fc" id="L25">                        rule.id(),</span>
+<span class="fc" id="L26">                        rule.to(),</span>
+<span class="fc" id="L27">                        rule.kind(),</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">                        rule.costDelta() &gt; 0,</span>
+<span class="fc" id="L29">                        rule.costDelta(),</span>
+                        true,
+<span class="fc" id="L31">                        rule.id() + &quot;:&quot; + rule.to()));</span>
+            }
+<span class="fc" id="L33">        }</span>
+<span class="fc" id="L34">        return transformations;</span>
     }
 
     private String canonical(String expression) {
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

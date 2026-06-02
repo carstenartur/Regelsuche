@@ -191,90 +191,101 @@ import java.util.jar.JarFile;
 <span class="pc bpc" id="L191" title="1 of 2 branches missed.">                        rule.kind == null ? RewriteKind.NORMALIZE : RewriteKind.valueOf(rule.kind.toUpperCase(Locale.ROOT)),</span>
                         rule.costDelta,
 <span class="pc bpc" id="L193" title="1 of 2 branches missed.">                        rule.effects == null ? List.of() : rule.effects.stream().map(SearchEffect::fromExternal).toList(),</span>
-                        rule.family))
-<span class="fc" id="L195">                .toList();</span>
-<span class="fc" id="L196">        return new ScenarioRulePack(yaml.id, rules);</span>
+                        rule.family,
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">                        rule.status == null ? ScenarioRuleStatus.VALIDATED : ScenarioRuleStatus.valueOf(rule.status.toUpperCase(Locale.ROOT)),</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                        rule.enabledByDefault == null || rule.enabledByDefault,</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                        rule.examples == null ? List.of() : rule.examples))</span>
+<span class="fc" id="L198">                .toList();</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (ScenarioRule rule : rules) {</span>
+<span class="pc bpc" id="L200" title="1 of 4 branches missed.">            if (rule.status() == ScenarioRuleStatus.VALIDATED &amp;&amp; rule.examples().isEmpty()) {</span>
+<span class="fc" id="L201">                throw new IllegalArgumentException(&quot;VALIDATED scenario rule requires examples: &quot; + yaml.id + &quot;/&quot; + rule.id());</span>
+            }
+<span class="fc" id="L203">        }</span>
+<span class="fc" id="L204">        return new ScenarioRulePack(yaml.id, rules);</span>
     }
 
     private void validate(DiscoveryBenchmarkScenario scenario) {
-<span class="fc" id="L200">        requireText(scenario.id(), &quot;id&quot;);</span>
-<span class="fc" id="L201">        requireText(scenario.inputExpression(), &quot;inputExpression&quot;);</span>
-<span class="fc" id="L202">        requireText(scenario.targetExpression(), &quot;targetExpression&quot;);</span>
-<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (scenario.expectations().isEmpty()) {</span>
-<span class="nc" id="L204">            throw new IllegalArgumentException(&quot;Scenario must declare expectations: &quot; + scenario.id());</span>
+<span class="fc" id="L208">        requireText(scenario.id(), &quot;id&quot;);</span>
+<span class="fc" id="L209">        requireText(scenario.inputExpression(), &quot;inputExpression&quot;);</span>
+<span class="fc" id="L210">        requireText(scenario.targetExpression(), &quot;targetExpression&quot;);</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (scenario.expectations().isEmpty()) {</span>
+<span class="nc" id="L212">            throw new IllegalArgumentException(&quot;Scenario must declare expectations: &quot; + scenario.id());</span>
         }
-<span class="pc bpc" id="L206" title="3 of 6 branches missed.">        if (scenario.budgets() == null || scenario.budgets().maxDepth() &lt;= 0 || scenario.budgets().maxStates() &lt;= 0) {</span>
-<span class="nc" id="L207">            throw new IllegalArgumentException(&quot;Scenario must declare positive budgets: &quot; + scenario.id());</span>
+<span class="pc bpc" id="L214" title="3 of 6 branches missed.">        if (scenario.budgets() == null || scenario.budgets().maxDepth() &lt;= 0 || scenario.budgets().maxStates() &lt;= 0) {</span>
+<span class="nc" id="L215">            throw new IllegalArgumentException(&quot;Scenario must declare positive budgets: &quot; + scenario.id());</span>
         }
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (scenario.enabledRulePacks().isEmpty()) {</span>
-<span class="nc" id="L210">            throw new IllegalArgumentException(&quot;Scenario must declare enabledRulePacks: &quot; + scenario.id());</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (scenario.enabledRulePacks().isEmpty()) {</span>
+<span class="nc" id="L218">            throw new IllegalArgumentException(&quot;Scenario must declare enabledRulePacks: &quot; + scenario.id());</span>
         }
-<span class="fc" id="L212">        loadRulePacks(scenario);</span>
-<span class="fc" id="L213">    }</span>
+<span class="fc" id="L220">        loadRulePacks(scenario);</span>
+<span class="fc" id="L221">    }</span>
 
     private void requireText(String value, String field) {
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (!hasText(value)) {</span>
-<span class="nc" id="L217">            throw new IllegalArgumentException(&quot;Scenario must declare &quot; + field);</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (!hasText(value)) {</span>
+<span class="nc" id="L225">            throw new IllegalArgumentException(&quot;Scenario must declare &quot; + field);</span>
         }
-<span class="fc" id="L219">    }</span>
+<span class="fc" id="L227">    }</span>
 
     private boolean hasText(String value) {
-<span class="pc bpc" id="L222" title="2 of 4 branches missed.">        return value != null &amp;&amp; !value.isBlank();</span>
+<span class="pc bpc" id="L230" title="2 of 4 branches missed.">        return value != null &amp;&amp; !value.isBlank();</span>
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L226">    public static final class ScenarioYaml {</span>
+<span class="fc" id="L234">    public static final class ScenarioYaml {</span>
         public String id;
         public String displayName;
         public String inputExpression;
         public String targetExpression;
-<span class="fc" id="L231">        public List&lt;String&gt; expectations = List.of();</span>
-<span class="fc" id="L232">        public List&lt;String&gt; enabledOperators = List.of();</span>
-<span class="fc" id="L233">        public List&lt;String&gt; enabledRulePacks = List.of();</span>
-<span class="fc" id="L234">        public List&lt;String&gt; requiredBridgeEffects = List.of();</span>
-<span class="fc" id="L235">        public List&lt;String&gt; requiredRuleFamilies = List.of();</span>
-<span class="fc" id="L236">        public List&lt;String&gt; requiredBridgeRules = List.of();</span>
+<span class="fc" id="L239">        public List&lt;String&gt; expectations = List.of();</span>
+<span class="fc" id="L240">        public List&lt;String&gt; enabledOperators = List.of();</span>
+<span class="fc" id="L241">        public List&lt;String&gt; enabledRulePacks = List.of();</span>
+<span class="fc" id="L242">        public List&lt;String&gt; requiredBridgeEffects = List.of();</span>
+<span class="fc" id="L243">        public List&lt;String&gt; requiredRuleFamilies = List.of();</span>
+<span class="fc" id="L244">        public List&lt;String&gt; requiredBridgeRules = List.of();</span>
         public MacroLearningYaml macroLearning;
         public BudgetsYaml budgets;
         public GalleryYaml gallery;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L243">    public static final class MacroLearningYaml {</span>
+<span class="fc" id="L251">    public static final class MacroLearningYaml {</span>
         public boolean enabled;
         public String reuseInputExpression;
         public String expectedMacroRule;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L250">    public static final class BudgetsYaml {</span>
+<span class="fc" id="L258">    public static final class BudgetsYaml {</span>
         public int maxDepth;
         public int maxStates;
         public long timeoutMillis;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L257">    public static final class GalleryYaml {</span>
+<span class="fc" id="L265">    public static final class GalleryYaml {</span>
         public boolean generateSvg;
         public int preferredPathCount;
         public int minVisibleNodes;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L264">    public static final class RulePackYaml {</span>
+<span class="fc" id="L272">    public static final class RulePackYaml {</span>
         public String id;
-<span class="fc" id="L266">        public List&lt;RuleYaml&gt; rules = List.of();</span>
+<span class="fc" id="L274">        public List&lt;RuleYaml&gt; rules = List.of();</span>
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L270">    public static final class RuleYaml {</span>
+<span class="fc" id="L278">    public static final class RuleYaml {</span>
         public String id;
         public String from;
         public String to;
         public String kind;
         public int costDelta;
-<span class="fc" id="L276">        public List&lt;String&gt; effects = List.of();</span>
+<span class="fc" id="L284">        public List&lt;String&gt; effects = List.of();</span>
         public String family;
+        public String status;
+        public Boolean enabledByDefault;
+<span class="fc" id="L288">        public List&lt;String&gt; examples = List.of();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
