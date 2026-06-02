@@ -142,12 +142,20 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
     }
 
     private Expr squareBase(Expr expression) {
-        return expression instanceof BinaryExpr binary
+        if (expression instanceof BinaryExpr binary
             && binary.operator() == BinaryOperator.POW
             && binary.right() instanceof NumberExpr exponent
             && Double.compare(exponent.value(), 2.0) == 0
-            ? binary.left()
-            : null;
+        ) {
+            return binary.left();
+        }
+        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL) {
+            List<Expr> factors = flattenMultiplication(expression);
+            if (factors.size() == 2 && sameExpression(factors.get(0), factors.get(1))) {
+                return factors.get(0);
+            }
+        }
+        return null;
     }
 
     private LinearTerm linearTermForBase(Expr expression, Expr base, double sign) {

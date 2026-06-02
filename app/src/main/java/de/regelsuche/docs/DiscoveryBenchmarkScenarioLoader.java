@@ -191,8 +191,16 @@ public final class DiscoveryBenchmarkScenarioLoader {
                         rule.kind == null ? RewriteKind.NORMALIZE : RewriteKind.valueOf(rule.kind.toUpperCase(Locale.ROOT)),
                         rule.costDelta,
                         rule.effects == null ? List.of() : rule.effects.stream().map(SearchEffect::fromExternal).toList(),
-                        rule.family))
+                        rule.family,
+                        rule.status == null ? ScenarioRuleStatus.VALIDATED : ScenarioRuleStatus.valueOf(rule.status.toUpperCase(Locale.ROOT)),
+                        rule.enabledByDefault == null || rule.enabledByDefault,
+                        rule.examples == null ? List.of() : rule.examples))
                 .toList();
+        for (ScenarioRule rule : rules) {
+            if (rule.status() == ScenarioRuleStatus.VALIDATED && rule.examples().isEmpty()) {
+                throw new IllegalArgumentException("VALIDATED scenario rule requires examples: " + yaml.id + "/" + rule.id());
+            }
+        }
         return new ScenarioRulePack(yaml.id, rules);
     }
 
@@ -275,5 +283,8 @@ public final class DiscoveryBenchmarkScenarioLoader {
         public int costDelta;
         public List<String> effects = List.of();
         public String family;
+        public String status;
+        public Boolean enabledByDefault;
+        public List<String> examples = List.of();
     }
 }

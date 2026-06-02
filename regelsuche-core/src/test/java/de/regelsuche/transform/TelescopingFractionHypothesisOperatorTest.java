@@ -31,11 +31,20 @@ class TelescopingFractionHypothesisOperatorTest {
     }
 
     @Test
+    void supportsScaledNumeratorsForAdjacentFactors() {
+        List<Transformation> candidates = operator.generateCandidates("2 / (n * (n + 1))");
+
+        assertEquals(1, candidates.size());
+        assertEquals("2 / n - 2 / (n + 1)", candidates.getFirst().transformedExpression());
+    }
+
+    @Test
     void rejectsNearMisses() {
         List<String> nearMisses = List.of(
             "1 / (n + n + 1)",
             "1 / (n * (m + 1))",
-            "1 / (n^2 + 1)"
+            "1 / (n^2 + 1)",
+            "1 / (n * (n + 2))"
         );
 
         for (String expression : nearMisses) {

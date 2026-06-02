@@ -17,10 +17,24 @@ record ScenarioRule(
         RewriteKind kind,
         int costDelta,
         List<SearchEffect> effects,
-        String family) {
+        String family,
+        ScenarioRuleStatus status,
+        boolean enabledByDefault,
+        List<String> examples) {
     ScenarioRule {
         effects = effects == null ? List.of() : List.copyOf(effects);
         kind = kind == null ? RewriteKind.NORMALIZE : kind;
         family = family == null ? "" : family;
+        status = status == null ? ScenarioRuleStatus.VALIDATED : status;
+        examples = examples == null ? List.of() : List.copyOf(examples);
     }
+
+    boolean active() {
+        return enabledByDefault && status == ScenarioRuleStatus.VALIDATED && !examples.isEmpty();
+    }
+}
+
+enum ScenarioRuleStatus {
+    CANDIDATE,
+    VALIDATED
 }
