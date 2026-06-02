@@ -54,7 +54,14 @@ public record DiscoveryBenchmarkEvidence(
         }
     }
 
-    public record EvidenceNode(String id, String label, String kind) {
+    public record EvidenceNode(String id, String label, String kind, int depth, List<String> tags) {
+        public EvidenceNode {
+            tags = tags == null ? List.of() : List.copyOf(tags);
+        }
+
+        public EvidenceNode(String id, String label, String kind) {
+            this(id, label, kind, 0, List.of());
+        }
     }
 
     public record EvidenceEdge(
@@ -64,9 +71,22 @@ public record DiscoveryBenchmarkEvidence(
             String kind,
             String source,
             String packId,
-            List<de.regelsuche.knowledge.SearchEffect> searchEffect) {
+            List<de.regelsuche.knowledge.SearchEffect> searchEffect,
+            List<String> tags) {
         public EvidenceEdge {
             searchEffect = searchEffect == null ? List.of() : List.copyOf(searchEffect);
+            tags = tags == null ? List.of() : List.copyOf(tags);
+        }
+
+        public EvidenceEdge(
+                String from,
+                String to,
+                String ruleId,
+                String kind,
+                String source,
+                String packId,
+                List<de.regelsuche.knowledge.SearchEffect> searchEffect) {
+            this(from, to, ruleId, kind, source, packId, searchEffect, List.of());
         }
     }
 

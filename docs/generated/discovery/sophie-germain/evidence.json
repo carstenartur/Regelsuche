@@ -21,15 +21,970 @@
   },
   "bridgeRulesUsed" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
   "convergentStates" : [ "x^4+4*y^4" ],
-  "edgeCount" : 3,
+  "edgeCount" : 149,
   "edges" : [ {
-    "from" : "x^4+4*y^4",
-    "kind" : "bridge",
+    "from" : "(0-2*x*y+x*x+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
     "packId" : "core",
-    "ruleId" : "hypothesis_difference_of_squares_preparation",
-    "searchEffect" : [ "BRIDGING" ],
-    "source" : "operator",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x*x+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y*y)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x*x+2*y^2)"
+  }, {
+    "from" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y*y)"
+  }, {
+    "from" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x*x+2*y^2)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y*y+2*x*y)"
+  }, {
+    "from" : "(2*x*y+x*x+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(2*x*y+x*x+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(2*x*y+x^2+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(2*x*y+x^2+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x*x+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(2*x*y+x^2+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(0-2*x*y+x^2+2*y*y)"
+  }, {
+    "from" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x*x+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y*y)"
+  }, {
+    "from" : "(x*x+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x*x+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x*x+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x*x+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(x*x+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x*x+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(x*x+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(x*x+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y*y)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x*x+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x*x+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x*x+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x*x+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
     "to" : "(x^2+2*y^2)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x*x+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x*x+2*y*y)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x*x+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x*x+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y*y)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x*x+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-2*x*y*2*x*y"
+  }, {
+    "from" : "(x*x+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x*x+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "sympy.poly.factor.difference_of_squares",
+    "searchEffect" : [ "FACTORIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x*x+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x*x+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x*x+2*y^2)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-4*x*y*x*y"
+  }, {
+    "from" : "(x*x+2*y^2)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-4*x^2*y*y"
+  }, {
+    "from" : "(x*x+2*y^2)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x*x+2*y^2)^2-4*x*y*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x*x+2*y^2)^2-4*x^2*y*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x*x+2*y^2)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x*x+2*y^2)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(x*x+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y*y)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y*y)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y*y)"
+  }, {
+    "from" : "(x^2+2*y*y)*(x^2+2*y*y)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y*y)*(x^2+2*y*y)-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y*y)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)*(x^2+2*y*y)-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-2*x*y*2*x*y"
+  }, {
+    "from" : "(x^2+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-4*x*y*x*y"
+  }, {
+    "from" : "(x^2+2*y*y)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-4*x^2*y*y"
+  }, {
+    "from" : "(x^2+2*y*y)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-4*x*y*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-4*x^2*y*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y*y)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)*(x^2+2*y*y)-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y*y)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y*y-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y*y-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y-2*x*y)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y*y-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2)*(x*x+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)*(x*x+2*y^2)-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x*x+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x*x+2*y^2)-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)*(x^2+2*y^2)-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)*(x^2+2*y^2)-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)*(x*x+2*y^2)-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)*(x^2+2*y^2)-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-2*x*y*2*x*y"
+  }, {
+    "from" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
   }, {
     "from" : "(x^2+2*y^2)^2-(2*x*y)^2",
     "kind" : "bridge",
@@ -37,7 +992,359 @@
     "ruleId" : "ast_square_difference_factor",
     "searchEffect" : [ "FACTORIZING" ],
     "source" : "core",
+    "tags" : [ "selected-path" ],
     "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "sympy.poly.factor.difference_of_squares",
+    "searchEffect" : [ "FACTORIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x*y*x*y"
+  }, {
+    "from" : "(x^2+2*y^2)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y*y"
+  }, {
+    "from" : "(x^2+2*y^2)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-2*x*y*2*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x*y*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y*y"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x*y*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x*y*x*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x^2*y*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x^2*y*y",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y)^2-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)*(x^2+2*y^2)-4*x^2*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x*x*y^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-4*x^2*y^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y-2*x*y)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y*y)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y*y+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y*y-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)"
+  }, {
+    "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y*y+2*x*y)"
+  }, {
+    "from" : "0-4*x*x*y^2+(x^2+2*y^2)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "0-4*x^2*y^2+(x*x+2*y^2)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "0-4*x^2*y^2+(x^2+2*y*y)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "0-4*x^2*y^2+(x^2+2*y^2)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x*x*y^2+(x^2+2*y^2)^2"
+  }, {
+    "from" : "0-4*x^2*y^2+(x^2+2*y^2)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x*x+2*y^2)^2"
+  }, {
+    "from" : "0-4*x^2*y^2+(x^2+2*y^2)^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "0-4*x^2*y^2+(x^2+2*y*y)^2"
   }, {
     "from" : "x^4+4*y^4",
     "kind" : "macro",
@@ -45,36 +1352,408 @@
     "ruleId" : "macro_6bd0496b",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "macro",
+    "tags" : [ "alternative-branch", "macro-shortcut" ],
     "to" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)"
+  }, {
+    "from" : "x^4+4*y^4",
+    "kind" : "bridge",
+    "packId" : "core",
+    "ruleId" : "hypothesis_difference_of_squares_preparation",
+    "searchEffect" : [ "BRIDGING" ],
+    "source" : "operator",
+    "tags" : [ "selected-path" ],
+    "to" : "(x^2+2*y^2)^2-(2*x*y)^2"
   } ],
   "failureReason" : "",
   "foundPaths" : [ [ "x ^ 4 + 4 * y ^ 4", "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2", "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)" ], [ "x ^ 4 + 4 * y ^ 4", "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)" ] ],
   "generatedBy" : "DocsDiscoveryGalleryGenerator",
   "inputExpression" : "x ^ 4 + 4 * y ^ 4",
   "learnedMacros" : [ "macro_6bd0496b" ],
-  "nodeCount" : 4,
+  "nodeCount" : 63,
   "nodes" : [ {
+    "depth" : 0,
     "id" : "x^4+4*y^4",
-    "kind" : "state",
-    "label" : "x ^ 4 + 4 * y ^ 4"
+    "kind" : "input",
+    "label" : "x ^ 4 + 4 * y ^ 4",
+    "tags" : [ "input", "selected-path" ]
   }, {
-    "id" : "(x^2+2*y^2)^2-(2*x*y)^2",
-    "kind" : "state",
-    "label" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"
-  }, {
-    "id" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
-    "kind" : "target",
-    "label" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)"
-  }, {
+    "depth" : 1,
     "id" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
     "kind" : "target",
-    "label" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"
+    "label" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 1,
+    "id" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
+    "tags" : [ "selected-path" ]
+  }, {
+    "depth" : 2,
+    "id" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "target",
+    "label" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x*x+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "target",
+    "label" : "(x * x + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x*x+2*y^2)^2-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x * x + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x^2+2*y*y)^2-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y * y) ^ 2 - (2 * x * y) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "target", "selected-path" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x^2+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x^2+2*y^2)^2-2*x*y*2*x*y",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x^2+2*y^2)^2-4*x^2*y^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "0-4*x^2*y^2+(x^2+2*y^2)^2",
+    "kind" : "state",
+    "label" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(2*x*y+x*x+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "target",
+    "label" : "(2 * x * y + x * x + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(2*x*y+x^2+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y*y)",
+    "kind" : "target",
+    "label" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x*x+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(x * x + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x*x+2*y*y)^2-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x * x + 2 * y * y) ^ 2 - (2 * x * y) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x*x+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x*x+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x * x + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x*x+2*y^2)^2-2*x*y*2*x*y",
+    "kind" : "state",
+    "label" : "(x * x + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x*x+2*y^2)^2-4*x^2*y^2",
+    "kind" : "state",
+    "label" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y*y-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y*y)*(x^2+2*y*y)-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - (2 * x * y) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y*y)*(x^2+2*y^2)-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y*y)^2-2*x*y*2*x*y",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y * y) ^ 2 - 2 * x * y * 2 * x * y",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y*y)^2-4*x^2*y^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x ^ 2 * y ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y^2-2*x*y)*(x^2+2*y*y+2*x*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y * y + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y^2)*(x*x+2*y^2)-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - (2 * x * y) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y^2)*(x^2+2*y^2)-4*x^2*y^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y^2)^2-4*x*y*x*y",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x * y * x * y",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2+2*y^2)^2-4*x^2*y*y",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y * y",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "0-4*x*x*y^2+(x^2+2*y^2)^2",
+    "kind" : "state",
+    "label" : "0 - 4 * x * x * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "0-4*x^2*y^2+(x*x+2*y^2)^2",
+    "kind" : "state",
+    "label" : "0 - 4 * x ^ 2 * y ^ 2 + (x * x + 2 * y ^ 2) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 3,
+    "id" : "0-4*x^2*y^2+(x^2+2*y*y)^2",
+    "kind" : "state",
+    "label" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y * y) ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(0-2*x*y+x*x+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x * x + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(0-2*x*y+x*x+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x * x + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(0-2*x*y+x^2+2*y*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x ^ 2 + 2 * y * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(0-2*x*y+x^2+2*y*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y*y)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(0-2*x*y+x^2+2*y^2)*(x*x+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (x * x + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y*y+2*x*y)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y * y + 2 * x * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(2*x*y+x*x+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(2 * x * y + x * x + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(2*x*y+x^2+2*y^2)*(0-2*x*y+x^2+2*y*y)",
+    "kind" : "target",
+    "label" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x*x+2*y*y)^2-4*x^2*y^2",
+    "kind" : "state",
+    "label" : "(x * x + 2 * y * y) ^ 2 - 4 * x ^ 2 * y ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x*x+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x*x+2*y^2)^2-4*x*y*x*y",
+    "kind" : "state",
+    "label" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x * y * x * y",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x*x+2*y^2)^2-4*x^2*y*y",
+    "kind" : "state",
+    "label" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y * y",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x^2+2*y*y-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x^2+2*y*y)*(x^2+2*y*y)-4*x^2*y^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - 4 * x ^ 2 * y ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x^2+2*y*y)^2-4*x*y*x*y",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x * y * x * y",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x^2+2*y*y)^2-4*x^2*y*y",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x ^ 2 * y * y",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y * y)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 4,
+    "id" : "(x^2+2*y^2)*(x*x+2*y^2)-4*x^2*y^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 5,
+    "id" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x*x+2*y^2)",
+    "kind" : "target",
+    "label" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x * x + 2 * y ^ 2)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 5,
+    "id" : "(x^2+2*y^2)^2-4*x*x*y^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x * x * y ^ 2",
+    "tags" : [ "alternative-branch", "dead-end" ]
   } ],
   "reusedMacros" : [ "macro_6bd0496b" ],
   "ruleFamiliesUsed" : [ ],
   "scenarioId" : "sophie-germain",
-  "smallGraphMessage" : "Search produced only 4 visible states under this budget.",
-  "sourceCommit" : "d74c79c66a68bcf23833c6c6d537392abac5a84a",
+  "smallGraphMessage" : "",
+  "sourceCommit" : "c807a5612b1c39825b118e2ca8219b797e6a0716",
   "success" : true,
   "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)",
   "validationStatus" : "PASS",

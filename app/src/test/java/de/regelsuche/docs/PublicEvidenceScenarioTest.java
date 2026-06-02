@@ -25,6 +25,7 @@ class PublicEvidenceScenarioTest {
             assertTrue(evidence.failureReason().isBlank(), scenario.id());
             assertTrue(evidence.nodeCount() > 0, scenario.id());
             assertTrue(evidence.edgeCount() > 0, scenario.id());
+            assertTrue(evidence.nodeCount() > 8, scenario.id() + ": public evidence graph should be >8 nodes");
             assertFalse(evidence.bridgeRulesUsed().isEmpty(), scenario.id());
             if (scenario.macroLearning().enabled()) {
                 assertFalse(evidence.learnedMacros().isEmpty(), scenario.id());
