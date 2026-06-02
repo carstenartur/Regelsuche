@@ -91,6 +91,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6.1.0
       - name: Build, test, coverage
         run: ./gradlew build jacocoTestReport
+      - name: Verify discovery gallery reproducibility
+        run: |
+          env -u GITHUB_SHA ./gradlew :app:generateDiscoveryGallery
+          git diff --exit-code docs/generated/discovery docs/demo-gallery.md README.md
       - name: Generate Pages reports and badge JSON
         if: always()
         run: |
