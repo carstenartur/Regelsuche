@@ -68,7 +68,7 @@ import java.util.Map;
     private boolean eligibleForGallery(DiscoveryBenchmarkEvidence evidence) {
 <span class="pc bpc" id="L69" title="1 of 2 branches missed.">        return evidence.success()</span>
 <span class="pc bpc" id="L70" title="1 of 2 branches missed.">                &amp;&amp; !evidence.bridgeRulesUsed().isEmpty()</span>
-<span class="pc bpc" id="L71" title="1 of 4 branches missed.">                &amp;&amp; (evidence.learnedMacros().isEmpty() || !evidence.reusedMacros().isEmpty())</span>
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">                &amp;&amp; (evidence.learnedMacros().isEmpty() || !evidence.reusedMacros().isEmpty())</span>
 <span class="pc bpc" id="L72" title="3 of 6 branches missed.">                &amp;&amp; evidence.edges().stream().noneMatch(edge -&gt; edge.source().equals(&quot;hardcoded&quot;) || edge.source().equals(&quot;scenario&quot;));</span>
     }
 

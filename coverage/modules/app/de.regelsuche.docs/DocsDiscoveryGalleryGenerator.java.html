@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DocsDiscoveryGalleryGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DocsDiscoveryGalleryGenerator.java</span></div><h1>DocsDiscoveryGalleryGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+<span class="nc" id="L19">public final class DocsDiscoveryGalleryGenerator {</span>
+    public static final String GENERATED_BY = &quot;DocsDiscoveryGalleryGenerator&quot;;
+<span class="nc" id="L21">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="nc" id="L22">            .findAndRegisterModules()</span>
+<span class="nc" id="L23">            .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+<span class="nc" id="L24">    private static final List&lt;String&gt; PUBLIC_SCENARIO_IDS = List.of(&quot;complete-square-factorization&quot;, &quot;sophie-germain&quot;);</span>
+
+<span class="nc" id="L26">    private final DiscoveryBenchmarkScenarioLoader scenarioLoader = new DiscoveryBenchmarkScenarioLoader();</span>
+<span class="nc" id="L27">    private final DiscoveryBenchmarkExecutor executor = new DiscoveryBenchmarkExecutor();</span>
+<span class="nc" id="L28">    private final SearchSpaceGallerySvgWriter svgWriter = new SearchSpaceGallerySvgWriter();</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        Path repoRoot = args.length == 0 ? Path.of(&quot;.&quot;).toAbsolutePath().normalize() : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L32">        new DocsDiscoveryGalleryGenerator().generate(repoRoot);</span>
+<span class="nc" id="L33">    }</span>
+
+    public void generate(Path repoRoot) {
+        try {
+<span class="nc" id="L37">            Path generatedRoot = repoRoot.resolve(&quot;docs/generated/discovery&quot;);</span>
+<span class="nc" id="L38">            deleteDirectory(generatedRoot);</span>
+<span class="nc" id="L39">            Files.createDirectories(generatedRoot);</span>
+
+<span class="nc" id="L41">            List&lt;PublicScenarioArtifact&gt; artifacts = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">            for (DiscoveryBenchmarkScenario scenario : scenarioLoader.loadAll(&quot;discovery-scenarios&quot;)) {</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">                if (!PUBLIC_SCENARIO_IDS.contains(scenario.id())) {</span>
+<span class="nc" id="L44">                    continue;</span>
+                }
+<span class="nc" id="L46">                DiscoveryBenchmarkEvidence evidence = executor.execute(scenario);</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">                if (!evidence.success()) {</span>
+<span class="nc" id="L48">                    throw new IllegalStateException(&quot;Public discovery scenario is not successful: &quot;</span>
+<span class="nc" id="L49">                            + scenario.id() + &quot; - &quot; + evidence.failureReason());</span>
+                }
+<span class="nc" id="L51">                artifacts.add(writeScenarioArtifacts(generatedRoot, scenario, evidence));</span>
+<span class="nc" id="L52">            }</span>
+<span class="nc" id="L53">            ensureAllPublicScenariosGenerated(artifacts);</span>
+<span class="nc" id="L54">            writeIndex(generatedRoot.resolve(&quot;index.json&quot;), artifacts);</span>
+<span class="nc" id="L55">            Files.writeString(repoRoot.resolve(&quot;docs/demo-gallery.md&quot;), renderGallery(artifacts), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L56">        } catch (IOException exception) {</span>
+<span class="nc" id="L57">            throw new UncheckedIOException(exception);</span>
+<span class="nc" id="L58">        }</span>
+<span class="nc" id="L59">    }</span>
+
+    private PublicScenarioArtifact writeScenarioArtifacts(
+            Path generatedRoot,
+            DiscoveryBenchmarkScenario scenario,
+            DiscoveryBenchmarkEvidence evidence) throws IOException {
+<span class="nc" id="L65">        String slug = slugFor(scenario.id());</span>
+<span class="nc" id="L66">        Path scenarioDir = generatedRoot.resolve(slug);</span>
+<span class="nc" id="L67">        Files.createDirectories(scenarioDir);</span>
+<span class="nc" id="L68">        Path evidencePath = scenarioDir.resolve(&quot;evidence.json&quot;);</span>
+<span class="nc" id="L69">        Path svgPath = scenarioDir.resolve(&quot;search-space.svg&quot;);</span>
+<span class="nc" id="L70">        Path summaryPath = scenarioDir.resolve(&quot;summary.md&quot;);</span>
+<span class="nc" id="L71">        String relativeEvidence = slug + &quot;/evidence.json&quot;;</span>
+<span class="nc" id="L72">        String relativeSvg = slug + &quot;/search-space.svg&quot;;</span>
+<span class="nc" id="L73">        String relativeSummary = slug + &quot;/summary.md&quot;;</span>
+
+<span class="nc" id="L75">        AtomicJsonFile.writeUtf8(evidencePath, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(evidenceDocument(evidence)));</span>
+<span class="nc" id="L76">        Files.writeString(svgPath, svgWriter.write(evidence, &quot;evidence.json&quot;), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L77">        Files.writeString(summaryPath, renderSummary(scenario, evidence), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L78">        return new PublicScenarioArtifact(scenario, evidence, relativeEvidence, relativeSvg, relativeSummary);</span>
+    }
+
+    private Map&lt;String, Object&gt; evidenceDocument(DiscoveryBenchmarkEvidence evidence) {
+<span class="nc" id="L82">        Map&lt;String, Object&gt; document = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L83">        document.put(&quot;generatedBy&quot;, GENERATED_BY);</span>
+<span class="nc" id="L84">        document.put(&quot;scenarioId&quot;, evidence.scenarioId());</span>
+<span class="nc" id="L85">        document.put(&quot;inputExpression&quot;, evidence.inputExpression());</span>
+<span class="nc" id="L86">        document.put(&quot;targetExpression&quot;, evidence.targetExpression());</span>
+<span class="nc" id="L87">        document.put(&quot;nodeCount&quot;, evidence.nodeCount());</span>
+<span class="nc" id="L88">        document.put(&quot;edgeCount&quot;, evidence.edgeCount());</span>
+<span class="nc" id="L89">        document.put(&quot;bridgeRulesUsed&quot;, evidence.bridgeRulesUsed());</span>
+<span class="nc" id="L90">        document.put(&quot;learnedMacros&quot;, evidence.learnedMacros());</span>
+<span class="nc" id="L91">        document.put(&quot;reusedMacros&quot;, evidence.reusedMacros());</span>
+<span class="nc" id="L92">        String sourceCommit = System.getenv(&quot;GITHUB_SHA&quot;);</span>
+<span class="nc bnc" id="L93" title="All 4 branches missed.">        if (sourceCommit != null &amp;&amp; !sourceCommit.isBlank()) {</span>
+<span class="nc" id="L94">            document.put(&quot;sourceCommit&quot;, sourceCommit);</span>
+        }
+<span class="nc" id="L96">        Map&lt;String, Object&gt; evidenceFields = JSON.convertValue(evidence, new TypeReference&lt;LinkedHashMap&lt;String, Object&gt;&gt;() { });</span>
+<span class="nc" id="L97">        evidenceFields.forEach(document::putIfAbsent);</span>
+<span class="nc" id="L98">        return document;</span>
+    }
+
+    private void writeIndex(Path path, List&lt;PublicScenarioArtifact&gt; artifacts) throws IOException {
+<span class="nc" id="L102">        Map&lt;String, Object&gt; index = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L103">        index.put(&quot;generatedBy&quot;, GENERATED_BY);</span>
+<span class="nc" id="L104">        List&lt;Map&lt;String, Object&gt;&gt; scenarios = artifacts.stream().map(artifact -&gt; {</span>
+<span class="nc" id="L105">            Map&lt;String, Object&gt; scenario = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L106">            scenario.put(&quot;id&quot;, artifact.evidence().scenarioId());</span>
+<span class="nc" id="L107">            scenario.put(&quot;success&quot;, artifact.evidence().success());</span>
+<span class="nc" id="L108">            scenario.put(&quot;evidence&quot;, artifact.evidencePath());</span>
+<span class="nc" id="L109">            scenario.put(&quot;svg&quot;, artifact.svgPath());</span>
+<span class="nc" id="L110">            scenario.put(&quot;summary&quot;, artifact.summaryPath());</span>
+<span class="nc" id="L111">            return scenario;</span>
+<span class="nc" id="L112">        }).toList();</span>
+<span class="nc" id="L113">        index.put(&quot;scenarios&quot;, scenarios);</span>
+<span class="nc" id="L114">        AtomicJsonFile.writeUtf8(path, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(index));</span>
+<span class="nc" id="L115">    }</span>
+
+    private String renderGallery(List&lt;PublicScenarioArtifact&gt; artifacts) {
+<span class="nc" id="L118">        PublicScenarioArtifact completeSquare = artifactById(artifacts, &quot;complete-square-factorization&quot;);</span>
+<span class="nc" id="L119">        PublicScenarioArtifact sophieGermain = artifactById(artifacts, &quot;sophie-germain&quot;);</span>
+<span class="nc" id="L120">        return &quot;&quot;&quot;</span>
+                # Regelsuche Discovery Gallery
+
+                This gallery contains generated evidence only.
+
+                ## Complete-square factorization
+
+                ${completeSquare}
+
+                ## Sophie-Germain discovery
+
+                ${sophieGermain}
+
+                ## Scenario comparison
+
+                | Scenario | Success | States | Edges | Bridge rules | Learned macros | Reused macros |
+                |---|---:|---:|---:|---:|---:|---:|
+                ${rows}
+                &quot;&quot;&quot;
+<span class="nc" id="L139">                .replace(&quot;${completeSquare}&quot;, renderScenarioSection(completeSquare, &quot;Bridge used&quot;))</span>
+<span class="nc" id="L140">                .replace(&quot;${sophieGermain}&quot;, renderScenarioSection(sophieGermain, &quot;Hidden bridge used&quot;))</span>
+<span class="nc" id="L141">                .replace(&quot;${rows}&quot;, renderComparisonRows(artifacts));</span>
+    }
+
+    private String renderScenarioSection(PublicScenarioArtifact artifact, String bridgeLabel) {
+<span class="nc" id="L145">        DiscoveryBenchmarkEvidence evidence = artifact.evidence();</span>
+<span class="nc" id="L146">        return &quot;&quot;&quot;</span>
+                - Input: `${input}`
+                - Target: `${target}`
+                - Evidence status: success
+                - ${bridgeLabel}: ${bridges}
+                - Macro learned: ${learned}
+                - Macro reused: ${reused}
+                - Search-space excerpt: [SVG](generated/discovery/${svg})
+                - Evidence JSON link: [evidence.json](generated/discovery/${evidence})
+
+                &lt;img src=&quot;generated/discovery/${svg}&quot; alt=&quot;Generated evidence search-space for ${scenario}&quot;&gt;
+                &quot;&quot;&quot;
+<span class="nc" id="L158">                .replace(&quot;${input}&quot;, evidence.inputExpression())</span>
+<span class="nc" id="L159">                .replace(&quot;${target}&quot;, evidence.targetExpression())</span>
+<span class="nc" id="L160">                .replace(&quot;${bridgeLabel}&quot;, bridgeLabel)</span>
+<span class="nc" id="L161">                .replace(&quot;${bridges}&quot;, inlineList(evidence.bridgeRulesUsed()))</span>
+<span class="nc" id="L162">                .replace(&quot;${learned}&quot;, inlineList(evidence.learnedMacros()))</span>
+<span class="nc" id="L163">                .replace(&quot;${reused}&quot;, inlineList(evidence.reusedMacros()))</span>
+<span class="nc" id="L164">                .replace(&quot;${svg}&quot;, artifact.svgPath())</span>
+<span class="nc" id="L165">                .replace(&quot;${evidence}&quot;, artifact.evidencePath())</span>
+<span class="nc" id="L166">                .replace(&quot;${scenario}&quot;, escapeMarkdown(evidence.scenarioId()));</span>
+    }
+
+    private String renderComparisonRows(List&lt;PublicScenarioArtifact&gt; artifacts) {
+<span class="nc" id="L170">        StringBuilder rows = new StringBuilder();</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        for (PublicScenarioArtifact artifact : artifacts) {</span>
+<span class="nc" id="L172">            DiscoveryBenchmarkEvidence evidence = artifact.evidence();</span>
+<span class="nc" id="L173">            rows.append(&quot;| &quot;).append(escapeMarkdown(artifact.scenario().displayName())).append(&quot; | &quot;)</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                    .append(evidence.success() ? &quot;yes&quot; : &quot;no&quot;).append(&quot; | &quot;)</span>
+<span class="nc" id="L175">                    .append(evidence.nodeCount()).append(&quot; | &quot;)</span>
+<span class="nc" id="L176">                    .append(evidence.edgeCount()).append(&quot; | &quot;)</span>
+<span class="nc" id="L177">                    .append(evidence.bridgeRulesUsed().size()).append(&quot; | &quot;)</span>
+<span class="nc" id="L178">                    .append(evidence.learnedMacros().size()).append(&quot; | &quot;)</span>
+<span class="nc" id="L179">                    .append(evidence.reusedMacros().size()).append(&quot; |\n&quot;);</span>
+<span class="nc" id="L180">        }</span>
+<span class="nc" id="L181">        return rows.toString();</span>
+    }
+
+    private String renderSummary(DiscoveryBenchmarkScenario scenario, DiscoveryBenchmarkEvidence evidence) {
+<span class="nc" id="L185">        return &quot;&quot;&quot;</span>
+                # ${name}
+
+                - generatedBy: `${generatedBy}`
+                - scenarioId: `${scenarioId}`
+                - inputExpression: `${input}`
+                - targetExpression: `${target}`
+                - nodeCount: ${nodes}
+                - edgeCount: ${edges}
+                - bridgeRulesUsed: ${bridges}
+                - learnedMacros: ${learned}
+                - reusedMacros: ${reused}
+                - evidence: success
+                &quot;&quot;&quot;
+<span class="nc" id="L199">                .replace(&quot;${name}&quot;, scenario.displayName())</span>
+<span class="nc" id="L200">                .replace(&quot;${generatedBy}&quot;, GENERATED_BY)</span>
+<span class="nc" id="L201">                .replace(&quot;${scenarioId}&quot;, evidence.scenarioId())</span>
+<span class="nc" id="L202">                .replace(&quot;${input}&quot;, evidence.inputExpression())</span>
+<span class="nc" id="L203">                .replace(&quot;${target}&quot;, evidence.targetExpression())</span>
+<span class="nc" id="L204">                .replace(&quot;${nodes}&quot;, Integer.toString(evidence.nodeCount()))</span>
+<span class="nc" id="L205">                .replace(&quot;${edges}&quot;, Integer.toString(evidence.edgeCount()))</span>
+<span class="nc" id="L206">                .replace(&quot;${bridges}&quot;, inlineList(evidence.bridgeRulesUsed()))</span>
+<span class="nc" id="L207">                .replace(&quot;${learned}&quot;, inlineList(evidence.learnedMacros()))</span>
+<span class="nc" id="L208">                .replace(&quot;${reused}&quot;, inlineList(evidence.reusedMacros()));</span>
+    }
+
+    private PublicScenarioArtifact artifactById(List&lt;PublicScenarioArtifact&gt; artifacts, String scenarioId) {
+<span class="nc" id="L212">        return artifacts.stream()</span>
+<span class="nc" id="L213">                .filter(artifact -&gt; artifact.evidence().scenarioId().equals(scenarioId))</span>
+<span class="nc" id="L214">                .findFirst()</span>
+<span class="nc" id="L215">                .orElseThrow(() -&gt; new IllegalStateException(&quot;Missing public scenario: &quot; + scenarioId));</span>
+    }
+
+    private void ensureAllPublicScenariosGenerated(List&lt;PublicScenarioArtifact&gt; artifacts) {
+<span class="nc" id="L219">        List&lt;String&gt; ids = artifacts.stream().map(artifact -&gt; artifact.evidence().scenarioId()).toList();</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        for (String scenarioId : PUBLIC_SCENARIO_IDS) {</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            if (!ids.contains(scenarioId)) {</span>
+<span class="nc" id="L222">                throw new IllegalStateException(&quot;Public scenario was not generated: &quot; + scenarioId);</span>
+            }
+<span class="nc" id="L224">        }</span>
+<span class="nc" id="L225">    }</span>
+
+    private String inlineList(List&lt;String&gt; values) {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L229">            return &quot;none&quot;;</span>
+        }
+<span class="nc" id="L231">        return values.stream().map(value -&gt; &quot;`&quot; + escapeMarkdown(value) + &quot;`&quot;).reduce((left, right) -&gt; left + &quot;, &quot; + right).orElse(&quot;none&quot;);</span>
+    }
+
+    private String escapeMarkdown(String value) {
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;);</span>
+    }
+
+    private String slugFor(String scenarioId) {
+<span class="nc" id="L239">        String normalized = scenarioId.toLowerCase(Locale.ROOT);</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (normalized.equals(&quot;complete-square-factorization&quot;)) {</span>
+<span class="nc" id="L241">            return &quot;complete-square&quot;;</span>
+        }
+<span class="nc" id="L243">        return normalized.replaceAll(&quot;[^a-z0-9-]&quot;, &quot;-&quot;);</span>
+    }
+
+    private void deleteDirectory(Path directory) throws IOException {
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (!Files.exists(directory)) {</span>
+<span class="nc" id="L248">            return;</span>
+        }
+<span class="nc" id="L250">        try (var paths = Files.walk(directory)) {</span>
+<span class="nc" id="L251">            paths.sorted(Comparator.reverseOrder()).forEach(path -&gt; {</span>
+                try {
+<span class="nc" id="L253">                    Files.delete(path);</span>
+<span class="nc" id="L254">                } catch (IOException exception) {</span>
+<span class="nc" id="L255">                    throw new UncheckedIOException(exception);</span>
+<span class="nc" id="L256">                }</span>
+<span class="nc" id="L257">            });</span>
+<span class="nc" id="L258">        } catch (UncheckedIOException exception) {</span>
+<span class="nc" id="L259">            throw exception.getCause();</span>
+<span class="nc" id="L260">        }</span>
+<span class="nc" id="L261">    }</span>
+
+<span class="nc" id="L263">    private record PublicScenarioArtifact(</span>
+            DiscoveryBenchmarkScenario scenario,
+            DiscoveryBenchmarkEvidence evidence,
+            String evidencePath,
+            String svgPath,
+            String summaryPath) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
