@@ -38,107 +38,120 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
 <span class="nc" id="L38">        } catch (IllegalArgumentException exception) {</span>
 <span class="nc" id="L39">            return List.of();</span>
 <span class="fc" id="L40">        }</span>
-<span class="pc bpc" id="L41" title="3 of 6 branches missed.">        if (!(root instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV || !isOne(division.left())) {</span>
-<span class="nc" id="L42">            return List.of();</span>
+<span class="pc bpc" id="L41" title="2 of 6 branches missed.">        if (!(root instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV || !isOne(division.left())) {</span>
+<span class="fc" id="L42">            return List.of();</span>
         }
 <span class="fc" id="L44">        List&lt;Expr&gt; factors = flattenMultiplication(division.right());</span>
 <span class="fc bfc" id="L45" title="All 2 branches covered.">        if (factors.size() != 2) {</span>
 <span class="fc" id="L46">            return List.of();</span>
         }
-<span class="fc" id="L48">        UnitStepPair pair = unitStepPair(factors.get(0), factors.get(1));</span>
+<span class="fc" id="L48">        KStepPair pair = kStepPair(factors.get(0), factors.get(1));</span>
 <span class="fc bfc" id="L49" title="All 2 branches covered.">        if (pair == null) {</span>
-<span class="fc" id="L50">            pair = unitStepPair(factors.get(1), factors.get(0));</span>
+<span class="fc" id="L50">            pair = kStepPair(factors.get(1), factors.get(0));</span>
         }
 <span class="fc bfc" id="L52" title="All 2 branches covered.">        if (pair == null) {</span>
 <span class="fc" id="L53">            return List.of();</span>
         }
 <span class="fc" id="L55">        String formattedInput = ExpressionFormatter.format(root);</span>
-<span class="fc" id="L56">        Expr transformed = new BinaryExpr(</span>
+<span class="fc" id="L56">        Expr difference = new BinaryExpr(</span>
 <span class="fc" id="L57">            new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, pair.lower()),</span>
             BinaryOperator.SUB,
 <span class="fc" id="L59">            new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, pair.upper())</span>
         );
-<span class="fc" id="L61">        String formatted = ExpressionFormatter.format(transformed);</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (formatted.equals(formattedInput)) {</span>
-<span class="nc" id="L63">            return List.of();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        Expr transformed = Double.compare(pair.step(), 1.0) == 0</span>
+<span class="fc" id="L62">            ? difference</span>
+<span class="fc" id="L63">            : new BinaryExpr(</span>
+<span class="fc" id="L64">                new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, new NumberExpr(pair.step())),</span>
+                BinaryOperator.MUL,
+                difference
+              );
+<span class="fc" id="L68">        String formatted = ExpressionFormatter.format(transformed);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (formatted.equals(formattedInput)) {</span>
+<span class="nc" id="L70">            return List.of();</span>
         }
-<span class="fc" id="L65">        String key = canonicalizer.stableHash(formatted);</span>
-<span class="fc" id="L66">        Transformation transformation = new Transformation(</span>
+<span class="fc" id="L72">        String key = canonicalizer.stableHash(formatted);</span>
+<span class="fc" id="L73">        Transformation transformation = new Transformation(</span>
             RULE_ID,
             formatted,
             RewriteKind.NORMALIZE,
             false,
             -1,
             true,
-<span class="fc" id="L73">            RULE_ID + &quot;:&quot; + canonicalizer.stableHash(formattedInput) + &quot;-&gt;&quot; + key</span>
+<span class="fc" id="L80">            RULE_ID + &quot;:&quot; + canonicalizer.stableHash(formattedInput) + &quot;-&gt;&quot; + key</span>
         );
-<span class="fc" id="L75">        return List.of(transformation).stream()</span>
-<span class="fc" id="L76">            .sorted(Comparator.comparing(Transformation::transformedExpression))</span>
-<span class="fc" id="L77">            .limit(maxCandidates)</span>
-<span class="fc" id="L78">            .toList();</span>
+<span class="fc" id="L82">        return List.of(transformation).stream()</span>
+<span class="fc" id="L83">            .sorted(Comparator.comparing(Transformation::transformedExpression))</span>
+<span class="fc" id="L84">            .limit(maxCandidates)</span>
+<span class="fc" id="L85">            .toList();</span>
     }
 
-    private UnitStepPair unitStepPair(Expr lower, Expr upper) {
-<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (isPlusOne(upper, lower)) {</span>
-<span class="fc" id="L83">            return new UnitStepPair(lower, upper);</span>
+    private KStepPair kStepPair(Expr lower, Expr upper) {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (isPlusOne(upper, lower)) {</span>
+<span class="fc" id="L90">            return new KStepPair(lower, upper, 1.0);</span>
         }
-<span class="fc" id="L85">        AdditiveOffset lowerOffset = additiveOffset(lower);</span>
-<span class="fc" id="L86">        AdditiveOffset upperOffset = additiveOffset(upper);</span>
-<span class="pc bpc" id="L87" title="2 of 4 branches missed.">        if (lowerOffset != null</span>
+<span class="fc" id="L92">        AdditiveOffset lowerOffset = additiveOffset(lower);</span>
+<span class="fc" id="L93">        AdditiveOffset upperOffset = additiveOffset(upper);</span>
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">        if (lowerOffset != null</span>
             &amp;&amp; upperOffset != null
-<span class="fc bfc" id="L89" title="All 2 branches covered.">            &amp;&amp; same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())</span>
-<span class="fc bfc" id="L90" title="All 2 branches covered.">            &amp;&amp; Double.compare(upperOffset.offset() - lowerOffset.offset(), 1.0) == 0) {</span>
-<span class="fc" id="L91">            return new UnitStepPair(lower, upper);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            &amp;&amp; same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())) {</span>
+<span class="fc" id="L97">            double diff = upperOffset.offset() - lowerOffset.offset();</span>
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">            if (diff &gt;= 1.0 &amp;&amp; isPositiveInteger(diff)) {</span>
+<span class="fc" id="L99">                return new KStepPair(lower, upper, diff);</span>
+            }
         }
-<span class="fc" id="L93">        return null;</span>
+<span class="fc" id="L102">        return null;</span>
+    }
+
+    private boolean isPositiveInteger(double value) {
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">        return value &gt; 0 &amp;&amp; Math.rint(value) == value;</span>
     }
 
     private boolean isPlusOne(Expr candidate, Expr base) {
-<span class="pc bpc" id="L97" title="1 of 4 branches missed.">        if (!(candidate instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.ADD) {</span>
-<span class="fc" id="L98">            return false;</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        if (!(candidate instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.ADD) {</span>
+<span class="fc" id="L111">            return false;</span>
         }
-<span class="fc bfc" id="L100" title="All 4 branches covered.">        return (isOne(binary.right()) &amp;&amp; same(binary.left(), base))</span>
-<span class="pc bpc" id="L101" title="3 of 4 branches missed.">            || (isOne(binary.left()) &amp;&amp; same(binary.right(), base));</span>
+<span class="fc bfc" id="L113" title="All 4 branches covered.">        return (isOne(binary.right()) &amp;&amp; same(binary.left(), base))</span>
+<span class="pc bpc" id="L114" title="3 of 4 branches missed.">            || (isOne(binary.left()) &amp;&amp; same(binary.right(), base));</span>
     }
 
     private AdditiveOffset additiveOffset(Expr expression) {
-<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
-<span class="nc" id="L106">            return new AdditiveOffset(new NumberExpr(0), number.value());</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
+<span class="nc" id="L119">            return new AdditiveOffset(new NumberExpr(0), number.value());</span>
         }
-<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (binary.right() instanceof NumberExpr right) {</span>
-<span class="fc" id="L110">                return new AdditiveOffset(binary.left(), right.value());</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (binary.right() instanceof NumberExpr right) {</span>
+<span class="fc" id="L123">                return new AdditiveOffset(binary.left(), right.value());</span>
             }
-<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (binary.left() instanceof NumberExpr left) {</span>
-<span class="nc" id="L113">                return new AdditiveOffset(binary.right(), left.value());</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            if (binary.left() instanceof NumberExpr left) {</span>
+<span class="nc" id="L126">                return new AdditiveOffset(binary.right(), left.value());</span>
             }
         }
-<span class="fc" id="L116">        return new AdditiveOffset(expression, 0.0);</span>
+<span class="fc" id="L129">        return new AdditiveOffset(expression, 0.0);</span>
     }
 
     private List&lt;Expr&gt; flattenMultiplication(Expr expression) {
-<span class="fc bfc" id="L120" title="All 4 branches covered.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
-<span class="fc" id="L121">            List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L122">            result.addAll(flattenMultiplication(binary.left()));</span>
-<span class="fc" id="L123">            result.addAll(flattenMultiplication(binary.right()));</span>
-<span class="fc" id="L124">            return result;</span>
+<span class="fc bfc" id="L133" title="All 4 branches covered.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L134">            List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L135">            result.addAll(flattenMultiplication(binary.left()));</span>
+<span class="fc" id="L136">            result.addAll(flattenMultiplication(binary.right()));</span>
+<span class="fc" id="L137">            return result;</span>
         }
-<span class="fc" id="L126">        return List.of(expression);</span>
+<span class="fc" id="L139">        return List.of(expression);</span>
     }
 
     private boolean isOne(Expr expression) {
-<span class="fc bfc" id="L130" title="All 4 branches covered.">        return expression instanceof NumberExpr number &amp;&amp; Double.compare(number.value(), 1.0) == 0;</span>
+<span class="fc bfc" id="L143" title="All 4 branches covered.">        return expression instanceof NumberExpr number &amp;&amp; Double.compare(number.value(), 1.0) == 0;</span>
     }
 
     private boolean same(Expr left, Expr right) {
-<span class="fc" id="L134">        return canonicalizer.stableHash(ExpressionFormatter.format(left))</span>
-<span class="fc" id="L135">            .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));</span>
+<span class="fc" id="L147">        return canonicalizer.stableHash(ExpressionFormatter.format(left))</span>
+<span class="fc" id="L148">            .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));</span>
     }
 
-<span class="fc" id="L138">    private record UnitStepPair(Expr lower, Expr upper) {</span>
+<span class="fc" id="L151">    private record KStepPair(Expr lower, Expr upper, double step) {</span>
     }
 
-<span class="fc" id="L141">    private record AdditiveOffset(Expr symbolicPart, double offset) {</span>
+<span class="fc" id="L154">    private record AdditiveOffset(Expr symbolicPart, double offset) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

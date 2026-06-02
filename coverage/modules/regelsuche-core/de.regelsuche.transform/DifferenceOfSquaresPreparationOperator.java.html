@@ -129,7 +129,7 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
         }
 <span class="pc bpc" id="L130" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binaryExpr &amp;&amp; binaryExpr.operator() == BinaryOperator.MUL) {</span>
 <span class="fc" id="L131">            Expr root = squareRootOfProduct(flattenMultiplication(expression));</span>
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            return root == null ? null : new SquareRoot(root);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            return root == null ? null : new SquareRoot(root);</span>
         }
 <span class="fc" id="L134">        return null;</span>
     }
@@ -164,7 +164,7 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
 <span class="nc" id="L164">            return null;</span>
         }
 <span class="fc" id="L166">        List&lt;Expr&gt; rootedFactors = new ArrayList&lt;&gt;();</span>
-<span class="pc bpc" id="L167" title="3 of 4 branches missed.">        if (numericRoot != 1 || symbolicFactors.isEmpty()) {</span>
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        if (numericRoot != 1 || symbolicFactors.isEmpty()) {</span>
 <span class="fc" id="L168">            rootedFactors.add(new NumberExpr(numericRoot));</span>
         }
 <span class="fc" id="L170">        rootedFactors.addAll(symbolicFactors);</span>
@@ -201,28 +201,41 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
     }
 
     private Double perfectSquareRoot(double value) {
-<span class="pc bpc" id="L204" title="2 of 4 branches missed.">        if (value &lt; 0 || Math.rint(value) != value) {</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (value &lt; 0) {</span>
 <span class="nc" id="L205">            return null;</span>
         }
-<span class="fc" id="L207">        long rounded = (long) value;</span>
-<span class="fc" id="L208">        long root = Math.round(Math.sqrt(rounded));</span>
-<span class="fc bfc" id="L209" title="All 2 branches covered.">        return root * root == rounded ? (double) root : null;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (Math.rint(value) == value) {</span>
+<span class="fc" id="L208">            long rounded = (long) value;</span>
+<span class="fc" id="L209">            long root = Math.round(Math.sqrt(rounded));</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            if (root * root == rounded) {</span>
+<span class="fc" id="L211">                return (double) root;</span>
+            }
+        }
+<span class="fc" id="L214">        double scaled = value * 4;</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (Math.rint(scaled) == scaled &amp;&amp; scaled &gt; 0) {</span>
+<span class="fc" id="L216">            long rounded = (long) scaled;</span>
+<span class="fc" id="L217">            long root = Math.round(Math.sqrt(rounded));</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (root * root == rounded) {</span>
+<span class="fc" id="L219">                return root / 2.0;</span>
+            }
+        }
+<span class="fc" id="L222">        return null;</span>
     }
 
     private boolean isPositiveInteger(double value) {
-<span class="pc bpc" id="L213" title="2 of 4 branches missed.">        return value &gt; 0 &amp;&amp; Math.rint(value) == value;</span>
+<span class="pc bpc" id="L226" title="2 of 4 branches missed.">        return value &gt; 0 &amp;&amp; Math.rint(value) == value;</span>
     }
 
     private int repeatedStructureBonus(Expr expression) {
-<span class="fc" id="L217">        String formatted = ExpressionFormatter.format(expression);</span>
-<span class="fc" id="L218">        int repeatedPowerMarkers = formatted.split(&quot;\\^ 2&quot;, -1).length - 1;</span>
-<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        return repeatedPowerMarkers &gt; 1 ? 2 : 0;</span>
+<span class="fc" id="L230">        String formatted = ExpressionFormatter.format(expression);</span>
+<span class="fc" id="L231">        int repeatedPowerMarkers = formatted.split(&quot;\\^ 2&quot;, -1).length - 1;</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        return repeatedPowerMarkers &gt; 1 ? 2 : 0;</span>
     }
 
-<span class="fc" id="L222">    private record SquareRoot(Expr root) {</span>
+<span class="fc" id="L235">    private record SquareRoot(Expr root) {</span>
     }
 
-<span class="fc" id="L225">    private record ScoredCandidate(int score, Transformation transformation) {</span>
+<span class="fc" id="L238">    private record ScoredCandidate(int score, Transformation transformation) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

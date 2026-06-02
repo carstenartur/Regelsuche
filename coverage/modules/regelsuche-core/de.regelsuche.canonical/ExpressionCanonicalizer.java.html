@@ -136,8 +136,8 @@ import java.util.Optional;
 <span class="fc" id="L136">            Expr normalized = canonicalize(signedTerm.term(), context);</span>
 <span class="fc" id="L137">            Coefficient coefficient = coefficientOf(normalized);</span>
 <span class="fc" id="L138">            int value = signedTerm.sign() * coefficient.value();</span>
-<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (value == 0) {</span>
-<span class="nc" id="L140">                continue;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (value == 0) {</span>
+<span class="fc" id="L140">                continue;</span>
             }
 <span class="fc" id="L142">            String key = ExpressionFormatter.format(coefficient.term());</span>
 <span class="fc" id="L143">            buckets.computeIfAbsent(key, ignored -&gt; new TermBucket(coefficient.term())).add(value);</span>
