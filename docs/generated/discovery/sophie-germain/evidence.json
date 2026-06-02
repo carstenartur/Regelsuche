@@ -1,0 +1,126 @@
+{
+  "analytics" : {
+    "averageBranchingFactor" : 0.0,
+    "convergentStates" : 0,
+    "learnedMacroUsage" : 1,
+    "ruleUsage" : {
+      "ast_square_difference_factor" : 1,
+      "hypothesis_difference_of_squares_preparation" : 1,
+      "macro_6bd0496b" : 1
+    },
+    "statesExplored" : 4,
+    "topBridgeRules" : {
+      "hypothesis_difference_of_squares_preparation" : 1
+    },
+    "topConvergentNodes" : { },
+    "topFactorizationRules" : {
+      "ast_square_difference_factor" : 1
+    },
+    "topSimplificationRules" : { },
+    "uniqueCanonicalStates" : 4
+  },
+  "bridgeRulesUsed" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
+  "convergentStates" : [ "x^4+4*y^4" ],
+  "edgeCount" : 3,
+  "edges" : [ {
+    "from" : "x^4+4*y^4",
+    "kind" : "bridge",
+    "packId" : "core",
+    "ruleId" : "hypothesis_difference_of_squares_preparation",
+    "searchEffect" : [ "BRIDGING" ],
+    "source" : "operator",
+    "to" : "(x^2+2*y^2)^2-(2*x*y)^2"
+  }, {
+    "from" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "bridge",
+    "packId" : "core",
+    "ruleId" : "ast_square_difference_factor",
+    "searchEffect" : [ "FACTORIZING" ],
+    "source" : "core",
+    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "from" : "x^4+4*y^4",
+    "kind" : "macro",
+    "packId" : "core",
+    "ruleId" : "macro_6bd0496b",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "macro",
+    "to" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)"
+  } ],
+  "failureReason" : "",
+  "foundPaths" : [ [ "x ^ 4 + 4 * y ^ 4", "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2", "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)" ], [ "x ^ 4 + 4 * y ^ 4", "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)" ] ],
+  "generatedBy" : "DocsDiscoveryGalleryGenerator",
+  "inputExpression" : "x ^ 4 + 4 * y ^ 4",
+  "learnedMacros" : [ "macro_6bd0496b" ],
+  "nodeCount" : 4,
+  "nodes" : [ {
+    "id" : "x^4+4*y^4",
+    "kind" : "state",
+    "label" : "x ^ 4 + 4 * y ^ 4"
+  }, {
+    "id" : "(x^2+2*y^2)^2-(2*x*y)^2",
+    "kind" : "state",
+    "label" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"
+  }, {
+    "id" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)"
+  }, {
+    "id" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)",
+    "kind" : "target",
+    "label" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)"
+  } ],
+  "reusedMacros" : [ "macro_6bd0496b" ],
+  "ruleFamiliesUsed" : [ ],
+  "scenarioId" : "sophie-germain",
+  "smallGraphMessage" : "Search produced only 4 visible states under this budget.",
+  "sourceCommit" : "d74c79c66a68bcf23833c6c6d537392abac5a84a",
+  "success" : true,
+  "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)",
+  "validationStatus" : "PASS",
+  "withMacroRun" : {
+    "analytics" : {
+      "averageBranchingFactor" : 0.0,
+      "convergentStates" : 0,
+      "learnedMacroUsage" : 1,
+      "ruleUsage" : {
+        "macro_6bd0496b" : 1
+      },
+      "statesExplored" : 2,
+      "topBridgeRules" : { },
+      "topConvergentNodes" : { },
+      "topFactorizationRules" : { },
+      "topSimplificationRules" : { },
+      "uniqueCanonicalStates" : 2
+    },
+    "appliedRuleIds" : [ "macro_6bd0496b" ],
+    "failureReason" : "",
+    "path" : [ "x ^ 4 + 4 * y ^ 4", "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)" ],
+    "success" : true
+  },
+  "withoutMacroRun" : {
+    "analytics" : {
+      "averageBranchingFactor" : 0.0,
+      "convergentStates" : 0,
+      "learnedMacroUsage" : 0,
+      "ruleUsage" : {
+        "ast_square_difference_factor" : 1,
+        "hypothesis_difference_of_squares_preparation" : 1
+      },
+      "statesExplored" : 3,
+      "topBridgeRules" : {
+        "hypothesis_difference_of_squares_preparation" : 1
+      },
+      "topConvergentNodes" : { },
+      "topFactorizationRules" : {
+        "ast_square_difference_factor" : 1
+      },
+      "topSimplificationRules" : { },
+      "uniqueCanonicalStates" : 3
+    },
+    "appliedRuleIds" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
+    "failureReason" : "",
+    "path" : [ "x ^ 4 + 4 * y ^ 4", "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2", "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)" ],
+    "success" : true
+  }
+}

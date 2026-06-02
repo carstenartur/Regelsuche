@@ -62,14 +62,17 @@ public final class DiscoveryBenchmarkExecutor {
                 ? learnMacros(scenario, baseEngine, withoutMacro)
                 : new MacroLearningRun(List.of(), Map.of(), new InMemoryRuleInventoryRepository());
         List<String> learnedMacros = macroLearningRun.learnedMacros().stream().map(ReusableRule::id).toList();
+        String macroGoalExpression = withoutMacro.path().isEmpty() ? scenario.targetExpression() : withoutMacro.path().getLast();
+        boolean macroReuseRequired = scenario.expectations().contains(DiscoveryExpectation.MACRO_REUSE_REQUIRED);
         SearchRun withMacro = scenario.macroLearning().enabled()
                 ? (!learnedMacros.isEmpty()
-                        ? run(scenario, new MacroMoveTransformationEngine(
+                        ? runMacroRerun(
+                                scenario,
                                 baseEngine,
-                                new GoalAwareMacroMoveSelector(macroLearningRun.inventory()),
-                                scenario.targetExpression(),
-                                macroLearningRun.atomicStepsByRuleId(),
-                                macroLearningRun.learnedMacros().getFirst().assumptions()))
+                                macroLearningRun,
+                                learnedMacros,
+                                macroGoalExpression,
+                                macroReuseRequired)
                         : new SearchRun(false, "Macro learning required but no macro was learned", List.of(), List.of(), List.of()))
                 : new SearchRun(false, "Macro learning disabled", List.of(), List.of(), List.of());
         List<String> bridgeRules = bridgeRules(withoutMacro.appliedRuleIds(), scenario, rulesById);
@@ -119,6 +122,32 @@ public final class DiscoveryBenchmarkExecutor {
                 nodes,
                 edges,
                 smallGraphMessage);
+    }
+
+    private SearchRun runMacroRerun(
+            DiscoveryBenchmarkScenario scenario,
+            TransformationEngine baseEngine,
+            MacroLearningRun macroLearningRun,
+            List<String> learnedMacros,
+            String macroGoalExpression,
+            boolean macroReuseRequired) {
+        GoalAwareMacroMoveSelector selector = new GoalAwareMacroMoveSelector(macroLearningRun.inventory());
+        SearchRun goalAwareRun = run(scenario, new MacroMoveTransformationEngine(
+                baseEngine,
+                selector,
+                macroGoalExpression,
+                macroLearningRun.atomicStepsByRuleId(),
+                macroLearningRun.learnedMacros().getFirst().assumptions()));
+        if (!macroReuseRequired || goalAwareRun.appliedRuleIds().stream().anyMatch(learnedMacros::contains)) {
+            return goalAwareRun;
+        }
+        SearchRun fallbackRun = run(scenario, new MacroMoveTransformationEngine(
+                baseEngine,
+                selector,
+                null,
+                macroLearningRun.atomicStepsByRuleId(),
+                macroLearningRun.learnedMacros().getFirst().assumptions()));
+        return fallbackRun.appliedRuleIds().stream().anyMatch(learnedMacros::contains) ? fallbackRun : goalAwareRun;
     }
 
     private TransformationEngine engineFor(DiscoveryBenchmarkScenario scenario, List<ScenarioRulePack> scenarioPacks) {
@@ -215,7 +244,10 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     private int pathPreference(List<String> appliedRuleIds) {
-        return appliedRuleIds.contains("ast_linear_offset_simplify") ? 0 : 1;
+        if (appliedRuleIds.stream().anyMatch(rule -> rule.toLowerCase(Locale.ROOT).contains("macro"))) {
+            return 0;
+        }
+        return appliedRuleIds.contains("ast_linear_offset_simplify") ? 1 : 2;
     }
 
     private SearchRun toRun(SearchState targetState, boolean success, String failureReason) {

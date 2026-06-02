@@ -1,0 +1,140 @@
+{
+  "analytics" : {
+    "averageBranchingFactor" : 0.0,
+    "convergentStates" : 0,
+    "learnedMacroUsage" : 1,
+    "ruleUsage" : {
+      "ast_linear_offset_simplify" : 1,
+      "ast_square_difference_factor" : 1,
+      "complete_square_bridge" : 1,
+      "macro_3bbfed5b" : 1
+    },
+    "statesExplored" : 5,
+    "topBridgeRules" : {
+      "complete_square_bridge" : 1
+    },
+    "topConvergentNodes" : { },
+    "topFactorizationRules" : {
+      "ast_square_difference_factor" : 1
+    },
+    "topSimplificationRules" : {
+      "ast_linear_offset_simplify" : 1
+    },
+    "uniqueCanonicalStates" : 5
+  },
+  "bridgeRulesUsed" : [ "complete_square_bridge", "ast_square_difference_factor" ],
+  "convergentStates" : [ "x^2+6*x+5", "(x+1)*(x+3+2)" ],
+  "edgeCount" : 4,
+  "edges" : [ {
+    "from" : "x^2+6*x+5",
+    "kind" : "bridge",
+    "packId" : "core",
+    "ruleId" : "complete_square_bridge",
+    "searchEffect" : [ "BRIDGING" ],
+    "source" : "operator",
+    "to" : "(x+3)^2-2^2"
+  }, {
+    "from" : "(x+3)^2-2^2",
+    "kind" : "bridge",
+    "packId" : "core",
+    "ruleId" : "ast_square_difference_factor",
+    "searchEffect" : [ "FACTORIZING" ],
+    "source" : "core",
+    "to" : "(x+3-2)*(x+3+2)"
+  }, {
+    "from" : "(x+3-2)*(x+3+2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_linear_offset_simplify",
+    "searchEffect" : [ "SIMPLIFYING" ],
+    "source" : "core",
+    "to" : "(x+1)*(x+3+2)"
+  }, {
+    "from" : "x^2+6*x+5",
+    "kind" : "macro",
+    "packId" : "core",
+    "ruleId" : "macro_3bbfed5b",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "macro",
+    "to" : "(x+1)*(x+3+2)"
+  } ],
+  "failureReason" : "",
+  "foundPaths" : [ [ "x ^ 2 + 6 * x + 5", "(x + 3) ^ 2 - 2 ^ 2", "(x + 3 - 2) * (x + 3 + 2)", "(x + 1) * (x + 3 + 2)" ], [ "x ^ 2 + 6 * x + 5", "(x + 1) * (x + 3 + 2)" ] ],
+  "generatedBy" : "DocsDiscoveryGalleryGenerator",
+  "inputExpression" : "x ^ 2 + 6 * x + 5",
+  "learnedMacros" : [ "macro_3bbfed5b" ],
+  "nodeCount" : 4,
+  "nodes" : [ {
+    "id" : "x^2+6*x+5",
+    "kind" : "state",
+    "label" : "x ^ 2 + 6 * x + 5"
+  }, {
+    "id" : "(x+3)^2-2^2",
+    "kind" : "state",
+    "label" : "(x + 3) ^ 2 - 2 ^ 2"
+  }, {
+    "id" : "(x+3-2)*(x+3+2)",
+    "kind" : "target",
+    "label" : "(x + 3 - 2) * (x + 3 + 2)"
+  }, {
+    "id" : "(x+1)*(x+3+2)",
+    "kind" : "target",
+    "label" : "(x + 1) * (x + 3 + 2)"
+  } ],
+  "reusedMacros" : [ "macro_3bbfed5b" ],
+  "ruleFamiliesUsed" : [ ],
+  "scenarioId" : "complete-square-factorization",
+  "smallGraphMessage" : "Search produced only 4 visible states under this budget.",
+  "sourceCommit" : "d74c79c66a68bcf23833c6c6d537392abac5a84a",
+  "success" : true,
+  "targetExpression" : "(x + 1) * (x + 5)",
+  "validationStatus" : "PASS",
+  "withMacroRun" : {
+    "analytics" : {
+      "averageBranchingFactor" : 0.0,
+      "convergentStates" : 0,
+      "learnedMacroUsage" : 1,
+      "ruleUsage" : {
+        "macro_3bbfed5b" : 1
+      },
+      "statesExplored" : 2,
+      "topBridgeRules" : { },
+      "topConvergentNodes" : { },
+      "topFactorizationRules" : { },
+      "topSimplificationRules" : { },
+      "uniqueCanonicalStates" : 2
+    },
+    "appliedRuleIds" : [ "macro_3bbfed5b" ],
+    "failureReason" : "",
+    "path" : [ "x ^ 2 + 6 * x + 5", "(x + 1) * (x + 3 + 2)" ],
+    "success" : true
+  },
+  "withoutMacroRun" : {
+    "analytics" : {
+      "averageBranchingFactor" : 0.0,
+      "convergentStates" : 0,
+      "learnedMacroUsage" : 0,
+      "ruleUsage" : {
+        "ast_linear_offset_simplify" : 1,
+        "ast_square_difference_factor" : 1,
+        "complete_square_bridge" : 1
+      },
+      "statesExplored" : 4,
+      "topBridgeRules" : {
+        "complete_square_bridge" : 1
+      },
+      "topConvergentNodes" : { },
+      "topFactorizationRules" : {
+        "ast_square_difference_factor" : 1
+      },
+      "topSimplificationRules" : {
+        "ast_linear_offset_simplify" : 1
+      },
+      "uniqueCanonicalStates" : 4
+    },
+    "appliedRuleIds" : [ "complete_square_bridge", "ast_square_difference_factor", "ast_linear_offset_simplify" ],
+    "failureReason" : "",
+    "path" : [ "x ^ 2 + 6 * x + 5", "(x + 3) ^ 2 - 2 ^ 2", "(x + 3 - 2) * (x + 3 + 2)", "(x + 1) * (x + 3 + 2)" ],
+    "success" : true
+  }
+}

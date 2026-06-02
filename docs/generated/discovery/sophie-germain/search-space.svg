@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="352" viewBox="0 0 980 352" data-generated-by="SearchSpaceGallerySvgWriter" data-scenario-id="sophie-germain" data-evidence="evidence.json" data-node-count="4" data-edge-count="3">
+  <rect width="100%" height="100%" fill="#f8fafc"/>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker></defs>
+  <text x="40" y="36" font-size="16" font-weight="700">x ^ 4 + 4 * y ^ 4</text>
+  <text x="940" y="36" font-size="16" font-weight="700" text-anchor="end">(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y …</text>
+  <path class="edge bridge" d="M 122 110 C 285 82, 285 100, 448 128" fill="none" stroke="#d97706" stroke-width="3.0" marker-end="url(#arrow)"><title>hypothesis_difference_of_squares_preparation · operator · core</title></path>
+<text x="237" y="109" font-size="10" fill="#d97706">hypothesis_difference_of_sq…<title>hypothesis_difference_of_squares_preparation</title></text>
+<path class="edge bridge" d="M 532 128 C 695 100, 695 174, 858 202" fill="none" stroke="#d97706" stroke-width="3.0" marker-end="url(#arrow)"><title>ast_square_difference_factor · core · core</title></path>
+<text x="647" y="155" font-size="10" fill="#d97706">ast_square_difference_factor<title>ast_square_difference_factor</title></text>
+<path class="edge macro" d="M 122 76 C 490 48, 490 48, 858 76" fill="none" stroke="#7c3aed" stroke-width="3.0" marker-end="url(#arrow)" stroke-dasharray="8 5"><title>macro_6bd0496b · macro · core</title></path>
+<text x="442" y="66" font-size="10" fill="#7c3aed">macro_6bd0496b<title>macro_6bd0496b</title></text>
+
+  <g class="node input"><rect id="x^4+4*y^4" x="22" y="86" width="116" height="48" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/><title>x ^ 4 + 4 * y ^ 4</title><text x="30" y="107" font-size="10">x ^ 4 + 4 * y ^ 4</text><text x="30" y="123" font-size="9" fill="#64748b">x ^ 4 + 4 * y ^ 4</text></g>
+<g class="node state"><rect id="(x^2+2*y^2)^2-(2*x*y)^2" x="432" y="104" width="116" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2"/><title>(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2</title><text x="440" y="125" font-size="10">(x ^ 2 + 2 * y ^ 2) ^…</text><text x="440" y="141" font-size="9" fill="#64748b">state</text></g>
+<g class="node target"><rect id="(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)" x="842" y="178" width="116" height="48" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/><title>(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)</title><text x="850" y="199" font-size="10">(x ^ 2 + 2 * y ^ 2 - …</text><text x="850" y="215" font-size="9" fill="#64748b">(x ^ 2 - 2 * x * y + …</text></g>
+<g class="node target"><rect id="(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)" x="842" y="86" width="116" height="48" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/><title>(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)</title><text x="850" y="107" font-size="10">(x ^ 2 + 2 * x * y + …</text><text x="850" y="123" font-size="9" fill="#64748b">(x ^ 2 - 2 * x * y + …</text></g>
+
+  <text x="40" y="308" font-size="12" fill="#475569">Bridge edges: amber · Macro shortcut edges: purple dashed · full labels in SVG titles</text>
+  <text x="40" y="330" font-size="12">Search produced only 4 visible states under this budget.</text>
+</svg>

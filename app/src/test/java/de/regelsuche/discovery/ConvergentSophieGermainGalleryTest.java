@@ -171,11 +171,11 @@ class ConvergentSophieGermainGalleryTest {
             "Search-space SVG must be generated from SearchSpaceSubgraph");
         String readme = Files.readString(locateRepoRoot().resolve("README.md"));
         String gallery = Files.readString(locateRepoRoot().resolve("docs/demo-gallery.md"));
-        assertTrue(readme.contains("search-space-sophie-germain-compact.svg"),
-            "README must show the compact search-space SVG");
-        assertTrue(gallery.contains("search-space-sophie-germain.svg"), "Gallery must show the search-space SVG");
-        assertTrue(gallery.contains("Regelsuche does not only output the factorization.\n"
-            + "It records the explored transformation space and shows which different ideas converge."));
+        assertTrue(readme.contains("docs/generated/discovery/sophie-germain/evidence.json"),
+            "README must link generated Sophie-Germain evidence");
+        assertTrue(gallery.contains("generated/discovery/sophie-germain/search-space.svg"),
+            "Gallery must show the generated evidence search-space SVG");
+        assertTrue(gallery.contains("This gallery contains generated evidence only."));
     }
 
     @Test

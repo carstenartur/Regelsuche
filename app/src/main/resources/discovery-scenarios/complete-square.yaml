@@ -4,6 +4,8 @@ inputExpression: "x ^ 2 + 6 * x + 5"
 targetExpression: "(x + 1) * (x + 5)"
 expectations:
   - BRIDGE_REQUIRED
+  - MACRO_LEARNING_REQUIRED
+  - MACRO_REUSE_REQUIRED
 enabledOperators:
   - complete_square_bridge
 enabledRulePacks:
@@ -16,6 +18,8 @@ requiredRuleFamilies:
 requiredBridgeRules:
   - complete_square_bridge
   - ast_square_difference_factor
+macroLearning:
+  enabled: true
 budgets:
   maxDepth: 6
   maxStates: 120

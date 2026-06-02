@@ -18,6 +18,8 @@ class CompleteSquareScenarioDiscoveryTest {
         assertTrue(evidence.withoutMacroRun().appliedRuleIds().contains(CompleteSquareBridgeOperator.RULE_ID));
         assertTrue(evidence.withoutMacroRun().appliedRuleIds().contains("ast_square_difference_factor"));
         assertTrue(evidence.withoutMacroRun().appliedRuleIds().contains("ast_linear_offset_simplify"));
+        assertFalse(evidence.learnedMacros().isEmpty());
+        assertFalse(evidence.reusedMacros().isEmpty());
         assertFalse(evidence.edges().stream().anyMatch(edge -> edge.source().contains("scenario-exact-path")));
     }
 }
