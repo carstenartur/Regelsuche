@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.Set;
 
 final class SearchTraceCollector {
+    private final ExpressionCanonicalizer expressionCanonicalizer = new ExpressionCanonicalizer();
+
     TraceGraph collect(
             DiscoveryBenchmarkScenario scenario,
             SearchRunTrace withoutMacro,
@@ -206,7 +208,7 @@ final class SearchTraceCollector {
             return "";
         }
         try {
-            return new ExpressionCanonicalizer().canonicalize(expression);
+            return expressionCanonicalizer.canonicalize(expression);
         } catch (IllegalArgumentException exception) {
             return expression.trim().replaceAll("\\s+", " ");
         }

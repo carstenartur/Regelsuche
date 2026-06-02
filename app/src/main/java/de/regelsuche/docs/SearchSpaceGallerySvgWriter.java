@@ -161,17 +161,24 @@ public final class SearchSpaceGallerySvgWriter {
                 .thenComparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth)
                 .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label));
         int preferredVisible = Math.max(MIN_VISIBLE_NODES, Math.min(MAX_VISIBLE_NODES, ranked.size()));
-        List<DiscoveryBenchmarkEvidence.EvidenceNode> selected = new ArrayList<>(required);
+        LinkedHashSet<DiscoveryBenchmarkEvidence.EvidenceNode> selected = new LinkedHashSet<>();
         for (DiscoveryBenchmarkEvidence.EvidenceNode node : ranked) {
             if (selected.size() >= preferredVisible) {
                 break;
             }
-            if (!selected.contains(node)) {
+            if (required.contains(node)) {
                 selected.add(node);
             }
         }
-        selected.sort(Comparator.comparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth).thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label));
-        return selected;
+        for (DiscoveryBenchmarkEvidence.EvidenceNode node : ranked) {
+            if (selected.size() >= preferredVisible) {
+                break;
+            }
+            selected.add(node);
+        }
+        List<DiscoveryBenchmarkEvidence.EvidenceNode> visible = new ArrayList<>(selected);
+        visible.sort(Comparator.comparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth).thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label));
+        return visible;
     }
 
     private Map<String, Point> layout(List<DiscoveryBenchmarkEvidence.EvidenceNode> graphNodes) {
