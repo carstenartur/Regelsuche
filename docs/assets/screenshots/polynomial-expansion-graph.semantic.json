@@ -1,19 +1,18 @@
 {
   "schema": "regelsuche.semantic-graph-debug/v1",
   "fileName": "polynomial-expansion-graph.png",
-  "requestUrl": "/api/search-graph/semantic?mode=semantic&showMacroSteps=didactic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-4d1e7b17",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showMacroSteps=didactic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-e1428b30",
   "requestParams": {
     "mode": "semantic",
     "showMacroSteps": "didactic",
     "showLowSignal": false,
     "showAlternatives": false,
     "showVariants": false,
-    "pathId": "demo-4d1e7b17"
+    "pathId": "demo-e1428b30"
   },
   "visibleNodeIds": [
     "didactic-seed-13vtrk3",
     "didactic-1-1u0zexs",
-    "didactic-2-176q96m",
     "didactic-3-lgh6e1",
     "didactic-prepare-3-oit6kn",
     "didactic-goal-1iheuhx"
@@ -35,7 +34,7 @@
       },
       "renderedLayout": {
         "x": 319,
-        "y": 50.32508833922272
+        "y": 51.36842105263153
       }
     },
     {
@@ -54,26 +53,7 @@
       },
       "renderedLayout": {
         "x": 319,
-        "y": 329.79505300353367
-      }
-    },
-    {
-      "id": "didactic-2-176q96m",
-      "canonicalHash": "didactic:didactic-2-176q96m",
-      "normalizedLabel": "x*(x+2)+x+2",
-      "label": "x * (x + 2) + x + 2",
-      "revisit": false,
-      "cycle": false,
-      "onMainPath": true,
-      "explicitEndpoint": false,
-      "minDepth": 2,
-      "layout": {
-        "x": 0,
-        "y": 520
-      },
-      "renderedLayout": {
-        "x": 319,
-        "y": 609.2650176678446
+        "y": 345.1842105263157
       }
     },
     {
@@ -88,11 +68,11 @@
       "minDepth": 3,
       "layout": {
         "x": 0,
-        "y": 740
+        "y": 520
       },
       "renderedLayout": {
         "x": 319,
-        "y": 888.7349823321555
+        "y": 639
       }
     },
     {
@@ -107,11 +87,11 @@
       "minDepth": 4,
       "layout": {
         "x": 0,
-        "y": 960
+        "y": 740
       },
       "renderedLayout": {
         "x": 319,
-        "y": 1168.2049469964666
+        "y": 932.8157894736842
       }
     },
     {
@@ -126,11 +106,11 @@
       "minDepth": 5,
       "layout": {
         "x": 0,
-        "y": 1180
+        "y": 960
       },
       "renderedLayout": {
         "x": 319,
-        "y": 1447.6749116607773
+        "y": 1226.6315789473683
       }
     }
   ],
@@ -143,29 +123,18 @@
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
-        "y": 190.06007067137818
+        "y": 198.27631578947364
       }
     },
     {
-      "id": "didactic-1-1u0zexs->didactic-2-176q96m:ast_multiply_one_left",
+      "id": "didactic-1-1u0zexs->didactic-3-lgh6e1:ast_distribute_left_add",
       "from": "didactic-1-1u0zexs",
-      "to": "didactic-2-176q96m",
-      "label": "ast_multiply_one_left",
-      "kind": "MAIN_STEP",
-      "layout": {
-        "x": 319,
-        "y": 469.53003533568915
-      }
-    },
-    {
-      "id": "didactic-2-176q96m->didactic-3-lgh6e1:ast_distribute_left_add",
-      "from": "didactic-2-176q96m",
       "to": "didactic-3-lgh6e1",
       "label": "ast_distribute_left_add",
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
-        "y": 749
+        "y": 492.09210526315786
       }
     },
     {
@@ -176,7 +145,7 @@
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
-        "y": 1028.469964664311
+        "y": 785.9078947368421
       }
     },
     {
@@ -187,7 +156,7 @@
       "kind": "MAIN_STEP",
       "layout": {
         "x": 319,
-        "y": 1307.939929328622
+        "y": 1079.7236842105262
       }
     }
   ],
@@ -195,42 +164,35 @@
     {
       "id": "didactic-seed-13vtrk3",
       "x": 639.03125,
-      "y": 559.5672607421875,
+      "y": 560.610595703125,
       "width": 121.9375,
       "height": 27.734375
     },
     {
       "id": "didactic-1-1u0zexs",
       "x": 615.21875,
-      "y": 839.0372314453125,
+      "y": 854.4263916015625,
       "width": 169.5625,
-      "height": 27.734375
-    },
-    {
-      "id": "didactic-2-176q96m",
-      "x": 630.875,
-      "y": 1118.5072021484375,
-      "width": 138.25,
       "height": 27.734375
     },
     {
       "id": "didactic-3-lgh6e1",
       "x": 626.71875,
-      "y": 1397.9771728515625,
+      "y": 1148.2421875,
       "width": 146.5625,
       "height": 27.734375
     },
     {
       "id": "didactic-prepare-3-oit6kn",
       "x": 633.46875,
-      "y": 1677.4471435546875,
+      "y": 1442.0579833984375,
       "width": 133.0625,
       "height": 27.734375
     },
     {
       "id": "didactic-goal-1iheuhx",
       "x": 647.625,
-      "y": 1956.9171142578125,
+      "y": 1735.873779296875,
       "width": 104.75,
       "height": 27.734375
     }
@@ -239,35 +201,28 @@
     {
       "id": "\\text{distribute right add}",
       "x": 583.5,
-      "y": 702.46630859375,
+      "y": 710.6825561523438,
       "width": 137,
-      "height": 21.40625
-    },
-    {
-      "id": "\\text{multiply one left}",
-      "x": 593,
-      "y": 981.936279296875,
-      "width": 118,
       "height": 21.40625
     },
     {
       "id": "\\text{distribute left add}",
       "x": 588.5,
-      "y": 1261.40625,
+      "y": 1004.4983520507812,
       "width": 127,
-      "height": 21.40625
+      "height": 21.40618896484375
     },
     {
       "id": "\\text{multiply constants and product to power}",
       "x": 562,
-      "y": 1540.876220703125,
+      "y": 1298.314208984375,
       "width": 180,
       "height": 21.40625
     },
     {
       "id": "\\text{collect like terms}",
       "x": 591,
-      "y": 1820.34619140625,
+      "y": 1592.1298828125,
       "width": 122,
       "height": 21.40625
     }
@@ -276,8 +231,8 @@
   "duplicateNormalizedLabelCount": 0,
   "nodeOverlapCount": 0,
   "edgeLabelOverlapCount": 0,
-  "visibleMainPathMeaningfulNodeCount": 6,
-  "collapsedMainPathStepCount": 5,
+  "visibleMainPathMeaningfulNodeCount": 5,
+  "collapsedMainPathStepCount": 4,
   "finalNormalizedLabel": "x^2+3*x+2",
-  "mainPathMeaningfulNodeCount": 6
+  "mainPathMeaningfulNodeCount": 5
 }
