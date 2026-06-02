@@ -33,7 +33,6 @@ class TelescopingFractionHypothesisOperatorTest {
     @Test
     void rejectsNearMisses() {
         List<String> nearMisses = List.of(
-            "1 / (n * (n + 2))",
             "1 / (n + n + 1)",
             "1 / (n * (m + 1))",
             "1 / (n^2 + 1)"

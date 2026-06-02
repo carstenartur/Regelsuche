@@ -11,7 +11,7 @@ import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 
-/** Structural predicate for unit-fraction differences such as {@code 1/u - 1/(u + 1)}. */
+/** Structural predicate for unit-fraction differences such as {@code 1/u - 1/(u + k)} for positive integer k. */
 public final class TelescopingDifferenceAstPredicate {
     private static final ExpressionParser PARSER = new ExpressionParser();
     private static final ExpressionCanonicalizer CANONICALIZER = new ExpressionCanonicalizer();
@@ -58,23 +58,27 @@ public final class TelescopingDifferenceAstPredicate {
         AdditiveOffset baseOffset = additiveOffset(base);
         if (candidateOffset != null
             && baseOffset != null
-            && same(candidateOffset.symbolicPart(), baseOffset.symbolicPart())
-            && Double.compare(candidateOffset.offset() - baseOffset.offset(), 1.0) == 0) {
-            return true;
+            && same(candidateOffset.symbolicPart(), baseOffset.symbolicPart())) {
+            double step = candidateOffset.offset() - baseOffset.offset();
+            if (step >= 1.0 && step == Math.floor(step)) {
+                return true;
+            }
         }
-        return isPlusOne(candidate, base);
+        return isPositiveIntegerAddition(candidate, base);
     }
 
-    private static boolean isPlusOne(Expr candidate, Expr base) {
+    private static boolean isPositiveIntegerAddition(Expr candidate, Expr base) {
         if (!(candidate instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.ADD) {
             return false;
         }
-        return (isOne(binary.right()) && same(binary.left(), base))
-            || (isOne(binary.left()) && same(binary.right(), base));
+        return (isPositiveInteger(binary.right()) && same(binary.left(), base))
+            || (isPositiveInteger(binary.left()) && same(binary.right(), base));
     }
 
-    private static boolean isOne(Expr expression) {
-        return expression instanceof NumberExpr number && Double.compare(number.value(), 1.0) == 0;
+    private static boolean isPositiveInteger(Expr expression) {
+        return expression instanceof NumberExpr number
+            && number.value() >= 1.0
+            && number.value() == Math.floor(number.value());
     }
 
     private static boolean same(Expr left, Expr right) {

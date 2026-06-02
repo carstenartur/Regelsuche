@@ -22,6 +22,19 @@ rules:
       examples:
         - from: "div(1, mul(n, add(n, 1)))"
           to: "sub(div(1, n), div(1, add(n, 1)))"
+  - id: sympy.rational.partial_fraction.telescoping.k2
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - BRIDGING
+    riskLevel: low
+    rule:
+      from: "div(1, mul(?A, add(?A, 2)))"
+      to: "mul(div(1, 2), sub(div(1, ?A), div(1, add(?A, 2))))"
+    validation:
+      examples:
+        - from: "div(1, mul(n, add(n, 2)))"
+          to: "mul(div(1, 2), sub(div(1, n), div(1, add(n, 2))))"
   - id: sympy.rational.rationalize.sqrt_plus
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED

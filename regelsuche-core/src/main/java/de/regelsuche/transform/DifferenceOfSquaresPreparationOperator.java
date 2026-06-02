@@ -201,12 +201,25 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
     }
 
     private Double perfectSquareRoot(double value) {
-        if (value < 0 || Math.rint(value) != value) {
+        if (value < 0) {
             return null;
         }
-        long rounded = (long) value;
-        long root = Math.round(Math.sqrt(rounded));
-        return root * root == rounded ? (double) root : null;
+        if (Math.rint(value) == value) {
+            long rounded = (long) value;
+            long root = Math.round(Math.sqrt(rounded));
+            if (root * root == rounded) {
+                return (double) root;
+            }
+        }
+        double scaled = value * 4;
+        if (Math.rint(scaled) == scaled && scaled > 0) {
+            long rounded = (long) scaled;
+            long root = Math.round(Math.sqrt(rounded));
+            if (root * root == rounded) {
+                return root / 2.0;
+            }
+        }
+        return null;
     }
 
     private boolean isPositiveInteger(double value) {
