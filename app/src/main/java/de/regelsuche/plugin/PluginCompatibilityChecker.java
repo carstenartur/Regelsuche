@@ -2,6 +2,8 @@ package de.regelsuche.plugin;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Checks whether a plugin is compatible with the current Regelsuche core version.
@@ -11,6 +13,19 @@ public final class PluginCompatibilityChecker {
     public static final String CORE_API_VERSION = "1";
     /** The core version string. */
     public static final String CORE_VERSION = "1.0.0";
+    private static final Set<String> SUPPORTED_CAPABILITIES = Set.of(
+        "rules",
+        "transformations",
+        "visitors",
+        "macros",
+        "search-strategies",
+        "heuristics",
+        "cost-functions",
+        "renderers",
+        "explanations",
+        "parser-extensions",
+        "examples"
+    );
 
     private PluginCompatibilityChecker() {}
 
@@ -43,8 +58,8 @@ public final class PluginCompatibilityChecker {
         return check(plugin).isEmpty();
     }
 
-    private static boolean isSupportedCapability(String capability) {
-        return false;
+    static boolean isSupportedCapability(String capability) {
+        return capability != null && SUPPORTED_CAPABILITIES.contains(capability.toLowerCase(Locale.ROOT));
     }
 
     /**

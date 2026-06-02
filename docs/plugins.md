@@ -56,7 +56,7 @@ Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/exa
 - `rules validate <datei>` prüft DSL-Dateien mit verständlichen Diagnosen
 - `rules conflicts` zeigt konkurrierende Regeln, die dasselbe Quellmuster verwenden, sowie zyklische (zueinander inverse) Regelpaare
 - `rules profiles` zeigt geladene Aktivierungsprofile
-- `rules debug <ausdruck>` zeigt Regelversuche und Rejektionsgründe eines Transformationslaufs
+- `rules debug <ausdruck>` zeigt Regelversuche, Rejektionsgründe und Diagnosen eines Transformationslaufs, inklusive deaktivierter Regeln, Bedingungen und Zyklusrisiken
 - `rules import` kopiert `.regelsuche`/`.rules`-Pakete in das Zielverzeichnis
 - `rules export` schreibt aktive Regeln als `.regelsuche`-Paket heraus
 
@@ -94,5 +94,7 @@ durch Richtung, Priorität oder Aktivierungsprofile auflösen.
 ## Hot-Reload
 
 `PluginRuntime#reload()` lädt Classpath-Plugins, externe JARs aus `plugins/` und Regeldateien aus `rules/` neu. `PluginRuntime#reloadWithResult()` liefert zusätzlich Plugin-/Regeldatei-Diffs, Diagnosen und Konflikte als `PluginReloadResult`.
+
+Die Reload-Diffs vergleichen Snapshots statt nur IDs bzw. Pfade: unveränderte Plugins oder Regeldateien erscheinen nicht im Ergebnis, geänderte Snapshots erscheinen als `CHANGED`, nur vorher vorhandene Einträge als `REMOVED` und nur nachher vorhandene Einträge als `ADDED`. Regeldatei-Snapshots enthalten den Inhalts-Hash, sodass auch Änderungen bei gleichem Pfad und gleicher Eintragszahl sichtbar werden.
 
 `PluginDirectoryWatcher` beobachtet `plugins/` und `rules/` per `WatchService`, entprellt Dateisystem-Events und löst anschließend `reloadWithResult()` aus. Die CLI bindet das über `plugins watch` an, damit Plugin-JARs und Regelpakete ohne Neustart getestet werden können.

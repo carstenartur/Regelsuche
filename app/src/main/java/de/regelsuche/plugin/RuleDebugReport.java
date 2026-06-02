@@ -8,9 +8,15 @@ public record RuleDebugReport(
     int totalAttempts,
     int successfulApplications,
     int growthLimitRejections,
-    int candidateLimitRejections
+    int candidateLimitRejections,
+    int disabledByConfigRejections,
+    int disabledByProfileRejections,
+    int conditionFailedRejections,
+    int cycleRiskRejections,
+    List<String> diagnostics
 ) {
     public RuleDebugReport {
         attempts = List.copyOf(attempts);
+        diagnostics = List.copyOf(diagnostics);
     }
 }

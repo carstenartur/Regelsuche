@@ -684,13 +684,23 @@ public class CliRouter {
             out.println("Successful applications: " + report.successfulApplications());
             out.println("Growth limit rejections: " + report.growthLimitRejections());
             out.println("Candidate limit rejections: " + report.candidateLimitRejections());
+            out.println("Disabled by config: " + report.disabledByConfigRejections());
+            out.println("Disabled by profile: " + report.disabledByProfileRejections());
+            out.println("Condition failed: " + report.conditionFailedRejections());
+            out.println("Cycle risk: " + report.cycleRiskRejections());
+            if (!report.diagnostics().isEmpty()) {
+                out.println();
+                out.println("Diagnostics:");
+                report.diagnostics().forEach(diagnostic -> out.println("  " + diagnostic));
+            }
             out.println();
             out.println("Rule attempts (first 50):");
             report.attempts().stream().limit(50).forEach(attempt ->
-                out.printf("  %-40s %-8s %s%n",
+                out.printf("  %-40s %-8s %-25s %s%n",
                     attempt.ruleId(),
                     attempt.matched() ? "APPLIED" : "SKIP",
-                    attempt.reason()));
+                    attempt.reason(),
+                    attempt.detail()));
             return 0;
         }
     }

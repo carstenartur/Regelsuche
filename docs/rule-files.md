@@ -107,3 +107,4 @@ Jedes Paket bringt ein passendes Aktivierungsprofil mit und wird durch Tests in
 - `rules import <datei-oder-verzeichnis>` kopiert `.regelsuche`- und `.rules`-Dateien in das Zielverzeichnis (standardmäßig `rules/`).
 - `rules export --profile <id> [--dir <rules>] [--out <ziel>]` schreibt die aktuell aktiven Regeln als `.regelsuche`-Datei heraus.
 - `rules debug <ausdruck> [--dir <rules>]` führt die pluginbewusste Regel-Engine im Debug-Modus aus und zeigt Regelversuche, erfolgreiche Anwendungen sowie Rejektionen durch Wachstums- oder Kandidatenlimits.
+  Zusätzlich werden Laufzeitdiagnosen als Rejektionsgründe sichtbar: `DISABLED_BY_CONFIG`, `DISABLED_BY_PROFILE`, `CONDITION_FAILED` und `CYCLE_RISK` erscheinen mit Kontext in der Diagnose- und Attempt-Ausgabe.

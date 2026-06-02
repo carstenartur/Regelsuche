@@ -26,6 +26,7 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
     private final AstVisitorRegistry visitorRegistry;
     private final int maxAstSizeIncreasePerStep;
     private final int maxCandidatesPerState;
+    private final List<RuleDebugMetadata> debugMetadata;
     private List<AstVisitorContext.VisitorDiagnostic> lastVisitorDiagnostics = List.of();
     private boolean debugMode = false;
     private RuleDebugReport lastDebugReport;
@@ -44,6 +45,21 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
         this.visitorRegistry = visitorRegistry;
         this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;
         this.maxCandidatesPerState = maxCandidatesPerState;
+        this.debugMetadata = List.of();
+    }
+
+    PluginAwareAstRewriteTransformationEngine(
+        List<RewriteRule> rules,
+        AstVisitorRegistry visitorRegistry,
+        int maxAstSizeIncreasePerStep,
+        int maxCandidatesPerState,
+        List<RuleDebugMetadata> debugMetadata
+    ) {
+        this.rules = List.copyOf(rules);
+        this.visitorRegistry = visitorRegistry;
+        this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;
+        this.maxCandidatesPerState = maxCandidatesPerState;
+        this.debugMetadata = List.copyOf(debugMetadata);
     }
 
     public List<RewriteRule> rules() {
@@ -87,6 +103,9 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
         String formattedInput = ExpressionFormatter.format(root);
         int originalSize = canonicalizer.astNodeCount(formattedInput);
         List<RuleAttempt> attempts = debugMode ? new ArrayList<>() : null;
+        if (attempts != null) {
+            appendRuntimeDebugAttempts(attempts);
+        }
         Set<Transformation> transformations = new LinkedHashSet<>();
         for (RewriteResult result : rewriteEverywhere(root, context, attempts)) {
             String formatted = ExpressionFormatter.format(result.expression());
@@ -261,8 +280,30 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
             attempts.size(),
             successful,
             growthRejections,
-            candidateLimitRejections
+            candidateLimitRejections,
+            countReason(attempts, RuleRejectionReason.DISABLED_BY_CONFIG),
+            countReason(attempts, RuleRejectionReason.DISABLED_BY_PROFILE),
+            countReason(attempts, RuleRejectionReason.CONDITION_FAILED),
+            countReason(attempts, RuleRejectionReason.CYCLE_RISK),
+            debugMetadata.stream().map(RuleDebugMetadata::diagnostic).toList()
         );
+    }
+
+    private int countReason(List<RuleAttempt> attempts, RuleRejectionReason reason) {
+        return (int) attempts.stream().filter(attempt -> attempt.reason() == reason).count();
+    }
+
+    private void appendRuntimeDebugAttempts(List<RuleAttempt> attempts) {
+        for (RuleDebugMetadata metadata : debugMetadata) {
+            attempts.add(new RuleAttempt(
+                metadata.ruleId(),
+                metadata.context(),
+                "RUNTIME",
+                false,
+                metadata.reason(),
+                metadata.detail()
+            ));
+        }
     }
 
     private record RewriteResult(RewriteRule rule, Expr expression, String sourceSubtreeHash) {
