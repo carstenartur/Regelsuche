@@ -7,6 +7,8 @@ public final class MyPlugin implements RegelsuchePlugin {
     public String id() { return "my-plugin"; }
     public String name() { return "My Plugin"; }
     public String version() { return "1.0.0"; }
+    public String apiVersion() { return "1"; }
+    public String minimumCoreVersion() { return "1.0.0"; }
 }
 ```
 
@@ -70,3 +72,7 @@ und UI/CLI-Komponenten nur aktive Erweiterungen verwenden können.
 - Transformationen für binomische Formeln
 - Makro-Registrierung
 - Laufzeit-Erweiterungen für Heuristik, Kosten, Renderer, Erklärungen, Parser-Normalisierung und Beispiele
+
+## Kompatibilität
+
+`RegelsuchePlugin` bietet standardmäßig `apiVersion()`, `minimumCoreVersion()` und `capabilities()`. `PluginCompatibilityChecker` prüft diese Angaben beim Laden eines Plugins und meldet Inkompatibilitäten als Laufzeitdiagnosen, statt das Plugin stillschweigend zu registrieren.

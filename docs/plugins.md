@@ -30,6 +30,7 @@ Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/exa
 - [x] Stabile Plugin-Schnittstelle (`RegelsuchePlugin`)
 - [x] Plugin-Discovery über `ServiceLoader`
 - [x] Vorbereitung für Reload über `PluginRuntime#reload()`
+- [x] Hot-Reload-Ergebnisobjekt (`PluginReloadResult`) und Verzeichnis-Watcher für `plugins/` und `rules/`
 - [x] Erweiterbare zentrale Registries: `RuleRegistry`, `TransformationRegistry`, `AstVisitorRegistry`, `MacroRegistry`, `SearchStrategyRegistry`, `HeuristicRegistry`, `CostFunctionRegistry`, `RendererRegistry`, `ExplanationRegistry`, `ParserExtensionRegistry`, `ExampleRegistry`
 - [x] Eigene AST-Visitor mit allen dokumentierten Hook-Phasen
 - [x] Plugin-Transformationen erscheinen als Suchgraph-Kanten
@@ -48,10 +49,16 @@ Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/exa
 ## Sichtbarkeit und Debugging
 
 - `plugins list` zeigt geladene Plugins
+- `plugins reload` liefert Diff, Diagnosen und Konflikte eines Reloads
+- `plugins status` zeigt Verzeichnis-, Plugin-, Regel- und Konfliktstatus
+- `plugins watch` überwacht `plugins/` und `rules/` mit debounce-basiertem Hot-Reload
 - `rules list` zeigt geladene Regeln, Transformationen und Makros (`--profile <id>` wendet ein Aktivierungsprofil an)
 - `rules validate <datei>` prüft DSL-Dateien mit verständlichen Diagnosen
 - `rules conflicts` zeigt konkurrierende Regeln, die dasselbe Quellmuster verwenden, sowie zyklische (zueinander inverse) Regelpaare
 - `rules profiles` zeigt geladene Aktivierungsprofile
+- `rules debug <ausdruck>` zeigt Regelversuche und Rejektionsgründe eines Transformationslaufs
+- `rules import` kopiert `.regelsuche`/`.rules`-Pakete in das Zielverzeichnis
+- `rules export` schreibt aktive Regeln als `.regelsuche`-Paket heraus
 
 ## Aktivierungsprofile
 
@@ -84,6 +91,8 @@ werden. `PluginRuntime` meldet solche Paare als `rule-cycle`-Diagnose und über
 `runtime.cyclicConflicts()`. So lassen sich potenzielle Endlosschleifen früh erkennen und
 durch Richtung, Priorität oder Aktivierungsprofile auflösen.
 
-## Hot-Reload-Vorbereitung
+## Hot-Reload
 
-`PluginRuntime#reload()` lädt Classpath-Plugins, externe JARs aus `plugins/` und Regeldateien aus `rules/` neu. Das ist bewusst einfach gehalten und bereitet spätere Lifecycle-/Hot-Reload-Erweiterungen vor.
+`PluginRuntime#reload()` lädt Classpath-Plugins, externe JARs aus `plugins/` und Regeldateien aus `rules/` neu. `PluginRuntime#reloadWithResult()` liefert zusätzlich Plugin-/Regeldatei-Diffs, Diagnosen und Konflikte als `PluginReloadResult`.
+
+`PluginDirectoryWatcher` beobachtet `plugins/` und `rules/` per `WatchService`, entprellt Dateisystem-Events und löst anschließend `reloadWithResult()` aus. Die CLI bindet das über `plugins watch` an, damit Plugin-JARs und Regelpakete ohne Neustart getestet werden können.

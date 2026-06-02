@@ -7,6 +7,18 @@ public interface RegelsuchePlugin {
 
     String version();
 
+    default String apiVersion() {
+        return "1";
+    }
+
+    default String minimumCoreVersion() {
+        return "0.0.0";
+    }
+
+    default java.util.Set<String> capabilities() {
+        return java.util.Set.of();
+    }
+
     default void registerRules(RuleRegistry registry) {
     }
 

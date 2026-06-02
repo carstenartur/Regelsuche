@@ -24,7 +24,10 @@ import de.regelsuche.mining.RuleDiscoveryService;
 import de.regelsuche.notify.ConsoleNotifier;
 import de.regelsuche.plugin.PluginRuntime;
 import de.regelsuche.plugin.PluginRuntimeConfig;
+import de.regelsuche.plugin.PluginDirectoryWatcher;
 import de.regelsuche.plugin.PluginExtensionRegistry;
+import de.regelsuche.plugin.PluginReloadResult;
+import de.regelsuche.plugin.RuleDebugReport;
 import de.regelsuche.plugin.RuleFileParseException;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
@@ -33,10 +36,12 @@ import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.SymPyTransformationEngine;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -202,35 +207,114 @@ public class CliRouter {
 
     private int runPlugins(String[] args) {
         String sub = args.length == 0 ? "list" : args[0].toLowerCase(Locale.ROOT);
-        if (!"list".equals(sub)) {
-            out.println("Usage: plugins list [--dir PATH]");
-            return 1;
-        }
-        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, Math.min(args.length, 1), args.length));
+        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, Math.min(1, args.length), args.length));
         Path pluginsDir = Paths.get(options.getOrDefault("dir", "plugins"));
-        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
-            pluginsDir,
-            Paths.get("rules"),
-            true,
-            java.util.Set.of(),
-            java.util.Set.of()
-        ))) {
-            if (runtime.loadedPlugins().isEmpty()) {
-                out.println("No plugins loaded.");
-            } else {
-                runtime.loadedPlugins().forEach(plugin -> out.println(
-                    plugin.id() + " " + plugin.version() + " (" + plugin.source() + ", "
-                        + (plugin.enabled() ? "enabled" : "disabled") + ")"
-                ));
+        Path rulesDir = Paths.get(options.getOrDefault("rules", "rules"));
+
+        switch (sub) {
+            case "list" -> {
+                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+                    pluginsDir,
+                    rulesDir,
+                    true,
+                    java.util.Set.of(),
+                    java.util.Set.of()
+                ))) {
+                    if (runtime.loadedPlugins().isEmpty()) {
+                        out.println("No plugins loaded.");
+                    } else {
+                        runtime.loadedPlugins().forEach(plugin -> out.println(
+                            plugin.id() + " " + plugin.version() + " (" + plugin.source() + ", "
+                                + (plugin.enabled() ? "enabled" : "disabled") + ")"
+                        ));
+                    }
+                    runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
+                    return 0;
+                }
             }
-            runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
-            return 0;
+            case "reload" -> {
+                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+                    pluginsDir,
+                    rulesDir,
+                    true,
+                    java.util.Set.of(),
+                    java.util.Set.of()
+                ))) {
+                    PluginReloadResult result = runtime.reloadWithResult();
+                    out.println("Reload complete.");
+                    result.pluginChanges().forEach(change -> out.println("  plugin " + change.type() + " " + change.id()));
+                    result.ruleFileChanges().forEach(change -> out.println("  rulefile " + change.type() + " " + change.id()));
+                    result.diagnostics().forEach(diagnostic -> out.println("  WARN " + diagnostic.message()));
+                    result.conflicts().forEach(conflict ->
+                        out.println("  CONFLICT " + String.join(", ", conflict.ruleIds())));
+                    result.cyclicConflicts().forEach(conflict ->
+                        out.println("  CYCLE " + String.join(", ", conflict.ruleIds())));
+                    return 0;
+                }
+            }
+            case "status" -> {
+                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+                    pluginsDir,
+                    rulesDir,
+                    true,
+                    java.util.Set.of(),
+                    java.util.Set.of()
+                ))) {
+                    out.println("Plugins directory: " + pluginsDir.toAbsolutePath());
+                    out.println("Rules directory: " + rulesDir.toAbsolutePath());
+                    out.println("Plugins loaded: " + runtime.loadedPlugins().size());
+                    out.println("Rules loaded: " + runtime.registeredRules().size());
+                    out.println("Rule files: " + runtime.loadedRuleFiles().size());
+                    out.println("Conflicts: " + runtime.conflicts().size());
+                    out.println("Cyclic conflicts: " + runtime.cyclicConflicts().size());
+                    runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
+                    return 0;
+                }
+            }
+            case "watch" -> {
+                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+                    pluginsDir,
+                    rulesDir,
+                    true,
+                    java.util.Set.of(),
+                    java.util.Set.of()
+                ))) {
+                    out.println("Watching " + pluginsDir + " and " + rulesDir + " for changes. Press Ctrl+C to stop.");
+                    try (PluginDirectoryWatcher watcher = new PluginDirectoryWatcher(
+                        runtime,
+                        java.time.Duration.ofMillis(500),
+                        result -> {
+                            out.println("[reload] Reload triggered.");
+                            result.pluginChanges().forEach(change ->
+                                out.println("  plugin " + change.type() + " " + change.id()));
+                            result.ruleFileChanges().forEach(change ->
+                                out.println("  rulefile " + change.type() + " " + change.id()));
+                            result.diagnostics().stream()
+                                .filter(diagnostic -> !diagnostic.message().contains("Activation profile"))
+                                .forEach(diagnostic -> out.println("  WARN " + diagnostic.message()));
+                        }
+                    )) {
+                        watcher.start();
+                        Thread.currentThread().join();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return 0;
+                } catch (IOException ex) {
+                    out.println("Watch failed: " + ex.getMessage());
+                    return 2;
+                }
+            }
+            default -> {
+                out.println("Usage: plugins list|reload|watch|status [--dir PATH] [--rules PATH]");
+                return 1;
+            }
         }
     }
 
     private int runRules(String[] args) {
         if (args.length == 0) {
-            out.println("Usage: rules list|validate|conflicts|profiles");
+            out.println("Usage: rules list|validate|conflicts|profiles|debug|import|export");
             return 1;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
@@ -335,6 +419,33 @@ public class CliRouter {
                     runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
                     return 0;
                 }
+            }
+            case "import" -> {
+                if (args.length < 2) {
+                    out.println("Usage: rules import <file-or-dir> [--into rules/]");
+                    return 1;
+                }
+                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
+                Path source = Paths.get(args[1]);
+                Path targetDir = Paths.get(options.getOrDefault("into", "rules"));
+                return runRulesImport(source, targetDir);
+            }
+            case "export" -> {
+                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
+                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+                Path outputDir = Paths.get(options.getOrDefault("out", "exports"));
+                String profile = options.getOrDefault("profile", "");
+                return runRulesExport(rulesDir, outputDir, profile);
+            }
+            case "debug" -> {
+                if (args.length < 2) {
+                    out.println("Usage: rules debug <expression> [--dir rules/]");
+                    return 1;
+                }
+                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
+                String expression = args[1];
+                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+                return runRulesDebug(expression, rulesDir);
             }
             default -> {
                 out.println("Unknown rules command: " + sub);
@@ -443,6 +554,228 @@ public class CliRouter {
                 return 1;
             }
         }
+    }
+
+    private int runRulesImport(Path source, Path targetDir) {
+        try {
+            Files.createDirectories(targetDir);
+            if (Files.isDirectory(source)) {
+                try (var stream = Files.list(source)) {
+                    List<Path> files = stream
+                        .filter(Files::isRegularFile)
+                        .filter(path -> {
+                            String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+                            return name.endsWith(".regelsuche") || name.endsWith(".rules");
+                        })
+                        .toList();
+                    if (files.isEmpty()) {
+                        out.println("No rule files found in: " + source);
+                        return 1;
+                    }
+                    for (Path file : files) {
+                        Path target = targetDir.resolve(file.getFileName());
+                        Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+                        out.println("Imported " + file.getFileName() + " -> " + target);
+                    }
+                }
+            } else if (Files.isRegularFile(source)) {
+                Path target = targetDir.resolve(source.getFileName());
+                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                out.println("Imported " + source.getFileName() + " -> " + target);
+            } else {
+                out.println("Not found: " + source);
+                return 1;
+            }
+            return 0;
+        } catch (IOException ex) {
+            out.println("Import failed: " + ex.getMessage());
+            return 2;
+        }
+    }
+
+    private int runRulesExport(Path rulesDir, Path outputDir, String profile) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            Paths.get("plugins"),
+            rulesDir,
+            true,
+            java.util.Set.of(),
+            java.util.Set.of(),
+            profile.isBlank() ? null : profile
+        ))) {
+            Files.createDirectories(outputDir);
+            StringBuilder sb = new StringBuilder();
+            sb.append("# Exported rules").append(System.lineSeparator());
+            if (!profile.isBlank()) {
+                sb.append("# profile: ").append(profile).append(System.lineSeparator());
+            }
+            sb.append(System.lineSeparator());
+            int exported = 0;
+            for (de.regelsuche.plugin.RuleRegistry.RuleRegistration registration : runtime.ruleRegistry().registrations()) {
+                if (!registration.enabled()) {
+                    continue;
+                }
+                if (registration.rule() instanceof de.regelsuche.transform.PatternRewriteRule rule) {
+                    appendExportedRule(
+                        sb,
+                        registration.id(),
+                        rule.source(),
+                        rule.target(),
+                        registration.source(),
+                        registration.explanation(),
+                        registration.tags(),
+                        registration.conditions(),
+                        -rule.estimatedCostDelta()
+                    );
+                    exported++;
+                }
+            }
+            for (de.regelsuche.plugin.TransformationRegistry.TransformationRegistration registration
+                : runtime.transformationRegistry().registrations()) {
+                if (!registration.enabled()) {
+                    continue;
+                }
+                if (registration.transformation() instanceof de.regelsuche.plugin.PatternBasedTransformation transformation) {
+                    appendExportedRule(
+                        sb,
+                        registration.id(),
+                        transformation.source(),
+                        transformation.target(),
+                        registration.source(),
+                        registration.explanation(),
+                        registration.tags(),
+                        List.of(),
+                        -transformation.estimatedCostDelta()
+                    );
+                    exported++;
+                }
+            }
+            String filename = profile.isBlank()
+                ? "exported-rules.regelsuche"
+                : "exported-rules-" + profile + ".regelsuche";
+            Path outFile = outputDir.resolve(filename);
+            Files.writeString(outFile, sb.toString());
+            out.println("Exported " + exported + " rules to " + outFile.toAbsolutePath());
+            runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
+            return 0;
+        } catch (IOException ex) {
+            out.println("Export failed: " + ex.getMessage());
+            return 2;
+        }
+    }
+
+    private int runRulesDebug(String expression, Path rulesDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            Paths.get("plugins"),
+            rulesDir,
+            true,
+            java.util.Set.of(),
+            java.util.Set.of()
+        ))) {
+            de.regelsuche.plugin.PluginAwareAstRewriteTransformationEngine engine = runtime.createTransformationEngine();
+            engine.enableDebugMode();
+            engine.transform(expression);
+            RuleDebugReport report = engine.lastDebugReport();
+            if (report == null) {
+                out.println("No debug report generated for: " + expression);
+                return 1;
+            }
+            out.println("Debug report for: " + report.expression());
+            out.println("Total rule attempts: " + report.totalAttempts());
+            out.println("Successful applications: " + report.successfulApplications());
+            out.println("Growth limit rejections: " + report.growthLimitRejections());
+            out.println("Candidate limit rejections: " + report.candidateLimitRejections());
+            out.println();
+            out.println("Rule attempts (first 50):");
+            report.attempts().stream().limit(50).forEach(attempt ->
+                out.printf("  %-40s %-8s %s%n",
+                    attempt.ruleId(),
+                    attempt.matched() ? "APPLIED" : "SKIP",
+                    attempt.reason()));
+            return 0;
+        }
+    }
+
+    private void appendExportedRule(
+        StringBuilder sb,
+        String id,
+        de.regelsuche.transform.PatternExpr source,
+        de.regelsuche.transform.PatternExpr target,
+        String sourceInfo,
+        String explanation,
+        List<String> tags,
+        List<de.regelsuche.plugin.RuleFileParser.RuleCondition> conditions,
+        int priority
+    ) {
+        sb.append("rule ").append(id).append(":").append(System.lineSeparator());
+        sb.append("  pattern: ").append(formatPatternExpr(source)).append(System.lineSeparator());
+        sb.append("  replace: ").append(formatPatternExpr(target)).append(System.lineSeparator());
+        sb.append("  direction: forward").append(System.lineSeparator());
+        sb.append("  # source: ").append(sourceInfo).append(System.lineSeparator());
+        if (!explanation.isBlank()) {
+            sb.append("  explanation: \"")
+                .append(explanation.replace("\"", "\\\""))
+                .append("\"")
+                .append(System.lineSeparator());
+        }
+        if (priority != 0) {
+            sb.append("  priority: ").append(priority).append(System.lineSeparator());
+        }
+        if (!tags.isEmpty()) {
+            sb.append("  tags:").append(System.lineSeparator());
+            for (String tag : tags) {
+                sb.append("    - ").append(tag).append(System.lineSeparator());
+            }
+        }
+        if (!conditions.isEmpty()) {
+            sb.append("  conditions:").append(System.lineSeparator());
+            for (de.regelsuche.plugin.RuleFileParser.RuleCondition condition : conditions) {
+                sb.append("    - ").append(condition.name()).append(": ").append(condition.value())
+                    .append(System.lineSeparator());
+            }
+        }
+        sb.append(System.lineSeparator());
+    }
+
+    private String formatPatternExpr(de.regelsuche.transform.PatternExpr expr) {
+        if (expr instanceof de.regelsuche.transform.PatternExpr.Placeholder placeholder) {
+            return placeholder.name();
+        }
+        if (expr instanceof de.regelsuche.transform.PatternExpr.LiteralNumber number) {
+            double value = number.value();
+            if (value == Math.rint(value)) {
+                return Long.toString((long) value);
+            }
+            return Double.toString(value);
+        }
+        if (expr instanceof de.regelsuche.transform.PatternExpr.LiteralVariable variable) {
+            return variable.name();
+        }
+        if (expr instanceof de.regelsuche.transform.PatternExpr.Operation operation) {
+            return formatOperation(operation);
+        }
+        if (expr instanceof de.regelsuche.transform.PatternExpr.Function function) {
+            return function.name() + "(" + function.arguments().stream().map(this::formatPatternExpr)
+                .collect(java.util.stream.Collectors.joining(", ")) + ")";
+        }
+        throw new IllegalArgumentException("Unsupported pattern expression: " + expr);
+    }
+
+    private String formatOperation(de.regelsuche.transform.PatternExpr.Operation operation) {
+        String left = formatPatternOperand(operation.left(), operation.operator().precedence(), false);
+        String right = formatPatternOperand(operation.right(), operation.operator().precedence(), true);
+        return left + " " + operation.operator().symbol() + " " + right;
+    }
+
+    private String formatPatternOperand(de.regelsuche.transform.PatternExpr operand, int parentPrecedence, boolean rightSide) {
+        String rendered = formatPatternExpr(operand);
+        if (operand instanceof de.regelsuche.transform.PatternExpr.Operation nested) {
+            boolean needsParentheses = nested.operator().precedence() < parentPrecedence
+                || (rightSide && nested.operator().precedence() == parentPrecedence);
+            if (needsParentheses) {
+                return "(" + rendered + ")";
+            }
+        }
+        return rendered;
     }
 
     private void printExtensions(

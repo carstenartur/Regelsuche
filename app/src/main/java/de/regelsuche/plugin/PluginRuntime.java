@@ -100,6 +100,43 @@ public final class PluginRuntime implements AutoCloseable {
         diagnostics = List.copyOf(discoveredDiagnostics);
     }
 
+    public PluginReloadResult reloadWithResult() {
+        List<String> previousPluginIds = loadedPlugins.stream().map(LoadedPlugin::id).toList();
+        List<String> previousRuleFilePaths = loadedRuleFiles.stream().map(LoadedRuleFile::path).toList();
+        reload();
+        List<String> newPluginIds = loadedPlugins.stream().map(LoadedPlugin::id).toList();
+        List<String> newRuleFilePaths = loadedRuleFiles.stream().map(LoadedRuleFile::path).toList();
+        List<PluginReloadChange> pluginChanges = new ArrayList<>();
+        for (String id : previousPluginIds) {
+            if (!newPluginIds.contains(id)) {
+                pluginChanges.add(new PluginReloadChange(id, PluginReloadChange.ChangeType.REMOVED));
+            } else {
+                pluginChanges.add(new PluginReloadChange(id, PluginReloadChange.ChangeType.CHANGED));
+            }
+        }
+        for (String id : newPluginIds) {
+            if (!previousPluginIds.contains(id)) {
+                pluginChanges.add(new PluginReloadChange(id, PluginReloadChange.ChangeType.ADDED));
+            }
+        }
+        List<PluginReloadChange> ruleFileChanges = new ArrayList<>();
+        for (String path : previousRuleFilePaths) {
+            if (!newRuleFilePaths.contains(path)) {
+                ruleFileChanges.add(new PluginReloadChange(path, PluginReloadChange.ChangeType.REMOVED));
+            }
+        }
+        for (String path : newRuleFilePaths) {
+            if (!previousRuleFilePaths.contains(path)) {
+                ruleFileChanges.add(new PluginReloadChange(path, PluginReloadChange.ChangeType.ADDED));
+            }
+        }
+        return new PluginReloadResult(pluginChanges, ruleFileChanges, diagnostics, conflicts, cyclicConflicts);
+    }
+
+    public PluginRuntimeConfig config() {
+        return config;
+    }
+
     public RuleRegistry ruleRegistry() {
         return ruleRegistry;
     }
@@ -253,11 +290,18 @@ public final class PluginRuntime implements AutoCloseable {
         try {
             for (RegelsuchePlugin plugin : loader) {
                 boolean enabled = !config.disabledPluginIds().contains(plugin.id());
-                discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, enabled));
                 if (!enabled) {
+                    discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, false));
                     discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(), "Plugin disabled by configuration"));
                     continue;
                 }
+                List<PluginRuntime.RuntimeDiagnostic> compatibilityIssues = PluginCompatibilityChecker.check(plugin);
+                if (!compatibilityIssues.isEmpty()) {
+                    discoveredDiagnostics.addAll(compatibilityIssues);
+                    discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, false));
+                    continue;
+                }
+                discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, true));
                 registerPlugin(plugin, source, discoveredDiagnostics);
             }
         } catch (ServiceConfigurationError error) {

@@ -2,6 +2,7 @@ package de.regelsuche.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
@@ -504,4 +505,41 @@ class PluginRuntimeTest {
                     && ruleFile.path().endsWith("bad-priority.regelsuche")));
         }
     }
+    @Test
+    void debugModeProducesRuleAttemptReport(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of(),
+            Set.of()
+        ))) {
+            PluginAwareAstRewriteTransformationEngine engine = runtime.createTransformationEngine();
+            engine.enableDebugMode();
+
+            engine.transform("(a + b)^2");
+
+            RuleDebugReport report = engine.lastDebugReport();
+            assertNotNull(report);
+            assertEquals("(a + b)^2", report.expression());
+            assertTrue(report.totalAttempts() > 0);
+            assertTrue(report.successfulApplications() > 0);
+            assertTrue(report.attempts().stream().anyMatch(attempt -> attempt.reason() == RuleRejectionReason.APPLIED));
+        }
+    }
+
+    @Test
+    void externalJarLoadingUsesURLClassLoaderAndServiceLoaderDiscovery(@TempDir Path tempDir) throws Exception {
+        Path pluginsDir = tempDir.resolve("plugins");
+        Files.createDirectories(pluginsDir);
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            pluginsDir, tempDir.resolve("rules"), true, Set.of(), Set.of()
+        ))) {
+            assertTrue(runtime.loadedPlugins().stream().anyMatch(p -> p.id().equals("binomial-formulas")));
+            assertTrue(runtime.loadedPlugins().stream()
+                .filter(p -> p.source().equals(pluginsDir.toString()))
+                .findFirst().isEmpty());
+        }
+    }
+
 }
