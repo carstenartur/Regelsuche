@@ -35,5 +35,5 @@ This gallery contains generated evidence only.
 | Scenario | Success | States | Edges | Bridge rules | Learned macros | Reused macros |
 |---|---:|---:|---:|---:|---:|---:|
 | Complete-square factorization | yes | 13 | 30 | 2 | 1 | 1 |
-| Sophie-Germain hidden structure | yes | 63 | 149 | 2 | 1 | 1 |
+| Sophie-Germain hidden structure | yes | 56 | 113 | 2 | 1 | 1 |
 

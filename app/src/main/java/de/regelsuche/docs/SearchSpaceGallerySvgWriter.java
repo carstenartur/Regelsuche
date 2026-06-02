@@ -22,6 +22,7 @@ public final class SearchSpaceGallerySvgWriter {
         Set<String> visibleNodeIds = graphNodes.stream().map(DiscoveryBenchmarkEvidence.EvidenceNode::id).collect(java.util.stream.Collectors.toSet());
         List<DiscoveryBenchmarkEvidence.EvidenceEdge> visibleEdges = evidence.edges().stream()
                 .filter(edge -> visibleNodeIds.contains(edge.from()) && visibleNodeIds.contains(edge.to()))
+                .sorted(evidenceEdgeComparator())
                 .toList();
         Map<String, Point> positions = layout(graphNodes);
 
@@ -139,19 +140,17 @@ public final class SearchSpaceGallerySvgWriter {
                 required.add(node);
             }
         }
-        for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges()) {
-            if ("bridge".equals(edge.kind()) || "macro".equals(edge.kind())) {
-                DiscoveryBenchmarkEvidence.EvidenceNode from = byId.get(edge.from());
-                DiscoveryBenchmarkEvidence.EvidenceNode to = byId.get(edge.to());
-                if (from != null) {
-                    required.add(from);
-                }
-                if (to != null) {
-                    required.add(to);
-                }
-                if (required.size() >= MIN_VISIBLE_NODES) {
-                    break;
-                }
+        for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges().stream()
+                .filter(candidate -> "bridge".equals(candidate.kind()) || "macro".equals(candidate.kind()))
+                .sorted(evidenceEdgeComparator())
+                .toList()) {
+            DiscoveryBenchmarkEvidence.EvidenceNode from = byId.get(edge.from());
+            DiscoveryBenchmarkEvidence.EvidenceNode to = byId.get(edge.to());
+            if (from != null) {
+                required.add(from);
+            }
+            if (to != null) {
+                required.add(to);
             }
         }
         List<DiscoveryBenchmarkEvidence.EvidenceNode> ranked = new ArrayList<>(all);
@@ -159,7 +158,8 @@ public final class SearchSpaceGallerySvgWriter {
                 .comparing((DiscoveryBenchmarkEvidence.EvidenceNode node) -> !hasTag(node.tags(), "selected-path"))
                 .thenComparing(node -> "target".equals(node.kind()) ? 0 : "input".equals(node.kind()) ? 1 : 2)
                 .thenComparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth)
-                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label));
+                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label)
+                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::id));
         int preferredVisible = Math.max(MIN_VISIBLE_NODES, Math.min(MAX_VISIBLE_NODES, ranked.size()));
         LinkedHashSet<DiscoveryBenchmarkEvidence.EvidenceNode> selected = new LinkedHashSet<>();
         for (DiscoveryBenchmarkEvidence.EvidenceNode node : ranked) {
@@ -177,7 +177,9 @@ public final class SearchSpaceGallerySvgWriter {
             selected.add(node);
         }
         List<DiscoveryBenchmarkEvidence.EvidenceNode> visible = new ArrayList<>(selected);
-        visible.sort(Comparator.comparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth).thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label));
+        visible.sort(Comparator.comparingInt(DiscoveryBenchmarkEvidence.EvidenceNode::depth)
+                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::label)
+                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceNode::id));
         return visible;
     }
 
@@ -225,6 +227,20 @@ public final class SearchSpaceGallerySvgWriter {
 
     private boolean hasTag(List<String> tags, String tag) {
         return tags != null && tags.contains(tag);
+    }
+
+    private Comparator<DiscoveryBenchmarkEvidence.EvidenceEdge> evidenceEdgeComparator() {
+        return Comparator.comparing(DiscoveryBenchmarkEvidence.EvidenceEdge::from)
+                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::to)
+                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::ruleId)
+                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::kind)
+                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::source)
+                .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::packId)
+                .thenComparing(edge -> edge.searchEffect().stream()
+                        .map(Enum::name)
+                        .sorted()
+                        .collect(java.util.stream.Collectors.joining("|")))
+                .thenComparing(edge -> edge.tags().stream().sorted().collect(java.util.stream.Collectors.joining("|")));
     }
 
     private String strokeFor(String kind, boolean selectedPath) {

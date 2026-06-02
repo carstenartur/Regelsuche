@@ -33,7 +33,14 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             0
         );
 
-        Comparator<SearchState> byPriority = Comparator.comparingInt(state -> priority(state, problem));
+        Comparator<SearchState> byPriority = Comparator
+            .comparingInt((SearchState state) -> priority(state, problem))
+            .thenComparingInt(SearchState::depth)
+            .thenComparing(SearchState::canonicalHash)
+            .thenComparing(SearchState::expression)
+            .thenComparing(state -> String.join("->", state.appliedRuleIds()))
+            .thenComparing(state -> String.join("->", state.path()))
+            .thenComparing(state -> String.join("->", sortedValues(state.appliedRuleApplications())));
         PriorityQueue<SearchState> frontier = new PriorityQueue<>(byPriority);
         List<SearchState> explored = new ArrayList<>();
         Set<String> visited = new HashSet<>();
@@ -56,7 +63,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             }
 
             int generated = 0;
-            for (Transformation transformation : problem.engine().transform(current.expression())) {
+            List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));
+            transformations.sort(Comparator
+                .comparing(Transformation::rule)
+                .thenComparing(Transformation::transformedExpression)
+                .thenComparing(Transformation::applicationKey));
+            for (Transformation transformation : transformations) {
                 if (generated >= problem.heuristic().maxCandidatesPerState()) {
                     break;
                 }
@@ -147,5 +159,9 @@ public class BestFirstSearchStrategy implements SearchStrategy {
 
     private String stateKey(SearchState state) {
         return state.canonicalHash() + ":" + state.appliedRuleApplications();
+    }
+
+    private List<String> sortedValues(Set<String> values) {
+        return values.stream().sorted().toList();
     }
 }
