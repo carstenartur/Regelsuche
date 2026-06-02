@@ -24,15 +24,142 @@
   },
   "bridgeRulesUsed" : [ "complete_square_bridge", "ast_square_difference_factor" ],
   "convergentStates" : [ "x^2+6*x+5", "(x+1)*(x+3+2)" ],
-  "edgeCount" : 4,
+  "edgeCount" : 30,
   "edges" : [ {
-    "from" : "x^2+6*x+5",
-    "kind" : "bridge",
+    "from" : "(x+1)*(x+3)+(x+1)*2",
+    "kind" : "rule",
     "packId" : "core",
-    "ruleId" : "complete_square_bridge",
-    "searchEffect" : [ "BRIDGING" ],
-    "source" : "operator",
+    "ruleId" : "ast_factor_common_left",
+    "searchEffect" : [ "FACTORIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+1)*(x+3+2)"
+  }, {
+    "from" : "(x+1)*(x+3+2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_distribute_left_add",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+1)*(x+3)+(x+1)*2"
+  }, {
+    "from" : "(x+1)*(x+3+2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+1)*(x+5)"
+  }, {
+    "from" : "(x+1)*(x+3+2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_linear_offset_simplify",
+    "searchEffect" : [ "SIMPLIFYING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+1)*(x+5)"
+  }, {
+    "from" : "(x+3)*(x+3)-2^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)*(x+3)-4"
+  }, {
+    "from" : "(x+3)*(x+3)-2^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-2^2"
+  }, {
+    "from" : "(x+3)*(x+3)-2^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-2^2"
+  }, {
+    "from" : "(x+3)*(x+3)-2^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-4"
+  }, {
+    "from" : "(x+3)*(x+3)-4",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-4"
+  }, {
+    "from" : "(x+3)*(x+3)-4",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-4"
+  }, {
+    "from" : "(x+3)^2-2*2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_product_to_power_two",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-2^2"
+  }, {
+    "from" : "(x+3)^2-2*2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-4"
+  }, {
+    "from" : "(x+3)^2-2^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)*(x+3)-2^2"
+  }, {
+    "from" : "(x+3)^2-2^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-2*2"
+  }, {
+    "from" : "(x+3)^2-2^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-4"
   }, {
     "from" : "(x+3)^2-2^2",
     "kind" : "bridge",
@@ -40,7 +167,35 @@
     "ruleId" : "ast_square_difference_factor",
     "searchEffect" : [ "FACTORIZING" ],
     "source" : "core",
+    "tags" : [ "selected-path" ],
     "to" : "(x+3-2)*(x+3+2)"
+  }, {
+    "from" : "(x+3)^2-2^2",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "sympy.poly.factor.difference_of_squares",
+    "searchEffect" : [ "FACTORIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3-2)*(x+3+2)"
+  }, {
+    "from" : "(x+3)^2-4",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)*(x+3)-4"
+  }, {
+    "from" : "(x+3-2)*(x+3+2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+1)*(x+3+2)"
   }, {
     "from" : "(x+3-2)*(x+3+2)",
     "kind" : "rule",
@@ -48,7 +203,62 @@
     "ruleId" : "ast_linear_offset_simplify",
     "searchEffect" : [ "SIMPLIFYING" ],
     "source" : "core",
+    "tags" : [ "selected-path" ],
     "to" : "(x+1)*(x+3+2)"
+  }, {
+    "from" : "(x+3-2)*(x+3+2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+1)*(x+5)"
+  }, {
+    "from" : "(x+3-2)*(x+3+2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3-2)*(x+5)"
+  }, {
+    "from" : "(x+3-2)*(x+3+2)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_linear_offset_simplify",
+    "searchEffect" : [ "SIMPLIFYING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3-2)*(x+5)"
+  }, {
+    "from" : "(x+3-2)*(x+5)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+1)*(x+5)"
+  }, {
+    "from" : "(x+3-2)*(x+5)",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_linear_offset_simplify",
+    "searchEffect" : [ "SIMPLIFYING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+1)*(x+5)"
+  }, {
+    "from" : "x*x+6*x+5",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_factor_common_right",
+    "searchEffect" : [ "FACTORIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+6)*x+5"
   }, {
     "from" : "x^2+6*x+5",
     "kind" : "macro",
@@ -56,36 +266,126 @@
     "ruleId" : "macro_3bbfed5b",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "macro",
+    "tags" : [ "alternative-branch", "macro-shortcut" ],
     "to" : "(x+1)*(x+3+2)"
+  }, {
+    "from" : "x^2+6*x+5",
+    "kind" : "bridge",
+    "packId" : "core",
+    "ruleId" : "complete_square_bridge",
+    "searchEffect" : [ "BRIDGING" ],
+    "source" : "operator",
+    "tags" : [ "selected-path" ],
+    "to" : "(x+3)^2-2^2"
+  }, {
+    "from" : "x^2+6*x+5",
+    "kind" : "bridge",
+    "packId" : "core",
+    "ruleId" : "complete_square_bridge",
+    "searchEffect" : [ "BRIDGING" ],
+    "source" : "operator",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-4"
+  }, {
+    "from" : "x^2+6*x+5",
+    "kind" : "rule",
+    "packId" : "core",
+    "ruleId" : "ast_power_two_to_product",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "x*x+6*x+5"
   } ],
   "failureReason" : "",
   "foundPaths" : [ [ "x ^ 2 + 6 * x + 5", "(x + 3) ^ 2 - 2 ^ 2", "(x + 3 - 2) * (x + 3 + 2)", "(x + 1) * (x + 3 + 2)" ], [ "x ^ 2 + 6 * x + 5", "(x + 1) * (x + 3 + 2)" ] ],
   "generatedBy" : "DocsDiscoveryGalleryGenerator",
   "inputExpression" : "x ^ 2 + 6 * x + 5",
   "learnedMacros" : [ "macro_3bbfed5b" ],
-  "nodeCount" : 4,
+  "nodeCount" : 13,
   "nodes" : [ {
+    "depth" : 0,
     "id" : "x^2+6*x+5",
-    "kind" : "state",
-    "label" : "x ^ 2 + 6 * x + 5"
+    "kind" : "input",
+    "label" : "x ^ 2 + 6 * x + 5",
+    "tags" : [ "input", "selected-path" ]
   }, {
-    "id" : "(x+3)^2-2^2",
-    "kind" : "state",
-    "label" : "(x + 3) ^ 2 - 2 ^ 2"
-  }, {
-    "id" : "(x+3-2)*(x+3+2)",
-    "kind" : "target",
-    "label" : "(x + 3 - 2) * (x + 3 + 2)"
-  }, {
+    "depth" : 1,
     "id" : "(x+1)*(x+3+2)",
     "kind" : "target",
-    "label" : "(x + 1) * (x + 3 + 2)"
+    "label" : "(x + 1) * (x + 3 + 2)",
+    "tags" : [ "target", "selected-path" ]
+  }, {
+    "depth" : 1,
+    "id" : "(x+3)^2-2^2",
+    "kind" : "state",
+    "label" : "(x + 3) ^ 2 - 2 ^ 2",
+    "tags" : [ "selected-path" ]
+  }, {
+    "depth" : 1,
+    "id" : "(x+3)^2-4",
+    "kind" : "state",
+    "label" : "(x + 3) ^ 2 - 4",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 1,
+    "id" : "x*x+6*x+5",
+    "kind" : "state",
+    "label" : "x * x + 6 * x + 5",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x+1)*(x+3)+(x+1)*2",
+    "kind" : "state",
+    "label" : "(x + 1) * (x + 3) + (x + 1) * 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x+1)*(x+5)",
+    "kind" : "target",
+    "label" : "(x + 1) * (x + 5)",
+    "tags" : [ "target", "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x+3-2)*(x+3+2)",
+    "kind" : "target",
+    "label" : "(x + 3 - 2) * (x + 3 + 2)",
+    "tags" : [ "target", "selected-path" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x+3)*(x+3)-2^2",
+    "kind" : "state",
+    "label" : "(x + 3) * (x + 3) - 2 ^ 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x+3)*(x+3)-4",
+    "kind" : "state",
+    "label" : "(x + 3) * (x + 3) - 4",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x+3)^2-2*2",
+    "kind" : "state",
+    "label" : "(x + 3) ^ 2 - 2 * 2",
+    "tags" : [ "alternative-branch" ]
+  }, {
+    "depth" : 2,
+    "id" : "(x+6)*x+5",
+    "kind" : "state",
+    "label" : "(x + 6) * x + 5",
+    "tags" : [ "alternative-branch", "dead-end" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x+3-2)*(x+5)",
+    "kind" : "target",
+    "label" : "(x + 3 - 2) * (x + 5)",
+    "tags" : [ "target", "alternative-branch" ]
   } ],
   "reusedMacros" : [ "macro_3bbfed5b" ],
   "ruleFamiliesUsed" : [ ],
   "scenarioId" : "complete-square-factorization",
-  "smallGraphMessage" : "Search produced only 4 visible states under this budget.",
-  "sourceCommit" : "d74c79c66a68bcf23833c6c6d537392abac5a84a",
+  "smallGraphMessage" : "",
+  "sourceCommit" : "c807a5612b1c39825b118e2ca8219b797e6a0716",
   "success" : true,
   "targetExpression" : "(x + 1) * (x + 5)",
   "validationStatus" : "PASS",

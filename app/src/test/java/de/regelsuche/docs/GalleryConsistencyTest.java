@@ -55,11 +55,16 @@ class GalleryConsistencyTest {
             assertTrue(svgContent.contains("data-scenario-id=\"" + evidence.path("scenarioId").asText() + "\""), svg.toString());
             assertTrue(svgContent.contains("data-generated-by=\"SearchSpaceGallerySvgWriter\""), svg.toString());
             assertTrue(svgContent.contains("data-evidence=\"evidence.json\""), svg.toString());
-            assertTrue(svgContent.contains("class=\"edge bridge\""), svg.toString());
+            assertTrue(svgContent.contains("class=\"edge bridge"), svg.toString());
             if (!evidence.path("reusedMacros").isEmpty()) {
-                assertTrue(svgContent.contains("class=\"edge macro\""), svg.toString());
+                assertTrue(svgContent.contains("class=\"edge macro"), svg.toString());
             }
-            assertTrue(evidence.path("nodeCount").asInt() > 3, "No old three-node graph may be the main evidence: " + evidenceFile);
+            assertTrue(evidence.path("nodeCount").asInt() > 4, "No tiny <=4 node graph may be the main evidence: " + evidenceFile);
+            String scenarioId = evidence.path("scenarioId").asText();
+            if (scenarioId.equals("complete-square-factorization") || scenarioId.equals("sophie-germain")) {
+                assertTrue(evidence.path("nodeCount").asInt() > 8,
+                        "Public scenario must expose meaningful real search-space size (>8 nodes): " + evidenceFile);
+            }
         }
     }
 

@@ -3,8 +3,8 @@ package de.regelsuche.docs;
 import de.regelsuche.search.SearchSpaceAnalytics;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -49,5 +49,59 @@ class SearchSpaceGallerySvgWriterTest {
         assertFalse(svg.contains("complete square"));
         assertFalse(svg.contains("stale label"));
         assertFalse(svg.contains("rule_beta"));
+    }
+
+    @Test
+    void visibleNodeSelectionStaysWithinConfiguredMaximum() {
+        List<DiscoveryBenchmarkEvidence.EvidenceNode> nodes = new ArrayList<>();
+        List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges = new ArrayList<>();
+        for (int index = 0; index < 35; index++) {
+            String id = "n" + index;
+            String kind = index == 0 ? "input" : index == 1 ? "target" : "state";
+            nodes.add(new DiscoveryBenchmarkEvidence.EvidenceNode(
+                    id,
+                    "Node " + index,
+                    kind,
+                    index,
+                    List.of("selected-path")));
+            if (index > 0) {
+                edges.add(new DiscoveryBenchmarkEvidence.EvidenceEdge(
+                        "n" + (index - 1),
+                        id,
+                        "rule_" + index,
+                        "rule",
+                        "core",
+                        "core",
+                        List.of()));
+            }
+        }
+        DiscoveryBenchmarkEvidence evidence = new DiscoveryBenchmarkEvidence(
+                "synthetic-scenario",
+                "a",
+                "b",
+                true,
+                "",
+                new DiscoveryBenchmarkEvidence.SearchRunEvidence(true, "", List.of("a", "b"), List.of("rule_1"),
+                        new SearchSpaceAnalytics(35, 34, 0, 0, 0.0d)),
+                new DiscoveryBenchmarkEvidence.SearchRunEvidence(false, "", List.of(), List.of(),
+                        new SearchSpaceAnalytics(0, 0, 0, 0, 0.0d)),
+                List.of(List.of("a", "b")),
+                List.of(),
+                List.of("synthetic"),
+                List.of(),
+                List.of(),
+                List.of(),
+                new SearchSpaceAnalytics(35, 34, 0, 0, 0.0d),
+                "PASS",
+                nodes,
+                edges,
+                "");
+
+        String svg = new SearchSpaceGallerySvgWriter().write(evidence, "synthetic-evidence.json");
+
+        assertTrue(svg.contains("Visible: 30/35 nodes"), svg);
+        assertTrue(svg.contains("Node 29"), svg);
+        assertFalse(svg.contains("Node 30"), svg);
+        assertFalse(svg.contains("Node 34"), svg);
     }
 }

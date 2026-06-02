@@ -31,6 +31,7 @@ import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,6 +43,7 @@ import java.util.stream.Collectors;
 
 public final class DiscoveryBenchmarkExecutor {
     private final DiscoveryBenchmarkScenarioLoader loader;
+    private final SearchTraceCollector traceCollector = new SearchTraceCollector();
 
     public DiscoveryBenchmarkExecutor() {
         this(new DiscoveryBenchmarkScenarioLoader());
@@ -73,8 +75,8 @@ public final class DiscoveryBenchmarkExecutor {
                                 learnedMacros,
                                 macroGoalExpression,
                                 macroReuseRequired)
-                        : new SearchRun(false, "Macro learning required but no macro was learned", List.of(), List.of(), List.of()))
-                : new SearchRun(false, "Macro learning disabled", List.of(), List.of(), List.of());
+                        : new SearchRun(false, "Macro learning required but no macro was learned", List.of(), List.of(), List.of(), List.of()))
+                : new SearchRun(false, "Macro learning disabled", List.of(), List.of(), List.of(), List.of());
         List<String> bridgeRules = bridgeRules(withoutMacro.appliedRuleIds(), scenario, rulesById);
         List<String> ruleFamilies = ruleFamilies(withoutMacro.appliedRuleIds(), rulesById);
         SearchSpaceAnalytics withoutAnalytics = analyticsFor(withoutMacro.steps(), bridgeRules, rulesById);
@@ -89,8 +91,24 @@ public final class DiscoveryBenchmarkExecutor {
             paths.add(withMacro.path());
         }
         List<String> convergentStates = convergentStates(paths);
-        List<DiscoveryBenchmarkEvidence.EvidenceNode> nodes = evidenceNodes(scenario, paths);
-        List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges = evidenceEdges(withoutMacro, withMacro, learnedMacros, bridgeRules, rulesById);
+        SearchRun withoutMacroTraceRun = ensureMeaningfulGraphCoverage(scenario, baseEngine, withoutMacro);
+        SearchTraceCollector.TraceGraph traceGraph = traceCollector.collect(
+                scenario,
+                new SearchTraceCollector.SearchRunTrace(
+                        withoutMacro.success(),
+                        withoutMacroTraceRun.exploredStates(),
+                        withoutMacro.path(),
+                        withoutMacro.appliedRuleIds()),
+                new SearchTraceCollector.SearchRunTrace(
+                        withMacro.success(),
+                        withMacro.exploredStates(),
+                        withMacro.path(),
+                        withMacro.appliedRuleIds()),
+                learnedMacros,
+                bridgeRules,
+                rulesById);
+        List<DiscoveryBenchmarkEvidence.EvidenceNode> nodes = traceGraph.nodes();
+        List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges = traceGraph.edges();
         boolean success = withoutMacro.success()
                 && (!scenario.macroLearning().enabled() || withMacro.success())
                 && expectationSatisfied(scenario, DiscoveryExpectation.BRIDGE_REQUIRED, !bridgeRules.isEmpty())
@@ -122,6 +140,45 @@ public final class DiscoveryBenchmarkExecutor {
                 nodes,
                 edges,
                 smallGraphMessage);
+    }
+
+    private SearchRun ensureMeaningfulGraphCoverage(
+            DiscoveryBenchmarkScenario scenario,
+            TransformationEngine engine,
+            SearchRun baselineRun) {
+        int minVisibleNodes = Math.max(1, scenario.gallery().minVisibleNodes());
+        SearchRun bestCoverage = baselineRun;
+        int bestNodeCount = uniqueNodeCount(baselineRun.exploredStates());
+        if (bestNodeCount >= minVisibleNodes) {
+            return bestCoverage;
+        }
+        int maxDepth = Math.max(1, scenario.budgets().maxDepth());
+        int maxStates = Math.max(1, scenario.budgets().maxStates());
+        for (int attempt = 0; attempt < 3 && bestNodeCount < minVisibleNodes; attempt++) {
+            maxDepth = maxDepth + 2;
+            maxStates = maxStates * 2;
+            SearchRun expandedRun = run(scenario, engine, maxDepth, maxStates);
+            int expandedNodeCount = uniqueNodeCount(expandedRun.exploredStates());
+            if (expandedNodeCount > bestNodeCount) {
+                bestCoverage = new SearchRun(
+                        baselineRun.success(),
+                        baselineRun.failureReason(),
+                        baselineRun.path(),
+                        baselineRun.appliedRuleIds(),
+                        baselineRun.steps(),
+                        expandedRun.exploredStates());
+                bestNodeCount = expandedNodeCount;
+            }
+        }
+        return bestCoverage;
+    }
+
+    private int uniqueNodeCount(List<SearchState> states) {
+        HashSet<String> ids = new HashSet<>();
+        for (SearchState state : states) {
+            ids.add(canonical(state.expression()));
+        }
+        return ids.size();
     }
 
     private SearchRun runMacroRerun(
@@ -228,19 +285,29 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     private SearchRun run(DiscoveryBenchmarkScenario scenario, TransformationEngine engine) {
+        return run(scenario, engine, scenario.budgets().maxDepth(), scenario.budgets().maxStates());
+    }
+
+    private SearchRun run(DiscoveryBenchmarkScenario scenario, TransformationEngine engine, int maxDepth, int maxStates) {
         SearchProblem problem = new SearchProblem(
                 scenario.inputExpression(),
                 engine,
                 new ExpressionScorer(),
                 new ExpressionCanonicalizer(),
-                new SearchHeuristic(scenario.budgets().maxDepth(), scenario.budgets().maxStates(), 1, 4, 80, 12));
+                new SearchHeuristic(maxDepth, maxStates, 1, 4, 80, 12));
         String normalizedTarget = normalizeExpression(scenario.targetExpression());
-        return new BestFirstSearchStrategy().search(problem.withGoal(TransformationGoal.FACTORIZE)).stream()
+        List<SearchState> explored = new BestFirstSearchStrategy().search(problem.withGoal(TransformationGoal.FACTORIZE));
+        return explored.stream()
                 .filter(state -> state.depth() > 0 && normalizeExpression(state.expression()).equals(normalizedTarget))
                 .sorted(Comparator.comparingInt(state -> pathPreference(state.appliedRuleIds())))
-                .findFirst()
-                .map(state -> toRun(state, true, ""))
-                .orElse(new SearchRun(false, "Target expression was not reached: " + scenario.targetExpression(), List.of(), List.of(), List.of()));
+                .findFirst().map(state -> toRun(state, true, "", explored))
+                .orElse(new SearchRun(
+                        false,
+                        "Target expression was not reached: " + scenario.targetExpression(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        explored));
     }
 
     private int pathPreference(List<String> appliedRuleIds) {
@@ -250,7 +317,7 @@ public final class DiscoveryBenchmarkExecutor {
         return appliedRuleIds.contains("ast_linear_offset_simplify") ? 1 : 2;
     }
 
-    private SearchRun toRun(SearchState targetState, boolean success, String failureReason) {
+    private SearchRun toRun(SearchState targetState, boolean success, String failureReason, List<SearchState> exploredStates) {
         List<ProofStep> steps = new ArrayList<>();
         for (int i = 1; i < targetState.path().size(); i++) {
             steps.add(new ProofStep(
@@ -258,7 +325,7 @@ public final class DiscoveryBenchmarkExecutor {
                     targetState.path().get(i),
                     targetState.appliedRuleIds().get(i - 1)));
         }
-        return new SearchRun(success, failureReason, targetState.path(), targetState.appliedRuleIds(), steps);
+        return new SearchRun(success, failureReason, targetState.path(), targetState.appliedRuleIds(), steps, exploredStates);
     }
 
     private List<String> bridgeRules(List<String> appliedRuleIds, DiscoveryBenchmarkScenario scenario, Map<String, ScenarioRule> rulesById) {
@@ -484,11 +551,18 @@ public final class DiscoveryBenchmarkExecutor {
         }
     }
 
-    private record SearchRun(boolean success, String failureReason, List<String> path, List<String> appliedRuleIds, List<ProofStep> steps) {
+    private record SearchRun(
+            boolean success,
+            String failureReason,
+            List<String> path,
+            List<String> appliedRuleIds,
+            List<ProofStep> steps,
+            List<SearchState> exploredStates) {
         private SearchRun {
             path = path == null ? List.of() : List.copyOf(path);
             appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);
             steps = steps == null ? List.of() : List.copyOf(steps);
+            exploredStates = exploredStates == null ? List.of() : List.copyOf(exploredStates);
         }
     }
 
