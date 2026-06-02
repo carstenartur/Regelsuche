@@ -16,7 +16,11 @@ public final class DiscoveryOperatorRegistry {
         if (provider == null) {
             throw new IllegalArgumentException("Provider must not be null");
         }
-        for (DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition : provider.operators()) {
+        List<DiscoveryOperatorProvider.DiscoveryOperatorDefinition> definitions = provider.operators();
+        if (definitions == null) {
+            throw new IllegalArgumentException("Provider '" + provider.id() + "' returned null operators");
+        }
+        for (DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition : definitions) {
             operatorsById.put(definition.id(), definition);
         }
         return this;

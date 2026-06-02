@@ -1,6 +1,7 @@
 package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -21,5 +22,28 @@ class DiscoveryOperatorRegistryTest {
         assertTrue(registry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(List.of("complete_square_bridge"))).isEmpty());
         registry.enable("complete_square_bridge");
         assertFalse(registry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(List.of("complete_square_bridge"))).isEmpty());
+    }
+
+    @Test
+    void rejectsNullProviderAndNullProviderOperatorList() {
+        DiscoveryOperatorRegistry registry = new DiscoveryOperatorRegistry();
+        assertThrows(IllegalArgumentException.class, () -> registry.register(null));
+        assertThrows(IllegalArgumentException.class, () -> registry.register(new DiscoveryOperatorProvider() {
+            @Override
+            public String id() {
+                return "broken";
+            }
+
+            @Override
+            public List<DiscoveryOperatorDefinition> operators() {
+                return null;
+            }
+        }));
+    }
+
+    @Test
+    void benchmarkExecutorRejectsNullConstructorDependencies() {
+        assertThrows(IllegalArgumentException.class, () -> new DiscoveryBenchmarkExecutor(null, new DiscoveryOperatorRegistry()));
+        assertThrows(IllegalArgumentException.class, () -> new DiscoveryBenchmarkExecutor(new DiscoveryBenchmarkScenarioLoader(), null));
     }
 }

@@ -53,6 +53,12 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     DiscoveryBenchmarkExecutor(DiscoveryBenchmarkScenarioLoader loader, DiscoveryOperatorRegistry operatorRegistry) {
+        if (loader == null) {
+            throw new IllegalArgumentException("Loader must not be null");
+        }
+        if (operatorRegistry == null) {
+            throw new IllegalArgumentException("Operator registry must not be null");
+        }
         this.loader = loader;
         this.operatorRegistry = operatorRegistry;
         this.operatorRuleIds = operatorRegistry.operatorRuleIds();

@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class GeneratedDiscoveryEvidenceReproducibilityTest {
@@ -28,9 +29,11 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         files.put("README.md", Files.readString(repoRoot.resolve("README.md"), StandardCharsets.UTF_8));
         files.put("docs/demo-gallery.md", Files.readString(repoRoot.resolve("docs/demo-gallery.md"), StandardCharsets.UTF_8));
         Path generated = repoRoot.resolve("docs/generated/discovery");
-        for (Path file : Files.walk(generated).filter(Files::isRegularFile).sorted().toList()) {
-            String relative = generated.relativize(file).toString().replace('\\', '/');
-            files.put("docs/generated/discovery/" + relative, Files.readString(file, StandardCharsets.UTF_8));
+        try (Stream<Path> paths = Files.walk(generated)) {
+            for (Path file : paths.filter(Files::isRegularFile).sorted().toList()) {
+                String relative = generated.relativize(file).toString().replace('\\', '/');
+                files.put("docs/generated/discovery/" + relative, Files.readString(file, StandardCharsets.UTF_8));
+            }
         }
         return Map.copyOf(files);
     }
