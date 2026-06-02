@@ -45,19 +45,26 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
         if (factors.size() != 2) {
             return List.of();
         }
-        UnitStepPair pair = unitStepPair(factors.get(0), factors.get(1));
+        KStepPair pair = kStepPair(factors.get(0), factors.get(1));
         if (pair == null) {
-            pair = unitStepPair(factors.get(1), factors.get(0));
+            pair = kStepPair(factors.get(1), factors.get(0));
         }
         if (pair == null) {
             return List.of();
         }
         String formattedInput = ExpressionFormatter.format(root);
-        Expr transformed = new BinaryExpr(
+        Expr difference = new BinaryExpr(
             new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, pair.lower()),
             BinaryOperator.SUB,
             new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, pair.upper())
         );
+        Expr transformed = Double.compare(pair.step(), 1.0) == 0
+            ? difference
+            : new BinaryExpr(
+                new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, new NumberExpr(pair.step())),
+                BinaryOperator.MUL,
+                difference
+              );
         String formatted = ExpressionFormatter.format(transformed);
         if (formatted.equals(formattedInput)) {
             return List.of();
@@ -78,19 +85,25 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
             .toList();
     }
 
-    private UnitStepPair unitStepPair(Expr lower, Expr upper) {
+    private KStepPair kStepPair(Expr lower, Expr upper) {
         if (isPlusOne(upper, lower)) {
-            return new UnitStepPair(lower, upper);
+            return new KStepPair(lower, upper, 1.0);
         }
         AdditiveOffset lowerOffset = additiveOffset(lower);
         AdditiveOffset upperOffset = additiveOffset(upper);
         if (lowerOffset != null
             && upperOffset != null
-            && same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())
-            && Double.compare(upperOffset.offset() - lowerOffset.offset(), 1.0) == 0) {
-            return new UnitStepPair(lower, upper);
+            && same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())) {
+            double diff = upperOffset.offset() - lowerOffset.offset();
+            if (diff >= 1.0 && isPositiveInteger(diff)) {
+                return new KStepPair(lower, upper, diff);
+            }
         }
         return null;
+    }
+
+    private boolean isPositiveInteger(double value) {
+        return value > 0 && Math.rint(value) == value;
     }
 
     private boolean isPlusOne(Expr candidate, Expr base) {
@@ -135,7 +148,7 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
             .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));
     }
 
-    private record UnitStepPair(Expr lower, Expr upper) {
+    private record KStepPair(Expr lower, Expr upper, double step) {
     }
 
     private record AdditiveOffset(Expr symbolicPart, double offset) {
