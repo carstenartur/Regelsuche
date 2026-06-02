@@ -21,12 +21,9 @@ import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.CompleteSquareBridgeOperator;
-import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
-import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.ArrayList;
@@ -43,14 +40,29 @@ import java.util.stream.Collectors;
 
 public final class DiscoveryBenchmarkExecutor {
     private final DiscoveryBenchmarkScenarioLoader loader;
-    private final SearchTraceCollector traceCollector = new SearchTraceCollector();
+    private final DiscoveryOperatorRegistry operatorRegistry;
+    private final Set<String> operatorRuleIds;
+    private final SearchTraceCollector traceCollector;
 
     public DiscoveryBenchmarkExecutor() {
-        this(new DiscoveryBenchmarkScenarioLoader());
+        this(new DiscoveryBenchmarkScenarioLoader(), new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()));
     }
 
     DiscoveryBenchmarkExecutor(DiscoveryBenchmarkScenarioLoader loader) {
+        this(loader, new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()));
+    }
+
+    DiscoveryBenchmarkExecutor(DiscoveryBenchmarkScenarioLoader loader, DiscoveryOperatorRegistry operatorRegistry) {
+        if (loader == null) {
+            throw new IllegalArgumentException("Loader must not be null");
+        }
+        if (operatorRegistry == null) {
+            throw new IllegalArgumentException("Operator registry must not be null");
+        }
         this.loader = loader;
+        this.operatorRegistry = operatorRegistry;
+        this.operatorRuleIds = operatorRegistry.operatorRuleIds();
+        this.traceCollector = new SearchTraceCollector(this.operatorRuleIds);
     }
 
     public DiscoveryBenchmarkEvidence execute(DiscoveryBenchmarkScenario scenario) {
@@ -218,29 +230,7 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     private List<HypothesisOperator> operatorsFor(DiscoveryBenchmarkScenario scenario) {
-        LinkedHashSet<String> ids = new LinkedHashSet<>(scenario.enabledOperators());
-        if (ids.isEmpty()) {
-            if (scenario.enabledRulePacks().contains("sophie-germain")) {
-                ids.add("sophie_germain_bridge");
-            }
-            if (scenario.enabledRulePacks().contains("complete-square")) {
-                ids.add("complete_square_bridge");
-            }
-            if (scenario.enabledRulePacks().contains("telescoping")) {
-                ids.add("telescoping_fraction");
-            }
-        }
-        List<HypothesisOperator> operators = new ArrayList<>();
-        for (String id : ids) {
-            if ("complete_square_bridge".equals(id)) {
-                operators.add(new CompleteSquareBridgeOperator());
-            } else if ("sophie_germain_bridge".equals(id) || "hidden_structure_bridge".equals(id)) {
-                operators.add(new DifferenceOfSquaresPreparationOperator());
-            } else if ("telescoping_fraction".equals(id)) {
-                operators.add(new TelescopingFractionHypothesisOperator());
-            }
-        }
-        return List.copyOf(operators);
+        return operatorRegistry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(scenario.enabledOperators()));
     }
 
     private MacroLearningRun learnMacros(DiscoveryBenchmarkScenario scenario, TransformationEngine baseEngine, SearchRun withoutMacro) {
@@ -334,9 +324,7 @@ public final class DiscoveryBenchmarkExecutor {
             ScenarioRule rule = rulesById.get(ruleId);
             if (scenario.requiredBridgeRules().contains(ruleId)
                     || ruleId.toLowerCase(Locale.ROOT).contains("bridge")
-                    || CompleteSquareBridgeOperator.RULE_ID.equals(ruleId)
-                    || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
-                    || TelescopingFractionHypothesisOperator.RULE_ID.equals(ruleId)
+                    || operatorRuleIds.contains(ruleId)
                     || (rule != null && rule.effects().contains(SearchEffect.BRIDGING))) {
                 bridgeRules.add(ruleId);
             }
@@ -466,9 +454,7 @@ public final class DiscoveryBenchmarkExecutor {
         if (learnedMacros.contains(ruleId)) {
             return "macro";
         }
-        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId)
-                || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
-                || TelescopingFractionHypothesisOperator.RULE_ID.equals(ruleId)) {
+        if (operatorRuleIds.contains(ruleId)) {
             return "operator";
         }
         return rulesById.containsKey(ruleId) ? "scenario-generic" : "core";
@@ -481,10 +467,7 @@ public final class DiscoveryBenchmarkExecutor {
     private Set<SearchEffect> inferredEffects(String ruleId) {
         LinkedHashSet<SearchEffect> effects = new LinkedHashSet<>();
         String lower = ruleId.toLowerCase(Locale.ROOT);
-        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId)
-                || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
-                || TelescopingFractionHypothesisOperator.RULE_ID.equals(ruleId)
-                || lower.contains("bridge")) {
+        if (operatorRuleIds.contains(ruleId) || lower.contains("bridge")) {
             effects.add(SearchEffect.BRIDGING);
         }
         if (lower.contains("factor")) {

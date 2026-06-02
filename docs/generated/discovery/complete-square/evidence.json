@@ -24,7 +24,7 @@
   },
   "bridgeRulesUsed" : [ "complete_square_bridge", "ast_square_difference_factor" ],
   "convergentStates" : [ "x^2+6*x+5", "(x+1)*(x+3+2)" ],
-  "edgeCount" : 30,
+  "edgeCount" : 32,
   "edges" : [ {
     "from" : "(x+1)*(x+3)+(x+1)*2",
     "kind" : "rule",
@@ -250,6 +250,24 @@
     "source" : "core",
     "tags" : [ "alternative-branch" ],
     "to" : "(x+1)*(x+5)"
+  }, {
+    "from" : "x*x+6*x+5",
+    "kind" : "bridge",
+    "packId" : "core",
+    "ruleId" : "complete_square_bridge",
+    "searchEffect" : [ "BRIDGING" ],
+    "source" : "operator",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-2^2"
+  }, {
+    "from" : "x*x+6*x+5",
+    "kind" : "bridge",
+    "packId" : "core",
+    "ruleId" : "complete_square_bridge",
+    "searchEffect" : [ "BRIDGING" ],
+    "source" : "operator",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-4"
   }, {
     "from" : "x*x+6*x+5",
     "kind" : "rule",

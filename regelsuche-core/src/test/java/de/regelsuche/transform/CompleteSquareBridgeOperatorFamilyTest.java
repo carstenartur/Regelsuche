@@ -44,6 +44,12 @@ class CompleteSquareBridgeOperatorFamilyTest {
     }
 
     @Test
+    void variantFamily_termOrderAndMultiplicationForms() {
+        assertGenerates("5 + 6*x + x^2", "(x + 3) ^ 2 - 4");
+        assertGenerates("x*x + 6*x + 5", "(x + 3) ^ 2 - 4");
+    }
+
+    @Test
     void variantFamily_differentVariable() {
         assertGenerates("y^2 + 4*y + 3", "(y + 2) ^ 2 - 1");
     }

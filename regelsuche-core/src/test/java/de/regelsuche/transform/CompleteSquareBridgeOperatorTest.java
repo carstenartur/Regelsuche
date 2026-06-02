@@ -12,6 +12,8 @@ class CompleteSquareBridgeOperatorTest {
     @Test
     void generatesParametricCompleteSquareCandidates() {
         assertGenerated("x^2 + 6*x + 5", "(x + 3) ^ 2 - 4");
+        assertGenerated("5 + 6*x + x^2", "(x + 3) ^ 2 - 4");
+        assertGenerated("x*x + 6*x + 5", "(x + 3) ^ 2 - 4");
         assertGenerated("x^2 + 10*x + 21", "(x + 5) ^ 2 - 4");
         assertGenerated("x^2 - 4*x + 3", "(x - 2) ^ 2 - 1");
         assertGenerated("x^2 + 2*x + 1", "(x + 1) ^ 2");

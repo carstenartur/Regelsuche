@@ -3,9 +3,6 @@ package de.regelsuche.docs;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.knowledge.SearchEffect;
 import de.regelsuche.search.strategy.SearchState;
-import de.regelsuche.transform.CompleteSquareBridgeOperator;
-import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
-import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -16,6 +13,15 @@ import java.util.Set;
 
 final class SearchTraceCollector {
     private final ExpressionCanonicalizer expressionCanonicalizer = new ExpressionCanonicalizer();
+    private final Set<String> operatorRuleIds;
+
+    SearchTraceCollector() {
+        this(new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()).operatorRuleIds());
+    }
+
+    SearchTraceCollector(Set<String> operatorRuleIds) {
+        this.operatorRuleIds = operatorRuleIds == null ? Set.of() : Set.copyOf(operatorRuleIds);
+    }
 
     TraceGraph collect(
             DiscoveryBenchmarkScenario scenario,
@@ -165,9 +171,7 @@ final class SearchTraceCollector {
         if (learnedMacros.contains(ruleId)) {
             return "macro";
         }
-        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId)
-                || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
-                || TelescopingFractionHypothesisOperator.RULE_ID.equals(ruleId)) {
+        if (operatorRuleIds.contains(ruleId)) {
             return "operator";
         }
         return rulesById.containsKey(ruleId) ? "scenario-generic" : "core";
@@ -184,10 +188,7 @@ final class SearchTraceCollector {
             effects.addAll(rule.effects());
         }
         String lower = ruleId.toLowerCase(Locale.ROOT);
-        if (CompleteSquareBridgeOperator.RULE_ID.equals(ruleId)
-                || DifferenceOfSquaresPreparationOperator.RULE_ID.equals(ruleId)
-                || TelescopingFractionHypothesisOperator.RULE_ID.equals(ruleId)
-                || lower.contains("bridge")) {
+        if (operatorRuleIds.contains(ruleId) || lower.contains("bridge")) {
             effects.add(SearchEffect.BRIDGING);
         }
         if (lower.contains("factor")) {

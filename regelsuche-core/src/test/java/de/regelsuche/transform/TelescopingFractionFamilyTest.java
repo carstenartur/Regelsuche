@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** Family-level tests for {@link TelescopingFractionHypothesisOperator} covering k-step variants, near-misses, and negatives. */
+/** Family-level tests for {@link TelescopingFractionHypothesisOperator} covering variants, near-misses, and negatives. */
 class TelescopingFractionFamilyTest {
     private final TelescopingFractionHypothesisOperator operator = new TelescopingFractionHypothesisOperator();
 
@@ -30,36 +30,20 @@ class TelescopingFractionFamilyTest {
     }
 
     @Test
-    void positiveFamily_kStep() {
-        List<Transformation> candidates = operator.generateCandidates("1 / (n * (n + 2))");
-        assertFalse(candidates.isEmpty(), "k=2 step should produce a candidate");
+    void positiveFamily_scaledNumerator() {
+        List<Transformation> candidates = operator.generateCandidates("2 / (n * (n + 1))");
+        assertFalse(candidates.isEmpty(), "scaled numerator should produce a candidate");
         Transformation candidate = candidates.getFirst();
         assertEquals(TelescopingFractionHypothesisOperator.RULE_ID, candidate.rule());
-        assertTrue(candidate.transformedExpression().contains("1 / n"),
-            "k=2 output should contain 1/n: " + candidate.transformedExpression());
-        assertTrue(candidate.transformedExpression().contains("1 / (n + 2)"),
-            "k=2 output should contain 1/(n+2): " + candidate.transformedExpression());
-        assertTrue(TelescopingDifferenceAstPredicate.containsTelescopingDifference(candidate.transformedExpression()),
-            "k=2 output should satisfy telescoping predicate: " + candidate.transformedExpression());
-    }
-
-    @Test
-    void positiveFamily_kStep_largerGap() {
-        List<Transformation> candidates = operator.generateCandidates("1 / (n * (n + 3))");
-        assertFalse(candidates.isEmpty(), "k=3 step should produce a candidate");
-        Transformation candidate = candidates.getFirst();
-        assertTrue(candidate.transformedExpression().contains("1 / n"),
-            "k=3 output: " + candidate.transformedExpression());
-        assertTrue(candidate.transformedExpression().contains("1 / (n + 3)"),
-            "k=3 output: " + candidate.transformedExpression());
-        assertTrue(TelescopingDifferenceAstPredicate.containsTelescopingDifference(candidate.transformedExpression()),
-            "k=3 output should satisfy telescoping predicate: " + candidate.transformedExpression());
+        assertTrue(candidate.transformedExpression().contains("2 / n"), candidate.transformedExpression());
+        assertTrue(candidate.transformedExpression().contains("2 / (n + 1)"), candidate.transformedExpression());
     }
 
     @Test
     void variantFamily_compoundAdjacentFactors() {
         assertDecomposesTo("1 / ((x + 2) * (x + 3))", "1 / (x + 2) - 1 / (x + 3)");
         assertDecomposesTo("1 / ((k + 3) * (k + 4))", "1 / (k + 3) - 1 / (k + 4)");
+        assertDecomposesTo("1 / ((n + 1) * (n + 2))", "1 / (n + 1) - 1 / (n + 2)");
     }
 
     @Test
@@ -77,15 +61,17 @@ class TelescopingFractionFamilyTest {
     }
 
     @Test
-    void nearMissFamily_singleQuadraticTerm() {
-        assertTrue(operator.generateCandidates("1 / (n^2 + 1)").isEmpty(),
-            "1/(n^2+1) must produce no candidate");
+    void nearMissFamily_nonAdjacentFactors() {
+        assertTrue(operator.generateCandidates("1 / (n * (n + 2))").isEmpty(),
+            "non-adjacent denominator factors must not produce a candidate");
+        assertTrue(operator.generateCandidates("1 / ((n + 1) * (n + 3))").isEmpty(),
+            "non-adjacent shifted denominator factors must not produce a candidate");
     }
 
     @Test
-    void negativeFamily_nonUnitNumerator() {
-        assertTrue(operator.generateCandidates("2 / (n * (n + 1))").isEmpty(),
-            "non-unit numerator must be rejected");
+    void nearMissFamily_singleQuadraticTerm() {
+        assertTrue(operator.generateCandidates("1 / (n^2 + 1)").isEmpty(),
+            "1/(n^2+1) must produce no candidate");
     }
 
     @Test

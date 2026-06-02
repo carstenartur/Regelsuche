@@ -17,6 +17,9 @@ final class ScenarioRuleTransformationEngine implements TransformationEngine {
         String canonical = canonical(expression);
         List<Transformation> transformations = new ArrayList<>();
         for (ScenarioRule rule : rules) {
+            if (!rule.active()) {
+                continue;
+            }
             if (canonical(rule.from()).equals(canonical)) {
                 transformations.add(new Transformation(
                         rule.id(),

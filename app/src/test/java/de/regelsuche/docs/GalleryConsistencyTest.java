@@ -60,6 +60,10 @@ class GalleryConsistencyTest {
                 assertTrue(svgContent.contains("class=\"edge macro"), svg.toString());
             }
             assertTrue(evidence.path("nodeCount").asInt() > 4, "No tiny <=4 node graph may be the main evidence: " + evidenceFile);
+            assertTrue(evidence.path("edgeCount").asInt() > 0, "Evidence must have at least one edge: " + evidenceFile);
+            assertFalse(evidence.path("bridgeRulesUsed").isEmpty(), "Evidence must have non-empty bridgeRulesUsed: " + evidenceFile);
+            assertFalse(evidence.path("learnedMacros").isEmpty(), "Evidence must have non-empty learnedMacros: " + evidenceFile);
+            assertFalse(evidence.path("reusedMacros").isEmpty(), "Evidence must have non-empty reusedMacros: " + evidenceFile);
             String scenarioId = evidence.path("scenarioId").asText();
             if (scenarioId.equals("complete-square-factorization") || scenarioId.equals("sophie-germain")) {
                 assertTrue(evidence.path("nodeCount").asInt() > 8,
@@ -99,6 +103,15 @@ class GalleryConsistencyTest {
             assertTrue(Files.exists(indexPath.getParent().resolve(scenario.path("evidence").asText())), scenario.toString());
             assertTrue(Files.exists(indexPath.getParent().resolve(scenario.path("svg").asText())), scenario.toString());
         }
+    }
+
+    @Test
+    void generatedDiscoveryReadmeExists() throws IOException {
+        Path readmePath = REPO_ROOT.resolve("docs/generated/discovery/README.md");
+        assertTrue(Files.exists(readmePath), "docs/generated/discovery/README.md must exist");
+        String content = Files.readString(readmePath, StandardCharsets.UTF_8);
+        assertTrue(content.contains("do not edit manually") || content.contains("generated"), "README must warn against manual edits");
+        assertTrue(content.contains("generateDiscoveryGallery"), "README must reference the regeneration command");
     }
 
     @Test

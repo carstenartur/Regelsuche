@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/** Conservative operator for {@code 1 / (u * (u + 1)) -> 1/u - 1/(u + 1)}. */
+/** Conservative operator for {@code k / (u * (u + 1)) -> k/u - k/(u + 1)}. */
 public class TelescopingFractionHypothesisOperator implements HypothesisOperator {
     public static final String RULE_ID = "hypothesis_telescoping_fraction";
     private static final int DEFAULT_MAX_CANDIDATES = 4;
@@ -38,33 +38,31 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
         } catch (IllegalArgumentException exception) {
             return List.of();
         }
-        if (!(root instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV || !isOne(division.left())) {
+        if (!(root instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV) {
+            return List.of();
+        }
+        NumberExpr numerator = numerator(division.left());
+        if (numerator == null || Double.compare(numerator.value(), 0.0) == 0) {
             return List.of();
         }
         List<Expr> factors = flattenMultiplication(division.right());
         if (factors.size() != 2) {
             return List.of();
         }
-        KStepPair pair = kStepPair(factors.get(0), factors.get(1));
+        AdjacentPair pair = adjacentPair(factors.get(0), factors.get(1));
         if (pair == null) {
-            pair = kStepPair(factors.get(1), factors.get(0));
+            pair = adjacentPair(factors.get(1), factors.get(0));
         }
         if (pair == null) {
             return List.of();
         }
         String formattedInput = ExpressionFormatter.format(root);
         Expr difference = new BinaryExpr(
-            new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, pair.lower()),
+            fraction(numerator, pair.lower()),
             BinaryOperator.SUB,
-            new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, pair.upper())
+            fraction(numerator, pair.upper())
         );
-        Expr transformed = Double.compare(pair.step(), 1.0) == 0
-            ? difference
-            : new BinaryExpr(
-                new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, new NumberExpr(pair.step())),
-                BinaryOperator.MUL,
-                difference
-              );
+        Expr transformed = difference;
         String formatted = ExpressionFormatter.format(transformed);
         if (formatted.equals(formattedInput)) {
             return List.of();
@@ -85,25 +83,19 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
             .toList();
     }
 
-    private KStepPair kStepPair(Expr lower, Expr upper) {
+    private AdjacentPair adjacentPair(Expr lower, Expr upper) {
         if (isPlusOne(upper, lower)) {
-            return new KStepPair(lower, upper, 1.0);
+            return new AdjacentPair(lower, upper);
         }
         AdditiveOffset lowerOffset = additiveOffset(lower);
         AdditiveOffset upperOffset = additiveOffset(upper);
         if (lowerOffset != null
             && upperOffset != null
-            && same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())) {
-            double diff = upperOffset.offset() - lowerOffset.offset();
-            if (diff >= 1.0 && isPositiveInteger(diff)) {
-                return new KStepPair(lower, upper, diff);
-            }
+            && same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())
+            && Double.compare(upperOffset.offset() - lowerOffset.offset(), 1.0) == 0) {
+            return new AdjacentPair(lower, upper);
         }
         return null;
-    }
-
-    private boolean isPositiveInteger(double value) {
-        return value > 0 && Math.rint(value) == value;
     }
 
     private boolean isPlusOne(Expr candidate, Expr base) {
@@ -112,6 +104,14 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
         }
         return (isOne(binary.right()) && same(binary.left(), base))
             || (isOne(binary.left()) && same(binary.right(), base));
+    }
+
+    private boolean isOne(Expr expression) {
+        return expression instanceof NumberExpr number && Double.compare(number.value(), 1.0) == 0;
+    }
+
+    private NumberExpr numerator(Expr expression) {
+        return expression instanceof NumberExpr numberExpr ? numberExpr : null;
     }
 
     private AdditiveOffset additiveOffset(Expr expression) {
@@ -129,6 +129,14 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
         return new AdditiveOffset(expression, 0.0);
     }
 
+    private Expr fraction(NumberExpr numerator, Expr denominator) {
+        return new BinaryExpr(
+            Double.compare(numerator.value(), 1.0) == 0 ? new NumberExpr(1) : new NumberExpr(numerator.value()),
+            BinaryOperator.DIV,
+            denominator
+        );
+    }
+
     private List<Expr> flattenMultiplication(Expr expression) {
         if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL) {
             List<Expr> result = new ArrayList<>();
@@ -139,16 +147,12 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
         return List.of(expression);
     }
 
-    private boolean isOne(Expr expression) {
-        return expression instanceof NumberExpr number && Double.compare(number.value(), 1.0) == 0;
-    }
-
     private boolean same(Expr left, Expr right) {
         return canonicalizer.stableHash(ExpressionFormatter.format(left))
             .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));
     }
 
-    private record KStepPair(Expr lower, Expr upper, double step) {
+    private record AdjacentPair(Expr lower, Expr upper) {
     }
 
     private record AdditiveOffset(Expr symbolicPart, double offset) {

@@ -77,7 +77,10 @@ class SearchTraceCollectorTest {
                 RewriteKind.NORMALIZE,
                 0,
                 List.of(de.regelsuche.knowledge.SearchEffect.SIMPLIFYING, de.regelsuche.knowledge.SearchEffect.BRIDGING),
-                "synthetic-family"
+                "synthetic-family",
+                ScenarioRuleStatus.VALIDATED,
+                true,
+                List.of("x + x")
             ))
         );
 

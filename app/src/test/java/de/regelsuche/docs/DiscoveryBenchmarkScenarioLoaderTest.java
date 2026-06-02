@@ -1,6 +1,7 @@
 package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.OutputStream;
 import java.net.URLClassLoader;
@@ -25,8 +26,11 @@ class DiscoveryBenchmarkScenarioLoaderTest {
                       - id: test_rule
                         from: a + b
                         to: b + a
+                        status: VALIDATED
+                        enabledByDefault: true
                         effects: [normalizing]
                         family: synthetic
+                        examples: [a + b]
                     """);
             addEntry(
                     jarOut,
@@ -66,5 +70,53 @@ class DiscoveryBenchmarkScenarioLoaderTest {
         out.putNextEntry(new JarEntry(path));
         out.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         out.closeEntry();
+    }
+
+    @Test
+    void validatedRulesWithoutExamplesAreRejected() throws Exception {
+        Path jar = Files.createTempFile("scenarios-invalid", ".jar");
+        try (OutputStream out = Files.newOutputStream(jar); JarOutputStream jarOut = new JarOutputStream(out)) {
+            addEntry(
+                    jarOut,
+                    "discovery-scenario-rules/test-pack.yaml",
+                    """
+                    id: test-pack
+                    rules:
+                      - id: invalid_validated_rule
+                        from: a + b
+                        to: b + a
+                        status: VALIDATED
+                        enabledByDefault: true
+                        effects: [normalizing]
+                        family: synthetic
+                    """);
+            addEntry(
+                    jarOut,
+                    "discovery-scenarios/test.yaml",
+                    """
+                    id: test
+                    displayName: Test Scenario
+                    inputExpression: a+b
+                    targetExpression: b+a
+                    expectations: [BRIDGE_REQUIRED]
+                    enabledRulePacks: [test-pack]
+                    budgets:
+                      maxDepth: 2
+                      maxStates: 10
+                      timeoutMillis: 1000
+                    gallery:
+                      generateSvg: false
+                      preferredPathCount: 1
+                      minVisibleNodes: 1
+                    """);
+        }
+
+        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        try (URLClassLoader loader = new URLClassLoader(new java.net.URL[] {jar.toUri().toURL()}, null)) {
+            Thread.currentThread().setContextClassLoader(loader);
+            assertThrows(IllegalArgumentException.class, () -> new DiscoveryBenchmarkScenarioLoader().load("discovery-scenarios/test.yaml"));
+        } finally {
+            Thread.currentThread().setContextClassLoader(original);
+        }
     }
 }
