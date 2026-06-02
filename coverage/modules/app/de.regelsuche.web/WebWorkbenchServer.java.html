@@ -1435,8 +1435,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1435">            level = de.regelsuche.didactic.DifficultyLevel.valueOf(</span>
 <span class="fc" id="L1436">                difficulty.toUpperCase(Locale.ROOT));</span>
 <span class="fc" id="L1437">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L1438">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
-<span class="nc" id="L1439">            return;</span>
+<span class="fc" id="L1438">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
+<span class="fc" id="L1439">            return;</span>
 <span class="fc" id="L1440">        }</span>
 <span class="fc" id="L1441">        de.regelsuche.didactic.StudentStepValidator.Result result =</span>
 <span class="fc" id="L1442">            didacticStepValidator.validate(currentExpression, studentStep, level);</span>
@@ -2282,8 +2282,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2283">            return;</span>
         }
-<span class="nc" id="L2285">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="nc" id="L2286">    }</span>
+<span class="fc" id="L2285">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="fc" id="L2286">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2289">        var jobs = proofWorkbenchService.listJobs();</span>

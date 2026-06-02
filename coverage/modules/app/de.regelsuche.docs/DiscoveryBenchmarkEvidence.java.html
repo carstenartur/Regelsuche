@@ -54,7 +54,14 @@ public record DiscoveryBenchmarkEvidence(
 <span class="fc" id="L54">        }</span>
     }
 
-<span class="fc" id="L57">    public record EvidenceNode(String id, String label, String kind) {</span>
+    public record EvidenceNode(String id, String label, String kind, int depth, List&lt;String&gt; tags) {
+<span class="fc" id="L58">        public EvidenceNode {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            tags = tags == null ? List.of() : List.copyOf(tags);</span>
+<span class="fc" id="L60">        }</span>
+
+        public EvidenceNode(String id, String label, String kind) {
+<span class="fc" id="L63">            this(id, label, kind, 0, List.of());</span>
+<span class="fc" id="L64">        }</span>
     }
 
     public record EvidenceEdge(
@@ -64,18 +71,31 @@ public record DiscoveryBenchmarkEvidence(
             String kind,
             String source,
             String packId,
-            List&lt;de.regelsuche.knowledge.SearchEffect&gt; searchEffect) {
-<span class="fc" id="L68">        public EvidenceEdge {</span>
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            searchEffect = searchEffect == null ? List.of() : List.copyOf(searchEffect);</span>
-<span class="fc" id="L70">        }</span>
+            List&lt;de.regelsuche.knowledge.SearchEffect&gt; searchEffect,
+            List&lt;String&gt; tags) {
+<span class="fc" id="L76">        public EvidenceEdge {</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            searchEffect = searchEffect == null ? List.of() : List.copyOf(searchEffect);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            tags = tags == null ? List.of() : List.copyOf(tags);</span>
+<span class="fc" id="L79">        }</span>
+
+        public EvidenceEdge(
+                String from,
+                String to,
+                String ruleId,
+                String kind,
+                String source,
+                String packId,
+                List&lt;de.regelsuche.knowledge.SearchEffect&gt; searchEffect) {
+<span class="fc" id="L89">            this(from, to, ruleId, kind, source, packId, searchEffect, List.of());</span>
+<span class="fc" id="L90">        }</span>
     }
 
     public Map&lt;String, Object&gt; summary() {
-<span class="nc" id="L74">        return Map.of(</span>
+<span class="nc" id="L94">        return Map.of(</span>
                 &quot;scenarioId&quot;, scenarioId,
-<span class="nc" id="L76">                &quot;success&quot;, success,</span>
-<span class="nc" id="L77">                &quot;nodeCount&quot;, nodeCount(),</span>
-<span class="nc" id="L78">                &quot;edgeCount&quot;, edgeCount(),</span>
+<span class="nc" id="L96">                &quot;success&quot;, success,</span>
+<span class="nc" id="L97">                &quot;nodeCount&quot;, nodeCount(),</span>
+<span class="nc" id="L98">                &quot;edgeCount&quot;, edgeCount(),</span>
                 &quot;bridgeRulesUsed&quot;, bridgeRulesUsed,
                 &quot;learnedMacros&quot;, learnedMacros,
                 &quot;reusedMacros&quot;, reusedMacros);
