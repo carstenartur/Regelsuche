@@ -1,20 +1,20 @@
 {
   "schema": "regelsuche.semantic-graph-debug/v1",
   "fileName": "binomial-graph.png",
-  "requestUrl": "/api/search-graph/semantic?mode=semantic&showMacroSteps=didactic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-4f934d41",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showMacroSteps=didactic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-54fb67e6",
   "requestParams": {
     "mode": "semantic",
     "showMacroSteps": "didactic",
     "showLowSignal": false,
     "showAlternatives": false,
     "showVariants": false,
-    "pathId": "demo-4f934d41"
+    "pathId": "demo-54fb67e6"
   },
   "visibleNodeIds": [
     "didactic-seed-1eyjz4b",
     "didactic-1-185j5b4",
     "didactic-2-syk3a8",
-    "didactic-3-1cy47x",
+    "didactic-3-1fop26w",
     "didactic-4-mc4ifp",
     "didactic-prepare-4-37goj0",
     "didactic-goal-zu6u3z"
@@ -78,10 +78,10 @@
       }
     },
     {
-      "id": "didactic-3-1cy47x",
-      "canonicalHash": "didactic:didactic-3-1cy47x",
-      "normalizedLabel": "x*x+3*x+(x+3)*3",
-      "label": "x * x + 3 * x + (x + 3) * 3",
+      "id": "didactic-3-1fop26w",
+      "canonicalHash": "didactic:didactic-3-1fop26w",
+      "normalizedLabel": "(x+3)*x+x*3+3*3",
+      "label": "(x + 3) * x + x * 3 + 3 * 3",
       "revisit": false,
       "cycle": false,
       "onMainPath": true,
@@ -178,9 +178,9 @@
       }
     },
     {
-      "id": "didactic-2-syk3a8->didactic-3-1cy47x:ast_distribute_right_add",
+      "id": "didactic-2-syk3a8->didactic-3-1fop26w:ast_distribute_right_add",
       "from": "didactic-2-syk3a8",
-      "to": "didactic-3-1cy47x",
+      "to": "didactic-3-1fop26w",
       "label": "ast_distribute_right_add",
       "kind": "MAIN_STEP",
       "layout": {
@@ -189,8 +189,8 @@
       }
     },
     {
-      "id": "didactic-3-1cy47x->didactic-4-mc4ifp:ast_distribute_right_add",
-      "from": "didactic-3-1cy47x",
+      "id": "didactic-3-1fop26w->didactic-4-mc4ifp:ast_distribute_right_add",
+      "from": "didactic-3-1fop26w",
       "to": "didactic-4-mc4ifp",
       "label": "ast_distribute_right_add",
       "kind": "MAIN_STEP",
@@ -245,10 +245,10 @@
       "height": 27.734375
     },
     {
-      "id": "didactic-3-1cy47x",
-      "x": 611.0625,
+      "id": "didactic-3-1fop26w",
+      "x": 611.5625,
       "y": 1367.9765625,
-      "width": 177.875,
+      "width": 176.875,
       "height": 27.734375
     },
     {
