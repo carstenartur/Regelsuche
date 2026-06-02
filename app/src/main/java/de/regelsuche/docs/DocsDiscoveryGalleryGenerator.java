@@ -52,6 +52,7 @@ public final class DocsDiscoveryGalleryGenerator {
             }
             ensureAllPublicScenariosGenerated(artifacts);
             writeIndex(generatedRoot.resolve("index.json"), artifacts);
+            Files.writeString(generatedRoot.resolve("README.md"), renderGeneratedReadme(), StandardCharsets.UTF_8);
             Files.writeString(repoRoot.resolve("docs/demo-gallery.md"), renderGallery(artifacts), StandardCharsets.UTF_8);
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
@@ -206,6 +207,20 @@ public final class DocsDiscoveryGalleryGenerator {
                 .replace("${bridges}", inlineList(evidence.bridgeRulesUsed()))
                 .replace("${learned}", inlineList(evidence.learnedMacros()))
                 .replace("${reused}", inlineList(evidence.reusedMacros()));
+    }
+
+    private String renderGeneratedReadme() {
+        return """
+                # Generated discovery evidence
+
+                These files are generated — do not edit manually.
+
+                Regenerate with:
+
+                ```
+                ./gradlew :app:generateDiscoveryGallery
+                ```
+                """;
     }
 
     private PublicScenarioArtifact artifactById(List<PublicScenarioArtifact> artifacts, String scenarioId) {
