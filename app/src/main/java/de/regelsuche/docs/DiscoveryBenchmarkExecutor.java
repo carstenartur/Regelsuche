@@ -62,7 +62,7 @@ public final class DiscoveryBenchmarkExecutor {
         this.loader = loader;
         this.operatorRegistry = operatorRegistry;
         this.operatorRuleIds = operatorRegistry.operatorRuleIds();
-        this.traceCollector = new SearchTraceCollector(this.operatorRuleIds);
+        this.traceCollector = new SearchTraceCollector(operatorRegistry);
     }
 
     public DiscoveryBenchmarkEvidence execute(DiscoveryBenchmarkScenario scenario) {
@@ -70,6 +70,8 @@ public final class DiscoveryBenchmarkExecutor {
         Map<String, ScenarioRule> rulesById = packs.stream()
                 .flatMap(pack -> pack.rules().stream())
                 .collect(Collectors.toMap(ScenarioRule::id, Function.identity(), (left, right) -> left, LinkedHashMap::new));
+        Map<String, String> ruleIdToPackId = buildRuleIdToPackId(packs);
+        Set<String> enabledOperators = Set.copyOf(scenario.enabledOperators());
         TransformationEngine baseEngine = engineFor(scenario, packs);
         SearchRun withoutMacro = run(scenario, baseEngine);
         MacroLearningRun macroLearningRun = scenario.macroLearning().enabled() && withoutMacro.success()
@@ -118,7 +120,9 @@ public final class DiscoveryBenchmarkExecutor {
                         withMacro.appliedRuleIds()),
                 learnedMacros,
                 bridgeRules,
-                rulesById);
+                rulesById,
+                ruleIdToPackId,
+                enabledOperators);
         List<DiscoveryBenchmarkEvidence.EvidenceNode> nodes = traceGraph.nodes();
         List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges = traceGraph.edges();
         boolean success = withoutMacro.success()
@@ -231,6 +235,16 @@ public final class DiscoveryBenchmarkExecutor {
 
     private List<HypothesisOperator> operatorsFor(DiscoveryBenchmarkScenario scenario) {
         return operatorRegistry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(scenario.enabledOperators()));
+    }
+
+    private static Map<String, String> buildRuleIdToPackId(List<ScenarioRulePack> packs) {
+        Map<String, String> map = new LinkedHashMap<>();
+        for (ScenarioRulePack pack : packs) {
+            for (ScenarioRule rule : pack.rules()) {
+                map.putIfAbsent(rule.id(), pack.id());
+            }
+        }
+        return Map.copyOf(map);
     }
 
     private MacroLearningRun learnMacros(DiscoveryBenchmarkScenario scenario, TransformationEngine baseEngine, SearchRun withoutMacro) {

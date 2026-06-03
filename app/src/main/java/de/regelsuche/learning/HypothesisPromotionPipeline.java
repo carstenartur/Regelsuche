@@ -13,6 +13,7 @@ import de.regelsuche.mining.SuccessfulTransformationPath;
 import de.regelsuche.mining.SymbolicRegressionHypothesisSource;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.OracleValidator;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -46,6 +47,7 @@ public class HypothesisPromotionPipeline {
     private final boolean autoPromote;
     private final List<SymbolicRegressionHypothesisSource> symbolicRegressionSources;
     private final HypothesisRankingStrategy rankingStrategy;
+    private final OracleValidator oracleValidator;
 
     /**
      * Full-featured constructor.
@@ -89,6 +91,21 @@ public class HypothesisPromotionPipeline {
         List<SymbolicRegressionHypothesisSource> symbolicRegressionSources,
         HypothesisRankingStrategy rankingStrategy
     ) {
+        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,
+            symbolicRegressionSources, rankingStrategy,
+            (leftExpression, rightExpression) -> OracleValidator.OracleValidation.unavailable("no oracle configured"));
+    }
+
+    public HypothesisPromotionPipeline(
+        RuleCandidateMiner miner,
+        HypothesisRepository hypothesisRepository,
+        CounterexampleSearchService counterexampleService,
+        MacroRuleLearningService learningService,
+        boolean autoPromote,
+        List<SymbolicRegressionHypothesisSource> symbolicRegressionSources,
+        HypothesisRankingStrategy rankingStrategy,
+        OracleValidator oracleValidator
+    ) {
         this.miner = miner;
         this.hypothesisRepository = hypothesisRepository;
         this.counterexampleService = counterexampleService;
@@ -98,6 +115,9 @@ public class HypothesisPromotionPipeline {
             ? List.of()
             : List.copyOf(symbolicRegressionSources);
         this.rankingStrategy = rankingStrategy == null ? new InterestingnessRankingStrategy() : rankingStrategy;
+        this.oracleValidator = oracleValidator == null
+            ? (leftExpression, rightExpression) -> OracleValidator.OracleValidation.unavailable("no oracle configured")
+            : oracleValidator;
     }
 
     /**
@@ -159,6 +179,11 @@ public class HypothesisPromotionPipeline {
             if (counterexampleResult.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {
                 hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);
             }
+            if (hypothesis.proofStatus().atLeast(CandidateProofStatus.VALIDATED_BY_EXAMPLES)
+                && oracleValidator.validateEquivalence(hypothesis.leftPattern(), hypothesis.rightPattern()).status()
+                == OracleValidator.OracleValidationStatus.DISAGREE) {
+                hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);
+            }
 
             // Store as a pending hypothesis.
             hypothesisRepository.save(hypothesis.id(), hypothesis);
@@ -167,8 +192,7 @@ public class HypothesisPromotionPipeline {
             // Track which paths back this validated candidate for the promotion step.
             if (autoPromote
                 && counterexampleResult.status() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND
-                && candidate.proofStatus().ordinal()
-                >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {
+                && hypothesis.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {
                 List<String> candidateAssumptions = hypothesis.assumptions();
                 for (String pathId : candidate.supportingTransformationIds()) {
                     pathAssumptions.computeIfAbsent(pathId, k -> new ArrayList<>())

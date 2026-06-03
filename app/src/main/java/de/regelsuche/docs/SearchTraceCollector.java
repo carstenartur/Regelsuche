@@ -14,13 +14,22 @@ import java.util.Set;
 final class SearchTraceCollector {
     private final ExpressionCanonicalizer expressionCanonicalizer = new ExpressionCanonicalizer();
     private final Set<String> operatorRuleIds;
+    private final DiscoveryOperatorRegistry operatorRegistry;
 
     SearchTraceCollector() {
-        this(new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()).operatorRuleIds());
+        DiscoveryOperatorRegistry registry = new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider());
+        this.operatorRegistry = registry;
+        this.operatorRuleIds = registry.operatorRuleIds();
     }
 
     SearchTraceCollector(Set<String> operatorRuleIds) {
         this.operatorRuleIds = operatorRuleIds == null ? Set.of() : Set.copyOf(operatorRuleIds);
+        this.operatorRegistry = null;
+    }
+
+    SearchTraceCollector(DiscoveryOperatorRegistry registry) {
+        this.operatorRegistry = registry;
+        this.operatorRuleIds = registry == null ? Set.of() : registry.operatorRuleIds();
     }
 
     TraceGraph collect(
@@ -30,6 +39,18 @@ final class SearchTraceCollector {
             List<String> learnedMacros,
             List<String> bridgeRules,
             Map<String, ScenarioRule> rulesById) {
+        return collect(scenario, withoutMacro, withMacro, learnedMacros, bridgeRules, rulesById, Map.of(), Set.of());
+    }
+
+    TraceGraph collect(
+            DiscoveryBenchmarkScenario scenario,
+            SearchRunTrace withoutMacro,
+            SearchRunTrace withMacro,
+            List<String> learnedMacros,
+            List<String> bridgeRules,
+            Map<String, ScenarioRule> rulesById,
+            Map<String, String> ruleIdToPackId,
+            Set<String> enabledOperators) {
         SearchRunTrace primary = withoutMacro.success() ? withoutMacro : withMacro;
         Set<String> selectedNodeIds = toNodeIds(primary.selectedPath());
         Set<String> selectedEdgeIds = toEdgeIds(primary.selectedPath(), primary.selectedRuleIds());
@@ -54,8 +75,11 @@ final class SearchTraceCollector {
                                 toId,
                                 state.appliedRuleId(),
                                 kindFor(state.appliedRuleId(), learnedMacros, bridgeRules),
-                                sourceFor(state.appliedRuleId(), learnedMacros, rulesById),
-                                packIdFor(state.appliedRuleId(), rulesById),
+                                sourceFor(state.appliedRuleId(), learnedMacros, rulesById, ruleIdToPackId),
+                                packIdFor(state.appliedRuleId(), rulesById, ruleIdToPackId),
+                                operatorIdFor(state.appliedRuleId()),
+                                maturityFor(state.appliedRuleId(), learnedMacros, rulesById),
+                                enabledByProfileFor(state.appliedRuleId(), enabledOperators),
                                 inferredEffects(state.appliedRuleId(), rulesById)));
                 if (selectedEdgeIds.contains(edgeKey)) {
                     edge.tags.add("selected-path");
@@ -121,6 +145,9 @@ final class SearchTraceCollector {
                         edge.kind,
                         edge.source,
                         edge.packId,
+                        edge.operatorId,
+                        edge.maturity,
+                        edge.enabledByProfile,
                         sortedSearchEffects(edge.searchEffects),
                         sortedStrings(edge.tags)))
                 .toList();
@@ -167,18 +194,66 @@ final class SearchTraceCollector {
         return "rule";
     }
 
-    private String sourceFor(String ruleId, List<String> learnedMacros, Map<String, ScenarioRule> rulesById) {
+    private String sourceFor(String ruleId, List<String> learnedMacros, Map<String, ScenarioRule> rulesById, Map<String, String> ruleIdToPackId) {
         if (learnedMacros.contains(ruleId)) {
             return "macro";
+        }
+        if (ruleId != null && (ruleId.startsWith("hypothesis_sympy_")
+                || "hypothesis_common_subexpression_discovery".equals(ruleId))) {
+            return "sympy-derived";
         }
         if (operatorRuleIds.contains(ruleId)) {
             return "operator";
         }
+        String packId = ruleIdToPackId.get(ruleId);
+        if (packId != null) {
+            return packId.toLowerCase(Locale.ROOT).contains("sympy") ? "sympy-derived" : "scenario";
+        }
         return rulesById.containsKey(ruleId) ? "scenario-generic" : "core";
     }
 
-    private String packIdFor(String ruleId, Map<String, ScenarioRule> rulesById) {
-        return rulesById.containsKey(ruleId) ? "scenario-generic" : "core";
+    private String packIdFor(String ruleId, Map<String, ScenarioRule> rulesById, Map<String, String> ruleIdToPackId) {
+        if ("hypothesis_sympy_factor_candidate".equals(ruleId)
+                || "hypothesis_common_subexpression_discovery".equals(ruleId)) {
+            return "sympy-polynomial-basic";
+        }
+        if ("hypothesis_sympy_rational_discovery".equals(ruleId)) {
+            return "sympy-rational-basic";
+        }
+        if (operatorRuleIds.contains(ruleId)) {
+            return "operator-derived";
+        }
+        String packId = ruleIdToPackId.get(ruleId);
+        return packId != null ? packId : (rulesById.containsKey(ruleId) ? "scenario-generic" : "core");
+    }
+
+    private String operatorIdFor(String ruleId) {
+        if (operatorRegistry != null) {
+            return operatorRegistry.operatorIdForRule(ruleId);
+        }
+        return "";
+    }
+
+    private String maturityFor(String ruleId, List<String> learnedMacros, Map<String, ScenarioRule> rulesById) {
+        if (learnedMacros.contains(ruleId)) {
+            return "MACRO";
+        }
+        if (operatorRuleIds.contains(ruleId)) {
+            return "OPERATOR_DERIVED";
+        }
+        ScenarioRule rule = rulesById.get(ruleId);
+        return rule != null ? rule.status().name() : "CORE";
+    }
+
+    private boolean enabledByProfileFor(String ruleId, Set<String> enabledOperators) {
+        if (!operatorRuleIds.contains(ruleId)) {
+            return false;
+        }
+        if (operatorRegistry == null || enabledOperators.isEmpty()) {
+            return false;
+        }
+        String operatorId = operatorRegistry.operatorIdForRule(ruleId);
+        return !operatorId.isEmpty() && enabledOperators.contains(operatorId);
     }
 
     private List<SearchEffect> inferredEffects(String ruleId, Map<String, ScenarioRule> rulesById) {
@@ -279,6 +354,9 @@ final class SearchTraceCollector {
         private final String kind;
         private final String source;
         private final String packId;
+        private final String operatorId;
+        private final String maturity;
+        private final boolean enabledByProfile;
         private final List<SearchEffect> searchEffects;
         private final LinkedHashSet<String> tags = new LinkedHashSet<>();
 
@@ -289,6 +367,9 @@ final class SearchTraceCollector {
                 String kind,
                 String source,
                 String packId,
+                String operatorId,
+                String maturity,
+                boolean enabledByProfile,
                 List<SearchEffect> searchEffects) {
             this.from = from;
             this.to = to;
@@ -296,6 +377,9 @@ final class SearchTraceCollector {
             this.kind = kind;
             this.source = source;
             this.packId = packId;
+            this.operatorId = operatorId == null ? "" : operatorId;
+            this.maturity = maturity == null ? "" : maturity;
+            this.enabledByProfile = enabledByProfile;
             this.searchEffects = searchEffects == null ? List.of()
                     : searchEffects.stream().sorted(Comparator.comparing(Enum::name)).toList();
         }

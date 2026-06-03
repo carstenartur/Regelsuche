@@ -33,6 +33,7 @@ class KnowledgePackRegistryTest {
                 sourceUrl: https://example.invalid/bad-pack
                 sourceVersion: reviewed-test-fixture
                 sourceReference: test fixture
+                maturity: EXPERIMENTAL
                 rules:
                   - id: bad.rule
                     status: VALIDATED
@@ -94,6 +95,7 @@ class KnowledgePackRegistryTest {
                 sourceUrl: https://example.invalid/missing-examples
                 sourceVersion: reviewed-test-fixture
                 sourceReference: test fixture
+                maturity: VALIDATED
                 rules:
                   - id: missing.examples.rule
                     derivationType: REIMPLEMENTED_RULE
@@ -118,6 +120,7 @@ class KnowledgePackRegistryTest {
 
         assertEquals(CANDIDATE_PACKS.size(), candidatePacks.size());
         assertTrue(candidatePacks.stream().noneMatch(KnowledgePack::enabledByDefault));
+        assertTrue(candidatePacks.stream().allMatch(pack -> pack.maturity() == KnowledgePackMaturity.EXPERIMENTAL));
         assertEquals(7, candidatePacks.stream().mapToInt(pack -> pack.rules().size()).sum());
         assertTrue(candidatePacks.stream()
                 .flatMap(pack -> pack.rules().stream())
@@ -159,6 +162,7 @@ class KnowledgePackRegistryTest {
                 .orElseThrow();
 
         assertEquals("SymPy 1.14.0 documentation", pack.sourceVersion());
+        assertEquals(KnowledgePackMaturity.VALIDATED, pack.maturity());
         assertTrue(pack.sourceUrl().contains("sympy.polys.polytools.factor"));
         assertTrue(pack.sourceReference().contains("independently reimplemented"));
         assertTrue(pack.rules().stream().allMatch(rule -> !rule.descriptor().sourceVersion().isBlank()));
@@ -177,6 +181,7 @@ class KnowledgePackRegistryTest {
                 sourceVersion: reviewed-test-fixture
                 sourceReference: test fixture
                 enabledByDefault: true
+                maturity: VALIDATED
                 rules:
                   - id: default.enabled.rule
                     derivationType: REIMPLEMENTED_RULE
@@ -218,6 +223,39 @@ class KnowledgePackRegistryTest {
 
         assertEquals(SYMPY_PACK, transformation.packId());
         assertEquals("BSD-3-Clause", transformation.license());
+    }
+
+    @Test
+    void experimentalPackDoesNotActivateViaEnabledByDefaultOnly(@TempDir Path tempDir) throws Exception {
+        Path pack = tempDir.resolve("default-experimental.rules.yaml");
+        Files.writeString(pack, """
+                packId: default-experimental
+                displayName: Default Experimental
+                sourceProject: External
+                license: BSD-3-Clause
+                sourceUrl: https://example.invalid/rules
+                sourceVersion: reviewed-test-fixture
+                sourceReference: test fixture
+                enabledByDefault: true
+                maturity: EXPERIMENTAL
+                rules:
+                  - id: default.experimental.rule
+                    derivationType: REIMPLEMENTED_RULE
+                    status: REVIEWED
+                    searchEffects: [NORMALIZING]
+                    rule:
+                      from: "?A^2 - ?B^2"
+                      to: "(?A - ?B) * (?A + ?B)"
+                    validation:
+                      examples:
+                        - from: "x^2 - y^2"
+                          to: "(x - y) * (x + y)"
+                """);
+        KnowledgePackRegistry registry = new KnowledgePackRegistry(new KnowledgePackLoader().loadAll(tempDir));
+
+        assertTrue(registry.enabledRules(KnowledgePackSelection.CORE).isEmpty());
+        assertTrue(registry.enabledRules(KnowledgePackSelection.CORE.enablePack("default-experimental")).stream()
+            .anyMatch(rule -> rule.id().equals("default.experimental.rule")));
     }
 
     @Test

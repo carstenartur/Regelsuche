@@ -47,4 +47,12 @@ class AssumptionTest {
             sig.normalizedAssumptions());
         assertEquals("a > b;c < d;x >= 0;y <= 1", sig.fingerprint());
     }
+
+    @Test
+    void integerKnowledgeImpliesRationalButUnknownStaysUnknown() {
+        assertEquals(AssumptionTruthValue.TRUE,
+            Assumption.rational("n").truthValueUnder(java.util.List.of(Assumption.integer("n"))));
+        assertEquals(AssumptionTruthValue.UNKNOWN,
+            Assumption.real("x").truthValueUnder(java.util.List.of(Assumption.unknown("x"))));
+    }
 }

@@ -57,7 +57,8 @@ public class SmtProofBridge implements ProofBridge {
             case NON_ZERO -> "(distinct " + renderTerm(assumption) + " 0)";
             case POSITIVE -> "(> " + renderTerm(assumption) + " 0)";
             case NON_NEGATIVE -> "(>= " + renderTerm(assumption) + " 0)";
-            case DOMAIN, CUSTOM -> "(! true :named " + sanitize(assumption.expression()) + ")";
+            case REAL, INTEGER, RATIONAL, UNKNOWN, DOMAIN, CUSTOM ->
+                "(! true :named " + sanitize(assumption.expression()) + ")";
         };
     }
 

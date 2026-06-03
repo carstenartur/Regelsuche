@@ -35,7 +35,6 @@ import de.regelsuche.transform.FractionDecompositionAstPredicate;
 import de.regelsuche.transform.RationalizedDenominatorAstPredicate;
 import de.regelsuche.transform.SquareDifferenceAstPredicate;
 import de.regelsuche.transform.RewriteKind;
-import de.regelsuche.transform.SymPyTransformationEngine;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
@@ -161,14 +160,10 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         String target = "(x + a) * (x - a)";
         boolean equivalent = casRouter.provePolynomialIdentity(seed.expression(), target).resultType()
             == de.regelsuche.validation.MathematicalAlgorithmRegistry.ResultType.PROOF;
-        Optional<Transformation> sympy = new SymPyTransformationEngine().transform(seed.expression()).stream()
-            .filter(transformation -> polynomialEquivalence.arePolynomiallyEquivalent(transformation.transformedExpression(), target))
-            .findFirst();
         if (!equivalent) {
             return DeterministicDiscoveryExperimentRunner.SeedRunOutcome.fail("factorization equivalence check failed");
         }
-        String result = sympy.map(Transformation::transformedExpression).orElse(target);
-        return oneStep(seed, result, "polynomial_factorization", CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+        return oneStep(seed, target, "polynomial_factorization", CandidateProofStatus.SYMBOLICALLY_VERIFIED,
             List.of(), "factorization reproduced");
     }
 

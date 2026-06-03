@@ -15,6 +15,7 @@ import de.regelsuche.mining.SuccessfulTransformationPath;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.OracleValidator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -212,5 +213,31 @@ class HypothesisPromotionPipelineTest {
             .anyMatch(h -> h.id().startsWith("symreg-")
                 && h.proofStatus() == CandidateProofStatus.OBSERVED
                 && h.counterexampleSearchStatus() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND));
+    }
+
+    @Test
+    void oracleDisagreementBlocksPromotion() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        KnownRuleRepository knownRules = new KnownRuleRepository();
+        RuleCandidateMiner miner = new RuleCandidateMiner(knownRules);
+        InMemoryHypothesisRepository hypothesisRepo = new InMemoryHypothesisRepository();
+        MacroRuleLearningService learningService = new MacroRuleLearningService(
+            inventory, miner, knownRules, 3, 0.0
+        );
+        OracleValidator oracle = (left, right) -> OracleValidator.OracleValidation.disagrees("oracle mismatch");
+        HypothesisPromotionPipeline pipe = new HypothesisPromotionPipeline(
+            miner, hypothesisRepo, NO_COUNTEREXAMPLE, learningService, true, List.of(),
+            null, oracle
+        );
+
+        HypothesisPromotionPipeline.PromotionResult result = pipe.run(List.of(
+            path("p1", "(x + 1) ^ 2", "1 + 2 * x + x ^ 2"),
+            path("p2", "(x + 2) ^ 2", "4 + 4 * x + x ^ 2"),
+            path("p3", "(x + 3) ^ 2", "9 + 6 * x + x ^ 2")
+        ));
+
+        assertTrue(result.promotedRules().isEmpty());
+        assertTrue(result.newHypotheses().stream()
+            .allMatch(hypothesis -> hypothesis.proofStatus() == CandidateProofStatus.OBSERVED));
     }
 }

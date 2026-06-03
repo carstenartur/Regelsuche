@@ -26,8 +26,11 @@
   "convergentStates" : [ "x^2+6*x+5", "(x+1)*(x+3+2)" ],
   "edgeCount" : 32,
   "edges" : [ {
+    "enabledByProfile" : false,
     "from" : "(x+1)*(x+3)+(x+1)*2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_factor_common_left",
     "searchEffect" : [ "FACTORIZING" ],
@@ -35,8 +38,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+1)*(x+3+2)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+1)*(x+3+2)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_distribute_left_add",
     "searchEffect" : [ "NORMALIZING" ],
@@ -44,8 +50,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+1)*(x+3)+(x+1)*2"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+1)*(x+3+2)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -53,8 +62,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+1)*(x+5)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+1)*(x+3+2)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_linear_offset_simplify",
     "searchEffect" : [ "SIMPLIFYING" ],
@@ -62,8 +74,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+1)*(x+5)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)*(x+3)-2^2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -71,8 +86,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)*(x+3)-4"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)*(x+3)-2^2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -80,8 +98,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-2^2"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)*(x+3)-2^2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_product_to_power_two",
     "searchEffect" : [ "NORMALIZING" ],
@@ -89,8 +110,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-2^2"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)*(x+3)-2^2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -98,8 +122,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-4"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)*(x+3)-4",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -107,8 +134,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-4"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)*(x+3)-4",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_product_to_power_two",
     "searchEffect" : [ "NORMALIZING" ],
@@ -116,8 +146,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-4"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)^2-2*2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_product_to_power_two",
     "searchEffect" : [ "NORMALIZING" ],
@@ -125,8 +158,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-2^2"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)^2-2*2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -134,8 +170,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-4"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)^2-2^2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_power_two_to_product",
     "searchEffect" : [ "NORMALIZING" ],
@@ -143,8 +182,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)*(x+3)-2^2"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)^2-2^2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_power_two_to_product",
     "searchEffect" : [ "NORMALIZING" ],
@@ -152,8 +194,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-2*2"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)^2-2^2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -161,8 +206,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-4"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)^2-2^2",
     "kind" : "bridge",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_square_difference_factor",
     "searchEffect" : [ "FACTORIZING" ],
@@ -170,8 +218,11 @@
     "tags" : [ "selected-path" ],
     "to" : "(x+3-2)*(x+3+2)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)^2-2^2",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "sympy.poly.factor.difference_of_squares",
     "searchEffect" : [ "FACTORIZING" ],
@@ -179,8 +230,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3-2)*(x+3+2)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3)^2-4",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_power_two_to_product",
     "searchEffect" : [ "NORMALIZING" ],
@@ -188,8 +242,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)*(x+3)-4"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3-2)*(x+3+2)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -197,8 +254,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+1)*(x+3+2)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3-2)*(x+3+2)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_linear_offset_simplify",
     "searchEffect" : [ "SIMPLIFYING" ],
@@ -206,8 +266,11 @@
     "tags" : [ "selected-path" ],
     "to" : "(x+1)*(x+3+2)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3-2)*(x+3+2)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -215,8 +278,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+1)*(x+5)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3-2)*(x+3+2)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -224,8 +290,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3-2)*(x+5)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3-2)*(x+3+2)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_linear_offset_simplify",
     "searchEffect" : [ "SIMPLIFYING" ],
@@ -233,8 +302,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3-2)*(x+5)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3-2)*(x+5)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
@@ -242,8 +314,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+1)*(x+5)"
   }, {
+    "enabledByProfile" : false,
     "from" : "(x+3-2)*(x+5)",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_linear_offset_simplify",
     "searchEffect" : [ "SIMPLIFYING" ],
@@ -251,26 +326,35 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+1)*(x+5)"
   }, {
+    "enabledByProfile" : true,
     "from" : "x*x+6*x+5",
     "kind" : "bridge",
-    "packId" : "core",
+    "maturity" : "OPERATOR_DERIVED",
+    "operatorId" : "complete_square_bridge",
+    "packId" : "operator-derived",
     "ruleId" : "complete_square_bridge",
     "searchEffect" : [ "BRIDGING" ],
     "source" : "operator",
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-2^2"
   }, {
+    "enabledByProfile" : true,
     "from" : "x*x+6*x+5",
     "kind" : "bridge",
-    "packId" : "core",
+    "maturity" : "OPERATOR_DERIVED",
+    "operatorId" : "complete_square_bridge",
+    "packId" : "operator-derived",
     "ruleId" : "complete_square_bridge",
     "searchEffect" : [ "BRIDGING" ],
     "source" : "operator",
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-4"
   }, {
+    "enabledByProfile" : false,
     "from" : "x*x+6*x+5",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_factor_common_right",
     "searchEffect" : [ "FACTORIZING" ],
@@ -278,8 +362,11 @@
     "tags" : [ "alternative-branch" ],
     "to" : "(x+6)*x+5"
   }, {
+    "enabledByProfile" : false,
     "from" : "x^2+6*x+5",
     "kind" : "macro",
+    "maturity" : "MACRO",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "macro_3bbfed5b",
     "searchEffect" : [ "NORMALIZING" ],
@@ -287,26 +374,35 @@
     "tags" : [ "alternative-branch", "macro-shortcut" ],
     "to" : "(x+1)*(x+3+2)"
   }, {
+    "enabledByProfile" : true,
     "from" : "x^2+6*x+5",
     "kind" : "bridge",
-    "packId" : "core",
+    "maturity" : "OPERATOR_DERIVED",
+    "operatorId" : "complete_square_bridge",
+    "packId" : "operator-derived",
     "ruleId" : "complete_square_bridge",
     "searchEffect" : [ "BRIDGING" ],
     "source" : "operator",
     "tags" : [ "selected-path" ],
     "to" : "(x+3)^2-2^2"
   }, {
+    "enabledByProfile" : true,
     "from" : "x^2+6*x+5",
     "kind" : "bridge",
-    "packId" : "core",
+    "maturity" : "OPERATOR_DERIVED",
+    "operatorId" : "complete_square_bridge",
+    "packId" : "operator-derived",
     "ruleId" : "complete_square_bridge",
     "searchEffect" : [ "BRIDGING" ],
     "source" : "operator",
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)^2-4"
   }, {
+    "enabledByProfile" : false,
     "from" : "x^2+6*x+5",
     "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
     "packId" : "core",
     "ruleId" : "ast_power_two_to_product",
     "searchEffect" : [ "NORMALIZING" ],

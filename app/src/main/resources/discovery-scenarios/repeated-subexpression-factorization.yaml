@@ -1,0 +1,25 @@
+id: repeated-subexpression-factorization
+displayName: Repeated-subexpression factorization shortcut
+inputExpression: "(y + 1) * x + z * (y + 1)"
+targetExpression: "(y + 1) * (x + z)"
+expectations:
+  - BRIDGE_REQUIRED
+enabledOperators:
+  - repeated_subexpression_factorization
+enabledRulePacks:
+  - factorization-basic
+requiredBridgeEffects:
+  - BRIDGING
+requiredRuleFamilies: []
+requiredBridgeRules:
+  - hypothesis_repeated_subexpression_factorization
+macroLearning:
+  enabled: false
+budgets:
+  maxDepth: 3
+  maxStates: 20
+  timeoutMillis: 5000
+gallery:
+  generateSvg: true
+  preferredPathCount: 1
+  minVisibleNodes: 3

@@ -49,6 +49,7 @@ public class LeanProofBridge implements ProofBridge {
             case NON_ZERO -> assumption.symbols().isEmpty()
                 ? assumption.expression()
                 : assumption.symbols().get(0) + " ≠ 0";
+            case REAL, INTEGER, RATIONAL, UNKNOWN -> "True";
             case POSITIVE -> assumption.symbols().isEmpty()
                 ? assumption.expression()
                 : assumption.symbols().get(0) + " > 0";

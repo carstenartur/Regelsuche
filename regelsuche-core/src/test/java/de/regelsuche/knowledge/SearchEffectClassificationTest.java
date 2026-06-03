@@ -44,6 +44,7 @@ class SearchEffectClassificationTest {
                 sourceVersion: v1
                 sourceReference: ref
                 enabledByDefault: true
+                maturity: VALIDATED
                 rules:
                   - id: test_rule
                     derivationType: GENERATED

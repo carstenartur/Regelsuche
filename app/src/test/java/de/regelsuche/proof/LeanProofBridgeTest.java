@@ -15,12 +15,13 @@ class LeanProofBridgeTest {
         ProofBridge.ProofAttempt attempt = bridge.prove(
             "a / b * b",
             "a",
-            List.of(Assumption.nonZero("b"))
+            List.of(Assumption.nonZero("b"), Assumption.real("x"))
         );
         assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, attempt.status());
         assertEquals("lean4", attempt.tool());
         assertTrue(attempt.artifact().contains("theorem regelsuche_lemma"));
         assertTrue(attempt.artifact().contains("≠ 0"));
+        assertTrue(attempt.artifact().contains("(h1 : True)"));
         assertTrue(attempt.artifact().contains("sorry"));
     }
 }
