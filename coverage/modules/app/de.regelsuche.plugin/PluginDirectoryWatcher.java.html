@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginDirectoryWatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginDirectoryWatcher.java</span></div><h1>PluginDirectoryWatcher.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.nio.file.ClosedWatchServiceException;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
+
+/**
+ * Watches the plugins/ and rules/ directories for file system changes and triggers
+ * a debounced reload on the provided {@link PluginRuntime}.
+ */
+public final class PluginDirectoryWatcher implements Closeable {
+<span class="fc" id="L25">    private static final Logger LOGGER = Logger.getLogger(PluginDirectoryWatcher.class.getName());</span>
+<span class="fc" id="L26">    private static final Duration DEFAULT_DEBOUNCE = Duration.ofMillis(300);</span>
+
+    private final PluginRuntime runtime;
+    private final Duration debounce;
+    private final Consumer&lt;PluginReloadResult&gt; listener;
+<span class="fc" id="L31">    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -&gt; {</span>
+<span class="fc" id="L32">        Thread t = new Thread(r, &quot;plugin-dir-watcher&quot;);</span>
+<span class="fc" id="L33">        t.setDaemon(true);</span>
+<span class="fc" id="L34">        return t;</span>
+    });
+    private WatchService watchService;
+    private Thread watchThread;
+    private volatile ScheduledFuture&lt;?&gt; pending;
+    private volatile boolean running;
+
+    public PluginDirectoryWatcher(PluginRuntime runtime) {
+<span class="nc" id="L42">        this(runtime, DEFAULT_DEBOUNCE, result -&gt; {});</span>
+<span class="nc" id="L43">    }</span>
+
+<span class="fc" id="L45">    public PluginDirectoryWatcher(PluginRuntime runtime, Duration debounce, Consumer&lt;PluginReloadResult&gt; listener) {</span>
+<span class="fc" id="L46">        this.runtime = runtime;</span>
+<span class="fc" id="L47">        this.debounce = debounce;</span>
+<span class="fc" id="L48">        this.listener = listener;</span>
+<span class="fc" id="L49">    }</span>
+
+    public void start() throws IOException {
+<span class="fc" id="L52">        watchService = FileSystems.getDefault().newWatchService();</span>
+<span class="fc" id="L53">        registerIfExists(runtime.config().pluginsDirectory());</span>
+<span class="fc" id="L54">        registerIfExists(runtime.config().rulesDirectory());</span>
+<span class="fc" id="L55">        running = true;</span>
+<span class="fc" id="L56">        watchThread = new Thread(this::watchLoop, &quot;plugin-dir-watch-loop&quot;);</span>
+<span class="fc" id="L57">        watchThread.setDaemon(true);</span>
+<span class="fc" id="L58">        watchThread.start();</span>
+<span class="fc" id="L59">    }</span>
+
+    private void registerIfExists(Path dir) throws IOException {
+<span class="pc bpc" id="L62" title="1 of 4 branches missed.">        if (dir != null &amp;&amp; Files.isDirectory(dir)) {</span>
+<span class="fc" id="L63">            dir.register(watchService,</span>
+                StandardWatchEventKinds.ENTRY_CREATE,
+                StandardWatchEventKinds.ENTRY_MODIFY,
+                StandardWatchEventKinds.ENTRY_DELETE);
+        }
+<span class="fc" id="L68">    }</span>
+
+    private void watchLoop() {
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        while (running) {</span>
+            WatchKey key;
+            try {
+<span class="fc" id="L74">                key = watchService.poll(500, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L75">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L76">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L77">                break;</span>
+<span class="fc" id="L78">            } catch (ClosedWatchServiceException e) {</span>
+<span class="fc" id="L79">                break;</span>
+<span class="fc" id="L80">            }</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (key == null) {</span>
+<span class="fc" id="L82">                continue;</span>
+            }
+<span class="fc" id="L84">            key.pollEvents();</span>
+<span class="fc" id="L85">            key.reset();</span>
+<span class="fc" id="L86">            scheduleReload();</span>
+<span class="fc" id="L87">        }</span>
+<span class="fc" id="L88">    }</span>
+
+    private void scheduleReload() {
+<span class="fc" id="L91">        ScheduledFuture&lt;?&gt; existing = pending;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L93">            existing.cancel(false);</span>
+        }
+<span class="fc" id="L95">        pending = scheduler.schedule(() -&gt; {</span>
+            try {
+<span class="fc" id="L97">                PluginReloadResult result = runtime.reloadWithResult();</span>
+<span class="fc" id="L98">                listener.accept(result);</span>
+<span class="nc" id="L99">            } catch (Exception ex) {</span>
+<span class="nc" id="L100">                LOGGER.warning(&quot;Hot reload failed: &quot; + ex.getMessage());</span>
+<span class="fc" id="L101">            }</span>
+<span class="fc" id="L102">        }, debounce.toMillis(), TimeUnit.MILLISECONDS);</span>
+<span class="fc" id="L103">    }</span>
+
+    @Override
+    public void close() throws IOException {
+<span class="fc" id="L107">        running = false;</span>
+<span class="fc" id="L108">        scheduler.shutdownNow();</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (watchService != null) {</span>
+<span class="fc" id="L110">            watchService.close();</span>
+        }
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (watchThread != null) {</span>
+<span class="fc" id="L113">            watchThread.interrupt();</span>
+        }
+<span class="fc" id="L115">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

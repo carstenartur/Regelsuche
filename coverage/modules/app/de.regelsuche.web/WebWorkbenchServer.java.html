@@ -365,8 +365,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L365">                ? profile.defaultGoal()</span>
 <span class="fc" id="L366">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L367">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L368">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="nc" id="L369">            return;</span>
+<span class="fc" id="L368">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="fc" id="L369">            return;</span>
 <span class="fc" id="L370">        }</span>
 <span class="fc" id="L371">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1479,8 +1479,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1479">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1480">            .findFirst();</span>
 <span class="fc bfc" id="L1481" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="fc" id="L1482">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="fc" id="L1483">            return;</span>
+<span class="nc" id="L1482">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1483">            return;</span>
         }
 <span class="fc" id="L1485">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
 <span class="fc" id="L1486">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>
@@ -1568,8 +1568,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1568">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1569">            .findFirst();</span>
 <span class="fc bfc" id="L1570" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="nc" id="L1571">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="nc" id="L1572">            return;</span>
+<span class="fc" id="L1571">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="fc" id="L1572">            return;</span>
         }
 <span class="fc" id="L1574">        var derivation = match.get();</span>
 <span class="fc" id="L1575">        JsonWriter writer = new JsonWriter();</span>

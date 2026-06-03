@@ -31,7 +31,7 @@ import java.util.Objects;
 
     public AstVisitorContext execute(AstVisitorPhase phase, Expr root, AstVisitorContext context) {
 <span class="fc bfc" id="L33" title="All 2 branches covered.">        for (MutableVisitorRegistration registration : visitors.values()) {</span>
-<span class="pc bpc" id="L34" title="1 of 4 branches missed.">            if (registration.enabled &amp;&amp; registration.visitor.phase() == phase) {</span>
+<span class="fc bfc" id="L34" title="All 4 branches covered.">            if (registration.enabled &amp;&amp; registration.visitor.phase() == phase) {</span>
 <span class="fc" id="L35">                registration.visitor.visit(root, context);</span>
             }
 <span class="fc" id="L37">        }</span>

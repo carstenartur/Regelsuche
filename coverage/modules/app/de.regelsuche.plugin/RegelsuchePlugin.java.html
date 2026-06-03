@@ -7,37 +7,49 @@ public interface RegelsuchePlugin {
 
     String version();
 
+    default String apiVersion() {
+<span class="fc" id="L11">        return &quot;1&quot;;</span>
+    }
+
+    default String minimumCoreVersion() {
+<span class="fc" id="L15">        return &quot;0.0.0&quot;;</span>
+    }
+
+    default java.util.Set&lt;String&gt; capabilities() {
+<span class="fc" id="L19">        return java.util.Set.of();</span>
+    }
+
     default void registerRules(RuleRegistry registry) {
-<span class="nc" id="L11">    }</span>
-
-    default void registerTransformations(TransformationRegistry registry) {
-<span class="nc" id="L14">    }</span>
-
-    default void registerVisitors(AstVisitorRegistry registry) {
-<span class="nc" id="L17">    }</span>
-
-    default void registerMacros(MacroRegistry registry) {
-<span class="nc" id="L20">    }</span>
-
-    default void registerSearchStrategies(SearchStrategyRegistry registry) {
 <span class="nc" id="L23">    }</span>
 
-    default void registerHeuristics(HeuristicRegistry registry) {
+    default void registerTransformations(TransformationRegistry registry) {
 <span class="nc" id="L26">    }</span>
 
-    default void registerCostFunctions(CostFunctionRegistry registry) {
+    default void registerVisitors(AstVisitorRegistry registry) {
 <span class="nc" id="L29">    }</span>
 
-    default void registerRenderers(RendererRegistry registry) {
+    default void registerMacros(MacroRegistry registry) {
 <span class="nc" id="L32">    }</span>
 
-    default void registerExplanations(ExplanationRegistry registry) {
+    default void registerSearchStrategies(SearchStrategyRegistry registry) {
 <span class="nc" id="L35">    }</span>
 
-    default void registerParserExtensions(ParserExtensionRegistry registry) {
+    default void registerHeuristics(HeuristicRegistry registry) {
 <span class="nc" id="L38">    }</span>
 
-    default void registerExamples(ExampleRegistry registry) {
+    default void registerCostFunctions(CostFunctionRegistry registry) {
 <span class="nc" id="L41">    }</span>
+
+    default void registerRenderers(RendererRegistry registry) {
+<span class="nc" id="L44">    }</span>
+
+    default void registerExplanations(ExplanationRegistry registry) {
+<span class="nc" id="L47">    }</span>
+
+    default void registerParserExtensions(ParserExtensionRegistry registry) {
+<span class="nc" id="L50">    }</span>
+
+    default void registerExamples(ExampleRegistry registry) {
+<span class="nc" id="L53">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
