@@ -17,7 +17,10 @@ class DiscoveryOperatorRegistryTest {
         assertTrue(registry.availableOperatorIds().contains("sophie_germain_bridge"));
         assertTrue(registry.availableOperatorIds().contains("telescoping_fraction"));
         assertTrue(registry.availableOperatorIds().contains("repeated_subexpression_factorization"));
+        assertTrue(registry.availableOperatorIds().contains("common_subexpression_discovery"));
+        assertTrue(registry.availableOperatorIds().contains("factor_candidate"));
         assertTrue(registry.availableOperatorIds().contains("rational_normalization"));
+        assertTrue(registry.availableOperatorIds().contains("rational_discovery_toolkit"));
 
         assertFalse(registry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(List.of("complete_square_bridge"))).isEmpty());
         registry.disable("complete_square_bridge");

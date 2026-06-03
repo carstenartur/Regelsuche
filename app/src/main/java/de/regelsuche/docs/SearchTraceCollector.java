@@ -198,6 +198,10 @@ final class SearchTraceCollector {
         if (learnedMacros.contains(ruleId)) {
             return "macro";
         }
+        if (ruleId != null && (ruleId.startsWith("hypothesis_sympy_")
+                || "hypothesis_common_subexpression_discovery".equals(ruleId))) {
+            return "sympy-derived";
+        }
         if (operatorRuleIds.contains(ruleId)) {
             return "operator";
         }
@@ -209,6 +213,13 @@ final class SearchTraceCollector {
     }
 
     private String packIdFor(String ruleId, Map<String, ScenarioRule> rulesById, Map<String, String> ruleIdToPackId) {
+        if ("hypothesis_sympy_factor_candidate".equals(ruleId)
+                || "hypothesis_common_subexpression_discovery".equals(ruleId)) {
+            return "sympy-polynomial-basic";
+        }
+        if ("hypothesis_sympy_rational_discovery".equals(ruleId)) {
+            return "sympy-rational-basic";
+        }
         if (operatorRuleIds.contains(ruleId)) {
             return "operator-derived";
         }

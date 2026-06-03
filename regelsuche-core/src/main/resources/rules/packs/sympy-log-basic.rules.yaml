@@ -1,0 +1,50 @@
+packId: sympy-log-basic
+displayName: SymPy log basic discovery pack
+sourceProject: SymPy
+license: BSD-3-Clause
+sourceUrl: https://docs.sympy.org/latest/modules/simplify/simplify.html
+sourceVersion: SymPy 1.14.0 documentation
+sourceReference: Manually reviewed logarithm rules from SymPy docs and reimplemented as optional discovery candidates with explicit assumptions.
+enabledByDefault: false
+maturity: EXPERIMENTAL
+disabledByDefault: true
+categories:
+  - logarithms
+  - sympy-derived
+rules:
+  - id: sympy.log.basic.product
+    originProject: SymPy
+    sourceReference: SymPy log product split with positivity assumptions.
+    derivationType: REIMPLEMENTED_RULE
+    status: CANDIDATE
+    searchEffects:
+      - EXPANDING
+    riskLevel: high
+    assumptions:
+      - POSITIVE
+    examples:
+      - from: "log(a*b)"
+        to: "log(a) + log(b)"
+    nearMisses:
+      - "log(a-b)"
+    rule:
+      from: "log(?A*?B)"
+      to: "log(?A) + log(?B)"
+  - id: sympy.log.basic.power
+    originProject: SymPy
+    sourceReference: SymPy log power extraction with positivity assumptions.
+    derivationType: REIMPLEMENTED_RULE
+    status: CANDIDATE
+    searchEffects:
+      - EXPANDING
+    riskLevel: high
+    assumptions:
+      - POSITIVE
+    examples:
+      - from: "log(a^n)"
+        to: "n*log(a)"
+    nearMisses:
+      - "log(a^b + 1)"
+    rule:
+      from: "log(?A^?N)"
+      to: "?N*log(?A)"

@@ -1,0 +1,50 @@
+packId: sympy-trig-basic
+displayName: SymPy trig basic discovery pack
+sourceProject: SymPy
+license: BSD-3-Clause
+sourceUrl: https://docs.sympy.org/latest/modules/simplify/fu.html
+sourceVersion: SymPy 1.14.0 documentation
+sourceReference: Manually reviewed trigonometric simplification identities from SymPy docs and reimplemented as optional discovery candidates.
+enabledByDefault: false
+maturity: EXPERIMENTAL
+disabledByDefault: true
+categories:
+  - trigonometry
+  - sympy-derived
+rules:
+  - id: sympy.trig.basic.pythagorean
+    originProject: SymPy
+    sourceReference: SymPy trigsimp identity sin(x)^2 + cos(x)^2 = 1, retained as candidate for discovery QA comparison.
+    derivationType: REIMPLEMENTED_RULE
+    status: CANDIDATE
+    searchEffects:
+      - SIMPLIFYING
+    riskLevel: medium
+    assumptions:
+      - REAL
+    examples:
+      - from: "sin(x)^2 + cos(x)^2"
+        to: "1"
+    nearMisses:
+      - "sin(x)^2 + cos(y)^2"
+    rule:
+      from: "sin(?A)^2 + cos(?A)^2"
+      to: "1"
+  - id: sympy.trig.basic.sin_double
+    originProject: SymPy
+    sourceReference: SymPy trigsimp double-angle identity sin(2*x) = 2*sin(x)*cos(x), retained as candidate.
+    derivationType: REIMPLEMENTED_RULE
+    status: CANDIDATE
+    searchEffects:
+      - EXPANDING
+    riskLevel: medium
+    assumptions:
+      - REAL
+    examples:
+      - from: "sin(2*x)"
+        to: "2*sin(x)*cos(x)"
+    nearMisses:
+      - "sin(3*x)"
+    rule:
+      from: "sin(2*?A)"
+      to: "2*sin(?A)*cos(?A)"
