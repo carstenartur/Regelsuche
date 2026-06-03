@@ -7,6 +7,13 @@ public record RuleDebugMetadata(
     String detail
 ) {
     String diagnostic() {
-        return ruleId + " " + reason + (detail == null || detail.isBlank() ? "" : ": " + detail);
+        StringBuilder sb = new StringBuilder(ruleId).append(" ").append(reason);
+        if (context != null && !context.isBlank()) {
+            sb.append(" [").append(context).append("]");
+        }
+        if (detail != null && !detail.isBlank()) {
+            sb.append(": ").append(detail);
+        }
+        return sb.toString();
     }
 }

@@ -45,10 +45,13 @@ public final class PluginCompatibilityChecker {
                 "PLUGIN_REQUIRES_NEWER_CORE: plugin requires core >= "
                     + plugin.minimumCoreVersion() + " but running " + CORE_VERSION));
         }
-        for (String capability : plugin.capabilities()) {
-            if (!isSupportedCapability(capability)) {
-                issues.add(new PluginRuntime.RuntimeDiagnostic(plugin.id(),
-                    "PLUGIN_CAPABILITY_UNKNOWN: required capability '" + capability + "' is not provided by core"));
+        var capabilities = plugin.capabilities();
+        if (capabilities != null) {
+            for (String capability : capabilities) {
+                if (!isSupportedCapability(capability)) {
+                    issues.add(new PluginRuntime.RuntimeDiagnostic(plugin.id(),
+                        "PLUGIN_CAPABILITY_UNKNOWN: required capability '" + capability + "' is not provided by core"));
+                }
             }
         }
         return List.copyOf(issues);
@@ -72,20 +75,25 @@ public final class PluginCompatibilityChecker {
         }
         String[] req = required.split("\\.", 3);
         String[] avail = available.split("\\.", 3);
-        for (int i = 0; i < Math.min(req.length, avail.length); i++) {
-            try {
-                int r = Integer.parseInt(req[i].replaceAll("[^0-9]", ""));
-                int a = Integer.parseInt(avail[i].replaceAll("[^0-9]", ""));
-                if (r > a) {
-                    return true;
-                }
-                if (r < a) {
-                    return false;
-                }
-            } catch (NumberFormatException e) {
+        int len = Math.max(req.length, avail.length);
+        for (int i = 0; i < len; i++) {
+            int r = i < req.length ? parseVersionPart(req[i]) : 0;
+            int a = i < avail.length ? parseVersionPart(avail[i]) : 0;
+            if (r > a) {
+                return true;
+            }
+            if (r < a) {
                 return false;
             }
         }
         return false;
+    }
+
+    private static int parseVersionPart(String part) {
+        try {
+            return Integer.parseInt(part.replaceAll("[^0-9]", ""));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }

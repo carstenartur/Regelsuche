@@ -79,18 +79,23 @@ class PluginDirectoryWatcherTest {
         Path file = rulesDir.resolve("debounced.regelsuche");
 
         try (PluginRuntime runtime = runtime(tempDir, rulesDir)) {
-            CountDownLatch reloads = new CountDownLatch(2);
+            CountDownLatch firstReload = new CountDownLatch(1);
+            CountDownLatch secondReload = new CountDownLatch(2);
             List<PluginReloadResult> results = new CopyOnWriteArrayList<>();
             try (PluginDirectoryWatcher watcher = new PluginDirectoryWatcher(runtime, Duration.ofMillis(150), result -> {
                 results.add(result);
-                reloads.countDown();
+                firstReload.countDown();
+                secondReload.countDown();
             })) {
                 watcher.start();
                 Files.writeString(file, simpleRule("debounced_rule", "A + 0", "A"));
                 Files.writeString(file, simpleRule("debounced_rule", "A * 1", "A"));
                 Files.writeString(file, simpleRule("debounced_rule", "A - 0", "A"));
 
-                assertFalse(reloads.await(1, TimeUnit.SECONDS));
+                // Wait for the single debounced reload to happen
+                assertTrue(firstReload.await(5, TimeUnit.SECONDS));
+                // Then assert no second reload occurs in a short window
+                assertFalse(secondReload.await(400, TimeUnit.MILLISECONDS));
             }
             assertEquals(1, results.size());
             assertTrue(results.getFirst().ruleFileChanges().stream()

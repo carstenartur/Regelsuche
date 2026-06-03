@@ -695,12 +695,16 @@ public class CliRouter {
             }
             out.println();
             out.println("Rule attempts (first 50):");
-            report.attempts().stream().limit(50).forEach(attempt ->
-                out.printf("  %-40s %-8s %-25s %s%n",
+            report.attempts().stream().limit(50).forEach(attempt -> {
+                String context = "RUNTIME".equals(attempt.phase()) && attempt.subtree() != null && !attempt.subtree().isBlank()
+                    ? " [" + attempt.subtree() + "]" : "";
+                out.printf("  %-40s %-8s %-25s %s%s%n",
                     attempt.ruleId(),
                     attempt.matched() ? "APPLIED" : "SKIP",
                     attempt.reason(),
-                    attempt.detail()));
+                    attempt.detail(),
+                    context);
+            });
             return 0;
         }
     }
