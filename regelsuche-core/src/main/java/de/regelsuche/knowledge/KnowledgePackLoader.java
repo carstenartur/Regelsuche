@@ -93,7 +93,8 @@ public class KnowledgePackLoader {
                         descriptor));
             }
             return new KnowledgePack(yaml.packId, yaml.displayName, yaml.sourceProject, yaml.license,
-                    yaml.sourceUrl, yaml.sourceVersion, yaml.sourceReference, yaml.enabledByDefault, packCategories, rules);
+                    yaml.sourceUrl, yaml.sourceVersion, yaml.sourceReference, yaml.enabledByDefault,
+                    yaml.maturity, packCategories, rules);
         } catch (IOException ex) {
             throw new IllegalArgumentException("Invalid knowledge pack YAML: " + path, ex);
         }
@@ -108,6 +109,9 @@ public class KnowledgePackLoader {
         require(yaml.sourceUrl, "sourceUrl", path);
         require(yaml.sourceVersion, "sourceVersion", path);
         require(yaml.sourceReference, "sourceReference", path);
+        if (yaml.maturity == null) {
+            throw new IllegalArgumentException("Knowledge pack is missing maturity in " + path);
+        }
         if (yaml.rules == null || yaml.rules.isEmpty()) {
             throw new IllegalArgumentException("Knowledge pack must declare at least one rule: " + path);
         }
@@ -187,6 +191,7 @@ public class KnowledgePackLoader {
         public String sourceVersion;
         public String sourceReference;
         public boolean enabledByDefault;
+        public KnowledgePackMaturity maturity;
         public List<String> categories;
         public List<RuleYaml> rules;
     }

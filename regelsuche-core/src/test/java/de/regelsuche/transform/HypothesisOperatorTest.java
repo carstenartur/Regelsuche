@@ -94,6 +94,41 @@ class HypothesisOperatorTest {
             candidate.equals("(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2")), candidates.toString());
     }
 
+    @Test
+    void factorsRepeatedSubexpressionIntoSharedMultiplier() {
+        RepeatedSubexpressionFactorizationHypothesisOperator operator =
+            new RepeatedSubexpressionFactorizationHypothesisOperator();
+
+        List<String> candidates = operator.generateCandidates("x * (y + 1) + z * (y + 1)").stream()
+            .map(Transformation::transformedExpression)
+            .toList();
+
+        assertTrue(candidates.contains("(y + 1) * (x + z)"), candidates.toString());
+    }
+
+    @Test
+    void rationalNormalizationCombinesSameDenominatorAndCancelsFactors() {
+        RationalNormalizationHypothesisOperator operator = new RationalNormalizationHypothesisOperator();
+
+        List<String> togetherCandidates = operator.generateCandidates("x / y + z / y").stream()
+            .map(Transformation::transformedExpression)
+            .toList();
+        List<String> cancelCandidates = operator.generateCandidates("(x * z) / (y * z)").stream()
+            .map(Transformation::transformedExpression)
+            .toList();
+
+        assertTrue(togetherCandidates.contains("(x + z) / y"), togetherCandidates.toString());
+        assertTrue(cancelCandidates.contains("x / y"), cancelCandidates.toString());
+    }
+
+    @Test
+    void repeatedSubexpressionAndRationalNormalizationAvoidNearMisses() {
+        assertTrue(new RepeatedSubexpressionFactorizationHypothesisOperator()
+            .generateCandidates("x * y + z * w").isEmpty());
+        assertTrue(new RationalNormalizationHypothesisOperator()
+            .generateCandidates("x / y + z / w").isEmpty());
+    }
+
     private String squareRootOfProduct(String expression) {
         Expr product = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();
         Expr root = new DifferenceOfSquaresPreparationOperator().squareRootOfProduct(product);

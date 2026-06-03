@@ -13,6 +13,7 @@ public record KnowledgePack(
         String sourceVersion,
         String sourceReference,
         boolean enabledByDefault,
+        KnowledgePackMaturity maturity,
         List<String> categories,
         List<PatternRewriteRule> rules) {
 
@@ -37,6 +38,9 @@ public record KnowledgePack(
         }
         if (isBlank(sourceReference)) {
             throw new IllegalArgumentException("sourceReference is required");
+        }
+        if (maturity == null) {
+            throw new IllegalArgumentException("maturity is required");
         }
         categories = categories == null ? List.of() : List.copyOf(categories);
         rules = rules == null ? List.of() : List.copyOf(rules);

@@ -36,8 +36,11 @@ public class KnowledgePackRegistry {
                 .map(KnowledgePack::packId)
                 .collect(Collectors.toSet());
         Set<String> enabled = options.effectiveEnabledPacks(packsById.keySet(), defaultEnabled);
+        Set<String> explicitlyEnabled = explicitlyEnabledPacks(options);
         return packsById.values().stream()
                 .filter(pack -> enabled.contains(pack.packId()))
+                .filter(pack -> pack.maturity() != KnowledgePackMaturity.EXPERIMENTAL
+                        || explicitlyEnabled.contains(pack.packId()))
                 .toList();
     }
 
@@ -46,5 +49,14 @@ public class KnowledgePackRegistry {
                 .flatMap(pack -> pack.rules().stream())
                 .filter(rule -> rule.descriptor().eligibleForRegistration())
                 .toList();
+    }
+
+    private Set<String> explicitlyEnabledPacks(KnowledgePackSelection options) {
+        Set<String> explicit = new java.util.LinkedHashSet<>(options.enabledPacks());
+        explicit.addAll(options.profile().enabledPackIds());
+        if (options.profile().enableAllPacks()) {
+            explicit.addAll(packsById.keySet());
+        }
+        return Set.copyOf(explicit);
     }
 }
