@@ -71,6 +71,8 @@ public final class SymPyDiscoveryOracleAdapter {
         String script = "import sympy as sp\n"
             + "from sympy.parsing.sympy_parser import parse_expr\n"
             + "gens = sp.symbols('" + symbolList + "')\n"
+            + "if not isinstance(gens, tuple):\n"
+            + "    gens = (gens,)\n"
             + "G = sp.groebner([" + generatorList + "], *gens)\n"
             + "poly = parse_expr('" + escape(polynomial) + "', evaluate=False)\n"
             + "G.reduce(poly)[1] == 0";
