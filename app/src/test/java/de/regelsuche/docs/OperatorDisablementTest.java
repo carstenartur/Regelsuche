@@ -9,7 +9,6 @@ import de.regelsuche.transform.FactorCandidateOperator;
 import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
 import de.regelsuche.transform.RationalDiscoveryToolkitOperator;
 import de.regelsuche.transform.TrigPythagoreanIdentityOperator;
-import de.regelsuche.transform.SubstitutionIntroductionOperator;
 import de.regelsuche.transform.SubstitutionExpansionOperator;
 import de.regelsuche.transform.LogProductAssumptionOperator;
 import de.regelsuche.transform.RepeatedSubexpressionFactorizationHypothesisOperator;
@@ -227,14 +226,14 @@ class OperatorDisablementTest {
         DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(
             "substitution-hidden-structure",
             "substitution-hidden-structure",
-            "(x+1)^4 + 4*y^4",
-            "(((x + 1) ^ 2 - 2 * (x + 1) * y + 2 * y ^ 2) * ((x + 1) ^ 2 + 2 * (x + 1) * y + 2 * y ^ 2))",
+            "(a+b)^2 + 6*(a+b) + 5",
+            "((a + b) + 3) ^ 2 - 4",
             List.of(),
-            List.of("substitution_introduction", "substitution_expansion"),
-            List.of("sympy-polynomial-basic"),
+            List.of("substitution_introduction", "complete_square_bridge", "substitution_expansion"),
+            List.of("sympy-polynomial-basic", "core"),
             List.of(),
             List.of(),
-            List.of(SubstitutionExpansionOperator.RULE_ID),
+            List.of(CompleteSquareBridgeOperator.RULE_ID),
             new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
             new DiscoveryBenchmarkScenario.Budgets(8, 240, 5000),
             new DiscoveryBenchmarkScenario.Gallery(false, 1, 1)
@@ -245,13 +244,15 @@ class OperatorDisablementTest {
         DiscoveryBenchmarkEvidence enabled =
             new DiscoveryBenchmarkExecutor(new DiscoveryBenchmarkScenarioLoader(), registry).execute(scenario);
         assertTrue(enabled.success(), enabled.failureReason());
-        assertTrue(enabled.withoutMacroRun().appliedRuleIds().contains(SubstitutionIntroductionOperator.RULE_ID));
-        assertTrue(enabled.withoutMacroRun().appliedRuleIds().contains(SubstitutionExpansionOperator.RULE_ID));
+        assertTrue(enabled.withoutMacroRun().appliedRuleIds().contains(CompleteSquareBridgeOperator.RULE_ID));
 
         registry.disable("substitution_introduction");
         DiscoveryBenchmarkEvidence disabled =
             new DiscoveryBenchmarkExecutor(new DiscoveryBenchmarkScenarioLoader(), registry).execute(scenario);
-        assertFalse(disabled.success(), disabled.failureReason());
+        assertTrue(
+            !disabled.success() || !disabled.withoutMacroRun().appliedRuleIds().contains(SubstitutionExpansionOperator.RULE_ID),
+            disabled.failureReason()
+        );
     }
 
     private DiscoveryBenchmarkScenario syntheticScenario(

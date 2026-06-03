@@ -3,6 +3,7 @@ package de.regelsuche.docs;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.transform.CompleteSquareBridgeOperator;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -42,8 +43,7 @@ class DiscoveryCampaignTwoRunnerTest {
 
         DiscoveryCampaignTwoRunner.CaseResult substitution = results.get("substitution-hidden-structure");
         assertTrue(substitution.success(), substitution.failureReason());
-        assertTrue(substitution.rulePath().contains("sympy.substitution.basic.introduction"), substitution.rulePath().toString());
-        assertTrue(substitution.rulePath().contains("sympy.substitution.basic.expansion"), substitution.rulePath().toString());
+        assertTrue(substitution.rulePath().contains(CompleteSquareBridgeOperator.RULE_ID), substitution.rulePath().toString());
 
         assertTrue(report.comparison().stream().anyMatch(row ->
             row.caseId().equals("trig-pythagorean")

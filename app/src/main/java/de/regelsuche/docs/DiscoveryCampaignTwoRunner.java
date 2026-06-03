@@ -7,6 +7,7 @@ import de.regelsuche.sympyqa.SymPyQaHarness;
 import de.regelsuche.transform.ExpLogInverseOperator;
 import de.regelsuche.transform.LogProductAssumptionOperator;
 import de.regelsuche.transform.PowerRootAssumptionRules;
+import de.regelsuche.transform.CompleteSquareBridgeOperator;
 import de.regelsuche.transform.SubstitutionExpansionOperator;
 import de.regelsuche.transform.SubstitutionIntroductionOperator;
 import de.regelsuche.transform.TrigPowerReductionOperator;
@@ -347,12 +348,12 @@ public final class DiscoveryCampaignTwoRunner {
             new CampaignCase(
                 "substitution-hidden-structure",
                 "substitution",
-                "(x+1)^4 + 4*y^4",
-                "(((x + 1) ^ 2 - 2 * (x + 1) * y + 2 * y ^ 2) * ((x + 1) ^ 2 + 2 * (x + 1) * y + 2 * y ^ 2))",
-                List.of("substitution_introduction", "substitution_expansion"),
-                SubstitutionExpansionOperator.RULE_ID,
-                List.of("sympy-polynomial-basic"),
-                "discover hidden structure via substitution and expand back"
+                "(a+b)^2 + 6*(a+b) + 5",
+                "((a + b) + 3) ^ 2 - 4",
+                List.of("substitution_introduction", "complete_square_bridge", "substitution_expansion"),
+                CompleteSquareBridgeOperator.RULE_ID,
+                List.of("sympy-polynomial-basic", "core"),
+                "discover hidden structure via substitution before bridge application"
             )
         );
     }

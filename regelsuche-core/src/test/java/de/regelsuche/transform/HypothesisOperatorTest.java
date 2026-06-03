@@ -221,16 +221,58 @@ class HypothesisOperatorTest {
     }
 
     @Test
-    void substitutionOperatorsIntroduceAndExpandPlaceholders() {
+    void substitutionOperatorsIntroduceGeneralStructuralPlaceholders() {
         SubstitutionIntroductionOperator introduction = new SubstitutionIntroductionOperator();
         SubstitutionExpansionOperator expansion = new SubstitutionExpansionOperator();
 
         List<Transformation> introduced = introduction.generateCandidates("(a+b)^2 + 6*(a+b) + 5");
-        assertTrue(introduced.stream().anyMatch(candidate -> candidate.transformedExpression().equals("B ^ 2 + 6 * B + 5")));
+        assertTrue(introduced.stream().anyMatch(candidate -> candidate.transformedExpression().equals("A ^ 2 + 6 * A + 5")));
+        assertTrue(introduced.getFirst().assumptions().stream().anyMatch(value ->
+            value.equals("substitution.placeholder.A=a + b")));
+        assertTrue(introduced.getFirst().assumptions().stream().anyMatch(value ->
+            value.equals("substitution.occurrences.A=2")));
 
-        List<Transformation> expanded = expansion.generateCandidates("(B + 1) * (B + 5)");
+        List<Transformation> expanded = expansion.generateCandidates("(A + 1) * (A + 5)");
         assertTrue(expanded.stream().anyMatch(candidate ->
             candidate.transformedExpression().equals("((a + b) + 1) * ((a + b) + 5)")));
+    }
+
+    @Test
+    void substitutionOperatorsCoverRequiredPositiveAndNegativeGeneralizationCases() {
+        SubstitutionIntroductionOperator introduction = new SubstitutionIntroductionOperator();
+
+        SubstitutionRewriteState.clear();
+        List<Transformation> sophieStyle = introduction.generateCandidates("(x+1)^4 + 4*y^4");
+        assertTrue(sophieStyle.stream()
+            .anyMatch(candidate -> candidate.transformedExpression().matches("[A-Z][A-Za-z0-9]* \\^ 4 \\+ 4 \\* y \\^ 4")),
+            sophieStyle.toString());
+        SubstitutionRewriteState.clear();
+        assertTrue(introduction.generateCandidates("u*(v+w) + t*(v+w)").stream()
+            .anyMatch(candidate -> candidate.transformedExpression().matches("u \\* [A-Z][A-Za-z0-9]* \\+ t \\* [A-Z][A-Za-z0-9]*")));
+        SubstitutionRewriteState.clear();
+        assertTrue(introduction.generateCandidates("1 / ((n + 1) * (n + 2))").stream()
+            .anyMatch(candidate -> candidate.transformedExpression().matches("1 / \\([A-Z][A-Za-z0-9]* \\* [A-Z][A-Za-z0-9]*\\)")));
+        SubstitutionRewriteState.clear();
+        assertTrue(introduction.generateCandidates("(p+q+r)^2 + 4*(p+q+r)").stream()
+            .anyMatch(candidate -> candidate.transformedExpression().matches("[A-Z][A-Za-z0-9]* \\^ 2 \\+ 4 \\* [A-Z][A-Za-z0-9]*")));
+
+        // Negative and near-miss: no meaningful exact repeated structure.
+        SubstitutionRewriteState.clear();
+        assertTrue(introduction.generateCandidates("x*y + z*w").isEmpty());
+        SubstitutionRewriteState.clear();
+        assertTrue(introduction.generateCandidates("u*(v+w) + t*(v+z)").isEmpty());
+    }
+
+    @Test
+    void substitutionExpansionSupportsNestedPlaceholders() {
+        SubstitutionExpansionOperator expansion = new SubstitutionExpansionOperator();
+        SubstitutionRewriteState.remember("A", "x + 1");
+        SubstitutionRewriteState.remember("B", "A ^ 2 + y");
+
+        List<Transformation> expanded = expansion.generateCandidates("B + 1");
+
+        assertTrue(expanded.stream().anyMatch(candidate ->
+            candidate.transformedExpression().equals("((x + 1) ^ 2 + y) + 1")));
     }
 
     private String squareRootOfProduct(String expression) {
