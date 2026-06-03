@@ -14,6 +14,7 @@ Wichtige Tests:
 ```bash
 ./gradlew :app:test --tests de.regelsuche.discovery.ScientificDiscoveryReproductionTest
 ./gradlew :app:dockerE2eTest --tests de.regelsuche.dockere2e.ScientificDiscoveryPostgresE2ETest
+./gradlew runDiscoveryCampaign1
 ```
 
 Die erzeugten Artefakte eignen sich für:

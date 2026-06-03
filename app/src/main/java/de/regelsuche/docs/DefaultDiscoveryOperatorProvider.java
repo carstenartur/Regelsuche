@@ -6,6 +6,7 @@ import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.FactorCandidateOperator;
 import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
 import de.regelsuche.transform.RationalDiscoveryToolkitOperator;
+import de.regelsuche.transform.RationalizationHypothesisOperator;
 import de.regelsuche.transform.RepeatedSubexpressionFactorizationHypothesisOperator;
 import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import java.util.List;
@@ -51,6 +52,10 @@ final class DefaultDiscoveryOperatorProvider implements DiscoveryOperatorProvide
                         "rational_normalization",
                         RationalNormalizationHypothesisOperator::new,
                         List.of(RationalNormalizationHypothesisOperator.RULE_ID)),
+                new DiscoveryOperatorDefinition(
+                        "rationalization",
+                        RationalizationHypothesisOperator::new,
+                        List.of(RationalizationHypothesisOperator.RULE_ID)),
                 new DiscoveryOperatorDefinition(
                         "rational_discovery_toolkit",
                         RationalDiscoveryToolkitOperator::new,

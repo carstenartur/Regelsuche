@@ -72,12 +72,14 @@ public record DiscoveryBenchmarkEvidence(
             String source,
             String packId,
             String operatorId,
+            List<String> assumptions,
             String maturity,
             boolean enabledByProfile,
             List<de.regelsuche.knowledge.SearchEffect> searchEffect,
             List<String> tags) {
         public EvidenceEdge {
             operatorId = operatorId == null ? "" : operatorId;
+            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
             maturity = maturity == null ? "" : maturity;
             searchEffect = searchEffect == null ? List.of() : List.copyOf(searchEffect);
             tags = tags == null ? List.of() : List.copyOf(tags);
@@ -91,7 +93,7 @@ public record DiscoveryBenchmarkEvidence(
                 String source,
                 String packId,
                 List<de.regelsuche.knowledge.SearchEffect> searchEffect) {
-            this(from, to, ruleId, kind, source, packId, "", "", false, searchEffect, List.of());
+            this(from, to, ruleId, kind, source, packId, "", List.of(), "", false, searchEffect, List.of());
         }
     }
 

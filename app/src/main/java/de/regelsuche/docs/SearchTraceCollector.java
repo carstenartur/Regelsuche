@@ -78,6 +78,7 @@ final class SearchTraceCollector {
                                 sourceFor(state.appliedRuleId(), learnedMacros, rulesById, ruleIdToPackId),
                                 packIdFor(state.appliedRuleId(), rulesById, ruleIdToPackId),
                                 operatorIdFor(state.appliedRuleId()),
+                                state.assumptions(),
                                 maturityFor(state.appliedRuleId(), learnedMacros, rulesById),
                                 enabledByProfileFor(state.appliedRuleId(), enabledOperators),
                                 inferredEffects(state.appliedRuleId(), rulesById)));
@@ -146,6 +147,7 @@ final class SearchTraceCollector {
                         edge.source,
                         edge.packId,
                         edge.operatorId,
+                        edge.assumptions,
                         edge.maturity,
                         edge.enabledByProfile,
                         sortedSearchEffects(edge.searchEffects),
@@ -199,7 +201,8 @@ final class SearchTraceCollector {
             return "macro";
         }
         if (ruleId != null && (ruleId.startsWith("hypothesis_sympy_")
-                || "hypothesis_common_subexpression_discovery".equals(ruleId))) {
+                || "hypothesis_common_subexpression_discovery".equals(ruleId)
+                || ruleId.startsWith("sympy."))) {
             return "sympy-derived";
         }
         if (operatorRuleIds.contains(ruleId)) {
@@ -219,6 +222,20 @@ final class SearchTraceCollector {
         }
         if ("hypothesis_sympy_rational_discovery".equals(ruleId)) {
             return "sympy-rational-basic";
+        }
+        if (ruleId != null) {
+            if (ruleId.startsWith("sympy.poly.")) {
+                return "sympy-polynomial-basic";
+            }
+            if (ruleId.startsWith("sympy.rational.")) {
+                return "sympy-rational-basic";
+            }
+            if (ruleId.startsWith("sympy.trig.")) {
+                return "sympy-trig-basic";
+            }
+            if (ruleId.startsWith("sympy.log.")) {
+                return "sympy-log-basic";
+            }
         }
         if (operatorRuleIds.contains(ruleId)) {
             return "operator-derived";
@@ -355,6 +372,7 @@ final class SearchTraceCollector {
         private final String source;
         private final String packId;
         private final String operatorId;
+        private final List<String> assumptions;
         private final String maturity;
         private final boolean enabledByProfile;
         private final List<SearchEffect> searchEffects;
@@ -368,6 +386,7 @@ final class SearchTraceCollector {
                 String source,
                 String packId,
                 String operatorId,
+                List<String> assumptions,
                 String maturity,
                 boolean enabledByProfile,
                 List<SearchEffect> searchEffects) {
@@ -378,6 +397,7 @@ final class SearchTraceCollector {
             this.source = source;
             this.packId = packId;
             this.operatorId = operatorId == null ? "" : operatorId;
+            this.assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
             this.maturity = maturity == null ? "" : maturity;
             this.enabledByProfile = enabledByProfile;
             this.searchEffects = searchEffects == null ? List.of()

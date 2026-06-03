@@ -21,6 +21,7 @@ Typische Kommandos:
 ```bash
 ./gradlew :app:test --tests de.regelsuche.discovery.ScientificDiscoveryReproductionTest
 ./gradlew benchmarkReport
+./gradlew runDiscoveryCampaign1
 ```
 
 Siehe auch:
