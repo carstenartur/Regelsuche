@@ -12,16 +12,25 @@ import java.util.Map;
 import java.util.Set;
 
 final class SearchTraceCollector {
-<span class="fc" id="L15">    private final ExpressionCanonicalizer expressionCanonicalizer = new ExpressionCanonicalizer();</span>
+<span class="pc" id="L15">    private final ExpressionCanonicalizer expressionCanonicalizer = new ExpressionCanonicalizer();</span>
     private final Set&lt;String&gt; operatorRuleIds;
+    private final DiscoveryOperatorRegistry operatorRegistry;
 
-    SearchTraceCollector() {
-<span class="fc" id="L19">        this(new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()).operatorRuleIds());</span>
-<span class="fc" id="L20">    }</span>
+<span class="fc" id="L19">    SearchTraceCollector() {</span>
+<span class="fc" id="L20">        DiscoveryOperatorRegistry registry = new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider());</span>
+<span class="fc" id="L21">        this.operatorRegistry = registry;</span>
+<span class="fc" id="L22">        this.operatorRuleIds = registry.operatorRuleIds();</span>
+<span class="fc" id="L23">    }</span>
 
-<span class="fc" id="L22">    SearchTraceCollector(Set&lt;String&gt; operatorRuleIds) {</span>
-<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        this.operatorRuleIds = operatorRuleIds == null ? Set.of() : Set.copyOf(operatorRuleIds);</span>
-<span class="fc" id="L24">    }</span>
+<span class="nc" id="L25">    SearchTraceCollector(Set&lt;String&gt; operatorRuleIds) {</span>
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        this.operatorRuleIds = operatorRuleIds == null ? Set.of() : Set.copyOf(operatorRuleIds);</span>
+<span class="nc" id="L27">        this.operatorRegistry = null;</span>
+<span class="nc" id="L28">    }</span>
+
+<span class="fc" id="L30">    SearchTraceCollector(DiscoveryOperatorRegistry registry) {</span>
+<span class="fc" id="L31">        this.operatorRegistry = registry;</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        this.operatorRuleIds = registry == null ? Set.of() : registry.operatorRuleIds();</span>
+<span class="fc" id="L33">    }</span>
 
     TraceGraph collect(
             DiscoveryBenchmarkScenario scenario,
@@ -30,231 +39,297 @@ final class SearchTraceCollector {
             List&lt;String&gt; learnedMacros,
             List&lt;String&gt; bridgeRules,
             Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="fc bfc" id="L33" title="All 2 branches covered.">        SearchRunTrace primary = withoutMacro.success() ? withoutMacro : withMacro;</span>
-<span class="fc" id="L34">        Set&lt;String&gt; selectedNodeIds = toNodeIds(primary.selectedPath());</span>
-<span class="fc" id="L35">        Set&lt;String&gt; selectedEdgeIds = toEdgeIds(primary.selectedPath(), primary.selectedRuleIds());</span>
-<span class="fc" id="L36">        String inputId = canonical(scenario.inputExpression());</span>
-<span class="fc" id="L37">        String normalizedTarget = normalizeExpression(scenario.targetExpression());</span>
+<span class="fc" id="L42">        return collect(scenario, withoutMacro, withMacro, learnedMacros, bridgeRules, rulesById, Map.of(), Set.of());</span>
+    }
 
-<span class="fc" id="L39">        LinkedHashMap&lt;String, MutableNode&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L40">        LinkedHashMap&lt;String, MutableEdge&gt; edges = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (SearchRunTrace run : List.of(withoutMacro, withMacro)) {</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (SearchState state : run.exploredStates()) {</span>
-<span class="fc" id="L43">                upsertNode(nodes, state.expression(), state.depth());</span>
-<span class="pc bpc" id="L44" title="2 of 6 branches missed.">                if (state.parentExpression() == null || state.appliedRuleId() == null || state.appliedRuleId().isBlank()) {</span>
-<span class="nc" id="L45">                    continue;</span>
+    TraceGraph collect(
+            DiscoveryBenchmarkScenario scenario,
+            SearchRunTrace withoutMacro,
+            SearchRunTrace withMacro,
+            List&lt;String&gt; learnedMacros,
+            List&lt;String&gt; bridgeRules,
+            Map&lt;String, ScenarioRule&gt; rulesById,
+            Map&lt;String, String&gt; ruleIdToPackId,
+            Set&lt;String&gt; enabledOperators) {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        SearchRunTrace primary = withoutMacro.success() ? withoutMacro : withMacro;</span>
+<span class="fc" id="L55">        Set&lt;String&gt; selectedNodeIds = toNodeIds(primary.selectedPath());</span>
+<span class="fc" id="L56">        Set&lt;String&gt; selectedEdgeIds = toEdgeIds(primary.selectedPath(), primary.selectedRuleIds());</span>
+<span class="fc" id="L57">        String inputId = canonical(scenario.inputExpression());</span>
+<span class="fc" id="L58">        String normalizedTarget = normalizeExpression(scenario.targetExpression());</span>
+
+<span class="fc" id="L60">        LinkedHashMap&lt;String, MutableNode&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L61">        LinkedHashMap&lt;String, MutableEdge&gt; edges = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (SearchRunTrace run : List.of(withoutMacro, withMacro)) {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            for (SearchState state : run.exploredStates()) {</span>
+<span class="fc" id="L64">                upsertNode(nodes, state.expression(), state.depth());</span>
+<span class="pc bpc" id="L65" title="2 of 6 branches missed.">                if (state.parentExpression() == null || state.appliedRuleId() == null || state.appliedRuleId().isBlank()) {</span>
+<span class="nc" id="L66">                    continue;</span>
                 }
-<span class="fc" id="L47">                String fromId = canonical(state.parentExpression());</span>
-<span class="fc" id="L48">                String toId = canonical(state.expression());</span>
-<span class="fc" id="L49">                String edgeKey = edgeKey(fromId, toId, state.appliedRuleId());</span>
-<span class="fc" id="L50">                MutableEdge edge = edges.computeIfAbsent(</span>
+<span class="fc" id="L68">                String fromId = canonical(state.parentExpression());</span>
+<span class="fc" id="L69">                String toId = canonical(state.expression());</span>
+<span class="fc" id="L70">                String edgeKey = edgeKey(fromId, toId, state.appliedRuleId());</span>
+<span class="fc" id="L71">                MutableEdge edge = edges.computeIfAbsent(</span>
                         edgeKey,
-<span class="fc" id="L52">                        ignored -&gt; new MutableEdge(</span>
+<span class="fc" id="L73">                        ignored -&gt; new MutableEdge(</span>
                                 fromId,
                                 toId,
-<span class="fc" id="L55">                                state.appliedRuleId(),</span>
-<span class="fc" id="L56">                                kindFor(state.appliedRuleId(), learnedMacros, bridgeRules),</span>
-<span class="fc" id="L57">                                sourceFor(state.appliedRuleId(), learnedMacros, rulesById),</span>
-<span class="fc" id="L58">                                packIdFor(state.appliedRuleId(), rulesById),</span>
-<span class="fc" id="L59">                                inferredEffects(state.appliedRuleId(), rulesById)));</span>
-<span class="fc bfc" id="L60" title="All 2 branches covered.">                if (selectedEdgeIds.contains(edgeKey)) {</span>
-<span class="fc" id="L61">                    edge.tags.add(&quot;selected-path&quot;);</span>
+<span class="fc" id="L76">                                state.appliedRuleId(),</span>
+<span class="fc" id="L77">                                kindFor(state.appliedRuleId(), learnedMacros, bridgeRules),</span>
+<span class="fc" id="L78">                                sourceFor(state.appliedRuleId(), learnedMacros, rulesById, ruleIdToPackId),</span>
+<span class="fc" id="L79">                                packIdFor(state.appliedRuleId(), rulesById, ruleIdToPackId),</span>
+<span class="fc" id="L80">                                operatorIdFor(state.appliedRuleId()),</span>
+<span class="fc" id="L81">                                maturityFor(state.appliedRuleId(), learnedMacros, rulesById),</span>
+<span class="fc" id="L82">                                enabledByProfileFor(state.appliedRuleId(), enabledOperators),</span>
+<span class="fc" id="L83">                                inferredEffects(state.appliedRuleId(), rulesById)));</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                if (selectedEdgeIds.contains(edgeKey)) {</span>
+<span class="fc" id="L85">                    edge.tags.add(&quot;selected-path&quot;);</span>
                 } else {
-<span class="fc" id="L63">                    edge.tags.add(&quot;alternative-branch&quot;);</span>
+<span class="fc" id="L87">                    edge.tags.add(&quot;alternative-branch&quot;);</span>
                 }
-<span class="fc bfc" id="L65" title="All 2 branches covered.">                if (&quot;macro&quot;.equals(edge.kind)) {</span>
-<span class="fc" id="L66">                    edge.tags.add(&quot;macro-shortcut&quot;);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                if (&quot;macro&quot;.equals(edge.kind)) {</span>
+<span class="fc" id="L90">                    edge.tags.add(&quot;macro-shortcut&quot;);</span>
                 }
-<span class="fc" id="L68">                upsertNode(nodes, state.parentExpression(), Math.max(0, state.depth() - 1));</span>
-<span class="fc" id="L69">            }</span>
-<span class="fc" id="L70">        }</span>
+<span class="fc" id="L92">                upsertNode(nodes, state.parentExpression(), Math.max(0, state.depth() - 1));</span>
+<span class="fc" id="L93">            }</span>
+<span class="fc" id="L94">        }</span>
 
-<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (MutableNode node : nodes.values()) {</span>
-<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (node.id.equals(inputId)) {</span>
-<span class="fc" id="L74">                node.kind = &quot;input&quot;;</span>
-<span class="fc" id="L75">                node.tags.add(&quot;input&quot;);</span>
-<span class="fc bfc" id="L76" title="All 2 branches covered.">            } else if (normalizeExpression(node.label).equals(normalizedTarget)) {</span>
-<span class="fc" id="L77">                node.kind = &quot;target&quot;;</span>
-<span class="fc" id="L78">                node.tags.add(&quot;target&quot;);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (MutableNode node : nodes.values()) {</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            if (node.id.equals(inputId)) {</span>
+<span class="fc" id="L98">                node.kind = &quot;input&quot;;</span>
+<span class="fc" id="L99">                node.tags.add(&quot;input&quot;);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            } else if (normalizeExpression(node.label).equals(normalizedTarget)) {</span>
+<span class="fc" id="L101">                node.kind = &quot;target&quot;;</span>
+<span class="fc" id="L102">                node.tags.add(&quot;target&quot;);</span>
             }
-<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (selectedNodeIds.contains(node.id)) {</span>
-<span class="fc" id="L81">                node.tags.add(&quot;selected-path&quot;);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (selectedNodeIds.contains(node.id)) {</span>
+<span class="fc" id="L105">                node.tags.add(&quot;selected-path&quot;);</span>
             } else {
-<span class="fc" id="L83">                node.tags.add(&quot;alternative-branch&quot;);</span>
+<span class="fc" id="L107">                node.tags.add(&quot;alternative-branch&quot;);</span>
             }
-<span class="fc" id="L85">        }</span>
+<span class="fc" id="L109">        }</span>
 
-<span class="fc" id="L87">        Set&lt;String&gt; hasOutgoing = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (MutableEdge edge : edges.values()) {</span>
-<span class="fc" id="L89">            hasOutgoing.add(edge.from);</span>
-<span class="fc" id="L90">        }</span>
-<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (MutableNode node : nodes.values()) {</span>
-<span class="fc bfc" id="L92" title="All 4 branches covered.">            if (!&quot;target&quot;.equals(node.kind) &amp;&amp; !hasOutgoing.contains(node.id)) {</span>
-<span class="fc" id="L93">                node.tags.add(&quot;dead-end&quot;);</span>
+<span class="fc" id="L111">        Set&lt;String&gt; hasOutgoing = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (MutableEdge edge : edges.values()) {</span>
+<span class="fc" id="L113">            hasOutgoing.add(edge.from);</span>
+<span class="fc" id="L114">        }</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (MutableNode node : nodes.values()) {</span>
+<span class="fc bfc" id="L116" title="All 4 branches covered.">            if (!&quot;target&quot;.equals(node.kind) &amp;&amp; !hasOutgoing.contains(node.id)) {</span>
+<span class="fc" id="L117">                node.tags.add(&quot;dead-end&quot;);</span>
             }
-<span class="fc" id="L95">        }</span>
+<span class="fc" id="L119">        }</span>
 
-<span class="fc" id="L97">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; evidenceNodes = nodes.values().stream()</span>
-<span class="fc" id="L98">                .sorted(Comparator.comparingInt((MutableNode node) -&gt; node.depth)</span>
-<span class="fc" id="L99">                        .thenComparing(node -&gt; node.label)</span>
-<span class="pc" id="L100">                        .thenComparing(node -&gt; node.id))</span>
-<span class="fc" id="L101">                .map(node -&gt; new DiscoveryBenchmarkEvidence.EvidenceNode(</span>
+<span class="fc" id="L121">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; evidenceNodes = nodes.values().stream()</span>
+<span class="fc" id="L122">                .sorted(Comparator.comparingInt((MutableNode node) -&gt; node.depth)</span>
+<span class="fc" id="L123">                        .thenComparing(node -&gt; node.label)</span>
+<span class="pc" id="L124">                        .thenComparing(node -&gt; node.id))</span>
+<span class="fc" id="L125">                .map(node -&gt; new DiscoveryBenchmarkEvidence.EvidenceNode(</span>
                         node.id,
                         node.label,
                         node.kind,
                         node.depth,
-<span class="fc" id="L106">                        sortedStrings(node.tags)))</span>
-<span class="fc" id="L107">                .toList();</span>
-<span class="fc" id="L108">        List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; evidenceEdges = edges.values().stream()</span>
-<span class="fc" id="L109">                .sorted(Comparator.comparing((MutableEdge edge) -&gt; edge.from)</span>
-<span class="fc" id="L110">                        .thenComparing(edge -&gt; edge.to)</span>
-<span class="fc" id="L111">                        .thenComparing(edge -&gt; edge.ruleId)</span>
-<span class="pc" id="L112">                        .thenComparing(edge -&gt; edge.kind)</span>
-<span class="pc" id="L113">                        .thenComparing(edge -&gt; edge.source)</span>
-<span class="pc" id="L114">                        .thenComparing(edge -&gt; edge.packId)</span>
-<span class="pc" id="L115">                        .thenComparing(edge -&gt; searchEffectsKey(edge.searchEffects))</span>
-<span class="pc" id="L116">                        .thenComparing(edge -&gt; tagsKey(edge.tags)))</span>
-<span class="fc" id="L117">                .map(edge -&gt; new DiscoveryBenchmarkEvidence.EvidenceEdge(</span>
+<span class="fc" id="L130">                        sortedStrings(node.tags)))</span>
+<span class="fc" id="L131">                .toList();</span>
+<span class="fc" id="L132">        List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; evidenceEdges = edges.values().stream()</span>
+<span class="fc" id="L133">                .sorted(Comparator.comparing((MutableEdge edge) -&gt; edge.from)</span>
+<span class="fc" id="L134">                        .thenComparing(edge -&gt; edge.to)</span>
+<span class="fc" id="L135">                        .thenComparing(edge -&gt; edge.ruleId)</span>
+<span class="pc" id="L136">                        .thenComparing(edge -&gt; edge.kind)</span>
+<span class="pc" id="L137">                        .thenComparing(edge -&gt; edge.source)</span>
+<span class="pc" id="L138">                        .thenComparing(edge -&gt; edge.packId)</span>
+<span class="pc" id="L139">                        .thenComparing(edge -&gt; searchEffectsKey(edge.searchEffects))</span>
+<span class="pc" id="L140">                        .thenComparing(edge -&gt; tagsKey(edge.tags)))</span>
+<span class="fc" id="L141">                .map(edge -&gt; new DiscoveryBenchmarkEvidence.EvidenceEdge(</span>
                         edge.from,
                         edge.to,
                         edge.ruleId,
                         edge.kind,
                         edge.source,
                         edge.packId,
-<span class="fc" id="L124">                        sortedSearchEffects(edge.searchEffects),</span>
-<span class="fc" id="L125">                        sortedStrings(edge.tags)))</span>
-<span class="fc" id="L126">                .toList();</span>
-<span class="fc" id="L127">        return new TraceGraph(evidenceNodes, evidenceEdges);</span>
+                        edge.operatorId,
+                        edge.maturity,
+                        edge.enabledByProfile,
+<span class="fc" id="L151">                        sortedSearchEffects(edge.searchEffects),</span>
+<span class="fc" id="L152">                        sortedStrings(edge.tags)))</span>
+<span class="fc" id="L153">                .toList();</span>
+<span class="fc" id="L154">        return new TraceGraph(evidenceNodes, evidenceEdges);</span>
     }
 
     private void upsertNode(Map&lt;String, MutableNode&gt; nodes, String expression, int depth) {
-<span class="fc" id="L131">        String id = canonical(expression);</span>
-<span class="fc" id="L132">        MutableNode node = nodes.computeIfAbsent(id, ignored -&gt; new MutableNode(id, expression, &quot;state&quot;, depth));</span>
-<span class="pc bpc" id="L133" title="2 of 4 branches missed.">        if (node.label == null || node.label.isBlank()) {</span>
-<span class="nc" id="L134">            node.label = expression;</span>
+<span class="fc" id="L158">        String id = canonical(expression);</span>
+<span class="fc" id="L159">        MutableNode node = nodes.computeIfAbsent(id, ignored -&gt; new MutableNode(id, expression, &quot;state&quot;, depth));</span>
+<span class="pc bpc" id="L160" title="2 of 4 branches missed.">        if (node.label == null || node.label.isBlank()) {</span>
+<span class="nc" id="L161">            node.label = expression;</span>
         }
-<span class="fc" id="L136">        node.depth = Math.min(node.depth, depth);</span>
-<span class="fc" id="L137">    }</span>
+<span class="fc" id="L163">        node.depth = Math.min(node.depth, depth);</span>
+<span class="fc" id="L164">    }</span>
 
     private Set&lt;String&gt; toNodeIds(List&lt;String&gt; path) {
-<span class="fc" id="L140">        LinkedHashSet&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (String expression : path) {</span>
-<span class="fc" id="L142">            ids.add(canonical(expression));</span>
-<span class="fc" id="L143">        }</span>
-<span class="fc" id="L144">        return ids;</span>
+<span class="fc" id="L167">        LinkedHashSet&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        for (String expression : path) {</span>
+<span class="fc" id="L169">            ids.add(canonical(expression));</span>
+<span class="fc" id="L170">        }</span>
+<span class="fc" id="L171">        return ids;</span>
     }
 
     private Set&lt;String&gt; toEdgeIds(List&lt;String&gt; path, List&lt;String&gt; appliedRuleIds) {
-<span class="fc" id="L148">        LinkedHashSet&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L149">        int edgeCount = Math.min(appliedRuleIds.size(), Math.max(0, path.size() - 1));</span>
-<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (int i = 0; i &lt; edgeCount; i++) {</span>
-<span class="fc" id="L151">            ids.add(edgeKey(canonical(path.get(i)), canonical(path.get(i + 1)), appliedRuleIds.get(i)));</span>
+<span class="fc" id="L175">        LinkedHashSet&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L176">        int edgeCount = Math.min(appliedRuleIds.size(), Math.max(0, path.size() - 1));</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (int i = 0; i &lt; edgeCount; i++) {</span>
+<span class="fc" id="L178">            ids.add(edgeKey(canonical(path.get(i)), canonical(path.get(i + 1)), appliedRuleIds.get(i)));</span>
         }
-<span class="fc" id="L153">        return ids;</span>
+<span class="fc" id="L180">        return ids;</span>
     }
 
     private String edgeKey(String from, String to, String ruleId) {
-<span class="fc" id="L157">        return from + &quot;-&gt;&quot; + to + &quot;|&quot; + ruleId;</span>
+<span class="fc" id="L184">        return from + &quot;-&gt;&quot; + to + &quot;|&quot; + ruleId;</span>
     }
 
     private String kindFor(String ruleId, List&lt;String&gt; learnedMacros, List&lt;String&gt; bridgeRules) {
-<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (learnedMacros.contains(ruleId)) {</span>
-<span class="fc" id="L162">            return &quot;macro&quot;;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (learnedMacros.contains(ruleId)) {</span>
+<span class="fc" id="L189">            return &quot;macro&quot;;</span>
         }
-<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (bridgeRules.contains(ruleId)) {</span>
-<span class="fc" id="L165">            return &quot;bridge&quot;;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (bridgeRules.contains(ruleId)) {</span>
+<span class="fc" id="L192">            return &quot;bridge&quot;;</span>
         }
-<span class="fc" id="L167">        return &quot;rule&quot;;</span>
+<span class="fc" id="L194">        return &quot;rule&quot;;</span>
     }
 
-    private String sourceFor(String ruleId, List&lt;String&gt; learnedMacros, Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (learnedMacros.contains(ruleId)) {</span>
-<span class="fc" id="L172">            return &quot;macro&quot;;</span>
+    private String sourceFor(String ruleId, List&lt;String&gt; learnedMacros, Map&lt;String, ScenarioRule&gt; rulesById, Map&lt;String, String&gt; ruleIdToPackId) {
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (learnedMacros.contains(ruleId)) {</span>
+<span class="fc" id="L199">            return &quot;macro&quot;;</span>
         }
-<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (operatorRuleIds.contains(ruleId)) {</span>
-<span class="fc" id="L175">            return &quot;operator&quot;;</span>
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">        if (ruleId != null &amp;&amp; (ruleId.startsWith(&quot;hypothesis_sympy_&quot;)</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                || &quot;hypothesis_common_subexpression_discovery&quot;.equals(ruleId))) {</span>
+<span class="fc" id="L203">            return &quot;sympy-derived&quot;;</span>
         }
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        return rulesById.containsKey(ruleId) ? &quot;scenario-generic&quot; : &quot;core&quot;;</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (operatorRuleIds.contains(ruleId)) {</span>
+<span class="fc" id="L206">            return &quot;operator&quot;;</span>
+        }
+<span class="fc" id="L208">        String packId = ruleIdToPackId.get(ruleId);</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (packId != null) {</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            return packId.toLowerCase(Locale.ROOT).contains(&quot;sympy&quot;) ? &quot;sympy-derived&quot; : &quot;scenario&quot;;</span>
+        }
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        return rulesById.containsKey(ruleId) ? &quot;scenario-generic&quot; : &quot;core&quot;;</span>
     }
 
-    private String packIdFor(String ruleId, Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="fc bfc" id="L181" title="All 2 branches covered.">        return rulesById.containsKey(ruleId) ? &quot;scenario-generic&quot; : &quot;core&quot;;</span>
+    private String packIdFor(String ruleId, Map&lt;String, ScenarioRule&gt; rulesById, Map&lt;String, String&gt; ruleIdToPackId) {
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (&quot;hypothesis_sympy_factor_candidate&quot;.equals(ruleId)</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                || &quot;hypothesis_common_subexpression_discovery&quot;.equals(ruleId)) {</span>
+<span class="fc" id="L218">            return &quot;sympy-polynomial-basic&quot;;</span>
+        }
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (&quot;hypothesis_sympy_rational_discovery&quot;.equals(ruleId)) {</span>
+<span class="fc" id="L221">            return &quot;sympy-rational-basic&quot;;</span>
+        }
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (operatorRuleIds.contains(ruleId)) {</span>
+<span class="fc" id="L224">            return &quot;operator-derived&quot;;</span>
+        }
+<span class="fc" id="L226">        String packId = ruleIdToPackId.get(ruleId);</span>
+<span class="pc bpc" id="L227" title="1 of 4 branches missed.">        return packId != null ? packId : (rulesById.containsKey(ruleId) ? &quot;scenario-generic&quot; : &quot;core&quot;);</span>
+    }
+
+    private String operatorIdFor(String ruleId) {
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (operatorRegistry != null) {</span>
+<span class="fc" id="L232">            return operatorRegistry.operatorIdForRule(ruleId);</span>
+        }
+<span class="nc" id="L234">        return &quot;&quot;;</span>
+    }
+
+    private String maturityFor(String ruleId, List&lt;String&gt; learnedMacros, Map&lt;String, ScenarioRule&gt; rulesById) {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (learnedMacros.contains(ruleId)) {</span>
+<span class="fc" id="L239">            return &quot;MACRO&quot;;</span>
+        }
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (operatorRuleIds.contains(ruleId)) {</span>
+<span class="fc" id="L242">            return &quot;OPERATOR_DERIVED&quot;;</span>
+        }
+<span class="fc" id="L244">        ScenarioRule rule = rulesById.get(ruleId);</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        return rule != null ? rule.status().name() : &quot;CORE&quot;;</span>
+    }
+
+    private boolean enabledByProfileFor(String ruleId, Set&lt;String&gt; enabledOperators) {
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (!operatorRuleIds.contains(ruleId)) {</span>
+<span class="fc" id="L250">            return false;</span>
+        }
+<span class="pc bpc" id="L252" title="2 of 4 branches missed.">        if (operatorRegistry == null || enabledOperators.isEmpty()) {</span>
+<span class="nc" id="L253">            return false;</span>
+        }
+<span class="fc" id="L255">        String operatorId = operatorRegistry.operatorIdForRule(ruleId);</span>
+<span class="pc bpc" id="L256" title="2 of 4 branches missed.">        return !operatorId.isEmpty() &amp;&amp; enabledOperators.contains(operatorId);</span>
     }
 
     private List&lt;SearchEffect&gt; inferredEffects(String ruleId, Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="fc" id="L185">        LinkedHashSet&lt;SearchEffect&gt; effects = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L186">        ScenarioRule rule = rulesById.get(ruleId);</span>
-<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (rule != null) {</span>
-<span class="fc" id="L188">            effects.addAll(rule.effects());</span>
+<span class="fc" id="L260">        LinkedHashSet&lt;SearchEffect&gt; effects = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L261">        ScenarioRule rule = rulesById.get(ruleId);</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (rule != null) {</span>
+<span class="fc" id="L263">            effects.addAll(rule.effects());</span>
         }
-<span class="fc" id="L190">        String lower = ruleId.toLowerCase(Locale.ROOT);</span>
-<span class="pc bpc" id="L191" title="1 of 4 branches missed.">        if (operatorRuleIds.contains(ruleId) || lower.contains(&quot;bridge&quot;)) {</span>
-<span class="fc" id="L192">            effects.add(SearchEffect.BRIDGING);</span>
+<span class="fc" id="L265">        String lower = ruleId.toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L266" title="1 of 4 branches missed.">        if (operatorRuleIds.contains(ruleId) || lower.contains(&quot;bridge&quot;)) {</span>
+<span class="fc" id="L267">            effects.add(SearchEffect.BRIDGING);</span>
         }
-<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (lower.contains(&quot;factor&quot;)) {</span>
-<span class="fc" id="L195">            effects.add(SearchEffect.FACTORIZING);</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (lower.contains(&quot;factor&quot;)) {</span>
+<span class="fc" id="L270">            effects.add(SearchEffect.FACTORIZING);</span>
         }
-<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (lower.contains(&quot;simplify&quot;)) {</span>
-<span class="fc" id="L198">            effects.add(SearchEffect.SIMPLIFYING);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (lower.contains(&quot;simplify&quot;)) {</span>
+<span class="fc" id="L273">            effects.add(SearchEffect.SIMPLIFYING);</span>
         }
-<span class="fc bfc" id="L200" title="All 4 branches covered.">        if (lower.contains(&quot;normalize&quot;) || lower.contains(&quot;macro&quot;)) {</span>
-<span class="fc" id="L201">            effects.add(SearchEffect.NORMALIZING);</span>
+<span class="fc bfc" id="L275" title="All 4 branches covered.">        if (lower.contains(&quot;normalize&quot;) || lower.contains(&quot;macro&quot;)) {</span>
+<span class="fc" id="L276">            effects.add(SearchEffect.NORMALIZING);</span>
         }
-<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (lower.contains(&quot;expand&quot;)) {</span>
-<span class="nc" id="L204">            effects.add(SearchEffect.EXPANDING);</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (lower.contains(&quot;expand&quot;)) {</span>
+<span class="nc" id="L279">            effects.add(SearchEffect.EXPANDING);</span>
         }
-<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (effects.isEmpty()) {</span>
-<span class="fc" id="L207">            effects.add(SearchEffect.NORMALIZING);</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (effects.isEmpty()) {</span>
+<span class="fc" id="L282">            effects.add(SearchEffect.NORMALIZING);</span>
         }
-<span class="fc" id="L209">        return List.copyOf(effects);</span>
+<span class="fc" id="L284">        return List.copyOf(effects);</span>
     }
 
     private String canonical(String expression) {
-<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
     }
 
     private String normalizeExpression(String expression) {
-<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (expression == null) {</span>
-<span class="nc" id="L218">            return &quot;&quot;;</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L293">            return &quot;&quot;;</span>
         }
         try {
-<span class="fc" id="L221">            return expressionCanonicalizer.canonicalize(expression);</span>
-<span class="nc" id="L222">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L223">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L296">            return expressionCanonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L297">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L298">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
         }
     }
 
     private List&lt;SearchEffect&gt; sortedSearchEffects(List&lt;SearchEffect&gt; effects) {
-<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        return effects == null ? List.of() : effects.stream()</span>
-<span class="fc" id="L229">                .sorted(Comparator.comparing(Enum::name))</span>
-<span class="fc" id="L230">                .toList();</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">        return effects == null ? List.of() : effects.stream()</span>
+<span class="fc" id="L304">                .sorted(Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L305">                .toList();</span>
     }
 
     private List&lt;String&gt; sortedStrings(Set&lt;String&gt; values) {
-<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        return values == null ? List.of() : values.stream().sorted().toList();</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        return values == null ? List.of() : values.stream().sorted().toList();</span>
     }
 
     private String searchEffectsKey(List&lt;SearchEffect&gt; effects) {
-<span class="nc" id="L238">        return sortedSearchEffects(effects).stream().map(Enum::name).collect(java.util.stream.Collectors.joining(&quot;|&quot;));</span>
+<span class="nc" id="L313">        return sortedSearchEffects(effects).stream().map(Enum::name).collect(java.util.stream.Collectors.joining(&quot;|&quot;));</span>
     }
 
     private String tagsKey(Set&lt;String&gt; tags) {
-<span class="nc" id="L242">        return String.join(&quot;|&quot;, sortedStrings(tags));</span>
+<span class="nc" id="L317">        return String.join(&quot;|&quot;, sortedStrings(tags));</span>
     }
 
     record SearchRunTrace(boolean success, List&lt;SearchState&gt; exploredStates, List&lt;String&gt; selectedPath, List&lt;String&gt; selectedRuleIds) {
-<span class="fc" id="L246">        SearchRunTrace {</span>
-<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            exploredStates = exploredStates == null ? List.of() : List.copyOf(exploredStates);</span>
-<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            selectedPath = selectedPath == null ? List.of() : List.copyOf(selectedPath);</span>
-<span class="pc bpc" id="L249" title="1 of 2 branches missed.">            selectedRuleIds = selectedRuleIds == null ? List.of() : List.copyOf(selectedRuleIds);</span>
-<span class="fc" id="L250">        }</span>
+<span class="fc" id="L321">        SearchRunTrace {</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            exploredStates = exploredStates == null ? List.of() : List.copyOf(exploredStates);</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            selectedPath = selectedPath == null ? List.of() : List.copyOf(selectedPath);</span>
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            selectedRuleIds = selectedRuleIds == null ? List.of() : List.copyOf(selectedRuleIds);</span>
+<span class="fc" id="L325">        }</span>
     }
 
     record TraceGraph(List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; nodes, List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; edges) {
-<span class="fc" id="L254">        TraceGraph {</span>
-<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
-<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            edges = edges == null ? List.of() : List.copyOf(edges);</span>
-<span class="fc" id="L257">        }</span>
+<span class="fc" id="L329">        TraceGraph {</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            edges = edges == null ? List.of() : List.copyOf(edges);</span>
+<span class="fc" id="L332">        }</span>
     }
 
     private static final class MutableNode {
@@ -262,14 +337,14 @@ final class SearchTraceCollector {
         private String label;
         private String kind;
         private int depth;
-<span class="fc" id="L265">        private final LinkedHashSet&lt;String&gt; tags = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L340">        private final LinkedHashSet&lt;String&gt; tags = new LinkedHashSet&lt;&gt;();</span>
 
-<span class="fc" id="L267">        private MutableNode(String id, String label, String kind, int depth) {</span>
-<span class="fc" id="L268">            this.id = id;</span>
-<span class="fc" id="L269">            this.label = label;</span>
-<span class="fc" id="L270">            this.kind = kind;</span>
-<span class="fc" id="L271">            this.depth = depth;</span>
-<span class="fc" id="L272">        }</span>
+<span class="fc" id="L342">        private MutableNode(String id, String label, String kind, int depth) {</span>
+<span class="fc" id="L343">            this.id = id;</span>
+<span class="fc" id="L344">            this.label = label;</span>
+<span class="fc" id="L345">            this.kind = kind;</span>
+<span class="fc" id="L346">            this.depth = depth;</span>
+<span class="fc" id="L347">        }</span>
     }
 
     private static final class MutableEdge {
@@ -279,8 +354,11 @@ final class SearchTraceCollector {
         private final String kind;
         private final String source;
         private final String packId;
+        private final String operatorId;
+        private final String maturity;
+        private final boolean enabledByProfile;
         private final List&lt;SearchEffect&gt; searchEffects;
-<span class="fc" id="L283">        private final LinkedHashSet&lt;String&gt; tags = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L361">        private final LinkedHashSet&lt;String&gt; tags = new LinkedHashSet&lt;&gt;();</span>
 
         private MutableEdge(
                 String from,
@@ -289,16 +367,22 @@ final class SearchTraceCollector {
                 String kind,
                 String source,
                 String packId,
-<span class="fc" id="L292">                List&lt;SearchEffect&gt; searchEffects) {</span>
-<span class="fc" id="L293">            this.from = from;</span>
-<span class="fc" id="L294">            this.to = to;</span>
-<span class="fc" id="L295">            this.ruleId = ruleId;</span>
-<span class="fc" id="L296">            this.kind = kind;</span>
-<span class="fc" id="L297">            this.source = source;</span>
-<span class="fc" id="L298">            this.packId = packId;</span>
-<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            this.searchEffects = searchEffects == null ? List.of()</span>
-<span class="fc" id="L300">                    : searchEffects.stream().sorted(Comparator.comparing(Enum::name)).toList();</span>
-<span class="fc" id="L301">        }</span>
+                String operatorId,
+                String maturity,
+                boolean enabledByProfile,
+<span class="fc" id="L373">                List&lt;SearchEffect&gt; searchEffects) {</span>
+<span class="fc" id="L374">            this.from = from;</span>
+<span class="fc" id="L375">            this.to = to;</span>
+<span class="fc" id="L376">            this.ruleId = ruleId;</span>
+<span class="fc" id="L377">            this.kind = kind;</span>
+<span class="fc" id="L378">            this.source = source;</span>
+<span class="fc" id="L379">            this.packId = packId;</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">            this.operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">            this.maturity = maturity == null ? &quot;&quot; : maturity;</span>
+<span class="fc" id="L382">            this.enabledByProfile = enabledByProfile;</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">            this.searchEffects = searchEffects == null ? List.of()</span>
+<span class="fc" id="L384">                    : searchEffects.stream().sorted(Comparator.comparing(Enum::name)).toList();</span>
+<span class="fc" id="L385">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

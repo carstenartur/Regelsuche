@@ -32,14 +32,22 @@ public record Assumption(Kind kind, String expression, List&lt;String&gt; symbol
 <span class="fc" id="L32">    public enum Kind {</span>
         /** Denominator (or other given subterm) must be non-zero. */
 <span class="fc" id="L34">        NON_ZERO,</span>
+        /** Variable is known to be real-valued. */
+<span class="fc" id="L36">        REAL,</span>
+        /** Variable is known to be integer-valued. */
+<span class="fc" id="L38">        INTEGER,</span>
+        /** Variable is known to be rational-valued. */
+<span class="fc" id="L40">        RATIONAL,</span>
         /** Argument must be strictly positive. */
-<span class="fc" id="L36">        POSITIVE,</span>
+<span class="fc" id="L42">        POSITIVE,</span>
         /** Argument must be non-negative. */
-<span class="fc" id="L38">        NON_NEGATIVE,</span>
+<span class="fc" id="L44">        NON_NEGATIVE,</span>
+        /** Explicitly unknown / inconclusive domain information. */
+<span class="fc" id="L46">        UNKNOWN,</span>
         /** Variable belongs to a particular domain (e.g. integer). */
-<span class="fc" id="L40">        DOMAIN,</span>
+<span class="fc" id="L48">        DOMAIN,</span>
         /** Free-form predicate. */
-<span class="fc" id="L42">        CUSTOM</span>
+<span class="fc" id="L50">        CUSTOM</span>
     }
 
     /**
@@ -47,22 +55,86 @@ public record Assumption(Kind kind, String expression, List&lt;String&gt; symbol
      * is rendered verbatim into the assumption expression.
      */
     public static Assumption nonZero(String denominator) {
-<span class="fc" id="L50">        return new Assumption(Kind.NON_ZERO, denominator + &quot; != 0&quot;, List.of(denominator));</span>
+<span class="fc" id="L58">        return new Assumption(Kind.NON_ZERO, denominator + &quot; != 0&quot;, List.of(denominator));</span>
+    }
+
+    public static Assumption nonzero(String denominator) {
+<span class="nc" id="L62">        return nonZero(denominator);</span>
     }
 
     /** {@code argument &gt; 0}, useful for logarithm/root domains. */
     public static Assumption positive(String argument) {
-<span class="fc" id="L55">        return new Assumption(Kind.POSITIVE, argument + &quot; &gt; 0&quot;, List.of(argument));</span>
+<span class="fc" id="L67">        return new Assumption(Kind.POSITIVE, argument + &quot; &gt; 0&quot;, List.of(argument));</span>
     }
 
     /** {@code argument &gt;= 0}, useful for square-root identities. */
     public static Assumption nonNegative(String argument) {
-<span class="fc" id="L60">        return new Assumption(Kind.NON_NEGATIVE, argument + &quot; &gt;= 0&quot;, List.of(argument));</span>
+<span class="fc" id="L72">        return new Assumption(Kind.NON_NEGATIVE, argument + &quot; &gt;= 0&quot;, List.of(argument));</span>
+    }
+
+    public static Assumption real(String symbol) {
+<span class="fc" id="L76">        return new Assumption(Kind.REAL, symbol + &quot; ∈ R&quot;, List.of(symbol));</span>
+    }
+
+    public static Assumption integer(String symbol) {
+<span class="fc" id="L80">        return new Assumption(Kind.INTEGER, symbol + &quot; ∈ Z&quot;, List.of(symbol));</span>
+    }
+
+    public static Assumption rational(String symbol) {
+<span class="fc" id="L84">        return new Assumption(Kind.RATIONAL, symbol + &quot; ∈ Q&quot;, List.of(symbol));</span>
+    }
+
+    public static Assumption unknown(String symbol) {
+<span class="fc" id="L88">        return new Assumption(Kind.UNKNOWN, symbol + &quot; ? unknown&quot;, List.of(symbol));</span>
+    }
+
+    public AssumptionTruthValue truthValueUnder(Iterable&lt;Assumption&gt; knownAssumptions) {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (kind == Kind.UNKNOWN) {</span>
+<span class="nc" id="L93">            return AssumptionTruthValue.UNKNOWN;</span>
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (knownAssumptions == null) {</span>
+<span class="nc" id="L96">            return AssumptionTruthValue.UNKNOWN;</span>
+        }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (Assumption known : knownAssumptions) {</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">            if (known == null || !sameSymbols(known)) {</span>
+<span class="nc" id="L100">                continue;</span>
+            }
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (known.expression().equals(expression())) {</span>
+<span class="nc" id="L103">                return AssumptionTruthValue.TRUE;</span>
+            }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (implies(known.kind(), kind)) {</span>
+<span class="fc" id="L106">                return AssumptionTruthValue.TRUE;</span>
+            }
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (contradicts(known.kind(), kind)) {</span>
+<span class="nc" id="L109">                return AssumptionTruthValue.FALSE;</span>
+            }
+<span class="fc" id="L111">        }</span>
+<span class="fc" id="L112">        return AssumptionTruthValue.UNKNOWN;</span>
+    }
+
+    private boolean sameSymbols(Assumption other) {
+<span class="fc" id="L116">        return symbols.equals(other.symbols);</span>
+    }
+
+    private static boolean implies(Kind known, Kind required) {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (known == required) {</span>
+<span class="nc" id="L121">            return true;</span>
+        }
+<span class="pc bpc" id="L123" title="2 of 4 branches missed.">        return switch (required) {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            case NON_ZERO -&gt; known == Kind.POSITIVE;</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            case RATIONAL -&gt; known == Kind.INTEGER;</span>
+<span class="pc bpc" id="L126" title="4 of 8 branches missed.">            case REAL -&gt; known == Kind.INTEGER || known == Kind.RATIONAL || known == Kind.POSITIVE || known == Kind.NON_NEGATIVE;</span>
+<span class="nc" id="L127">            default -&gt; false;</span>
+        };
+    }
+
+    private static boolean contradicts(Kind known, Kind required) {
+<span class="fc" id="L132">        return false;</span>
     }
 
     @Override
     public String toString() {
-<span class="fc" id="L65">        return kind + &quot;(&quot; + expression + &quot;)&quot;;</span>
+<span class="fc" id="L137">        return kind + &quot;(&quot; + expression + &quot;)&quot;;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

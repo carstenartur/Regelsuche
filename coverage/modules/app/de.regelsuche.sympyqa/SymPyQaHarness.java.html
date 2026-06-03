@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymPyQaHarness.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sympyqa</a> &gt; <span class="el_source">SymPyQaHarness.java</span></div><h1>SymPyQaHarness.java</h1><pre class="source lang-java linenums">package de.regelsuche.sympyqa;
+
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.validation.SymPyDiscoveryOracleAdapter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Value;
+
+/** SymPy-vs-Regelsuche QA harness with optional SymPy runtime and report export. */
+public final class SymPyQaHarness {
+<span class="fc" id="L21">    private static final List&lt;String&gt; DEFAULT_TERMS = List.of(</span>
+        &quot;(x+1)^2&quot;,
+        &quot;x^2 + 2*x + 1&quot;,
+        &quot;x/y + z/y&quot;,
+        &quot;(x*z)/(y*z)&quot;,
+        &quot;1/(n*(n+1))&quot;,
+        &quot;sin(x)^2 + cos(x)^2&quot;,
+        &quot;x^4 + 4*y^4&quot;
+    );
+
+    private final AstRewriteTransformationEngine engine;
+<span class="fc" id="L32">    private final SymPyDiscoveryOracleAdapter oracle = new SymPyDiscoveryOracleAdapter();</span>
+<span class="fc" id="L33">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    public SymPyQaHarness() {
+<span class="fc" id="L36">        this(AstRewriteTransformationEngine.withKnowledgePacks(KnowledgePackSelection.profile(</span>
+            de.regelsuche.knowledge.RuleProfile.ALL)));
+<span class="fc" id="L38">    }</span>
+
+<span class="fc" id="L40">    SymPyQaHarness(AstRewriteTransformationEngine engine) {</span>
+<span class="fc" id="L41">        this.engine = engine;</span>
+<span class="fc" id="L42">    }</span>
+
+    public QaSummary runDefault(Path reportDirectory) {
+<span class="fc" id="L45">        return run(DEFAULT_TERMS, reportDirectory);</span>
+    }
+
+    public QaSummary run(List&lt;String&gt; expressions, Path reportDirectory) {
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        List&lt;String&gt; terms = expressions == null || expressions.isEmpty() ? DEFAULT_TERMS : List.copyOf(expressions);</span>
+<span class="fc" id="L50">        List&lt;QaCase&gt; cases = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (String expression : terms) {</span>
+<span class="fc" id="L52">            cases.add(analyze(expression));</span>
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">        QaSummary summary = buildSummary(cases);</span>
+<span class="fc" id="L55">        writeReports(reportDirectory, summary, cases);</span>
+<span class="fc" id="L56">        return summary;</span>
+    }
+
+    private QaCase analyze(String expression) {
+<span class="fc" id="L60">        List&lt;Transformation&gt; candidates = engine.transform(expression);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        Transformation selected = candidates.isEmpty() ? null : candidates.getFirst();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        String regelsucheResult = selected == null ? normalize(expression) : selected.transformedExpression();</span>
+<span class="fc" id="L63">        String sympyResult = simplifyWithSymPy(expression);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        boolean sympyAvailable = sympyResult != null;</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        SymPyDiscoveryOracleAdapter.OracleResult equivalence = oracle.equivalence(regelsucheResult, sympyAvailable ? sympyResult : expression);</span>
+<span class="fc" id="L66">        return new QaCase(</span>
+            expression,
+            regelsucheResult,
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            sympyAvailable ? sympyResult : &quot;UNAVAILABLE&quot;,</span>
+            sympyAvailable,
+<span class="fc" id="L71">            candidates.size(),</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            selected == null ? &quot;&quot; : selected.rule(),</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            selected == null ? &quot;&quot; : selected.packId(),</span>
+<span class="fc" id="L74">            equivalence.status().name(),</span>
+<span class="fc" id="L75">            equivalence.evidence()</span>
+        );
+    }
+
+    private String simplifyWithSymPy(String expression) {
+        String normalized;
+        try {
+<span class="fc" id="L82">            normalized = ExpressionFormatter.format(parser.parseTerm(expression)).replace(&quot;^&quot;, &quot;**&quot;);</span>
+<span class="nc" id="L83">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L84">            return null;</span>
+<span class="fc" id="L85">        }</span>
+<span class="fc" id="L86">        String script = &quot;import sympy as sp\n&quot;</span>
+            + &quot;from sympy.parsing.sympy_parser import parse_expr\n&quot;
+<span class="fc" id="L88">            + &quot;str(sp.simplify(parse_expr('&quot; + escape(normalized) + &quot;', evaluate=False)))&quot;;</span>
+<span class="nc" id="L89">        try (Context context = Context.newBuilder(&quot;python&quot;).build()) {</span>
+<span class="nc" id="L90">            Value value = context.eval(&quot;python&quot;, script);</span>
+<span class="nc" id="L91">            return value.asString().replace(&quot;**&quot;, &quot;^&quot;);</span>
+<span class="fc" id="L92">        } catch (RuntimeException | LinkageError ignored) {</span>
+<span class="fc" id="L93">            return null;</span>
+        }
+    }
+
+    private QaSummary buildSummary(List&lt;QaCase&gt; cases) {
+<span class="fc" id="L98">        long sympyAvailableCases = cases.stream().filter(QaCase::sympyAvailable).count();</span>
+<span class="fc" id="L99">        long disagreements = cases.stream()</span>
+<span class="fc" id="L100">            .filter(QaCase::sympyAvailable)</span>
+<span class="pc" id="L101">            .filter(row -&gt; &quot;DISAGREE&quot;.equals(row.oracleStatus()))</span>
+<span class="fc" id="L102">            .count();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        long noPath = cases.stream().filter(row -&gt; row.pathLength() == 0).count();</span>
+<span class="fc" id="L104">        return new QaSummary(</span>
+<span class="fc" id="L105">            cases.size(),</span>
+            sympyAvailableCases,
+            disagreements,
+            noPath,
+<span class="fc" id="L109">            cases.size() - noPath</span>
+        );
+    }
+
+    private void writeReports(Path reportDirectory, QaSummary summary, List&lt;QaCase&gt; cases) {
+        try {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            Path dir = reportDirectory == null</span>
+<span class="nc" id="L116">                ? Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;sympy-qa&quot;)</span>
+<span class="fc" id="L117">                : reportDirectory;</span>
+<span class="fc" id="L118">            Files.createDirectories(dir);</span>
+<span class="fc" id="L119">            Files.writeString(dir.resolve(&quot;summary.json&quot;), summaryJson(summary));</span>
+<span class="fc" id="L120">            Files.writeString(dir.resolve(&quot;disagreements.md&quot;), disagreementsMarkdown(cases));</span>
+<span class="fc" id="L121">            Files.writeString(dir.resolve(&quot;candidate-rules.md&quot;), candidateRulesMarkdown(cases));</span>
+<span class="fc" id="L122">            Files.writeString(dir.resolve(&quot;interesting-discoveries.md&quot;), interestingMarkdown(cases));</span>
+<span class="nc" id="L123">        } catch (IOException exception) {</span>
+<span class="nc" id="L124">            throw new IllegalStateException(&quot;failed to write SymPy QA reports&quot;, exception);</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">    }</span>
+
+    private String summaryJson(QaSummary summary) {
+<span class="fc" id="L129">        return &quot;{\n&quot;</span>
+            + &quot;  \&quot;schema\&quot;: \&quot;regelsuche.sympy-qa.summary/v1\&quot;,\n&quot;
+<span class="fc" id="L131">            + &quot;  \&quot;totalCases\&quot;: &quot; + summary.totalCases() + &quot;,\n&quot;</span>
+<span class="fc" id="L132">            + &quot;  \&quot;sympyAvailableCases\&quot;: &quot; + summary.sympyAvailableCases() + &quot;,\n&quot;</span>
+<span class="fc" id="L133">            + &quot;  \&quot;disagreements\&quot;: &quot; + summary.disagreements() + &quot;,\n&quot;</span>
+<span class="fc" id="L134">            + &quot;  \&quot;regelsucheNoPath\&quot;: &quot; + summary.regelsucheNoPath() + &quot;,\n&quot;</span>
+<span class="fc" id="L135">            + &quot;  \&quot;regelsuchePathFound\&quot;: &quot; + summary.regelsuchePathFound() + &quot;\n&quot;</span>
+            + &quot;}\n&quot;;
+    }
+
+    private String disagreementsMarkdown(List&lt;QaCase&gt; cases) {
+<span class="fc" id="L140">        StringBuilder builder = new StringBuilder(&quot;# Disagreements\n\n&quot;);</span>
+<span class="fc" id="L141">        cases.stream()</span>
+<span class="fc" id="L142">            .filter(QaCase::sympyAvailable)</span>
+<span class="pc" id="L143">            .filter(row -&gt; &quot;DISAGREE&quot;.equals(row.oracleStatus()))</span>
+<span class="pc" id="L144">            .forEach(row -&gt; builder</span>
+<span class="nc" id="L145">                .append(&quot;- `&quot;).append(row.input()).append(&quot;` → Regelsuche `&quot;)</span>
+<span class="nc" id="L146">                .append(row.regelsucheResult()).append(&quot;`, SymPy `&quot;)</span>
+<span class="nc" id="L147">                .append(row.sympyResult()).append(&quot;` (oracle: &quot;)</span>
+<span class="nc" id="L148">                .append(row.oracleEvidence()).append(&quot;)\n&quot;));</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (builder.toString().endsWith(&quot;\n\n&quot;)) {</span>
+<span class="fc" id="L150">            builder.append(&quot;- none\n&quot;);</span>
+        }
+<span class="fc" id="L152">        return builder.toString();</span>
+    }
+
+    private String candidateRulesMarkdown(List&lt;QaCase&gt; cases) {
+<span class="fc" id="L156">        Map&lt;String, Long&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (QaCase row : cases) {</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (row.ruleId().isBlank()) {</span>
+<span class="fc" id="L159">                continue;</span>
+            }
+<span class="fc" id="L161">            counts.merge(row.ruleId() + &quot; [&quot; + row.packId() + &quot;]&quot;, 1L, Long::sum);</span>
+<span class="fc" id="L162">        }</span>
+<span class="fc" id="L163">        StringBuilder builder = new StringBuilder(&quot;# Candidate rules\n\n&quot;);</span>
+<span class="fc" id="L164">        counts.forEach((rule, count) -&gt; builder.append(&quot;- &quot;).append(rule).append(&quot;: &quot;).append(count).append('\n'));</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (counts.isEmpty()) {</span>
+<span class="nc" id="L166">            builder.append(&quot;- none\n&quot;);</span>
+        }
+<span class="fc" id="L168">        return builder.toString();</span>
+    }
+
+    private String interestingMarkdown(List&lt;QaCase&gt; cases) {
+<span class="fc" id="L172">        StringBuilder builder = new StringBuilder(&quot;# Interesting discoveries\n\n&quot;);</span>
+<span class="fc" id="L173">        cases.stream()</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            .filter(row -&gt; row.pathLength() &gt; 0)</span>
+<span class="pc bpc" id="L175" title="3 of 4 branches missed.">            .filter(row -&gt; row.sympyAvailable() &amp;&amp; !row.regelsucheResult().equals(row.sympyResult()))</span>
+<span class="pc" id="L176">            .forEach(row -&gt; builder</span>
+<span class="nc" id="L177">                .append(&quot;- input `&quot;).append(row.input()).append(&quot;` Regelsuche `&quot;)</span>
+<span class="nc" id="L178">                .append(row.regelsucheResult()).append(&quot;` vs SymPy `&quot;)</span>
+<span class="nc" id="L179">                .append(row.sympyResult()).append(&quot;`\n&quot;));</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (builder.toString().endsWith(&quot;\n\n&quot;)) {</span>
+<span class="fc" id="L181">            builder.append(&quot;- none\n&quot;);</span>
+        }
+<span class="fc" id="L183">        return builder.toString();</span>
+    }
+
+    private String escape(String expression) {
+<span class="fc" id="L187">        return expression.replace(&quot;\\&quot;, &quot;\\\\&quot;).replace(&quot;'&quot;, &quot;\\'&quot;);</span>
+    }
+
+    private String normalize(String expression) {
+        try {
+<span class="fc" id="L192">            return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+<span class="nc" id="L193">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L194">            return expression;</span>
+        }
+    }
+
+<span class="fc" id="L198">    public record QaSummary(</span>
+        long totalCases,
+        long sympyAvailableCases,
+        long disagreements,
+        long regelsucheNoPath,
+        long regelsuchePathFound
+    ) {
+    }
+
+<span class="fc" id="L207">    public record QaCase(</span>
+        String input,
+        String regelsucheResult,
+        String sympyResult,
+        boolean sympyAvailable,
+        int pathLength,
+        String ruleId,
+        String packId,
+        String oracleStatus,
+        String oracleEvidence
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -93,92 +93,96 @@ import java.util.stream.Stream;
                         descriptor));
 <span class="fc" id="L94">            }</span>
 <span class="fc" id="L95">            return new KnowledgePack(yaml.packId, yaml.displayName, yaml.sourceProject, yaml.license,</span>
-                    yaml.sourceUrl, yaml.sourceVersion, yaml.sourceReference, yaml.enabledByDefault, packCategories, rules);
-<span class="nc" id="L97">        } catch (IOException ex) {</span>
-<span class="nc" id="L98">            throw new IllegalArgumentException(&quot;Invalid knowledge pack YAML: &quot; + path, ex);</span>
+                    yaml.sourceUrl, yaml.sourceVersion, yaml.sourceReference, yaml.enabledByDefault,
+                    yaml.maturity, packCategories, rules);
+<span class="nc" id="L98">        } catch (IOException ex) {</span>
+<span class="nc" id="L99">            throw new IllegalArgumentException(&quot;Invalid knowledge pack YAML: &quot; + path, ex);</span>
         }
     }
 
     private void validatePack(PackYaml yaml, Path path) {
-<span class="fc" id="L103">        Objects.requireNonNull(yaml, &quot;Knowledge pack YAML must not be empty&quot;);</span>
-<span class="fc" id="L104">        require(yaml.packId, &quot;packId&quot;, path);</span>
-<span class="fc" id="L105">        require(yaml.displayName, &quot;displayName&quot;, path);</span>
-<span class="fc" id="L106">        require(yaml.sourceProject, &quot;sourceProject&quot;, path);</span>
-<span class="fc" id="L107">        require(yaml.license, &quot;license&quot;, path);</span>
-<span class="fc" id="L108">        require(yaml.sourceUrl, &quot;sourceUrl&quot;, path);</span>
-<span class="fc" id="L109">        require(yaml.sourceVersion, &quot;sourceVersion&quot;, path);</span>
-<span class="fc" id="L110">        require(yaml.sourceReference, &quot;sourceReference&quot;, path);</span>
-<span class="pc bpc" id="L111" title="2 of 4 branches missed.">        if (yaml.rules == null || yaml.rules.isEmpty()) {</span>
-<span class="nc" id="L112">            throw new IllegalArgumentException(&quot;Knowledge pack must declare at least one rule: &quot; + path);</span>
+<span class="fc" id="L104">        Objects.requireNonNull(yaml, &quot;Knowledge pack YAML must not be empty&quot;);</span>
+<span class="fc" id="L105">        require(yaml.packId, &quot;packId&quot;, path);</span>
+<span class="fc" id="L106">        require(yaml.displayName, &quot;displayName&quot;, path);</span>
+<span class="fc" id="L107">        require(yaml.sourceProject, &quot;sourceProject&quot;, path);</span>
+<span class="fc" id="L108">        require(yaml.license, &quot;license&quot;, path);</span>
+<span class="fc" id="L109">        require(yaml.sourceUrl, &quot;sourceUrl&quot;, path);</span>
+<span class="fc" id="L110">        require(yaml.sourceVersion, &quot;sourceVersion&quot;, path);</span>
+<span class="fc" id="L111">        require(yaml.sourceReference, &quot;sourceReference&quot;, path);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (yaml.maturity == null) {</span>
+<span class="nc" id="L113">            throw new IllegalArgumentException(&quot;Knowledge pack is missing maturity in &quot; + path);</span>
         }
-<span class="fc" id="L114">    }</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">        if (yaml.rules == null || yaml.rules.isEmpty()) {</span>
+<span class="nc" id="L116">            throw new IllegalArgumentException(&quot;Knowledge pack must declare at least one rule: &quot; + path);</span>
+        }
+<span class="fc" id="L118">    }</span>
 
     private void validateRule(PackYaml pack, RuleYaml rule, Path path) {
-<span class="fc" id="L117">        require(rule.id, &quot;rule id&quot;, path);</span>
-<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (rule.rule == null) {</span>
-<span class="nc" id="L119">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing rule.from/rule.to in &quot; + path);</span>
+<span class="fc" id="L121">        require(rule.id, &quot;rule id&quot;, path);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (rule.rule == null) {</span>
+<span class="nc" id="L123">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing rule.from/rule.to in &quot; + path);</span>
         }
-<span class="fc" id="L121">        require(rule.rule.from, &quot;rule.from&quot;, path);</span>
-<span class="fc" id="L122">        require(rule.rule.to, &quot;rule.to&quot;, path);</span>
-<span class="fc" id="L123">        require(firstNonBlank(rule.originProject, pack.sourceProject), &quot;originProject&quot;, path);</span>
-<span class="fc" id="L124">        require(firstNonBlank(rule.license, pack.license), &quot;license&quot;, path);</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (rule.derivationType == null) {</span>
-<span class="fc" id="L126">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing derivationType in &quot; + path);</span>
+<span class="fc" id="L125">        require(rule.rule.from, &quot;rule.from&quot;, path);</span>
+<span class="fc" id="L126">        require(rule.rule.to, &quot;rule.to&quot;, path);</span>
+<span class="fc" id="L127">        require(firstNonBlank(rule.originProject, pack.sourceProject), &quot;originProject&quot;, path);</span>
+<span class="fc" id="L128">        require(firstNonBlank(rule.license, pack.license), &quot;license&quot;, path);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (rule.derivationType == null) {</span>
+<span class="fc" id="L130">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing derivationType in &quot; + path);</span>
         }
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (rule.status == null) {</span>
-<span class="nc" id="L129">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing status in &quot; + path);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (rule.status == null) {</span>
+<span class="nc" id="L133">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing status in &quot; + path);</span>
         }
-<span class="fc bfc" id="L131" title="All 4 branches covered.">        if (rule.status == RuleStatus.CANDIDATE &amp;&amp; searchEffects(rule).contains(SearchEffect.BRIDGING)) {</span>
-<span class="fc" id="L132">            rule.status = RuleStatus.DISCOVERY_CANDIDATE;</span>
+<span class="fc bfc" id="L135" title="All 4 branches covered.">        if (rule.status == RuleStatus.CANDIDATE &amp;&amp; searchEffects(rule).contains(SearchEffect.BRIDGING)) {</span>
+<span class="fc" id="L136">            rule.status = RuleStatus.DISCOVERY_CANDIDATE;</span>
         }
-<span class="fc" id="L134">        require(firstNonBlank(rule.sourceVersion, pack.sourceVersion), &quot;sourceVersion&quot;, path);</span>
-<span class="fc" id="L135">        require(firstNonBlank(rule.sourceReference, pack.sourceReference), &quot;sourceReference&quot;, path);</span>
-<span class="fc bfc" id="L136" title="All 4 branches covered.">        if (rule.status == RuleStatus.VALIDATED &amp;&amp; validationExamples(rule.validation).isEmpty()) {</span>
-<span class="fc" id="L137">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing validation.examples in &quot; + path);</span>
+<span class="fc" id="L138">        require(firstNonBlank(rule.sourceVersion, pack.sourceVersion), &quot;sourceVersion&quot;, path);</span>
+<span class="fc" id="L139">        require(firstNonBlank(rule.sourceReference, pack.sourceReference), &quot;sourceReference&quot;, path);</span>
+<span class="fc bfc" id="L140" title="All 4 branches covered.">        if (rule.status == RuleStatus.VALIDATED &amp;&amp; validationExamples(rule.validation).isEmpty()) {</span>
+<span class="fc" id="L141">            throw new IllegalArgumentException(&quot;Rule &quot; + rule.id + &quot; is missing validation.examples in &quot; + path);</span>
         }
-<span class="fc" id="L139">    }</span>
+<span class="fc" id="L143">    }</span>
 
     private static List&lt;ValidationExample&gt; validationExamples(ValidationYaml validation) {
-<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        if (validation == null || validation.examples == null) {</span>
-<span class="fc" id="L143">            return List.of();</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">        if (validation == null || validation.examples == null) {</span>
+<span class="fc" id="L147">            return List.of();</span>
         }
-<span class="fc" id="L145">        return validation.examples.stream()</span>
-<span class="fc" id="L146">                .map(example -&gt; new ValidationExample(example.from, example.to))</span>
-<span class="fc" id="L147">                .toList();</span>
+<span class="fc" id="L149">        return validation.examples.stream()</span>
+<span class="fc" id="L150">                .map(example -&gt; new ValidationExample(example.from, example.to))</span>
+<span class="fc" id="L151">                .toList();</span>
     }
 
     private static List&lt;ValidationExample&gt; counterExamples(ValidationYaml validation) {
-<span class="pc bpc" id="L151" title="1 of 4 branches missed.">        if (validation == null || validation.counterexamples == null) {</span>
-<span class="fc" id="L152">            return List.of();</span>
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">        if (validation == null || validation.counterexamples == null) {</span>
+<span class="fc" id="L156">            return List.of();</span>
         }
-<span class="nc" id="L154">        return validation.counterexamples.stream()</span>
-<span class="nc" id="L155">                .map(example -&gt; new ValidationExample(example.from, example.to))</span>
-<span class="nc" id="L156">                .toList();</span>
+<span class="nc" id="L158">        return validation.counterexamples.stream()</span>
+<span class="nc" id="L159">                .map(example -&gt; new ValidationExample(example.from, example.to))</span>
+<span class="nc" id="L160">                .toList();</span>
     }
 
     private static String require(String value, String field, Path path) {
-<span class="pc bpc" id="L160" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L161">            throw new IllegalArgumentException(&quot;Missing required field &quot; + field + &quot; in &quot; + path);</span>
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L165">            throw new IllegalArgumentException(&quot;Missing required field &quot; + field + &quot; in &quot; + path);</span>
         }
-<span class="fc" id="L163">        return value;</span>
+<span class="fc" id="L167">        return value;</span>
     }
 
     private static String firstNonBlank(String first, String fallback) {
-<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        return first == null || first.isBlank() ? fallback : first;</span>
+<span class="pc bpc" id="L171" title="1 of 4 branches missed.">        return first == null || first.isBlank() ? fallback : first;</span>
     }
 
     private static &lt;T&gt; List&lt;T&gt; nonNull(List&lt;T&gt; values) {
-<span class="fc bfc" id="L171" title="All 2 branches covered.">        return values == null ? List.of() : List.copyOf(values);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        return values == null ? List.of() : List.copyOf(values);</span>
     }
 
     private static List&lt;SearchEffect&gt; searchEffects(RuleYaml rule) {
-<span class="pc bpc" id="L175" title="1 of 4 branches missed.">        return rule.searchEffects == null || rule.searchEffects.isEmpty()</span>
-<span class="fc" id="L176">                ? List.of()</span>
-<span class="fc" id="L177">                : List.copyOf(rule.searchEffects);</span>
+<span class="pc bpc" id="L179" title="1 of 4 branches missed.">        return rule.searchEffects == null || rule.searchEffects.isEmpty()</span>
+<span class="fc" id="L180">                ? List.of()</span>
+<span class="fc" id="L181">                : List.copyOf(rule.searchEffects);</span>
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L181">    public static class PackYaml {</span>
+<span class="fc" id="L185">    public static class PackYaml {</span>
         public String packId;
         public String displayName;
         public String sourceProject;
@@ -187,12 +191,13 @@ import java.util.stream.Stream;
         public String sourceVersion;
         public String sourceReference;
         public boolean enabledByDefault;
+        public KnowledgePackMaturity maturity;
         public List&lt;String&gt; categories;
         public List&lt;RuleYaml&gt; rules;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L195">    public static class RuleYaml {</span>
+<span class="fc" id="L200">    public static class RuleYaml {</span>
         public String id;
         public String originProject;
         public String license;
@@ -208,19 +213,19 @@ import java.util.stream.Stream;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L211">    public static class RuleBodyYaml {</span>
+<span class="fc" id="L216">    public static class RuleBodyYaml {</span>
         public String from;
         public String to;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L217">    public static class ValidationYaml {</span>
+<span class="fc" id="L222">    public static class ValidationYaml {</span>
         public List&lt;ValidationExampleYaml&gt; examples;
         public List&lt;ValidationExampleYaml&gt; counterexamples;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-<span class="fc" id="L223">    public static class ValidationExampleYaml {</span>
+<span class="fc" id="L228">    public static class ValidationExampleYaml {</span>
         public String from;
         public String to;
     }

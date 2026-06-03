@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FactorCandidateOperator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">FactorCandidateOperator.java</span></div><h1>FactorCandidateOperator.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** SymPy-derived factor candidate provider with explicit discovery provenance. */
+<span class="fc" id="L17">public final class FactorCandidateOperator implements HypothesisOperator {</span>
+    public static final String RULE_ID = &quot;hypothesis_sympy_factor_candidate&quot;;
+    private static final String PACK_ID = &quot;sympy-polynomial-basic&quot;;
+    private static final String LICENSE = &quot;BSD-3-Clause&quot;;
+    private static final String KIND = &quot;kind=factor-candidate&quot;;
+    private static final String SOURCE = &quot;source=sympy-derived&quot;;
+
+<span class="fc" id="L24">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L25">    private final QuadraticFactorizationHypothesisOperator quadratic = new QuadraticFactorizationHypothesisOperator();</span>
+<span class="fc" id="L26">    private final RepeatedSubexpressionFactorizationHypothesisOperator repeated =</span>
+        new RepeatedSubexpressionFactorizationHypothesisOperator();
+
+    @Override
+    public List&lt;Transformation&gt; generateCandidates(String expression) {
+<span class="fc" id="L31">        LinkedHashMap&lt;String, Transformation&gt; candidates = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc" id="L32">        quadratic.generateCandidates(expression).forEach(candidate -&gt; addMappedCandidate(candidate, candidates, true));</span>
+<span class="pc" id="L33">        repeated.generateCandidates(expression).forEach(candidate -&gt; addMappedCandidate(candidate, candidates, false));</span>
+<span class="fc" id="L34">        contentCandidate(expression).ifPresent(candidate -&gt; candidates.putIfAbsent(candidate.transformedExpression(), candidate));</span>
+<span class="fc" id="L35">        return List.copyOf(candidates.values());</span>
+    }
+
+    private void addMappedCandidate(Transformation candidate, Map&lt;String, Transformation&gt; out, boolean validated) {
+<span class="nc" id="L39">        String applicationKey = RULE_ID + &quot;|&quot; + SOURCE + &quot;|&quot; + KIND + &quot;|validated=&quot; + validated + &quot;|&quot;</span>
+<span class="nc" id="L40">            + candidate.applicationKey();</span>
+<span class="nc" id="L41">        out.putIfAbsent(candidate.transformedExpression(), new Transformation(</span>
+            RULE_ID,
+<span class="nc" id="L43">            candidate.transformedExpression(),</span>
+            RewriteKind.FACTOR,
+<span class="nc" id="L45">            candidate.mayIncreaseComplexity(),</span>
+<span class="nc" id="L46">            candidate.estimatedCostDelta(),</span>
+<span class="nc" id="L47">            candidate.equivalencePreservingByConstruction(),</span>
+            applicationKey,
+<span class="nc" id="L49">            candidate.assumptions(),</span>
+            PACK_ID,
+            LICENSE
+        ));
+<span class="nc" id="L53">    }</span>
+
+    private java.util.Optional&lt;Transformation&gt; contentCandidate(String expression) {
+        Expr parsed;
+        try {
+<span class="fc" id="L58">            parsed = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="nc" id="L59">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L60">            return java.util.Optional.empty();</span>
+<span class="fc" id="L61">        }</span>
+<span class="fc" id="L62">        List&lt;Expr&gt; addends = flattenAddends(parsed);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (addends.size() &lt; 2) {</span>
+<span class="nc" id="L64">            return java.util.Optional.empty();</span>
+        }
+<span class="fc" id="L66">        int gcd = 0;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (Expr addend : addends) {</span>
+<span class="fc" id="L68">            int coefficient = integerCoefficient(addend);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (coefficient == 0) {</span>
+<span class="nc" id="L70">                return java.util.Optional.empty();</span>
+            }
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            gcd = gcd == 0 ? Math.abs(coefficient) : gcd(gcd, Math.abs(coefficient));</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (gcd == 1) {</span>
+<span class="nc" id="L74">                return java.util.Optional.empty();</span>
+            }
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">        Expr primitive = divideBy(addends.getFirst(), gcd);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int index = 1; index &lt; addends.size(); index++) {</span>
+<span class="fc" id="L79">            primitive = new BinaryExpr(primitive, BinaryOperator.ADD, divideBy(addends.get(index), gcd));</span>
+        }
+<span class="fc" id="L81">        Expr factored = new BinaryExpr(new NumberExpr(gcd), BinaryOperator.MUL, primitive);</span>
+<span class="fc" id="L82">        String transformed = ExpressionFormatter.format(factored);</span>
+<span class="fc" id="L83">        String formattedInput = ExpressionFormatter.format(parsed);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (transformed.equals(formattedInput)) {</span>
+<span class="nc" id="L85">            return java.util.Optional.empty();</span>
+        }
+<span class="fc" id="L87">        return java.util.Optional.of(new Transformation(</span>
+            RULE_ID,
+            transformed,
+            RewriteKind.FACTOR,
+            false,
+            -1,
+            true,
+            RULE_ID + &quot;|&quot; + SOURCE + &quot;|&quot; + KIND + &quot;|validated=true|provider=content-primitive&quot;,
+<span class="fc" id="L95">            List.of(),</span>
+            PACK_ID,
+            LICENSE
+        ));
+    }
+
+    private List&lt;Expr&gt; flattenAddends(Expr expression) {
+<span class="fc" id="L102">        List&lt;Expr&gt; out = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L103">        collectAddends(expression, 1, out);</span>
+<span class="fc" id="L104">        return out;</span>
+    }
+
+    private void collectAddends(Expr expression, int sign, List&lt;Expr&gt; out) {
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L110">                collectAddends(binary.left(), sign, out);</span>
+<span class="fc" id="L111">                collectAddends(binary.right(), sign, out);</span>
+<span class="fc" id="L112">                return;</span>
+            }
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            if (binary.operator() == BinaryOperator.SUB) {</span>
+<span class="nc" id="L115">                collectAddends(binary.left(), sign, out);</span>
+<span class="nc" id="L116">                collectAddends(binary.right(), -sign, out);</span>
+<span class="nc" id="L117">                return;</span>
+            }
+        }
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        out.add(sign &gt;= 0 ? expression : new BinaryExpr(new NumberExpr(-1), BinaryOperator.MUL, expression));</span>
+<span class="fc" id="L121">    }</span>
+
+    private int integerCoefficient(Expr expression) {
+<span class="pc bpc" id="L124" title="3 of 4 branches missed.">        if (expression instanceof NumberExpr number &amp;&amp; Math.rint(number.value()) == number.value()) {</span>
+<span class="nc" id="L125">            return (int) number.value();</span>
+        }
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">            if (binary.left() instanceof NumberExpr left &amp;&amp; Math.rint(left.value()) == left.value()) {</span>
+<span class="fc" id="L129">                return (int) left.value();</span>
+            }
+<span class="nc bnc" id="L131" title="All 4 branches missed.">            if (binary.right() instanceof NumberExpr right &amp;&amp; Math.rint(right.value()) == right.value()) {</span>
+<span class="nc" id="L132">                return (int) right.value();</span>
+            }
+        }
+<span class="nc" id="L135">        return 1;</span>
+    }
+
+    private Expr divideBy(Expr expression, int divisor) {
+<span class="pc bpc" id="L139" title="3 of 4 branches missed.">        if (expression instanceof NumberExpr number &amp;&amp; Math.rint(number.value()) == number.value()) {</span>
+<span class="nc" id="L140">            return new NumberExpr(number.value() / divisor);</span>
+        }
+<span class="pc bpc" id="L142" title="2 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">            if (binary.left() instanceof NumberExpr left &amp;&amp; Math.rint(left.value()) == left.value()) {</span>
+<span class="fc" id="L144">                double scaled = left.value() / divisor;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                if (Double.compare(scaled, 1.0) == 0) {</span>
+<span class="fc" id="L146">                    return binary.right();</span>
+                }
+<span class="fc" id="L148">                return new BinaryExpr(new NumberExpr(scaled), BinaryOperator.MUL, binary.right());</span>
+            }
+<span class="nc bnc" id="L150" title="All 4 branches missed.">            if (binary.right() instanceof NumberExpr right &amp;&amp; Math.rint(right.value()) == right.value()) {</span>
+<span class="nc" id="L151">                double scaled = right.value() / divisor;</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                if (Double.compare(scaled, 1.0) == 0) {</span>
+<span class="nc" id="L153">                    return binary.left();</span>
+                }
+<span class="nc" id="L155">                return new BinaryExpr(binary.left(), BinaryOperator.MUL, new NumberExpr(scaled));</span>
+            }
+        }
+<span class="nc" id="L158">        return new BinaryExpr(new NumberExpr(1.0 / divisor), BinaryOperator.MUL, expression);</span>
+    }
+
+    private int gcd(int left, int right) {
+<span class="fc" id="L162">        int a = Math.abs(left);</span>
+<span class="fc" id="L163">        int b = Math.abs(right);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        while (b != 0) {</span>
+<span class="fc" id="L165">            int next = a % b;</span>
+<span class="fc" id="L166">            a = b;</span>
+<span class="fc" id="L167">            b = next;</span>
+<span class="fc" id="L168">        }</span>
+<span class="fc" id="L169">        return a;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

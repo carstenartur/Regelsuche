@@ -56,28 +56,40 @@ import java.util.Set;
 <span class="fc" id="L56">        return Set.copyOf(ids);</span>
     }
 
-    public List&lt;HypothesisOperator&gt; operatorsFor(OperatorProfile profile) {
-<span class="pc bpc" id="L60" title="1 of 4 branches missed.">        if (profile == null || profile.enabledOperatorIds().isEmpty()) {</span>
-<span class="fc" id="L61">            return List.of();</span>
+    public String operatorIdForRule(String ruleId) {
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">        if (ruleId == null || ruleId.isBlank()) {</span>
+<span class="nc" id="L61">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L63">        List&lt;HypothesisOperator&gt; operators = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (String operatorId : profile.enabledOperatorIds()) {</span>
-<span class="pc bpc" id="L65" title="2 of 6 branches missed.">            if (operatorId == null || operatorId.isBlank() || disabledOperatorIds.contains(operatorId)) {</span>
-<span class="fc" id="L66">                continue;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (Map.Entry&lt;String, DiscoveryOperatorProvider.DiscoveryOperatorDefinition&gt; entry : operatorsById.entrySet()) {</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (entry.getValue().producedRuleIds().contains(ruleId)) {</span>
+<span class="fc" id="L65">                return entry.getKey();</span>
             }
-<span class="fc" id="L68">            DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition = operatorsById.get(operatorId);</span>
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (definition == null) {</span>
-<span class="nc" id="L70">                continue;</span>
+<span class="fc" id="L67">        }</span>
+<span class="fc" id="L68">        return &quot;&quot;;</span>
+    }
+
+    public List&lt;HypothesisOperator&gt; operatorsFor(OperatorProfile profile) {
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">        if (profile == null || profile.enabledOperatorIds().isEmpty()) {</span>
+<span class="fc" id="L73">            return List.of();</span>
+        }
+<span class="fc" id="L75">        List&lt;HypothesisOperator&gt; operators = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (String operatorId : profile.enabledOperatorIds()) {</span>
+<span class="pc bpc" id="L77" title="2 of 6 branches missed.">            if (operatorId == null || operatorId.isBlank() || disabledOperatorIds.contains(operatorId)) {</span>
+<span class="fc" id="L78">                continue;</span>
             }
-<span class="fc" id="L72">            operators.add(definition.factory().get());</span>
-<span class="fc" id="L73">        }</span>
-<span class="fc" id="L74">        return List.copyOf(operators);</span>
+<span class="fc" id="L80">            DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition = operatorsById.get(operatorId);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if (definition == null) {</span>
+<span class="nc" id="L82">                continue;</span>
+            }
+<span class="fc" id="L84">            operators.add(definition.factory().get());</span>
+<span class="fc" id="L85">        }</span>
+<span class="fc" id="L86">        return List.copyOf(operators);</span>
     }
 
     public record OperatorProfile(List&lt;String&gt; enabledOperatorIds) {
-<span class="fc" id="L78">        public OperatorProfile {</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            enabledOperatorIds = enabledOperatorIds == null ? List.of() : List.copyOf(enabledOperatorIds);</span>
-<span class="fc" id="L80">        }</span>
+<span class="fc" id="L90">        public OperatorProfile {</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            enabledOperatorIds = enabledOperatorIds == null ? List.of() : List.copyOf(enabledOperatorIds);</span>
+<span class="fc" id="L92">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

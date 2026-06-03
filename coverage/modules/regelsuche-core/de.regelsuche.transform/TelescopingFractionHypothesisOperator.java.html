@@ -38,8 +38,8 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
 <span class="nc" id="L38">        } catch (IllegalArgumentException exception) {</span>
 <span class="nc" id="L39">            return List.of();</span>
 <span class="fc" id="L40">        }</span>
-<span class="pc bpc" id="L41" title="2 of 4 branches missed.">        if (!(root instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV) {</span>
-<span class="nc" id="L42">            return List.of();</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">        if (!(root instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV) {</span>
+<span class="fc" id="L42">            return List.of();</span>
         }
 <span class="fc" id="L44">        NumberExpr numerator = numerator(division.left());</span>
 <span class="pc bpc" id="L45" title="2 of 4 branches missed.">        if (numerator == null || Double.compare(numerator.value(), 0.0) == 0) {</span>

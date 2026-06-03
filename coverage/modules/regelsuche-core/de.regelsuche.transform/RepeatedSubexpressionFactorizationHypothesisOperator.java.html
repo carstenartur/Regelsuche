@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepeatedSubexpressionFactorizationHypothesisOperator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RepeatedSubexpressionFactorizationHypothesisOperator.java</span></div><h1>RepeatedSubexpressionFactorizationHypothesisOperator.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Detects a repeated multiplicative subexpression and factors it out of a sum or difference. */
+<span class="fc" id="L19">public class RepeatedSubexpressionFactorizationHypothesisOperator implements HypothesisOperator {</span>
+    public static final String RULE_ID = &quot;hypothesis_repeated_subexpression_factorization&quot;;
+
+<span class="fc" id="L22">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L23">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+
+    @Override
+    public List&lt;Transformation&gt; generateCandidates(String expression) {
+        Expr root;
+        try {
+<span class="fc" id="L29">            root = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="nc" id="L30">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L31">            return List.of();</span>
+<span class="fc" id="L32">        }</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (!(root instanceof BinaryExpr binary)</span>
+<span class="pc bpc" id="L34" title="3 of 4 branches missed.">            || (binary.operator() != BinaryOperator.ADD &amp;&amp; binary.operator() != BinaryOperator.SUB)) {</span>
+<span class="nc" id="L35">            return List.of();</span>
+        }
+<span class="fc" id="L37">        CommonFactor common = commonFactor(binary.left(), binary.right());</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (common == null) {</span>
+<span class="fc" id="L39">            return List.of();</span>
+        }
+<span class="fc" id="L41">        Expr grouped = new BinaryExpr(common.leftRemainder(), binary.operator(), common.rightRemainder());</span>
+<span class="fc" id="L42">        Expr factored = new BinaryExpr(common.factor(), BinaryOperator.MUL, grouped);</span>
+<span class="fc" id="L43">        String formattedInput = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L44">        String formatted = ExpressionFormatter.format(factored);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (formatted.equals(formattedInput)) {</span>
+<span class="nc" id="L46">            return List.of();</span>
+        }
+<span class="fc" id="L48">        return List.of(new ScoredCandidate(</span>
+<span class="fc" id="L49">                canonicalizer.astNodeCount(formatted),</span>
+                new Transformation(
+                    RULE_ID,
+                    formatted,
+                    RewriteKind.NORMALIZE,
+                    true,
+                    -1,
+                    true,
+<span class="fc" id="L57">                    RULE_ID + &quot;:&quot; + canonicalizer.stableHash(formattedInput) + &quot;-&gt;&quot; + canonicalizer.stableHash(formatted)</span>
+                )))
+<span class="fc" id="L59">            .stream()</span>
+<span class="fc" id="L60">            .sorted(Comparator.comparingInt(ScoredCandidate::score)</span>
+<span class="pc" id="L61">                .thenComparing(candidate -&gt; candidate.transformation().transformedExpression()))</span>
+<span class="fc" id="L62">            .map(ScoredCandidate::transformation)</span>
+<span class="fc" id="L63">            .toList();</span>
+    }
+
+    private CommonFactor commonFactor(Expr left, Expr right) {
+<span class="fc" id="L67">        List&lt;Expr&gt; leftFactors = flattenMultiplication(left);</span>
+<span class="fc" id="L68">        List&lt;Expr&gt; rightFactors = flattenMultiplication(right);</span>
+<span class="fc" id="L69">        Map&lt;String, Expr&gt; rightByHash = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (Expr factor : rightFactors) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (factor instanceof NumberExpr) {</span>
+<span class="fc" id="L72">                continue;</span>
+            }
+<span class="fc" id="L74">            rightByHash.putIfAbsent(hash(factor), factor);</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        Expr selected = null;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (Expr factor : leftFactors) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (factor instanceof NumberExpr) {</span>
+<span class="fc" id="L79">                continue;</span>
+            }
+<span class="fc" id="L81">            Expr candidate = rightByHash.get(hash(factor));</span>
+<span class="pc bpc" id="L82" title="3 of 6 branches missed.">            if (candidate != null &amp;&amp; (selected == null || betterFactor(factor, selected))) {</span>
+<span class="fc" id="L83">                selected = factor;</span>
+            }
+<span class="fc" id="L85">        }</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (selected == null) {</span>
+<span class="fc" id="L87">            return null;</span>
+        }
+<span class="fc" id="L89">        Expr factor = selected;</span>
+<span class="fc" id="L90">        Expr leftRemainder = buildProduct(removeFirstMatch(leftFactors, factor));</span>
+<span class="fc" id="L91">        Expr rightRemainder = buildProduct(removeFirstMatch(rightFactors, factor));</span>
+<span class="fc" id="L92">        return new CommonFactor(factor, leftRemainder, rightRemainder);</span>
+    }
+
+    private boolean betterFactor(Expr candidate, Expr selected) {
+<span class="nc" id="L96">        int candidateSize = canonicalizer.astNodeCount(ExpressionFormatter.format(candidate));</span>
+<span class="nc" id="L97">        int selectedSize = canonicalizer.astNodeCount(ExpressionFormatter.format(selected));</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (candidateSize != selectedSize) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            return candidateSize &gt; selectedSize;</span>
+        }
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        return ExpressionFormatter.format(candidate).compareTo(ExpressionFormatter.format(selected)) &lt; 0;</span>
+    }
+
+    private List&lt;Expr&gt; flattenMultiplication(Expr expression) {
+<span class="fc bfc" id="L105" title="All 4 branches covered.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L106">            List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L107">            result.addAll(flattenMultiplication(binary.left()));</span>
+<span class="fc" id="L108">            result.addAll(flattenMultiplication(binary.right()));</span>
+<span class="fc" id="L109">            return result;</span>
+        }
+<span class="fc" id="L111">        return List.of(expression);</span>
+    }
+
+    private List&lt;Expr&gt; removeFirstMatch(List&lt;Expr&gt; factors, Expr target) {
+<span class="fc" id="L115">        List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L116">        boolean removed = false;</span>
+<span class="fc" id="L117">        String targetHash = hash(target);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (Expr factor : factors) {</span>
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">            if (!removed &amp;&amp; hash(factor).equals(targetHash)) {</span>
+<span class="fc" id="L120">                removed = true;</span>
+<span class="fc" id="L121">                continue;</span>
+            }
+<span class="fc" id="L123">            result.add(factor);</span>
+<span class="fc" id="L124">        }</span>
+<span class="fc" id="L125">        return result;</span>
+    }
+
+    private Expr buildProduct(List&lt;Expr&gt; factors) {
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (factors.isEmpty()) {</span>
+<span class="nc" id="L130">            return new NumberExpr(1);</span>
+        }
+<span class="fc" id="L132">        Expr result = factors.getFirst();</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        for (int index = 1; index &lt; factors.size(); index++) {</span>
+<span class="nc" id="L134">            result = new BinaryExpr(result, BinaryOperator.MUL, factors.get(index));</span>
+        }
+<span class="fc" id="L136">        return result;</span>
+    }
+
+    private String hash(Expr expression) {
+<span class="fc" id="L140">        return canonicalizer.stableHash(ExpressionFormatter.format(expression));</span>
+    }
+
+<span class="fc" id="L143">    private record CommonFactor(Expr factor, Expr leftRemainder, Expr rightRemainder) {</span>
+    }
+
+<span class="fc" id="L146">    private record ScoredCandidate(int score, Transformation transformation) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -45,17 +45,18 @@ import java.util.List;
     }
 
     private String toLeanProp(Assumption assumption) {
-<span class="pc bpc" id="L48" title="3 of 4 branches missed.">        return switch (assumption.kind()) {</span>
+<span class="pc bpc" id="L48" title="3 of 5 branches missed.">        return switch (assumption.kind()) {</span>
 <span class="pc bpc" id="L49" title="1 of 2 branches missed.">            case NON_ZERO -&gt; assumption.symbols().isEmpty()</span>
 <span class="nc" id="L50">                ? assumption.expression()</span>
 <span class="fc" id="L51">                : assumption.symbols().get(0) + &quot; ≠ 0&quot;;</span>
-<span class="nc bnc" id="L52" title="All 2 branches missed.">            case POSITIVE -&gt; assumption.symbols().isEmpty()</span>
-<span class="nc" id="L53">                ? assumption.expression()</span>
-<span class="nc" id="L54">                : assumption.symbols().get(0) + &quot; &gt; 0&quot;;</span>
-<span class="nc bnc" id="L55" title="All 2 branches missed.">            case NON_NEGATIVE -&gt; assumption.symbols().isEmpty()</span>
-<span class="nc" id="L56">                ? assumption.expression()</span>
-<span class="nc" id="L57">                : assumption.symbols().get(0) + &quot; ≥ 0&quot;;</span>
-<span class="nc" id="L58">            case DOMAIN, CUSTOM -&gt; assumption.expression();</span>
+<span class="fc" id="L52">            case REAL, INTEGER, RATIONAL, UNKNOWN -&gt; &quot;True&quot;;</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            case POSITIVE -&gt; assumption.symbols().isEmpty()</span>
+<span class="nc" id="L54">                ? assumption.expression()</span>
+<span class="nc" id="L55">                : assumption.symbols().get(0) + &quot; &gt; 0&quot;;</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            case NON_NEGATIVE -&gt; assumption.symbols().isEmpty()</span>
+<span class="nc" id="L57">                ? assumption.expression()</span>
+<span class="nc" id="L58">                : assumption.symbols().get(0) + &quot; ≥ 0&quot;;</span>
+<span class="nc" id="L59">            case DOMAIN, CUSTOM -&gt; assumption.expression();</span>
         };
     }
 }

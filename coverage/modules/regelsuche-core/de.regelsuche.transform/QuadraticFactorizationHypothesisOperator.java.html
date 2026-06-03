@@ -29,8 +29,8 @@ import java.util.Optional;
 <span class="nc" id="L29">            return List.of();</span>
 <span class="fc" id="L30">        }</span>
 <span class="fc" id="L31">        Optional&lt;Quadratic&gt; quadratic = monicQuadratic(parsed);</span>
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (quadratic.isEmpty()) {</span>
-<span class="nc" id="L33">            return List.of();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (quadratic.isEmpty()) {</span>
+<span class="fc" id="L33">            return List.of();</span>
         }
 <span class="fc" id="L35">        Quadratic q = quadratic.get();</span>
 <span class="pc bpc" id="L36" title="1 of 2 branches missed.">        for (int left = -Math.abs(q.constant()) - 1; left &lt;= Math.abs(q.constant()) + 1; left++) {</span>
@@ -59,8 +59,8 @@ import java.util.Optional;
 
     private Optional&lt;Quadratic&gt; monicQuadratic(Expr expression) {
 <span class="fc" id="L61">        List&lt;Expr&gt; terms = flattenAddends(expression);</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (terms.size() != 3) {</span>
-<span class="nc" id="L63">            return Optional.empty();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (terms.size() != 3) {</span>
+<span class="fc" id="L63">            return Optional.empty();</span>
         }
 <span class="fc" id="L65">        Expr variable = null;</span>
 <span class="fc" id="L66">        Integer sum = null;</span>
