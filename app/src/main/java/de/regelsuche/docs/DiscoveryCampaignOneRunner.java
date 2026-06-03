@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.benchmark.DiscoveryExpectation;
 import de.regelsuche.sympyqa.SymPyQaHarness;
 import de.regelsuche.transform.CompleteSquareBridgeOperator;
-import de.regelsuche.transform.CommonSubexpressionDiscoveryOperator;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.FactorCandidateOperator;
 import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
 import de.regelsuche.transform.RationalizationHypothesisOperator;
 import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
@@ -216,14 +216,14 @@ public final class DiscoveryCampaignOneRunner {
                 "hidden-structure Sophie-Germain shortcut"
             ),
             new CampaignCase(
-                "common-subexpression",
+                "factor-candidate",
                 "polynomial",
-                "x * (y + 1) + z * (y + 1)",
-                "(y + 1) * (x + z)",
-                "common_subexpression_discovery",
-                CommonSubexpressionDiscoveryOperator.RULE_ID,
-                List.of(),
-                "common substructure shortcut"
+                "2*x^2 + 4*x",
+                "2 * (x^2 + 2*x)",
+                "factor_candidate",
+                FactorCandidateOperator.RULE_ID,
+                List.of("sympy-polynomial-basic"),
+                "factor candidate shortcut"
             ),
             new CampaignCase(
                 "telescoping-rational",
