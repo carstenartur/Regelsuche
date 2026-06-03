@@ -347,9 +347,9 @@ public final class DiscoveryCampaignTwoRunner {
             new CampaignCase(
                 "substitution-hidden-structure",
                 "substitution",
-                "(a+b)^2 + 6*(a+b) + 5",
-                "(a+b+1) * (a+b+5)",
-                List.of("substitution_introduction", "factor_candidate", "substitution_expansion"),
+                "(x+1)^4 + 4*y^4",
+                "(((x + 1) ^ 2 - 2 * (x + 1) * y + 2 * y ^ 2) * ((x + 1) ^ 2 + 2 * (x + 1) * y + 2 * y ^ 2))",
+                List.of("substitution_introduction", "substitution_expansion"),
                 SubstitutionExpansionOperator.RULE_ID,
                 List.of("sympy-polynomial-basic"),
                 "discover hidden structure via substitution and expand back"

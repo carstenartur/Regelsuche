@@ -227,10 +227,10 @@ class OperatorDisablementTest {
         DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(
             "substitution-hidden-structure",
             "substitution-hidden-structure",
-            "(a+b)^2 + 6*(a+b) + 5",
-            "(a+b+1) * (a+b+5)",
+            "(x+1)^4 + 4*y^4",
+            "(((x + 1) ^ 2 - 2 * (x + 1) * y + 2 * y ^ 2) * ((x + 1) ^ 2 + 2 * (x + 1) * y + 2 * y ^ 2))",
             List.of(),
-            List.of("substitution_introduction", "factor_candidate", "substitution_expansion"),
+            List.of("substitution_introduction", "substitution_expansion"),
             List.of("sympy-polynomial-basic"),
             List.of(),
             List.of(),

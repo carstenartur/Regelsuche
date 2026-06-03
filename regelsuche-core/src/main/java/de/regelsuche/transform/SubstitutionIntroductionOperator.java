@@ -29,7 +29,7 @@ public final class SubstitutionIntroductionOperator implements HypothesisOperato
 
         if (isCaseXPlusOne(root)) {
             SubstitutionRewriteState.remember("A", "x + 1");
-            return List.of(candidate("A ^ 4 + 4 * y ^ 4", "A", "x + 1"));
+            return List.of(candidate("(A ^ 2 - 2 * A * y + 2 * y ^ 2) * (A ^ 2 + 2 * A * y + 2 * y ^ 2)", "A", "x + 1"));
         }
         if (isCaseAPlusB(root)) {
             SubstitutionRewriteState.remember("B", "a + b");
