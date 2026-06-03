@@ -2,6 +2,7 @@ package de.regelsuche.transform;
 
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /** Expands previously introduced substitution placeholders back to original subexpressions. */
 public final class SubstitutionExpansionOperator implements HypothesisOperator {
@@ -16,7 +17,10 @@ public final class SubstitutionExpansionOperator implements HypothesisOperator {
         for (Map.Entry<String, String> entry : SubstitutionRewriteState.snapshot().entrySet()) {
             String placeholder = entry.getKey();
             String replacement = "(" + entry.getValue() + ")";
-            String updated = transformed.replace(placeholder, replacement);
+            // Use word-boundary-aware replacement so that e.g. "B" does not
+            // match inside "B2" or "AB".
+            Pattern pattern = Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(placeholder) + "(?![A-Za-z0-9_])");
+            String updated = pattern.matcher(transformed).replaceAll(replacement.replace("$", "\\$"));
             if (!updated.equals(transformed)) {
                 transformed = updated;
                 changed = true;

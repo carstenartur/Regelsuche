@@ -341,7 +341,7 @@ public final class DiscoveryCampaignTwoRunner {
                 "x",
                 List.of("power_root_assumptions"),
                 PowerRootAssumptionRules.RULE_ID,
-                List.of("sympy-polynomial-basic"),
+                List.of("sympy-power-basic"),
                 "assumption-carrying root/power simplification"
             ),
             new CampaignCase(

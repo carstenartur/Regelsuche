@@ -7,6 +7,7 @@ import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
 
@@ -40,10 +41,12 @@ public final class TrigPythagoreanIdentityOperator implements HypothesisOperator
                 LICENSE
             ));
         }
-        if (matchesTanSquaredPlusOne(root)) {
+        Expr tanArg = extractTanArg(root);
+        if (tanArg != null) {
+            String arg = ExpressionFormatter.format(tanArg);
             return List.of(new Transformation(
                 RULE_ID,
-                "sec(x) ^ 2",
+                "sec(" + arg + ") ^ 2",
                 RewriteKind.SIMPLIFY,
                 false,
                 -2,
@@ -65,12 +68,17 @@ public final class TrigPythagoreanIdentityOperator implements HypothesisOperator
             || (isSquaredTrig(sum.left(), "cos") && isSquaredTrig(sum.right(), "sin"));
     }
 
-    private boolean matchesTanSquaredPlusOne(Expr expression) {
+    private Expr extractTanArg(Expr expression) {
         if (!(expression instanceof BinaryExpr sum) || sum.operator() != BinaryOperator.ADD) {
-            return false;
+            return null;
         }
-        return (isSquaredTrig(sum.left(), "tan") && isOne(sum.right()))
-            || (isSquaredTrig(sum.right(), "tan") && isOne(sum.left()));
+        if (isSquaredTrig(sum.left(), "tan") && isOne(sum.right())) {
+            return ((FunctionExpr) ((BinaryExpr) sum.left()).left()).argument();
+        }
+        if (isSquaredTrig(sum.right(), "tan") && isOne(sum.left())) {
+            return ((FunctionExpr) ((BinaryExpr) sum.right()).left()).argument();
+        }
+        return null;
     }
 
     private boolean isSquaredTrig(Expr expression, String functionName) {

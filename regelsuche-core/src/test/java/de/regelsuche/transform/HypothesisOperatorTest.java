@@ -11,10 +11,16 @@ import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class HypothesisOperatorTest {
     private final ExpressionParser parser = new ExpressionParser();
+
+    @BeforeEach
+    void clearSubstitutionState() {
+        SubstitutionRewriteState.clear();
+    }
 
     @Test
     void differenceOfSquaresPreparationGeneratesOrdinaryTransformations() {
@@ -181,6 +187,14 @@ class HypothesisOperatorTest {
             .anyMatch(candidate -> candidate.transformedExpression().equals("cos(x) ^ 2")));
         assertTrue(powerReduction.generateCandidates("1 - cos(x)^2").stream()
             .anyMatch(candidate -> candidate.transformedExpression().equals("sin(x) ^ 2")));
+
+        // Non-x arguments: verify argument is preserved, not hard-coded as x
+        assertTrue(pythagorean.generateCandidates("tan(y)^2 + 1").stream()
+            .anyMatch(candidate -> candidate.transformedExpression().equals("sec(y) ^ 2")));
+        assertTrue(powerReduction.generateCandidates("1 - sin(y)^2").stream()
+            .anyMatch(candidate -> candidate.transformedExpression().equals("cos(y) ^ 2")));
+        assertTrue(powerReduction.generateCandidates("1 - cos(y)^2").stream()
+            .anyMatch(candidate -> candidate.transformedExpression().equals("sin(y) ^ 2")));
     }
 
     @Test
