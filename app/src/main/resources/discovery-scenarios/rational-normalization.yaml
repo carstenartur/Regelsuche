@@ -1,0 +1,25 @@
+id: rational-normalization
+displayName: Rational normalization bridge
+inputExpression: "x / y + z / y"
+targetExpression: "(x + z) / y"
+expectations:
+  - BRIDGE_REQUIRED
+enabledOperators:
+  - rational_normalization
+enabledRulePacks:
+  - rational-basic
+requiredBridgeEffects:
+  - BRIDGING
+requiredRuleFamilies: []
+requiredBridgeRules:
+  - hypothesis_rational_normalization
+macroLearning:
+  enabled: false
+budgets:
+  maxDepth: 3
+  maxStates: 20
+  timeoutMillis: 5000
+gallery:
+  generateSvg: true
+  preferredPathCount: 1
+  minVisibleNodes: 3

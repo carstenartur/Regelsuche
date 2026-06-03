@@ -12,6 +12,10 @@ class PublicEvidenceScenarioTest {
             "discovery-scenarios/complete-square.yaml",
             "discovery-scenarios/sophie-germain.yaml");
 
+    private static final List<String> SHORTCUT_SCENARIOS = List.of(
+            "discovery-scenarios/repeated-subexpression-factorization.yaml",
+            "discovery-scenarios/rational-normalization.yaml");
+
     @Test
     void publicDiscoveryScenariosProduceSuccessfulEvidence() {
         DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();
@@ -39,6 +43,40 @@ class PublicEvidenceScenarioTest {
                 assertNotNull(edge.searchEffect(), scenario.id() + " edge.searchEffect");
                 assertFalse(edge.searchEffect().isEmpty(), scenario.id() + " edge.searchEffect");
             }
+        }
+    }
+
+    @Test
+    void shortcutOperatorScenariosProduceSuccessfulEvidenceWithOperatorProvenance() {
+        DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();
+        DiscoveryBenchmarkExecutor executor = new DiscoveryBenchmarkExecutor();
+
+        for (String resource : SHORTCUT_SCENARIOS) {
+            DiscoveryBenchmarkScenario scenario = loader.load(resource);
+            DiscoveryBenchmarkEvidence evidence = executor.execute(scenario);
+
+            assertTrue(evidence.success(), scenario.id() + ": " + evidence.failureReason());
+            assertFalse(evidence.bridgeRulesUsed().isEmpty(), scenario.id() + ": bridge rule must be present");
+
+            boolean foundOperatorEdge = false;
+            for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges()) {
+                assertHasText(edge.ruleId(), scenario.id() + " edge.ruleId");
+                assertHasText(edge.source(), scenario.id() + " edge.source");
+                assertHasText(edge.packId(), scenario.id() + " edge.packId");
+                assertHasText(edge.maturity(), scenario.id() + " edge.maturity");
+                assertFalse(edge.searchEffect().isEmpty(), scenario.id() + " edge.searchEffect");
+                if ("operator".equals(edge.source())) {
+                    assertHasText(edge.operatorId(), scenario.id() + " operator edge.operatorId");
+                    assertTrue(scenario.enabledOperators().contains(edge.operatorId()),
+                            scenario.id() + ": operatorId " + edge.operatorId() + " should be in enabledOperators");
+                    assertTrue(edge.enabledByProfile(),
+                            scenario.id() + " operator edge.enabledByProfile should be true");
+                    assertTrue("OPERATOR_DERIVED".equals(edge.maturity()),
+                            scenario.id() + " operator edge.maturity should be OPERATOR_DERIVED, was: " + edge.maturity());
+                    foundOperatorEdge = true;
+                }
+            }
+            assertTrue(foundOperatorEdge, scenario.id() + ": at least one operator edge must appear in evidence");
         }
     }
 

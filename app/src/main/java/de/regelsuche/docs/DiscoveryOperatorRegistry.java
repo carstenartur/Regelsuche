@@ -56,6 +56,18 @@ public final class DiscoveryOperatorRegistry {
         return Set.copyOf(ids);
     }
 
+    public String operatorIdForRule(String ruleId) {
+        if (ruleId == null || ruleId.isBlank()) {
+            return "";
+        }
+        for (Map.Entry<String, DiscoveryOperatorProvider.DiscoveryOperatorDefinition> entry : operatorsById.entrySet()) {
+            if (entry.getValue().producedRuleIds().contains(ruleId)) {
+                return entry.getKey();
+            }
+        }
+        return "";
+    }
+
     public List<HypothesisOperator> operatorsFor(OperatorProfile profile) {
         if (profile == null || profile.enabledOperatorIds().isEmpty()) {
             return List.of();
