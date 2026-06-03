@@ -239,6 +239,16 @@ tasks.register('runDiscoveryCampaign1', JavaExec) {
     args rootProject.projectDir.absolutePath
 }
 
+
+tasks.register('runDiscoveryCampaign2', JavaExec) {
+    description = 'Runs Discovery Campaign 2 and writes reports under app/build/reports/discovery-campaign-2.'
+    group = 'documentation'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.docs.DiscoveryCampaignTwoRunner'
+    args rootProject.projectDir.absolutePath
+}
+
 tasks.register('e2eTest', Test) {
     description = 'Browser-driven end-to-end demo flows (Playwright). Use ' +
         '-Pregelsuche.recordDocs=true to refresh docs/assets/{screenshots,videos}.'

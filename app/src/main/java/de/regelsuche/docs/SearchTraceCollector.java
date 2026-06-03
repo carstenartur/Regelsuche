@@ -236,6 +236,12 @@ final class SearchTraceCollector {
             if (ruleId.startsWith("sympy.log.")) {
                 return "sympy-log-basic";
             }
+            if (ruleId.startsWith("sympy.power.")) {
+                return "sympy-power-basic";
+            }
+            if (ruleId.startsWith("sympy.substitution.")) {
+                return "sympy-polynomial-basic";
+            }
         }
         if (operatorRuleIds.contains(ruleId)) {
             return "operator-derived";

@@ -8,6 +8,10 @@ import de.regelsuche.transform.CommonSubexpressionDiscoveryOperator;
 import de.regelsuche.transform.FactorCandidateOperator;
 import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
 import de.regelsuche.transform.RationalDiscoveryToolkitOperator;
+import de.regelsuche.transform.TrigPythagoreanIdentityOperator;
+import de.regelsuche.transform.SubstitutionIntroductionOperator;
+import de.regelsuche.transform.SubstitutionExpansionOperator;
+import de.regelsuche.transform.LogProductAssumptionOperator;
 import de.regelsuche.transform.RepeatedSubexpressionFactorizationHypothesisOperator;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -173,6 +177,81 @@ class OperatorDisablementTest {
         assertTrue(evidence.edges().stream()
             .anyMatch(edge -> edge.ruleId().equals(CommonSubexpressionDiscoveryOperator.RULE_ID)
                 && edge.source().equals("sympy-derived")));
+    }
+
+
+    @Test
+    void disablingTrigPythagoreanIdentityRestoresCampaignBlocker() {
+        DiscoveryBenchmarkScenario scenario = syntheticScenario(
+            "trig-pythagorean",
+            "sin(x)^2 + cos(x)^2",
+            "1",
+            "trig_pythagorean_identity",
+            TrigPythagoreanIdentityOperator.RULE_ID);
+        DiscoveryOperatorRegistry registry = new DiscoveryOperatorRegistry()
+            .register(new DefaultDiscoveryOperatorProvider());
+
+        DiscoveryBenchmarkEvidence enabled =
+            new DiscoveryBenchmarkExecutor(new DiscoveryBenchmarkScenarioLoader(), registry).execute(scenario);
+        assertTrue(enabled.success(), enabled.failureReason());
+
+        registry.disable("trig_pythagorean_identity");
+        DiscoveryBenchmarkEvidence disabled =
+            new DiscoveryBenchmarkExecutor(new DiscoveryBenchmarkScenarioLoader(), registry).execute(scenario);
+        assertFalse(disabled.success(), disabled.failureReason());
+    }
+
+    @Test
+    void disablingLogProductAssumptionRestoresCampaignBlocker() {
+        DiscoveryBenchmarkScenario scenario = syntheticScenario(
+            "log-product-assumptions",
+            "log(a * b)",
+            "log(a) + log(b)",
+            "log_product_assumption",
+            LogProductAssumptionOperator.RULE_ID);
+        DiscoveryOperatorRegistry registry = new DiscoveryOperatorRegistry()
+            .register(new DefaultDiscoveryOperatorProvider());
+
+        DiscoveryBenchmarkEvidence enabled =
+            new DiscoveryBenchmarkExecutor(new DiscoveryBenchmarkScenarioLoader(), registry).execute(scenario);
+        assertTrue(enabled.success(), enabled.failureReason());
+
+        registry.disable("log_product_assumption");
+        DiscoveryBenchmarkEvidence disabled =
+            new DiscoveryBenchmarkExecutor(new DiscoveryBenchmarkScenarioLoader(), registry).execute(scenario);
+        assertFalse(disabled.success(), disabled.failureReason());
+    }
+
+    @Test
+    void disablingSubstitutionIntroductionBreaksHiddenStructureCase() {
+        DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(
+            "substitution-hidden-structure",
+            "substitution-hidden-structure",
+            "(a+b)^2 + 6*(a+b) + 5",
+            "(a+b+1) * (a+b+5)",
+            List.of(),
+            List.of("substitution_introduction", "factor_candidate", "substitution_expansion"),
+            List.of("sympy-polynomial-basic"),
+            List.of(),
+            List.of(),
+            List.of(SubstitutionExpansionOperator.RULE_ID),
+            new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
+            new DiscoveryBenchmarkScenario.Budgets(8, 240, 5000),
+            new DiscoveryBenchmarkScenario.Gallery(false, 1, 1)
+        );
+        DiscoveryOperatorRegistry registry = new DiscoveryOperatorRegistry()
+            .register(new DefaultDiscoveryOperatorProvider());
+
+        DiscoveryBenchmarkEvidence enabled =
+            new DiscoveryBenchmarkExecutor(new DiscoveryBenchmarkScenarioLoader(), registry).execute(scenario);
+        assertTrue(enabled.success(), enabled.failureReason());
+        assertTrue(enabled.withoutMacroRun().appliedRuleIds().contains(SubstitutionIntroductionOperator.RULE_ID));
+        assertTrue(enabled.withoutMacroRun().appliedRuleIds().contains(SubstitutionExpansionOperator.RULE_ID));
+
+        registry.disable("substitution_introduction");
+        DiscoveryBenchmarkEvidence disabled =
+            new DiscoveryBenchmarkExecutor(new DiscoveryBenchmarkScenarioLoader(), registry).execute(scenario);
+        assertFalse(disabled.success(), disabled.failureReason());
     }
 
     private DiscoveryBenchmarkScenario syntheticScenario(
