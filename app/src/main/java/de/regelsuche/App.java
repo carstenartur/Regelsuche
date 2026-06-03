@@ -82,10 +82,14 @@ public class App {
         System.out.println("  <term|equation|system> <expression>");
         System.out.println("  discover [--min N] [--max N] [--export json,markdown,mermaid,latex,inventory] [--dir PATH]");
         System.out.println("  transform <expression>");
-        System.out.println("  plugins list [--dir PATH]");
-        System.out.println("  rules list [--dir PATH]");
+        System.out.println("  plugins list|reload|watch|status [--dir PATH] [--rules PATH]");
+        System.out.println("  rules list [--dir PATH] [--profile ID]");
         System.out.println("  rules validate <file.regelsuche>");
         System.out.println("  rules conflicts [--dir PATH]");
+        System.out.println("  rules profiles [--dir PATH] [--profile ID]");
+        System.out.println("  rules debug <expression> [--dir PATH]");
+        System.out.println("  rules import <file-or-dir> [--into PATH]");
+        System.out.println("  rules export [--profile ID] [--dir PATH] [--out PATH]");
         System.out.println("  inventory list");
         System.out.println("  inventory export --format json [--dir PATH]");
         System.out.println("  path show <pathId> --format markdown|latex|mermaid|json");

@@ -10,8 +10,11 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -44,6 +47,7 @@ public final class PluginRuntime implements AutoCloseable {
     private List<RuleConflictDetector.CyclicConflict> cyclicConflicts = List.of();
     private List<RuleProfile> profiles = List.of();
     private List<LoadedRuleFile> loadedRuleFiles = List.of();
+    private List<RuleDebugMetadata> debugMetadata = List.of();
     private URLClassLoader externalPluginClassLoader;
 
     public PluginRuntime() {
@@ -77,8 +81,9 @@ public final class PluginRuntime implements AutoCloseable {
         this.profiles = List.of();
         List<LoadedRuleFile> discoveredRuleFiles = new ArrayList<>();
         loadRuleFiles(discoveredDiagnostics, discoveredRuleFiles);
-        disableConfiguredRules();
-        applyActiveProfile(discoveredDiagnostics);
+        List<RuleDebugMetadata> discoveredDebugMetadata = new ArrayList<>();
+        disableConfiguredRules(discoveredDebugMetadata);
+        applyActiveProfile(discoveredDiagnostics, discoveredDebugMetadata);
         this.macroTransformations = buildMacroTransformations(discoveredDiagnostics);
         List<RuleConflictDetector.ConflictCandidate> conflictCandidates = buildConflictCandidates();
         this.conflicts = RuleConflictDetector.detect(conflictCandidates);
@@ -94,10 +99,69 @@ public final class PluginRuntime implements AutoCloseable {
                 "rule-cycle",
                 "Inverse rules can loop indefinitely: " + String.join(", ", cycle.ruleIds())
             ));
+            int cycleRiskIndex = cyclicConflicts.indexOf(cycle) + 1;
+            for (String ruleId : cycle.ruleIds()) {
+                discoveredDebugMetadata.add(new RuleDebugMetadata(
+                    ruleId,
+                    RuleRejectionReason.CYCLE_RISK,
+                    "cycle-risk-index=" + cycleRiskIndex,
+                    "inverse cycle with " + String.join(", ", cycle.ruleIds())
+                ));
+            }
         }
+        appendConditionDebugMetadata(discoveredDebugMetadata);
         loadedPlugins = List.copyOf(discoveredPlugins);
         loadedRuleFiles = List.copyOf(discoveredRuleFiles);
+        debugMetadata = List.copyOf(discoveredDebugMetadata);
         diagnostics = List.copyOf(discoveredDiagnostics);
+    }
+
+    public PluginReloadResult reloadWithResult() {
+        Map<String, PluginSnapshot> previousPlugins = pluginSnapshots();
+        Map<String, RuleFileSnapshot> previousRuleFiles = ruleFileSnapshots();
+        reload();
+        List<PluginReloadChange> pluginChanges = diffSnapshots(previousPlugins, pluginSnapshots());
+        List<PluginReloadChange> ruleFileChanges = diffSnapshots(previousRuleFiles, ruleFileSnapshots());
+        return new PluginReloadResult(pluginChanges, ruleFileChanges, diagnostics, conflicts, cyclicConflicts);
+    }
+
+    private Map<String, PluginSnapshot> pluginSnapshots() {
+        Map<String, PluginSnapshot> snapshots = new LinkedHashMap<>();
+        for (LoadedPlugin plugin : loadedPlugins) {
+            snapshots.put(plugin.id(), PluginSnapshot.from(plugin));
+        }
+        return snapshots;
+    }
+
+    private Map<String, RuleFileSnapshot> ruleFileSnapshots() {
+        Map<String, RuleFileSnapshot> snapshots = new LinkedHashMap<>();
+        for (LoadedRuleFile ruleFile : loadedRuleFiles) {
+            snapshots.put(ruleFile.path(), RuleFileSnapshot.from(ruleFile));
+        }
+        return snapshots;
+    }
+
+    private <T> List<PluginReloadChange> diffSnapshots(Map<String, T> before, Map<String, T> after) {
+        List<PluginReloadChange> changes = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
+        ids.addAll(before.keySet());
+        ids.addAll(after.keySet());
+        ids.stream().sorted().forEach(id -> {
+            T previous = before.get(id);
+            T current = after.get(id);
+            if (previous == null) {
+                changes.add(new PluginReloadChange(id, PluginReloadChange.ChangeType.ADDED));
+            } else if (current == null) {
+                changes.add(new PluginReloadChange(id, PluginReloadChange.ChangeType.REMOVED));
+            } else if (!previous.equals(current)) {
+                changes.add(new PluginReloadChange(id, PluginReloadChange.ChangeType.CHANGED));
+            }
+        });
+        return List.copyOf(changes);
+    }
+
+    public PluginRuntimeConfig config() {
+        return config;
     }
 
     public RuleRegistry ruleRegistry() {
@@ -157,7 +221,13 @@ public final class PluginRuntime implements AutoCloseable {
         combined.addAll(ruleRegistry.enabledRules());
         combined.addAll(transformationRegistry.enabledTransformations());
         combined.addAll(macroTransformations);
-        return new PluginAwareAstRewriteTransformationEngine(combined, astVisitorRegistry);
+        return new PluginAwareAstRewriteTransformationEngine(
+            combined,
+            astVisitorRegistry,
+            12,
+            80,
+            debugMetadata
+        );
     }
 
     public List<PatternTransformation> macroTransformations() {
@@ -253,11 +323,18 @@ public final class PluginRuntime implements AutoCloseable {
         try {
             for (RegelsuchePlugin plugin : loader) {
                 boolean enabled = !config.disabledPluginIds().contains(plugin.id());
-                discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, enabled));
                 if (!enabled) {
+                    discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, false));
                     discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(), "Plugin disabled by configuration"));
                     continue;
                 }
+                List<PluginRuntime.RuntimeDiagnostic> compatibilityIssues = PluginCompatibilityChecker.check(plugin);
+                if (!compatibilityIssues.isEmpty()) {
+                    discoveredDiagnostics.addAll(compatibilityIssues);
+                    discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, false));
+                    continue;
+                }
+                discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, true));
                 registerPlugin(plugin, source, discoveredDiagnostics);
             }
         } catch (ServiceConfigurationError error) {
@@ -312,7 +389,8 @@ public final class PluginRuntime implements AutoCloseable {
                 List<String> fileDiagnostics = result.diagnostics().stream()
                     .map(RuleFileParser.RuleFileDiagnostic::format)
                     .toList();
-                discoveredRuleFiles.add(new LoadedRuleFile(file.toString(), result.loadedEntries(), true, fileDiagnostics));
+                discoveredRuleFiles.add(new LoadedRuleFile(file.toString(), result.loadedEntries(), true, fileDiagnostics,
+                    contentHash(file)));
                 if (!result.profiles().isEmpty()) {
                     List<RuleProfile> merged = new ArrayList<>(this.profiles);
                     merged.addAll(result.profiles());
@@ -325,13 +403,13 @@ public final class PluginRuntime implements AutoCloseable {
                 List<String> fileDiagnostics = ex.diagnostics().stream()
                     .map(RuleFileParser.RuleFileDiagnostic::format)
                     .toList();
-                discoveredRuleFiles.add(new LoadedRuleFile(file.toString(), 0, false, fileDiagnostics));
+                discoveredRuleFiles.add(new LoadedRuleFile(file.toString(), 0, false, fileDiagnostics, contentHash(file)));
                 for (RuleFileParser.RuleFileDiagnostic diagnostic : ex.diagnostics()) {
                     discoveredDiagnostics.add(new RuntimeDiagnostic(file.toString(), diagnostic.format()));
                 }
             } catch (RuntimeException ex) {
                 discoveredRuleFiles.add(new LoadedRuleFile(file.toString(), 0, false,
-                    List.of("ERROR " + file.getFileName() + ":0 - " + ex.getMessage())));
+                    List.of("ERROR " + file.getFileName() + ":0 - " + ex.getMessage()), contentHash(file)));
                 discoveredDiagnostics.add(new RuntimeDiagnostic(
                     file.toString(),
                     "Failed to load rule file: " + ex.getMessage()
@@ -340,7 +418,7 @@ public final class PluginRuntime implements AutoCloseable {
         }
     }
 
-    private void disableConfiguredRules() {
+    private void disableConfiguredRules(List<RuleDebugMetadata> discoveredDebugMetadata) {
         for (String disabledRuleId : config.disabledRuleIds()) {
             ruleRegistry.disable(disabledRuleId);
             // Also disable .forward/.backward variants generated for `direction: both` rules
@@ -359,10 +437,19 @@ public final class PluginRuntime implements AutoCloseable {
             explanationRegistry.disable(disabledRuleId);
             parserExtensionRegistry.disable(disabledRuleId);
             exampleRegistry.disable(disabledRuleId);
+            discoveredDebugMetadata.add(new RuleDebugMetadata(
+                disabledRuleId,
+                RuleRejectionReason.DISABLED_BY_CONFIG,
+                "config.disabledRuleIds",
+                "disabled by runtime configuration"
+            ));
         }
     }
 
-    private void applyActiveProfile(List<RuntimeDiagnostic> discoveredDiagnostics) {
+    private void applyActiveProfile(
+        List<RuntimeDiagnostic> discoveredDiagnostics,
+        List<RuleDebugMetadata> discoveredDebugMetadata
+    ) {
         String activeProfile = config.activeProfile();
         if (activeProfile == null) {
             return;
@@ -381,16 +468,34 @@ public final class PluginRuntime implements AutoCloseable {
         for (RuleRegistry.RuleRegistration registration : ruleRegistry.registrations()) {
             if (registration.enabled() && !profile.includes(registration.id(), registration.tags())) {
                 ruleRegistry.disable(registration.id());
+                discoveredDebugMetadata.add(new RuleDebugMetadata(
+                    registration.id(),
+                    RuleRejectionReason.DISABLED_BY_PROFILE,
+                    "profile:" + activeProfile,
+                    "not included by activation profile"
+                ));
             }
         }
         for (TransformationRegistry.TransformationRegistration registration : transformationRegistry.registrations()) {
             if (registration.enabled() && !profile.includes(registration.id(), registration.tags())) {
                 transformationRegistry.disable(registration.id());
+                discoveredDebugMetadata.add(new RuleDebugMetadata(
+                    registration.id(),
+                    RuleRejectionReason.DISABLED_BY_PROFILE,
+                    "profile:" + activeProfile,
+                    "not included by activation profile"
+                ));
             }
         }
         for (MacroRegistry.MacroRegistration registration : macroRegistry.registrations()) {
             if (registration.enabled() && !profile.includes(registration.id(), registration.macro().tags())) {
                 macroRegistry.disable(registration.id());
+                discoveredDebugMetadata.add(new RuleDebugMetadata(
+                    "macro." + registration.id(),
+                    RuleRejectionReason.DISABLED_BY_PROFILE,
+                    "profile:" + activeProfile,
+                    "not included by activation profile"
+                ));
             }
         }
         applyProfileToExtensions(profile, searchStrategyRegistry);
@@ -407,10 +512,24 @@ public final class PluginRuntime implements AutoCloseable {
                 "Rule id '" + conflict + "' is both whitelisted and blacklisted; blacklist wins"
             ));
         }
+
         discoveredDiagnostics.add(new RuntimeDiagnostic(
             "profile:" + activeProfile,
             "Activation profile '" + activeProfile + "' applied"
         ));
+    }
+
+    private void appendConditionDebugMetadata(List<RuleDebugMetadata> discoveredDebugMetadata) {
+        for (RuleRegistry.RuleRegistration registration : ruleRegistry.registrations()) {
+            if (!registration.conditions().isEmpty()) {
+                discoveredDebugMetadata.add(new RuleDebugMetadata(
+                    registration.id(),
+                    RuleRejectionReason.CONDITION_FAILED,
+                    "conditions=" + registration.conditions(),
+                    "condition evaluation requires matching runtime metadata"
+                ));
+            }
+        }
     }
 
     private <T extends PluginExtension> void applyProfileToExtensions(
@@ -486,6 +605,23 @@ public final class PluginRuntime implements AutoCloseable {
         }
     }
 
+    private String contentHash(Path path) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return bytesToHex(digest.digest(Files.readAllBytes(path)));
+        } catch (IOException | NoSuchAlgorithmException ex) {
+            return "unreadable:" + ex.getMessage();
+        }
+    }
+
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
     private void closeQuietly() {
         if (externalPluginClassLoader != null) {
             try {
@@ -503,7 +639,7 @@ public final class PluginRuntime implements AutoCloseable {
     public record RuntimeDiagnostic(String source, String message) {
     }
 
-    public record LoadedRuleFile(String path, int loadedEntries, boolean loaded, List<String> diagnostics) {
+    public record LoadedRuleFile(String path, int loadedEntries, boolean loaded, List<String> diagnostics, String contentHash) {
         public LoadedRuleFile {
             diagnostics = List.copyOf(diagnostics);
         }
