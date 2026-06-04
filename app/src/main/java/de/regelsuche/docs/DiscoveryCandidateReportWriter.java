@@ -115,7 +115,9 @@ final class DiscoveryCandidateReportWriter {
     private String renderMacroCandidates(CandidateBundle bundle) {
         StringBuilder out = new StringBuilder("# Macro candidates\n\n");
         List<CandidateView> macroCandidates = bundle.candidates().stream()
-            .filter(candidate -> candidate.success() && candidate.rulePath().size() >= 2)
+            .filter(candidate -> candidate.success())
+            .filter(candidate -> candidate.rulePath().size() >= 2
+                || "substitution".equals(candidate.family()))
             .toList();
         if (macroCandidates.isEmpty()) {
             out.append("- none\n");
