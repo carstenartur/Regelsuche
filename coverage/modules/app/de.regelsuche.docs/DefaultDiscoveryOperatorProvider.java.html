@@ -3,58 +3,98 @@
 import de.regelsuche.transform.CompleteSquareBridgeOperator;
 import de.regelsuche.transform.CommonSubexpressionDiscoveryOperator;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.ExpLogInverseOperator;
 import de.regelsuche.transform.FactorCandidateOperator;
-import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
+import de.regelsuche.transform.LogProductAssumptionOperator;
+import de.regelsuche.transform.PowerRootAssumptionRules;
 import de.regelsuche.transform.RationalDiscoveryToolkitOperator;
+import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
+import de.regelsuche.transform.RationalizationHypothesisOperator;
 import de.regelsuche.transform.RepeatedSubexpressionFactorizationHypothesisOperator;
+import de.regelsuche.transform.SubstitutionExpansionOperator;
+import de.regelsuche.transform.SubstitutionIntroductionOperator;
 import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
+import de.regelsuche.transform.TrigPowerReductionOperator;
+import de.regelsuche.transform.TrigPythagoreanIdentityOperator;
 import java.util.List;
 
-<span class="fc" id="L13">final class DefaultDiscoveryOperatorProvider implements DiscoveryOperatorProvider {</span>
+<span class="fc" id="L21">final class DefaultDiscoveryOperatorProvider implements DiscoveryOperatorProvider {</span>
     @Override
     public String id() {
-<span class="nc" id="L16">        return &quot;core-default-operators&quot;;</span>
+<span class="nc" id="L24">        return &quot;core-default-operators&quot;;</span>
     }
 
     @Override
     public List&lt;DiscoveryOperatorDefinition&gt; operators() {
-<span class="fc" id="L21">        return List.of(</span>
+<span class="fc" id="L29">        return List.of(</span>
                 new DiscoveryOperatorDefinition(
                         &quot;complete_square_bridge&quot;,
                         CompleteSquareBridgeOperator::new,
-<span class="fc" id="L25">                        List.of(CompleteSquareBridgeOperator.RULE_ID)),</span>
+<span class="fc" id="L33">                        List.of(CompleteSquareBridgeOperator.RULE_ID)),</span>
                 new DiscoveryOperatorDefinition(
                         &quot;sophie_germain_bridge&quot;,
                         DifferenceOfSquaresPreparationOperator::new,
-<span class="fc" id="L29">                        List.of(DifferenceOfSquaresPreparationOperator.RULE_ID)),</span>
+<span class="fc" id="L37">                        List.of(DifferenceOfSquaresPreparationOperator.RULE_ID)),</span>
                 new DiscoveryOperatorDefinition(
                         &quot;hidden_structure_bridge&quot;,
                         DifferenceOfSquaresPreparationOperator::new,
-<span class="fc" id="L33">                        List.of(DifferenceOfSquaresPreparationOperator.RULE_ID)),</span>
+<span class="fc" id="L41">                        List.of(DifferenceOfSquaresPreparationOperator.RULE_ID)),</span>
                 new DiscoveryOperatorDefinition(
                         &quot;repeated_subexpression_factorization&quot;,
                         RepeatedSubexpressionFactorizationHypothesisOperator::new,
-<span class="fc" id="L37">                        List.of(RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID)),</span>
+<span class="fc" id="L45">                        List.of(RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID)),</span>
                 new DiscoveryOperatorDefinition(
                         &quot;common_subexpression_discovery&quot;,
                         CommonSubexpressionDiscoveryOperator::new,
-<span class="fc" id="L41">                        List.of(CommonSubexpressionDiscoveryOperator.RULE_ID)),</span>
+<span class="fc" id="L49">                        List.of(CommonSubexpressionDiscoveryOperator.RULE_ID)),</span>
                 new DiscoveryOperatorDefinition(
                         &quot;factor_candidate&quot;,
                         FactorCandidateOperator::new,
-<span class="fc" id="L45">                        List.of(FactorCandidateOperator.RULE_ID)),</span>
+<span class="fc" id="L53">                        List.of(FactorCandidateOperator.RULE_ID)),</span>
                 new DiscoveryOperatorDefinition(
                         &quot;telescoping_fraction&quot;,
                         TelescopingFractionHypothesisOperator::new,
-<span class="fc" id="L49">                        List.of(TelescopingFractionHypothesisOperator.RULE_ID)),</span>
+<span class="fc" id="L57">                        List.of(TelescopingFractionHypothesisOperator.RULE_ID)),</span>
                 new DiscoveryOperatorDefinition(
                         &quot;rational_normalization&quot;,
                         RationalNormalizationHypothesisOperator::new,
-<span class="fc" id="L53">                        List.of(RationalNormalizationHypothesisOperator.RULE_ID)),</span>
+<span class="fc" id="L61">                        List.of(RationalNormalizationHypothesisOperator.RULE_ID)),</span>
+                new DiscoveryOperatorDefinition(
+                        &quot;rationalization&quot;,
+                        RationalizationHypothesisOperator::new,
+<span class="fc" id="L65">                        List.of(RationalizationHypothesisOperator.RULE_ID)),</span>
                 new DiscoveryOperatorDefinition(
                         &quot;rational_discovery_toolkit&quot;,
                         RationalDiscoveryToolkitOperator::new,
-<span class="fc" id="L57">                        List.of(RationalDiscoveryToolkitOperator.RULE_ID)));</span>
+<span class="fc" id="L69">                        List.of(RationalDiscoveryToolkitOperator.RULE_ID)),</span>
+                new DiscoveryOperatorDefinition(
+                        &quot;trig_pythagorean_identity&quot;,
+                        TrigPythagoreanIdentityOperator::new,
+<span class="fc" id="L73">                        List.of(TrigPythagoreanIdentityOperator.RULE_ID)),</span>
+                new DiscoveryOperatorDefinition(
+                        &quot;trig_power_reduction&quot;,
+                        TrigPowerReductionOperator::new,
+<span class="fc" id="L77">                        List.of(TrigPowerReductionOperator.RULE_ID)),</span>
+                new DiscoveryOperatorDefinition(
+                        &quot;log_product_assumption&quot;,
+                        LogProductAssumptionOperator::new,
+<span class="fc" id="L81">                        List.of(LogProductAssumptionOperator.RULE_ID)),</span>
+                new DiscoveryOperatorDefinition(
+                        &quot;exp_log_inverse&quot;,
+                        ExpLogInverseOperator::new,
+<span class="fc" id="L85">                        List.of(ExpLogInverseOperator.RULE_ID)),</span>
+                new DiscoveryOperatorDefinition(
+                        &quot;power_root_assumptions&quot;,
+                        PowerRootAssumptionRules::new,
+<span class="fc" id="L89">                        List.of(PowerRootAssumptionRules.RULE_ID)),</span>
+                new DiscoveryOperatorDefinition(
+                        &quot;substitution_introduction&quot;,
+                        SubstitutionIntroductionOperator::new,
+<span class="fc" id="L93">                        List.of(SubstitutionIntroductionOperator.RULE_ID)),</span>
+                new DiscoveryOperatorDefinition(
+                        &quot;substitution_expansion&quot;,
+                        SubstitutionExpansionOperator::new,
+<span class="fc" id="L97">                        List.of(SubstitutionExpansionOperator.RULE_ID)));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

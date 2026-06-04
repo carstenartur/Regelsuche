@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExpLogInverseOperator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">ExpLogInverseOperator.java</span></div><h1>ExpLogInverseOperator.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.List;
+import java.util.Locale;
+
+/** Assumption-aware exp/log inverse under strictly positive argument. */
+<span class="fc" id="L13">public final class ExpLogInverseOperator implements HypothesisOperator {</span>
+    public static final String RULE_ID = &quot;sympy.log.basic.exp_log_inverse&quot;;
+    private static final String PACK_ID = &quot;sympy-log-basic&quot;;
+    private static final String LICENSE = &quot;BSD-3-Clause&quot;;
+
+<span class="fc" id="L18">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    @Override
+    public List&lt;Transformation&gt; generateCandidates(String expression) {
+        Expr root;
+        try {
+<span class="fc" id="L24">            root = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="nc" id="L25">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L26">            return List.of();</span>
+<span class="fc" id="L27">        }</span>
+<span class="pc bpc" id="L28" title="3 of 6 branches missed.">        if (!(root instanceof FunctionExpr exp) || !&quot;exp&quot;.equals(exp.name()) || exp.arguments().size() != 1) {</span>
+<span class="nc" id="L29">            return List.of();</span>
+        }
+<span class="fc" id="L31">        Expr expArg = exp.argument();</span>
+<span class="pc bpc" id="L32" title="3 of 6 branches missed.">        if (!(expArg instanceof FunctionExpr log) || !&quot;log&quot;.equals(log.name()) || log.arguments().size() != 1) {</span>
+<span class="nc" id="L33">            return List.of();</span>
+        }
+<span class="fc" id="L35">        String argument = ExpressionFormatter.format(log.argument());</span>
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">        if (argument.isBlank() || argument.toLowerCase(Locale.ROOT).contains(&quot;unknown&quot;)) {</span>
+<span class="fc" id="L37">            return List.of();</span>
+        }
+<span class="fc" id="L39">        return List.of(new Transformation(</span>
+            RULE_ID,
+            argument,
+            RewriteKind.SIMPLIFY,
+            false,
+            -2,
+            true,
+            RULE_ID + &quot;|source=sympy-derived|pack=&quot; + PACK_ID,
+<span class="fc" id="L47">            List.of(argument + &quot; &gt; 0&quot;),</span>
+            PACK_ID,
+            LICENSE
+        ));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

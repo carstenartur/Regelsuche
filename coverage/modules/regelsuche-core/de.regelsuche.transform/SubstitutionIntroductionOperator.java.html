@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubstitutionIntroductionOperator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">SubstitutionIntroductionOperator.java</span></div><h1>SubstitutionIntroductionOperator.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Introduces structural placeholders for repeated non-trivial subexpressions. */
+<span class="fc" id="L22">public final class SubstitutionIntroductionOperator implements HypothesisOperator {</span>
+    public static final String RULE_ID = &quot;sympy.substitution.basic.introduction&quot;;
+    private static final String PACK_ID = &quot;sympy-polynomial-basic&quot;;
+    private static final String LICENSE = &quot;BSD-3-Clause&quot;;
+
+<span class="fc" id="L27">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    @Override
+    public List&lt;Transformation&gt; generateCandidates(String expression) {
+        Expr root;
+        try {
+<span class="fc" id="L33">            root = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="nc" id="L34">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L35">            return List.of();</span>
+<span class="fc" id="L36">        }</span>
+<span class="fc" id="L37">        String original = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L38">        Map&lt;Expr, CandidateStats&gt; stats = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L39">        collectStats(root, 0, stats);</span>
+<span class="fc" id="L40">        List&lt;CandidateStats&gt; sortedCandidates = stats.values().stream()</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            .filter(candidate -&gt; candidate.occurrences() &gt;= 2)</span>
+<span class="fc" id="L42">            .filter(candidate -&gt; isNonTrivial(candidate.expression()))</span>
+<span class="fc" id="L43">            .sorted(Comparator.comparingInt(CandidateStats::occurrences).reversed()</span>
+<span class="fc" id="L44">                .thenComparingInt(CandidateStats::nodeCount).reversed()</span>
+<span class="fc" id="L45">                .thenComparingInt(CandidateStats::depth)</span>
+<span class="fc" id="L46">                .thenComparing(CandidateStats::formatted))</span>
+<span class="fc" id="L47">            .toList();</span>
+<span class="fc" id="L48">        List&lt;CandidateStats&gt; selected = selectNonOverlapping(sortedCandidates);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (selected.isEmpty()) {</span>
+<span class="fc" id="L50">            selected = selectDenominatorFactors(root);</span>
+        }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (selected.isEmpty()) {</span>
+<span class="fc" id="L53">            selected = selectPowerBases(root);</span>
+        }
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (selected.isEmpty()) {</span>
+<span class="fc" id="L56">            return List.of();</span>
+        }
+
+<span class="fc" id="L59">        Set&lt;String&gt; blockedNames = new LinkedHashSet&lt;&gt;(collectVariableNames(root));</span>
+<span class="fc" id="L60">        LinkedHashMap&lt;String, String&gt; placeholderToReplacement = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L61">        LinkedHashMap&lt;String, Integer&gt; placeholderOccurrences = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L62">        Expr substituted = root;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (CandidateStats candidate : selected) {</span>
+<span class="fc" id="L64">            String placeholder = SubstitutionRewriteState.nextPlaceholder(blockedNames);</span>
+<span class="fc" id="L65">            Expr replaced = replaceExact(substituted, candidate.expression(), new VariableExpr(placeholder));</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (replaced.equals(substituted)) {</span>
+<span class="nc" id="L67">                continue;</span>
+            }
+<span class="fc" id="L69">            substituted = replaced;</span>
+<span class="fc" id="L70">            placeholderToReplacement.put(placeholder, candidate.formatted());</span>
+<span class="fc" id="L71">            placeholderOccurrences.put(placeholder, candidate.occurrences());</span>
+<span class="fc" id="L72">            blockedNames.add(placeholder);</span>
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">        String transformed = ExpressionFormatter.format(substituted);</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">        if (placeholderToReplacement.isEmpty() || transformed.equals(original)) {</span>
+<span class="nc" id="L76">            return List.of();</span>
+        }
+<span class="fc" id="L78">        SubstitutionRewriteState.rememberAll(placeholderToReplacement);</span>
+<span class="fc" id="L79">        List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L80">        assumptions.add(&quot;substitution.operator=&quot; + RULE_ID);</span>
+<span class="fc" id="L81">        assumptions.add(&quot;substitution.substituted=&quot; + transformed);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : placeholderToReplacement.entrySet()) {</span>
+<span class="fc" id="L83">            String placeholder = entry.getKey();</span>
+<span class="fc" id="L84">            assumptions.add(&quot;substitution.placeholder.&quot; + placeholder + &quot;=&quot; + entry.getValue());</span>
+<span class="fc" id="L85">            assumptions.add(&quot;substitution.occurrences.&quot; + placeholder + &quot;=&quot; + placeholderOccurrences.get(placeholder));</span>
+<span class="fc" id="L86">        }</span>
+<span class="fc" id="L87">        String mappingKey = placeholderToReplacement.entrySet().stream()</span>
+<span class="fc" id="L88">            .map(entry -&gt; entry.getKey() + &quot;=&quot; + compact(entry.getValue()))</span>
+<span class="fc" id="L89">            .reduce((left, right) -&gt; left + &quot;;&quot; + right)</span>
+<span class="fc" id="L90">            .orElse(&quot;&quot;);</span>
+<span class="fc" id="L91">        return List.of(new Transformation(</span>
+            RULE_ID,
+            transformed,
+            RewriteKind.NORMALIZE,
+            true,
+            1,
+            true,
+            RULE_ID + &quot;|source=sympy-derived|pack=&quot; + PACK_ID
+                + &quot;|mappings=&quot; + mappingKey
+<span class="fc" id="L100">                + &quot;|substituted=&quot; + compact(transformed),</span>
+            assumptions,
+            PACK_ID,
+            LICENSE
+        ));
+    }
+
+    private List&lt;CandidateStats&gt; selectNonOverlapping(List&lt;CandidateStats&gt; candidates) {
+<span class="fc" id="L108">        List&lt;CandidateStats&gt; selected = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (CandidateStats candidate : candidates) {</span>
+<span class="fc" id="L110">            boolean overlaps = false;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            for (CandidateStats existing : selected) {</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                if (containsSubexpression(candidate.expression(), existing.expression())</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    || containsSubexpression(existing.expression(), candidate.expression())) {</span>
+<span class="fc" id="L114">                    overlaps = true;</span>
+<span class="fc" id="L115">                    break;</span>
+                }
+<span class="nc" id="L117">            }</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (!overlaps) {</span>
+<span class="fc" id="L119">                selected.add(candidate);</span>
+            }
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        return selected;</span>
+    }
+
+    private List&lt;CandidateStats&gt; selectDenominatorFactors(Expr expression) {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr div)</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            || div.operator() != BinaryOperator.DIV</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            || !(div.left() instanceof NumberExpr numerator)</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            || Double.compare(numerator.value(), 1.0) != 0) {</span>
+<span class="fc" id="L130">            return List.of();</span>
+        }
+<span class="fc" id="L132">        List&lt;Expr&gt; factors = flattenMultiplication(div.right());</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (factors.size() &lt; 2) {</span>
+<span class="nc" id="L134">            return List.of();</span>
+        }
+<span class="fc" id="L136">        List&lt;CandidateStats&gt; selected = factors.stream()</span>
+<span class="fc" id="L137">            .filter(this::isNonTrivial)</span>
+<span class="fc" id="L138">            .map(factor -&gt; new CandidateStats(</span>
+                factor,
+<span class="fc" id="L140">                ExpressionFormatter.format(factor),</span>
+                1,
+                1,
+<span class="fc" id="L143">                nodeCount(factor)</span>
+            ))
+<span class="fc" id="L145">            .sorted(Comparator.comparingInt(CandidateStats::nodeCount).reversed()</span>
+<span class="fc" id="L146">                .thenComparing(CandidateStats::formatted))</span>
+<span class="fc" id="L147">            .limit(3)</span>
+<span class="fc" id="L148">            .toList();</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        return selected.size() &gt;= 2 ? selected : List.of();</span>
+    }
+
+    private List&lt;Expr&gt; flattenMultiplication(Expr expression) {
+<span class="pc bpc" id="L153" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L154">            List&lt;Expr&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L155">            factors.addAll(flattenMultiplication(binary.left()));</span>
+<span class="fc" id="L156">            factors.addAll(flattenMultiplication(binary.right()));</span>
+<span class="fc" id="L157">            return factors;</span>
+        }
+<span class="fc" id="L159">        return List.of(expression);</span>
+    }
+
+    private List&lt;CandidateStats&gt; selectPowerBases(Expr expression) {
+<span class="fc" id="L163">        Map&lt;Expr, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L164">        collectPowerBases(expression, counts);</span>
+<span class="fc" id="L165">        return counts.entrySet().stream()</span>
+<span class="fc" id="L166">            .map(entry -&gt; new CandidateStats(</span>
+<span class="fc" id="L167">                entry.getKey(),</span>
+<span class="fc" id="L168">                ExpressionFormatter.format(entry.getKey()),</span>
+<span class="fc" id="L169">                entry.getValue(),</span>
+                1,
+<span class="fc" id="L171">                nodeCount(entry.getKey())</span>
+            ))
+<span class="fc" id="L173">            .filter(candidate -&gt; isNonTrivial(candidate.expression()))</span>
+<span class="fc" id="L174">            .sorted(Comparator.comparingInt(CandidateStats::occurrences).reversed()</span>
+<span class="fc" id="L175">                .thenComparingInt(CandidateStats::nodeCount).reversed()</span>
+<span class="fc" id="L176">                .thenComparing(CandidateStats::formatted))</span>
+<span class="fc" id="L177">            .limit(2)</span>
+<span class="fc" id="L178">            .toList();</span>
+    }
+
+    private void collectPowerBases(Expr expression, Map&lt;Expr, Integer&gt; counts) {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                &amp;&amp; binary.right() instanceof NumberExpr exponent</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                &amp;&amp; exponent.value() &gt;= 2.0</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                &amp;&amp; Math.rint(exponent.value()) == exponent.value()) {</span>
+<span class="fc" id="L187">                counts.merge(binary.left(), 1, Integer::sum);</span>
+            }
+<span class="fc" id="L189">            collectPowerBases(binary.left(), counts);</span>
+<span class="fc" id="L190">            collectPowerBases(binary.right(), counts);</span>
+<span class="fc" id="L191">            return;</span>
+        }
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="nc" id="L195">                collectPowerBases(argument, counts);</span>
+<span class="nc" id="L196">            }</span>
+        }
+<span class="fc" id="L198">    }</span>
+
+    private void collectStats(Expr expression, int depth, Map&lt;Expr, CandidateStats&gt; stats) {
+<span class="fc" id="L201">        String formatted = ExpressionFormatter.format(expression);</span>
+<span class="fc" id="L202">        int nodeCount = nodeCount(expression);</span>
+<span class="fc" id="L203">        CandidateStats existing = stats.get(expression);</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (existing == null) {</span>
+<span class="fc" id="L205">            stats.put(expression, new CandidateStats(expression, formatted, 1, depth, nodeCount));</span>
+        } else {
+<span class="fc" id="L207">            stats.put(expression, new CandidateStats(</span>
+                expression,
+<span class="fc" id="L209">                existing.formatted(),</span>
+<span class="fc" id="L210">                existing.occurrences() + 1,</span>
+<span class="fc" id="L211">                Math.min(existing.depth(), depth),</span>
+<span class="fc" id="L212">                existing.nodeCount()</span>
+            ));
+        }
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L216">            collectStats(binary.left(), depth + 1, stats);</span>
+<span class="fc" id="L217">            collectStats(binary.right(), depth + 1, stats);</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="nc" id="L220">                collectStats(argument, depth + 1, stats);</span>
+<span class="nc" id="L221">            }</span>
+        }
+<span class="fc" id="L223">    }</span>
+
+    private int nodeCount(Expr expression) {
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L227">            return 1 + nodeCount(binary.left()) + nodeCount(binary.right());</span>
+        }
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="nc" id="L230">            int count = 1;</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="nc" id="L232">                count += nodeCount(argument);</span>
+<span class="nc" id="L233">            }</span>
+<span class="nc" id="L234">            return count;</span>
+        }
+<span class="fc" id="L236">        return 1;</span>
+    }
+
+    private boolean isNonTrivial(Expr expression) {
+<span class="fc bfc" id="L240" title="All 4 branches covered.">        return !(expression instanceof NumberExpr) &amp;&amp; !(expression instanceof VariableExpr);</span>
+    }
+
+    private Set&lt;String&gt; collectVariableNames(Expr expression) {
+<span class="fc" id="L244">        LinkedHashSet&lt;String&gt; names = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L245">        collectVariableNames(expression, names);</span>
+<span class="fc" id="L246">        return names;</span>
+    }
+
+    private void collectVariableNames(Expr expression, Set&lt;String&gt; names) {
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
+<span class="fc" id="L251">            names.add(variableExpr.name());</span>
+<span class="fc" id="L252">            return;</span>
+        }
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L255">            collectVariableNames(binary.left(), names);</span>
+<span class="fc" id="L256">            collectVariableNames(binary.right(), names);</span>
+<span class="fc" id="L257">            return;</span>
+        }
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="nc" id="L261">                collectVariableNames(argument, names);</span>
+<span class="nc" id="L262">            }</span>
+        }
+<span class="fc" id="L264">    }</span>
+
+    private Expr replaceExact(Expr expression, Expr target, Expr replacement) {
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        if (expression.equals(target)) {</span>
+<span class="fc" id="L268">            return replacement;</span>
+        }
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L271">            Expr left = replaceExact(binary.left(), target, replacement);</span>
+<span class="fc" id="L272">            Expr right = replaceExact(binary.right(), target, replacement);</span>
+<span class="fc bfc" id="L273" title="All 4 branches covered.">            if (left == binary.left() &amp;&amp; right == binary.right()) {</span>
+<span class="fc" id="L274">                return expression;</span>
+            }
+<span class="fc" id="L276">            return new BinaryExpr(left, binary.operator(), right);</span>
+        }
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="nc" id="L279">            List&lt;Expr&gt; rewritten = new ArrayList&lt;&gt;(functionExpr.arguments().size());</span>
+<span class="nc" id="L280">            boolean changed = false;</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="nc" id="L282">                Expr replaced = replaceExact(argument, target, replacement);</span>
+<span class="nc" id="L283">                rewritten.add(replaced);</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                if (replaced != argument) {</span>
+<span class="nc" id="L285">                    changed = true;</span>
+                }
+<span class="nc" id="L287">            }</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            return changed ? new FunctionExpr(functionExpr.name(), rewritten) : expression;</span>
+        }
+<span class="fc" id="L290">        return expression;</span>
+    }
+
+    private boolean containsSubexpression(Expr expression, Expr target) {
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (expression.equals(target)) {</span>
+<span class="fc" id="L295">            return true;</span>
+        }
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L298" title="1 of 4 branches missed.">            return containsSubexpression(binary.left(), target) || containsSubexpression(binary.right(), target);</span>
+        }
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">                if (containsSubexpression(argument, target)) {</span>
+<span class="nc" id="L303">                    return true;</span>
+                }
+<span class="nc" id="L305">            }</span>
+        }
+<span class="fc" id="L307">        return false;</span>
+    }
+
+    private String compact(String expression) {
+<span class="fc" id="L311">        return expression.replace(&quot; &quot;, &quot;&quot;);</span>
+    }
+
+<span class="fc" id="L314">    private record CandidateStats(</span>
+        Expr expression,
+        String formatted,
+        int occurrences,
+        int depth,
+        int nodeCount
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
