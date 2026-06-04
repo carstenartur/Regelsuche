@@ -9,7 +9,10 @@ record PromotionRecord(
     String discoveryDate,
     String family,
     PromotionStage stage,
+    String originalExpression,
+    String discoveredStructure,
     String oracleStatus,
+    String oracleEvidence,
     String ablationStatus,
     String sourceOperator,
     String sourcePack,
@@ -30,7 +33,10 @@ record PromotionRecord(
     PromotionRecord {
         family = family == null ? "" : family;
         stage = stage == null ? PromotionStage.OBSERVED : stage;
+        originalExpression = originalExpression == null ? "" : originalExpression;
+        discoveredStructure = discoveredStructure == null ? "" : discoveredStructure;
         oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? "UNAVAILABLE" : oracleStatus;
+        oracleEvidence = oracleEvidence == null ? "" : oracleEvidence;
         ablationStatus = ablationStatus == null || ablationStatus.isBlank() ? "N/A" : ablationStatus;
         sourceOperator = sourceOperator == null ? "" : sourceOperator;
         sourcePack = sourcePack == null ? "" : sourcePack;
@@ -47,6 +53,11 @@ record PromotionRecord(
         return !stage.atLeast(PromotionStage.PROMOTED);
     }
 
+    boolean galleryEligible() {
+        return !fallbackUsed && !curatedPathPresent
+            && (promotionEligible || stage.atLeast(PromotionStage.REUSED));
+    }
+
     PromotionRecord withReuse(DiscoveryCampaignFourRunner.CaseResult reuse) {
         LinkedHashSet<String> reused = new LinkedHashSet<>(reusedMacroIds);
         reused.addAll(reuse.reusedMacroIds());
@@ -59,7 +70,10 @@ record PromotionRecord(
             discoveryDate,
             family,
             nextStage,
+            originalExpression,
+            discoveredStructure,
             oracleStatus,
+            oracleEvidence,
             ablationStatus,
             sourceOperator,
             sourcePack,

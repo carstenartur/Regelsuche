@@ -9,8 +9,11 @@ record PromotionObservation(
     String sourceCampaign,
     String discoveryDate,
     String family,
+    String originalExpression,
+    String discoveredStructure,
     boolean success,
     String oracleStatus,
+    String oracleEvidence,
     String ablationStatus,
     String sourceOperator,
     String sourcePack,
@@ -24,7 +27,10 @@ record PromotionObservation(
 ) {
     PromotionObservation {
         family = family == null ? "" : family;
+        originalExpression = originalExpression == null ? "" : originalExpression;
+        discoveredStructure = discoveredStructure == null ? "" : discoveredStructure;
         oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? "UNAVAILABLE" : oracleStatus;
+        oracleEvidence = oracleEvidence == null ? "" : oracleEvidence;
         ablationStatus = ablationStatus == null || ablationStatus.isBlank() ? "N/A" : ablationStatus;
         sourceOperator = sourceOperator == null ? "" : sourceOperator;
         sourcePack = sourcePack == null ? "" : sourcePack;
@@ -39,8 +45,11 @@ record PromotionObservation(
             campaignId,
             discoveryDateFor(campaignId),
             result.family(),
+            result.inputExpression(),
+            result.targetExpression(),
             result.success(),
             result.oracleStatus(),
+            result.oracleEvidence(),
             result.ablationStatus(),
             result.shortcutOperatorId(),
             result.shortcutPackId(),
@@ -60,8 +69,11 @@ record PromotionObservation(
             campaignId,
             discoveryDateFor(campaignId),
             result.family(),
+            result.inputExpression(),
+            result.targetExpression(),
             result.success(),
             result.oracleStatus(),
+            result.oracleEvidence(),
             result.ablationStatus(),
             result.shortcutOperatorId(),
             result.shortcutPackId(),
@@ -81,8 +93,11 @@ record PromotionObservation(
             campaignId,
             discoveryDateFor(campaignId),
             result.family(),
+            result.inputExpression(),
+            result.targetExpression(),
             result.success(),
             result.oracleStatus(),
+            result.oracleEvidence(),
             result.ablationStatus(),
             result.shortcutOperatorId(),
             result.shortcutPackId(),

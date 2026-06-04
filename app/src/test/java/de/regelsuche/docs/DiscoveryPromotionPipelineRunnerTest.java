@@ -25,6 +25,10 @@ class DiscoveryPromotionPipelineRunnerTest {
         assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("blocked-candidates.md")));
         assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("operator-opportunities.md")));
         assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("macro-opportunities.md")));
+        assertTrue(Files.exists(tempDir.resolve("promotion-dashboard.json")));
+        assertTrue(Files.exists(tempDir.resolve("promotion-dashboard.md")));
+        assertTrue(Files.exists(tempDir.resolve("gallery-2.0.md")));
+        assertTrue(Files.exists(tempDir.resolve("discovery-details").resolve("README.md")));
         assertTrue(Files.exists(tempDir.resolve("discovery-campaign-4").resolve("discovery-campaign-4.json")));
         assertTrue(Files.exists(tempDir.resolve("discovery-campaign-4").resolve("macro-reuse-report.md")));
 
@@ -36,6 +40,20 @@ class DiscoveryPromotionPipelineRunnerTest {
             .map(PromotionRecord::candidateId)
             .collect(Collectors.toSet());
         assertEquals(candidateIds.size(), report.registry().records().size());
+
+        String dashboard = Files.readString(tempDir.resolve("promotion-dashboard.md"), StandardCharsets.UTF_8);
+        assertTrue(dashboard.contains("Top promoted candidates"));
+        assertTrue(dashboard.contains("Unresolved blockers"));
+
+        String detailsIndex = Files.readString(tempDir.resolve("discovery-details").resolve("README.md"), StandardCharsets.UTF_8);
+        assertTrue(detailsIndex.contains(".md)"));
+
+        String gallery = Files.readString(tempDir.resolve("gallery-2.0.md"), StandardCharsets.UTF_8);
+        for (PromotionRecord record : report.promotionRecords()) {
+            if (gallery.contains(record.candidateId())) {
+                assertTrue(record.galleryEligible(), record.candidateId());
+            }
+        }
     }
 
     @Test
