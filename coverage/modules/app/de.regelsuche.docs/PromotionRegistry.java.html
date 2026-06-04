@@ -45,13 +45,13 @@ import java.util.Map;
 <span class="fc" id="L45">        out.append(&quot;| Candidate | Campaign | Stage | Eligible | Generated macro | Reuse campaign | Blockers |\n&quot;);</span>
 <span class="fc" id="L46">        out.append(&quot;| --- | --- | --- | --- | --- | --- | --- |\n&quot;);</span>
 <span class="fc bfc" id="L47" title="All 2 branches covered.">        for (HistoryEntry entry : registry.history()) {</span>
-<span class="fc" id="L48">            out.append(&quot;| &quot;).append(escape(entry.candidateId()))</span>
-<span class="fc" id="L49">                .append(&quot; | &quot;).append(escape(entry.sourceCampaign()))</span>
+<span class="fc" id="L48">            out.append(&quot;| &quot;).append(escapeMarkdownTableCell(entry.candidateId()))</span>
+<span class="fc" id="L49">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(entry.sourceCampaign()))</span>
 <span class="fc" id="L50">                .append(&quot; | &quot;).append(entry.stage().name().toLowerCase(Locale.ROOT))</span>
 <span class="fc bfc" id="L51" title="All 2 branches covered.">                .append(&quot; | &quot;).append(entry.promotionEligible() ? &quot;yes&quot; : &quot;no&quot;)</span>
-<span class="fc" id="L52">                .append(&quot; | &quot;).append(escape(orDash(entry.generatedMacroId())))</span>
-<span class="fc" id="L53">                .append(&quot; | &quot;).append(escape(orDash(entry.reuseCampaign())))</span>
-<span class="fc bfc" id="L54" title="All 2 branches covered.">                .append(&quot; | &quot;).append(escape(entry.blockers().isEmpty() ? &quot;—&quot; : String.join(&quot;, &quot;, entry.blockers())))</span>
+<span class="fc" id="L52">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(orDash(entry.generatedMacroId())))</span>
+<span class="fc" id="L53">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(orDash(entry.reuseCampaign())))</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(entry.blockers().isEmpty() ? &quot;—&quot; : String.join(&quot;, &quot;, entry.blockers())))</span>
 <span class="fc" id="L55">                .append(&quot; |\n&quot;);</span>
 <span class="fc" id="L56">        }</span>
 <span class="fc" id="L57">        out.append(&quot;\n## Regression history\n\n&quot;);</span>
@@ -60,9 +60,9 @@ import java.util.Map;
 <span class="fc" id="L60">            return out.toString();</span>
         }
 <span class="nc bnc" id="L62" title="All 2 branches missed.">        for (RegressionEntry regression : registry.regressions()) {</span>
-<span class="nc" id="L63">            out.append(&quot;- &quot;).append(escape(regression.candidateId()))</span>
-<span class="nc" id="L64">                .append(&quot; (&quot;).append(escape(regression.campaignId())).append(&quot;): &quot;)</span>
-<span class="nc" id="L65">                .append(escape(regression.reason())).append('\n');</span>
+<span class="nc" id="L63">            out.append(&quot;- &quot;).append(escapeMarkdownInline(regression.candidateId()))</span>
+<span class="nc" id="L64">                .append(&quot; (&quot;).append(escapeMarkdownInline(regression.campaignId())).append(&quot;): &quot;)</span>
+<span class="nc" id="L65">                .append(escapeMarkdownInline(regression.reason())).append('\n');</span>
 <span class="nc" id="L66">        }</span>
 <span class="nc" id="L67">        return out.toString();</span>
     }
@@ -82,44 +82,71 @@ import java.util.Map;
 <span class="fc" id="L82">            higherStage.discoveryDate(),</span>
 <span class="fc" id="L83">            higherStage.family(),</span>
 <span class="fc" id="L84">            higherStage.stage(),</span>
-<span class="fc" id="L85">            higherStage.oracleStatus(),</span>
-<span class="fc" id="L86">            higherStage.ablationStatus(),</span>
-<span class="fc" id="L87">            choose(left.sourceOperator(), right.sourceOperator()),</span>
-<span class="fc" id="L88">            choose(left.sourcePack(), right.sourcePack()),</span>
-<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            !left.assumptions().isEmpty() ? left.assumptions() : right.assumptions(),</span>
-<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            !left.rationale().isBlank() ? left.rationale() : right.rationale(),</span>
-<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            !left.rulePath().isEmpty() ? left.rulePath() : right.rulePath(),</span>
-<span class="pc bpc" id="L92" title="2 of 4 branches missed.">            left.promotionEligible() || right.promotionEligible(),</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            !left.originalExpression().isBlank() ? left.originalExpression() : right.originalExpression(),</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            !left.discoveredStructure().isBlank() ? left.discoveredStructure() : right.discoveredStructure(),</span>
+<span class="fc" id="L87">            higherStage.oracleStatus(),</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            !left.oracleEvidence().isBlank() ? left.oracleEvidence() : right.oracleEvidence(),</span>
+<span class="fc" id="L89">            higherStage.ablationStatus(),</span>
+<span class="fc" id="L90">            choose(left.sourceOperator(), right.sourceOperator()),</span>
+<span class="fc" id="L91">            choose(left.sourcePack(), right.sourcePack()),</span>
+<span class="fc" id="L92">            mergeDistinctSorted(left.assumptions(), right.assumptions()),</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            !left.rationale().isBlank() ? left.rationale() : right.rationale(),</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            !left.rulePath().isEmpty() ? left.rulePath() : right.rulePath(),</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">            left.promotionEligible() || right.promotionEligible(),</span>
             uniqueBlockers,
-<span class="pc bpc" id="L94" title="2 of 4 branches missed.">            left.evidenceExists() || right.evidenceExists(),</span>
-<span class="pc bpc" id="L95" title="2 of 4 branches missed.">            left.curatedPathPresent() || right.curatedPathPresent(),</span>
-<span class="pc bpc" id="L96" title="2 of 4 branches missed.">            left.fallbackUsed() || right.fallbackUsed(),</span>
-<span class="pc bpc" id="L97" title="2 of 4 branches missed.">            left.macroOpportunity() || right.macroOpportunity(),</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">            left.evidenceExists() || right.evidenceExists(),</span>
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">            left.curatedPathPresent() || right.curatedPathPresent(),</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">            left.fallbackUsed() || right.fallbackUsed(),</span>
+<span class="pc bpc" id="L100" title="1 of 4 branches missed.">            left.macroOpportunity() || right.macroOpportunity(),</span>
             generatedMacroId,
             uniqueReusedMacroIds,
-<span class="pc bpc" id="L100" title="2 of 4 branches missed.">            left.measuredImprovement() || right.measuredImprovement(),</span>
-<span class="fc" id="L101">            choose(left.reuseCampaign(), right.reuseCampaign())</span>
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">            left.measuredImprovement() || right.measuredImprovement(),</span>
+<span class="fc" id="L104">            choose(left.reuseCampaign(), right.reuseCampaign())</span>
         );
     }
 
     private String choose(String left, String right) {
-<span class="pc bpc" id="L106" title="3 of 6 branches missed.">        return left != null &amp;&amp; !left.isBlank() ? left : (right == null ? &quot;&quot; : right);</span>
+<span class="pc bpc" id="L109" title="2 of 6 branches missed.">        return left != null &amp;&amp; !left.isBlank() ? left : (right == null ? &quot;&quot; : right);</span>
+    }
+
+    private List&lt;String&gt; mergeDistinctSorted(List&lt;String&gt; left, List&lt;String&gt; right) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        List&lt;String&gt; merged = new ArrayList&lt;&gt;(left == null ? List.of() : left);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        merged.addAll(right == null ? List.of() : right);</span>
+<span class="fc" id="L115">        return merged.stream()</span>
+<span class="pc bpc" id="L116" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L117">            .distinct()</span>
+<span class="fc" id="L118">            .sorted()</span>
+<span class="fc" id="L119">            .toList();</span>
     }
 
     private String orDash(String value) {
-<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
     }
 
-    private String escape(String value) {
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    private String normalizeMarkdownText(String value) {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L128">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L130">        return value</span>
+<span class="fc" id="L131">            .replace(&quot;\r\n&quot;, &quot;\n&quot;)</span>
+<span class="fc" id="L132">            .replace('\r', '\n')</span>
+<span class="fc" id="L133">            .replace('\n', ' ');</span>
+    }
+
+    private String escapeMarkdownInline(String value) {
+<span class="nc" id="L137">        return normalizeMarkdownText(value);</span>
+    }
+
+    private String escapeMarkdownTableCell(String value) {
+<span class="fc" id="L141">        return normalizeMarkdownText(value).replace(&quot;|&quot;, &quot;\\|&quot;);</span>
     }
 
     record Registry(List&lt;PromotionRecord&gt; records, List&lt;HistoryEntry&gt; history, List&lt;RegressionEntry&gt; regressions) {
-<span class="fc" id="L118">        Registry {</span>
-<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            records = records == null ? List.of() : List.copyOf(records);</span>
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            history = history == null ? List.of() : List.copyOf(history);</span>
-<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            regressions = regressions == null ? List.of() : List.copyOf(regressions);</span>
-<span class="fc" id="L122">        }</span>
+<span class="fc" id="L145">        Registry {</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            records = records == null ? List.of() : List.copyOf(records);</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            history = history == null ? List.of() : List.copyOf(history);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            regressions = regressions == null ? List.of() : List.copyOf(regressions);</span>
+<span class="fc" id="L149">        }</span>
     }
 
     record HistoryEntry(
@@ -131,12 +158,12 @@ import java.util.Map;
         String reuseCampaign,
         List&lt;String&gt; blockers
     ) {
-<span class="fc" id="L134">        HistoryEntry {</span>
-<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            blockers = blockers == null ? List.of() : List.copyOf(blockers);</span>
-<span class="fc" id="L136">        }</span>
+<span class="fc" id="L161">        HistoryEntry {</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            blockers = blockers == null ? List.of() : List.copyOf(blockers);</span>
+<span class="fc" id="L163">        }</span>
     }
 
-<span class="nc" id="L139">    record RegressionEntry(String candidateId, String campaignId, String reason) {</span>
+<span class="nc" id="L166">    record RegressionEntry(String candidateId, String campaignId, String reason) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

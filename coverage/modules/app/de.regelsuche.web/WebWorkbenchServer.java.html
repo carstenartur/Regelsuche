@@ -1479,8 +1479,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1479">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1480">            .findFirst();</span>
 <span class="fc bfc" id="L1481" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="nc" id="L1482">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="nc" id="L1483">            return;</span>
+<span class="fc" id="L1482">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="fc" id="L1483">            return;</span>
         }
 <span class="fc" id="L1485">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
 <span class="fc" id="L1486">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>
@@ -2282,8 +2282,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2283">            return;</span>
         }
-<span class="nc" id="L2285">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="nc" id="L2286">    }</span>
+<span class="fc" id="L2285">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="fc" id="L2286">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2289">        var jobs = proofWorkbenchService.listJobs();</span>
