@@ -75,7 +75,7 @@ public final class DiscoveryPromotionPipelineRunner {
             );
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("promotion-registry.json"),
-                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report.registry())
+                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report.registry().records())
             );
             Files.writeString(
                 outputDirectory.resolve("promotion-history.md"),
