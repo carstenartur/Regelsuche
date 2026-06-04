@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** Coordinates the promotion registry, closed-loop campaign 4 reuse validation, backlog, and metrics. */
@@ -249,7 +250,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 inlineCodeOrDash(highlightModel.discoveredStructure()),
                 escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel))),
                 escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),
-                inlinePath(record.rulePath()),
+                escapeMarkdownInline(inlinePath(record.rulePath())),
                 escapeMarkdownInline(promotionDecision(record)),
                 escapeMarkdownInline(missingPieces(record)),
                 inlineCodeOrDash(record.originalExpression()),
@@ -348,11 +349,21 @@ public final class DiscoveryPromotionPipelineRunner {
         String discoveredStructure = !substitutedExpression.isBlank()
             ? substitutedExpression
             : record.discoveredStructure();
-        String expandedExpression = expandedPlaceholders.isEmpty()
+        Map<String, String> placeholdersToExpand = expandedPlaceholders.isEmpty()
+            ? Map.of()
+            : placeholderMappings.entrySet().stream()
+                .filter(entry -> expandedPlaceholders.contains(entry.getKey()))
+                .collect(Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (left, right) -> left,
+                    LinkedHashMap::new
+                ));
+        String expandedExpression = placeholdersToExpand.isEmpty()
             ? ""
             : expandPlaceholders(
                 substitutedExpression.isBlank() ? record.discoveredStructure() : substitutedExpression,
-                placeholderMappings
+                placeholdersToExpand
             );
         String rewrittenAfter = !substitutedExpression.isBlank()
             ? substitutedExpression

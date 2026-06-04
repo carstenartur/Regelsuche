@@ -292,6 +292,50 @@ class DiscoveryPromotionPipelineRunnerTest {
     }
 
     @Test
+    void expandsOnlyPlaceholdersMarkedAsExpanded() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        PromotionRecord record = new PromotionRecord(
+            "partial-expansion",
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.PROMOTED,
+            "A + B + C",
+            "A + B + C",
+            "AGREE",
+            "ok",
+            "DEGRADED",
+            "substitution_introduction",
+            "sympy-polynomial-basic",
+            List.of(
+                "substitution.placeholder.A=x",
+                "substitution.placeholder.B=y",
+                "substitution.placeholder.C=z",
+                "substitution.substituted=A + B + C",
+                "substitution.expanded.A=true",
+                "substitution.expanded.C=true"
+            ),
+            "rationale",
+            List.of("substitution_introduction"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            true,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+
+        String detail = runner.renderDetailReport(record);
+
+        assertTrue(detail.contains("Expanded expression: (x) + B + (z)"));
+        assertFalse(detail.contains("Expanded expression: (x) + (y) + (z)"));
+    }
+
+    @Test
     void evidenceParsingKeepsEqualsAndTracksInvalidOccurrences() {
         DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
         PromotionRecord record = new PromotionRecord(
