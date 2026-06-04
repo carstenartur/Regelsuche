@@ -17,6 +17,8 @@ Wichtige Tests:
 ./gradlew runDiscoveryCampaign1
 ./gradlew runDiscoveryCampaign2
 ./gradlew runDiscoveryCampaign3
+./gradlew runDiscoveryCampaign4
+./gradlew runDiscoveryPromotionPipeline
 ```
 
 Die erzeugten Artefakte eignen sich für:

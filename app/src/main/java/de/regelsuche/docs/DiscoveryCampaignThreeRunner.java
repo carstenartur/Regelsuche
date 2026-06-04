@@ -60,6 +60,10 @@ public final class DiscoveryCampaignThreeRunner {
         try {
             Files.createDirectories(outputDirectory);
             CampaignReport report = run();
+            List<PromotionRecord> promotionRecords = report.results().stream()
+                .map(result -> new PromotionDecider()
+                    .decide(PromotionObservation.fromCampaignThree(result, report.id())))
+                .toList();
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("discovery-campaign-3.json"),
                 JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)
@@ -72,7 +76,7 @@ public final class DiscoveryCampaignThreeRunner {
             candidateReportWriter.write(
                 outputDirectory,
                 report.id(),
-                report.results().stream().map(CaseResult::candidateRecord).toList()
+                promotionRecords
             );
             Path qaDirectory = outputDirectory.resolve("sympy-qa");
             Files.createDirectories(qaDirectory);
@@ -357,22 +361,6 @@ public final class DiscoveryCampaignThreeRunner {
             smallGraphMessage = smallGraphMessage == null ? "" : smallGraphMessage;
         }
 
-        private DiscoveryCandidateReportWriter.CandidateRecord candidateRecord() {
-            return new DiscoveryCandidateReportWriter.CandidateRecord(
-                id,
-                family,
-                inputExpression,
-                targetExpression,
-                success,
-                oracleStatus,
-                ablationStatus,
-                shortcutSource,
-                shortcutPackId,
-                shortcutOperatorId,
-                rulePath,
-                smallGraphMessage
-            );
-        }
     }
 
     public record ProgressSummary(

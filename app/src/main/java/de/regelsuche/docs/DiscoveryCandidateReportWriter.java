@@ -19,13 +19,13 @@ final class DiscoveryCandidateReportWriter {
         .findAndRegisterModules()
         .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
-    CandidateBundle write(Path outputDirectory, String campaignId, List<CandidateRecord> candidates) {
+    CandidateBundle write(Path outputDirectory, String campaignId, List<PromotionRecord> promotionRecords) {
         try {
             Files.createDirectories(outputDirectory);
             CandidateBundle bundle = new CandidateBundle(
                 campaignId,
-                candidates.stream()
-                    .map(candidate -> new CandidateView(candidate, stage(candidate)))
+                promotionRecords.stream()
+                    .map(CandidateView::new)
                     .toList()
             );
             AtomicJsonFile.writeUtf8(
@@ -51,22 +51,6 @@ final class DiscoveryCandidateReportWriter {
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
-    }
-
-    private String stage(CandidateRecord candidate) {
-        if (!candidate.success()) {
-            return "observed";
-        }
-        if ("DISAGREE".equals(candidate.oracleStatus())) {
-            return "candidate";
-        }
-        if (!"DEGRADED".equals(candidate.ablationStatus())) {
-            return "candidate";
-        }
-        if (!candidate.operatorId().isBlank() || !candidate.packId().isBlank()) {
-            return candidate.smallGraphMessage().isBlank() ? "public-evidence" : "promoted";
-        }
-        return "validated";
     }
 
     private String renderCandidates(CandidateBundle bundle) {
@@ -101,10 +85,8 @@ final class DiscoveryCandidateReportWriter {
             out.append("## ").append(escape(entry.getKey())).append("\n\n");
             for (CandidateView candidate : entry.getValue()) {
                 out.append("- ").append(escape(candidate.id()))
-                    .append(": investigate operator for ")
-                    .append(escape(candidate.inputExpression()))
-                    .append(" -> ")
-                    .append(escape(candidate.targetExpression()))
+                    .append(": investigate operator support for recorded path ")
+                    .append(escape(candidate.rulePath().isEmpty() ? "—" : String.join(" -> ", candidate.rulePath())))
                     .append('\n');
             }
             out.append('\n');
@@ -146,70 +128,38 @@ final class DiscoveryCandidateReportWriter {
         }
     }
 
-    record CandidateRecord(
-        String id,
-        String family,
-        String inputExpression,
-        String targetExpression,
-        boolean success,
-        String oracleStatus,
-        String ablationStatus,
-        String source,
-        String packId,
-        String operatorId,
-        List<String> rulePath,
-        String smallGraphMessage
-    ) {
-        CandidateRecord {
-            family = family == null ? "" : family;
-            inputExpression = inputExpression == null ? "" : inputExpression;
-            targetExpression = targetExpression == null ? "" : targetExpression;
-            oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? "UNAVAILABLE" : oracleStatus;
-            ablationStatus = ablationStatus == null || ablationStatus.isBlank() ? "N/A" : ablationStatus;
-            source = source == null ? "" : source;
-            packId = packId == null ? "" : packId;
-            operatorId = operatorId == null ? "" : operatorId;
-            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
-            smallGraphMessage = smallGraphMessage == null ? "" : smallGraphMessage;
-        }
-    }
-
     record CandidateView(
         String id,
         String family,
-        String inputExpression,
-        String targetExpression,
-        boolean success,
         String oracleStatus,
         String ablationStatus,
         String source,
         String packId,
         String operatorId,
         List<String> rulePath,
-        String smallGraphMessage,
         String stage
     ) {
-        CandidateView(CandidateRecord record, String stage) {
+        CandidateView(PromotionRecord record) {
             this(
-                record.id(),
+                record.candidateId(),
                 record.family(),
-                record.inputExpression(),
-                record.targetExpression(),
-                record.success(),
                 record.oracleStatus(),
                 record.ablationStatus(),
-                record.source(),
-                record.packId(),
-                record.operatorId(),
+                record.sourcePack().isBlank() && record.sourceOperator().isBlank() ? "" : "promotion-record",
+                record.sourcePack(),
+                record.sourceOperator(),
                 record.rulePath(),
-                record.smallGraphMessage(),
-                stage
+                record.stage().name().toLowerCase(Locale.ROOT)
             );
         }
 
         CandidateView {
             rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
             stage = stage == null ? "observed" : stage;
+        }
+
+        boolean success() {
+            return !"observed".equals(stage);
         }
     }
 }
