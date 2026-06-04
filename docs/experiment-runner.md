@@ -23,6 +23,7 @@ Typische Kommandos:
 ./gradlew benchmarkReport
 ./gradlew runDiscoveryCampaign1
 ./gradlew runDiscoveryCampaign2
+./gradlew runDiscoveryCampaign3
 ```
 
 Siehe auch:

@@ -20,6 +20,9 @@ public record DiscoveryBenchmarkEvidence(
         List<String> reusedMacros,
         SearchSpaceAnalytics analytics,
         String validationStatus,
+        String oracleStatus,
+        String oracleEvidence,
+        boolean promotionEligible,
         List<EvidenceNode> nodes,
         List<EvidenceEdge> edges,
         String smallGraphMessage) {
@@ -32,6 +35,51 @@ public record DiscoveryBenchmarkEvidence(
         reusedMacros = reusedMacros == null ? List.of() : List.copyOf(reusedMacros);
         nodes = nodes == null ? List.of() : List.copyOf(nodes);
         edges = edges == null ? List.of() : List.copyOf(edges);
+        oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? "UNAVAILABLE" : oracleStatus;
+        oracleEvidence = oracleEvidence == null ? "" : oracleEvidence;
+    }
+
+    public DiscoveryBenchmarkEvidence(
+            String scenarioId,
+            String inputExpression,
+            String targetExpression,
+            boolean success,
+            String failureReason,
+            SearchRunEvidence withoutMacroRun,
+            SearchRunEvidence withMacroRun,
+            List<List<String>> foundPaths,
+            List<String> bridgeRulesUsed,
+            List<String> ruleFamiliesUsed,
+            List<String> convergentStates,
+            List<String> learnedMacros,
+            List<String> reusedMacros,
+            SearchSpaceAnalytics analytics,
+            String validationStatus,
+            List<EvidenceNode> nodes,
+            List<EvidenceEdge> edges,
+            String smallGraphMessage) {
+        this(
+                scenarioId,
+                inputExpression,
+                targetExpression,
+                success,
+                failureReason,
+                withoutMacroRun,
+                withMacroRun,
+                foundPaths,
+                bridgeRulesUsed,
+                ruleFamiliesUsed,
+                convergentStates,
+                learnedMacros,
+                reusedMacros,
+                analytics,
+                validationStatus,
+                "UNAVAILABLE",
+                "",
+                false,
+                nodes,
+                edges,
+                smallGraphMessage);
     }
 
     public int nodeCount() {
@@ -105,6 +153,8 @@ public record DiscoveryBenchmarkEvidence(
                 "edgeCount", edgeCount(),
                 "bridgeRulesUsed", bridgeRulesUsed,
                 "learnedMacros", learnedMacros,
-                "reusedMacros", reusedMacros);
+                "reusedMacros", reusedMacros,
+                "oracleStatus", oracleStatus,
+                "promotionEligible", promotionEligible);
     }
 }

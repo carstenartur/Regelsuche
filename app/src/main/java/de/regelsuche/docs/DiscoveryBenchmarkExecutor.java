@@ -26,6 +26,7 @@ import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.validation.SymPyDiscoveryOracleAdapter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -43,6 +44,7 @@ public final class DiscoveryBenchmarkExecutor {
     private final DiscoveryOperatorRegistry operatorRegistry;
     private final Set<String> operatorRuleIds;
     private final SearchTraceCollector traceCollector;
+    private final SymPyDiscoveryOracleAdapter oracle;
 
     public DiscoveryBenchmarkExecutor() {
         this(new DiscoveryBenchmarkScenarioLoader(), new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()));
@@ -63,6 +65,7 @@ public final class DiscoveryBenchmarkExecutor {
         this.operatorRegistry = operatorRegistry;
         this.operatorRuleIds = operatorRegistry.operatorRuleIds();
         this.traceCollector = new SearchTraceCollector(operatorRegistry);
+        this.oracle = new SymPyDiscoveryOracleAdapter();
     }
 
     public DiscoveryBenchmarkEvidence execute(DiscoveryBenchmarkScenario scenario) {
@@ -97,6 +100,11 @@ public final class DiscoveryBenchmarkExecutor {
         SearchSpaceAnalytics withAnalytics = analyticsFor(withMacro.steps(), learnedMacros, rulesById);
         SearchSpaceAnalytics combinedAnalytics = combine(withoutAnalytics, withAnalytics);
         List<String> reusedMacros = withMacro.appliedRuleIds().stream().filter(learnedMacros::contains).toList();
+        SymPyDiscoveryOracleAdapter.OracleResult oracleResult =
+                oracle.equivalence(scenario.inputExpression(), scenario.targetExpression());
+        boolean promotionEligible = withoutMacro.success()
+                && (!scenario.macroLearning().enabled() || withMacro.success())
+                && !"DISAGREE".equals(oracleResult.status().name());
         List<List<String>> paths = new ArrayList<>();
         if (!withoutMacro.path().isEmpty()) {
             paths.add(withoutMacro.path());
@@ -153,6 +161,9 @@ public final class DiscoveryBenchmarkExecutor {
                 reusedMacros,
                 combinedAnalytics,
                 success ? "PASS" : "FAIL",
+                oracleResult.status().name(),
+                oracleResult.evidence(),
+                promotionEligible,
                 nodes,
                 edges,
                 smallGraphMessage);

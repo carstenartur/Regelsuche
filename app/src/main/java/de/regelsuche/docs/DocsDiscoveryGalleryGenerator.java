@@ -52,6 +52,10 @@ public final class DocsDiscoveryGalleryGenerator {
                     throw new IllegalStateException("Public discovery scenario is not successful: "
                             + scenario.id() + " - " + evidence.failureReason());
                 }
+                if (!evidence.promotionEligible()) {
+                    throw new IllegalStateException("Public discovery scenario is not promotion eligible: "
+                            + scenario.id() + " - oracle=" + evidence.oracleStatus());
+                }
                 artifacts.add(writeScenarioArtifacts(generatedRoot, scenario, evidence));
             }
             ensureAllPublicScenariosGenerated(artifacts);
@@ -110,6 +114,8 @@ public final class DocsDiscoveryGalleryGenerator {
             Map<String, Object> scenario = new LinkedHashMap<>();
             scenario.put("id", artifact.evidence().scenarioId());
             scenario.put("success", artifact.evidence().success());
+            scenario.put("oracleStatus", artifact.evidence().oracleStatus());
+            scenario.put("promotionEligible", artifact.evidence().promotionEligible());
             scenario.put("evidence", artifact.evidencePath());
             scenario.put("svg", artifact.svgPath());
             scenario.put("summary", artifact.summaryPath());
@@ -137,8 +143,8 @@ public final class DocsDiscoveryGalleryGenerator {
 
                 ## Scenario comparison
 
-                | Scenario | Success | States | Edges | Bridge rules | Learned macros | Reused macros |
-                |---|---:|---:|---:|---:|---:|---:|
+                | Scenario | Success | Oracle | States | Edges | Bridge rules | Learned macros | Reused macros |
+                |---|---|---|---:|---:|---:|---:|---:|
                 ${rows}
                 """
                 .replace("${completeSquare}", renderScenarioSection(completeSquare, "Bridge used"))
@@ -152,6 +158,7 @@ public final class DocsDiscoveryGalleryGenerator {
                 - Input: `${input}`
                 - Target: `${target}`
                 - Evidence status: success
+                - Oracle status: `${oracleStatus}`
                 - ${bridgeLabel}: ${bridges}
                 - Macro learned: ${learned}
                 - Macro reused: ${reused}
@@ -162,6 +169,7 @@ public final class DocsDiscoveryGalleryGenerator {
                 """
                 .replace("${input}", evidence.inputExpression())
                 .replace("${target}", evidence.targetExpression())
+                .replace("${oracleStatus}", evidence.oracleStatus())
                 .replace("${bridgeLabel}", bridgeLabel)
                 .replace("${bridges}", inlineList(evidence.bridgeRulesUsed()))
                 .replace("${learned}", inlineList(evidence.learnedMacros()))
@@ -177,6 +185,7 @@ public final class DocsDiscoveryGalleryGenerator {
             DiscoveryBenchmarkEvidence evidence = artifact.evidence();
             rows.append("| ").append(escapeMarkdown(artifact.scenario().displayName())).append(" | ")
                     .append(evidence.success() ? "yes" : "no").append(" | ")
+                    .append(escapeMarkdown(evidence.oracleStatus().toLowerCase(Locale.ROOT))).append(" | ")
                     .append(evidence.nodeCount()).append(" | ")
                     .append(evidence.edgeCount()).append(" | ")
                     .append(evidence.bridgeRulesUsed().size()).append(" | ")
@@ -194,6 +203,8 @@ public final class DocsDiscoveryGalleryGenerator {
                 - scenarioId: `${scenarioId}`
                 - inputExpression: `${input}`
                 - targetExpression: `${target}`
+                - oracleStatus: `${oracleStatus}`
+                - promotionEligible: `${promotionEligible}`
                 - nodeCount: ${nodes}
                 - edgeCount: ${edges}
                 - bridgeRulesUsed: ${bridges}
@@ -206,6 +217,8 @@ public final class DocsDiscoveryGalleryGenerator {
                 .replace("${scenarioId}", evidence.scenarioId())
                 .replace("${input}", evidence.inputExpression())
                 .replace("${target}", evidence.targetExpression())
+                .replace("${oracleStatus}", evidence.oracleStatus())
+                .replace("${promotionEligible}", Boolean.toString(evidence.promotionEligible()))
                 .replace("${nodes}", Integer.toString(evidence.nodeCount()))
                 .replace("${edges}", Integer.toString(evidence.edgeCount()))
                 .replace("${bridges}", inlineList(evidence.bridgeRulesUsed()))

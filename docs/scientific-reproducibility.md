@@ -16,6 +16,7 @@ Wichtige Tests:
 ./gradlew :app:dockerE2eTest --tests de.regelsuche.dockere2e.ScientificDiscoveryPostgresE2ETest
 ./gradlew runDiscoveryCampaign1
 ./gradlew runDiscoveryCampaign2
+./gradlew runDiscoveryCampaign3
 ```
 
 Die erzeugten Artefakte eignen sich für:
