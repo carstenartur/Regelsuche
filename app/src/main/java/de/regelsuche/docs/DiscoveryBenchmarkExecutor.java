@@ -104,7 +104,7 @@ public final class DiscoveryBenchmarkExecutor {
                 oracle.equivalence(scenario.inputExpression(), scenario.targetExpression());
         boolean promotionEligible = withoutMacro.success()
                 && (!scenario.macroLearning().enabled() || withMacro.success())
-                && !"DISAGREE".equals(oracleResult.status().name());
+                && oracleResult.status() != SymPyDiscoveryOracleAdapter.Status.DISAGREE;
         List<List<String>> paths = new ArrayList<>();
         if (!withoutMacro.path().isEmpty()) {
             paths.add(withoutMacro.path());

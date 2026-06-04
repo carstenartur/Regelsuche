@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 final class PromotionRegistry {
@@ -46,7 +47,7 @@ final class PromotionRegistry {
         for (HistoryEntry entry : registry.history()) {
             out.append("| ").append(escape(entry.candidateId()))
                 .append(" | ").append(escape(entry.sourceCampaign()))
-                .append(" | ").append(entry.stage().name().toLowerCase())
+                .append(" | ").append(entry.stage().name().toLowerCase(Locale.ROOT))
                 .append(" | ").append(entry.promotionEligible() ? "yes" : "no")
                 .append(" | ").append(escape(orDash(entry.generatedMacroId())))
                 .append(" | ").append(escape(orDash(entry.reuseCampaign())))

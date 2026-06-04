@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -70,7 +71,7 @@ public final class DiscoveryCampaignFourRunner {
         DiscoveryBenchmarkScenario scenario = loader.load(reuseCase.scenarioResource());
         DiscoveryBenchmarkEvidence evidence = executor.execute(scenario);
         RunMetrics macroDisabled = metrics(evidence.withoutMacroRun().success(), evidence.withoutMacroRun().path(),
-            evidence.withoutMacroRun().analytics().statesExplored(), evidence.bridgeRulesUsed().size());
+            evidence.withoutMacroRun().analytics().statesExplored(), bridgeCount(evidence.withoutMacroRun().appliedRuleIds()));
         int enabledBridgeCount = bridgeCount(evidence.withMacroRun().appliedRuleIds());
         RunMetrics macroEnabled = metrics(evidence.withMacroRun().success(), evidence.withMacroRun().path(),
             evidence.withMacroRun().analytics().statesExplored(), enabledBridgeCount);
@@ -101,7 +102,7 @@ public final class DiscoveryCampaignFourRunner {
         return (int) appliedRuleIds.stream()
             .filter(ruleId -> ruleId != null)
             .filter(ruleId -> {
-                String lower = ruleId.toLowerCase();
+                String lower = ruleId.toLowerCase(Locale.ROOT);
                 return lower.contains("bridge") || lower.startsWith("hypothesis_");
             })
             .count();

@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -86,7 +87,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 outputDirectory.resolve("campaign-metrics.json"),
                 JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report.campaignMetrics())
             );
-            Path backlogDirectory = outputDirectory.resolveSibling("discovery-backlog");
+            Path backlogDirectory = outputDirectory.resolve("discovery-backlog");
             Files.createDirectories(backlogDirectory);
             Files.writeString(
                 backlogDirectory.resolve("blocked-candidates.md"),
@@ -103,7 +104,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 renderMacroOpportunities(report.promotionRecords()),
                 StandardCharsets.UTF_8
             );
-            campaignFourRunner.writeReport(outputDirectory.resolveSibling("discovery-campaign-4"), report.promotionRecords());
+            campaignFourRunner.writeReport(outputDirectory.resolve("discovery-campaign-4"), report.promotionRecords());
             return report;
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
@@ -164,7 +165,7 @@ public final class DiscoveryPromotionPipelineRunner {
         }
         for (PromotionRecord record : blocked) {
             out.append("- ").append(escape(record.candidateId()))
-                .append(" [").append(record.stage().name().toLowerCase()).append("]")
+                .append(" [").append(record.stage().name().toLowerCase(Locale.ROOT)).append("]")
                 .append(": ").append(escape(record.promotionBlockers().isEmpty()
                     ? record.rationale()
                     : String.join(", ", record.promotionBlockers())))
@@ -207,7 +208,7 @@ public final class DiscoveryPromotionPipelineRunner {
         for (PromotionRecord record : opportunities) {
             out.append("- ").append(escape(record.candidateId()))
                 .append(": ").append(escape(String.join(" -> ", record.rulePath())))
-                .append(" (stage=").append(record.stage().name().toLowerCase()).append(")\n");
+                .append(" (stage=").append(record.stage().name().toLowerCase(Locale.ROOT)).append(")\n");
         }
         return out.toString();
     }

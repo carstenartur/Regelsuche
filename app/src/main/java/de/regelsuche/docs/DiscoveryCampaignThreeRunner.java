@@ -8,7 +8,6 @@ import de.regelsuche.transform.CompleteSquareBridgeOperator;
 import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
 import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import de.regelsuche.util.AtomicJsonFile;
-import de.regelsuche.validation.SymPyDiscoveryOracleAdapter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -27,7 +26,6 @@ public final class DiscoveryCampaignThreeRunner {
 
     private final DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();
     private final DiscoveryCandidateReportWriter candidateReportWriter = new DiscoveryCandidateReportWriter();
-    private final SymPyDiscoveryOracleAdapter oracle = new SymPyDiscoveryOracleAdapter();
 
     public static void main(String[] args) {
         Path repoRoot = args.length == 0
@@ -140,8 +138,6 @@ public final class DiscoveryCampaignThreeRunner {
     private CaseResult evaluate(CampaignCase campaignCase) {
         DiscoveryBenchmarkScenario scenario = campaignCase.scenario();
         DiscoveryBenchmarkEvidence enabled = new DiscoveryBenchmarkExecutor(loader).execute(scenario);
-        SymPyDiscoveryOracleAdapter.OracleResult oracleResult =
-            oracle.equivalence(scenario.inputExpression(), scenario.targetExpression());
         AblationResult ablation = campaignCase.primaryOperatorId().isBlank()
             ? AblationResult.notApplicable()
             : runAblation(campaignCase, enabled);
@@ -153,8 +149,8 @@ public final class DiscoveryCampaignThreeRunner {
             scenario.targetExpression(),
             enabled.success(),
             enabled.failureReason(),
-            oracleResult.status().name(),
-            oracleResult.evidence(),
+            enabled.oracleStatus(),
+            enabled.oracleEvidence(),
             ablation.status(),
             shortcut == null ? "" : shortcut.source(),
             shortcut == null ? "" : shortcut.packId(),

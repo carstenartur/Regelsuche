@@ -22,11 +22,11 @@ class DiscoveryPromotionPipelineRunnerTest {
         assertTrue(Files.exists(tempDir.resolve("promotion-registry.json")));
         assertTrue(Files.exists(tempDir.resolve("promotion-history.md")));
         assertTrue(Files.exists(tempDir.resolve("campaign-metrics.json")));
-        assertTrue(Files.exists(tempDir.resolveSibling("discovery-backlog").resolve("blocked-candidates.md")));
-        assertTrue(Files.exists(tempDir.resolveSibling("discovery-backlog").resolve("operator-opportunities.md")));
-        assertTrue(Files.exists(tempDir.resolveSibling("discovery-backlog").resolve("macro-opportunities.md")));
-        assertTrue(Files.exists(tempDir.resolveSibling("discovery-campaign-4").resolve("discovery-campaign-4.json")));
-        assertTrue(Files.exists(tempDir.resolveSibling("discovery-campaign-4").resolve("macro-reuse-report.md")));
+        assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("blocked-candidates.md")));
+        assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("operator-opportunities.md")));
+        assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("macro-opportunities.md")));
+        assertTrue(Files.exists(tempDir.resolve("discovery-campaign-4").resolve("discovery-campaign-4.json")));
+        assertTrue(Files.exists(tempDir.resolve("discovery-campaign-4").resolve("macro-reuse-report.md")));
 
         assertTrue(report.promotionRecords().stream()
             .anyMatch(record -> record.stage() == PromotionStage.REUSED));
