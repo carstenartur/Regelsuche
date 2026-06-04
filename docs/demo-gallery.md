@@ -7,6 +7,7 @@ This gallery contains generated evidence only.
 - Input: `x ^ 2 + 6 * x + 5`
 - Target: `(x + 1) * (x + 5)`
 - Evidence status: success
+- Oracle status: `UNAVAILABLE`
 - Bridge used: `complete_square_bridge`, `ast_square_difference_factor`
 - Macro learned: `macro_3bbfed5b`
 - Macro reused: `macro_3bbfed5b`
@@ -21,6 +22,7 @@ This gallery contains generated evidence only.
 - Input: `x ^ 4 + 4 * y ^ 4`
 - Target: `(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)`
 - Evidence status: success
+- Oracle status: `UNAVAILABLE`
 - Hidden bridge used: `hypothesis_difference_of_squares_preparation`, `ast_square_difference_factor`
 - Macro learned: `macro_6bd0496b`
 - Macro reused: `macro_6bd0496b`
@@ -32,8 +34,8 @@ This gallery contains generated evidence only.
 
 ## Scenario comparison
 
-| Scenario | Success | States | Edges | Bridge rules | Learned macros | Reused macros |
-|---|---:|---:|---:|---:|---:|---:|
-| Complete-square factorization | yes | 13 | 32 | 2 | 1 | 1 |
-| Sophie-Germain hidden structure | yes | 56 | 113 | 2 | 1 | 1 |
+| Scenario | Success | Oracle | States | Edges | Bridge rules | Learned macros | Reused macros |
+|---|---|---|---:|---:|---:|---:|---:|
+| Complete-square factorization | yes | unavailable | 13 | 32 | 2 | 1 | 1 |
+| Sophie-Germain hidden structure | yes | unavailable | 56 | 113 | 2 | 1 | 1 |
 

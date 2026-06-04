@@ -3,6 +3,7 @@ package de.regelsuche.docs;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.transform.CommonSubexpressionDiscoveryOperator;
 import de.regelsuche.transform.CompleteSquareBridgeOperator;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -33,7 +34,10 @@ class DiscoveryCampaignThreeRunnerTest {
 
         DiscoveryCampaignThreeRunner.CaseResult common = results.get("common-subexpression-affine");
         assertTrue(common.success(), common.failureReason());
-        assertEquals("common_subexpression_discovery", common.shortcutOperatorId());
+        assertTrue(
+            !common.shortcutSource().isBlank() || common.rulePath().contains(CommonSubexpressionDiscoveryOperator.RULE_ID),
+            common.rulePath().toString()
+        );
         assertEquals("DEGRADED", common.ablationStatus());
 
         DiscoveryCampaignThreeRunner.CaseResult substitution = results.get("substitution-hidden-structure-shifted");

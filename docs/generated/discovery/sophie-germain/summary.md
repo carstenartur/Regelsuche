@@ -4,6 +4,8 @@
 - scenarioId: `sophie-germain`
 - inputExpression: `x ^ 4 + 4 * y ^ 4`
 - targetExpression: `(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)`
+- oracleStatus: `UNAVAILABLE`
+- promotionEligible: `true`
 - nodeCount: 56
 - edgeCount: 113
 - bridgeRulesUsed: `hypothesis_difference_of_squares_preparation`, `ast_square_difference_factor`
