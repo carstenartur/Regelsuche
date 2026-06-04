@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -49,10 +50,15 @@ class DiscoveryPromotionPipelineRunnerTest {
         assertTrue(detailsIndex.contains(".md)"));
 
         String gallery = Files.readString(tempDir.resolve("gallery-2.0.md"), StandardCharsets.UTF_8);
-        for (PromotionRecord record : report.promotionRecords()) {
-            if (gallery.contains(record.candidateId())) {
-                assertTrue(record.galleryEligible(), record.candidateId());
-            }
+        List<String> galleryCandidates = gallery.lines()
+            .filter(line -> line.startsWith("| ") && !line.contains("Candidate | Stage"))
+            .filter(line -> !line.contains("---"))
+            .map(line -> line.split("\\|")[1].trim())
+            .toList();
+        for (String candidateId : galleryCandidates) {
+            assertTrue(report.promotionRecords().stream()
+                .filter(entry -> entry.candidateId().equals(candidateId))
+                .anyMatch(PromotionRecord::galleryEligible), candidateId);
         }
     }
 
