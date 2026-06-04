@@ -18,6 +18,10 @@ import java.util.Map;
 
 public final class DocsDiscoveryGalleryGenerator {
     public static final String GENERATED_BY = "DocsDiscoveryGalleryGenerator";
+    private static final String SOURCE_REF = "generated";
+    private static final String GENERATOR_VERSION = "1";
+    private static final String SCENARIO_VERSION = "1";
+    private static final String EVIDENCE_SCHEMA_VERSION = "1";
     private static final ObjectMapper JSON = new ObjectMapper()
             .findAndRegisterModules()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
@@ -90,10 +94,10 @@ public final class DocsDiscoveryGalleryGenerator {
         document.put("bridgeRulesUsed", evidence.bridgeRulesUsed());
         document.put("learnedMacros", evidence.learnedMacros());
         document.put("reusedMacros", evidence.reusedMacros());
-        String sourceCommit = System.getenv("GITHUB_SHA");
-        if (sourceCommit != null && !sourceCommit.isBlank()) {
-            document.put("sourceCommit", sourceCommit);
-        }
+        document.put("sourceRef", SOURCE_REF);
+        document.put("generatorVersion", GENERATOR_VERSION);
+        document.put("scenarioVersion", SCENARIO_VERSION);
+        document.put("evidenceSchemaVersion", EVIDENCE_SCHEMA_VERSION);
         Map<String, Object> evidenceFields = JSON.convertValue(evidence, new TypeReference<LinkedHashMap<String, Object>>() { });
         evidenceFields.forEach(document::putIfAbsent);
         return document;

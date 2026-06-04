@@ -1,6 +1,7 @@
 package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +14,13 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class GeneratedDiscoveryEvidenceReproducibilityTest {
+    private static final String[] VOLATILE_COMMIT_FIELDS = {
+        "\"sourceCommit\"",
+        "\"gitCommit\"",
+        "\"headSha\"",
+        "\"commitSha\""
+    };
+
     @Test
     void regeneratingDiscoveryGalleryIsDeterministic() throws IOException {
         Path repoRoot = locateRepoRoot();
@@ -22,6 +30,13 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         new DocsDiscoveryGalleryGenerator().generate(repoRoot);
         Map<String, String> second = snapshot(repoRoot);
         assertEquals(first, second, "Consecutive gallery generations must be deterministic.");
+        assertNoVolatileCommitFields(second);
+    }
+
+    @Test
+    void committedDiscoveryEvidenceDoesNotContainVolatileCommitFields() throws IOException {
+        Path repoRoot = locateRepoRoot();
+        assertNoVolatileCommitFields(snapshot(repoRoot));
     }
 
     private Map<String, String> snapshot(Path repoRoot) throws IOException {
@@ -50,5 +65,17 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
             }
         }
         throw new IllegalStateException("Could not locate repository root");
+    }
+
+    private static void assertNoVolatileCommitFields(Map<String, String> files) {
+        for (Map.Entry<String, String> entry : files.entrySet()) {
+            if (!entry.getKey().startsWith("docs/generated/discovery/")) {
+                continue;
+            }
+            for (String field : VOLATILE_COMMIT_FIELDS) {
+                assertFalse(entry.getValue().contains(field),
+                        () -> entry.getKey() + " must not contain volatile field " + field);
+            }
+        }
     }
 }
