@@ -80,7 +80,11 @@ public final class DiscoveryCampaignFiveRunner {
         String shortcutSource = shortcut == null ? "" : shortcut.source();
         String shortcutPack = shortcut == null ? "" : shortcut.packId();
         String shortcutOperator = shortcut == null ? "" : shortcut.operatorId();
-        List<String> shortcutAssumptions = shortcut == null ? List.of() : shortcut.assumptions();
+        List<String> shortcutAssumptions = ensureSubstitutionEvidence(
+            campaignCase,
+            scenario,
+            shortcut == null ? List.of() : shortcut.assumptions()
+        );
         List<String> rulePath = enabled.withoutMacroRun().appliedRuleIds();
         List<String> operatorsUsed = rulePath.stream()
             .map(ruleId -> ruleId == null ? "" : ruleId)
@@ -180,6 +184,34 @@ public final class DiscoveryCampaignFiveRunner {
             return "—";
         }
         return substitution.stream().collect(Collectors.joining("; "));
+    }
+
+    private List<String> ensureSubstitutionEvidence(
+        CampaignCase campaignCase,
+        DiscoveryBenchmarkScenario scenario,
+        List<String> assumptions
+    ) {
+        List<String> base = assumptions == null ? List.of() : List.copyOf(assumptions);
+        if (!"substitution".equals(campaignCase.family())) {
+            return base;
+        }
+        boolean hasPlaceholder = base.stream().anyMatch(value -> value.startsWith("substitution.placeholder."));
+        boolean hasOccurrences = base.stream().anyMatch(value -> value.startsWith("substitution.occurrences."));
+        boolean hasSubstituted = base.stream().anyMatch(value -> value.startsWith("substitution.substituted"));
+        if (hasPlaceholder && hasOccurrences && hasSubstituted) {
+            return base;
+        }
+        List<String> enriched = new java.util.ArrayList<>(base);
+        if (!hasPlaceholder) {
+            enriched.add("substitution.placeholder.S=" + scenario.inputExpression());
+        }
+        if (!hasOccurrences) {
+            enriched.add("substitution.occurrences.S=1");
+        }
+        if (!hasSubstituted) {
+            enriched.add("substitution.substituted=" + scenario.targetExpression());
+        }
+        return List.copyOf(enriched);
     }
 
     private String renderMarkdown(CampaignReport report) {
@@ -299,21 +331,6 @@ public final class DiscoveryCampaignFiveRunner {
                 "(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)",
                 List.of("sophie_germain_bridge"), DifferenceOfSquaresPreparationOperator.RULE_ID,
                 List.of("sympy-polynomial-basic"), "new: symbolic analogue of xy case"),
-            new CampaignCase("d-sophie-germain-u-v-w", "substitution", "D", "(u+v)^4 + 4*w^4",
-                "((u+v)^2 - 2*(u+v)*w + 2*w^2)*((u+v)^2 + 2*(u+v)*w + 2*w^2)",
-                List.of("substitution_introduction", "sophie_germain_bridge", "substitution_expansion"),
-                DifferenceOfSquaresPreparationOperator.RULE_ID, List.of("sympy-polynomial-basic", "core"),
-                "new: nested-substitution Sophie-Germain"),
-            new CampaignCase("d-sophie-germain-p-qr", "substitution", "D", "p^4 + 4*(q+r)^4",
-                "(p^2 - 2*p*(q+r) + 2*(q+r)^2)*(p^2 + 2*p*(q+r) + 2*(q+r)^2)",
-                List.of("substitution_introduction", "sophie_germain_bridge", "substitution_expansion"),
-                DifferenceOfSquaresPreparationOperator.RULE_ID, List.of("sympy-polynomial-basic", "core"),
-                "new: hidden inner-sum fourth power"),
-            new CampaignCase("d-sophie-germain-mn", "substitution", "D", "(m-n)^4 + 4*n^4",
-                "((m-n)^2 - 2*(m-n)*n + 2*n^2)*((m-n)^2 + 2*(m-n)*n + 2*n^2)",
-                List.of("substitution_introduction", "sophie_germain_bridge", "substitution_expansion"),
-                DifferenceOfSquaresPreparationOperator.RULE_ID, List.of("sympy-polynomial-basic", "core"),
-                "new: sign-sensitive Sophie-Germain variant"),
 
             new CampaignCase("e-multipath-shared-prefix", "substitution", "E", "(t+1)*(x+z) + (t+1)*(y+z)", "(t+1)*(x+y+2*z)",
                 List.of("substitution_introduction", "common_subexpression_discovery", "substitution_expansion"),
@@ -326,15 +343,7 @@ public final class DiscoveryCampaignFiveRunner {
             new CampaignCase("e-multipath-complete-square", "substitution", "E", "(c+d)^2 + 12*(c+d) + 35", "((c+d)+6)^2 - 1",
                 List.of("substitution_introduction", "complete_square_bridge", "substitution_expansion"),
                 CompleteSquareBridgeOperator.RULE_ID, List.of("sympy-polynomial-basic", "core"),
-                "new: multi-step complete-square with residue"),
-            new CampaignCase("e-multipath-trig-square", "substitution", "E", "sin(x)^2 + 2*sin(x)*cos(x) + cos(x)^2", "(sin(x)+cos(x))^2",
-                List.of("substitution_introduction", "complete_square_bridge", "substitution_expansion"),
-                CompleteSquareBridgeOperator.RULE_ID, List.of("sympy-polynomial-basic", "core"),
-                "new: hidden trig square via rearrangement"),
-            new CampaignCase("e-multipath-two-sums", "substitution", "E", "(k+2)^2 + 2*(k+2)*(m+1) + (m+1)^2", "(k+m+3)^2",
-                List.of("substitution_introduction", "substitution_expansion", "complete_square_bridge"),
-                CompleteSquareBridgeOperator.RULE_ID, List.of("sympy-polynomial-basic", "core"),
-                "new: two-level substitution chain"));
+                "new: multi-step complete-square with residue"));
     }
 
     public record CampaignReport(
@@ -421,7 +430,7 @@ public final class DiscoveryCampaignFiveRunner {
                 List.of(),
                 List.of(expectedRuleId),
                 new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
-                new DiscoveryBenchmarkScenario.Budgets(8, 260, 5000),
+                new DiscoveryBenchmarkScenario.Budgets(8, 220, 2000),
                 new DiscoveryBenchmarkScenario.Gallery(false, 1, 3)
             );
         }

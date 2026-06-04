@@ -1,6 +1,5 @@
 package de.regelsuche.docs;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -66,10 +65,9 @@ class DiscoveryCampaignFiveRunnerTest {
             .map(line -> line.split("\\|")[1].trim())
             .toList();
         for (String candidateId : galleryCandidates) {
-            pipelineReport.promotionRecords().stream()
+            assertTrue(pipelineReport.promotionRecords().stream()
                 .filter(record -> record.candidateId().equals(candidateId))
-                .findFirst()
-                .ifPresent(record -> assertTrue(record.galleryEligible(), candidateId));
+                .anyMatch(PromotionRecord::galleryEligible), candidateId);
         }
     }
 
