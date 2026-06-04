@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryCandidateReportWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryCandidateReportWriter.java</span></div><h1>DiscoveryCandidateReportWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+<span class="fc" id="L17">final class DiscoveryCandidateReportWriter {</span>
+<span class="fc" id="L18">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L19">        .findAndRegisterModules()</span>
+<span class="fc" id="L20">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+    CandidateBundle write(Path outputDirectory, String campaignId, List&lt;PromotionRecord&gt; promotionRecords) {
+        try {
+<span class="fc" id="L24">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L25">            CandidateBundle bundle = new CandidateBundle(</span>
+                campaignId,
+<span class="fc" id="L27">                promotionRecords.stream()</span>
+<span class="fc" id="L28">                    .map(CandidateView::new)</span>
+<span class="fc" id="L29">                    .toList()</span>
+            );
+<span class="fc" id="L31">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L32">                outputDirectory.resolve(&quot;discovery-candidates.json&quot;),</span>
+<span class="fc" id="L33">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(bundle)</span>
+            );
+<span class="fc" id="L35">            Files.writeString(</span>
+<span class="fc" id="L36">                outputDirectory.resolve(&quot;discovery-candidates.md&quot;),</span>
+<span class="fc" id="L37">                renderCandidates(bundle),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L40">            Files.writeString(</span>
+<span class="fc" id="L41">                outputDirectory.resolve(&quot;operator-suggestions.md&quot;),</span>
+<span class="fc" id="L42">                renderOperatorSuggestions(bundle),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L45">            Files.writeString(</span>
+<span class="fc" id="L46">                outputDirectory.resolve(&quot;macro-candidates.md&quot;),</span>
+<span class="fc" id="L47">                renderMacroCandidates(bundle),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L50">            return bundle;</span>
+<span class="nc" id="L51">        } catch (IOException exception) {</span>
+<span class="nc" id="L52">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private String renderCandidates(CandidateBundle bundle) {
+<span class="fc" id="L57">        StringBuilder out = new StringBuilder(&quot;# Discovery candidates\n\n&quot;);</span>
+<span class="fc" id="L58">        out.append(&quot;| Candidate | Family | Stage | Success | Oracle | Ablation | Source | Pack | Operator |\n&quot;);</span>
+<span class="fc" id="L59">        out.append(&quot;| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (CandidateView candidate : bundle.candidates()) {</span>
+<span class="fc" id="L61">            out.append(&quot;| &quot;).append(escape(candidate.id()))</span>
+<span class="fc" id="L62">                .append(&quot; | &quot;).append(escape(candidate.family()))</span>
+<span class="fc" id="L63">                .append(&quot; | &quot;).append(escape(candidate.stage()))</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(candidate.success() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc" id="L65">                .append(&quot; | &quot;).append(escape(candidate.oracleStatus().toLowerCase(Locale.ROOT)))</span>
+<span class="fc" id="L66">                .append(&quot; | &quot;).append(escape(candidate.ablationStatus().toLowerCase(Locale.ROOT)))</span>
+<span class="fc" id="L67">                .append(&quot; | &quot;).append(escape(orDash(candidate.source())))</span>
+<span class="fc" id="L68">                .append(&quot; | &quot;).append(escape(orDash(candidate.packId())))</span>
+<span class="fc" id="L69">                .append(&quot; | &quot;).append(escape(orDash(candidate.operatorId())))</span>
+<span class="fc" id="L70">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L71">        }</span>
+<span class="fc" id="L72">        return out.toString();</span>
+    }
+
+    private String renderOperatorSuggestions(CandidateBundle bundle) {
+<span class="fc" id="L76">        StringBuilder out = new StringBuilder(&quot;# Operator suggestions\n\n&quot;);</span>
+<span class="fc" id="L77">        Map&lt;String, List&lt;CandidateView&gt;&gt; blockedByFamily = bundle.candidates().stream()</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            .filter(candidate -&gt; !candidate.success())</span>
+<span class="fc" id="L79">            .collect(Collectors.groupingBy(CandidateView::family, LinkedHashMap::new, Collectors.toList()));</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (blockedByFamily.isEmpty()) {</span>
+<span class="fc" id="L81">            out.append(&quot;- none\n&quot;);</span>
+<span class="fc" id="L82">            return out.toString();</span>
+        }
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        for (Map.Entry&lt;String, List&lt;CandidateView&gt;&gt; entry : blockedByFamily.entrySet()) {</span>
+<span class="nc" id="L85">            out.append(&quot;## &quot;).append(escape(entry.getKey())).append(&quot;\n\n&quot;);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            for (CandidateView candidate : entry.getValue()) {</span>
+<span class="nc" id="L87">                out.append(&quot;- &quot;).append(escape(candidate.id()))</span>
+<span class="nc" id="L88">                    .append(&quot;: investigate operator support for recorded path &quot;)</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                    .append(escape(candidate.rulePath().isEmpty() ? &quot;—&quot; : String.join(&quot; -&gt; &quot;, candidate.rulePath())))</span>
+<span class="nc" id="L90">                    .append('\n');</span>
+<span class="nc" id="L91">            }</span>
+<span class="nc" id="L92">            out.append('\n');</span>
+<span class="nc" id="L93">        }</span>
+<span class="nc" id="L94">        return out.toString();</span>
+    }
+
+    private String renderMacroCandidates(CandidateBundle bundle) {
+<span class="fc" id="L98">        StringBuilder out = new StringBuilder(&quot;# Macro candidates\n\n&quot;);</span>
+<span class="fc" id="L99">        List&lt;CandidateView&gt; macroCandidates = bundle.candidates().stream()</span>
+<span class="fc" id="L100">            .filter(candidate -&gt; candidate.success())</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            .filter(candidate -&gt; candidate.rulePath().size() &gt;= 2</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                || &quot;substitution&quot;.equals(candidate.family()))</span>
+<span class="fc" id="L103">            .toList();</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (macroCandidates.isEmpty()) {</span>
+<span class="nc" id="L105">            out.append(&quot;- none\n&quot;);</span>
+<span class="nc" id="L106">            return out.toString();</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (CandidateView candidate : macroCandidates) {</span>
+<span class="fc" id="L109">            out.append(&quot;- &quot;).append(escape(candidate.id()))</span>
+<span class="fc" id="L110">                .append(&quot;: &quot;)</span>
+<span class="fc" id="L111">                .append(escape(String.join(&quot; -&gt; &quot;, candidate.rulePath())))</span>
+<span class="fc" id="L112">                .append(&quot; (stage=&quot;).append(escape(candidate.stage())).append(&quot;)\n&quot;);</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">        return out.toString();</span>
+    }
+
+    private String orDash(String value) {
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    record CandidateBundle(String campaignId, List&lt;CandidateView&gt; candidates) {
+<span class="fc" id="L126">        CandidateBundle {</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            candidates = candidates == null ? List.of() : List.copyOf(candidates);</span>
+<span class="fc" id="L128">        }</span>
+    }
+
+    record CandidateView(
+        String id,
+        String family,
+        String oracleStatus,
+        String ablationStatus,
+        String source,
+        String packId,
+        String operatorId,
+        List&lt;String&gt; rulePath,
+        String stage
+    ) {
+        CandidateView(PromotionRecord record) {
+<span class="fc" id="L143">            this(</span>
+<span class="fc" id="L144">                record.candidateId(),</span>
+<span class="fc" id="L145">                record.family(),</span>
+<span class="fc" id="L146">                record.oracleStatus(),</span>
+<span class="fc" id="L147">                record.ablationStatus(),</span>
+<span class="pc bpc" id="L148" title="3 of 4 branches missed.">                record.sourcePack().isBlank() &amp;&amp; record.sourceOperator().isBlank() ? &quot;&quot; : &quot;promotion-record&quot;,</span>
+<span class="fc" id="L149">                record.sourcePack(),</span>
+<span class="fc" id="L150">                record.sourceOperator(),</span>
+<span class="fc" id="L151">                record.rulePath(),</span>
+<span class="fc" id="L152">                record.stage().name().toLowerCase(Locale.ROOT)</span>
+            );
+<span class="fc" id="L154">        }</span>
+
+<span class="fc" id="L156">        CandidateView {</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            stage = stage == null ? &quot;observed&quot; : stage;</span>
+<span class="fc" id="L159">        }</span>
+
+        boolean success() {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            return !&quot;observed&quot;.equals(stage);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

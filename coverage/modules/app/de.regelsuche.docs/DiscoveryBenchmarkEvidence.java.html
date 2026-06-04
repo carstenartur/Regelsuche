@@ -20,26 +20,74 @@ public record DiscoveryBenchmarkEvidence(
         List&lt;String&gt; reusedMacros,
         SearchSpaceAnalytics analytics,
         String validationStatus,
+        String oracleStatus,
+        String oracleEvidence,
+        boolean promotionEligible,
         List&lt;EvidenceNode&gt; nodes,
         List&lt;EvidenceEdge&gt; edges,
         String smallGraphMessage) {
-<span class="fc" id="L26">    public DiscoveryBenchmarkEvidence {</span>
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        foundPaths = foundPaths == null ? List.of() : foundPaths.stream().map(List::copyOf).toList();</span>
-<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        bridgeRulesUsed = bridgeRulesUsed == null ? List.of() : List.copyOf(bridgeRulesUsed);</span>
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        ruleFamiliesUsed = ruleFamiliesUsed == null ? List.of() : List.copyOf(ruleFamiliesUsed);</span>
-<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        convergentStates = convergentStates == null ? List.of() : List.copyOf(convergentStates);</span>
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        learnedMacros = learnedMacros == null ? List.of() : List.copyOf(learnedMacros);</span>
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        reusedMacros = reusedMacros == null ? List.of() : List.copyOf(reusedMacros);</span>
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        edges = edges == null ? List.of() : List.copyOf(edges);</span>
-<span class="fc" id="L35">    }</span>
+<span class="fc" id="L29">    public DiscoveryBenchmarkEvidence {</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        foundPaths = foundPaths == null ? List.of() : foundPaths.stream().map(List::copyOf).toList();</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        bridgeRulesUsed = bridgeRulesUsed == null ? List.of() : List.copyOf(bridgeRulesUsed);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        ruleFamiliesUsed = ruleFamiliesUsed == null ? List.of() : List.copyOf(ruleFamiliesUsed);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        convergentStates = convergentStates == null ? List.of() : List.copyOf(convergentStates);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        learnedMacros = learnedMacros == null ? List.of() : List.copyOf(learnedMacros);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        reusedMacros = reusedMacros == null ? List.of() : List.copyOf(reusedMacros);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        edges = edges == null ? List.of() : List.copyOf(edges);</span>
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">        oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
+<span class="fc" id="L40">    }</span>
+
+    public DiscoveryBenchmarkEvidence(
+            String scenarioId,
+            String inputExpression,
+            String targetExpression,
+            boolean success,
+            String failureReason,
+            SearchRunEvidence withoutMacroRun,
+            SearchRunEvidence withMacroRun,
+            List&lt;List&lt;String&gt;&gt; foundPaths,
+            List&lt;String&gt; bridgeRulesUsed,
+            List&lt;String&gt; ruleFamiliesUsed,
+            List&lt;String&gt; convergentStates,
+            List&lt;String&gt; learnedMacros,
+            List&lt;String&gt; reusedMacros,
+            SearchSpaceAnalytics analytics,
+            String validationStatus,
+            List&lt;EvidenceNode&gt; nodes,
+            List&lt;EvidenceEdge&gt; edges,
+            String smallGraphMessage) {
+<span class="fc" id="L61">        this(</span>
+                scenarioId,
+                inputExpression,
+                targetExpression,
+                success,
+                failureReason,
+                withoutMacroRun,
+                withMacroRun,
+                foundPaths,
+                bridgeRulesUsed,
+                ruleFamiliesUsed,
+                convergentStates,
+                learnedMacros,
+                reusedMacros,
+                analytics,
+                validationStatus,
+                &quot;UNAVAILABLE&quot;,
+                &quot;&quot;,
+                false,
+                nodes,
+                edges,
+                smallGraphMessage);
+<span class="fc" id="L83">    }</span>
 
     public int nodeCount() {
-<span class="fc" id="L38">        return nodes.size();</span>
+<span class="fc" id="L86">        return nodes.size();</span>
     }
 
     public int edgeCount() {
-<span class="fc" id="L42">        return edges.size();</span>
+<span class="fc" id="L90">        return edges.size();</span>
     }
 
     public record SearchRunEvidence(
@@ -48,20 +96,20 @@ public record DiscoveryBenchmarkEvidence(
             List&lt;String&gt; path,
             List&lt;String&gt; appliedRuleIds,
             SearchSpaceAnalytics analytics) {
-<span class="fc" id="L51">        public SearchRunEvidence {</span>
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
-<span class="fc" id="L54">        }</span>
+<span class="fc" id="L99">        public SearchRunEvidence {</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
+<span class="fc" id="L102">        }</span>
     }
 
     public record EvidenceNode(String id, String label, String kind, int depth, List&lt;String&gt; tags) {
-<span class="fc" id="L58">        public EvidenceNode {</span>
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            tags = tags == null ? List.of() : List.copyOf(tags);</span>
-<span class="fc" id="L60">        }</span>
+<span class="fc" id="L106">        public EvidenceNode {</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            tags = tags == null ? List.of() : List.copyOf(tags);</span>
+<span class="fc" id="L108">        }</span>
 
         public EvidenceNode(String id, String label, String kind) {
-<span class="fc" id="L63">            this(id, label, kind, 0, List.of());</span>
-<span class="fc" id="L64">        }</span>
+<span class="fc" id="L111">            this(id, label, kind, 0, List.of());</span>
+<span class="fc" id="L112">        }</span>
     }
 
     public record EvidenceEdge(
@@ -77,13 +125,13 @@ public record DiscoveryBenchmarkEvidence(
             boolean enabledByProfile,
             List&lt;de.regelsuche.knowledge.SearchEffect&gt; searchEffect,
             List&lt;String&gt; tags) {
-<span class="fc" id="L80">        public EvidenceEdge {</span>
-<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
-<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            maturity = maturity == null ? &quot;&quot; : maturity;</span>
-<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            searchEffect = searchEffect == null ? List.of() : List.copyOf(searchEffect);</span>
-<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            tags = tags == null ? List.of() : List.copyOf(tags);</span>
-<span class="fc" id="L86">        }</span>
+<span class="fc" id="L128">        public EvidenceEdge {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            maturity = maturity == null ? &quot;&quot; : maturity;</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            searchEffect = searchEffect == null ? List.of() : List.copyOf(searchEffect);</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            tags = tags == null ? List.of() : List.copyOf(tags);</span>
+<span class="fc" id="L134">        }</span>
 
         public EvidenceEdge(
                 String from,
@@ -93,19 +141,21 @@ public record DiscoveryBenchmarkEvidence(
                 String source,
                 String packId,
                 List&lt;de.regelsuche.knowledge.SearchEffect&gt; searchEffect) {
-<span class="fc" id="L96">            this(from, to, ruleId, kind, source, packId, &quot;&quot;, List.of(), &quot;&quot;, false, searchEffect, List.of());</span>
-<span class="fc" id="L97">        }</span>
+<span class="fc" id="L144">            this(from, to, ruleId, kind, source, packId, &quot;&quot;, List.of(), &quot;&quot;, false, searchEffect, List.of());</span>
+<span class="fc" id="L145">        }</span>
     }
 
     public Map&lt;String, Object&gt; summary() {
-<span class="nc" id="L101">        return Map.of(</span>
+<span class="nc" id="L149">        return Map.of(</span>
                 &quot;scenarioId&quot;, scenarioId,
-<span class="nc" id="L103">                &quot;success&quot;, success,</span>
-<span class="nc" id="L104">                &quot;nodeCount&quot;, nodeCount(),</span>
-<span class="nc" id="L105">                &quot;edgeCount&quot;, edgeCount(),</span>
+<span class="nc" id="L151">                &quot;success&quot;, success,</span>
+<span class="nc" id="L152">                &quot;nodeCount&quot;, nodeCount(),</span>
+<span class="nc" id="L153">                &quot;edgeCount&quot;, edgeCount(),</span>
                 &quot;bridgeRulesUsed&quot;, bridgeRulesUsed,
                 &quot;learnedMacros&quot;, learnedMacros,
-                &quot;reusedMacros&quot;, reusedMacros);
+                &quot;reusedMacros&quot;, reusedMacros,
+                &quot;oracleStatus&quot;, oracleStatus,
+<span class="nc" id="L158">                &quot;promotionEligible&quot;, promotionEligible);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

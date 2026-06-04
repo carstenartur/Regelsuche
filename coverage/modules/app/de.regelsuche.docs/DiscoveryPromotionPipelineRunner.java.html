@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryPromotionPipelineRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryPromotionPipelineRunner.java</span></div><h1>DiscoveryPromotionPipelineRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Stream;
+
+/** Coordinates the promotion registry, closed-loop campaign 4 reuse validation, backlog, and metrics. */
+<span class="fc" id="L20">public final class DiscoveryPromotionPipelineRunner {</span>
+<span class="fc" id="L21">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L22">        .findAndRegisterModules()</span>
+<span class="fc" id="L23">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+<span class="fc" id="L25">    private final PromotionDecider decider = new PromotionDecider();</span>
+<span class="fc" id="L26">    private final PromotionRegistry registry = new PromotionRegistry();</span>
+<span class="fc" id="L27">    private final DiscoveryCampaignFourRunner campaignFourRunner = new DiscoveryCampaignFourRunner();</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L31">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L32">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L33">        new DiscoveryPromotionPipelineRunner()</span>
+<span class="nc" id="L34">            .writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-promotion&quot;));</span>
+<span class="nc" id="L35">    }</span>
+
+    PipelineReport run() {
+<span class="fc" id="L38">        DiscoveryCampaignOneRunner.CampaignReport campaignOne = new DiscoveryCampaignOneRunner().run();</span>
+<span class="fc" id="L39">        DiscoveryCampaignTwoRunner.CampaignReport campaignTwo = new DiscoveryCampaignTwoRunner().run();</span>
+<span class="fc" id="L40">        DiscoveryCampaignThreeRunner.CampaignReport campaignThree = new DiscoveryCampaignThreeRunner().run();</span>
+
+<span class="fc" id="L42">        List&lt;PromotionRecord&gt; promotionRecords = Stream.of(</span>
+<span class="fc" id="L43">                campaignOne.results().stream()</span>
+<span class="fc" id="L44">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignOne(result, campaignOne.id()))),</span>
+<span class="fc" id="L45">                campaignTwo.results().stream()</span>
+<span class="fc" id="L46">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignTwo(result, campaignTwo.id()))),</span>
+<span class="fc" id="L47">                campaignThree.results().stream()</span>
+<span class="fc" id="L48">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignThree(result, campaignThree.id()))))</span>
+<span class="fc" id="L49">            .flatMap(Function.identity())</span>
+<span class="fc" id="L50">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L51">            .toList();</span>
+
+<span class="fc" id="L53">        DiscoveryCampaignFourRunner.CampaignReport campaignFour = campaignFourRunner.run(promotionRecords);</span>
+<span class="fc" id="L54">        Map&lt;String, DiscoveryCampaignFourRunner.CaseResult&gt; reuseByCandidateId = campaignFour.results().stream()</span>
+<span class="fc" id="L55">            .collect(java.util.stream.Collectors.toMap(</span>
+                DiscoveryCampaignFourRunner.CaseResult::candidateId,
+<span class="fc" id="L57">                Function.identity(),</span>
+<span class="nc" id="L58">                (left, right) -&gt; left,</span>
+                LinkedHashMap::new));
+<span class="fc" id="L60">        List&lt;PromotionRecord&gt; updatedRecords = promotionRecords.stream()</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            .map(record -&gt; reuseByCandidateId.containsKey(record.candidateId())</span>
+<span class="fc" id="L62">                ? record.withReuse(reuseByCandidateId.get(record.candidateId()))</span>
+<span class="fc" id="L63">                : record)</span>
+<span class="fc" id="L64">            .toList();</span>
+<span class="fc" id="L65">        PromotionRegistry.Registry promotionRegistry = registry.build(updatedRecords);</span>
+<span class="fc" id="L66">        return new PipelineReport(updatedRecords, promotionRegistry, campaignFour, campaignMetrics(updatedRecords));</span>
+    }
+
+    PipelineReport writeReport(Path outputDirectory) {
+        try {
+<span class="fc" id="L71">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L72">            PipelineReport report = run();</span>
+<span class="fc" id="L73">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L74">                outputDirectory.resolve(&quot;promotion-records.json&quot;),</span>
+<span class="fc" id="L75">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report.promotionRecords())</span>
+            );
+<span class="fc" id="L77">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L78">                outputDirectory.resolve(&quot;promotion-registry.json&quot;),</span>
+<span class="fc" id="L79">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report.registry().records())</span>
+            );
+<span class="fc" id="L81">            Files.writeString(</span>
+<span class="fc" id="L82">                outputDirectory.resolve(&quot;promotion-history.md&quot;),</span>
+<span class="fc" id="L83">                registry.renderHistoryMarkdown(report.registry()),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L86">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L87">                outputDirectory.resolve(&quot;campaign-metrics.json&quot;),</span>
+<span class="fc" id="L88">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report.campaignMetrics())</span>
+            );
+<span class="fc" id="L90">            Path backlogDirectory = outputDirectory.resolve(&quot;discovery-backlog&quot;);</span>
+<span class="fc" id="L91">            Files.createDirectories(backlogDirectory);</span>
+<span class="fc" id="L92">            Files.writeString(</span>
+<span class="fc" id="L93">                backlogDirectory.resolve(&quot;blocked-candidates.md&quot;),</span>
+<span class="fc" id="L94">                renderBlockedCandidates(report.promotionRecords()),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L97">            Files.writeString(</span>
+<span class="fc" id="L98">                backlogDirectory.resolve(&quot;operator-opportunities.md&quot;),</span>
+<span class="fc" id="L99">                renderOperatorOpportunities(report.promotionRecords()),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L102">            Files.writeString(</span>
+<span class="fc" id="L103">                backlogDirectory.resolve(&quot;macro-opportunities.md&quot;),</span>
+<span class="fc" id="L104">                renderMacroOpportunities(report.promotionRecords()),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L107">            campaignFourRunner.writeReport(outputDirectory.resolve(&quot;discovery-campaign-4&quot;), report.promotionRecords());</span>
+<span class="fc" id="L108">            return report;</span>
+<span class="nc" id="L109">        } catch (IOException exception) {</span>
+<span class="nc" id="L110">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private List&lt;CampaignMetric&gt; campaignMetrics(List&lt;PromotionRecord&gt; records) {
+<span class="fc" id="L115">        return records.stream()</span>
+<span class="fc" id="L116">            .collect(java.util.stream.Collectors.groupingBy(</span>
+                PromotionRecord::sourceCampaign,
+                LinkedHashMap::new,
+<span class="fc" id="L119">                java.util.stream.Collectors.toList()))</span>
+<span class="fc" id="L120">            .entrySet().stream()</span>
+<span class="fc" id="L121">            .map(entry -&gt; metric(entry.getKey(), entry.getValue()))</span>
+<span class="fc" id="L122">            .sorted(Comparator.comparing(CampaignMetric::campaign))</span>
+<span class="fc" id="L123">            .toList();</span>
+    }
+
+    private CampaignMetric metric(String campaignId, List&lt;PromotionRecord&gt; records) {
+<span class="fc" id="L127">        long observed = records.size();</span>
+<span class="fc" id="L128">        long candidate = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.CANDIDATE)).count();</span>
+<span class="fc" id="L129">        long validated = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.VALIDATED)).count();</span>
+<span class="fc" id="L130">        long promoted = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED)).count();</span>
+<span class="fc" id="L131">        long reused = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.REUSED)).count();</span>
+<span class="fc" id="L132">        return new CampaignMetric(</span>
+            campaignId,
+            observed,
+            candidate,
+            validated,
+            promoted,
+            reused,
+<span class="fc" id="L139">            conversionRates(observed, candidate, validated, promoted, reused)</span>
+        );
+    }
+
+    private Map&lt;String, Double&gt; conversionRates(long observed, long candidate, long validated, long promoted, long reused) {
+<span class="fc" id="L144">        Map&lt;String, Double&gt; rates = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L145">        rates.put(&quot;candidatePerObserved&quot;, ratio(candidate, observed));</span>
+<span class="fc" id="L146">        rates.put(&quot;validatedPerCandidate&quot;, ratio(validated, candidate));</span>
+<span class="fc" id="L147">        rates.put(&quot;promotedPerValidated&quot;, ratio(promoted, validated));</span>
+<span class="fc" id="L148">        rates.put(&quot;reusedPerPromoted&quot;, ratio(reused, promoted));</span>
+<span class="fc" id="L149">        return Map.copyOf(rates);</span>
+    }
+
+    private double ratio(long numerator, long denominator) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        return denominator == 0L ? 0.0d : numerator / (double) denominator;</span>
+    }
+
+    private String renderBlockedCandidates(List&lt;PromotionRecord&gt; records) {
+<span class="fc" id="L157">        StringBuilder out = new StringBuilder(&quot;# Blocked candidates\n\n&quot;);</span>
+<span class="fc" id="L158">        List&lt;PromotionRecord&gt; blocked = records.stream()</span>
+<span class="fc" id="L159">            .filter(PromotionRecord::unresolved)</span>
+<span class="fc" id="L160">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L161">            .toList();</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (blocked.isEmpty()) {</span>
+<span class="nc" id="L163">            out.append(&quot;- none\n&quot;);</span>
+<span class="nc" id="L164">            return out.toString();</span>
+        }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (PromotionRecord record : blocked) {</span>
+<span class="fc" id="L167">            out.append(&quot;- &quot;).append(escape(record.candidateId()))</span>
+<span class="fc" id="L168">                .append(&quot; [&quot;).append(record.stage().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                .append(&quot;: &quot;).append(escape(record.promotionBlockers().isEmpty()</span>
+<span class="nc" id="L170">                    ? record.rationale()</span>
+<span class="fc" id="L171">                    : String.join(&quot;, &quot;, record.promotionBlockers())))</span>
+<span class="fc" id="L172">                .append('\n');</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        return out.toString();</span>
+    }
+
+    private String renderOperatorOpportunities(List&lt;PromotionRecord&gt; records) {
+<span class="fc" id="L178">        StringBuilder out = new StringBuilder(&quot;# Operator opportunities\n\n&quot;);</span>
+<span class="fc" id="L179">        List&lt;PromotionRecord&gt; opportunities = records.stream()</span>
+<span class="fc" id="L180">            .filter(PromotionRecord::unresolved)</span>
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">            .filter(record -&gt; record.sourceOperator().isBlank() || record.stage() == PromotionStage.OBSERVED)</span>
+<span class="fc" id="L182">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L183">            .toList();</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (opportunities.isEmpty()) {</span>
+<span class="nc" id="L185">            out.append(&quot;- none\n&quot;);</span>
+<span class="nc" id="L186">            return out.toString();</span>
+        }
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (PromotionRecord record : opportunities) {</span>
+<span class="fc" id="L189">            out.append(&quot;- &quot;).append(escape(record.candidateId()))</span>
+<span class="fc" id="L190">                .append(&quot;: investigate operator support for family &quot;)</span>
+<span class="fc" id="L191">                .append(escape(record.family()))</span>
+<span class="fc" id="L192">                .append(&quot; (campaign=&quot;).append(escape(record.sourceCampaign())).append(&quot;)\n&quot;);</span>
+<span class="fc" id="L193">        }</span>
+<span class="fc" id="L194">        return out.toString();</span>
+    }
+
+    private String renderMacroOpportunities(List&lt;PromotionRecord&gt; records) {
+<span class="fc" id="L198">        StringBuilder out = new StringBuilder(&quot;# Macro opportunities\n\n&quot;);</span>
+<span class="fc" id="L199">        List&lt;PromotionRecord&gt; opportunities = records.stream()</span>
+<span class="fc" id="L200">            .filter(PromotionRecord::unresolved)</span>
+<span class="fc" id="L201">            .filter(PromotionRecord::macroOpportunity)</span>
+<span class="fc" id="L202">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L203">            .toList();</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (opportunities.isEmpty()) {</span>
+<span class="nc" id="L205">            out.append(&quot;- none\n&quot;);</span>
+<span class="nc" id="L206">            return out.toString();</span>
+        }
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (PromotionRecord record : opportunities) {</span>
+<span class="fc" id="L209">            out.append(&quot;- &quot;).append(escape(record.candidateId()))</span>
+<span class="fc" id="L210">                .append(&quot;: &quot;).append(escape(String.join(&quot; -&gt; &quot;, record.rulePath())))</span>
+<span class="fc" id="L211">                .append(&quot; (stage=&quot;).append(record.stage().name().toLowerCase(Locale.ROOT)).append(&quot;)\n&quot;);</span>
+<span class="fc" id="L212">        }</span>
+<span class="fc" id="L213">        return out.toString();</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    record PipelineReport(
+        List&lt;PromotionRecord&gt; promotionRecords,
+        PromotionRegistry.Registry registry,
+        DiscoveryCampaignFourRunner.CampaignReport campaignFour,
+        List&lt;CampaignMetric&gt; campaignMetrics
+    ) {
+<span class="fc" id="L226">        PipelineReport {</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            promotionRecords = promotionRecords == null ? List.of() : List.copyOf(promotionRecords);</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            campaignMetrics = campaignMetrics == null ? List.of() : List.copyOf(campaignMetrics);</span>
+<span class="fc" id="L229">        }</span>
+    }
+
+    record CampaignMetric(
+        String campaign,
+        long observed,
+        long candidate,
+        long validated,
+        long promoted,
+        long reused,
+        Map&lt;String, Double&gt; conversionRates
+    ) {
+<span class="fc" id="L241">        CampaignMetric {</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            conversionRates = conversionRates == null ? Map.of() : Map.copyOf(conversionRates);</span>
+<span class="fc" id="L243">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

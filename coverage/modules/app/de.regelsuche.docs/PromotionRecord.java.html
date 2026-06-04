@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PromotionRecord.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">PromotionRecord.java</span></div><h1>PromotionRecord.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+
+record PromotionRecord(
+    String candidateId,
+    String sourceCampaign,
+    String discoveryDate,
+    String family,
+    PromotionStage stage,
+    String oracleStatus,
+    String ablationStatus,
+    String sourceOperator,
+    String sourcePack,
+    List&lt;String&gt; assumptions,
+    String rationale,
+    List&lt;String&gt; rulePath,
+    boolean promotionEligible,
+    List&lt;String&gt; promotionBlockers,
+    boolean evidenceExists,
+    boolean curatedPathPresent,
+    boolean fallbackUsed,
+    boolean macroOpportunity,
+    String generatedMacroId,
+    List&lt;String&gt; reusedMacroIds,
+    boolean measuredImprovement,
+    String reuseCampaign
+) {
+<span class="fc" id="L30">    PromotionRecord {</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        family = family == null ? &quot;&quot; : family;</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        stage = stage == null ? PromotionStage.OBSERVED : stage;</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">        ablationStatus = ablationStatus == null || ablationStatus.isBlank() ? &quot;N/A&quot; : ablationStatus;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        sourceOperator = sourceOperator == null ? &quot;&quot; : sourceOperator;</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        sourcePack = sourcePack == null ? &quot;&quot; : sourcePack;</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        rationale = rationale == null ? &quot;&quot; : rationale;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        promotionBlockers = promotionBlockers == null ? List.of() : List.copyOf(promotionBlockers);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        generatedMacroId = generatedMacroId == null ? &quot;&quot; : generatedMacroId;</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        reusedMacroIds = reusedMacroIds == null ? List.of() : List.copyOf(reusedMacroIds);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        reuseCampaign = reuseCampaign == null ? &quot;&quot; : reuseCampaign;</span>
+<span class="fc" id="L44">    }</span>
+
+    boolean unresolved() {
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        return !stage.atLeast(PromotionStage.PROMOTED);</span>
+    }
+
+    PromotionRecord withReuse(DiscoveryCampaignFourRunner.CaseResult reuse) {
+<span class="fc" id="L51">        LinkedHashSet&lt;String&gt; reused = new LinkedHashSet&lt;&gt;(reusedMacroIds);</span>
+<span class="fc" id="L52">        reused.addAll(reuse.reusedMacroIds());</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        PromotionStage nextStage = reuse.measuredImprovement() &amp;&amp; !reuse.reusedMacroIds().isEmpty()</span>
+<span class="fc" id="L54">            ? PromotionStage.REUSED</span>
+<span class="pc" id="L55">            : stage;</span>
+<span class="fc" id="L56">        return new PromotionRecord(</span>
+            candidateId,
+            sourceCampaign,
+            discoveryDate,
+            family,
+            nextStage,
+            oracleStatus,
+            ablationStatus,
+            sourceOperator,
+            sourcePack,
+            assumptions,
+            rationale,
+            rulePath,
+            promotionEligible,
+            promotionBlockers,
+            evidenceExists,
+            curatedPathPresent,
+            fallbackUsed,
+            macroOpportunity,
+<span class="fc" id="L75">            reuse.generatedMacroId(),</span>
+<span class="fc" id="L76">            List.copyOf(reused),</span>
+<span class="fc" id="L77">            reuse.measuredImprovement(),</span>
+<span class="fc" id="L78">            reuse.campaignId()</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PromotionDecider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">PromotionDecider.java</span></div><h1>PromotionDecider.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import java.util.ArrayList;
+import java.util.List;
+
+<span class="fc" id="L6">final class PromotionDecider {</span>
+    PromotionRecord decide(PromotionObservation observation) {
+<span class="fc" id="L8">        List&lt;String&gt; blockers = promotionBlockers(observation);</span>
+<span class="fc" id="L9">        boolean promotionEligible = blockers.isEmpty();</span>
+<span class="fc" id="L10">        PromotionStage stage = stageFor(observation, promotionEligible);</span>
+<span class="fc" id="L11">        return new PromotionRecord(</span>
+<span class="fc" id="L12">            observation.candidateId(),</span>
+<span class="fc" id="L13">            observation.sourceCampaign(),</span>
+<span class="fc" id="L14">            observation.discoveryDate(),</span>
+<span class="fc" id="L15">            observation.family(),</span>
+            stage,
+<span class="fc" id="L17">            observation.oracleStatus(),</span>
+<span class="fc" id="L18">            observation.ablationStatus(),</span>
+<span class="fc" id="L19">            observation.sourceOperator(),</span>
+<span class="fc" id="L20">            observation.sourcePack(),</span>
+<span class="fc" id="L21">            observation.assumptions(),</span>
+<span class="fc" id="L22">            observation.rationale(),</span>
+<span class="fc" id="L23">            observation.rulePath(),</span>
+            promotionEligible,
+            blockers,
+<span class="fc" id="L26">            observation.evidenceExists(),</span>
+<span class="fc" id="L27">            observation.curatedPathPresent(),</span>
+<span class="fc" id="L28">            observation.fallbackUsed(),</span>
+<span class="fc" id="L29">            observation.macroOpportunity(),</span>
+            &quot;&quot;,
+<span class="fc" id="L31">            List.of(),</span>
+            false,
+            &quot;&quot;
+        );
+    }
+
+    private List&lt;String&gt; promotionBlockers(PromotionObservation observation) {
+<span class="fc" id="L38">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (!observation.success()) {</span>
+<span class="fc" id="L40">            blockers.add(&quot;success=false&quot;);</span>
+        }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (&quot;DISAGREE&quot;.equals(observation.oracleStatus())) {</span>
+<span class="nc" id="L43">            blockers.add(&quot;oracle=DISAGREE&quot;);</span>
+        }
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (!&quot;DEGRADED&quot;.equals(observation.ablationStatus())) {</span>
+<span class="fc" id="L46">            blockers.add(&quot;ablation=&quot; + observation.ablationStatus());</span>
+        }
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!observation.evidenceExists()) {</span>
+<span class="fc" id="L49">            blockers.add(&quot;evidence=missing&quot;);</span>
+        }
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (observation.curatedPathPresent()) {</span>
+<span class="nc" id="L52">            blockers.add(&quot;curated-path=true&quot;);</span>
+        }
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (observation.fallbackUsed()) {</span>
+<span class="nc" id="L55">            blockers.add(&quot;fallback=true&quot;);</span>
+        }
+<span class="fc" id="L57">        return List.copyOf(blockers);</span>
+    }
+
+    private PromotionStage stageFor(PromotionObservation observation, boolean promotionEligible) {
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (!observation.success()) {</span>
+<span class="fc" id="L62">            return PromotionStage.OBSERVED;</span>
+        }
+<span class="pc bpc" id="L64" title="2 of 4 branches missed.">        if (&quot;DISAGREE&quot;.equals(observation.oracleStatus()) || !observation.evidenceExists()) {</span>
+<span class="nc" id="L65">            return PromotionStage.CANDIDATE;</span>
+        }
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (!&quot;DEGRADED&quot;.equals(observation.ablationStatus())</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            || observation.curatedPathPresent()</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            || observation.fallbackUsed()) {</span>
+<span class="fc" id="L70">            return PromotionStage.VALIDATED;</span>
+        }
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        return promotionEligible ? PromotionStage.PROMOTED : PromotionStage.VALIDATED;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
