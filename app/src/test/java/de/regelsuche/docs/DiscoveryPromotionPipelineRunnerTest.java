@@ -9,10 +9,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -172,6 +174,8 @@ class DiscoveryPromotionPipelineRunnerTest {
 
         String gallery = runner.renderGallery(List.of(eligible, blocked));
 
+        assertTrue(gallery.contains("## Selection policy"));
+        assertTrue(gallery.contains("fallbackUsed=false"));
         assertTrue(gallery.contains("| eligible |"));
         assertFalse(gallery.contains("| blocked |"));
     }
@@ -218,6 +222,198 @@ class DiscoveryPromotionPipelineRunnerTest {
         assertTrue(details.contains("Placeholder mappings: A -> y + 2 (occurrences=2)"));
         assertTrue(details.contains("Substituted expression: A * z + A"));
         assertFalse(details.contains("Abstracted subexpression: (x + 1)"));
+    }
+
+    @Test
+    void detailReportsUseUniqueSlugWhenCandidateIdsCollide(@TempDir Path tempDir) throws Exception {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        List<PromotionRecord> records = List.of(
+            promotedRecord("a+b", "A + A"),
+            promotedRecord("a b", "B + B")
+        );
+        Path detailsDir = tempDir.resolve("discovery-details");
+
+        invokeWriteDiscoveryDetails(runner, detailsDir, records);
+
+        assertTrue(Files.exists(detailsDir.resolve("a-b.md")));
+        assertTrue(Files.exists(detailsDir.resolve("a-b-2.md")));
+        try (Stream<Path> files = Files.list(detailsDir)) {
+            assertEquals(3L, files.count());
+        }
+        String index = Files.readString(detailsDir.resolve("README.md"), StandardCharsets.UTF_8);
+        assertTrue(index.contains("[a+b]("));
+        assertTrue(index.contains("[a b]("));
+        assertTrue(index.contains("(a-b.md)"));
+        assertTrue(index.contains("(a-b-2.md)"));
+    }
+
+    @Test
+    void tokenSafeExpansionReplacesOnlyWholePlaceholderTokens() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        PromotionRecord record = new PromotionRecord(
+            "token-safe",
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.PROMOTED,
+            "ABC + A1 + A + B",
+            "A + B",
+            "AGREE",
+            "ok",
+            "DEGRADED",
+            "substitution_introduction",
+            "sympy-polynomial-basic",
+            List.of(
+                "substitution.placeholder.A=x",
+                "substitution.placeholder.B=y",
+                "substitution.substituted=ABC + A1 + A + B",
+                "substitution.expanded.A=true",
+                "substitution.expanded.B=true"
+            ),
+            "rationale",
+            List.of("substitution_introduction"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            true,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+
+        String detail = runner.renderDetailReport(record);
+
+        assertTrue(detail.contains("Expanded expression: ABC + A1 + (x) + (y)"));
+        assertFalse(detail.contains("Expanded expression: (x)BC"));
+        assertFalse(detail.contains("Expanded expression: (x)1"));
+    }
+
+    @Test
+    void evidenceParsingKeepsEqualsAndTracksInvalidOccurrences() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        PromotionRecord record = new PromotionRecord(
+            "parsing",
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.PROMOTED,
+            "A + A",
+            "A + A",
+            "AGREE",
+            "ok",
+            "DEGRADED",
+            "substitution_introduction",
+            "sympy-polynomial-basic",
+            List.of(
+                "substitution.placeholder.A=x=y",
+                "substitution.placeholder.B=",
+                "substitution.occurrences.A=not-a-number",
+                "substitution.substituted=A + A",
+                "substitution.invalidWithoutEquals"
+            ),
+            "rationale",
+            List.of("substitution_introduction"),
+            false,
+            List.of("oracle=UNAVAILABLE"),
+            true,
+            false,
+            false,
+            true,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+
+        String detail = runner.renderDetailReport(record);
+
+        assertTrue(detail.contains("A -> x=y"));
+        assertTrue(detail.contains("B -> "));
+        assertTrue(detail.contains("ignored.invalid.occurrences=A=not-a-number"));
+        assertTrue(detail.contains("substitution.invalidWithoutEquals"));
+    }
+
+    @Test
+    void markdownOutputEscapesPipesNormalizesNewlinesAndHandlesBackticks() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        PromotionRecord record = new PromotionRecord(
+            "md",
+            "campaign",
+            "2026-01-01",
+            "family",
+            PromotionStage.REUSED,
+            "a | b\nc`d",
+            "res | ult`",
+            "AGREE",
+            "ok",
+            "DEGRADED",
+            "operator",
+            "pack",
+            List.of(),
+            "rationale",
+            List.of("step1"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            true,
+            "macro",
+            List.of("m1"),
+            true,
+            "campaign-4"
+        );
+
+        String gallery = runner.renderGallery(List.of(record));
+
+        assertTrue(gallery.contains("a \\| b c`d"));
+        assertTrue(gallery.contains("res \\| ult`"));
+        assertTrue(gallery.contains("``a \\| b c`d``"));
+        assertFalse(gallery.contains("a | b\nc`d"));
+    }
+
+    private PromotionRecord promotedRecord(String candidateId, String discoveredStructure) {
+        return new PromotionRecord(
+            candidateId,
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.PROMOTED,
+            discoveredStructure,
+            discoveredStructure,
+            "AGREE",
+            "ok",
+            "DEGRADED",
+            "substitution_introduction",
+            "sympy-polynomial-basic",
+            List.of("substitution.placeholder.A=x"),
+            "rationale",
+            List.of("substitution_introduction"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            true,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+    }
+
+    private void invokeWriteDiscoveryDetails(DiscoveryPromotionPipelineRunner runner, Path detailsDir, List<PromotionRecord> records)
+        throws Exception {
+        Method method = DiscoveryPromotionPipelineRunner.class.getDeclaredMethod(
+            "writeDiscoveryDetailReports",
+            Path.class,
+            List.class
+        );
+        method.setAccessible(true);
+        method.invoke(runner, detailsDir, records);
     }
 
 }

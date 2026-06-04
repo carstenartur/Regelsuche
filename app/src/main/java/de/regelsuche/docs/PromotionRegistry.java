@@ -45,13 +45,13 @@ final class PromotionRegistry {
         out.append("| Candidate | Campaign | Stage | Eligible | Generated macro | Reuse campaign | Blockers |\n");
         out.append("| --- | --- | --- | --- | --- | --- | --- |\n");
         for (HistoryEntry entry : registry.history()) {
-            out.append("| ").append(escape(entry.candidateId()))
-                .append(" | ").append(escape(entry.sourceCampaign()))
+            out.append("| ").append(escapeMarkdownTableCell(entry.candidateId()))
+                .append(" | ").append(escapeMarkdownTableCell(entry.sourceCampaign()))
                 .append(" | ").append(entry.stage().name().toLowerCase(Locale.ROOT))
                 .append(" | ").append(entry.promotionEligible() ? "yes" : "no")
-                .append(" | ").append(escape(orDash(entry.generatedMacroId())))
-                .append(" | ").append(escape(orDash(entry.reuseCampaign())))
-                .append(" | ").append(escape(entry.blockers().isEmpty() ? "—" : String.join(", ", entry.blockers())))
+                .append(" | ").append(escapeMarkdownTableCell(orDash(entry.generatedMacroId())))
+                .append(" | ").append(escapeMarkdownTableCell(orDash(entry.reuseCampaign())))
+                .append(" | ").append(escapeMarkdownTableCell(entry.blockers().isEmpty() ? "—" : String.join(", ", entry.blockers())))
                 .append(" |\n");
         }
         out.append("\n## Regression history\n\n");
@@ -60,9 +60,9 @@ final class PromotionRegistry {
             return out.toString();
         }
         for (RegressionEntry regression : registry.regressions()) {
-            out.append("- ").append(escape(regression.candidateId()))
-                .append(" (").append(escape(regression.campaignId())).append("): ")
-                .append(escape(regression.reason())).append('\n');
+            out.append("- ").append(escapeMarkdownInline(regression.candidateId()))
+                .append(" (").append(escapeMarkdownInline(regression.campaignId())).append("): ")
+                .append(escapeMarkdownInline(regression.reason())).append('\n');
         }
         return out.toString();
     }
@@ -89,7 +89,7 @@ final class PromotionRegistry {
             higherStage.ablationStatus(),
             choose(left.sourceOperator(), right.sourceOperator()),
             choose(left.sourcePack(), right.sourcePack()),
-            !left.assumptions().isEmpty() ? left.assumptions() : right.assumptions(),
+            mergeDistinctSorted(left.assumptions(), right.assumptions()),
             !left.rationale().isBlank() ? left.rationale() : right.rationale(),
             !left.rulePath().isEmpty() ? left.rulePath() : right.rulePath(),
             left.promotionEligible() || right.promotionEligible(),
@@ -109,12 +109,36 @@ final class PromotionRegistry {
         return left != null && !left.isBlank() ? left : (right == null ? "" : right);
     }
 
+    private List<String> mergeDistinctSorted(List<String> left, List<String> right) {
+        List<String> merged = new ArrayList<>(left == null ? List.of() : left);
+        merged.addAll(right == null ? List.of() : right);
+        return merged.stream()
+            .filter(value -> value != null && !value.isBlank())
+            .distinct()
+            .sorted()
+            .toList();
+    }
+
     private String orDash(String value) {
         return value == null || value.isBlank() ? "—" : value;
     }
 
-    private String escape(String value) {
-        return value == null ? "" : value.replace("|", "\\|").replace("\n", " ");
+    private String normalizeMarkdownText(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+            .replace("\r\n", "\n")
+            .replace('\r', '\n')
+            .replace('\n', ' ');
+    }
+
+    private String escapeMarkdownInline(String value) {
+        return normalizeMarkdownText(value);
+    }
+
+    private String escapeMarkdownTableCell(String value) {
+        return normalizeMarkdownText(value).replace("|", "\\|");
     }
 
     record Registry(List<PromotionRecord> records, List<HistoryEntry> history, List<RegressionEntry> regressions) {

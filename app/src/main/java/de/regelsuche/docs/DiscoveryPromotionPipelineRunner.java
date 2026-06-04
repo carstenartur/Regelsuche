@@ -8,6 +8,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -16,6 +17,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /** Coordinates the promotion registry, closed-loop campaign 4 reuse validation, backlog, and metrics. */
@@ -181,11 +184,12 @@ public final class DiscoveryPromotionPipelineRunner {
             return;
         }
         StringBuilder index = new StringBuilder("# Discovery details\n\n");
+        Map<String, Integer> slugCounts = new LinkedHashMap<>();
         for (PromotionRecord record : explainable) {
-            String slug = slug(record.candidateId());
-            Files.writeString(detailsDirectory.resolve(slug + ".md"), renderDetailReport(record), StandardCharsets.UTF_8);
-            index.append("- [").append(escape(record.candidateId())).append("](")
-                .append(slug).append(".md)\n");
+            String fileSlug = uniqueSlug(slug(record.candidateId()), slugCounts);
+            Files.writeString(detailsDirectory.resolve(fileSlug + ".md"), renderDetailReport(record), StandardCharsets.UTF_8);
+            index.append("- [").append(escapeMarkdownInline(record.candidateId())).append("](")
+                .append(fileSlug).append(".md)\n");
         }
         Files.writeString(detailsDirectory.resolve("README.md"), index.toString(), StandardCharsets.UTF_8);
     }
@@ -195,30 +199,40 @@ public final class DiscoveryPromotionPipelineRunner {
         return """
             # Discovery detail: %s
 
+            ## Discovery summary
+
+            - Origin expression: %s
+            - Discovered structure: %s
+            - Supporting evidence: %s
+            - Introduced placeholders: %s
+            - Transformation/operator path: %s
+            - Promotion decision: %s
+            - Missing pieces: %s
+
             ## Candidate context
 
-            - Original expression: `%s`
-            - Detected structure from evidence: `%s`
+            - Original expression: %s
+            - Detected structure from evidence: %s
             - Placeholder mappings: %s
             - Operator path: %s
-            - Oracle status: `%s`
-            - Oracle evidence: `%s`
-            - Ablation result: `%s`
-            - Promotion stage: `%s`
-            - Reuse improvement: `%s`
+            - Oracle status: %s
+            - Oracle evidence: %s
+            - Ablation result: %s
+            - Promotion stage: %s
+            - Reuse improvement: %s
 
             ## Timeline
 
-            - original: `%s`
-            - evidence-based abstraction/substitution: `%s`
-            - bridge/operator path: `%s`
-            - result: `%s`
-            - macro reuse: `%s`
+            - original: %s
+            - evidence-based abstraction/substitution: %s
+            - bridge/operator path: %s
+            - result: %s
+            - macro reuse: %s
 
             ## Evidence-based highlight model
 
-            - Original expression: `%s`
-            - Discovered structure: `%s`
+            - Original expression: %s
+            - Discovered structure: %s
             - Abstracted subexpression: %s
             - Placeholder mappings: %s
             - Substituted expression: %s
@@ -227,32 +241,40 @@ public final class DiscoveryPromotionPipelineRunner {
               - before: %s
               - after: %s
             - Source evidence: %s
+            - Token-safe placeholder expansion: only whole placeholder tokens are replaced; identifiers like `ABC` or `A1` stay unchanged when replacing placeholder `A`.
             """
             .formatted(
-                escape(record.candidateId()),
-                escape(record.originalExpression()),
-                escape(orDash(highlightModel.discoveredStructure())),
-                escape(orDash(renderPlaceholderMappings(highlightModel))),
+                escapeMarkdownInline(record.candidateId()),
+                inlineCodeOrDash(record.originalExpression()),
+                inlineCodeOrDash(highlightModel.discoveredStructure()),
+                escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel))),
+                escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),
                 inlinePath(record.rulePath()),
-                escape(record.oracleStatus()),
-                escape(orDash(record.oracleEvidence())),
-                escape(record.ablationStatus()),
-                record.stage().name().toLowerCase(Locale.ROOT),
+                escapeMarkdownInline(promotionDecision(record)),
+                escapeMarkdownInline(missingPieces(record)),
+                inlineCodeOrDash(record.originalExpression()),
+                inlineCodeOrDash(highlightModel.discoveredStructure()),
+                escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),
+                escapeMarkdownInline(inlinePath(record.rulePath())),
+                inlineCodeOrDash(record.oracleStatus()),
+                inlineCodeOrDash(orDash(record.oracleEvidence())),
+                inlineCodeOrDash(record.ablationStatus()),
+                inlineCodeOrDash(record.stage().name().toLowerCase(Locale.ROOT)),
                 record.measuredImprovement() ? "improved" : "not-measured",
-                escape(orDash(record.originalExpression())),
-                escape(orDash(timelineAbstraction(highlightModel))),
-                escape(orDash(timelineMiddle(record))),
-                escape(orDash(record.discoveredStructure())),
-                escape(orDash(timelineReuse(record))),
-                escape(orDash(highlightModel.originalExpression())),
-                escape(orDash(highlightModel.discoveredStructure())),
-                escape(orDash(abstractedSubexpression(highlightModel))),
-                escape(orDash(renderPlaceholderMappings(highlightModel))),
-                escape(orDash(highlightModel.substitutedExpression())),
-                escape(orDash(highlightModel.expandedExpression())),
-                escape(orDash(highlightModel.rewrittenBefore())),
-                escape(orDash(highlightModel.rewrittenAfter())),
-                escape(orDash(renderSourceEvidence(highlightModel)))
+                inlineCodeOrDash(record.originalExpression()),
+                inlineCodeOrDash(timelineAbstraction(highlightModel)),
+                inlineCodeOrDash(timelineMiddle(record)),
+                inlineCodeOrDash(record.discoveredStructure()),
+                inlineCodeOrDash(timelineReuse(record)),
+                inlineCodeOrDash(highlightModel.originalExpression()),
+                inlineCodeOrDash(highlightModel.discoveredStructure()),
+                escapeMarkdownInline(orDash(abstractedSubexpression(highlightModel))),
+                escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),
+                escapeMarkdownInline(orDash(highlightModel.substitutedExpression())),
+                escapeMarkdownInline(orDash(highlightModel.expandedExpression())),
+                escapeMarkdownInline(orDash(highlightModel.rewrittenBefore())),
+                escapeMarkdownInline(orDash(highlightModel.rewrittenAfter())),
+                escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel)))
             );
     }
 
@@ -289,6 +311,7 @@ public final class DiscoveryPromotionPipelineRunner {
     private DiscoveryHighlightModel highlightModel(PromotionRecord record) {
         Map<String, String> placeholderMappings = new LinkedHashMap<>();
         Map<String, Integer> placeholderOccurrences = new LinkedHashMap<>();
+        Map<String, String> invalidPlaceholderOccurrences = new LinkedHashMap<>();
         Set<String> expandedPlaceholders = new LinkedHashSet<>();
         List<String> sourceEvidence = record.assumptions().stream()
             .filter(assumption -> assumption != null && assumption.startsWith("substitution."))
@@ -296,7 +319,7 @@ public final class DiscoveryPromotionPipelineRunner {
         String substitutedExpression = "";
         for (String assumption : sourceEvidence) {
             int separatorIndex = assumption.indexOf('=');
-            if (separatorIndex < 0 || separatorIndex == assumption.length() - 1) {
+            if (separatorIndex < 0) {
                 continue;
             }
             String key = assumption.substring(0, separatorIndex);
@@ -310,6 +333,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 try {
                     placeholderOccurrences.put(placeholder, Integer.parseInt(value));
                 } catch (NumberFormatException ignored) {
+                    invalidPlaceholderOccurrences.put(placeholder, value);
                 }
                 continue;
             }
@@ -338,6 +362,7 @@ public final class DiscoveryPromotionPipelineRunner {
             discoveredStructure,
             placeholderMappings,
             placeholderOccurrences,
+            invalidPlaceholderOccurrences,
             substitutedExpression,
             expandedExpression,
             record.originalExpression(),
@@ -351,8 +376,17 @@ public final class DiscoveryPromotionPipelineRunner {
             return "";
         }
         String expanded = expression;
-        for (Map.Entry<String, String> entry : placeholderMappings.entrySet()) {
-            expanded = expanded.replace(entry.getKey(), "(" + entry.getValue() + ")");
+        List<Map.Entry<String, String>> orderedMappings = placeholderMappings.entrySet().stream()
+            .sorted((left, right) -> Integer.compare(right.getKey().length(), left.getKey().length()))
+            .toList();
+        for (Map.Entry<String, String> entry : orderedMappings) {
+            String placeholder = entry.getKey();
+            if (placeholder == null || placeholder.isBlank()) {
+                continue;
+            }
+            Pattern tokenPattern = Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(placeholder) + "(?![A-Za-z0-9_])");
+            Matcher matcher = tokenPattern.matcher(expanded);
+            expanded = matcher.replaceAll(Matcher.quoteReplacement("(" + entry.getValue() + ")"));
         }
         return expanded.equals(expression) ? "" : expanded;
     }
@@ -389,10 +423,18 @@ public final class DiscoveryPromotionPipelineRunner {
     }
 
     private String renderSourceEvidence(DiscoveryHighlightModel highlightModel) {
-        if (highlightModel.sourceEvidence().isEmpty()) {
+        List<String> evidence = new ArrayList<>(highlightModel.sourceEvidence());
+        if (!highlightModel.invalidPlaceholderOccurrences().isEmpty()) {
+            String invalid = highlightModel.invalidPlaceholderOccurrences().entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("");
+            evidence.add("ignored.invalid.occurrences=" + invalid);
+        }
+        if (evidence.isEmpty()) {
             return "none";
         }
-        return String.join("; ", highlightModel.sourceEvidence());
+        return String.join("; ", evidence);
     }
 
     private PromotionDashboard buildDashboard(List<PromotionRecord> records) {
@@ -453,10 +495,10 @@ public final class DiscoveryPromotionPipelineRunner {
             out.append("- none\n");
         } else {
             for (TopCandidate candidate : dashboard.topPromotedCandidates()) {
-                out.append("- ").append(escape(candidate.candidateId()))
+                    out.append("- ").append(escapeMarkdownInline(candidate.candidateId()))
                     .append(" [").append(candidate.stage().name().toLowerCase(Locale.ROOT)).append("]")
-                    .append(" oracle=").append(escape(candidate.oracleStatus()))
-                    .append(" ablation=").append(escape(candidate.ablationStatus()))
+                        .append(" oracle=").append(escapeMarkdownInline(candidate.oracleStatus()))
+                        .append(" ablation=").append(escapeMarkdownInline(candidate.ablationStatus()))
                     .append(" reuseImprovement=").append(candidate.measuredImprovement() ? "yes" : "no")
                     .append('\n');
             }
@@ -466,9 +508,9 @@ public final class DiscoveryPromotionPipelineRunner {
             out.append("- none\n");
         } else {
             for (UnresolvedBlocker blocker : dashboard.unresolvedBlockers()) {
-                out.append("- ").append(escape(blocker.candidateId()))
+                out.append("- ").append(escapeMarkdownInline(blocker.candidateId()))
                     .append(" [").append(blocker.stage().name().toLowerCase(Locale.ROOT)).append("]")
-                    .append(": ").append(escape(String.join(", ", blocker.blockers())))
+                    .append(": ").append(escapeMarkdownInline(String.join(", ", blocker.blockers())))
                     .append('\n');
             }
         }
@@ -477,6 +519,9 @@ public final class DiscoveryPromotionPipelineRunner {
 
     String renderGallery(List<PromotionRecord> records) {
         StringBuilder out = new StringBuilder("# Gallery 2.0\n\n");
+        out.append("## Selection policy\n\n")
+            .append("- Candidate is selected only if `fallbackUsed=false` and `curatedPathPresent=false`.\n")
+            .append("- Additionally, candidate must be `promotionEligible=true` or have stage `reused` (or higher).\n\n");
         List<PromotionRecord> selected = records.stream()
             .filter(PromotionRecord::galleryEligible)
             .sorted(Comparator.comparing(PromotionRecord::candidateId))
@@ -488,12 +533,13 @@ public final class DiscoveryPromotionPipelineRunner {
         out.append("| Candidate | Stage | Original | Result | Operator path | Reused macros |\n")
             .append("| --- | --- | --- | --- | --- | --- |\n");
         for (PromotionRecord record : selected) {
-            out.append("| ").append(escape(record.candidateId()))
+            out.append("| ").append(escapeMarkdownTableCell(record.candidateId()))
                 .append(" | ").append(record.stage().name().toLowerCase(Locale.ROOT))
-                .append(" | `").append(escape(orDash(record.originalExpression()))).append("`")
-                .append(" | `").append(escape(orDash(record.discoveredStructure()))).append("`")
-                .append(" | ").append(escape(inlinePath(record.rulePath())))
-                .append(" | ").append(escape(record.reusedMacroIds().isEmpty() ? "—" : String.join(", ", record.reusedMacroIds())))
+                .append(" | ").append(escapeMarkdownTableCell(inlineCodeOrDash(record.originalExpression())))
+                .append(" | ").append(escapeMarkdownTableCell(inlineCodeOrDash(record.discoveredStructure())))
+                .append(" | ").append(escapeMarkdownTableCell(inlinePath(record.rulePath())))
+                .append(" | ").append(escapeMarkdownTableCell(
+                    record.reusedMacroIds().isEmpty() ? "—" : String.join(", ", record.reusedMacroIds())))
                 .append(" |\n");
         }
         return out.toString();
@@ -510,9 +556,9 @@ public final class DiscoveryPromotionPipelineRunner {
             return out.toString();
         }
         for (PromotionRecord record : blocked) {
-            out.append("- ").append(escape(record.candidateId()))
+            out.append("- ").append(escapeMarkdownInline(record.candidateId()))
                 .append(" [").append(record.stage().name().toLowerCase(Locale.ROOT)).append("]")
-                .append(": ").append(escape(record.promotionBlockers().isEmpty()
+                .append(": ").append(escapeMarkdownInline(record.promotionBlockers().isEmpty()
                     ? record.rationale()
                     : String.join(", ", record.promotionBlockers())))
                 .append('\n');
@@ -532,10 +578,10 @@ public final class DiscoveryPromotionPipelineRunner {
             return out.toString();
         }
         for (PromotionRecord record : opportunities) {
-            out.append("- ").append(escape(record.candidateId()))
+            out.append("- ").append(escapeMarkdownInline(record.candidateId()))
                 .append(": investigate operator support for family ")
-                .append(escape(record.family()))
-                .append(" (campaign=").append(escape(record.sourceCampaign())).append(")\n");
+                .append(escapeMarkdownInline(record.family()))
+                .append(" (campaign=").append(escapeMarkdownInline(record.sourceCampaign())).append(")\n");
         }
         return out.toString();
     }
@@ -552,8 +598,8 @@ public final class DiscoveryPromotionPipelineRunner {
             return out.toString();
         }
         for (PromotionRecord record : opportunities) {
-            out.append("- ").append(escape(record.candidateId()))
-                .append(": ").append(escape(String.join(" -> ", record.rulePath())))
+            out.append("- ").append(escapeMarkdownInline(record.candidateId()))
+                .append(": ").append(escapeMarkdownInline(String.join(" -> ", record.rulePath())))
                 .append(" (stage=").append(record.stage().name().toLowerCase(Locale.ROOT)).append(")\n");
         }
         return out.toString();
@@ -573,8 +619,71 @@ public final class DiscoveryPromotionPipelineRunner {
         return slug.isBlank() ? "candidate" : slug;
     }
 
-    private String escape(String value) {
-        return value == null ? "" : value.replace("|", "\\|").replace("\n", " ");
+    private String uniqueSlug(String baseSlug, Map<String, Integer> slugCounts) {
+        int occurrence = slugCounts.merge(baseSlug, 1, Integer::sum);
+        return occurrence == 1 ? baseSlug : baseSlug + "-" + occurrence;
+    }
+
+    private String promotionDecision(PromotionRecord record) {
+        if (record.promotionEligible()) {
+            return "eligible: oracle and ablation checks are satisfied for promotion";
+        }
+        if (!record.promotionBlockers().isEmpty()) {
+            return "not eligible: " + String.join(", ", record.promotionBlockers());
+        }
+        return "not eligible: promotion evidence is incomplete";
+    }
+
+    private String missingPieces(PromotionRecord record) {
+        if (record.promotionEligible()) {
+            return "none";
+        }
+        if (!record.promotionBlockers().isEmpty()) {
+            return String.join(", ", record.promotionBlockers());
+        }
+        return orDash(record.rationale());
+    }
+
+    private String inlineCodeOrDash(String value) {
+        String normalized = normalizeMarkdownText(orDash(value));
+        if (normalized.equals("—")) {
+            return "—";
+        }
+        int longestRun = longestBacktickRun(normalized);
+        String fence = "`".repeat(longestRun + 1);
+        return fence + normalized + fence;
+    }
+
+    private int longestBacktickRun(String value) {
+        int longest = 0;
+        int current = 0;
+        for (int index = 0; index < value.length(); index++) {
+            if (value.charAt(index) == '`') {
+                current++;
+                longest = Math.max(longest, current);
+            } else {
+                current = 0;
+            }
+        }
+        return longest;
+    }
+
+    private String normalizeMarkdownText(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+            .replace("\r\n", "\n")
+            .replace('\r', '\n')
+            .replace('\n', ' ');
+    }
+
+    private String escapeMarkdownInline(String value) {
+        return normalizeMarkdownText(value);
+    }
+
+    private String escapeMarkdownTableCell(String value) {
+        return normalizeMarkdownText(value).replace("|", "\\|");
     }
 
     record PipelineReport(
@@ -640,6 +749,7 @@ public final class DiscoveryPromotionPipelineRunner {
         String discoveredStructure,
         Map<String, String> placeholderMappings,
         Map<String, Integer> placeholderOccurrences,
+        Map<String, String> invalidPlaceholderOccurrences,
         String substitutedExpression,
         String expandedExpression,
         String rewrittenBefore,
@@ -649,6 +759,9 @@ public final class DiscoveryPromotionPipelineRunner {
         DiscoveryHighlightModel {
             placeholderMappings = placeholderMappings == null ? Map.of() : Map.copyOf(placeholderMappings);
             placeholderOccurrences = placeholderOccurrences == null ? Map.of() : Map.copyOf(placeholderOccurrences);
+            invalidPlaceholderOccurrences = invalidPlaceholderOccurrences == null
+                ? Map.of()
+                : Map.copyOf(invalidPlaceholderOccurrences);
             sourceEvidence = sourceEvidence == null ? List.of() : List.copyOf(sourceEvidence);
         }
     }
