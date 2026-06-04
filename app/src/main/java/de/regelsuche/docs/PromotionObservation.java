@@ -111,12 +111,37 @@ record PromotionObservation(
         );
     }
 
+    static PromotionObservation fromCampaignFive(DiscoveryCampaignFiveRunner.CaseResult result, String campaignId) {
+        return new PromotionObservation(
+            result.id(),
+            campaignId,
+            discoveryDateFor(campaignId),
+            result.family(),
+            result.inputExpression(),
+            result.targetExpression(),
+            result.success(),
+            result.oracleStatus(),
+            result.oracleEvidence(),
+            result.ablationStatus(),
+            result.shortcutOperatorId(),
+            result.shortcutPackId(),
+            result.shortcutAssumptions(),
+            rationale(result.notes(), result.failureReason()),
+            result.rulePath(),
+            !result.rulePath().isEmpty(),
+            curatedPathPresent(result.shortcutSource()),
+            fallbackUsed(result.rulePath()),
+            macroOpportunity(result.family(), result.rulePath())
+        );
+    }
+
     static String discoveryDateFor(String campaignId) {
         int month = switch (campaignId) {
             case "discovery-campaign-1" -> 1;
             case "discovery-campaign-2" -> 2;
             case "discovery-campaign-3" -> 3;
             case "discovery-campaign-4" -> 4;
+            case "discovery-campaign-5" -> 5;
             default -> 12;
         };
         return LocalDate.of(2026, month, 1).toString();

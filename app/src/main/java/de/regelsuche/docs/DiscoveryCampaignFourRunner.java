@@ -143,6 +143,18 @@ public final class DiscoveryCampaignFourRunner {
                 "discovery-campaign-1",
                 "sophie-germain",
                 "discovery-scenarios/sophie-germain.yaml"
+            ),
+            new ReuseCase(
+                "b-complete-square-plus-rest",
+                "discovery-campaign-5",
+                "complete-square-factorization",
+                "discovery-scenarios/complete-square.yaml"
+            ),
+            new ReuseCase(
+                "d-sophie-germain-xy",
+                "discovery-campaign-5",
+                "sophie-germain",
+                "discovery-scenarios/sophie-germain.yaml"
             )
         );
     }

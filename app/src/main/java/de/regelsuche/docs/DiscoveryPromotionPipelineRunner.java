@@ -29,6 +29,7 @@ public final class DiscoveryPromotionPipelineRunner {
         .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
     private final PromotionDecider decider = new PromotionDecider();
     private final PromotionRegistry registry = new PromotionRegistry();
+    private final DiscoveryCampaignFiveRunner campaignFiveRunner = new DiscoveryCampaignFiveRunner();
     private final DiscoveryCampaignFourRunner campaignFourRunner = new DiscoveryCampaignFourRunner();
 
     public static void main(String[] args) {
@@ -43,6 +44,9 @@ public final class DiscoveryPromotionPipelineRunner {
         DiscoveryCampaignOneRunner.CampaignReport campaignOne = new DiscoveryCampaignOneRunner().run();
         DiscoveryCampaignTwoRunner.CampaignReport campaignTwo = new DiscoveryCampaignTwoRunner().run();
         DiscoveryCampaignThreeRunner.CampaignReport campaignThree = new DiscoveryCampaignThreeRunner().run();
+        // Order decision: Campaign 5 runs before Campaign 4 so newly promoted hidden-structure cases can be
+        // considered by Campaign 4's macro-reuse validation in the same pipeline run.
+        DiscoveryCampaignFiveRunner.CampaignReport campaignFive = campaignFiveRunner.run();
 
         List<PromotionRecord> promotionRecords = Stream.of(
                 campaignOne.results().stream()
@@ -50,7 +54,9 @@ public final class DiscoveryPromotionPipelineRunner {
                 campaignTwo.results().stream()
                     .map(result -> decider.decide(PromotionObservation.fromCampaignTwo(result, campaignTwo.id()))),
                 campaignThree.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignThree(result, campaignThree.id()))))
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignThree(result, campaignThree.id()))),
+                campaignFive.results().stream()
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignFive(result, campaignFive.id()))))
             .flatMap(Function.identity())
             .sorted(Comparator.comparing(PromotionRecord::candidateId))
             .toList();
@@ -125,6 +131,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 renderGallery(report.promotionRecords()),
                 StandardCharsets.UTF_8
             );
+            campaignFiveRunner.writeReport(outputDirectory.resolve("discovery-campaign-5"));
             campaignFourRunner.writeReport(outputDirectory.resolve("discovery-campaign-4"), report.promotionRecords());
             return report;
         } catch (IOException exception) {
