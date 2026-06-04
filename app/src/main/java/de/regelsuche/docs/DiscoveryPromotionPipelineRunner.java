@@ -16,8 +16,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /** Coordinates the promotion registry, closed-loop campaign 4 reuse validation, backlog, and metrics. */
@@ -25,8 +23,6 @@ public final class DiscoveryPromotionPipelineRunner {
     private static final ObjectMapper JSON = new ObjectMapper()
         .findAndRegisterModules()
         .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-    private static final Pattern SUBEXPRESSION_PATTERN = Pattern.compile("\\([^()]+\\)");
-
     private final PromotionDecider decider = new PromotionDecider();
     private final PromotionRegistry registry = new PromotionRegistry();
     private final DiscoveryCampaignFourRunner campaignFourRunner = new DiscoveryCampaignFourRunner();
@@ -194,50 +190,69 @@ public final class DiscoveryPromotionPipelineRunner {
         Files.writeString(detailsDirectory.resolve("README.md"), index.toString(), StandardCharsets.UTF_8);
     }
 
-    private String renderDetailReport(PromotionRecord record) {
-        HighlightSection highlights = highlights(record);
+    String renderDetailReport(PromotionRecord record) {
+        DiscoveryHighlightModel highlightModel = highlightModel(record);
         return """
             # Discovery detail: %s
 
             ## Candidate context
 
             - Original expression: `%s`
-            - Discovered hidden structure: `%s`
+            - Detected structure from evidence: `%s`
+            - Placeholder mappings: %s
             - Operator path: %s
             - Oracle status: `%s`
+            - Oracle evidence: `%s`
             - Ablation result: `%s`
             - Promotion stage: `%s`
             - Reuse improvement: `%s`
 
             ## Timeline
 
-            `%s` → `%s` → `%s` → `%s`
+            - original: `%s`
+            - evidence-based abstraction/substitution: `%s`
+            - bridge/operator path: `%s`
+            - result: `%s`
+            - macro reuse: `%s`
 
-            ## Highlighted before/after
+            ## Evidence-based highlight model
 
+            - Original expression: `%s`
+            - Discovered structure: `%s`
             - Abstracted subexpression: %s
+            - Placeholder mappings: %s
+            - Substituted expression: %s
+            - Expanded expression: %s
             - Rewritten section:
               - before: %s
               - after: %s
-            - Expanded section: %s
+            - Source evidence: %s
             """
             .formatted(
                 escape(record.candidateId()),
                 escape(record.originalExpression()),
-                escape(record.discoveredStructure()),
+                escape(orDash(highlightModel.discoveredStructure())),
+                escape(orDash(renderPlaceholderMappings(highlightModel))),
                 inlinePath(record.rulePath()),
                 escape(record.oracleStatus()),
+                escape(orDash(record.oracleEvidence())),
                 escape(record.ablationStatus()),
                 record.stage().name().toLowerCase(Locale.ROOT),
                 record.measuredImprovement() ? "improved" : "not-measured",
                 escape(orDash(record.originalExpression())),
+                escape(orDash(timelineAbstraction(highlightModel))),
                 escape(orDash(timelineMiddle(record))),
                 escape(orDash(record.discoveredStructure())),
                 escape(orDash(timelineReuse(record))),
-                escape(orDash(highlights.abstractedSubexpression())),
-                escape(orDash(highlights.rewrittenBefore())),
-                escape(orDash(highlights.rewrittenAfter())),
-                escape(orDash(highlights.expandedSubexpression()))
+                escape(orDash(highlightModel.originalExpression())),
+                escape(orDash(highlightModel.discoveredStructure())),
+                escape(orDash(abstractedSubexpression(highlightModel))),
+                escape(orDash(renderPlaceholderMappings(highlightModel))),
+                escape(orDash(highlightModel.substitutedExpression())),
+                escape(orDash(highlightModel.expandedExpression())),
+                escape(orDash(highlightModel.rewrittenBefore())),
+                escape(orDash(highlightModel.rewrittenAfter())),
+                escape(orDash(renderSourceEvidence(highlightModel)))
             );
     }
 
@@ -261,56 +276,123 @@ public final class DiscoveryPromotionPipelineRunner {
         return "macro reuse pending";
     }
 
-    private HighlightSection highlights(PromotionRecord record) {
-        String abstracted = detectAbstractedSubexpression(record.originalExpression());
-        Diff rewriteDiff = diff(record.originalExpression(), record.discoveredStructure());
-        String expanded = record.rulePath().stream()
-            .filter(step -> step != null && step.toLowerCase(Locale.ROOT).contains("expansion"))
-            .findFirst()
-            .orElse(record.rulePath().stream()
-                .filter(step -> step != null && step.toLowerCase(Locale.ROOT).contains("substitution"))
-                .findFirst()
-                .orElse(""));
-        return new HighlightSection(abstracted, rewriteDiff.before(), rewriteDiff.after(), expanded);
+    private String timelineAbstraction(DiscoveryHighlightModel highlightModel) {
+        if (!highlightModel.substitutedExpression().isBlank()) {
+            return highlightModel.substitutedExpression();
+        }
+        if (!highlightModel.placeholderMappings().isEmpty()) {
+            return "placeholder mappings: " + renderPlaceholderMappings(highlightModel);
+        }
+        return "no substitution evidence";
     }
 
-    private String detectAbstractedSubexpression(String expression) {
-        if (expression == null || expression.isBlank()) {
+    private DiscoveryHighlightModel highlightModel(PromotionRecord record) {
+        Map<String, String> placeholderMappings = new LinkedHashMap<>();
+        Map<String, Integer> placeholderOccurrences = new LinkedHashMap<>();
+        Set<String> expandedPlaceholders = new LinkedHashSet<>();
+        List<String> sourceEvidence = record.assumptions().stream()
+            .filter(assumption -> assumption != null && assumption.startsWith("substitution."))
+            .toList();
+        String substitutedExpression = "";
+        for (String assumption : sourceEvidence) {
+            int separatorIndex = assumption.indexOf('=');
+            if (separatorIndex < 0 || separatorIndex == assumption.length() - 1) {
+                continue;
+            }
+            String key = assumption.substring(0, separatorIndex);
+            String value = assumption.substring(separatorIndex + 1);
+            if (key.startsWith("substitution.placeholder.")) {
+                placeholderMappings.put(key.substring("substitution.placeholder.".length()), value);
+                continue;
+            }
+            if (key.startsWith("substitution.occurrences.")) {
+                String placeholder = key.substring("substitution.occurrences.".length());
+                try {
+                    placeholderOccurrences.put(placeholder, Integer.parseInt(value));
+                } catch (NumberFormatException ignored) {
+                }
+                continue;
+            }
+            if (key.equals("substitution.substituted")) {
+                substitutedExpression = value;
+                continue;
+            }
+            if (key.startsWith("substitution.expanded.") && "true".equalsIgnoreCase(value)) {
+                expandedPlaceholders.add(key.substring("substitution.expanded.".length()));
+            }
+        }
+        String discoveredStructure = !substitutedExpression.isBlank()
+            ? substitutedExpression
+            : record.discoveredStructure();
+        String expandedExpression = expandedPlaceholders.isEmpty()
+            ? ""
+            : expandPlaceholders(
+                substitutedExpression.isBlank() ? record.discoveredStructure() : substitutedExpression,
+                placeholderMappings
+            );
+        String rewrittenAfter = !substitutedExpression.isBlank()
+            ? substitutedExpression
+            : record.discoveredStructure();
+        return new DiscoveryHighlightModel(
+            record.originalExpression(),
+            discoveredStructure,
+            placeholderMappings,
+            placeholderOccurrences,
+            substitutedExpression,
+            expandedExpression,
+            record.originalExpression(),
+            rewrittenAfter,
+            sourceEvidence
+        );
+    }
+
+    private String expandPlaceholders(String expression, Map<String, String> placeholderMappings) {
+        if (expression == null || expression.isBlank() || placeholderMappings.isEmpty()) {
             return "";
         }
-        Matcher matcher = SUBEXPRESSION_PATTERN.matcher(expression);
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        while (matcher.find()) {
-            counts.merge(matcher.group(), 1, Integer::sum);
+        String expanded = expression;
+        for (Map.Entry<String, String> entry : placeholderMappings.entrySet()) {
+            expanded = expanded.replace(entry.getKey(), "(" + entry.getValue() + ")");
         }
-        return counts.entrySet().stream()
-            .filter(entry -> entry.getValue() > 1)
-            .map(Map.Entry::getKey)
-            .findFirst()
-            .orElse(counts.keySet().stream().findFirst().orElse(""));
+        return expanded.equals(expression) ? "" : expanded;
     }
 
-    private Diff diff(String before, String after) {
-        String left = before == null ? "" : before;
-        String right = after == null ? "" : after;
-        if (left.equals(right)) {
-            return new Diff(left, right);
+    private String abstractedSubexpression(DiscoveryHighlightModel highlightModel) {
+        if (highlightModel.placeholderMappings().isEmpty()) {
+            return "";
         }
-        int start = 0;
-        int leftLength = left.length();
-        int rightLength = right.length();
-        while (start < leftLength && start < rightLength && left.charAt(start) == right.charAt(start)) {
-            start++;
+        return highlightModel.placeholderMappings().entrySet().stream()
+            .map(entry -> {
+                String placeholder = entry.getKey();
+                String mapping = placeholder + " -> " + entry.getValue();
+                Integer occurrences = highlightModel.placeholderOccurrences().get(placeholder);
+                return occurrences == null ? mapping : mapping + " (occurrences=" + occurrences + ")";
+            })
+            .findFirst()
+            .orElse("");
+    }
+
+    private String renderPlaceholderMappings(DiscoveryHighlightModel highlightModel) {
+        if (highlightModel.placeholderMappings().isEmpty()) {
+            return "no substitution evidence recorded";
         }
-        int leftEnd = leftLength - 1;
-        int rightEnd = rightLength - 1;
-        while (leftEnd >= start && rightEnd >= start && left.charAt(leftEnd) == right.charAt(rightEnd)) {
-            leftEnd--;
-            rightEnd--;
+        return highlightModel.placeholderMappings().entrySet().stream()
+            .map(entry -> {
+                String placeholder = entry.getKey();
+                Integer occurrences = highlightModel.placeholderOccurrences().get(placeholder);
+                return occurrences == null
+                    ? placeholder + " -> " + entry.getValue()
+                    : placeholder + " -> " + entry.getValue() + " (occurrences=" + occurrences + ")";
+            })
+            .reduce((left, right) -> left + "; " + right)
+            .orElse("no substitution evidence recorded");
+    }
+
+    private String renderSourceEvidence(DiscoveryHighlightModel highlightModel) {
+        if (highlightModel.sourceEvidence().isEmpty()) {
+            return "none";
         }
-        String leftChanged = start <= leftEnd ? left.substring(start, leftEnd + 1) : "";
-        String rightChanged = start <= rightEnd ? right.substring(start, rightEnd + 1) : "";
-        return new Diff(leftChanged, rightChanged);
+        return String.join("; ", highlightModel.sourceEvidence());
     }
 
     private PromotionDashboard buildDashboard(List<PromotionRecord> records) {
@@ -393,7 +475,7 @@ public final class DiscoveryPromotionPipelineRunner {
         return out.toString();
     }
 
-    private String renderGallery(List<PromotionRecord> records) {
+    String renderGallery(List<PromotionRecord> records) {
         StringBuilder out = new StringBuilder("# Gallery 2.0\n\n");
         List<PromotionRecord> selected = records.stream()
             .filter(PromotionRecord::galleryEligible)
@@ -553,14 +635,21 @@ public final class DiscoveryPromotionPipelineRunner {
         }
     }
 
-    private record HighlightSection(
-        String abstractedSubexpression,
+    record DiscoveryHighlightModel(
+        String originalExpression,
+        String discoveredStructure,
+        Map<String, String> placeholderMappings,
+        Map<String, Integer> placeholderOccurrences,
+        String substitutedExpression,
+        String expandedExpression,
         String rewrittenBefore,
         String rewrittenAfter,
-        String expandedSubexpression
+        List<String> sourceEvidence
     ) {
-    }
-
-    private record Diff(String before, String after) {
+        DiscoveryHighlightModel {
+            placeholderMappings = placeholderMappings == null ? Map.of() : Map.copyOf(placeholderMappings);
+            placeholderOccurrences = placeholderOccurrences == null ? Map.of() : Map.copyOf(placeholderOccurrences);
+            sourceEvidence = sourceEvidence == null ? List.of() : List.copyOf(sourceEvidence);
+        }
     }
 }
