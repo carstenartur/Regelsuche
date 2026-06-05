@@ -68,3 +68,23 @@ Siehe auch:
 
 - [docs/rule-discovery.md](rule-discovery.md)
 - [docs/scientific-reproducibility.md](scientific-reproducibility.md)
+
+## Generated artifact ownership (Discovery Gallery)
+
+`generateDiscoveryGallery` muss reproduzierbar sein und der CI/CD-Check ist absichtlich strikt.
+
+Regel für dieses Repository:
+
+- Feature-PRs, die Discovery-Generatoren, Campaign-Runner, Report-Modelle oder die README/Gallery-Ausgabe ändern, committen die dadurch geänderten Artefakte im selben PR.
+- Der Reproducibility-Check in CI erwartet genau diese Konsistenz und bleibt hart.
+- Ein separater Gallery-Bot-PR ist nur für reine Artefakt-Aktualisierungen ohne Generatoränderung gedacht, nicht als Ersatz für fehlende Artefakte in Feature-PRs.
+
+Pflichtschritte vor Merge:
+
+```bash
+./gradlew build
+env -u GITHUB_SHA ./gradlew :app:generateDiscoveryGallery
+git diff --exit-code -- docs/generated/discovery docs/demo-gallery.md README.md
+```
+
+TODO: Clarify Gallery Bot ownership for feature branches.
