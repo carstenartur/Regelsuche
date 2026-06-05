@@ -2,53 +2,32 @@ package de.regelsuche.docs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.ast.VariableExpr;
-import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
-import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
-import de.regelsuche.parse.ExpressionFormatter;
-import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.moves.MoveCandidateTransformationEngine;
+import de.regelsuche.moves.RewriteMove;
+import de.regelsuche.moves.search.CountableMoveSearchEngine;
+import de.regelsuche.moves.search.CountableMoveSearchEngine.CountableMoveSearchResult;
 import de.regelsuche.util.AtomicJsonFile;
-import de.regelsuche.validation.SymPyDiscoveryOracleAdapter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
-/**
- * Runs Discovery Campaign 6 (Open-Ended Identity Mining).
- *
- * <p>Unlike campaigns 1-5, which validate curated input/target pairs, this campaign lets Regelsuche
- * <em>generate</em> identity candidates on its own. It seeds known identity families, applies a fixed
- * catalogue of substitutions (for example {@code x+1}, {@code sin(x)}, {@code a+b}, {@code x^2}),
- * checks equivalence deterministically (and corroborates with a SymPy oracle when available), ranks the
- * candidates by brevity, surprise, path length, reusability and difference from the source expression,
- * and reports the Top-20 as possible new macros.
- */
+/** Runs Discovery Campaign 6: Countable Move Search Probe. */
 public final class DiscoveryCampaignSixRunner {
     private static final ObjectMapper JSON = new ObjectMapper()
         .findAndRegisterModules()
         .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
-    private static final String PLACEHOLDER = "U";
-    private static final String ATOM = "u";
-    private static final int TOP_LIMIT = 20;
-    private static final double BREVITY_NODE_CAP = 14.0;
-    private static final double PROMOTABLE_THRESHOLD = 0.45;
-
-    private final ExpressionParser parser = new ExpressionParser();
-    private final PolynomialNormalFormEquivalenceService equivalence =
-        new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
-    private final SymPyDiscoveryOracleAdapter oracle = new SymPyDiscoveryOracleAdapter();
+    private final MoveCandidateTransformationEngine moveAdapter = new MoveCandidateTransformationEngine();
+    private final CountableMoveSearchEngine moveSearchEngine = new CountableMoveSearchEngine();
+    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
 
     public static void main(String[] args) {
         Path repoRoot = args.length == 0
@@ -59,27 +38,8 @@ public final class DiscoveryCampaignSixRunner {
     }
 
     public CampaignReport run() {
-        List<Candidate> scored = new ArrayList<>();
-        for (Seed seed : seeds()) {
-            for (Substitution substitution : substitutions()) {
-                scored.add(mine(seed, substitution));
-            }
-        }
-        scored.sort(Comparator
-            .comparingDouble(Candidate::interestingness).reversed()
-            .thenComparing(Candidate::id));
-
-        List<Candidate> ranked = new ArrayList<>();
-        int rank = 1;
-        for (Candidate candidate : scored) {
-            if (rank > TOP_LIMIT) {
-                break;
-            }
-            ranked.add(candidate.withRank(rank));
-            rank++;
-        }
-        long promotable = ranked.stream().filter(Candidate::promotable).count();
-        return new CampaignReport("discovery-campaign-6", ranked, scored.size(), (int) promotable);
+        List<CaseResult> results = cases().stream().map(this::evaluate).toList();
+        return new CampaignReport("discovery-campaign-6", results, relatedFollowUpIssues(), builtInArchitectureNote());
     }
 
     public CampaignReport writeReport(Path outputDirectory) {
@@ -94,7 +54,7 @@ public final class DiscoveryCampaignSixRunner {
                 JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)
             );
             Files.writeString(
-                outputDirectory.resolve("identity-mining-report.md"),
+                outputDirectory.resolve("countable-move-enumeration-report.md"),
                 renderMarkdown(report),
                 StandardCharsets.UTF_8
             );
@@ -104,309 +64,393 @@ public final class DiscoveryCampaignSixRunner {
         }
     }
 
-    private Candidate mine(Seed seed, Substitution substitution) {
-        String id = seed.id() + "--" + substitution.id();
-        String sourceExpression = instantiate(seed.sourceTemplate(), substitution.expression());
-        String simplifiedExpression = instantiate(seed.simplifiedTemplate(), substitution.expression());
+    private CaseResult evaluate(ProbeCase probeCase) {
+        MoveCandidateTransformationEngine.ComparisonReport comparison = moveAdapter.compare(probeCase.inputExpression());
+        boolean expectedMovePresent = switch (probeCase.id()) {
+            case "cancellation-plus-one" -> hasParameter(comparison.moveCandidates(), "cancel", "+1");
+            case "complete-square" -> hasParameter(comparison.moveCandidates(), "shift", "3")
+                && hasParameter(comparison.moveCandidates(), "residue", "-4");
+            case "repeated-subexpression" -> hasParameter(comparison.moveCandidates(), "x + 1", "x + 1");
+            case "common-subexpression" -> hasParameter(comparison.moveCandidates(), "y + 1", "y + 1");
+            default -> false;
+        };
+        String expectedMoveCoverage = expectedCoverage(comparison, probeCase.id());
 
-        // Deterministic, offline equivalence: the substituted subterm is treated as a single fresh
-        // atom so the family identity reduces to a pure polynomial normal-form comparison.
-        String atomicSource = seed.sourceTemplate().replace(PLACEHOLDER, ATOM);
-        String atomicSimplified = seed.simplifiedTemplate().replace(PLACEHOLDER, ATOM);
-        boolean equivalent = equivalence.arePolynomiallyEquivalent(atomicSource, atomicSimplified);
-        String deterministicEvidence = equivalence.lastResult().detail();
+        CountableMoveSearchResult searchResult = moveSearchEngine.search(
+            probeCase.inputExpression(),
+            probeCase.targetExpression(),
+            4,
+            120
+        );
 
-        SymPyDiscoveryOracleAdapter.OracleResult oracleResult =
-            oracle.equivalence(sourceExpression, simplifiedExpression);
+        List<PathStep> pathSteps = toPathSteps(searchResult);
+        String architectureNote = architectureNote(probeCase, expectedMovePresent, searchResult);
+        Interpretation interpretation = interpretation(probeCase, comparison, searchResult, architectureNote);
 
-        int sourceNodes = nodeCount(sourceExpression);
-        int simplifiedNodes = nodeCount(simplifiedExpression);
-        int baseNodes = nodeCount(instantiate(seed.sourceTemplate(), "x"));
-        Set<String> variables = variablesOf(sourceExpression);
-
-        List<String> path = buildPath(seed, substitution, sourceExpression, simplifiedExpression);
-
-        double brevity = clamp(1.0 - (simplifiedNodes / BREVITY_NODE_CAP));
-        double surprise = sourceNodes == 0
-            ? 0.0
-            : clamp((double) (sourceNodes - simplifiedNodes) / sourceNodes);
-        double pathLengthScore = clamp((path.size() - 1) / 3.0);
-        double reusability = clamp(
-            0.5 * clamp((variables.size() - 1) / 2.0) + 0.5 * substitution.generality());
-        double differenceFromSource = baseNodes == 0
-            ? 0.0
-            : clamp((double) Math.max(0, sourceNodes - baseNodes) / baseNodes);
-
-        Scores scores = new Scores(brevity, surprise, pathLengthScore, reusability, differenceFromSource);
-        double interestingness = clamp(
-            0.20 * brevity
-                + 0.30 * surprise
-                + 0.15 * pathLengthScore
-                + 0.20 * reusability
-                + 0.15 * differenceFromSource);
-
-        boolean knownSeed = substitution.identity();
-        boolean promotable = equivalent
-            && !knownSeed
-            && interestingness >= PROMOTABLE_THRESHOLD
-            && oracleResult.status() != SymPyDiscoveryOracleAdapter.Status.DISAGREE;
-
-        String whyInteresting = explain(seed, substitution, sourceNodes, simplifiedNodes,
-            variables.size(), path.size(), knownSeed, scores);
-
-        return new Candidate(
-            0,
-            id,
-            seed.family(),
-            seed.seedFamilyId(),
-            substitution.expression(),
-            sourceExpression,
-            simplifiedExpression,
-            path,
-            equivalent,
-            deterministicEvidence,
-            oracleResult.status().name(),
-            oracleResult.evidence(),
-            scores,
-            interestingness,
-            promotable,
-            whyInteresting
+        return new CaseResult(
+            probeCase.id(),
+            probeCase.inputExpression(),
+            probeCase.targetExpression(),
+            probeCase.expectation(),
+            new Depth1CandidateProbe(
+                expectedMovePresent,
+                expectedMoveCoverage,
+                comparison.classicCandidates().size(),
+                comparison.moveCandidates().size(),
+                comparison.overlaps().size(),
+                comparison.moveOnlyCandidates().size(),
+                comparison.classicOnlyCandidates().size()
+            ),
+            new MultiStepCountableMoveSearch(
+                searchResult.success(),
+                searchResult.pathLength(),
+                searchResult.pathExpressions(),
+                searchResult.appliedMoves(),
+                searchResult.appliedRuleIds(),
+                ordinalPath(searchResult.appliedMoves()),
+                searchResult.exploredStateCount(),
+                searchResult.uniqueCanonicalStateCount(),
+                searchResult.failureReason().name(),
+                pathSteps
+            ),
+            interpretation,
+            comparison,
+            architectureNote
         );
     }
 
-    private List<String> buildPath(Seed seed, Substitution substitution, String source, String simplified) {
-        List<String> path = new ArrayList<>();
-        path.add("seed:" + seed.family() + " (" + seed.sourceTemplate() + ")");
-        path.add("substitute " + PLACEHOLDER + " := " + substitution.expression());
-        if (!substitution.atomic()) {
-            path.add("expand to " + source);
+    private List<PathStep> toPathSteps(CountableMoveSearchResult searchResult) {
+        if (!searchResult.success() || searchResult.appliedMoves().isEmpty()) {
+            return List.of();
         }
-        path.add("compress to " + simplified);
-        return List.copyOf(path);
+        List<PathStep> steps = new ArrayList<>();
+        List<String> path = searchResult.pathExpressions();
+        for (int index = 0; index < searchResult.appliedMoves().size(); index++) {
+            RewriteMove move = searchResult.appliedMoves().get(index);
+            String before = index < path.size() ? path.get(index) : "";
+            String after = index + 1 < path.size() ? path.get(index + 1) : move.targetExpression();
+            steps.add(new PathStep(
+                index + 1,
+                before,
+                move.kind().name(),
+                move.ruleId(),
+                ordinalText(move),
+                renderParameters(move),
+                after
+            ));
+        }
+        return List.copyOf(steps);
     }
 
-    private String explain(Seed seed, Substitution substitution, int sourceNodes, int simplifiedNodes,
-                           int variableCount, int pathSteps, boolean knownSeed, Scores scores) {
-        if (knownSeed) {
-            return "Rediscovers the known " + seed.family() + " identity on its base variable; "
-                + "kept as a seed reference, not promotable.";
+    private String architectureNote(ProbeCase probeCase, boolean expectedMovePresent, CountableMoveSearchResult searchResult) {
+        if (!expectedMovePresent) {
+            return "Missing parameter enumerator";
         }
-        StringBuilder builder = new StringBuilder();
-        builder.append("Substituting ").append(substitution.expression())
-            .append(" into the ").append(seed.family())
-            .append(" family compresses ").append(sourceNodes)
-            .append(" nodes down to ").append(simplifiedNodes).append(" (surprise ")
-            .append(format(scores.surprise())).append(").");
-        if (variableCount > 1) {
-            builder.append(" Reusable across ").append(variableCount).append(" free variables.");
+        if (!searchResult.success() && "cancellation-plus-one".equals(probeCase.id())) {
+            return "Missing normalizer";
         }
-        if (!substitution.atomic()) {
-            builder.append(" Hidden structure revealed after a ").append(pathSteps).append("-step derivation.");
+        if (!searchResult.appliedMoves().isEmpty() && searchResult.appliedMoves().stream().anyMatch(move ->
+            move.kind().name().equals("UNKNOWN") || move.hasUnresolvedParameters())) {
+            return "Move enumeration needs classic fallback";
         }
-        return builder.toString();
+        if (!searchResult.success()) {
+            return "Missing realizer";
+        }
+        return "Move enumeration is sufficient";
     }
 
-    private String instantiate(String template, String substitution) {
-        String raw = template.replace(PLACEHOLDER, "(" + substitution + ")");
-        try {
-            return ExpressionFormatter.format(parser.parseTerm(raw));
-        } catch (IllegalArgumentException ex) {
-            return raw;
+    private Interpretation interpretation(
+        ProbeCase probeCase,
+        MoveCandidateTransformationEngine.ComparisonReport comparison,
+        CountableMoveSearchResult searchResult,
+        String architectureNote
+    ) {
+        String suitability = searchResult.success()
+            ? "Mehrstufiger Pfad erreichbar innerhalb des Budgets."
+            : "Ziel im aktuellen Budget nicht erreicht.";
+        String missingFamily = switch (architectureNote) {
+            case "Missing parameter enumerator" -> "Parameter-Enumerator für den erwarteten Move erweitern.";
+            case "Missing normalizer" -> "Nachgelagerte Normalisierung (z. B. cancellation -> solve) fehlt.";
+            case "Missing realizer" -> "Move-Realizer für diesen Fall vervollständigen.";
+            case "Move enumeration needs classic fallback" -> "Move-Metadatenableitung für klassische Kandidaten verbessern.";
+            default -> "Keine zusätzliche Move-Familie zwingend.";
+        };
+        String comparisonText = comparison.moveOnlyCandidates().size() > comparison.classicOnlyCandidates().size()
+            ? "Move-Enumeration ergänzt die klassische Engine sichtbar."
+            : comparison.moveOnlyCandidates().size() < comparison.classicOnlyCandidates().size()
+                ? "Klassische Engine deckt aktuell noch mehr Kandidaten ab."
+                : "Move-Enumeration und Classic sind in diesem Fall ähnlich stark.";
+        if ("cancellation-plus-one".equals(probeCase.id()) && !searchResult.success()) {
+            comparisonText = "Cancellation-Move ist da, aber Normalisierungsfolge bis x = 1 fehlt noch.";
         }
+        return new Interpretation(suitability, missingFamily, comparisonText);
     }
 
-    private int nodeCount(String expression) {
-        try {
-            return nodeCount(parser.parseTerm(expression));
-        } catch (IllegalArgumentException ex) {
-            return expression.length();
+    private String expectedCoverage(MoveCandidateTransformationEngine.ComparisonReport comparison, String caseId) {
+        Set<String> expectedCanonicalTargets = switch (caseId) {
+            case "cancellation-plus-one" -> Set.of(canonical("x - 1 + 1 = 0 + 1"));
+            case "complete-square" -> Set.of(canonical("(x + 3)^2 - 4"));
+            case "repeated-subexpression" -> Set.of(canonical("(x + 1) * x"));
+            case "common-subexpression" -> Set.of(canonical("(y + 1) * (x + z)"));
+            default -> Set.of();
+        };
+        boolean inMove = comparison.moveCandidates().stream()
+            .map(MoveCandidateTransformationEngine.CandidateSummary::transformedExpression)
+            .map(this::canonical)
+            .anyMatch(expectedCanonicalTargets::contains);
+        boolean inClassic = comparison.classicCandidates().stream()
+            .map(MoveCandidateTransformationEngine.CandidateSummary::transformedExpression)
+            .map(this::canonical)
+            .anyMatch(expectedCanonicalTargets::contains);
+        if (inMove && inClassic) {
+            return "Overlap";
         }
+        if (inMove) {
+            return "Move-only";
+        }
+        if (inClassic) {
+            return "Classic-only";
+        }
+        return "Not-found";
     }
 
-    private int nodeCount(Expr expression) {
-        if (expression instanceof BinaryExpr binaryExpr) {
-            return 1 + nodeCount(binaryExpr.left()) + nodeCount(binaryExpr.right());
-        }
-        if (expression instanceof FunctionExpr functionExpr) {
-            int total = 1;
-            for (Expr argument : functionExpr.arguments()) {
-                total += nodeCount(argument);
-            }
-            return total;
-        }
-        return 1;
+    private String ordinalText(RewriteMove move) {
+        return move.ordinal().ruleOrdinal() + ":" + move.ordinal().occurrenceOrdinal() + ":" + move.ordinal().parameterOrdinals();
     }
 
-    private Set<String> variablesOf(String expression) {
-        Set<String> variables = new LinkedHashSet<>();
-        try {
-            collectVariables(parser.parseTerm(expression), variables);
-        } catch (IllegalArgumentException ignored) {
-            // Leave the accumulated set as-is for unparseable expressions.
-        }
-        return variables;
+    private List<String> ordinalPath(List<RewriteMove> appliedMoves) {
+        return appliedMoves.stream().map(this::ordinalText).toList();
     }
 
-    private void collectVariables(Expr expression, Set<String> variables) {
-        if (expression instanceof VariableExpr variableExpr) {
-            variables.add(variableExpr.name());
-        } else if (expression instanceof BinaryExpr binaryExpr) {
-            collectVariables(binaryExpr.left(), variables);
-            collectVariables(binaryExpr.right(), variables);
-        } else if (expression instanceof FunctionExpr functionExpr) {
-            for (Expr argument : functionExpr.arguments()) {
-                collectVariables(argument, variables);
-            }
+    private String renderParameters(RewriteMove move) {
+        if (move.parameters().isEmpty()) {
+            return move.hasUnresolvedParameters() ? "parameters-unresolved" : "—";
         }
+        List<String> parts = new ArrayList<>();
+        for (var parameter : move.parameters()) {
+            parts.add(parameter.name() + "=" + parameter.value());
+        }
+        return String.join(", ", parts);
     }
 
-    private double clamp(double value) {
-        if (value < 0.0) {
-            return 0.0;
-        }
-        return Math.min(value, 1.0);
-    }
-
-    private String format(double value) {
-        return String.format(Locale.ROOT, "%.2f", value);
+    private boolean hasParameter(
+        List<MoveCandidateTransformationEngine.CandidateSummary> candidates,
+        String name,
+        String value
+    ) {
+        return candidates.stream().anyMatch(candidate -> value.equals(candidate.parameters().get(name)));
     }
 
     private String renderMarkdown(CampaignReport report) {
         StringBuilder out = new StringBuilder();
-        out.append("# Discovery Campaign 6: Open-Ended Identity Mining\n\n");
-        out.append("Regelsuche generated ").append(report.generatedCount())
-            .append(" identity candidates from seed families and substitutions, then ranked them. ")
-            .append("The Top ").append(report.topCandidates().size())
-            .append(" are listed below (").append(report.promotableCount())
-            .append(" promotable as new macros).\n\n");
-        out.append("Ranking factors: brevity, surprise, path length, reusability, difference from source.\n\n");
-        out.append("| Rank | Candidate | Family | Source | Simplified | Path | Oracle | Equivalent | Score | Promotable | Why interesting |\n");
-        out.append("| ---: | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |\n");
-        for (Candidate candidate : report.topCandidates()) {
-            out.append("| ").append(candidate.rank())
-                .append(" | ").append(escape(candidate.id()))
-                .append(" | ").append(escape(candidate.family()))
-                .append(" | ").append(escape(candidate.sourceExpression()))
-                .append(" | ").append(escape(candidate.simplifiedExpression()))
-                .append(" | ").append(escape(String.join(" -> ", candidate.path())))
-                .append(" | ").append(escape(candidate.oracleStatus().toLowerCase(Locale.ROOT)))
-                .append(" | ").append(candidate.equivalent() ? "yes" : "no")
-                .append(" | ").append(format(candidate.interestingness()))
-                .append(" | ").append(candidate.promotable() ? "yes" : "no")
-                .append(" | ").append(escape(candidate.whyInteresting()))
-                .append(" |\n");
-        }
-        out.append("\n## Oracle / proof evidence\n\n");
-        for (Candidate candidate : report.topCandidates()) {
-            out.append("- **").append(escape(candidate.id())).append("**: ")
-                .append(escape(candidate.deterministicEvidence()));
-            if (!candidate.oracleEvidence().isBlank()) {
-                out.append(" — oracle: ").append(escape(candidate.oracleEvidence()));
+        out.append("# Discovery Campaign 6: Countable Move Search Probe\n\n");
+        out.append("Diese Probe vergleicht Depth-1-Kandidaten und bewertet eine begrenzte mehrstufige Countable-Move-Suche (Depth<=4).\n\n");
+        out.append("## Built-in vs. nachladbare Module\n\n");
+        out.append(report.builtInArchitectureNote()).append("\n\n");
+
+        for (CaseResult result : report.cases()) {
+            out.append("## ").append(result.id()).append("\n\n");
+            out.append("- Input: `").append(result.inputExpression()).append("`\n");
+            out.append("- Target: `").append(result.targetExpression()).append("`\n");
+            out.append("- Erwartung: ").append(result.expectation()).append("\n\n");
+
+            out.append("### Depth-1 Candidate Summary\n\n");
+            out.append("- Erwarteter Move vorhanden: ").append(result.depth1CandidateProbe().expectedMovePresent() ? "ja" : "nein").append("\n");
+            out.append("- Expected coverage: ").append(result.depth1CandidateProbe().expectedMoveCoverage()).append("\n");
+            appendClassicVsMoveSummary(out, result.depth1CandidateProbe());
+
+            out.append("### Multi-step Search Result\n\n");
+            out.append("- Ziel erreichbar: ").append(result.multiStepSearch().success() ? "ja" : "nein").append("\n");
+            out.append("- Pfadlänge: ").append(result.multiStepSearch().pathLength()).append("\n");
+            out.append("- appliedMoves: ").append(result.multiStepSearch().appliedMoves().size()).append("\n");
+            out.append("- ordinalPath: ").append(escape(String.join(" -> ", result.multiStepSearch().ordinalPath()))).append("\n");
+            out.append("- explored states: ").append(result.multiStepSearch().exploredStateCount()).append("\n");
+            out.append("- unique canonical states: ").append(result.multiStepSearch().uniqueCanonicalStateCount()).append("\n");
+            out.append("- failure reason: ").append(result.multiStepSearch().failureReason()).append("\n\n");
+
+            out.append("### Successful path\n\n");
+            if (result.multiStepSearch().pathSteps().isEmpty()) {
+                out.append("_Kein erfolgreicher Pfad._\n\n");
+            } else {
+                out.append("| step | before | moveKind | ruleId | ordinal | parameters | after |\n");
+                out.append("| --- | --- | --- | --- | --- | --- | --- |\n");
+                for (PathStep step : result.multiStepSearch().pathSteps()) {
+                    out.append("| ").append(step.step())
+                        .append(" | ").append(escape(step.before()))
+                        .append(" | ").append(escape(step.moveKind()))
+                        .append(" | ").append(escape(step.ruleId()))
+                        .append(" | ").append(escape(step.ordinal()))
+                        .append(" | ").append(escape(step.parameters()))
+                        .append(" | ").append(escape(step.after()))
+                        .append(" |\n");
+                }
+                out.append('\n');
             }
-            out.append('\n');
+
+            out.append("### Classic-vs-Move Vergleich\n\n");
+            appendClassicVsMoveSummary(out, result.depth1CandidateProbe());
+
+            out.append("### Interpretation\n\n");
+            out.append("- Tauglichkeit: ").append(result.interpretation().suitability()).append("\n");
+            out.append("- Fehlende Move-Familie: ").append(result.interpretation().missingMoveFamily()).append("\n");
+            out.append("- Enumeration im Vergleich: ").append(result.interpretation().enumerationComparison()).append("\n\n");
+
+            out.append("### Architecture note\n\n");
+            out.append("- ").append(result.architectureNote()).append("\n\n");
         }
+
+        out.append("## Related follow-up issues\n\n");
+        for (String issue : report.relatedFollowUpIssues()) {
+            out.append("- ").append(issue).append("\n");
+        }
+        out.append('\n');
         return out.toString();
     }
 
+    private void appendClassicVsMoveSummary(StringBuilder out, Depth1CandidateProbe probe) {
+        out.append("- classic count: ").append(probe.classicCount()).append("\n");
+        out.append("- move count: ").append(probe.moveCount()).append("\n");
+        out.append("- overlap count: ").append(probe.overlapCount()).append("\n");
+        out.append("- move-only count: ").append(probe.moveOnlyCount()).append("\n");
+        out.append("- classic-only count: ").append(probe.classicOnlyCount()).append("\n\n");
+    }
+
     private String escape(String value) {
-        return value == null ? "" : value.replace("|", "\\|").replace("\n", " ");
+        if (value == null || value.isBlank()) {
+            return "—";
+        }
+        return value.replace("|", "\\|").replace("\n", " ");
     }
 
-    private List<Seed> seeds() {
+    private String canonical(String expression) {
+        try {
+            return canonicalizer.canonicalize(expression);
+        } catch (RuntimeException exception) {
+            return expression == null ? "" : expression.replaceAll("\\s+", " ").trim();
+        }
+    }
+
+    private List<ProbeCase> cases() {
         return List.of(
-            new Seed("complete-square-plus", "complete-square", "complete_square",
-                "U^2 + 2*U + 1", "(U + 1)^2"),
-            new Seed("complete-square-minus", "complete-square", "complete_square",
-                "U^2 - 2*U + 1", "(U - 1)^2"),
-            new Seed("square-of-sum-two", "perfect-square", "perfect_square_trinomial",
-                "U^2 + 4*U + 4", "(U + 2)^2"),
-            new Seed("difference-of-squares", "difference-of-squares", "difference_of_squares",
-                "U^2 - 1", "(U - 1)*(U + 1)"),
-            new Seed("binomial-cube-plus", "binomial-cube", "binomial_cube",
-                "U^3 + 3*U^2 + 3*U + 1", "(U + 1)^3"),
-            new Seed("binomial-cube-minus", "binomial-cube", "binomial_cube",
-                "U^3 - 3*U^2 + 3*U - 1", "(U - 1)^3")
+            new ProbeCase(
+                "cancellation-plus-one",
+                "x - 1 = 0",
+                "x = 1",
+                "+1 auf beiden Seiten muss als Move vorkommen; bei Fehlschlag: cancellation vorhanden, normalization follow-up fehlt"
+            ),
+            new ProbeCase(
+                "complete-square",
+                "x^2 + 6*x + 5",
+                "(x + 3)^2 - 4",
+                "complete-square Move mit shift=3 und residue=-4"
+            ),
+            new ProbeCase(
+                "repeated-subexpression",
+                "(x+1)^2 - (x+1)",
+                "(x+1)*x",
+                "repeated-subexpression/factor Move"
+            ),
+            new ProbeCase(
+                "common-subexpression",
+                "x*(y+1)+z*(y+1)",
+                "(y+1)*(x+z)",
+                "common-subexpression Move"
+            )
         );
     }
 
-    private List<Substitution> substitutions() {
+    private List<String> relatedFollowUpIssues() {
         return List.of(
-            new Substitution("x", "x", true, true, 0.10),
-            new Substitution("x-plus-1", "x + 1", false, false, 0.30),
-            new Substitution("x-squared", "x^2", false, false, 0.45),
-            new Substitution("sin-x", "sin(x)", true, false, 0.60),
-            new Substitution("cos-x", "cos(x)", true, false, 0.60),
-            new Substitution("a-plus-b", "a + b", false, false, 1.00),
-            new Substitution("two-x", "2*x", false, false, 0.35)
+            "#102 Discovery Engine Roadmap: durch diesen PR teilweise adressiert (Countable Move Search Probe in Campaign 6).",
+            "#103 Search Space Intelligence: Priorität steigt, weil explored/unique state Metriken jetzt systematisch vorliegen.",
+            "#105 Discovery Visualization & Explainability: Priorität bleibt hoch, da Pfad-/Move-Tabellen jetzt reichhaltigere Erklärsignale liefern.",
+            "#106 Rule Authoring IDE: sollte auf Countable Move Ordinals/Parameter aufbauen statt ältere ruleId-only Sicht.",
+            "#104 Plugin Ecosystem: für Move-Enumeratoren/Realizer aktuell bewusst zurückgestellt, bis API stabil ist."
         );
     }
 
-    /** A seed identity family parameterised by a single placeholder {@value #PLACEHOLDER}. */
-    public record Seed(String id, String family, String seedFamilyId, String sourceTemplate, String simplifiedTemplate) {
+    private String builtInArchitectureNote() {
+        return "Aktuell built-in: Cancellation-, Complete-Square-, Repeated- und Common-Subexpression-"
+            + "Move-Familien inkl. ParameterEnumeratoren und MoveRealizer. Spätere Modul-Kandidaten:"
+            + " zusätzliche mathematische Rule Packs und domänenspezifische Move-Familien. Stabil bleiben sollte"
+            + " primär die API aus ParameterEnumerator, MoveRealizer und MoveSearchEngine."
+            + " Jetzt bleibt alles built-in, weil Move-Modell/Realizer noch eng mit AST/Parser/Canonicalizer gekoppelt sind"
+            + " und eine frühe Plugin-Festlegung unnötig verengen würde.";
     }
 
-    /**
-     * A substitution applied to the placeholder.
-     *
-     * @param atomic whether the substitution is a single atom (variable or function call) that does not
-     *               require an explicit expansion step
-     * @param identity whether the substitution leaves the seed on its base variable (a known-rule rediscovery)
-     * @param generality reusability weight in [0,1] reflecting how generic the substitution is
-     */
-    public record Substitution(String id, String expression, boolean atomic, boolean identity, double generality) {
+    record ProbeCase(String id, String inputExpression, String targetExpression, String expectation) {
     }
 
-    /** Per-factor ranking scores, each in [0,1]. */
-    public record Scores(double brevity, double surprise, double pathLength, double reusability,
-                         double differenceFromSource) {
-    }
-
-    /** A mined identity candidate with its evidence and ranking. */
-    public record Candidate(
-        int rank,
-        String id,
-        String family,
-        String seedFamilyId,
-        String substitution,
-        String sourceExpression,
-        String simplifiedExpression,
-        List<String> path,
-        boolean equivalent,
-        String deterministicEvidence,
-        String oracleStatus,
-        String oracleEvidence,
-        Scores scores,
-        double interestingness,
-        boolean promotable,
-        String whyInteresting
+    public record Depth1CandidateProbe(
+        boolean expectedMovePresent,
+        String expectedMoveCoverage,
+        int classicCount,
+        int moveCount,
+        int overlapCount,
+        int moveOnlyCount,
+        int classicOnlyCount
     ) {
-        public Candidate {
-            id = id == null ? "" : id;
-            family = family == null ? "" : family;
-            seedFamilyId = seedFamilyId == null ? "" : seedFamilyId;
-            substitution = substitution == null ? "" : substitution;
-            sourceExpression = sourceExpression == null ? "" : sourceExpression;
-            simplifiedExpression = simplifiedExpression == null ? "" : simplifiedExpression;
-            path = path == null ? List.of() : List.copyOf(path);
-            deterministicEvidence = deterministicEvidence == null ? "" : deterministicEvidence;
-            oracleStatus = oracleStatus == null ? "UNAVAILABLE" : oracleStatus;
-            oracleEvidence = oracleEvidence == null ? "" : oracleEvidence;
-            scores = scores == null ? new Scores(0.0, 0.0, 0.0, 0.0, 0.0) : scores;
-            whyInteresting = whyInteresting == null ? "" : whyInteresting;
-        }
+    }
 
-        Candidate withRank(int newRank) {
-            return new Candidate(newRank, id, family, seedFamilyId, substitution, sourceExpression,
-                simplifiedExpression, path, equivalent, deterministicEvidence, oracleStatus, oracleEvidence,
-                scores, interestingness, promotable, whyInteresting);
+    public record MultiStepCountableMoveSearch(
+        boolean success,
+        int pathLength,
+        List<String> pathExpressions,
+        List<RewriteMove> appliedMoves,
+        List<String> appliedRuleIds,
+        List<String> ordinalPath,
+        int exploredStateCount,
+        int uniqueCanonicalStateCount,
+        String failureReason,
+        List<PathStep> pathSteps
+    ) {
+        public MultiStepCountableMoveSearch {
+            pathExpressions = pathExpressions == null ? List.of() : List.copyOf(pathExpressions);
+            appliedMoves = appliedMoves == null ? List.of() : List.copyOf(appliedMoves);
+            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);
+            ordinalPath = ordinalPath == null ? List.of() : List.copyOf(ordinalPath);
+            pathSteps = pathSteps == null ? List.of() : List.copyOf(pathSteps);
+            failureReason = failureReason == null ? "NONE" : failureReason;
         }
     }
 
-    /** Top-ranked report for Discovery Campaign 6. */
-    public record CampaignReport(String campaignId, List<Candidate> topCandidates, int generatedCount,
-                                int promotableCount) {
+    public record PathStep(
+        int step,
+        String before,
+        String moveKind,
+        String ruleId,
+        String ordinal,
+        String parameters,
+        String after
+    ) {
+    }
+
+    public record Interpretation(String suitability, String missingMoveFamily, String enumerationComparison) {
+    }
+
+    public record CaseResult(
+        String id,
+        String inputExpression,
+        String targetExpression,
+        String expectation,
+        Depth1CandidateProbe depth1CandidateProbe,
+        MultiStepCountableMoveSearch multiStepSearch,
+        Interpretation interpretation,
+        MoveCandidateTransformationEngine.ComparisonReport comparison,
+        String architectureNote
+    ) {
+    }
+
+    public record CampaignReport(
+        String campaignId,
+        List<CaseResult> cases,
+        List<String> relatedFollowUpIssues,
+        String builtInArchitectureNote
+    ) {
         public CampaignReport {
-            topCandidates = topCandidates == null ? List.of() : List.copyOf(topCandidates);
+            cases = cases == null ? List.of() : List.copyOf(cases);
+            relatedFollowUpIssues = relatedFollowUpIssues == null ? List.of() : List.copyOf(relatedFollowUpIssues);
+            builtInArchitectureNote = builtInArchitectureNote == null ? "" : builtInArchitectureNote;
         }
     }
 }

@@ -30,22 +30,61 @@ Typische Kommandos:
 ./gradlew runDiscoveryPromotionPipeline
 ```
 
-## Discovery Campaign 6: Open-Ended Identity Mining
+## Discovery Campaign 6: Countable Move Search Probe
 
-Im Gegensatz zu den Kampagnen 1-5, die kuratierte Eingabe-/Ziel-Paare prüfen, erzeugt
-`DiscoveryCampaignSixRunner` Kandidaten selbst. Bausteine:
+`DiscoveryCampaignSixRunner` kombiniert pro Fall drei Sichtweisen:
 
-- **Seed-Familien**: bekannte Identitäten (vollständiges Quadrat, Differenz von Quadraten,
-  Binomialkubus, …) mit einem Platzhalter `U`.
-- **Substitutionen**: systematisch eingesetzte Terme wie `x+1`, `sin(x)`, `a+b`, `x^2`, `2*x`.
-- **Äquivalenzprüfung**: deterministisch über die Polynom-Normalform (offline, immer verfügbar);
-  zusätzlich SymPy als Orakel-Evidenz, sofern vorhanden.
-- **Ranking** nach fünf Faktoren: Kürze, Überraschung, Pfadlänge, Wiederverwendbarkeit und
-  Unterschied zum Ausgangsausdruck.
-- **Report** (`app/build/reports/discovery-campaign-6/`): Top 20 Kandidaten mit Pfad,
-  Beweis-/Orakel-Evidenz, Begründung der Interessantheit und Markierung, ob als Makro promotable.
+1. **Depth-1 Candidate Probe**
+   - erwarteter Move vorhanden?
+   - Move-only / Classic-only / Overlap
+   - klassische vs. Move-Zählwerte
+2. **Multi-step Countable Move Search**
+   - bounded search (`maxDepth<=4`, `maxStates`)
+   - Zielerreichbarkeit, Pfadlänge, applied moves/rules, ordinal path
+   - explored/unique states und Failure Reason
+3. **Interpretation**
+   - Tauglichkeit des Falls
+   - fehlende Move-Familie
+   - Einordnung gegenüber klassischer Kandidatenerzeugung
+
+Die vier Kernfälle bleiben:
+
+- `x - 1 = 0` → Ziel `x = 1` (oder äquivalente Normalform), erwarteter `+1`-Move
+- `x^2 + 6*x + 5` → Ziel `(x + 3)^2 - 4`, erwarteter complete-square Move
+- `(x+1)^2 - (x+1)` → Ziel `(x+1)*x`, erwarteter repeated-subexpression/factor Move
+- `x*(y+1)+z*(y+1)` → Ziel `(y+1)*(x+z)`, erwarteter common-subexpression Move
+
+Der Report (`app/build/reports/discovery-campaign-6/`) enthält je Fall:
+
+- Input und Target
+- Depth-1 Candidate Summary
+- Multi-step Search Result
+- Successful Path Tabelle (`step`, `before`, `moveKind`, `ruleId`, `ordinal`, `parameters`, `after`)
+- Classic-vs-Move Vergleich
+- Interpretation und Architecture Note
+- Related follow-up issues
 
 Siehe auch:
 
 - [docs/rule-discovery.md](rule-discovery.md)
 - [docs/scientific-reproducibility.md](scientific-reproducibility.md)
+
+## Generated artifact ownership (Discovery Gallery)
+
+`generateDiscoveryGallery` muss reproduzierbar sein und der CI/CD-Check ist absichtlich strikt.
+
+Regel für dieses Repository:
+
+- Feature-PRs, die Discovery-Generatoren, Campaign-Runner, Report-Modelle oder die README/Gallery-Ausgabe ändern, committen die dadurch geänderten Artefakte im selben PR.
+- Der Reproducibility-Check in CI erwartet genau diese Konsistenz und bleibt hart.
+- Ein separater Gallery-Bot-PR ist nur für reine Artefakt-Aktualisierungen ohne Generatoränderung gedacht, nicht als Ersatz für fehlende Artefakte in Feature-PRs.
+
+Pflichtschritte vor Merge:
+
+```bash
+./gradlew build
+env -u GITHUB_SHA ./gradlew :app:generateDiscoveryGallery
+git diff --exit-code -- docs/generated/discovery docs/demo-gallery.md README.md
+```
+
+TODO: Clarify Gallery Bot ownership for feature branches.
