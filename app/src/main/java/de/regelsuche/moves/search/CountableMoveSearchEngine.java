@@ -181,7 +181,7 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
             .sorted(Map.Entry.comparingByKey())
             .map(entry -> new MoveParameter(
                 entry.getKey(),
-                MoveParameterKind.UNKNOWN,
+                MoveParameterKind.GENERATED,
                 entry.getValue(),
                 entry.getValue(),
                 -1,
