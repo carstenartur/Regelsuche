@@ -97,4 +97,14 @@ class CountableMoveSearchEngineTest {
             metrics.successfulPathMoveKinds()
         );
     }
+
+    @Test
+    void countsRootAsExploredWhenInputAlreadyMatchesTarget() {
+        CountableMoveSearchEngine.CountableMoveSearchResult result = engine.search("x+1", "x+1", 4, 120);
+
+        assertTrue(result.success());
+        assertEquals(1, result.exploredStateCount());
+        assertEquals(1, result.uniqueCanonicalStateCount());
+        assertEquals(1, result.searchSpaceMetrics().exploredStateCount());
+    }
 }

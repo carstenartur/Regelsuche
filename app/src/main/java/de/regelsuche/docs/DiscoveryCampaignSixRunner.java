@@ -159,7 +159,7 @@ public final class DiscoveryCampaignSixRunner {
         if (!searchResult.success()) {
             return "braucht stärkere Heuristik";
         }
-        return "ausreichend klein";
+        return "braucht stärkere Heuristik";
     }
 
     private SearchSpaceSummary summarize(List<CaseResult> results) {

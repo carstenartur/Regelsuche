@@ -85,6 +85,7 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         uniqueCanonicals.add(root.canonicalExpression());
         metrics.recordUniqueState();
         if (root.canonicalExpression().equals(canonicalTarget)) {
+            metrics.recordExploredState();
             return success(
                 input,
                 target,
