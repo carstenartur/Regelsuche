@@ -15,6 +15,7 @@ import de.regelsuche.transform.CommonSubexpressionDiscoveryOperator;
 import de.regelsuche.transform.CompleteSquareBridgeOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.SubstitutionRewriteState;
 import de.regelsuche.transform.SubstitutionIntroductionOperator;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
@@ -64,6 +65,7 @@ public final class MoveCandidateTransformationEngine implements TransformationEn
     }
 
     public List<Transformation> classicCandidates(String expression) {
+        SubstitutionRewriteState.clear();
         List<Transformation> sorted = new ArrayList<>(baseEngine.transform(expression));
         sorted.sort(candidateOrdering());
         return List.copyOf(sorted);
@@ -76,8 +78,8 @@ public final class MoveCandidateTransformationEngine implements TransformationEn
         addCompleteSquareCandidates(expression, enumerated, distinct);
         addRepeatedSubexpressionCandidates(expression, enumerated, distinct);
         List<MoveBackedTransformation> ordered = new ArrayList<>(distinct.values());
-        ordered.sort(Comparator
-            .comparing(candidate -> candidate.move().ordinal(), MoveOrdinal.CANONICAL_ORDER)
+        ordered.sort(Comparator.<MoveBackedTransformation, MoveOrdinal>comparing(
+                candidate -> candidate.move().ordinal(), MoveOrdinal.CANONICAL_ORDER)
             .thenComparing(candidate -> candidate.transformation().transformedExpression())
             .thenComparing(candidate -> candidate.move().moveId()));
         return List.copyOf(ordered);
@@ -264,7 +266,17 @@ public final class MoveCandidateTransformationEngine implements TransformationEn
         if (parameters.size() < 2) {
             return;
         }
-        Transformation selected = completeSquareOperator.generateCandidates(expression).stream().findFirst().orElse(null);
+        String residue = parameters.stream()
+            .filter(parameter -> parameter.name().equals("residue"))
+            .map(MoveParameter::value)
+            .findFirst()
+            .orElse("");
+        Transformation selected = completeSquareOperator.generateCandidates(expression).stream()
+            .sorted(Comparator
+                .comparing((Transformation transformation) -> !matchesResidueLiteral(transformation.transformedExpression(), residue))
+                .thenComparing(Transformation::transformedExpression))
+            .findFirst()
+            .orElse(null);
         if (selected == null) {
             return;
         }
@@ -311,12 +323,14 @@ public final class MoveCandidateTransformationEngine implements TransformationEn
     }
 
     private Optional<Transformation> selectCommonSubexpressionTransformation(String expression, String parameterValue) {
+        SubstitutionRewriteState.clear();
         Optional<Transformation> factored = commonSubexpressionOperator.generateCandidates(expression).stream()
             .filter(candidate -> candidate.transformedExpression().contains(parameterValue))
             .findFirst();
         if (factored.isPresent()) {
             return factored;
         }
+        SubstitutionRewriteState.clear();
         return substitutionIntroductionOperator.generateCandidates(expression).stream()
             .filter(candidate -> candidate.assumptions().stream()
                 .anyMatch(assumption -> assumption.startsWith("substitution.placeholder.")
@@ -432,6 +446,19 @@ public final class MoveCandidateTransformationEngine implements TransformationEn
             case SubstitutionIntroductionOperator.RULE_ID -> "substitution_introduction";
             default -> ruleId;
         };
+    }
+
+    private boolean matchesResidueLiteral(String transformedExpression, String residue) {
+        if (residue == null || residue.isBlank()) {
+            return true;
+        }
+        String normalized = residue.startsWith("+") ? residue.substring(1) : residue;
+        if (normalized.startsWith("-")) {
+            return transformedExpression.contains("- " + normalized.substring(1));
+        }
+        return transformedExpression.contains("+ " + normalized)
+            || transformedExpression.endsWith(normalized)
+            || transformedExpression.contains(" " + normalized + " ");
     }
 
     private static String ordinalText(MoveOrdinal ordinal) {

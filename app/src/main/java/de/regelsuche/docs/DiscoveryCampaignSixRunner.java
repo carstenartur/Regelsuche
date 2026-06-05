@@ -31,6 +31,7 @@ public final class DiscoveryCampaignSixRunner {
         MoveCandidateTransformationEngine.defaultClassicEngine(),
         new Depth1MoveEnumerator()
     );
+    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
 
     public static void main(String[] args) {
         Path repoRoot = args.length == 0
@@ -78,8 +79,11 @@ public final class DiscoveryCampaignSixRunner {
             default -> false;
         };
         boolean depth1SearchObserved = depth1SearchExpressions(probeCase.inputExpression()).stream()
+            .map(this::canonical)
             .anyMatch(expression -> comparison.moveCandidates().stream()
-                .anyMatch(candidate -> candidate.transformedExpression().equals(expression)));
+                .map(MoveCandidateTransformationEngine.CandidateSummary::transformedExpression)
+                .map(this::canonical)
+                .anyMatch(expression::equals));
         return new CaseResult(
             probeCase.id(),
             probeCase.inputExpression(),
@@ -172,6 +176,14 @@ public final class DiscoveryCampaignSixRunner {
             return "—";
         }
         return value.replace("|", "\\|").replace("\n", " ");
+    }
+
+    private String canonical(String expression) {
+        try {
+            return canonicalizer.canonicalize(expression);
+        } catch (RuntimeException exception) {
+            return expression == null ? "" : expression.replaceAll("\\s+", " ").trim();
+        }
     }
 
     private List<ProbeCase> cases() {
