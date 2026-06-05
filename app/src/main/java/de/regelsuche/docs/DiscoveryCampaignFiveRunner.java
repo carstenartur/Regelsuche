@@ -14,6 +14,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -51,9 +52,12 @@ public final class DiscoveryCampaignFiveRunner {
     }
 
     public CampaignReport writeReport(Path outputDirectory) {
+        return writeReport(outputDirectory, run());
+    }
+
+    CampaignReport writeReport(Path outputDirectory, CampaignReport report) {
         try {
             Files.createDirectories(outputDirectory);
-            CampaignReport report = run();
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("discovery-campaign-5.json"),
                 JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)
@@ -80,11 +84,7 @@ public final class DiscoveryCampaignFiveRunner {
         String shortcutSource = shortcut == null ? "" : shortcut.source();
         String shortcutPack = shortcut == null ? "" : shortcut.packId();
         String shortcutOperator = shortcut == null ? "" : shortcut.operatorId();
-        List<String> shortcutAssumptions = ensureSubstitutionEvidence(
-            campaignCase,
-            scenario,
-            shortcut == null ? List.of() : shortcut.assumptions()
-        );
+        List<String> shortcutAssumptions = ensureSubstitutionEvidence(shortcut == null ? List.of() : shortcut.assumptions());
         List<String> rulePath = enabled.withoutMacroRun().appliedRuleIds();
         List<String> operatorsUsed = rulePath.stream()
             .map(ruleId -> ruleId == null ? "" : ruleId)
@@ -164,16 +164,61 @@ public final class DiscoveryCampaignFiveRunner {
         List<DiscoveryBenchmarkEvidence.EvidenceEdge> selected = evidence.edges().stream()
             .filter(edge -> edge.tags().contains("selected-path"))
             .toList();
-        return selected.stream()
-            .filter(edge -> !campaignCase.expectedRuleId().isBlank() && edge.ruleId().equals(campaignCase.expectedRuleId()))
-            .findFirst()
-            .or(() -> selected.stream()
-                .filter(edge -> campaignCase.operatorIds().contains(edge.operatorId()))
-                .findFirst())
-            .or(() -> selected.stream()
-                .filter(edge -> !edge.assumptions().isEmpty())
-                .findFirst())
-            .or(() -> selected.stream().reduce((left, right) -> right));
+        if ("substitution".equals(campaignCase.family())) {
+            Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> substitutionEdge = firstMatching(selected, this::hasSubstitutionEvidence);
+            if (substitutionEdge.isPresent()) {
+                return substitutionEdge;
+            }
+            Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> substitutionOperatorEdge = firstMatching(
+                selected,
+                edge -> hasAnySubstitutionEvidence(edge) && campaignCase.operatorIds().contains(edge.operatorId())
+            );
+            if (substitutionOperatorEdge.isPresent()) {
+                return substitutionOperatorEdge;
+            }
+        }
+        return firstMatching(selected, edge -> !campaignCase.expectedRuleId().isBlank() && edge.ruleId().equals(campaignCase.expectedRuleId()))
+            .or(() -> firstMatching(selected, edge -> campaignCase.operatorIds().contains(edge.operatorId())))
+            .or(() -> firstMatching(selected, edge -> !edge.assumptions().isEmpty()))
+            .or(() -> firstMatching(selected, edge -> true));
+    }
+
+    private Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> firstMatching(
+        List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges,
+        java.util.function.Predicate<DiscoveryBenchmarkEvidence.EvidenceEdge> predicate
+    ) {
+        return edges.stream()
+            .filter(predicate)
+            .sorted(edgeOrdering())
+            .findFirst();
+    }
+
+    private Comparator<DiscoveryBenchmarkEvidence.EvidenceEdge> edgeOrdering() {
+        return Comparator
+            .comparing(DiscoveryBenchmarkEvidence.EvidenceEdge::from)
+            .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::to)
+            .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::ruleId)
+            .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::operatorId)
+            .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::source)
+            .thenComparing(DiscoveryBenchmarkEvidence.EvidenceEdge::packId)
+            .thenComparing(edge -> String.join("|", sortedCopy(edge.assumptions())));
+    }
+
+    private List<String> sortedCopy(List<String> values) {
+        ArrayList<String> copy = new ArrayList<>(values == null ? List.of() : values);
+        copy.sort(String::compareTo);
+        return copy;
+    }
+
+    private boolean hasSubstitutionEvidence(DiscoveryBenchmarkEvidence.EvidenceEdge edge) {
+        List<String> assumptions = edge.assumptions();
+        return assumptions.stream().anyMatch(value -> value.startsWith("substitution.placeholder."))
+            && assumptions.stream().anyMatch(value -> value.startsWith("substitution.occurrences."))
+            && assumptions.stream().anyMatch(value -> value.startsWith("substitution.substituted"));
+    }
+
+    private boolean hasAnySubstitutionEvidence(DiscoveryBenchmarkEvidence.EvidenceEdge edge) {
+        return edge.assumptions().stream().anyMatch(value -> value.startsWith("substitution."));
     }
 
     private String renderSubstitutionEvidence(List<String> assumptions) {
@@ -186,32 +231,8 @@ public final class DiscoveryCampaignFiveRunner {
         return substitution.stream().collect(Collectors.joining("; "));
     }
 
-    private List<String> ensureSubstitutionEvidence(
-        CampaignCase campaignCase,
-        DiscoveryBenchmarkScenario scenario,
-        List<String> assumptions
-    ) {
-        List<String> base = assumptions == null ? List.of() : List.copyOf(assumptions);
-        if (!"substitution".equals(campaignCase.family())) {
-            return base;
-        }
-        boolean hasPlaceholder = base.stream().anyMatch(value -> value.startsWith("substitution.placeholder."));
-        boolean hasOccurrences = base.stream().anyMatch(value -> value.startsWith("substitution.occurrences."));
-        boolean hasSubstituted = base.stream().anyMatch(value -> value.startsWith("substitution.substituted"));
-        if (hasPlaceholder && hasOccurrences && hasSubstituted) {
-            return base;
-        }
-        List<String> enriched = new java.util.ArrayList<>(base);
-        if (!hasPlaceholder) {
-            enriched.add("substitution.placeholder.S=" + scenario.inputExpression());
-        }
-        if (!hasOccurrences) {
-            enriched.add("substitution.occurrences.S=1");
-        }
-        if (!hasSubstituted) {
-            enriched.add("substitution.substituted=" + scenario.targetExpression());
-        }
-        return List.copyOf(enriched);
+    private List<String> ensureSubstitutionEvidence(List<String> assumptions) {
+        return assumptions == null ? List.of() : List.copyOf(assumptions);
     }
 
     private String renderMarkdown(CampaignReport report) {

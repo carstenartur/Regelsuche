@@ -74,7 +74,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 : record)
             .toList();
         PromotionRegistry.Registry promotionRegistry = registry.build(updatedRecords);
-        return new PipelineReport(updatedRecords, promotionRegistry, campaignFour, campaignMetrics(updatedRecords));
+        return new PipelineReport(updatedRecords, promotionRegistry, campaignFive, campaignFour, campaignMetrics(updatedRecords));
     }
 
     PipelineReport writeReport(Path outputDirectory) {
@@ -131,7 +131,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 renderGallery(report.promotionRecords()),
                 StandardCharsets.UTF_8
             );
-            campaignFiveRunner.writeReport(outputDirectory.resolve("discovery-campaign-5"));
+            campaignFiveRunner.writeReport(outputDirectory.resolve("discovery-campaign-5"), report.campaignFive());
             campaignFourRunner.writeReport(outputDirectory.resolve("discovery-campaign-4"), report.promotionRecords());
             return report;
         } catch (IOException exception) {
@@ -707,6 +707,7 @@ public final class DiscoveryPromotionPipelineRunner {
     record PipelineReport(
         List<PromotionRecord> promotionRecords,
         PromotionRegistry.Registry registry,
+        DiscoveryCampaignFiveRunner.CampaignReport campaignFive,
         DiscoveryCampaignFourRunner.CampaignReport campaignFour,
         List<CampaignMetric> campaignMetrics
     ) {

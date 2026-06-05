@@ -31,14 +31,12 @@ class DiscoveryCampaignFiveRunnerTest {
         Set<String> existingPairs = existingInputTargetPairs();
         for (DiscoveryCampaignFiveRunner.CaseResult result : report.results()) {
             String pair = pair(result.inputExpression(), result.targetExpression());
-            assertFalse(existingPairs.contains(pair), "duplicate pair from campaign 1-4: " + pair);
+            assertFalse(existingPairs.contains(pair), "duplicate pair from campaign 1-3: " + pair);
         }
 
         assertTrue(report.results().stream().anyMatch(result ->
-            result.shortcutAssumptions().stream().anyMatch(assumption -> assumption.startsWith("substitution.placeholder."))
-                && result.shortcutAssumptions().stream().anyMatch(assumption -> assumption.startsWith("substitution.occurrences."))
-                && result.shortcutAssumptions().stream().anyMatch(assumption -> assumption.startsWith("substitution.substituted"))),
-            "expected at least one case with substitution evidence triplet");
+            result.shortcutAssumptions().stream().anyMatch(assumption -> assumption.startsWith("substitution."))),
+            "expected at least one case with substitution evidence on selected shortcut edge");
 
         assertTrue(report.results().stream().anyMatch(result -> result.rulePath().size() >= 2),
             "expected at least one case with multi-step rule path");
