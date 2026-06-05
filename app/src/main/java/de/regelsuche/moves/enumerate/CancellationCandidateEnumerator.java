@@ -49,7 +49,7 @@ public final class CancellationCandidateEnumerator implements ParameterEnumerato
     private List<MoveParameter> enumerateEquation(Equation equation) {
         List<SignedTerm> terms = new ArrayList<>();
         flatten(equation.left(), true, terms);
-        flatten(equation.right(), false, terms);
+        flatten(equation.right(), true, terms);
         return parametersForTerms(terms);
     }
 

@@ -405,6 +405,13 @@ public final class MoveCandidateTransformationEngine implements TransformationEn
         try {
             return canonicalizer.canonicalize(expression);
         } catch (RuntimeException exception) {
+            if (expression.contains("=")) {
+                try {
+                    return ExpressionFormatter.format(parser.parseEquation(expression));
+                } catch (RuntimeException ignored) {
+                    // fall through to whitespace normalization
+                }
+            }
             return expression.trim().replaceAll("\\s+", " ");
         }
     }
