@@ -25,8 +25,25 @@ Typische Kommandos:
 ./gradlew runDiscoveryCampaign2
 ./gradlew runDiscoveryCampaign3
 ./gradlew runDiscoveryCampaign4
+./gradlew runDiscoveryCampaign5
+./gradlew runDiscoveryCampaign6
 ./gradlew runDiscoveryPromotionPipeline
 ```
+
+## Discovery Campaign 6: Open-Ended Identity Mining
+
+Im Gegensatz zu den Kampagnen 1-5, die kuratierte Eingabe-/Ziel-Paare prüfen, erzeugt
+`DiscoveryCampaignSixRunner` Kandidaten selbst. Bausteine:
+
+- **Seed-Familien**: bekannte Identitäten (vollständiges Quadrat, Differenz von Quadraten,
+  Binomialkubus, …) mit einem Platzhalter `U`.
+- **Substitutionen**: systematisch eingesetzte Terme wie `x+1`, `sin(x)`, `a+b`, `x^2`, `2*x`.
+- **Äquivalenzprüfung**: deterministisch über die Polynom-Normalform (offline, immer verfügbar);
+  zusätzlich SymPy als Orakel-Evidenz, sofern vorhanden.
+- **Ranking** nach fünf Faktoren: Kürze, Überraschung, Pfadlänge, Wiederverwendbarkeit und
+  Unterschied zum Ausgangsausdruck.
+- **Report** (`app/build/reports/discovery-campaign-6/`): Top 20 Kandidaten mit Pfad,
+  Beweis-/Orakel-Evidenz, Begründung der Interessantheit und Markierung, ob als Makro promotable.
 
 Siehe auch:
 
