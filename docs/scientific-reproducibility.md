@@ -18,6 +18,8 @@ Wichtige Tests:
 ./gradlew runDiscoveryCampaign2
 ./gradlew runDiscoveryCampaign3
 ./gradlew runDiscoveryCampaign4
+./gradlew runDiscoveryCampaign5
+./gradlew runDiscoveryCampaign6
 ./gradlew runDiscoveryPromotionPipeline
 ```
 
