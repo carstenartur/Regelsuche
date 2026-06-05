@@ -13,6 +13,7 @@ import java.util.Set;
 
 final class SearchTraceCollector {
     private final ExpressionCanonicalizer expressionCanonicalizer = new ExpressionCanonicalizer();
+    private final de.regelsuche.moves.RewriteMoveDeriver moveDeriver = new de.regelsuche.moves.RewriteMoveDeriver();
     private final Set<String> operatorRuleIds;
     private final DiscoveryOperatorRegistry operatorRegistry;
 
@@ -73,6 +74,8 @@ final class SearchTraceCollector {
                         ignored -> new MutableEdge(
                                 fromId,
                                 toId,
+                                state.parentExpression(),
+                                state.expression(),
                                 state.appliedRuleId(),
                                 kindFor(state.appliedRuleId(), learnedMacros, bridgeRules),
                                 sourceFor(state.appliedRuleId(), learnedMacros, rulesById, ruleIdToPackId),
@@ -151,9 +154,21 @@ final class SearchTraceCollector {
                         edge.maturity,
                         edge.enabledByProfile,
                         sortedSearchEffects(edge.searchEffects),
-                        sortedStrings(edge.tags)))
+                        sortedStrings(edge.tags),
+                        deriveMove(edge)))
                 .toList();
         return new TraceGraph(evidenceNodes, evidenceEdges);
+    }
+
+    private de.regelsuche.moves.RewriteMove deriveMove(MutableEdge edge) {
+        return moveDeriver.derive(new de.regelsuche.moves.RewriteMoveDeriver.MoveDerivationRequest(
+                edge.rawFrom,
+                edge.rawTo,
+                edge.ruleId,
+                edge.operatorId,
+                edge.assumptions,
+                edge.source,
+                List.copyOf(edge.tags)));
     }
 
     private void upsertNode(Map<String, MutableNode> nodes, String expression, int depth) {
@@ -373,6 +388,8 @@ final class SearchTraceCollector {
     private static final class MutableEdge {
         private final String from;
         private final String to;
+        private final String rawFrom;
+        private final String rawTo;
         private final String ruleId;
         private final String kind;
         private final String source;
@@ -387,6 +404,8 @@ final class SearchTraceCollector {
         private MutableEdge(
                 String from,
                 String to,
+                String rawFrom,
+                String rawTo,
                 String ruleId,
                 String kind,
                 String source,
@@ -398,6 +417,8 @@ final class SearchTraceCollector {
                 List<SearchEffect> searchEffects) {
             this.from = from;
             this.to = to;
+            this.rawFrom = rawFrom == null ? "" : rawFrom;
+            this.rawTo = rawTo == null ? "" : rawTo;
             this.ruleId = ruleId;
             this.kind = kind;
             this.source = source;

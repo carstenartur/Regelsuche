@@ -124,7 +124,9 @@ public record DiscoveryBenchmarkEvidence(
             String maturity,
             boolean enabledByProfile,
             List<de.regelsuche.knowledge.SearchEffect> searchEffect,
-            List<String> tags) {
+            List<String> tags,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            de.regelsuche.moves.RewriteMove rewriteMove) {
         public EvidenceEdge {
             operatorId = operatorId == null ? "" : operatorId;
             assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
@@ -140,8 +142,25 @@ public record DiscoveryBenchmarkEvidence(
                 String kind,
                 String source,
                 String packId,
+                String operatorId,
+                List<String> assumptions,
+                String maturity,
+                boolean enabledByProfile,
+                List<de.regelsuche.knowledge.SearchEffect> searchEffect,
+                List<String> tags) {
+            this(from, to, ruleId, kind, source, packId, operatorId, assumptions, maturity,
+                    enabledByProfile, searchEffect, tags, null);
+        }
+
+        public EvidenceEdge(
+                String from,
+                String to,
+                String ruleId,
+                String kind,
+                String source,
+                String packId,
                 List<de.regelsuche.knowledge.SearchEffect> searchEffect) {
-            this(from, to, ruleId, kind, source, packId, "", List.of(), "", false, searchEffect, List.of());
+            this(from, to, ruleId, kind, source, packId, "", List.of(), "", false, searchEffect, List.of(), null);
         }
     }
 
