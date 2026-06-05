@@ -48,4 +48,53 @@ class CountableMoveSearchEngineTest {
             || result.failureReason() == CountableMoveSearchEngine.FailureReason.TARGET_NOT_REACHED);
         assertTrue(result.exploredStateCount() <= 1);
     }
+
+    @Test
+    void reportsDeterministicSearchSpaceMetrics() {
+        CountableMoveSearchEngine.CountableMoveSearchResult first =
+            engine.search("x^2 + 6*x + 5", "(x + 3)^2 - 4", 4, 120);
+        CountableMoveSearchEngine.CountableMoveSearchResult second =
+            engine.search("x^2 + 6*x + 5", "(x + 3)^2 - 4", 4, 120);
+
+        assertEquals(first.searchSpaceMetrics(), second.searchSpaceMetrics());
+    }
+
+    @Test
+    void countsDuplicateCanonicalStates() {
+        CountableMoveSearchEngine.CountableMoveSearchResult result =
+            engine.search("x^2 + 6*x + 5", "(x + 3)^2 - 4", 4, 120);
+
+        CountableMoveSearchEngine.SearchSpaceMetrics metrics = result.searchSpaceMetrics();
+        assertTrue(metrics.generatedMoveCount() >= metrics.duplicateStateCount());
+        assertTrue(metrics.duplicateStateCount() >= 1);
+        assertEquals(
+            metrics.generatedMoveCount(),
+            metrics.moveKindHistogram().values().stream().mapToInt(Integer::intValue).sum()
+        );
+    }
+
+    @Test
+    void makesStateBudgetAbortVisibleInMetrics() {
+        CountableMoveSearchEngine.CountableMoveSearchResult result =
+            engine.search("x - 1 = 0", "x = 1", 4, 1);
+
+        assertFalse(result.success());
+        assertEquals(CountableMoveSearchEngine.FailureReason.MAX_STATES_REACHED, result.failureReason());
+        assertTrue(result.searchSpaceMetrics().prunedByStateBudgetCount() > 0);
+    }
+
+    @Test
+    void exposesSearchSpaceMetricsForSuccessfulPath() {
+        CountableMoveSearchEngine.CountableMoveSearchResult result =
+            engine.search("x^2 + 6*x + 5", "(x + 3)^2 - 4", 4, 120);
+
+        assertTrue(result.success());
+        CountableMoveSearchEngine.SearchSpaceMetrics metrics = result.searchSpaceMetrics();
+        assertTrue(metrics.generatedMoveCount() >= 1);
+        assertFalse(metrics.branchingFactorByDepth().isEmpty());
+        assertEquals(
+            result.appliedMoves().stream().map(move -> move.kind().name()).toList(),
+            metrics.successfulPathMoveKinds()
+        );
+    }
 }

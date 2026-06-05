@@ -60,9 +60,18 @@ Der Report (`app/build/reports/discovery-campaign-6/`) enthält je Fall:
 - Depth-1 Candidate Summary
 - Multi-step Search Result
 - Successful Path Tabelle (`step`, `before`, `moveKind`, `ruleId`, `ordinal`, `parameters`, `after`)
+- Search Space Intelligence Tabelle (`exploredStateCount`, `uniqueCanonicalStateCount`, `generatedMoveCount`, `duplicateStateCount`, `prunedByDepthCount`, `prunedByStateBudgetCount`, `classicFallbackMoveCount`, `unknownMoveCount`, `unresolvedParameterMoveCount`) inkl. branchingFactor pro Tiefe, MoveKind-/Enumerator-Histogramm, successfulPathMoveKinds und Bewertung
 - Classic-vs-Move Vergleich
 - Interpretation und Architecture Note
 - Related follow-up issues
+
+Zusätzlich enthält der Report eine **Search Space Intelligence Summary** über alle Fälle (Gesamtzählungen, max. branching factor, aggregierte Histogramme) und pro Fall eine Bewertung des Suchraums:
+
+- `ausreichend klein`
+- `braucht stärkere Heuristik`
+- `braucht Normalizer`
+- `braucht Parameterbegrenzung`
+- `braucht neuen Realizer`
 
 Siehe auch:
 

@@ -38,6 +38,20 @@ class DiscoveryCampaignSixRunnerTest {
         assertTrue(completeSquare.multiStepSearch().pathLength() >= 1);
         assertTrue(completeSquare.multiStepSearch().ordinalPath().size() == completeSquare.multiStepSearch().pathLength());
 
+        // Search Space Intelligence (Issue #103)
+        assertEquals(4, report.searchSpaceSummary().caseCount());
+        assertTrue(report.cases().stream().allMatch(result -> !result.searchSpaceAssessment().isBlank()));
+        assertTrue(report.searchSpaceSummary().totalDuplicateStates() >= 1, "Duplikate müssen gezählt werden");
+        assertTrue(report.cases().stream().anyMatch(result -> result.multiStepSearch().success()
+            && !result.searchSpace().successfulPathMoveKinds().isEmpty()),
+            "Mindestens ein Fall muss einen erfolgreichen Pfad mit Search-Space-Metriken zeigen");
+        assertEquals(
+            completeSquare.multiStepSearch().appliedMoves().stream().map(move -> move.kind().name()).toList(),
+            completeSquare.searchSpace().successfulPathMoveKinds()
+        );
+        assertEquals("ausreichend klein", completeSquare.searchSpaceAssessment());
+        assertEquals("braucht Normalizer", cancellation.searchSpaceAssessment());
+
         assertTrue(Files.exists(tempDir.resolve("discovery-campaign-6.json")));
         Path markdown = tempDir.resolve("countable-move-enumeration-report.md");
         assertTrue(Files.exists(markdown));
@@ -47,5 +61,24 @@ class DiscoveryCampaignSixRunnerTest {
         assertTrue(rendered.contains("Multi-step Search Result"));
         assertTrue(rendered.contains("Classic-vs-Move Vergleich"));
         assertTrue(rendered.contains("Related follow-up issues"));
+        assertTrue(rendered.contains("### Search Space Intelligence"));
+        assertTrue(rendered.contains("## Search Space Intelligence Summary"));
+        assertTrue(rendered.contains("branchingFactor pro Tiefe"));
+        assertTrue(rendered.contains("MoveKind-Histogramm"));
+        assertTrue(rendered.contains("Enumerator-Histogramm"));
+    }
+
+    @Test
+    void renderedReportIsReproducible(@TempDir Path first, @TempDir Path second) throws Exception {
+        DiscoveryCampaignSixRunner runner = new DiscoveryCampaignSixRunner();
+
+        runner.writeReport(first);
+        runner.writeReport(second);
+
+        String firstReport = Files.readString(
+            first.resolve("countable-move-enumeration-report.md"), StandardCharsets.UTF_8);
+        String secondReport = Files.readString(
+            second.resolve("countable-move-enumeration-report.md"), StandardCharsets.UTF_8);
+        assertEquals(firstReport, secondReport);
     }
 }
