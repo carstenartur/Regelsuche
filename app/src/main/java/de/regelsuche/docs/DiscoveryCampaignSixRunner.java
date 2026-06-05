@@ -158,7 +158,7 @@ public final class DiscoveryCampaignSixRunner {
             0,
             id,
             seed.family(),
-            seed.knownRuleId(),
+            seed.seedFamilyId(),
             substitution.expression(),
             sourceExpression,
             simplifiedExpression,
@@ -342,7 +342,7 @@ public final class DiscoveryCampaignSixRunner {
     }
 
     /** A seed identity family parameterised by a single placeholder {@value #PLACEHOLDER}. */
-    public record Seed(String id, String family, String knownRuleId, String sourceTemplate, String simplifiedTemplate) {
+    public record Seed(String id, String family, String seedFamilyId, String sourceTemplate, String simplifiedTemplate) {
     }
 
     /**
@@ -366,7 +366,7 @@ public final class DiscoveryCampaignSixRunner {
         int rank,
         String id,
         String family,
-        String knownRuleId,
+        String seedFamilyId,
         String substitution,
         String sourceExpression,
         String simplifiedExpression,
@@ -381,11 +381,22 @@ public final class DiscoveryCampaignSixRunner {
         String whyInteresting
     ) {
         public Candidate {
+            id = id == null ? "" : id;
+            family = family == null ? "" : family;
+            seedFamilyId = seedFamilyId == null ? "" : seedFamilyId;
+            substitution = substitution == null ? "" : substitution;
+            sourceExpression = sourceExpression == null ? "" : sourceExpression;
+            simplifiedExpression = simplifiedExpression == null ? "" : simplifiedExpression;
             path = path == null ? List.of() : List.copyOf(path);
+            deterministicEvidence = deterministicEvidence == null ? "" : deterministicEvidence;
+            oracleStatus = oracleStatus == null ? "UNAVAILABLE" : oracleStatus;
+            oracleEvidence = oracleEvidence == null ? "" : oracleEvidence;
+            scores = scores == null ? new Scores(0.0, 0.0, 0.0, 0.0, 0.0) : scores;
+            whyInteresting = whyInteresting == null ? "" : whyInteresting;
         }
 
         Candidate withRank(int newRank) {
-            return new Candidate(newRank, id, family, knownRuleId, substitution, sourceExpression,
+            return new Candidate(newRank, id, family, seedFamilyId, substitution, sourceExpression,
                 simplifiedExpression, path, equivalent, deterministicEvidence, oracleStatus, oracleEvidence,
                 scores, interestingness, promotable, whyInteresting);
         }

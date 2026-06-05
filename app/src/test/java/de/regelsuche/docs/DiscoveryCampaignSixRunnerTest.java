@@ -71,4 +71,40 @@ class DiscoveryCampaignSixRunnerTest {
                 "base-variable rediscoveries must not be promotable: " + candidate.id());
         }
     }
+
+    @Test
+    void writeReportNormalizesNullCandidateFieldsBeforeRendering(@TempDir Path tempDir) throws Exception {
+        DiscoveryCampaignSixRunner runner = new DiscoveryCampaignSixRunner();
+        DiscoveryCampaignSixRunner.Candidate candidate = new DiscoveryCampaignSixRunner.Candidate(
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            0.0,
+            false,
+            null
+        );
+
+        runner.writeReport(
+            tempDir,
+            new DiscoveryCampaignSixRunner.CampaignReport("discovery-campaign-6", List.of(candidate), 1, 0)
+        );
+
+        String json = Files.readString(tempDir.resolve("discovery-campaign-6.json"), StandardCharsets.UTF_8);
+        assertTrue(json.contains("\"seedFamilyId\""));
+        assertFalse(json.contains("\"knownRuleId\""));
+
+        String rendered = Files.readString(tempDir.resolve("identity-mining-report.md"), StandardCharsets.UTF_8);
+        assertTrue(rendered.contains("| 1 |  |  |  |  |  | unavailable | yes | 0.00 | no |  |"));
+        assertTrue(rendered.contains("- ****:"));
+    }
 }
