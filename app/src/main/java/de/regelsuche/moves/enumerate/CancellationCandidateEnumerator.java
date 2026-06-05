@@ -2,10 +2,12 @@ package de.regelsuche.moves.enumerate;
 
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.moves.MoveParameter;
 import de.regelsuche.moves.MoveParameterKind;
+import de.regelsuche.parse.ExpressionParser;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +19,8 @@ import java.util.Map;
  * candidate {@code +1}, which cancels the {@code -1}.
  */
 public final class CancellationCandidateEnumerator implements ParameterEnumerator {
+    private final ExpressionParser parser = new ExpressionParser();
+
 
     @Override
     public String id() {
@@ -25,14 +29,31 @@ public final class CancellationCandidateEnumerator implements ParameterEnumerato
 
     @Override
     public List<MoveParameter> enumerate(String expression) {
-        return MoveExpressions.parse(expression)
-                .map(this::enumerate)
-                .orElseGet(List::of);
+        if (expression != null && expression.contains("=")) {
+            try {
+                Equation equation = parser.parseEquation(expression);
+                return enumerateEquation(equation);
+            } catch (IllegalArgumentException ignored) {
+                // Fall back to the term-only parser below.
+            }
+        }
+        return MoveExpressions.parse(expression).map(this::enumerate).orElseGet(List::of);
     }
 
     private List<MoveParameter> enumerate(Expr root) {
         List<SignedTerm> terms = new ArrayList<>();
         flatten(root, true, terms);
+        return parametersForTerms(terms);
+    }
+
+    private List<MoveParameter> enumerateEquation(Equation equation) {
+        List<SignedTerm> terms = new ArrayList<>();
+        flatten(equation.left(), true, terms);
+        flatten(equation.right(), false, terms);
+        return parametersForTerms(terms);
+    }
+
+    private List<MoveParameter> parametersForTerms(List<SignedTerm> terms) {
         Map<String, MoveParameter> distinct = new LinkedHashMap<>();
         for (SignedTerm term : terms) {
             if (!(term.expr() instanceof NumberExpr number)) {

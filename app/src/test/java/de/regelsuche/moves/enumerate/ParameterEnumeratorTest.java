@@ -48,6 +48,12 @@ class ParameterEnumeratorTest {
     }
 
     @Test
+    void cancellationCandidateEnumeratorSupportsEquations() {
+        List<MoveParameter> parameters = new CancellationCandidateEnumerator().enumerate("x - 1 = 0");
+        assertTrue(parameters.stream().anyMatch(p -> p.value().equals("+1")), parameters.toString());
+    }
+
+    @Test
     void completeSquareEnumeratorRecognisesShiftAndResidue() {
         List<MoveParameter> parameters =
                 new CompleteSquareParameterEnumerator().enumerate("x^2 + 6*x + 5");

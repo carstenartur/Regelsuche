@@ -30,20 +30,24 @@ Typische Kommandos:
 ./gradlew runDiscoveryPromotionPipeline
 ```
 
-## Discovery Campaign 6: Open-Ended Identity Mining
+## Discovery Campaign 6: Countable Move Enumeration Probe
 
-Im Gegensatz zu den Kampagnen 1-5, die kuratierte Eingabe-/Ziel-Paare prüfen, erzeugt
-`DiscoveryCampaignSixRunner` Kandidaten selbst. Bausteine:
+`DiscoveryCampaignSixRunner` vergleicht für vier gezielte Depth-1-Fälle die klassische
+Kandidatenerzeugung mit explizit enumerierten `RewriteMove`s:
 
-- **Seed-Familien**: bekannte Identitäten (vollständiges Quadrat, Differenz von Quadraten,
-  Binomialkubus, …) mit einem Platzhalter `U`.
-- **Substitutionen**: systematisch eingesetzte Terme wie `x+1`, `sin(x)`, `a+b`, `x^2`, `2*x`.
-- **Äquivalenzprüfung**: deterministisch über die Polynom-Normalform (offline, immer verfügbar);
-  zusätzlich SymPy als Orakel-Evidenz, sofern vorhanden.
-- **Ranking** nach fünf Faktoren: Kürze, Überraschung, Pfadlänge, Wiederverwendbarkeit und
-  Unterschied zum Ausgangsausdruck.
-- **Report** (`app/build/reports/discovery-campaign-6/`): Top 20 Kandidaten mit Pfad,
-  Beweis-/Orakel-Evidenz, Begründung der Interessantheit und Markierung, ob als Makro promotable.
+- **Cancellation auf Gleichungen**: `x - 1 = 0` mit Kandidat `+1`
+- **Complete square**: `x^2 + 6*x + 5` mit Parametern `shift=3`, `residue=-4`
+- **Repeated subexpression**: `(x+1)^2 - (x+1)` mit Teilausdruck `x+1`
+- **Common subexpression**: `x*(y+1)+z*(y+1)` mit Teilausdruck `y+1`
+
+Der Report (`app/build/reports/discovery-campaign-6/`) enthält je Fall:
+
+- klassische Engine-Kandidaten
+- Move-Enumerator-Kandidaten
+- Überschneidungen
+- Kandidaten nur aus Move-Enumeration
+- Kandidaten nur aus der alten Engine
+- einen Check, ob der Kandidat im bestehenden `BestFirstSearchStrategy`-Raum auf Tiefe 1 sichtbar ist
 
 Siehe auch:
 
