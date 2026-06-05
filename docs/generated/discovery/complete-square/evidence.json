@@ -54,7 +54,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_factor_common_left",
       "sourceExpression" : "(x + 1) * (x + 3) + (x + 1) * 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 1) * (x + 3 + 2)",
       "validationStatus" : ""
     },
@@ -130,7 +130,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 1) * (x + 3 + 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 1) * (x + 5)",
       "validationStatus" : ""
     },
@@ -168,7 +168,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_linear_offset_simplify",
       "sourceExpression" : "(x + 1) * (x + 3 + 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 1) * (x + 5)",
       "validationStatus" : ""
     },
@@ -206,7 +206,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3) * (x + 3) - 2 ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3) * (x + 3) - 4",
       "validationStatus" : ""
     },
@@ -244,7 +244,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3) * (x + 3) - 2 ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3) ^ 2 - 2 ^ 2",
       "validationStatus" : ""
     },
@@ -320,7 +320,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3) * (x + 3) - 2 ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3) ^ 2 - 4",
       "validationStatus" : ""
     },
@@ -358,7 +358,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3) * (x + 3) - 4",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3) ^ 2 - 4",
       "validationStatus" : ""
     },
@@ -472,7 +472,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3) ^ 2 - 2 * 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3) ^ 2 - 4",
       "validationStatus" : ""
     },
@@ -586,7 +586,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3) ^ 2 - 2 ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3) ^ 2 - 4",
       "validationStatus" : ""
     },
@@ -624,7 +624,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_square_difference_factor",
       "sourceExpression" : "(x + 3) ^ 2 - 2 ^ 2",
-      "tags" : [ "selected-path", "parameters-unresolved" ],
+      "tags" : [ "selected-path" ],
       "targetExpression" : "(x + 3 - 2) * (x + 3 + 2)",
       "validationStatus" : ""
     },
@@ -662,7 +662,7 @@
       "parameters" : [ ],
       "ruleId" : "sympy.poly.factor.difference_of_squares",
       "sourceExpression" : "(x + 3) ^ 2 - 2 ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3 - 2) * (x + 3 + 2)",
       "validationStatus" : ""
     },
@@ -738,7 +738,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3 - 2) * (x + 3 + 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 1) * (x + 3 + 2)",
       "validationStatus" : ""
     },
@@ -776,7 +776,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_linear_offset_simplify",
       "sourceExpression" : "(x + 3 - 2) * (x + 3 + 2)",
-      "tags" : [ "selected-path", "parameters-unresolved" ],
+      "tags" : [ "selected-path" ],
       "targetExpression" : "(x + 1) * (x + 3 + 2)",
       "validationStatus" : ""
     },
@@ -814,7 +814,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3 - 2) * (x + 3 + 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 1) * (x + 5)",
       "validationStatus" : ""
     },
@@ -852,7 +852,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3 - 2) * (x + 3 + 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3 - 2) * (x + 5)",
       "validationStatus" : ""
     },
@@ -890,7 +890,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_linear_offset_simplify",
       "sourceExpression" : "(x + 3 - 2) * (x + 3 + 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3 - 2) * (x + 5)",
       "validationStatus" : ""
     },
@@ -928,7 +928,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x + 3 - 2) * (x + 5)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 1) * (x + 5)",
       "validationStatus" : ""
     },
@@ -966,7 +966,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_linear_offset_simplify",
       "sourceExpression" : "(x + 3 - 2) * (x + 5)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 1) * (x + 5)",
       "validationStatus" : ""
     },
@@ -1004,7 +1004,7 @@
       "parameters" : [ ],
       "ruleId" : "complete_square_bridge",
       "sourceExpression" : "x * x + 6 * x + 5",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3) ^ 2 - 2 ^ 2",
       "validationStatus" : ""
     },
@@ -1042,7 +1042,7 @@
       "parameters" : [ ],
       "ruleId" : "complete_square_bridge",
       "sourceExpression" : "x * x + 6 * x + 5",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3) ^ 2 - 4",
       "validationStatus" : ""
     },
@@ -1080,7 +1080,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_factor_common_right",
       "sourceExpression" : "x * x + 6 * x + 5",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 6) * x + 5",
       "validationStatus" : ""
     },
@@ -1118,7 +1118,7 @@
       "parameters" : [ ],
       "ruleId" : "macro_3bbfed5b",
       "sourceExpression" : "x ^ 2 + 6 * x + 5",
-      "tags" : [ "alternative-branch", "macro-shortcut", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch", "macro-shortcut" ],
       "targetExpression" : "(x + 1) * (x + 3 + 2)",
       "validationStatus" : ""
     },
@@ -1156,7 +1156,7 @@
       "parameters" : [ ],
       "ruleId" : "complete_square_bridge",
       "sourceExpression" : "x ^ 2 + 6 * x + 5",
-      "tags" : [ "selected-path", "parameters-unresolved" ],
+      "tags" : [ "selected-path" ],
       "targetExpression" : "(x + 3) ^ 2 - 2 ^ 2",
       "validationStatus" : ""
     },
@@ -1194,7 +1194,7 @@
       "parameters" : [ ],
       "ruleId" : "complete_square_bridge",
       "sourceExpression" : "x ^ 2 + 6 * x + 5",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x + 3) ^ 2 - 4",
       "validationStatus" : ""
     },

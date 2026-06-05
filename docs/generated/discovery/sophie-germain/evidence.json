@@ -51,7 +51,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(0 - 2 * x * y + x * x + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -127,7 +127,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -317,7 +317,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -355,7 +355,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(2 * x * y + x * x + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -431,7 +431,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(2 * x * y + x ^ 2 + 2 * y * y) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -469,7 +469,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -583,7 +583,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -697,7 +697,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -735,7 +735,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -811,7 +811,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -963,7 +963,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x * x + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
       "validationStatus" : ""
     },
@@ -1039,7 +1039,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -1077,7 +1077,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -1115,7 +1115,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -1267,7 +1267,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_square_difference_factor",
       "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -1305,7 +1305,7 @@
       "parameters" : [ ],
       "ruleId" : "sympy.poly.factor.difference_of_squares",
       "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -1343,7 +1343,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
       "validationStatus" : ""
     },
@@ -1419,7 +1419,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x * y * x * y",
       "validationStatus" : ""
     },
@@ -1457,7 +1457,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y * y",
       "validationStatus" : ""
     },
@@ -1571,7 +1571,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
       "validationStatus" : ""
     },
@@ -1647,7 +1647,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -1685,7 +1685,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -1761,7 +1761,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -1799,7 +1799,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -1875,7 +1875,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * x * y + 2 * y * y) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -1913,7 +1913,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * x * y + 2 * y * y) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -1951,7 +1951,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -2065,7 +2065,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -2103,7 +2103,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -2217,7 +2217,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -2255,7 +2255,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
       "validationStatus" : ""
     },
@@ -2293,7 +2293,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -2331,7 +2331,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -2369,7 +2369,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -2483,7 +2483,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_square_difference_factor",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y * y + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -2521,7 +2521,7 @@
       "parameters" : [ ],
       "ruleId" : "sympy.poly.factor.difference_of_squares",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y * y + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -2559,7 +2559,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
       "validationStatus" : ""
     },
@@ -2597,7 +2597,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x * y * x * y",
       "validationStatus" : ""
     },
@@ -2635,7 +2635,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x ^ 2 * y * y",
       "validationStatus" : ""
     },
@@ -2711,7 +2711,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
       "validationStatus" : ""
     },
@@ -2749,7 +2749,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y * y + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -2787,7 +2787,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y * y + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -2825,7 +2825,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -2863,7 +2863,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -2901,7 +2901,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
       "validationStatus" : ""
     },
@@ -2977,7 +2977,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -3015,7 +3015,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
       "validationStatus" : ""
     },
@@ -3091,7 +3091,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -3281,7 +3281,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
       "validationStatus" : ""
     },
@@ -3319,7 +3319,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_square_difference_factor",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "selected-path", "parameters-unresolved" ],
+      "tags" : [ "selected-path" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -3357,7 +3357,7 @@
       "parameters" : [ ],
       "ruleId" : "sympy.poly.factor.difference_of_squares",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -3395,7 +3395,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -3433,7 +3433,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x * y * x * y",
       "validationStatus" : ""
     },
@@ -3471,7 +3471,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y * y",
       "validationStatus" : ""
     },
@@ -3509,7 +3509,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
       "validationStatus" : ""
     },
@@ -3547,7 +3547,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -3585,7 +3585,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x * y * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y * y",
       "validationStatus" : ""
     },
@@ -3623,7 +3623,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x * y * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
       "validationStatus" : ""
     },
@@ -3661,7 +3661,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x * y * x * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -3699,7 +3699,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
       "validationStatus" : ""
     },
@@ -3737,7 +3737,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y * y",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -3889,7 +3889,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -3927,7 +3927,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -3965,7 +3965,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -4003,7 +4003,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
@@ -4041,7 +4041,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -4117,7 +4117,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "0 - 4 * x * x * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -4155,7 +4155,7 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -4269,7 +4269,7 @@
       "parameters" : [ ],
       "ruleId" : "macro_6bd0496b",
       "sourceExpression" : "x ^ 4 + 4 * y ^ 4",
-      "tags" : [ "alternative-branch", "macro-shortcut", "parameters-unresolved" ],
+      "tags" : [ "alternative-branch", "macro-shortcut" ],
       "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
     },
@@ -4307,7 +4307,7 @@
       "parameters" : [ ],
       "ruleId" : "hypothesis_difference_of_squares_preparation",
       "sourceExpression" : "x ^ 4 + 4 * y ^ 4",
-      "tags" : [ "selected-path", "parameters-unresolved" ],
+      "tags" : [ "selected-path" ],
       "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
       "validationStatus" : ""
     },
