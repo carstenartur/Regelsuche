@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryCampaignSixRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryCampaignSixRunner.java</span></div><h1>DiscoveryCampaignSixRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.util.AtomicJsonFile;
+import de.regelsuche.validation.SymPyDiscoveryOracleAdapter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
+/**
+ * Runs Discovery Campaign 6 (Open-Ended Identity Mining).
+ *
+ * &lt;p&gt;Unlike campaigns 1-5, which validate curated input/target pairs, this campaign lets Regelsuche
+ * &lt;em&gt;generate&lt;/em&gt; identity candidates on its own. It seeds known identity families, applies a fixed
+ * catalogue of substitutions (for example {@code x+1}, {@code sin(x)}, {@code a+b}, {@code x^2}),
+ * checks equivalence deterministically (and corroborates with a SymPy oracle when available), ranks the
+ * candidates by brevity, surprise, path length, reusability and difference from the source expression,
+ * and reports the Top-20 as possible new macros.
+ */
+<span class="fc" id="L37">public final class DiscoveryCampaignSixRunner {</span>
+<span class="fc" id="L38">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L39">        .findAndRegisterModules()</span>
+<span class="fc" id="L40">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+    private static final String PLACEHOLDER = &quot;U&quot;;
+    private static final String ATOM = &quot;u&quot;;
+    private static final int TOP_LIMIT = 20;
+    private static final double BREVITY_NODE_CAP = 14.0;
+    private static final double PROMOTABLE_THRESHOLD = 0.45;
+
+<span class="fc" id="L48">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L49">    private final PolynomialNormalFormEquivalenceService equivalence =</span>
+        new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
+<span class="fc" id="L51">    private final SymPyDiscoveryOracleAdapter oracle = new SymPyDiscoveryOracleAdapter();</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L55">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L56">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L57">        new DiscoveryCampaignSixRunner()</span>
+<span class="nc" id="L58">            .writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-campaign-6&quot;));</span>
+<span class="nc" id="L59">    }</span>
+
+    public CampaignReport run() {
+<span class="fc" id="L62">        List&lt;Candidate&gt; scored = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (Seed seed : seeds()) {</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            for (Substitution substitution : substitutions()) {</span>
+<span class="fc" id="L65">                scored.add(mine(seed, substitution));</span>
+<span class="fc" id="L66">            }</span>
+<span class="fc" id="L67">        }</span>
+<span class="fc" id="L68">        scored.sort(Comparator</span>
+<span class="fc" id="L69">            .comparingDouble(Candidate::interestingness).reversed()</span>
+<span class="fc" id="L70">            .thenComparing(Candidate::id));</span>
+
+<span class="fc" id="L72">        List&lt;Candidate&gt; ranked = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L73">        int rank = 1;</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        for (Candidate candidate : scored) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (rank &gt; TOP_LIMIT) {</span>
+<span class="fc" id="L76">                break;</span>
+            }
+<span class="fc" id="L78">            ranked.add(candidate.withRank(rank));</span>
+<span class="fc" id="L79">            rank++;</span>
+<span class="fc" id="L80">        }</span>
+<span class="fc" id="L81">        long promotable = ranked.stream().filter(Candidate::promotable).count();</span>
+<span class="fc" id="L82">        return new CampaignReport(&quot;discovery-campaign-6&quot;, ranked, scored.size(), (int) promotable);</span>
+    }
+
+    public CampaignReport writeReport(Path outputDirectory) {
+<span class="fc" id="L86">        return writeReport(outputDirectory, run());</span>
+    }
+
+    CampaignReport writeReport(Path outputDirectory, CampaignReport report) {
+        try {
+<span class="fc" id="L91">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L92">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L93">                outputDirectory.resolve(&quot;discovery-campaign-6.json&quot;),</span>
+<span class="fc" id="L94">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+            );
+<span class="fc" id="L96">            Files.writeString(</span>
+<span class="fc" id="L97">                outputDirectory.resolve(&quot;identity-mining-report.md&quot;),</span>
+<span class="fc" id="L98">                renderMarkdown(report),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L101">            return report;</span>
+<span class="nc" id="L102">        } catch (IOException exception) {</span>
+<span class="nc" id="L103">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private Candidate mine(Seed seed, Substitution substitution) {
+<span class="fc" id="L108">        String id = seed.id() + &quot;--&quot; + substitution.id();</span>
+<span class="fc" id="L109">        String sourceExpression = instantiate(seed.sourceTemplate(), substitution.expression());</span>
+<span class="fc" id="L110">        String simplifiedExpression = instantiate(seed.simplifiedTemplate(), substitution.expression());</span>
+
+        // Deterministic, offline equivalence: the substituted subterm is treated as a single fresh
+        // atom so the family identity reduces to a pure polynomial normal-form comparison.
+<span class="fc" id="L114">        String atomicSource = seed.sourceTemplate().replace(PLACEHOLDER, ATOM);</span>
+<span class="fc" id="L115">        String atomicSimplified = seed.simplifiedTemplate().replace(PLACEHOLDER, ATOM);</span>
+<span class="fc" id="L116">        boolean equivalent = equivalence.arePolynomiallyEquivalent(atomicSource, atomicSimplified);</span>
+<span class="fc" id="L117">        String deterministicEvidence = equivalence.lastResult().detail();</span>
+
+<span class="fc" id="L119">        SymPyDiscoveryOracleAdapter.OracleResult oracleResult =</span>
+<span class="fc" id="L120">            oracle.equivalence(sourceExpression, simplifiedExpression);</span>
+
+<span class="fc" id="L122">        int sourceNodes = nodeCount(sourceExpression);</span>
+<span class="fc" id="L123">        int simplifiedNodes = nodeCount(simplifiedExpression);</span>
+<span class="fc" id="L124">        int baseNodes = nodeCount(instantiate(seed.sourceTemplate(), &quot;x&quot;));</span>
+<span class="fc" id="L125">        Set&lt;String&gt; variables = variablesOf(sourceExpression);</span>
+
+<span class="fc" id="L127">        List&lt;String&gt; path = buildPath(seed, substitution, sourceExpression, simplifiedExpression);</span>
+
+<span class="fc" id="L129">        double brevity = clamp(1.0 - (simplifiedNodes / BREVITY_NODE_CAP));</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        double surprise = sourceNodes == 0</span>
+<span class="nc" id="L131">            ? 0.0</span>
+<span class="fc" id="L132">            : clamp((double) (sourceNodes - simplifiedNodes) / sourceNodes);</span>
+<span class="fc" id="L133">        double pathLengthScore = clamp((path.size() - 1) / 3.0);</span>
+<span class="fc" id="L134">        double reusability = clamp(</span>
+<span class="fc" id="L135">            0.5 * clamp((variables.size() - 1) / 2.0) + 0.5 * substitution.generality());</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        double differenceFromSource = baseNodes == 0</span>
+<span class="nc" id="L137">            ? 0.0</span>
+<span class="fc" id="L138">            : clamp((double) Math.max(0, sourceNodes - baseNodes) / baseNodes);</span>
+
+<span class="fc" id="L140">        Scores scores = new Scores(brevity, surprise, pathLengthScore, reusability, differenceFromSource);</span>
+<span class="fc" id="L141">        double interestingness = clamp(</span>
+            0.20 * brevity
+                + 0.30 * surprise
+                + 0.15 * pathLengthScore
+                + 0.20 * reusability
+                + 0.15 * differenceFromSource);
+
+<span class="fc" id="L148">        boolean knownSeed = substitution.identity();</span>
+<span class="pc bpc" id="L149" title="1 of 6 branches missed.">        boolean promotable = equivalent</span>
+            &amp;&amp; !knownSeed
+            &amp;&amp; interestingness &gt;= PROMOTABLE_THRESHOLD
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            &amp;&amp; oracleResult.status() != SymPyDiscoveryOracleAdapter.Status.DISAGREE;</span>
+
+<span class="fc" id="L154">        String whyInteresting = explain(seed, substitution, sourceNodes, simplifiedNodes,</span>
+<span class="fc" id="L155">            variables.size(), path.size(), knownSeed, scores);</span>
+
+<span class="fc" id="L157">        return new Candidate(</span>
+            0,
+            id,
+<span class="fc" id="L160">            seed.family(),</span>
+<span class="fc" id="L161">            seed.seedFamilyId(),</span>
+<span class="fc" id="L162">            substitution.expression(),</span>
+            sourceExpression,
+            simplifiedExpression,
+            path,
+            equivalent,
+            deterministicEvidence,
+<span class="fc" id="L168">            oracleResult.status().name(),</span>
+<span class="fc" id="L169">            oracleResult.evidence(),</span>
+            scores,
+            interestingness,
+            promotable,
+            whyInteresting
+        );
+    }
+
+    private List&lt;String&gt; buildPath(Seed seed, Substitution substitution, String source, String simplified) {
+<span class="fc" id="L178">        List&lt;String&gt; path = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L179">        path.add(&quot;seed:&quot; + seed.family() + &quot; (&quot; + seed.sourceTemplate() + &quot;)&quot;);</span>
+<span class="fc" id="L180">        path.add(&quot;substitute &quot; + PLACEHOLDER + &quot; := &quot; + substitution.expression());</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (!substitution.atomic()) {</span>
+<span class="fc" id="L182">            path.add(&quot;expand to &quot; + source);</span>
+        }
+<span class="fc" id="L184">        path.add(&quot;compress to &quot; + simplified);</span>
+<span class="fc" id="L185">        return List.copyOf(path);</span>
+    }
+
+    private String explain(Seed seed, Substitution substitution, int sourceNodes, int simplifiedNodes,
+                           int variableCount, int pathSteps, boolean knownSeed, Scores scores) {
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (knownSeed) {</span>
+<span class="fc" id="L191">            return &quot;Rediscovers the known &quot; + seed.family() + &quot; identity on its base variable; &quot;</span>
+                + &quot;kept as a seed reference, not promotable.&quot;;
+        }
+<span class="fc" id="L194">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L195">        builder.append(&quot;Substituting &quot;).append(substitution.expression())</span>
+<span class="fc" id="L196">            .append(&quot; into the &quot;).append(seed.family())</span>
+<span class="fc" id="L197">            .append(&quot; family compresses &quot;).append(sourceNodes)</span>
+<span class="fc" id="L198">            .append(&quot; nodes down to &quot;).append(simplifiedNodes).append(&quot; (surprise &quot;)</span>
+<span class="fc" id="L199">            .append(format(scores.surprise())).append(&quot;).&quot;);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (variableCount &gt; 1) {</span>
+<span class="fc" id="L201">            builder.append(&quot; Reusable across &quot;).append(variableCount).append(&quot; free variables.&quot;);</span>
+        }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (!substitution.atomic()) {</span>
+<span class="fc" id="L204">            builder.append(&quot; Hidden structure revealed after a &quot;).append(pathSteps).append(&quot;-step derivation.&quot;);</span>
+        }
+<span class="fc" id="L206">        return builder.toString();</span>
+    }
+
+    private String instantiate(String template, String substitution) {
+<span class="fc" id="L210">        String raw = template.replace(PLACEHOLDER, &quot;(&quot; + substitution + &quot;)&quot;);</span>
+        try {
+<span class="fc" id="L212">            return ExpressionFormatter.format(parser.parseTerm(raw));</span>
+<span class="nc" id="L213">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L214">            return raw;</span>
+        }
+    }
+
+    private int nodeCount(String expression) {
+        try {
+<span class="fc" id="L220">            return nodeCount(parser.parseTerm(expression));</span>
+<span class="nc" id="L221">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L222">            return expression.length();</span>
+        }
+    }
+
+    private int nodeCount(Expr expression) {
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc" id="L228">            return 1 + nodeCount(binaryExpr.left()) + nodeCount(binaryExpr.right());</span>
+        }
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="fc" id="L231">            int total = 1;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="fc" id="L233">                total += nodeCount(argument);</span>
+<span class="fc" id="L234">            }</span>
+<span class="fc" id="L235">            return total;</span>
+        }
+<span class="fc" id="L237">        return 1;</span>
+    }
+
+    private Set&lt;String&gt; variablesOf(String expression) {
+<span class="fc" id="L241">        Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
+        try {
+<span class="fc" id="L243">            collectVariables(parser.parseTerm(expression), variables);</span>
+<span class="nc" id="L244">        } catch (IllegalArgumentException ignored) {</span>
+            // Leave the accumulated set as-is for unparseable expressions.
+<span class="fc" id="L246">        }</span>
+<span class="fc" id="L247">        return variables;</span>
+    }
+
+    private void collectVariables(Expr expression, Set&lt;String&gt; variables) {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
+<span class="fc" id="L252">            variables.add(variableExpr.name());</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc" id="L254">            collectVariables(binaryExpr.left(), variables);</span>
+<span class="fc" id="L255">            collectVariables(binaryExpr.right(), variables);</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="fc" id="L258">                collectVariables(argument, variables);</span>
+<span class="fc" id="L259">            }</span>
+        }
+<span class="fc" id="L261">    }</span>
+
+    private double clamp(double value) {
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (value &lt; 0.0) {</span>
+<span class="fc" id="L265">            return 0.0;</span>
+        }
+<span class="fc" id="L267">        return Math.min(value, 1.0);</span>
+    }
+
+    private String format(double value) {
+<span class="fc" id="L271">        return String.format(Locale.ROOT, &quot;%.2f&quot;, value);</span>
+    }
+
+    private String renderMarkdown(CampaignReport report) {
+<span class="fc" id="L275">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L276">        out.append(&quot;# Discovery Campaign 6: Open-Ended Identity Mining\n\n&quot;);</span>
+<span class="fc" id="L277">        out.append(&quot;Regelsuche generated &quot;).append(report.generatedCount())</span>
+<span class="fc" id="L278">            .append(&quot; identity candidates from seed families and substitutions, then ranked them. &quot;)</span>
+<span class="fc" id="L279">            .append(&quot;The Top &quot;).append(report.topCandidates().size())</span>
+<span class="fc" id="L280">            .append(&quot; are listed below (&quot;).append(report.promotableCount())</span>
+<span class="fc" id="L281">            .append(&quot; promotable as new macros).\n\n&quot;);</span>
+<span class="fc" id="L282">        out.append(&quot;Ranking factors: brevity, surprise, path length, reusability, difference from source.\n\n&quot;);</span>
+<span class="fc" id="L283">        out.append(&quot;| Rank | Candidate | Family | Source | Simplified | Path | Oracle | Equivalent | Score | Promotable | Why interesting |\n&quot;);</span>
+<span class="fc" id="L284">        out.append(&quot;| ---: | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        for (Candidate candidate : report.topCandidates()) {</span>
+<span class="fc" id="L286">            out.append(&quot;| &quot;).append(candidate.rank())</span>
+<span class="fc" id="L287">                .append(&quot; | &quot;).append(escape(candidate.id()))</span>
+<span class="fc" id="L288">                .append(&quot; | &quot;).append(escape(candidate.family()))</span>
+<span class="fc" id="L289">                .append(&quot; | &quot;).append(escape(candidate.sourceExpression()))</span>
+<span class="fc" id="L290">                .append(&quot; | &quot;).append(escape(candidate.simplifiedExpression()))</span>
+<span class="fc" id="L291">                .append(&quot; | &quot;).append(escape(String.join(&quot; -&gt; &quot;, candidate.path())))</span>
+<span class="fc" id="L292">                .append(&quot; | &quot;).append(escape(candidate.oracleStatus().toLowerCase(Locale.ROOT)))</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(candidate.equivalent() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc" id="L294">                .append(&quot; | &quot;).append(format(candidate.interestingness()))</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">                .append(&quot; | &quot;).append(candidate.promotable() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc" id="L296">                .append(&quot; | &quot;).append(escape(candidate.whyInteresting()))</span>
+<span class="fc" id="L297">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L298">        }</span>
+<span class="fc" id="L299">        out.append(&quot;\n## Oracle / proof evidence\n\n&quot;);</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        for (Candidate candidate : report.topCandidates()) {</span>
+<span class="fc" id="L301">            out.append(&quot;- **&quot;).append(escape(candidate.id())).append(&quot;**: &quot;)</span>
+<span class="fc" id="L302">                .append(escape(candidate.deterministicEvidence()));</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (!candidate.oracleEvidence().isBlank()) {</span>
+<span class="fc" id="L304">                out.append(&quot; — oracle: &quot;).append(escape(candidate.oracleEvidence()));</span>
+            }
+<span class="fc" id="L306">            out.append('\n');</span>
+<span class="fc" id="L307">        }</span>
+<span class="fc" id="L308">        return out.toString();</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    private List&lt;Seed&gt; seeds() {
+<span class="fc" id="L316">        return List.of(</span>
+            new Seed(&quot;complete-square-plus&quot;, &quot;complete-square&quot;, &quot;complete_square&quot;,
+                &quot;U^2 + 2*U + 1&quot;, &quot;(U + 1)^2&quot;),
+            new Seed(&quot;complete-square-minus&quot;, &quot;complete-square&quot;, &quot;complete_square&quot;,
+                &quot;U^2 - 2*U + 1&quot;, &quot;(U - 1)^2&quot;),
+            new Seed(&quot;square-of-sum-two&quot;, &quot;perfect-square&quot;, &quot;perfect_square_trinomial&quot;,
+                &quot;U^2 + 4*U + 4&quot;, &quot;(U + 2)^2&quot;),
+            new Seed(&quot;difference-of-squares&quot;, &quot;difference-of-squares&quot;, &quot;difference_of_squares&quot;,
+                &quot;U^2 - 1&quot;, &quot;(U - 1)*(U + 1)&quot;),
+            new Seed(&quot;binomial-cube-plus&quot;, &quot;binomial-cube&quot;, &quot;binomial_cube&quot;,
+                &quot;U^3 + 3*U^2 + 3*U + 1&quot;, &quot;(U + 1)^3&quot;),
+            new Seed(&quot;binomial-cube-minus&quot;, &quot;binomial-cube&quot;, &quot;binomial_cube&quot;,
+                &quot;U^3 - 3*U^2 + 3*U - 1&quot;, &quot;(U - 1)^3&quot;)
+        );
+    }
+
+    private List&lt;Substitution&gt; substitutions() {
+<span class="fc" id="L333">        return List.of(</span>
+            new Substitution(&quot;x&quot;, &quot;x&quot;, true, true, 0.10),
+            new Substitution(&quot;x-plus-1&quot;, &quot;x + 1&quot;, false, false, 0.30),
+            new Substitution(&quot;x-squared&quot;, &quot;x^2&quot;, false, false, 0.45),
+            new Substitution(&quot;sin-x&quot;, &quot;sin(x)&quot;, true, false, 0.60),
+            new Substitution(&quot;cos-x&quot;, &quot;cos(x)&quot;, true, false, 0.60),
+            new Substitution(&quot;a-plus-b&quot;, &quot;a + b&quot;, false, false, 1.00),
+            new Substitution(&quot;two-x&quot;, &quot;2*x&quot;, false, false, 0.35)
+        );
+    }
+
+    /** A seed identity family parameterised by a single placeholder {@value #PLACEHOLDER}. */
+<span class="fc" id="L345">    public record Seed(String id, String family, String seedFamilyId, String sourceTemplate, String simplifiedTemplate) {</span>
+    }
+
+    /**
+     * A substitution applied to the placeholder.
+     *
+     * @param atomic whether the substitution is a single atom (variable or function call) that does not
+     *               require an explicit expansion step
+     * @param identity whether the substitution leaves the seed on its base variable (a known-rule rediscovery)
+     * @param generality reusability weight in [0,1] reflecting how generic the substitution is
+     */
+<span class="fc" id="L356">    public record Substitution(String id, String expression, boolean atomic, boolean identity, double generality) {</span>
+    }
+
+    /** Per-factor ranking scores, each in [0,1]. */
+<span class="fc" id="L360">    public record Scores(double brevity, double surprise, double pathLength, double reusability,</span>
+                         double differenceFromSource) {
+    }
+
+    /** A mined identity candidate with its evidence and ranking. */
+    public record Candidate(
+        int rank,
+        String id,
+        String family,
+        String seedFamilyId,
+        String substitution,
+        String sourceExpression,
+        String simplifiedExpression,
+        List&lt;String&gt; path,
+        boolean equivalent,
+        String deterministicEvidence,
+        String oracleStatus,
+        String oracleEvidence,
+        Scores scores,
+        double interestingness,
+        boolean promotable,
+        String whyInteresting
+    ) {
+<span class="fc" id="L383">        public Candidate {</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            id = id == null ? &quot;&quot; : id;</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            family = family == null ? &quot;&quot; : family;</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            seedFamilyId = seedFamilyId == null ? &quot;&quot; : seedFamilyId;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">            substitution = substitution == null ? &quot;&quot; : substitution;</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            sourceExpression = sourceExpression == null ? &quot;&quot; : sourceExpression;</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            simplifiedExpression = simplifiedExpression == null ? &quot;&quot; : simplifiedExpression;</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">            path = path == null ? List.of() : List.copyOf(path);</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">            deterministicEvidence = deterministicEvidence == null ? &quot;&quot; : deterministicEvidence;</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">            oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">            scores = scores == null ? new Scores(0.0, 0.0, 0.0, 0.0, 0.0) : scores;</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            whyInteresting = whyInteresting == null ? &quot;&quot; : whyInteresting;</span>
+<span class="fc" id="L396">        }</span>
+
+        Candidate withRank(int newRank) {
+<span class="fc" id="L399">            return new Candidate(newRank, id, family, seedFamilyId, substitution, sourceExpression,</span>
+                simplifiedExpression, path, equivalent, deterministicEvidence, oracleStatus, oracleEvidence,
+                scores, interestingness, promotable, whyInteresting);
+        }
+    }
+
+    /** Top-ranked report for Discovery Campaign 6. */
+    public record CampaignReport(String campaignId, List&lt;Candidate&gt; topCandidates, int generatedCount,
+                                int promotableCount) {
+<span class="fc" id="L408">        public CampaignReport {</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            topCandidates = topCandidates == null ? List.of() : List.copyOf(topCandidates);</span>
+<span class="fc" id="L410">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -352,8 +352,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L352">        String profileName = stringValue(body, &quot;profile&quot;, SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);</span>
 <span class="fc" id="L353">        String goalName = stringValue(body, &quot;goal&quot;, &quot;&quot;).toUpperCase(Locale.ROOT);</span>
 <span class="fc bfc" id="L354" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="fc" id="L355">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
-<span class="fc" id="L356">            return;</span>
+<span class="nc" id="L355">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
+<span class="nc" id="L356">            return;</span>
         }
         InputType type;
         SearchProfile profile;
@@ -2310,8 +2310,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2311">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2312" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="fc" id="L2313">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="fc" id="L2314">            return;</span>
+<span class="nc" id="L2313">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="nc" id="L2314">            return;</span>
         }
 <span class="fc" id="L2316">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
 <span class="fc" id="L2317">        Object raw = body.get(&quot;assumptions&quot;);</span>
