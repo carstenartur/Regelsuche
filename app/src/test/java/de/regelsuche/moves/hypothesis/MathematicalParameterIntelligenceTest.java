@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.moves.RewriteMoveKind;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class MathematicalParameterIntelligenceTest {
@@ -132,5 +134,14 @@ class MathematicalParameterIntelligenceTest {
     void noHypothesesProducedWhenMoveKindsDisallowed() {
         var context = ParameterContext.of("x^2 + 6*x + 5", null, 32, java.util.Set.of(RewriteMoveKind.NORMALIZE));
         assertTrue(intelligence.analyse(context).hypotheses().isEmpty());
+    }
+
+    @Test
+    void skeletonPlaceholdersDoNotCollideWithExistingAtoms() {
+        var context = ParameterContext.of("A^2 + 6*A + 5");
+        Set<String> atomCanonicals = context.skeletons().stream()
+                .map(TermSkeleton::atomCanonical)
+                .collect(Collectors.toSet());
+        assertTrue(context.skeletons().stream().noneMatch(s -> atomCanonicals.contains(s.placeholder())));
     }
 }

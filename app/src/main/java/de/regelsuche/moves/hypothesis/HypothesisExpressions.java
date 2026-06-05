@@ -105,23 +105,23 @@ final class HypothesisExpressions {
     }
 
     /**
-     * Replaces every occurrence of the atom (matched by its canonical form) with
-     * a {@link VariableExpr} placeholder, leaving the rest of the tree intact.
+     * Replaces every structural occurrence of {@code atom} with a
+     * {@link VariableExpr} placeholder, leaving the rest of the tree intact.
      */
-    static Expr replaceAtom(Expr node, String atomCanonical, String placeholder) {
-        if (format(node).equals(atomCanonical)) {
+    static Expr replaceAtom(Expr node, Expr atom, String placeholder) {
+        if (node.equals(atom)) {
             return new VariableExpr(placeholder);
         }
         if (node instanceof BinaryExpr binary) {
             return new BinaryExpr(
-                    replaceAtom(binary.left(), atomCanonical, placeholder),
+                    replaceAtom(binary.left(), atom, placeholder),
                     binary.operator(),
-                    replaceAtom(binary.right(), atomCanonical, placeholder));
+                    replaceAtom(binary.right(), atom, placeholder));
         }
         if (node instanceof FunctionExpr function) {
             List<Expr> arguments = new ArrayList<>(function.arguments().size());
             for (Expr argument : function.arguments()) {
-                arguments.add(replaceAtom(argument, atomCanonical, placeholder));
+                arguments.add(replaceAtom(argument, atom, placeholder));
             }
             return new FunctionExpr(function.name(), arguments);
         }

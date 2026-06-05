@@ -148,6 +148,9 @@ public final class ParameterContext {
                 continue;
             }
             String placeholder = placeholderName(placeholderIndex++);
+            while (atoms.contains(placeholder)) {
+                placeholder = placeholderName(placeholderIndex++);
+            }
             skeletons.add(TermSkeleton.forAtom(inputAst, atom.get(), placeholder));
         }
         return List.copyOf(skeletons);
@@ -163,7 +166,7 @@ public final class ParameterContext {
     }
 
     private static String placeholderName(int index) {
-        // A, B, ... Z, then A1, B1, ... to stay collision-free for wide inputs.
+        // A, B, ... Z, then A1, B1, ...; caller skips names already present in atoms.
         char letter = (char) ('A' + (index % 26));
         int suffix = index / 26;
         return suffix == 0 ? Character.toString(letter) : letter + Integer.toString(suffix);

@@ -31,7 +31,7 @@ public record TermSkeleton(String placeholder, String atomCanonical, String atom
     /** Builds a skeleton by replacing all occurrences of {@code atom} in {@code root}. */
     public static TermSkeleton forAtom(Expr root, Expr atom, String placeholder) {
         String atomCanonical = HypothesisExpressions.format(atom);
-        Expr skeleton = HypothesisExpressions.replaceAtom(root, atomCanonical, placeholder);
+        Expr skeleton = HypothesisExpressions.replaceAtom(root, atom, placeholder);
         return new TermSkeleton(placeholder, atomCanonical, atomCanonical, skeleton);
     }
 
