@@ -39,12 +39,16 @@ class DiscoveryPromotionPipelineRunnerTest {
         assertTrue(Files.exists(tempDir.resolve("promotion-dashboard.md")));
         assertTrue(Files.exists(tempDir.resolve("gallery-2.0.md")));
         assertTrue(Files.exists(tempDir.resolve("discovery-details").resolve("README.md")));
+        assertTrue(Files.exists(tempDir.resolve("discovery-campaign-5").resolve("discovery-campaign-5.json")));
+        assertTrue(Files.exists(tempDir.resolve("discovery-campaign-5").resolve("hidden-structure-report.md")));
         assertTrue(Files.exists(tempDir.resolve("discovery-campaign-4").resolve("discovery-campaign-4.json")));
         assertTrue(Files.exists(tempDir.resolve("discovery-campaign-4").resolve("macro-reuse-report.md")));
 
         assertTrue(report.promotionRecords().stream()
             .anyMatch(record -> record.stage() == PromotionStage.REUSED));
         assertTrue(report.campaignFour().improvedCandidates() > 0);
+        assertTrue(report.promotionRecords().stream()
+            .anyMatch(record -> "discovery-campaign-5".equals(record.sourceCampaign())));
 
         Set<String> candidateIds = report.registry().records().stream()
             .map(PromotionRecord::candidateId)

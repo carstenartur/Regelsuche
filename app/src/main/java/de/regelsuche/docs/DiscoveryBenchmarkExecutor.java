@@ -24,6 +24,7 @@ import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.SubstitutionRewriteState;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.SymPyDiscoveryOracleAdapter;
@@ -69,6 +70,7 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     public DiscoveryBenchmarkEvidence execute(DiscoveryBenchmarkScenario scenario) {
+        SubstitutionRewriteState.clear();
         List<ScenarioRulePack> packs = loader.loadRulePacks(scenario);
         Map<String, ScenarioRule> rulesById = packs.stream()
                 .flatMap(pack -> pack.rules().stream())
