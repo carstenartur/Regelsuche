@@ -63,6 +63,7 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
     ) {
         String input = normalize(inputExpression);
         String target = normalize(targetExpression);
+        MetricsAccumulator metrics = new MetricsAccumulator();
         if (input.isBlank() || target.isBlank()) {
             return failure(
                 input,
@@ -70,9 +71,8 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
                 List.of(input),
                 List.of(),
                 List.of(),
-                0,
-                0,
-                FailureReason.INVALID_INPUT
+                FailureReason.INVALID_INPUT,
+                metrics
             );
         }
 
@@ -83,30 +83,39 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         SearchNode root = new SearchNode(input, canonical(input), List.of(input), List.of(), List.of(), 0);
         LinkedHashSet<String> uniqueCanonicals = new LinkedHashSet<>();
         uniqueCanonicals.add(root.canonicalExpression());
+        metrics.recordUniqueState();
         if (root.canonicalExpression().equals(canonicalTarget)) {
-            return success(input, target, root.pathExpressions(), root.appliedMoves(), root.appliedRuleIds(), 1, 1);
+            metrics.recordExploredState();
+            return success(
+                input,
+                target,
+                root.pathExpressions(),
+                root.appliedMoves(),
+                root.appliedRuleIds(),
+                metrics
+            );
         }
 
         ArrayDeque<SearchNode> frontier = new ArrayDeque<>();
         frontier.add(root);
-        int exploredStateCount = 0;
 
         while (!frontier.isEmpty()) {
-            if (exploredStateCount >= stateBudget) {
+            if (metrics.exploredStateCount() >= stateBudget) {
+                metrics.recordStateBudgetPruned(frontier.size());
                 return failure(
                     input,
                     target,
                     List.of(input),
                     List.of(),
                     List.of(),
-                    exploredStateCount,
-                    uniqueCanonicals.size(),
-                    FailureReason.MAX_STATES_REACHED
+                    FailureReason.MAX_STATES_REACHED,
+                    metrics
                 );
             }
             SearchNode current = frontier.removeFirst();
-            exploredStateCount++;
+            metrics.recordExploredState();
             if (current.depth() >= depthLimit) {
+                metrics.recordDepthPruned();
                 continue;
             }
 
@@ -115,17 +124,21 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
                 .thenComparing(Transformation::transformedExpression)
                 .thenComparing(Transformation::applicationKey));
 
+            metrics.beginNodeExpansion(current.depth());
             for (Transformation transformation : transformations) {
                 String nextExpression = normalize(transformation.transformedExpression());
                 if (nextExpression.equals(current.expression())) {
                     continue;
                 }
                 String nextCanonical = canonical(nextExpression);
+                RewriteMove move = rewriteMoveFor(current.expression(), transformation);
+                metrics.recordGeneratedMove(current.depth(), move);
                 if (!uniqueCanonicals.add(nextCanonical)) {
+                    metrics.recordDuplicateState();
                     continue;
                 }
+                metrics.recordUniqueState();
 
-                RewriteMove move = rewriteMoveFor(current.expression(), transformation);
                 SearchNode next = current.advance(nextExpression, nextCanonical, move, transformation.rule());
                 if (nextCanonical.equals(canonicalTarget)) {
                     return success(
@@ -134,8 +147,7 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
                         next.pathExpressions(),
                         next.appliedMoves(),
                         next.appliedRuleIds(),
-                        exploredStateCount,
-                        uniqueCanonicals.size()
+                        metrics
                     );
                 }
                 frontier.addLast(next);
@@ -148,9 +160,8 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
             List.of(input),
             List.of(),
             List.of(),
-            exploredStateCount,
-            uniqueCanonicals.size(),
-            FailureReason.TARGET_NOT_REACHED
+            FailureReason.TARGET_NOT_REACHED,
+            metrics
         );
     }
 
@@ -240,9 +251,9 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         List<String> pathExpressions,
         List<RewriteMove> appliedMoves,
         List<String> appliedRuleIds,
-        int explored,
-        int uniqueCanonicalStateCount
+        MetricsAccumulator metrics
     ) {
+        SearchSpaceMetrics searchSpaceMetrics = metrics.build(appliedMoves);
         return new CountableMoveSearchResult(
             true,
             input,
@@ -250,9 +261,10 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
             pathExpressions,
             appliedMoves,
             appliedRuleIds,
-            explored,
-            uniqueCanonicalStateCount,
-            FailureReason.NONE
+            searchSpaceMetrics.exploredStateCount(),
+            searchSpaceMetrics.uniqueCanonicalStateCount(),
+            FailureReason.NONE,
+            searchSpaceMetrics
         );
     }
 
@@ -262,10 +274,10 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         List<String> pathExpressions,
         List<RewriteMove> appliedMoves,
         List<String> appliedRuleIds,
-        int explored,
-        int uniqueCanonicalStateCount,
-        FailureReason reason
+        FailureReason reason,
+        MetricsAccumulator metrics
     ) {
+        SearchSpaceMetrics searchSpaceMetrics = metrics.build(appliedMoves);
         return new CountableMoveSearchResult(
             false,
             input,
@@ -273,9 +285,10 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
             pathExpressions,
             appliedMoves,
             appliedRuleIds,
-            explored,
-            uniqueCanonicalStateCount,
-            reason
+            searchSpaceMetrics.exploredStateCount(),
+            searchSpaceMetrics.uniqueCanonicalStateCount(),
+            reason,
+            searchSpaceMetrics
         );
     }
 
@@ -348,7 +361,8 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         List<String> appliedRuleIds,
         int exploredStateCount,
         int uniqueCanonicalStateCount,
-        FailureReason failureReason
+        FailureReason failureReason,
+        SearchSpaceMetrics searchSpaceMetrics
     ) {
         public CountableMoveSearchResult {
             inputExpression = inputExpression == null ? "" : inputExpression;
@@ -357,10 +371,150 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
             appliedMoves = appliedMoves == null ? List.of() : List.copyOf(appliedMoves);
             appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);
             failureReason = failureReason == null ? FailureReason.NONE : failureReason;
+            searchSpaceMetrics = searchSpaceMetrics == null ? SearchSpaceMetrics.empty() : searchSpaceMetrics;
         }
 
         public int pathLength() {
             return Math.max(0, pathExpressions.size() - 1);
+        }
+    }
+
+    /** Per-depth branching factor: how many moves a node at this depth produced on average. */
+    public record DepthBranchingFactor(int depth, int expandedNodeCount, int generatedMoveCount, double branchingFactor) {
+    }
+
+    /**
+     * Search Space Intelligence metrics for a single bounded search run. Captures how the search
+     * space grew and which move kinds/enumerators were useful (Issue #103).
+     */
+    public record SearchSpaceMetrics(
+        int exploredStateCount,
+        int uniqueCanonicalStateCount,
+        int generatedMoveCount,
+        int duplicateStateCount,
+        int prunedByDepthCount,
+        int prunedByStateBudgetCount,
+        List<DepthBranchingFactor> branchingFactorByDepth,
+        Map<String, Integer> moveKindHistogram,
+        Map<String, Integer> enumeratorHistogram,
+        List<String> successfulPathMoveKinds,
+        int classicFallbackMoveCount,
+        int unknownMoveCount,
+        int unresolvedParameterMoveCount
+    ) {
+        public SearchSpaceMetrics {
+            branchingFactorByDepth = branchingFactorByDepth == null ? List.of() : List.copyOf(branchingFactorByDepth);
+            moveKindHistogram = moveKindHistogram == null ? Map.of() : Map.copyOf(moveKindHistogram);
+            enumeratorHistogram = enumeratorHistogram == null ? Map.of() : Map.copyOf(enumeratorHistogram);
+            successfulPathMoveKinds = successfulPathMoveKinds == null ? List.of() : List.copyOf(successfulPathMoveKinds);
+        }
+
+        public static SearchSpaceMetrics empty() {
+            return new SearchSpaceMetrics(0, 0, 0, 0, 0, 0, List.of(), Map.of(), Map.of(), List.of(), 0, 0, 0);
+        }
+    }
+
+    /** Tag identifying moves produced by the classic fallback derivation. */
+    static final String CLASSIC_FALLBACK_TAG = "classic-fallback";
+    /** Tag identifying moves produced from move-enumerator metadata. */
+    static final String MOVE_METADATA_TAG = "move-metadata";
+
+    /** Mutable, deterministic accumulator for {@link SearchSpaceMetrics}. */
+    private static final class MetricsAccumulator {
+        private int exploredStateCount;
+        private int uniqueCanonicalStateCount;
+        private int generatedMoveCount;
+        private int duplicateStateCount;
+        private int prunedByDepthCount;
+        private int prunedByStateBudgetCount;
+        private int classicFallbackMoveCount;
+        private int unknownMoveCount;
+        private int unresolvedParameterMoveCount;
+        private final java.util.TreeMap<Integer, int[]> branchingByDepth = new java.util.TreeMap<>();
+        private final java.util.TreeMap<String, Integer> moveKindHistogram = new java.util.TreeMap<>();
+        private final java.util.TreeMap<String, Integer> enumeratorHistogram = new java.util.TreeMap<>();
+
+        int exploredStateCount() {
+            return exploredStateCount;
+        }
+
+        void recordExploredState() {
+            exploredStateCount++;
+        }
+
+        void recordUniqueState() {
+            uniqueCanonicalStateCount++;
+        }
+
+        void recordDuplicateState() {
+            duplicateStateCount++;
+        }
+
+        void recordDepthPruned() {
+            prunedByDepthCount++;
+        }
+
+        void recordStateBudgetPruned(int remainingFrontier) {
+            prunedByStateBudgetCount += Math.max(0, remainingFrontier);
+        }
+
+        void beginNodeExpansion(int depth) {
+            branchingByDepth.computeIfAbsent(depth, key -> new int[2])[0]++;
+        }
+
+        void recordGeneratedMove(int depth, RewriteMove move) {
+            generatedMoveCount++;
+            branchingByDepth.computeIfAbsent(depth, key -> new int[2])[1]++;
+            String kind = move.kind() == null ? RewriteMoveKind.UNKNOWN.name() : move.kind().name();
+            moveKindHistogram.merge(kind, 1, Integer::sum);
+            enumeratorHistogram.merge(enumeratorOf(move), 1, Integer::sum);
+            if (move.kind() == RewriteMoveKind.UNKNOWN) {
+                unknownMoveCount++;
+            }
+            if (move.hasUnresolvedParameters()) {
+                unresolvedParameterMoveCount++;
+            }
+            if (move.tags().contains(CLASSIC_FALLBACK_TAG)) {
+                classicFallbackMoveCount++;
+            }
+        }
+
+        private String enumeratorOf(RewriteMove move) {
+            if (move.tags().contains(CLASSIC_FALLBACK_TAG)) {
+                return CLASSIC_FALLBACK_TAG;
+            }
+            if (move.tags().contains(MOVE_METADATA_TAG)) {
+                return MOVE_METADATA_TAG;
+            }
+            return "unclassified";
+        }
+
+        SearchSpaceMetrics build(List<RewriteMove> successfulPathMoves) {
+            List<DepthBranchingFactor> branching = new ArrayList<>();
+            for (Map.Entry<Integer, int[]> entry : branchingByDepth.entrySet()) {
+                int expandedNodes = entry.getValue()[0];
+                int generated = entry.getValue()[1];
+                double factor = expandedNodes == 0 ? 0.0 : (double) generated / expandedNodes;
+                branching.add(new DepthBranchingFactor(entry.getKey(), expandedNodes, generated, factor));
+            }
+            List<String> successfulKinds = successfulPathMoves == null ? List.of() : successfulPathMoves.stream()
+                .map(move -> move.kind() == null ? RewriteMoveKind.UNKNOWN.name() : move.kind().name())
+                .toList();
+            return new SearchSpaceMetrics(
+                exploredStateCount,
+                uniqueCanonicalStateCount,
+                generatedMoveCount,
+                duplicateStateCount,
+                prunedByDepthCount,
+                prunedByStateBudgetCount,
+                List.copyOf(branching),
+                new java.util.LinkedHashMap<>(moveKindHistogram),
+                new java.util.LinkedHashMap<>(enumeratorHistogram),
+                successfulKinds,
+                classicFallbackMoveCount,
+                unknownMoveCount,
+                unresolvedParameterMoveCount
+            );
         }
     }
 }

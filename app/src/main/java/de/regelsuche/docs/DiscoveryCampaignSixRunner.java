@@ -29,6 +29,9 @@ public final class DiscoveryCampaignSixRunner {
     private final CountableMoveSearchEngine moveSearchEngine = new CountableMoveSearchEngine();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
 
+    /** Explored-state count at or below which a successful search space counts as "ausreichend klein". */
+    private static final int SMALL_SEARCH_SPACE_THRESHOLD = 64;
+
     public static void main(String[] args) {
         Path repoRoot = args.length == 0
             ? Path.of(".").toAbsolutePath().normalize()
@@ -39,7 +42,13 @@ public final class DiscoveryCampaignSixRunner {
 
     public CampaignReport run() {
         List<CaseResult> results = cases().stream().map(this::evaluate).toList();
-        return new CampaignReport("discovery-campaign-6", results, relatedFollowUpIssues(), builtInArchitectureNote());
+        return new CampaignReport(
+            "discovery-campaign-6",
+            results,
+            summarize(results),
+            relatedFollowUpIssues(),
+            builtInArchitectureNote()
+        );
     }
 
     public CampaignReport writeReport(Path outputDirectory) {
@@ -86,6 +95,7 @@ public final class DiscoveryCampaignSixRunner {
         List<PathStep> pathSteps = toPathSteps(searchResult);
         String architectureNote = architectureNote(probeCase, expectedMovePresent, searchResult);
         Interpretation interpretation = interpretation(probeCase, comparison, searchResult, architectureNote);
+        String searchSpaceAssessment = assessSearchSpace(searchResult, architectureNote);
 
         return new CaseResult(
             probeCase.id(),
@@ -113,9 +123,97 @@ public final class DiscoveryCampaignSixRunner {
                 searchResult.failureReason().name(),
                 pathSteps
             ),
+            searchResult.searchSpaceMetrics(),
+            searchSpaceAssessment,
             interpretation,
             comparison,
             architectureNote
+        );
+    }
+
+    /**
+     * Classifies the search space of a single case into one of the actionable verdicts requested
+     * by Issue #103: sufficiently small, needs stronger heuristic, normalizer, parameter limiting,
+     * or a new realizer.
+     */
+    private String assessSearchSpace(CountableMoveSearchResult searchResult, String architectureNote) {
+        CountableMoveSearchEngine.SearchSpaceMetrics metrics = searchResult.searchSpaceMetrics();
+        if (searchResult.success()
+            && metrics.prunedByStateBudgetCount() == 0
+            && metrics.exploredStateCount() <= SMALL_SEARCH_SPACE_THRESHOLD) {
+            return "ausreichend klein";
+        }
+        if (searchResult.failureReason() == CountableMoveSearchEngine.FailureReason.MAX_STATES_REACHED
+            || metrics.prunedByStateBudgetCount() > 0) {
+            return "braucht stärkere Heuristik";
+        }
+        if ("Missing normalizer".equals(architectureNote)) {
+            return "braucht Normalizer";
+        }
+        if ("Missing realizer".equals(architectureNote) || "Missing parameter enumerator".equals(architectureNote)) {
+            return "braucht neuen Realizer";
+        }
+        if (metrics.unresolvedParameterMoveCount() > 0) {
+            return "braucht Parameterbegrenzung";
+        }
+        if (!searchResult.success()) {
+            return "braucht stärkere Heuristik";
+        }
+        return "braucht stärkere Heuristik";
+    }
+
+    private SearchSpaceSummary summarize(List<CaseResult> results) {
+        int successful = 0;
+        int totalExplored = 0;
+        int totalUnique = 0;
+        int totalGenerated = 0;
+        int totalDuplicates = 0;
+        int totalPrunedByDepth = 0;
+        int totalPrunedByBudget = 0;
+        int classicFallback = 0;
+        int unknown = 0;
+        int unresolved = 0;
+        double maxBranching = 0.0;
+        Map<String, Integer> moveKinds = new java.util.TreeMap<>();
+        Map<String, Integer> enumerators = new java.util.TreeMap<>();
+        Map<String, Integer> assessments = new java.util.TreeMap<>();
+        for (CaseResult result : results) {
+            CountableMoveSearchEngine.SearchSpaceMetrics metrics = result.searchSpace();
+            if (result.multiStepSearch().success()) {
+                successful++;
+            }
+            totalExplored += metrics.exploredStateCount();
+            totalUnique += metrics.uniqueCanonicalStateCount();
+            totalGenerated += metrics.generatedMoveCount();
+            totalDuplicates += metrics.duplicateStateCount();
+            totalPrunedByDepth += metrics.prunedByDepthCount();
+            totalPrunedByBudget += metrics.prunedByStateBudgetCount();
+            classicFallback += metrics.classicFallbackMoveCount();
+            unknown += metrics.unknownMoveCount();
+            unresolved += metrics.unresolvedParameterMoveCount();
+            for (var branching : metrics.branchingFactorByDepth()) {
+                maxBranching = Math.max(maxBranching, branching.branchingFactor());
+            }
+            metrics.moveKindHistogram().forEach((key, value) -> moveKinds.merge(key, value, Integer::sum));
+            metrics.enumeratorHistogram().forEach((key, value) -> enumerators.merge(key, value, Integer::sum));
+            assessments.merge(result.searchSpaceAssessment(), 1, Integer::sum);
+        }
+        return new SearchSpaceSummary(
+            results.size(),
+            successful,
+            totalExplored,
+            totalUnique,
+            totalGenerated,
+            totalDuplicates,
+            totalPrunedByDepth,
+            totalPrunedByBudget,
+            maxBranching,
+            new LinkedHashMap<>(moveKinds),
+            new LinkedHashMap<>(enumerators),
+            new LinkedHashMap<>(assessments),
+            classicFallback,
+            unknown,
+            unresolved
         );
     }
 
@@ -268,6 +366,8 @@ public final class DiscoveryCampaignSixRunner {
             out.append("- unique canonical states: ").append(result.multiStepSearch().uniqueCanonicalStateCount()).append("\n");
             out.append("- failure reason: ").append(result.multiStepSearch().failureReason()).append("\n\n");
 
+            appendSearchSpaceTable(out, result.searchSpace(), result.searchSpaceAssessment());
+
             out.append("### Successful path\n\n");
             if (result.multiStepSearch().pathSteps().isEmpty()) {
                 out.append("_Kein erfolgreicher Pfad._\n\n");
@@ -299,12 +399,91 @@ public final class DiscoveryCampaignSixRunner {
             out.append("- ").append(result.architectureNote()).append("\n\n");
         }
 
+        appendSearchSpaceSummary(out, report.searchSpaceSummary());
+
         out.append("## Related follow-up issues\n\n");
         for (String issue : report.relatedFollowUpIssues()) {
             out.append("- ").append(issue).append("\n");
         }
         out.append('\n');
         return out.toString();
+    }
+
+    private void appendSearchSpaceTable(
+        StringBuilder out,
+        CountableMoveSearchEngine.SearchSpaceMetrics metrics,
+        String assessment
+    ) {
+        out.append("### Search Space Intelligence\n\n");
+        out.append("| metric | value |\n");
+        out.append("| --- | --- |\n");
+        out.append("| exploredStateCount | ").append(metrics.exploredStateCount()).append(" |\n");
+        out.append("| uniqueCanonicalStateCount | ").append(metrics.uniqueCanonicalStateCount()).append(" |\n");
+        out.append("| generatedMoveCount | ").append(metrics.generatedMoveCount()).append(" |\n");
+        out.append("| duplicateStateCount | ").append(metrics.duplicateStateCount()).append(" |\n");
+        out.append("| prunedByDepthCount | ").append(metrics.prunedByDepthCount()).append(" |\n");
+        out.append("| prunedByStateBudgetCount | ").append(metrics.prunedByStateBudgetCount()).append(" |\n");
+        out.append("| classicFallbackMoveCount | ").append(metrics.classicFallbackMoveCount()).append(" |\n");
+        out.append("| unknownMoveCount | ").append(metrics.unknownMoveCount()).append(" |\n");
+        out.append("| unresolvedParameterMoveCount | ").append(metrics.unresolvedParameterMoveCount()).append(" |\n\n");
+
+        out.append("- branchingFactor pro Tiefe: ").append(renderBranchingFactor(metrics.branchingFactorByDepth())).append("\n");
+        out.append("- MoveKind-Histogramm: ").append(renderHistogram(metrics.moveKindHistogram())).append("\n");
+        out.append("- Enumerator-Histogramm: ").append(renderHistogram(metrics.enumeratorHistogram())).append("\n");
+        out.append("- successfulPathMoveKinds: ")
+            .append(metrics.successfulPathMoveKinds().isEmpty()
+                ? "—" : escape(String.join(" -> ", metrics.successfulPathMoveKinds())))
+            .append("\n");
+        out.append("- Bewertung: ").append(escape(assessment)).append("\n\n");
+    }
+
+    private void appendSearchSpaceSummary(StringBuilder out, SearchSpaceSummary summary) {
+        out.append("## Search Space Intelligence Summary\n\n");
+        out.append("| metric | value |\n");
+        out.append("| --- | --- |\n");
+        out.append("| caseCount | ").append(summary.caseCount()).append(" |\n");
+        out.append("| successfulCaseCount | ").append(summary.successfulCaseCount()).append(" |\n");
+        out.append("| totalExploredStates | ").append(summary.totalExploredStates()).append(" |\n");
+        out.append("| totalUniqueCanonicalStates | ").append(summary.totalUniqueCanonicalStates()).append(" |\n");
+        out.append("| totalGeneratedMoves | ").append(summary.totalGeneratedMoves()).append(" |\n");
+        out.append("| totalDuplicateStates | ").append(summary.totalDuplicateStates()).append(" |\n");
+        out.append("| totalPrunedByDepth | ").append(summary.totalPrunedByDepth()).append(" |\n");
+        out.append("| totalPrunedByStateBudget | ").append(summary.totalPrunedByStateBudget()).append(" |\n");
+        out.append("| maxBranchingFactor | ").append(formatFactor(summary.maxBranchingFactor())).append(" |\n");
+        out.append("| classicFallbackMoveCount | ").append(summary.classicFallbackMoveCount()).append(" |\n");
+        out.append("| unknownMoveCount | ").append(summary.unknownMoveCount()).append(" |\n");
+        out.append("| unresolvedParameterMoveCount | ").append(summary.unresolvedParameterMoveCount()).append(" |\n\n");
+
+        out.append("- MoveKind-Histogramm (gesamt): ").append(renderHistogram(summary.aggregatedMoveKindHistogram())).append("\n");
+        out.append("- Enumerator-Histogramm (gesamt): ").append(renderHistogram(summary.aggregatedEnumeratorHistogram())).append("\n");
+        out.append("- Bewertungen: ").append(renderHistogram(summary.assessmentHistogram())).append("\n\n");
+    }
+
+    private String renderBranchingFactor(List<CountableMoveSearchEngine.DepthBranchingFactor> branching) {
+        if (branching.isEmpty()) {
+            return "—";
+        }
+        List<String> parts = new ArrayList<>();
+        for (CountableMoveSearchEngine.DepthBranchingFactor entry : branching) {
+            parts.add("d" + entry.depth() + "=" + formatFactor(entry.branchingFactor())
+                + " (" + entry.generatedMoveCount() + "/" + entry.expandedNodeCount() + ")");
+        }
+        return escape(String.join(", ", parts));
+    }
+
+    private String renderHistogram(Map<String, Integer> histogram) {
+        if (histogram.isEmpty()) {
+            return "—";
+        }
+        List<String> parts = new ArrayList<>();
+        histogram.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> parts.add(entry.getKey() + "=" + entry.getValue()));
+        return escape(String.join(", ", parts));
+    }
+
+    private String formatFactor(double value) {
+        return String.format(java.util.Locale.ROOT, "%.2f", value);
     }
 
     private void appendClassicVsMoveSummary(StringBuilder out, Depth1CandidateProbe probe) {
@@ -435,15 +614,50 @@ public final class DiscoveryCampaignSixRunner {
         String expectation,
         Depth1CandidateProbe depth1CandidateProbe,
         MultiStepCountableMoveSearch multiStepSearch,
+        CountableMoveSearchEngine.SearchSpaceMetrics searchSpace,
+        String searchSpaceAssessment,
         Interpretation interpretation,
         MoveCandidateTransformationEngine.ComparisonReport comparison,
         String architectureNote
     ) {
+        public CaseResult {
+            searchSpace = searchSpace == null
+                ? CountableMoveSearchEngine.SearchSpaceMetrics.empty()
+                : searchSpace;
+            searchSpaceAssessment = searchSpaceAssessment == null ? "" : searchSpaceAssessment;
+        }
+    }
+
+    public record SearchSpaceSummary(
+        int caseCount,
+        int successfulCaseCount,
+        int totalExploredStates,
+        int totalUniqueCanonicalStates,
+        int totalGeneratedMoves,
+        int totalDuplicateStates,
+        int totalPrunedByDepth,
+        int totalPrunedByStateBudget,
+        double maxBranchingFactor,
+        Map<String, Integer> aggregatedMoveKindHistogram,
+        Map<String, Integer> aggregatedEnumeratorHistogram,
+        Map<String, Integer> assessmentHistogram,
+        int classicFallbackMoveCount,
+        int unknownMoveCount,
+        int unresolvedParameterMoveCount
+    ) {
+        public SearchSpaceSummary {
+            aggregatedMoveKindHistogram = aggregatedMoveKindHistogram == null
+                ? Map.of() : Map.copyOf(aggregatedMoveKindHistogram);
+            aggregatedEnumeratorHistogram = aggregatedEnumeratorHistogram == null
+                ? Map.of() : Map.copyOf(aggregatedEnumeratorHistogram);
+            assessmentHistogram = assessmentHistogram == null ? Map.of() : Map.copyOf(assessmentHistogram);
+        }
     }
 
     public record CampaignReport(
         String campaignId,
         List<CaseResult> cases,
+        SearchSpaceSummary searchSpaceSummary,
         List<String> relatedFollowUpIssues,
         String builtInArchitectureNote
     ) {
