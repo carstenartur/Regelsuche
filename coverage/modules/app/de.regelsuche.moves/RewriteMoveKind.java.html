@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RewriteMoveKind.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves</a> &gt; <span class="el_source">RewriteMoveKind.java</span></div><h1>RewriteMoveKind.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves;
+
+/**
+ * Enumerates the kinds of rewrite moves that the discovery search can apply.
+ *
+ * &lt;p&gt;The declaration order is significant: it defines the deterministic
+ * {@code ruleOrdinal} used by {@link MoveOrdinal}. New kinds must be appended
+ * (never inserted in the middle) so that previously computed ordinals stay
+ * reproducible across runs.&lt;/p&gt;
+ */
+<span class="fc" id="L11">public enum RewriteMoveKind {</span>
+<span class="fc" id="L12">    NORMALIZE,</span>
+<span class="fc" id="L13">    EXPAND,</span>
+<span class="fc" id="L14">    FACTOR,</span>
+<span class="fc" id="L15">    SUBSTITUTE_INTRODUCE,</span>
+<span class="fc" id="L16">    SUBSTITUTE_EXPAND,</span>
+<span class="fc" id="L17">    COMPLETE_SQUARE,</span>
+<span class="fc" id="L18">    DIFFERENCE_OF_SQUARES,</span>
+<span class="fc" id="L19">    SOPHIE_GERMAIN,</span>
+<span class="fc" id="L20">    COMMON_SUBEXPRESSION,</span>
+<span class="fc" id="L21">    ADD_SAME_TERM_BOTH_SIDES,</span>
+<span class="fc" id="L22">    MULTIPLY_SAME_TERM_BOTH_SIDES,</span>
+<span class="fc" id="L23">    LEARNED_MACRO,</span>
+<span class="fc" id="L24">    CURATED_MACRO,</span>
+<span class="fc" id="L25">    IMPORTED_RULE,</span>
+<span class="fc" id="L26">    UNKNOWN;</span>
+
+    /**
+     * @return the deterministic, stable ordinal used to order moves of this
+     *     kind. Backed by the declaration order so it is reproducible.
+     */
+    public int registryOrdinal() {
+<span class="fc" id="L33">        return ordinal();</span>
+    }
+
+    /** @return whether this move kind represents an expandable macro. */
+    public boolean isMacro() {
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">        return this == LEARNED_MACRO || this == CURATED_MACRO;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

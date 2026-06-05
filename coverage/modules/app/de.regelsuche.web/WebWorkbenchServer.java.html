@@ -1629,8 +1629,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1629">            default          -&gt; null;</span>
         };
 <span class="fc bfc" id="L1631" title="All 2 branches covered.">        if (body == null) {</span>
-<span class="fc" id="L1632">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
-<span class="fc" id="L1633">            return;</span>
+<span class="nc" id="L1632">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
+<span class="nc" id="L1633">            return;</span>
         }
 <span class="fc" id="L1635">        send(exchange, 200, &quot;text/markdown; charset=utf-8&quot;, body);</span>
 <span class="fc" id="L1636">    }</span>
@@ -2282,8 +2282,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2283">            return;</span>
         }
-<span class="fc" id="L2285">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="fc" id="L2286">    }</span>
+<span class="nc" id="L2285">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="nc" id="L2286">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2289">        var jobs = proofWorkbenchService.listJobs();</span>
@@ -2310,8 +2310,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2311">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2312" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="nc" id="L2313">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="nc" id="L2314">            return;</span>
+<span class="fc" id="L2313">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="fc" id="L2314">            return;</span>
         }
 <span class="fc" id="L2316">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
 <span class="fc" id="L2317">        Object raw = body.get(&quot;assumptions&quot;);</span>

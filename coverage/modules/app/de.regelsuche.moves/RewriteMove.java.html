@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RewriteMove.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves</a> &gt; <span class="el_source">RewriteMove.java</span></div><h1>RewriteMove.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+/**
+ * An explicit, countable rewrite move in the discovery search tree.
+ *
+ * &lt;p&gt;Besides the legacy {@code ruleId}/{@code operatorId}/{@code assumptions}
+ * triple, a move carries an explicit {@link RewriteMoveKind}, the source and
+ * target expressions (raw and canonical), a reproducible {@link MoveOrdinal},
+ * its parameters and macro-expansion metadata.&lt;/p&gt;
+ *
+ * &lt;p&gt;Macro moves ({@code atomic == false}) are never black boxes: they keep the
+ * list of {@code expandedMoves} so they can always be expanded back into atomic
+ * steps.&lt;/p&gt;
+ */
+public record RewriteMove(
+        String moveId,
+        RewriteMoveKind kind,
+        String ruleId,
+        String operatorId,
+        String sourceExpression,
+        String targetExpression,
+        String canonicalBefore,
+        String canonicalAfter,
+        MoveOrdinal ordinal,
+        List&lt;MoveParameter&gt; parameters,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; tags,
+        boolean atomic,
+        String macroId,
+        int macroVersion,
+        List&lt;RewriteMove&gt; expandedMoves,
+        String learnedFromPathId,
+        String validationStatus) {
+
+<span class="fc" id="L39">    public RewriteMove {</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (kind == null) {</span>
+<span class="nc" id="L41">            throw new IllegalArgumentException(&quot;kind must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        moveId = moveId == null ? &quot;&quot; : moveId;</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        sourceExpression = sourceExpression == null ? &quot;&quot; : sourceExpression;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        canonicalBefore = canonicalBefore == null ? &quot;&quot; : canonicalBefore;</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        canonicalAfter = canonicalAfter == null ? &quot;&quot; : canonicalAfter;</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        ordinal = ordinal == null ? MoveOrdinal.of(kind, 0, List.of()) : ordinal;</span>
+<span class="fc" id="L51">        parameters = canonicalParameters(parameters);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc" id="L53">        tags = canonicalTags(tags);</span>
+<span class="fc" id="L54">        expandedMoves = canonicalExpandedMoves(expandedMoves);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        macroId = macroId == null ? &quot;&quot; : macroId;</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        learnedFromPathId = learnedFromPathId == null ? &quot;&quot; : learnedFromPathId;</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        validationStatus = validationStatus == null ? &quot;&quot; : validationStatus;</span>
+<span class="fc" id="L58">    }</span>
+
+    /** @return whether this move carries no resolved parameters. */
+    public boolean hasUnresolvedParameters() {
+<span class="fc" id="L62">        return tags.contains(&quot;parameters-unresolved&quot;);</span>
+    }
+
+    private static List&lt;MoveParameter&gt; canonicalParameters(List&lt;MoveParameter&gt; parameters) {
+<span class="pc bpc" id="L66" title="1 of 4 branches missed.">        if (parameters == null || parameters.isEmpty()) {</span>
+<span class="fc" id="L67">            return List.of();</span>
+        }
+<span class="fc" id="L69">        List&lt;MoveParameter&gt; sorted = new ArrayList&lt;&gt;(parameters);</span>
+<span class="fc" id="L70">        sorted.sort(MoveParameter.CANONICAL_ORDER);</span>
+<span class="fc" id="L71">        return List.copyOf(sorted);</span>
+    }
+
+    private static List&lt;String&gt; canonicalTags(List&lt;String&gt; tags) {
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        if (tags == null || tags.isEmpty()) {</span>
+<span class="fc" id="L76">            return List.of();</span>
+        }
+<span class="fc" id="L78">        return tags.stream().distinct().sorted().toList();</span>
+    }
+
+    private static List&lt;RewriteMove&gt; canonicalExpandedMoves(List&lt;RewriteMove&gt; expandedMoves) {
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">        if (expandedMoves == null || expandedMoves.isEmpty()) {</span>
+<span class="fc" id="L83">            return List.of();</span>
+        }
+<span class="fc" id="L85">        List&lt;RewriteMove&gt; sorted = new ArrayList&lt;&gt;(expandedMoves);</span>
+<span class="fc" id="L86">        sorted.sort(Comparator.comparing(RewriteMove::ordinal, MoveOrdinal.CANONICAL_ORDER)</span>
+<span class="fc" id="L87">                .thenComparing(RewriteMove::moveId));</span>
+<span class="fc" id="L88">        return List.copyOf(sorted);</span>
+    }
+
+    /** @return whether this move is a (non-atomic) macro move. */
+    public boolean isMacro() {
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        return kind.isMacro() || !atomic;</span>
+    }
+
+    public static Builder builder(RewriteMoveKind kind) {
+<span class="fc" id="L97">        return new Builder(kind);</span>
+    }
+
+    /** Mutable builder producing immutable {@link RewriteMove}s. */
+    public static final class Builder {
+<span class="fc" id="L102">        private String moveId = &quot;&quot;;</span>
+        private final RewriteMoveKind kind;
+<span class="fc" id="L104">        private String ruleId = &quot;&quot;;</span>
+<span class="fc" id="L105">        private String operatorId = &quot;&quot;;</span>
+<span class="fc" id="L106">        private String sourceExpression = &quot;&quot;;</span>
+<span class="fc" id="L107">        private String targetExpression = &quot;&quot;;</span>
+<span class="fc" id="L108">        private String canonicalBefore = &quot;&quot;;</span>
+<span class="fc" id="L109">        private String canonicalAfter = &quot;&quot;;</span>
+        private MoveOrdinal ordinal;
+<span class="fc" id="L111">        private List&lt;MoveParameter&gt; parameters = List.of();</span>
+<span class="fc" id="L112">        private List&lt;String&gt; assumptions = List.of();</span>
+<span class="fc" id="L113">        private List&lt;String&gt; tags = List.of();</span>
+<span class="fc" id="L114">        private boolean atomic = true;</span>
+<span class="fc" id="L115">        private String macroId = &quot;&quot;;</span>
+        private int macroVersion;
+<span class="fc" id="L117">        private List&lt;RewriteMove&gt; expandedMoves = List.of();</span>
+<span class="fc" id="L118">        private String learnedFromPathId = &quot;&quot;;</span>
+<span class="fc" id="L119">        private String validationStatus = &quot;&quot;;</span>
+
+<span class="fc" id="L121">        private Builder(RewriteMoveKind kind) {</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (kind == null) {</span>
+<span class="nc" id="L123">                throw new IllegalArgumentException(&quot;kind must not be null&quot;);</span>
+            }
+<span class="fc" id="L125">            this.kind = kind;</span>
+<span class="fc" id="L126">        }</span>
+
+        public Builder moveId(String value) {
+<span class="fc" id="L129">            this.moveId = value;</span>
+<span class="fc" id="L130">            return this;</span>
+        }
+
+        public Builder ruleId(String value) {
+<span class="fc" id="L134">            this.ruleId = value;</span>
+<span class="fc" id="L135">            return this;</span>
+        }
+
+        public Builder operatorId(String value) {
+<span class="fc" id="L139">            this.operatorId = value;</span>
+<span class="fc" id="L140">            return this;</span>
+        }
+
+        public Builder sourceExpression(String value) {
+<span class="fc" id="L144">            this.sourceExpression = value;</span>
+<span class="fc" id="L145">            return this;</span>
+        }
+
+        public Builder targetExpression(String value) {
+<span class="fc" id="L149">            this.targetExpression = value;</span>
+<span class="fc" id="L150">            return this;</span>
+        }
+
+        public Builder canonicalBefore(String value) {
+<span class="fc" id="L154">            this.canonicalBefore = value;</span>
+<span class="fc" id="L155">            return this;</span>
+        }
+
+        public Builder canonicalAfter(String value) {
+<span class="fc" id="L159">            this.canonicalAfter = value;</span>
+<span class="fc" id="L160">            return this;</span>
+        }
+
+        public Builder ordinal(MoveOrdinal value) {
+<span class="fc" id="L164">            this.ordinal = value;</span>
+<span class="fc" id="L165">            return this;</span>
+        }
+
+        public Builder parameters(List&lt;MoveParameter&gt; value) {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            this.parameters = value == null ? List.of() : List.copyOf(value);</span>
+<span class="fc" id="L170">            return this;</span>
+        }
+
+        public Builder assumptions(List&lt;String&gt; value) {
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            this.assumptions = value == null ? List.of() : List.copyOf(value);</span>
+<span class="fc" id="L175">            return this;</span>
+        }
+
+        public Builder tags(List&lt;String&gt; value) {
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            this.tags = value == null ? List.of() : List.copyOf(value);</span>
+<span class="fc" id="L180">            return this;</span>
+        }
+
+        public Builder atomic(boolean value) {
+<span class="fc" id="L184">            this.atomic = value;</span>
+<span class="fc" id="L185">            return this;</span>
+        }
+
+        public Builder macroId(String value) {
+<span class="fc" id="L189">            this.macroId = value;</span>
+<span class="fc" id="L190">            return this;</span>
+        }
+
+        public Builder macroVersion(int value) {
+<span class="fc" id="L194">            this.macroVersion = value;</span>
+<span class="fc" id="L195">            return this;</span>
+        }
+
+        public Builder expandedMoves(List&lt;RewriteMove&gt; value) {
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            this.expandedMoves = value == null ? List.of() : List.copyOf(value);</span>
+<span class="fc" id="L200">            return this;</span>
+        }
+
+        public Builder learnedFromPathId(String value) {
+<span class="fc" id="L204">            this.learnedFromPathId = value;</span>
+<span class="fc" id="L205">            return this;</span>
+        }
+
+        public Builder validationStatus(String value) {
+<span class="fc" id="L209">            this.validationStatus = value;</span>
+<span class="fc" id="L210">            return this;</span>
+        }
+
+        public RewriteMove build() {
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            MoveOrdinal resolved = ordinal == null ? MoveOrdinal.of(kind, 0, parameters) : ordinal;</span>
+<span class="fc" id="L215">            return new RewriteMove(</span>
+                    moveId,
+                    kind,
+                    ruleId,
+                    operatorId,
+                    sourceExpression,
+                    targetExpression,
+                    canonicalBefore,
+                    canonicalAfter,
+                    resolved,
+                    parameters,
+                    assumptions,
+                    tags,
+                    atomic,
+                    macroId,
+                    macroVersion,
+                    expandedMoves,
+                    learnedFromPathId,
+                    validationStatus);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

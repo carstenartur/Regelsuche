@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveTreeReportAssembler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.report</a> &gt; <span class="el_source">MoveTreeReportAssembler.java</span></div><h1>MoveTreeReportAssembler.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.report;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.moves.MoveOrdinal;
+import de.regelsuche.moves.RewriteMove;
+import de.regelsuche.moves.RewriteMoveDeriver;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator;
+import de.regelsuche.moves.macro.MacroMoveEnumerator;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.ToDoubleFunction;
+
+/**
+ * Assembles a {@link MoveTreeReport} from a successful transformation path,
+ * deriving a {@link RewriteMove} for every applied step and enumerating the
+ * depth-1 candidate moves and macro moves at the start expression.
+ */
+public final class MoveTreeReportAssembler {
+
+    private final RewriteMoveDeriver deriver;
+    private final ExpressionCanonicalizer canonicalizer;
+    private final Depth1MoveEnumerator depth1Enumerator;
+    private final MacroMoveEnumerator macroEnumerator;
+
+    public MoveTreeReportAssembler() {
+<span class="fc" id="L29">        this(new RewriteMoveDeriver(), new ExpressionCanonicalizer(),</span>
+                new Depth1MoveEnumerator(), new MacroMoveEnumerator());
+<span class="fc" id="L31">    }</span>
+
+    public MoveTreeReportAssembler(
+            RewriteMoveDeriver deriver,
+            ExpressionCanonicalizer canonicalizer,
+            Depth1MoveEnumerator depth1Enumerator,
+<span class="fc" id="L37">            MacroMoveEnumerator macroEnumerator) {</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        this.deriver = deriver == null ? new RewriteMoveDeriver() : deriver;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        this.canonicalizer = canonicalizer == null ? new ExpressionCanonicalizer() : canonicalizer;</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        this.depth1Enumerator = depth1Enumerator == null ? new Depth1MoveEnumerator() : depth1Enumerator;</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        this.macroEnumerator = macroEnumerator == null ? new MacroMoveEnumerator() : macroEnumerator;</span>
+<span class="fc" id="L42">    }</span>
+
+    /**
+     * @param scenarioId the scenario id
+     * @param steps      ordered steps of the successful path
+     * @param macros     active macros from the inventory (may be empty)
+     * @param scorer     scores an expression for node ranking (may be {@code null})
+     * @return the assembled move-tree report
+     */
+    public MoveTreeReport assemble(
+            String scenarioId,
+            List&lt;PathStep&gt; steps,
+            List&lt;ReusableRule&gt; macros,
+            ToDoubleFunction&lt;String&gt; scorer) {
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        List&lt;PathStep&gt; safeSteps = steps == null ? List.of() : steps;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        ToDoubleFunction&lt;String&gt; safeScorer = scorer == null ? expression -&gt; 0.0 : scorer;</span>
+
+<span class="fc" id="L59">        Map&lt;String, MoveTreeReport.MoveNode&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L60">        List&lt;MoveTreeReport.MoveEdge&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L61">        List&lt;RewriteMove&gt; pathMoves = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L62">        List&lt;MoveTreeReport.UnresolvedParameterEntry&gt; unresolved = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L63">        List&lt;MoveOrdinal&gt; ordinalPath = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L65">        int depth = 0;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (PathStep step : safeSteps) {</span>
+<span class="fc" id="L67">            String fromId = canonical(step.before());</span>
+<span class="fc" id="L68">            String toId = canonical(step.after());</span>
+<span class="fc" id="L69">            nodes.computeIfAbsent(fromId, id -&gt; node(id, step.before(), depthOf(id, nodes), safeScorer));</span>
+<span class="fc" id="L70">            RewriteMove move = deriver.derive(new RewriteMoveDeriver.MoveDerivationRequest(</span>
+<span class="fc" id="L71">                    step.before(),</span>
+<span class="fc" id="L72">                    step.after(),</span>
+<span class="fc" id="L73">                    step.ruleId(),</span>
+<span class="fc" id="L74">                    step.operatorId(),</span>
+<span class="fc" id="L75">                    step.assumptions(),</span>
+<span class="fc" id="L76">                    step.source(),</span>
+<span class="fc" id="L77">                    List.of()));</span>
+<span class="fc" id="L78">            pathMoves.add(move);</span>
+<span class="fc" id="L79">            ordinalPath.add(move.ordinal());</span>
+<span class="fc" id="L80">            int toDepth = depth + 1;</span>
+<span class="fc" id="L81">            nodes.computeIfAbsent(toId, id -&gt; node(id, step.after(), toDepth, safeScorer));</span>
+<span class="fc" id="L82">            edges.add(new MoveTreeReport.MoveEdge(</span>
+                    fromId,
+                    toId,
+                    move,
+<span class="fc" id="L86">                    List.copyOf(ordinalPath),</span>
+                    true,
+<span class="fc" id="L88">                    move.isMacro(),</span>
+                    &quot;&quot;));
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (move.hasUnresolvedParameters()) {</span>
+<span class="nc" id="L91">                unresolved.add(new MoveTreeReport.UnresolvedParameterEntry(</span>
+<span class="nc" id="L92">                        move.moveId(), move.kind().name(), move.ruleId()));</span>
+            }
+<span class="fc" id="L94">            depth++;</span>
+<span class="fc" id="L95">        }</span>
+
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        String startExpression = safeSteps.isEmpty() ? &quot;&quot; : safeSteps.getFirst().before();</span>
+<span class="fc" id="L98">        List&lt;Depth1MoveEnumerator.CandidateMove&gt; depth1 = depth1Enumerator.enumerate(startExpression);</span>
+<span class="fc" id="L99">        List&lt;RewriteMove&gt; macroMoves = macroEnumerator.enumerate(</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                macros == null ? List.of() : macros, startExpression);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        for (RewriteMove macroMove : macroMoves) {</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (macroMove.hasUnresolvedParameters()) {</span>
+<span class="nc" id="L103">                unresolved.add(new MoveTreeReport.UnresolvedParameterEntry(</span>
+<span class="nc" id="L104">                        macroMove.moveId(), macroMove.kind().name(), macroMove.ruleId()));</span>
+            }
+<span class="nc" id="L106">        }</span>
+
+<span class="fc" id="L108">        return new MoveTreeReport(</span>
+                scenarioId,
+<span class="fc" id="L110">                sortedNodes(nodes.values()),</span>
+<span class="fc" id="L111">                sortedEdges(edges),</span>
+<span class="fc" id="L112">                List.copyOf(pathMoves),</span>
+                depth1,
+                macroMoves,
+<span class="fc" id="L115">                List.copyOf(unresolved));</span>
+    }
+
+    private List&lt;MoveTreeReport.MoveNode&gt; sortedNodes(java.util.Collection&lt;MoveTreeReport.MoveNode&gt; nodes) {
+<span class="fc" id="L119">        List&lt;MoveTreeReport.MoveNode&gt; sorted = new ArrayList&lt;&gt;(nodes);</span>
+<span class="fc" id="L120">        sorted.sort(java.util.Comparator.comparingInt(MoveTreeReport.MoveNode::depth)</span>
+<span class="fc" id="L121">                .thenComparing(MoveTreeReport.MoveNode::canonicalExpression)</span>
+<span class="fc" id="L122">                .thenComparing(MoveTreeReport.MoveNode::nodeId));</span>
+<span class="fc" id="L123">        return List.copyOf(sorted);</span>
+    }
+
+    private List&lt;MoveTreeReport.MoveEdge&gt; sortedEdges(List&lt;MoveTreeReport.MoveEdge&gt; edges) {
+<span class="fc" id="L127">        List&lt;MoveTreeReport.MoveEdge&gt; sorted = new ArrayList&lt;&gt;(edges);</span>
+<span class="fc" id="L128">        sorted.sort(java.util.Comparator.comparing(MoveTreeReport.MoveEdge::fromNodeId)</span>
+<span class="fc" id="L129">                .thenComparing(MoveTreeReport.MoveEdge::toNodeId)</span>
+<span class="fc" id="L130">                .thenComparing(this::ordinalPathKey)</span>
+<span class="pc bnc" id="L131" title="All 2 branches missed.">                .thenComparing(edge -&gt; edge.rewriteMove() == null ? &quot;&quot; : edge.rewriteMove().moveId()));</span>
+<span class="fc" id="L132">        return List.copyOf(sorted);</span>
+    }
+
+    private String ordinalPathKey(MoveTreeReport.MoveEdge edge) {
+<span class="fc" id="L136">        return edge.ordinalPath().stream()</span>
+<span class="fc" id="L137">                .map(ordinal -&gt; ordinal.ruleOrdinal() + &quot;:&quot; + ordinal.occurrenceOrdinal()</span>
+<span class="fc" id="L138">                        + &quot;:&quot; + ordinal.parameterOrdinals())</span>
+<span class="fc" id="L139">                .collect(java.util.stream.Collectors.joining(&quot;&gt;&quot;));</span>
+    }
+
+    private int depthOf(String id, Map&lt;String, MoveTreeReport.MoveNode&gt; nodes) {
+<span class="fc" id="L143">        MoveTreeReport.MoveNode existing = nodes.get(id);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        return existing == null ? 0 : existing.depth();</span>
+    }
+
+    private MoveTreeReport.MoveNode node(String id, String expression, int depth, ToDoubleFunction&lt;String&gt; scorer) {
+<span class="fc" id="L148">        return new MoveTreeReport.MoveNode(id, expression, canonical(expression), depth, scorer.applyAsDouble(expression));</span>
+    }
+
+    private String canonical(String expression) {
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L153">            return &quot;&quot;;</span>
+        }
+        try {
+<span class="fc" id="L156">            return canonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L157">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L158">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+        }
+    }
+
+    /**
+     * A single step of a successful path.
+     *
+     * @param before     source expression
+     * @param after      target expression
+     * @param ruleId     applied rule id
+     * @param operatorId applied operator id
+     * @param assumptions assumptions/evidence for the step
+     * @param source     provenance of the step
+     */
+    public record PathStep(
+            String before,
+            String after,
+            String ruleId,
+            String operatorId,
+            List&lt;String&gt; assumptions,
+            String source) {
+<span class="fc" id="L179">        public PathStep {</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            before = before == null ? &quot;&quot; : before;</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            after = after == null ? &quot;&quot; : after;</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">            ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            source = source == null ? &quot;&quot; : source;</span>
+<span class="fc" id="L186">        }</span>
+
+        public PathStep(String before, String after, String ruleId) {
+<span class="fc" id="L189">            this(before, after, ruleId, &quot;&quot;, List.of(), &quot;&quot;);</span>
+<span class="fc" id="L190">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RewriteMoveDeriver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves</a> &gt; <span class="el_source">RewriteMoveDeriver.java</span></div><h1>RewriteMoveDeriver.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.TreeMap;
+
+/**
+ * Best-effort derivation of a {@link RewriteMove} from existing, legacy search
+ * data (before/after expression, rule id, operator id, assumptions, tags).
+ *
+ * &lt;p&gt;The deriver never fails: when the move kind or the parameters cannot be
+ * reconstructed safely it still returns a structurally complete move and tags
+ * it with {@code &quot;parameters-unresolved&quot;}.&lt;/p&gt;
+ */
+public final class RewriteMoveDeriver {
+
+    private static final String UNRESOLVED_TAG = &quot;parameters-unresolved&quot;;
+
+    private final ExpressionCanonicalizer canonicalizer;
+
+    public RewriteMoveDeriver() {
+<span class="fc" id="L26">        this(new ExpressionCanonicalizer());</span>
+<span class="fc" id="L27">    }</span>
+
+<span class="fc" id="L29">    public RewriteMoveDeriver(ExpressionCanonicalizer canonicalizer) {</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        this.canonicalizer = canonicalizer == null ? new ExpressionCanonicalizer() : canonicalizer;</span>
+<span class="fc" id="L31">    }</span>
+
+    /** Derives a best-effort move from the supplied request. */
+    public RewriteMove derive(MoveDerivationRequest request) {
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(&quot;request must not be null&quot;);</span>
+        }
+<span class="fc" id="L38">        RewriteMoveKind kind = detectKind(request);</span>
+<span class="fc" id="L39">        List&lt;MoveParameter&gt; parameters = substitutionParameters(request.assumptions());</span>
+<span class="fc" id="L40">        boolean hasSubstitutionEvidence = hasSubstitutionEvidence(request.assumptions());</span>
+
+<span class="fc" id="L42">        LinkedHashSet&lt;String&gt; tags = new LinkedHashSet&lt;&gt;(request.tags());</span>
+<span class="pc bpc" id="L43" title="1 of 6 branches missed.">        if (kind == RewriteMoveKind.UNKNOWN || (hasSubstitutionEvidence &amp;&amp; parameters.isEmpty())) {</span>
+<span class="fc" id="L44">            tags.add(UNRESOLVED_TAG);</span>
+        }
+
+<span class="fc" id="L47">        String canonicalBefore = canonical(request.beforeExpression());</span>
+<span class="fc" id="L48">        String canonicalAfter = canonical(request.afterExpression());</span>
+<span class="fc" id="L49">        int occurrence = occurrenceOrdinal(canonicalBefore, canonicalAfter);</span>
+<span class="fc" id="L50">        MoveOrdinal ordinal = MoveOrdinal.of(kind, occurrence, parameters);</span>
+
+<span class="fc" id="L52">        boolean macro = kind.isMacro();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        String macroId = macro ? firstNonBlank(request.macroId(), request.ruleId()) : &quot;&quot;;</span>
+
+<span class="fc" id="L55">        return RewriteMove.builder(kind)</span>
+<span class="fc" id="L56">                .moveId(moveId(kind, request, canonicalBefore, canonicalAfter))</span>
+<span class="fc" id="L57">                .ruleId(request.ruleId())</span>
+<span class="fc" id="L58">                .operatorId(request.operatorId())</span>
+<span class="fc" id="L59">                .sourceExpression(request.beforeExpression())</span>
+<span class="fc" id="L60">                .targetExpression(request.afterExpression())</span>
+<span class="fc" id="L61">                .canonicalBefore(canonicalBefore)</span>
+<span class="fc" id="L62">                .canonicalAfter(canonicalAfter)</span>
+<span class="fc" id="L63">                .ordinal(ordinal)</span>
+<span class="fc" id="L64">                .parameters(parameters)</span>
+<span class="fc" id="L65">                .assumptions(request.assumptions())</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                .tags(List.copyOf(tags))</span>
+<span class="fc" id="L67">                .atomic(!macro)</span>
+<span class="fc" id="L68">                .macroId(macroId)</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                .macroVersion(macro ? Math.max(1, request.macroVersion()) : 0)</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                .learnedFromPathId(kind == RewriteMoveKind.LEARNED_MACRO ? request.learnedFromPathId() : &quot;&quot;)</span>
+<span class="fc" id="L71">                .validationStatus(request.validationStatus())</span>
+<span class="fc" id="L72">                .build();</span>
+    }
+
+    RewriteMoveKind detectKind(MoveDerivationRequest request) {
+<span class="fc" id="L76">        String ruleId = request.ruleId().toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L77">        String operatorId = request.operatorId().toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L78">        String source = request.source().toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L79">        String combined = ruleId + &quot; &quot; + operatorId;</span>
+
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (!request.macroId().isBlank()</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                || combined.contains(&quot;learned_macro&quot;)</span>
+<span class="pc bpc" id="L83" title="2 of 6 branches missed.">                || source.contains(&quot;macro&quot;) &amp;&amp; (combined.contains(&quot;learned&quot;) || source.contains(&quot;learned&quot;))) {</span>
+<span class="nc" id="L84">            return RewriteMoveKind.LEARNED_MACRO;</span>
+        }
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">        if (combined.contains(&quot;curated&quot;) || combined.contains(&quot;static_macro&quot;)</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                || (source.contains(&quot;curated&quot;))) {</span>
+<span class="nc" id="L88">            return RewriteMoveKind.CURATED_MACRO;</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">        if (contains(combined, &quot;substitution_introduction&quot;) || contains(combined, &quot;substitute_introduce&quot;)) {</span>
+<span class="fc" id="L91">            return RewriteMoveKind.SUBSTITUTE_INTRODUCE;</span>
+        }
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        if (contains(combined, &quot;substitution_expansion&quot;) || contains(combined, &quot;substitute_expand&quot;)) {</span>
+<span class="fc" id="L94">            return RewriteMoveKind.SUBSTITUTE_EXPAND;</span>
+        }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (contains(combined, &quot;complete_square&quot;)) {</span>
+<span class="fc" id="L97">            return RewriteMoveKind.COMPLETE_SQUARE;</span>
+        }
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (contains(combined, &quot;common_subexpression&quot;)) {</span>
+<span class="fc" id="L100">            return RewriteMoveKind.COMMON_SUBEXPRESSION;</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (contains(combined, &quot;sophie_germain&quot;)) {</span>
+<span class="fc" id="L103">            return RewriteMoveKind.SOPHIE_GERMAIN;</span>
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (contains(combined, &quot;difference_of_squares&quot;)) {</span>
+<span class="fc" id="L106">            return RewriteMoveKind.DIFFERENCE_OF_SQUARES;</span>
+        }
+<span class="fc bfc" id="L108" title="All 4 branches covered.">        if (contains(combined, &quot;ast_linear_offset_simplify&quot;) || contains(combined, &quot;normalize&quot;)) {</span>
+<span class="fc" id="L109">            return RewriteMoveKind.NORMALIZE;</span>
+        }
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (contains(combined, &quot;expand&quot;)) {</span>
+<span class="nc" id="L112">            return RewriteMoveKind.EXPAND;</span>
+        }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (contains(combined, &quot;factor&quot;)) {</span>
+<span class="fc" id="L115">            return RewriteMoveKind.FACTOR;</span>
+        }
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">        if (source.contains(&quot;macro&quot;) || contains(combined, &quot;macro&quot;)) {</span>
+<span class="fc" id="L118">            return RewriteMoveKind.LEARNED_MACRO;</span>
+        }
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (source.contains(&quot;import&quot;)) {</span>
+<span class="nc" id="L121">            return RewriteMoveKind.IMPORTED_RULE;</span>
+        }
+<span class="fc" id="L123">        return RewriteMoveKind.UNKNOWN;</span>
+    }
+
+    /**
+     * Parses substitution evidence assumptions of the forms
+     * {@code substitution.placeholder.X=...}, {@code substitution.occurrences.X=...}
+     * and {@code substitution.substituted=...} into concrete {@link MoveParameter}s.
+     */
+    List&lt;MoveParameter&gt; substitutionParameters(List&lt;String&gt; assumptions) {
+<span class="fc" id="L132">        TreeMap&lt;String, String&gt; placeholders = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L133">        TreeMap&lt;String, String&gt; occurrences = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L134">        String substituted = null;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (String assumption : assumptions) {</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (assumption == null) {</span>
+<span class="nc" id="L137">                continue;</span>
+            }
+<span class="fc" id="L139">            int separator = assumption.indexOf('=');</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (separator &lt; 0) {</span>
+<span class="fc" id="L141">                continue;</span>
+            }
+<span class="fc" id="L143">            String key = assumption.substring(0, separator).trim();</span>
+<span class="fc" id="L144">            String value = assumption.substring(separator + 1).trim();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (key.startsWith(&quot;substitution.placeholder.&quot;)) {</span>
+<span class="fc" id="L146">                placeholders.put(key.substring(&quot;substitution.placeholder.&quot;.length()), value);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            } else if (key.startsWith(&quot;substitution.occurrences.&quot;)) {</span>
+<span class="fc" id="L148">                occurrences.put(key.substring(&quot;substitution.occurrences.&quot;.length()), value);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            } else if (key.equals(&quot;substitution.substituted&quot;)) {</span>
+<span class="fc" id="L150">                substituted = value;</span>
+            }
+<span class="fc" id="L152">        }</span>
+<span class="pc bpc" id="L153" title="2 of 6 branches missed.">        if (placeholders.isEmpty() &amp;&amp; occurrences.isEmpty() &amp;&amp; substituted == null) {</span>
+<span class="fc" id="L154">            return List.of();</span>
+        }
+<span class="fc" id="L156">        List&lt;MoveParameter&gt; parameters = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L157">        int index = 0;</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (var entry : placeholders.entrySet()) {</span>
+<span class="fc" id="L159">            parameters.add(new MoveParameter(</span>
+<span class="fc" id="L160">                    entry.getKey(),</span>
+                    MoveParameterKind.PLACEHOLDER,
+<span class="fc" id="L162">                    entry.getValue(),</span>
+<span class="fc" id="L163">                    canonical(entry.getValue()),</span>
+                    index++,
+                    &quot;substitution-evidence&quot;));
+<span class="fc" id="L166">        }</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (var entry : occurrences.entrySet()) {</span>
+<span class="fc" id="L168">            parameters.add(new MoveParameter(</span>
+<span class="fc" id="L169">                    entry.getKey(),</span>
+                    MoveParameterKind.OCCURRENCE,
+<span class="fc" id="L171">                    entry.getValue(),</span>
+<span class="fc" id="L172">                    entry.getValue(),</span>
+                    index++,
+                    &quot;substitution-evidence&quot;));
+<span class="fc" id="L175">        }</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (substituted != null) {</span>
+<span class="fc" id="L177">            parameters.add(new MoveParameter(</span>
+                    &quot;substituted&quot;,
+                    MoveParameterKind.REPLACEMENT,
+                    substituted,
+<span class="fc" id="L181">                    canonical(substituted),</span>
+                    index,
+                    &quot;substitution-evidence&quot;));
+        }
+<span class="fc" id="L185">        return List.copyOf(parameters);</span>
+    }
+
+    private int occurrenceOrdinal(String canonicalBefore, String canonicalAfter) {
+        // Deterministic, content-derived occurrence position. Stable for a given
+        // (before, after) pair so repeated runs yield identical ordinals.
+<span class="fc" id="L191">        int hash = (canonicalBefore + &quot;=&gt;&quot; + canonicalAfter).hashCode();</span>
+<span class="fc" id="L192">        return Math.floorMod(hash, 1_000_000);</span>
+    }
+
+    private String moveId(RewriteMoveKind kind, MoveDerivationRequest request, String before, String after) {
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        String rule = request.ruleId().isBlank() ? request.operatorId() : request.ruleId();</span>
+<span class="fc" id="L197">        return kind.name() + &quot;|&quot; + rule + &quot;|&quot; + before + &quot;=&gt;&quot; + after;</span>
+    }
+
+    private String canonical(String expression) {
+<span class="pc bpc" id="L201" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L202">            return &quot;&quot;;</span>
+        }
+        try {
+<span class="fc" id="L205">            return canonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L206">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L207">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+        }
+    }
+
+    private static boolean contains(String haystack, String needle) {
+<span class="fc" id="L212">        return haystack.contains(needle);</span>
+    }
+
+    private static String firstNonBlank(String first, String second) {
+<span class="pc bpc" id="L216" title="2 of 4 branches missed.">        if (first != null &amp;&amp; !first.isBlank()) {</span>
+<span class="nc" id="L217">            return first;</span>
+        }
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        return second == null ? &quot;&quot; : second;</span>
+    }
+
+    private boolean hasSubstitutionEvidence(List&lt;String&gt; assumptions) {
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        for (String assumption : assumptions) {</span>
+<span class="pc bpc" id="L224" title="1 of 4 branches missed.">            if (assumption != null &amp;&amp; assumption.trim().startsWith(&quot;substitution.&quot;)) {</span>
+<span class="fc" id="L225">                return true;</span>
+            }
+<span class="fc" id="L227">        }</span>
+<span class="fc" id="L228">        return false;</span>
+    }
+
+    /**
+     * Input to {@link RewriteMoveDeriver#derive(MoveDerivationRequest)}.
+     *
+     * @param beforeExpression  source expression
+     * @param afterExpression   target expression
+     * @param ruleId            applied rule id
+     * @param operatorId        applied operator id
+     * @param assumptions       assumptions / evidence carried by the step
+     * @param source            provenance of the step (e.g. {@code &quot;macro&quot;})
+     * @param tags              pre-existing tags
+     * @param macroId           macro id when known
+     * @param macroVersion      macro version when known
+     * @param learnedFromPathId originating path id for learned macros
+     * @param validationStatus  validation status of the move
+     */
+    public record MoveDerivationRequest(
+            String beforeExpression,
+            String afterExpression,
+            String ruleId,
+            String operatorId,
+            List&lt;String&gt; assumptions,
+            String source,
+            List&lt;String&gt; tags,
+            String macroId,
+            int macroVersion,
+            String learnedFromPathId,
+            String validationStatus) {
+
+<span class="fc" id="L259">        public MoveDerivationRequest {</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            beforeExpression = beforeExpression == null ? &quot;&quot; : beforeExpression;</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            afterExpression = afterExpression == null ? &quot;&quot; : afterExpression;</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            source = source == null ? &quot;&quot; : source;</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">            tags = tags == null ? List.of() : List.copyOf(tags);</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            macroId = macroId == null ? &quot;&quot; : macroId;</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            learnedFromPathId = learnedFromPathId == null ? &quot;&quot; : learnedFromPathId;</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            validationStatus = validationStatus == null ? &quot;&quot; : validationStatus;</span>
+<span class="fc" id="L270">        }</span>
+
+        public MoveDerivationRequest(
+                String beforeExpression,
+                String afterExpression,
+                String ruleId,
+                String operatorId,
+                List&lt;String&gt; assumptions) {
+<span class="fc" id="L278">            this(beforeExpression, afterExpression, ruleId, operatorId, assumptions, &quot;&quot;, List.of(), &quot;&quot;, 0, &quot;&quot;, &quot;&quot;);</span>
+<span class="fc" id="L279">        }</span>
+
+        public MoveDerivationRequest(
+                String beforeExpression,
+                String afterExpression,
+                String ruleId,
+                String operatorId,
+                List&lt;String&gt; assumptions,
+                String source,
+                List&lt;String&gt; tags) {
+<span class="fc" id="L289">            this(beforeExpression, afterExpression, ruleId, operatorId, assumptions, source, tags, &quot;&quot;, 0, &quot;&quot;, &quot;&quot;);</span>
+<span class="fc" id="L290">        }</span>
+
+        Set&lt;String&gt; tagSet() {
+<span class="nc" id="L293">            return new LinkedHashSet&lt;&gt;(tags);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

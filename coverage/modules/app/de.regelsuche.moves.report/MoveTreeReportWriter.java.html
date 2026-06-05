@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveTreeReportWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.report</a> &gt; <span class="el_source">MoveTreeReportWriter.java</span></div><h1>MoveTreeReportWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.report;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.moves.MoveParameter;
+import de.regelsuche.moves.RewriteMove;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Writes the {@code move-tree-report.json} and {@code move-tree-report.md}
+ * artefacts into the discovery-pipeline output directory.
+ */
+<span class="fc" id="L21">public final class MoveTreeReportWriter {</span>
+
+    public static final String JSON_FILE_NAME = &quot;move-tree-report.json&quot;;
+    public static final String MARKDOWN_FILE_NAME = &quot;move-tree-report.md&quot;;
+
+<span class="fc" id="L26">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L27">            .findAndRegisterModules()</span>
+<span class="fc" id="L28">            .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+    /** Writes both report artefacts and returns the report unchanged. */
+    public MoveTreeReport write(Path outputDirectory, MoveTreeReport report) {
+        try {
+<span class="fc" id="L33">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L34">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L35">                    outputDirectory.resolve(JSON_FILE_NAME),</span>
+<span class="fc" id="L36">                    JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report));</span>
+<span class="fc" id="L37">            Files.writeString(</span>
+<span class="fc" id="L38">                    outputDirectory.resolve(MARKDOWN_FILE_NAME),</span>
+<span class="fc" id="L39">                    renderMarkdown(report),</span>
+                    StandardCharsets.UTF_8);
+<span class="fc" id="L41">            return report;</span>
+<span class="nc" id="L42">        } catch (IOException exception) {</span>
+<span class="nc" id="L43">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    String renderMarkdown(MoveTreeReport report) {
+<span class="fc" id="L48">        StringBuilder markdown = new StringBuilder();</span>
+<span class="fc" id="L49">        markdown.append(&quot;# Move tree report — &quot;).append(report.scenarioId()).append(&quot;\n\n&quot;);</span>
+
+<span class="fc" id="L51">        markdown.append(&quot;## Applied moves on the successful path\n\n&quot;);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (report.successfulPathMoves().isEmpty()) {</span>
+<span class="nc" id="L53">            markdown.append(&quot;_No successful path was found._\n\n&quot;);</span>
+        } else {
+<span class="fc" id="L55">            markdown.append(&quot;| # | Kind | Rule | Source | Target | Ordinal | Parameters |\n&quot;);</span>
+<span class="fc" id="L56">            markdown.append(&quot;| --- | --- | --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc" id="L57">            int index = 1;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            for (RewriteMove move : report.successfulPathMoves()) {</span>
+<span class="fc" id="L59">                markdown.append(&quot;| &quot;).append(index++)</span>
+<span class="fc" id="L60">                        .append(&quot; | &quot;).append(move.kind())</span>
+<span class="fc" id="L61">                        .append(&quot; | &quot;).append(escape(move.ruleId()))</span>
+<span class="fc" id="L62">                        .append(&quot; | &quot;).append(escape(move.sourceExpression()))</span>
+<span class="fc" id="L63">                        .append(&quot; | &quot;).append(escape(move.targetExpression()))</span>
+<span class="fc" id="L64">                        .append(&quot; | &quot;).append(ordinal(move))</span>
+<span class="fc" id="L65">                        .append(&quot; | &quot;).append(escape(renderParameters(move.parameters())))</span>
+<span class="fc" id="L66">                        .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L67">            }</span>
+<span class="fc" id="L68">            markdown.append('\n');</span>
+        }
+
+<span class="fc" id="L71">        markdown.append(&quot;## First depth-1 candidate moves\n\n&quot;);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (report.depth1Candidates().isEmpty()) {</span>
+<span class="nc" id="L73">            markdown.append(&quot;_No depth-1 candidates were enumerated._\n\n&quot;);</span>
+        } else {
+<span class="fc" id="L75">            markdown.append(&quot;| Enumerator | Kind | Parameter | Value | Ordinal |\n&quot;);</span>
+<span class="fc" id="L76">            markdown.append(&quot;| --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            for (Depth1MoveEnumerator.CandidateMove candidate : report.depth1Candidates()) {</span>
+<span class="fc" id="L78">                MoveParameter parameter = candidate.parameter();</span>
+<span class="fc" id="L79">                markdown.append(&quot;| &quot;).append(escape(candidate.enumeratorId()))</span>
+<span class="fc" id="L80">                        .append(&quot; | &quot;).append(candidate.kind())</span>
+<span class="fc" id="L81">                        .append(&quot; | &quot;).append(escape(parameter.name()))</span>
+<span class="fc" id="L82">                        .append(&quot; | &quot;).append(escape(parameter.value()))</span>
+<span class="fc" id="L83">                        .append(&quot; | &quot;).append(ordinalText(candidate.ordinal().ruleOrdinal(),</span>
+<span class="fc" id="L84">                                candidate.ordinal().occurrenceOrdinal(), candidate.ordinal().parameterOrdinals()))</span>
+<span class="fc" id="L85">                        .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L86">            }</span>
+<span class="fc" id="L87">            markdown.append('\n');</span>
+        }
+
+<span class="fc" id="L90">        markdown.append(&quot;## Macro moves\n\n&quot;);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (report.macroMoves().isEmpty()) {</span>
+<span class="fc" id="L92">            markdown.append(&quot;_No macro moves were available._\n\n&quot;);</span>
+        } else {
+<span class="nc" id="L94">            markdown.append(&quot;| Macro | Version | Atomic | Expanded steps | Validation | Tags |\n&quot;);</span>
+<span class="nc" id="L95">            markdown.append(&quot;| --- | --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            for (RewriteMove macro : report.macroMoves()) {</span>
+<span class="nc" id="L97">                markdown.append(&quot;| &quot;).append(escape(macro.macroId()))</span>
+<span class="nc" id="L98">                        .append(&quot; | &quot;).append(macro.macroVersion())</span>
+<span class="nc" id="L99">                        .append(&quot; | &quot;).append(macro.atomic())</span>
+<span class="nc" id="L100">                        .append(&quot; | &quot;).append(macro.expandedMoves().size())</span>
+<span class="nc" id="L101">                        .append(&quot; | &quot;).append(escape(macro.validationStatus()))</span>
+<span class="nc" id="L102">                        .append(&quot; | &quot;).append(escape(String.join(&quot;, &quot;, macro.tags())))</span>
+<span class="nc" id="L103">                        .append(&quot; |\n&quot;);</span>
+<span class="nc" id="L104">            }</span>
+<span class="nc" id="L105">            markdown.append('\n');</span>
+        }
+
+<span class="fc" id="L108">        markdown.append(&quot;## Unresolved parameters\n\n&quot;);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (report.unresolvedParameters().isEmpty()) {</span>
+<span class="fc" id="L110">            markdown.append(&quot;_All parameters were resolved._\n&quot;);</span>
+        } else {
+<span class="nc" id="L112">            markdown.append(&quot;| Move | Kind | Rule |\n&quot;);</span>
+<span class="nc" id="L113">            markdown.append(&quot;| --- | --- | --- |\n&quot;);</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            for (MoveTreeReport.UnresolvedParameterEntry entry : report.unresolvedParameters()) {</span>
+<span class="nc" id="L115">                markdown.append(&quot;| &quot;).append(escape(entry.moveId()))</span>
+<span class="nc" id="L116">                        .append(&quot; | &quot;).append(escape(entry.kind()))</span>
+<span class="nc" id="L117">                        .append(&quot; | &quot;).append(escape(entry.ruleId()))</span>
+<span class="nc" id="L118">                        .append(&quot; |\n&quot;);</span>
+<span class="nc" id="L119">            }</span>
+        }
+<span class="fc" id="L121">        return markdown.toString();</span>
+    }
+
+    private String renderParameters(List&lt;MoveParameter&gt; parameters) {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (parameters.isEmpty()) {</span>
+<span class="fc" id="L126">            return &quot;—&quot;;</span>
+        }
+<span class="fc" id="L128">        return parameters.stream()</span>
+<span class="fc" id="L129">                .map(parameter -&gt; parameter.name() + &quot;=&quot; + parameter.value())</span>
+<span class="fc" id="L130">                .collect(Collectors.joining(&quot;, &quot;));</span>
+    }
+
+    private String ordinal(RewriteMove move) {
+<span class="fc" id="L134">        return ordinalText(move.ordinal().ruleOrdinal(), move.ordinal().occurrenceOrdinal(),</span>
+<span class="fc" id="L135">                move.ordinal().parameterOrdinals());</span>
+    }
+
+    private String ordinalText(int ruleOrdinal, int occurrenceOrdinal, List&lt;Integer&gt; parameterOrdinals) {
+<span class="fc" id="L139">        return ruleOrdinal + &quot;:&quot; + occurrenceOrdinal + &quot;:&quot; + parameterOrdinals;</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L144">            return &quot;—&quot;;</span>
+        }
+<span class="fc" id="L146">        return value.replace(&quot;|&quot;, &quot;\\|&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MacroMoveEnumerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.macro</a> &gt; <span class="el_source">MacroMoveEnumerator.java</span></div><h1>MacroMoveEnumerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.macro;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.inventory.RuleInventoryRepository;
+import de.regelsuche.mining.RuleStatus;
+import de.regelsuche.moves.MoveOrdinal;
+import de.regelsuche.moves.MoveParameter;
+import de.regelsuche.moves.MoveParameterKind;
+import de.regelsuche.moves.RewriteMove;
+import de.regelsuche.moves.RewriteMoveKind;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Enumerates the active macros from the existing rule-inventory structure as
+ * normal — but expandable — {@link RewriteMove}s.
+ *
+ * &lt;p&gt;Each macro move carries {@code atomic == false} together with the macro id,
+ * version, originating path id and validation status. It expands into atomic
+ * {@link RewriteMove}s (the left/right pattern rewrite) so a macro is never a
+ * black box. When the inventory does not contain enough structure to expand the
+ * macro, a best-effort move is produced and tagged {@code &quot;macro-expansion-partial&quot;}.&lt;/p&gt;
+ */
+public final class MacroMoveEnumerator {
+
+    private static final String PARTIAL_TAG = &quot;macro-expansion-partial&quot;;
+
+    private final ExpressionCanonicalizer canonicalizer;
+
+    public MacroMoveEnumerator() {
+<span class="fc" id="L34">        this(new ExpressionCanonicalizer());</span>
+<span class="fc" id="L35">    }</span>
+
+<span class="fc" id="L37">    public MacroMoveEnumerator(ExpressionCanonicalizer canonicalizer) {</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        this.canonicalizer = canonicalizer == null ? new ExpressionCanonicalizer() : canonicalizer;</span>
+<span class="fc" id="L39">    }</span>
+
+    /**
+     * Enumerates macro moves applicable to {@code expression} from the inventory.
+     *
+     * @param inventory  the existing macro/inventory repository
+     * @param expression the current expression
+     * @return deterministic, ordinal-sorted macro moves
+     */
+    public List&lt;RewriteMove&gt; enumerate(RuleInventoryRepository inventory, String expression) {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (inventory == null) {</span>
+<span class="nc" id="L50">            return List.of();</span>
+        }
+<span class="nc" id="L52">        return enumerate(inventory.findEnabled(), expression);</span>
+    }
+
+    /** Enumerates macro moves from an explicit list of macros. */
+    public List&lt;RewriteMove&gt; enumerate(List&lt;ReusableRule&gt; macros, String expression) {
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (macros == null || macros.isEmpty()) {</span>
+<span class="fc" id="L58">            return List.of();</span>
+        }
+<span class="fc" id="L60">        String canonicalBefore = canonical(expression);</span>
+<span class="fc" id="L61">        List&lt;RewriteMove&gt; moves = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (ReusableRule macro : macros) {</span>
+<span class="fc" id="L63">            moves.add(toMove(macro, expression, canonicalBefore));</span>
+<span class="fc" id="L64">        }</span>
+<span class="fc" id="L65">        moves.sort(macroOrder());</span>
+<span class="fc" id="L66">        return List.copyOf(moves);</span>
+    }
+
+    private RewriteMove toMove(ReusableRule macro, String expression, String canonicalBefore) {
+<span class="fc" id="L70">        RewriteMoveKind kind = kindFor(macro);</span>
+<span class="fc" id="L71">        boolean applicable = isApplicable(macro, canonicalBefore);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        String predictedAfter = applicable ? rewrite(expression, macro) : expression;</span>
+
+<span class="fc" id="L74">        List&lt;MoveParameter&gt; parameters = parameters(macro);</span>
+<span class="fc" id="L75">        MoveOrdinal ordinal = MoveOrdinal.of(kind, occurrenceOrdinal(macro), parameters);</span>
+
+<span class="fc" id="L77">        List&lt;String&gt; tags = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L78">        List&lt;RewriteMove&gt; expanded = expand(macro, expression, predictedAfter);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (expanded.isEmpty()) {</span>
+<span class="fc" id="L80">            tags.add(PARTIAL_TAG);</span>
+        }
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (!applicable) {</span>
+<span class="fc" id="L83">            tags.add(&quot;macro-applicability-uncertain&quot;);</span>
+        }
+
+<span class="fc" id="L86">        return RewriteMove.builder(kind)</span>
+<span class="fc" id="L87">                .moveId(&quot;macro:&quot; + macro.id())</span>
+<span class="fc" id="L88">                .ruleId(macro.id())</span>
+<span class="fc" id="L89">                .operatorId(macro.id())</span>
+<span class="fc" id="L90">                .sourceExpression(expression)</span>
+<span class="fc" id="L91">                .targetExpression(predictedAfter)</span>
+<span class="fc" id="L92">                .canonicalBefore(canonicalBefore)</span>
+<span class="fc" id="L93">                .canonicalAfter(canonical(predictedAfter))</span>
+<span class="fc" id="L94">                .ordinal(ordinal)</span>
+<span class="fc" id="L95">                .parameters(parameters)</span>
+<span class="fc" id="L96">                .assumptions(macro.assumptions())</span>
+<span class="fc" id="L97">                .tags(List.copyOf(tags))</span>
+<span class="fc" id="L98">                .atomic(false)</span>
+<span class="fc" id="L99">                .macroId(macro.id())</span>
+<span class="fc" id="L100">                .macroVersion(macroVersion(macro))</span>
+<span class="fc" id="L101">                .expandedMoves(expanded)</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                .learnedFromPathId(macro.supportingPathIds().isEmpty() ? &quot;&quot; : macro.supportingPathIds().getFirst())</span>
+<span class="fc" id="L103">                .validationStatus(macro.proofStatus().name())</span>
+<span class="fc" id="L104">                .build();</span>
+    }
+
+    private RewriteMoveKind kindFor(ReusableRule macro) {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (macro.knownRuleStatus() == RuleStatus.MATCHES_KNOWN_RULE</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                || macro.id().toLowerCase(Locale.ROOT).contains(&quot;curated&quot;)</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                || macro.id().toLowerCase(Locale.ROOT).contains(&quot;static&quot;)) {</span>
+<span class="fc" id="L111">            return RewriteMoveKind.CURATED_MACRO;</span>
+        }
+<span class="fc" id="L113">        return RewriteMoveKind.LEARNED_MACRO;</span>
+    }
+
+    private boolean isApplicable(ReusableRule macro, String canonicalBefore) {
+<span class="fc" id="L117">        String left = canonical(macro.leftPattern());</span>
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        if (left.isBlank() || canonicalBefore.isBlank()) {</span>
+<span class="fc" id="L119">            return false;</span>
+        }
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        return canonicalBefore.equals(left) || canonicalBefore.contains(stripWhitespace(macro.leftPattern()));</span>
+    }
+
+    private String rewrite(String expression, ReusableRule macro) {
+<span class="fc" id="L125">        String left = stripWhitespace(macro.leftPattern());</span>
+<span class="fc" id="L126">        String right = macro.rightPattern();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (left.isBlank()) {</span>
+<span class="nc" id="L128">            return expression;</span>
+        }
+<span class="fc" id="L130">        String compact = stripWhitespace(expression);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (compact.equals(left)) {</span>
+<span class="fc" id="L132">            return right;</span>
+        }
+<span class="nc" id="L134">        return compact.replace(left, stripWhitespace(right));</span>
+    }
+
+    private List&lt;RewriteMove&gt; expand(ReusableRule macro, String before, String after) {
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">        if (macro.leftPattern().isBlank() || macro.rightPattern().isBlank()) {</span>
+<span class="fc" id="L139">            return List.of();</span>
+        }
+<span class="fc" id="L141">        RewriteMove atomic = RewriteMove.builder(RewriteMoveKind.IMPORTED_RULE)</span>
+<span class="fc" id="L142">                .moveId(&quot;macro:&quot; + macro.id() + &quot;:atomic&quot;)</span>
+<span class="fc" id="L143">                .ruleId(macro.id() + &quot;:pattern&quot;)</span>
+<span class="fc" id="L144">                .sourceExpression(before)</span>
+<span class="fc" id="L145">                .targetExpression(after)</span>
+<span class="fc" id="L146">                .canonicalBefore(canonical(before))</span>
+<span class="fc" id="L147">                .canonicalAfter(canonical(after))</span>
+<span class="fc" id="L148">                .ordinal(MoveOrdinal.of(RewriteMoveKind.IMPORTED_RULE, 0, List.of()))</span>
+<span class="fc" id="L149">                .parameters(parameters(macro))</span>
+<span class="fc" id="L150">                .assumptions(macro.assumptions())</span>
+<span class="fc" id="L151">                .atomic(true)</span>
+<span class="fc" id="L152">                .build();</span>
+<span class="fc" id="L153">        return List.of(atomic);</span>
+    }
+
+    private List&lt;MoveParameter&gt; parameters(ReusableRule macro) {
+<span class="fc" id="L157">        List&lt;MoveParameter&gt; parameters = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L158">        List&lt;String&gt; relations = macro.parameterRelations();</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (int index = 0; index &lt; relations.size(); index++) {</span>
+<span class="fc" id="L160">            String relation = relations.get(index);</span>
+<span class="fc" id="L161">            parameters.add(new MoveParameter(</span>
+                    &quot;p&quot; + index,
+                    MoveParameterKind.MACRO_ARGUMENT,
+                    relation,
+                    relation,
+                    index,
+                    &quot;macro-inventory&quot;));
+        }
+<span class="fc" id="L169">        parameters.sort(MoveParameter.CANONICAL_ORDER);</span>
+<span class="fc" id="L170">        return List.copyOf(parameters);</span>
+    }
+
+    private int macroVersion(ReusableRule macro) {
+<span class="fc" id="L174">        return Math.max(1, macro.usageCount() + 1);</span>
+    }
+
+    private int occurrenceOrdinal(ReusableRule macro) {
+<span class="fc" id="L178">        return Math.floorMod(macro.id().hashCode(), 1_000_000);</span>
+    }
+
+    private Comparator&lt;RewriteMove&gt; macroOrder() {
+<span class="fc" id="L182">        return Comparator.comparing(RewriteMove::macroId)</span>
+<span class="fc" id="L183">                .thenComparingInt(RewriteMove::macroVersion)</span>
+<span class="fc" id="L184">                .thenComparing(RewriteMove::ordinal, MoveOrdinal.CANONICAL_ORDER);</span>
+    }
+
+    private String canonical(String expression) {
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L189">            return &quot;&quot;;</span>
+        }
+        try {
+<span class="fc" id="L192">            return canonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L193">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L194">            return stripWhitespace(expression);</span>
+        }
+    }
+
+    private String stripWhitespace(String value) {
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

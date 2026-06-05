@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveParameterKind.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves</a> &gt; <span class="el_source">MoveParameterKind.java</span></div><h1>MoveParameterKind.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves;
+
+/**
+ * Classifies the role a {@link MoveParameter} plays inside a rewrite move.
+ *
+ * &lt;p&gt;Declaration order defines the deterministic tie-breaking order used when
+ * parameters are sorted (see {@link MoveParameter#CANONICAL_ORDER}). New kinds
+ * must be appended, never inserted, to keep ordinals reproducible.&lt;/p&gt;
+ */
+<span class="fc" id="L10">public enum MoveParameterKind {</span>
+<span class="fc" id="L11">    SUBTERM,</span>
+<span class="fc" id="L12">    CONSTANT,</span>
+<span class="fc" id="L13">    VARIABLE,</span>
+<span class="fc" id="L14">    EXPRESSION,</span>
+<span class="fc" id="L15">    OCCURRENCE,</span>
+<span class="fc" id="L16">    PATTERN,</span>
+<span class="fc" id="L17">    REPLACEMENT,</span>
+<span class="fc" id="L18">    PLACEHOLDER,</span>
+<span class="fc" id="L19">    GENERATED,</span>
+<span class="fc" id="L20">    MACRO_ARGUMENT</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

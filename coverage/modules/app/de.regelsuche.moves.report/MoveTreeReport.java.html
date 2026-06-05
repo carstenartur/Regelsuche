@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveTreeReport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.report</a> &gt; <span class="el_source">MoveTreeReport.java</span></div><h1>MoveTreeReport.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.report;
+
+import de.regelsuche.moves.MoveOrdinal;
+import de.regelsuche.moves.RewriteMove;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator;
+import java.util.List;
+
+/**
+ * Serializable model behind {@code move-tree-report.json} / {@code .md}.
+ *
+ * @param scenarioId            the scenario this report belongs to
+ * @param nodes                 nodes of the move tree
+ * @param edges                 edges of the move tree (each carrying a {@link RewriteMove})
+ * @param successfulPathMoves   the moves applied along the successful path
+ * @param depth1Candidates      the first depth-1 candidate moves for the start expression
+ * @param macroMoves            macro moves available at the start expression
+ * @param unresolvedParameters  moves whose parameters are still unresolved
+ */
+public record MoveTreeReport(
+        String scenarioId,
+        List&lt;MoveNode&gt; nodes,
+        List&lt;MoveEdge&gt; edges,
+        List&lt;RewriteMove&gt; successfulPathMoves,
+        List&lt;Depth1MoveEnumerator.CandidateMove&gt; depth1Candidates,
+        List&lt;RewriteMove&gt; macroMoves,
+        List&lt;UnresolvedParameterEntry&gt; unresolvedParameters) {
+
+<span class="fc" id="L28">    public MoveTreeReport {</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        edges = edges == null ? List.of() : List.copyOf(edges);</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        successfulPathMoves = successfulPathMoves == null ? List.of() : List.copyOf(successfulPathMoves);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        depth1Candidates = depth1Candidates == null ? List.of() : List.copyOf(depth1Candidates);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        macroMoves = macroMoves == null ? List.of() : List.copyOf(macroMoves);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        unresolvedParameters = unresolvedParameters == null ? List.of() : List.copyOf(unresolvedParameters);</span>
+<span class="fc" id="L35">    }</span>
+
+    /**
+     * A node in the move tree.
+     *
+     * @param nodeId               stable node id (canonical expression)
+     * @param expression           raw expression
+     * @param canonicalExpression  canonicalised expression
+     * @param depth                node depth in the tree
+     * @param score                heuristic score of the node
+     */
+<span class="fc" id="L46">    public record MoveNode(String nodeId, String expression, String canonicalExpression, int depth, double score) {</span>
+    }
+
+    /**
+     * An edge in the move tree.
+     *
+     * @param fromNodeId    source node id
+     * @param toNodeId      target node id
+     * @param rewriteMove   the rewrite move applied along this edge
+     * @param ordinalPath   the chain of move ordinals from the root to this edge
+     * @param selectedPath  whether this edge is part of the successful selected path
+     * @param macroExpanded whether the edge represents an expanded macro move
+     * @param prunedReason  reason the edge was pruned, when known
+     */
+    public record MoveEdge(
+            String fromNodeId,
+            String toNodeId,
+            RewriteMove rewriteMove,
+            List&lt;MoveOrdinal&gt; ordinalPath,
+            boolean selectedPath,
+            boolean macroExpanded,
+            String prunedReason) {
+<span class="fc" id="L68">        public MoveEdge {</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            ordinalPath = ordinalPath == null ? List.of() : List.copyOf(ordinalPath);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            prunedReason = prunedReason == null ? &quot;&quot; : prunedReason;</span>
+<span class="fc" id="L71">        }</span>
+    }
+
+    /**
+     * An entry describing a move whose parameters are still unresolved.
+     *
+     * @param moveId the move id
+     * @param kind   the move kind name
+     * @param ruleId the rule id
+     */
+<span class="nc" id="L81">    public record UnresolvedParameterEntry(String moveId, String kind, String ruleId) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

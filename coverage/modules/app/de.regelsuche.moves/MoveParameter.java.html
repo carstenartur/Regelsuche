@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveParameter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves</a> &gt; <span class="el_source">MoveParameter.java</span></div><h1>MoveParameter.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves;
+
+import java.util.Comparator;
+
+/**
+ * A single, named parameter of a {@link RewriteMove}.
+ *
+ * &lt;p&gt;Parameters are deterministically ordered through {@link #CANONICAL_ORDER},
+ * which sorts by (1) {@code parameterIndex} when present, then (2) {@code kind},
+ * (3) {@code canonicalValue} and finally (4) {@code value}. A negative
+ * {@code parameterIndex} marks an unspecified index that sorts after all
+ * explicitly indexed parameters.&lt;/p&gt;
+ *
+ * @param name           human-readable parameter name (never {@code null})
+ * @param kind           parameter classification (never {@code null})
+ * @param value          raw textual value as observed
+ * @param canonicalValue canonicalised value used for deterministic ordering
+ * @param parameterIndex stable index, or {@code -1} when unspecified
+ * @param source         provenance of the parameter (e.g. {@code &quot;substitution-evidence&quot;})
+ */
+public record MoveParameter(
+        String name,
+        MoveParameterKind kind,
+        String value,
+        String canonicalValue,
+        int parameterIndex,
+        String source) {
+
+    /** Sentinel used when no stable parameter index is available. */
+    public static final int UNSPECIFIED_INDEX = -1;
+
+    /**
+     * Deterministic ordering: indexed parameters first (ascending index), then
+     * by kind, canonical value and finally raw value. Reproducible for a given
+     * set of parameters.
+     */
+<span class="fc" id="L37">    public static final Comparator&lt;MoveParameter&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L38">            Comparator.comparingInt(MoveParameter::sortIndex)</span>
+<span class="fc" id="L39">                    .thenComparing(parameter -&gt; parameter.kind().ordinal())</span>
+<span class="fc" id="L40">                    .thenComparing(MoveParameter::canonicalValue, Comparator.nullsFirst(Comparator.naturalOrder()))</span>
+<span class="fc" id="L41">                    .thenComparing(MoveParameter::value, Comparator.nullsFirst(Comparator.naturalOrder()))</span>
+<span class="fc" id="L42">                    .thenComparing(MoveParameter::name, Comparator.nullsFirst(Comparator.naturalOrder()));</span>
+
+<span class="fc" id="L44">    public MoveParameter {</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;name must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (kind == null) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;kind must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        value = value == null ? &quot;&quot; : value;</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        canonicalValue = canonicalValue == null || canonicalValue.isBlank() ? value : canonicalValue;</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        source = source == null ? &quot;&quot; : source;</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (parameterIndex &lt; 0) {</span>
+<span class="fc" id="L55">            parameterIndex = UNSPECIFIED_INDEX;</span>
+        }
+<span class="fc" id="L57">    }</span>
+
+    public MoveParameter(String name, MoveParameterKind kind, String value, String source) {
+<span class="nc" id="L60">        this(name, kind, value, value, UNSPECIFIED_INDEX, source);</span>
+<span class="nc" id="L61">    }</span>
+
+    /** @return {@code true} when this parameter carries an explicit, stable index. */
+    public boolean hasIndex() {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        return parameterIndex &gt;= 0;</span>
+    }
+
+    private int sortIndex() {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        return parameterIndex &gt;= 0 ? parameterIndex : Integer.MAX_VALUE;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

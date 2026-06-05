@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CancellationCandidateEnumerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.enumerate</a> &gt; <span class="el_source">CancellationCandidateEnumerator.java</span></div><h1>CancellationCandidateEnumerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.enumerate;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.moves.MoveParameter;
+import de.regelsuche.moves.MoveParameterKind;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Enumerates cancellation candidates: additive terms that would neutralise an
+ * obvious term in the expression. For example, {@code x - 1} yields the
+ * candidate {@code +1}, which cancels the {@code -1}.
+ */
+<span class="fc" id="L19">public final class CancellationCandidateEnumerator implements ParameterEnumerator {</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L23">        return &quot;cancellation-candidate&quot;;</span>
+    }
+
+    @Override
+    public List&lt;MoveParameter&gt; enumerate(String expression) {
+<span class="fc" id="L28">        return MoveExpressions.parse(expression)</span>
+<span class="fc" id="L29">                .map(this::enumerate)</span>
+<span class="fc" id="L30">                .orElseGet(List::of);</span>
+    }
+
+    private List&lt;MoveParameter&gt; enumerate(Expr root) {
+<span class="fc" id="L34">        List&lt;SignedTerm&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L35">        flatten(root, true, terms);</span>
+<span class="fc" id="L36">        Map&lt;String, MoveParameter&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (SignedTerm term : terms) {</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            if (!(term.expr() instanceof NumberExpr number)) {</span>
+                continue;
+            }
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            double signedValue = term.positive() ? number.value() : -number.value();</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (signedValue == 0.0) {</span>
+<span class="fc" id="L43">                continue;</span>
+            }
+<span class="fc" id="L45">            double cancellation = -signedValue;</span>
+<span class="fc" id="L46">            String canonical = formatNumber(cancellation);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            String signed = (cancellation &gt; 0 ? &quot;+&quot; : &quot;&quot;) + canonical;</span>
+<span class="fc" id="L48">            distinct.putIfAbsent(signed, new MoveParameter(</span>
+                    &quot;cancel&quot;,
+                    MoveParameterKind.GENERATED,
+                    signed,
+                    canonical,
+                    MoveParameter.UNSPECIFIED_INDEX,
+<span class="fc" id="L54">                    id()));</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        List&lt;MoveParameter&gt; parameters = new ArrayList&lt;&gt;(distinct.values());</span>
+<span class="fc" id="L57">        parameters.sort(MoveParameter.CANONICAL_ORDER);</span>
+<span class="fc" id="L58">        return List.copyOf(parameters);</span>
+    }
+
+    private void flatten(Expr expr, boolean positive, List&lt;SignedTerm&gt; out) {
+<span class="fc bfc" id="L62" title="All 4 branches covered.">        if (expr instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L63">            flatten(binary.left(), positive, out);</span>
+<span class="fc" id="L64">            flatten(binary.right(), positive, out);</span>
+<span class="fc bfc" id="L65" title="All 4 branches covered.">        } else if (expr instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.SUB) {</span>
+<span class="fc" id="L66">            flatten(binary.left(), positive, out);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            flatten(binary.right(), !positive, out);</span>
+        } else {
+<span class="fc" id="L69">            out.add(new SignedTerm(positive, expr));</span>
+        }
+<span class="fc" id="L71">    }</span>
+
+    private String formatNumber(double value) {
+<span class="pc bpc" id="L74" title="2 of 4 branches missed.">        if (value == Math.rint(value) &amp;&amp; !Double.isInfinite(value)) {</span>
+<span class="fc" id="L75">            return Long.toString((long) value);</span>
+        }
+<span class="nc" id="L77">        return Double.toString(value);</span>
+    }
+
+<span class="fc" id="L80">    private record SignedTerm(boolean positive, Expr expr) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
