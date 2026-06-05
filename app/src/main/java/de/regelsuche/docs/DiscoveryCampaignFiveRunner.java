@@ -2,6 +2,10 @@ package de.regelsuche.docs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.moves.report.MoveTreeReport;
+import de.regelsuche.moves.report.MoveTreeReportAssembler;
+import de.regelsuche.moves.report.MoveTreeReportWriter;
+import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.transform.CommonSubexpressionDiscoveryOperator;
 import de.regelsuche.transform.CompleteSquareBridgeOperator;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
@@ -67,10 +71,75 @@ public final class DiscoveryCampaignFiveRunner {
                 renderMarkdown(report),
                 StandardCharsets.UTF_8
             );
+            writeMoveTreeReport(outputDirectory);
             return report;
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * Builds and writes the {@code move-tree-report.json} / {@code .md} artefacts
+     * from the first successful campaign path, modelling every applied step as a
+     * countable {@link de.regelsuche.moves.RewriteMove}.
+     */
+    MoveTreeReport writeMoveTreeReport(Path outputDirectory) {
+        MoveTreeReport moveTree = buildMoveTreeReport();
+        return new MoveTreeReportWriter().write(outputDirectory, moveTree);
+    }
+
+    MoveTreeReport buildMoveTreeReport() {
+        ExpressionScorer scorer = new ExpressionScorer();
+        MoveTreeReportAssembler assembler = new MoveTreeReportAssembler();
+        for (CampaignCase campaignCase : cases()) {
+            DiscoveryBenchmarkScenario scenario = campaignCase.scenario();
+            DiscoveryBenchmarkEvidence evidence = new DiscoveryBenchmarkExecutor(loader).execute(scenario);
+            List<String> path = evidence.withoutMacroRun().path();
+            List<String> rules = evidence.withoutMacroRun().appliedRuleIds();
+            if (path.size() < 2 || rules.isEmpty()) {
+                continue;
+            }
+            List<MoveTreeReportAssembler.PathStep> steps = pathSteps(evidence, path, rules);
+            return assembler.assemble(
+                campaignCase.id(),
+                steps,
+                List.of(),
+                expression -> scorer.score(expression).weightedTotal());
+        }
+        return assembler.assemble("discovery-campaign-5", List.of(), List.of(), null);
+    }
+
+    private List<MoveTreeReportAssembler.PathStep> pathSteps(
+        DiscoveryBenchmarkEvidence evidence, List<String> path, List<String> rules) {
+        java.util.Map<String, DiscoveryBenchmarkEvidence.EvidenceEdge> edgesByKey = new java.util.LinkedHashMap<>();
+        for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges()) {
+            edgesByKey.putIfAbsent(edgeKey(edge.from(), edge.to(), edge.ruleId()), edge);
+        }
+        List<MoveTreeReportAssembler.PathStep> steps = new ArrayList<>();
+        int stepCount = Math.min(rules.size(), path.size() - 1);
+        for (int i = 0; i < stepCount; i++) {
+            String before = path.get(i);
+            String after = path.get(i + 1);
+            String ruleId = rules.get(i);
+            String key = edgeKey(before, after, ruleId);
+            DiscoveryBenchmarkEvidence.EvidenceEdge edge = edgesByKey.get(key);
+            steps.add(new MoveTreeReportAssembler.PathStep(
+                before,
+                after,
+                ruleId,
+                edge == null ? "" : edge.operatorId(),
+                edge == null ? List.of() : edge.assumptions(),
+                edge == null ? "" : edge.source()));
+        }
+        return steps;
+    }
+
+    private String edgeKey(String from, String to, String ruleId) {
+        return stripWhitespace(from) + "->" + stripWhitespace(to) + "|" + (ruleId == null ? "" : ruleId);
+    }
+
+    private String stripWhitespace(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "");
     }
 
     private CaseResult evaluate(CampaignCase campaignCase) {

@@ -82,6 +82,31 @@ class DiscoveryCampaignFiveRunnerTest {
         }
     }
 
+    @Test
+    void campaignFiveWritesMoveTreeReportWithRewriteMoves(@TempDir Path tempDir) throws Exception {
+        DiscoveryCampaignFiveRunner runner = new DiscoveryCampaignFiveRunner();
+        runner.writeReport(tempDir);
+
+        assertTrue(Files.exists(tempDir.resolve("move-tree-report.json")));
+        assertTrue(Files.exists(tempDir.resolve("move-tree-report.md")));
+
+        String moveTreeJson = Files.readString(tempDir.resolve("move-tree-report.json"), StandardCharsets.UTF_8);
+        assertTrue(moveTreeJson.contains("rewriteMove"), moveTreeJson);
+
+        de.regelsuche.moves.report.MoveTreeReport moveTree = runner.buildMoveTreeReport();
+        assertFalse(moveTree.successfulPathMoves().isEmpty(),
+            "successful campaign-5 path should contain rewrite moves");
+        for (de.regelsuche.moves.RewriteMove move : moveTree.successfulPathMoves()) {
+            assertFalse(move.sourceExpression().isBlank());
+            assertFalse(move.targetExpression().isBlank());
+            assertFalse(move.canonicalBefore().isBlank());
+            assertFalse(move.canonicalAfter().isBlank());
+        }
+        assertTrue(moveTree.successfulPathMoves().stream().anyMatch(move ->
+                !move.operatorId().isBlank() || !move.assumptions().isEmpty()),
+            "expected successful-path moves to retain edge metadata");
+    }
+
     private Set<String> existingInputTargetPairs() {
         Set<String> pairs = new HashSet<>();
         collectPairs(pairs, new DiscoveryCampaignOneRunner().run().results().stream()
