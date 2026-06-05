@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveCandidateTransformationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves</a> &gt; <span class="el_source">MoveCandidateTransformationEngine.java</span></div><h1>MoveCandidateTransformationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.CommonSubexpressionDiscoveryOperator;
+import de.regelsuche.transform.CompleteSquareBridgeOperator;
+import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.SubstitutionIntroductionOperator;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Bridges explicit depth-1 move enumeration into the existing search
+ * infrastructure by turning enumerated {@link RewriteMove}s into ordinary
+ * {@link Transformation}s.
+ *
+ * &lt;p&gt;The adapter keeps the legacy engine intact: {@link #transform(String)}
+ * returns classic candidates plus move-enumerator-only candidates, while
+ * {@link #compare(String)} exposes the full overlap report.&lt;/p&gt;
+ */
+public final class MoveCandidateTransformationEngine implements TransformationEngine {
+    public static final String MOVE_RULE_ID = &quot;move.ruleId&quot;;
+    public static final String MOVE_OPERATOR_ID = &quot;move.operatorId&quot;;
+    public static final String MOVE_ID = &quot;move.moveId&quot;;
+    public static final String MOVE_ORDINAL = &quot;move.ordinal&quot;;
+    public static final String MOVE_SOURCE = &quot;move.source&quot;;
+    public static final String MOVE_PARAMETER_PREFIX = &quot;move.parameter.&quot;;
+
+    private final TransformationEngine baseEngine;
+    private final Depth1MoveEnumerator enumerator;
+    private final MoveRealizer moveRealizer;
+    private final MoveComparisonService comparisonService;
+<span class="fc" id="L43">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L44">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    public MoveCandidateTransformationEngine() {
+<span class="fc" id="L47">        this(</span>
+<span class="fc" id="L48">            defaultClassicEngine(),</span>
+            new Depth1MoveEnumerator(),
+            new MoveRealizer(),
+            new MoveComparisonService()
+        );
+<span class="fc" id="L53">    }</span>
+
+    public MoveCandidateTransformationEngine(TransformationEngine baseEngine, Depth1MoveEnumerator enumerator) {
+<span class="fc" id="L56">        this(baseEngine, enumerator, new MoveRealizer(), new MoveComparisonService());</span>
+<span class="fc" id="L57">    }</span>
+
+    public MoveCandidateTransformationEngine(
+        TransformationEngine baseEngine,
+        Depth1MoveEnumerator enumerator,
+        MoveRealizer moveRealizer,
+        MoveComparisonService comparisonService
+<span class="fc" id="L64">    ) {</span>
+<span class="fc" id="L65">        this.baseEngine = Objects.requireNonNull(baseEngine, &quot;baseEngine&quot;);</span>
+<span class="fc" id="L66">        this.enumerator = Objects.requireNonNull(enumerator, &quot;enumerator&quot;);</span>
+<span class="fc" id="L67">        this.moveRealizer = Objects.requireNonNull(moveRealizer, &quot;moveRealizer&quot;);</span>
+<span class="fc" id="L68">        this.comparisonService = Objects.requireNonNull(comparisonService, &quot;comparisonService&quot;);</span>
+<span class="fc" id="L69">    }</span>
+
+    public List&lt;Transformation&gt; classicCandidates(String expression) {
+<span class="fc" id="L72">        List&lt;Transformation&gt; sorted = new ArrayList&lt;&gt;(baseEngine.transform(expression));</span>
+<span class="fc" id="L73">        sorted.sort(candidateOrdering());</span>
+<span class="fc" id="L74">        return List.copyOf(sorted);</span>
+    }
+
+    public List&lt;MoveBackedTransformation&gt; moveCandidates(String expression) {
+<span class="fc" id="L78">        return moveRealizer.realize(expression, enumerator.enumerate(expression));</span>
+    }
+
+    public ComparisonReport compare(String expression) {
+<span class="fc" id="L82">        return comparisonService.compare(</span>
+            expression,
+<span class="fc" id="L84">            classicCandidates(expression),</span>
+<span class="fc" id="L85">            moveCandidates(expression),</span>
+            this::transformedKey
+        );
+    }
+
+    @Override
+    public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc" id="L92">        List&lt;Transformation&gt; classic = classicCandidates(expression);</span>
+<span class="fc" id="L93">        Map&lt;String, Transformation&gt; combined = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (Transformation transformation : classic) {</span>
+<span class="fc" id="L95">            combined.putIfAbsent(transformedKey(transformation.transformedExpression()), transformation);</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (MoveBackedTransformation candidate : moveCandidates(expression)) {</span>
+<span class="fc" id="L98">            combined.putIfAbsent(</span>
+<span class="fc" id="L99">                transformedKey(candidate.transformation().transformedExpression()),</span>
+<span class="fc" id="L100">                candidate.transformation()</span>
+            );
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        List&lt;Transformation&gt; ordered = new ArrayList&lt;&gt;(combined.values());</span>
+<span class="fc" id="L104">        ordered.sort(candidateOrdering());</span>
+<span class="fc" id="L105">        return List.copyOf(ordered);</span>
+    }
+
+    public static Optional&lt;MoveMetadata&gt; metadataOf(Transformation transformation) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (transformation == null) {</span>
+<span class="nc" id="L110">            return Optional.empty();</span>
+        }
+<span class="fc" id="L112">        String ruleId = &quot;&quot;;</span>
+<span class="fc" id="L113">        String operatorId = &quot;&quot;;</span>
+<span class="fc" id="L114">        String moveId = &quot;&quot;;</span>
+<span class="fc" id="L115">        String ordinal = &quot;&quot;;</span>
+<span class="fc" id="L116">        LinkedHashMap&lt;String, String&gt; parameters = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (String assumption : transformation.assumptions()) {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (assumption.startsWith(MOVE_RULE_ID + &quot;=&quot;)) {</span>
+<span class="fc" id="L119">                ruleId = valueAfterEquals(assumption);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            } else if (assumption.startsWith(MOVE_OPERATOR_ID + &quot;=&quot;)) {</span>
+<span class="fc" id="L121">                operatorId = valueAfterEquals(assumption);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            } else if (assumption.startsWith(MOVE_ID + &quot;=&quot;)) {</span>
+<span class="fc" id="L123">                moveId = valueAfterEquals(assumption);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            } else if (assumption.startsWith(MOVE_ORDINAL + &quot;=&quot;)) {</span>
+<span class="fc" id="L125">                ordinal = valueAfterEquals(assumption);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            } else if (assumption.startsWith(MOVE_PARAMETER_PREFIX)) {</span>
+<span class="fc" id="L127">                int separator = assumption.indexOf('=');</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                if (separator &gt; 0) {</span>
+<span class="fc" id="L129">                    parameters.put(</span>
+<span class="fc" id="L130">                        assumption.substring(MOVE_PARAMETER_PREFIX.length(), separator),</span>
+<span class="fc" id="L131">                        assumption.substring(separator + 1)</span>
+                    );
+                }
+            }
+<span class="fc" id="L135">        }</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (moveId.isBlank()) {</span>
+<span class="fc" id="L137">            return Optional.empty();</span>
+        }
+<span class="fc" id="L139">        return Optional.of(new MoveMetadata(ruleId, operatorId, moveId, ordinal, parameters));</span>
+    }
+
+    public static TransformationEngine defaultClassicEngine() {
+<span class="fc" id="L143">        return new HypothesisTransformationEngine(</span>
+<span class="fc" id="L144">            new AstRewriteTransformationEngine(AstRewriteTransformationEngine.defaultRules(), 128, 160),</span>
+<span class="fc" id="L145">            List.of(</span>
+                new CompleteSquareBridgeOperator(),
+                new CommonSubexpressionDiscoveryOperator(),
+                new SubstitutionIntroductionOperator()
+            ),
+            16
+        );
+    }
+
+    String canonical(String expression) {
+<span class="pc bpc" id="L155" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L156">            return &quot;&quot;;</span>
+        }
+        try {
+<span class="fc" id="L159">            return canonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L160">        } catch (RuntimeException exception) {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (expression.contains(&quot;=&quot;)) {</span>
+                try {
+<span class="nc" id="L163">                    return ExpressionFormatter.format(parser.parseEquation(expression));</span>
+<span class="nc" id="L164">                } catch (RuntimeException ignored) {</span>
+                    // fall through to whitespace normalization
+                }
+            }
+<span class="nc" id="L168">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+        }
+    }
+
+    private String transformedKey(String transformedExpression) {
+<span class="fc" id="L173">        return canonical(transformedExpression);</span>
+    }
+
+    private Comparator&lt;Transformation&gt; candidateOrdering() {
+<span class="fc" id="L177">        return Comparator.comparing(Transformation::rule)</span>
+<span class="fc" id="L178">            .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L179">            .thenComparing(Transformation::applicationKey);</span>
+    }
+
+    private static String ordinalText(MoveOrdinal ordinal) {
+<span class="fc" id="L183">        return ordinal.ruleOrdinal() + &quot;:&quot; + ordinal.occurrenceOrdinal() + &quot;:&quot; + ordinal.parameterOrdinals();</span>
+    }
+
+    private static String valueAfterEquals(String assumption) {
+<span class="fc" id="L187">        int index = assumption.indexOf('=');</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        return index &lt; 0 ? &quot;&quot; : assumption.substring(index + 1);</span>
+    }
+
+<span class="fc" id="L191">    public record MoveBackedTransformation(RewriteMove move, Transformation transformation) {</span>
+    }
+
+    public record MoveMetadata(
+        String ruleId,
+        String operatorId,
+        String moveId,
+        String ordinal,
+        Map&lt;String, String&gt; parameters
+    ) {
+<span class="fc" id="L201">        public MoveMetadata {</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            parameters = parameters == null ? Map.of() : Map.copyOf(parameters);</span>
+<span class="fc" id="L203">        }</span>
+    }
+
+    public record CandidateSummary(
+        String transformedExpression,
+        String ruleId,
+        String operatorId,
+        String moveId,
+        String ordinal,
+        Map&lt;String, String&gt; parameters
+    ) {
+<span class="fc" id="L214">        public CandidateSummary {</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            parameters = parameters == null ? Map.of() : Map.copyOf(parameters);</span>
+<span class="fc" id="L216">        }</span>
+
+        static CandidateSummary fromClassic(Transformation transformation) {
+<span class="fc" id="L219">            return metadataOf(transformation)</span>
+<span class="pc" id="L220">                .map(metadata -&gt; new CandidateSummary(</span>
+<span class="nc" id="L221">                    transformation.transformedExpression(),</span>
+<span class="nc" id="L222">                    metadata.ruleId(),</span>
+<span class="nc" id="L223">                    metadata.operatorId(),</span>
+<span class="nc" id="L224">                    metadata.moveId(),</span>
+<span class="nc" id="L225">                    metadata.ordinal(),</span>
+<span class="nc" id="L226">                    metadata.parameters()</span>
+                ))
+<span class="fc" id="L228">                .orElseGet(() -&gt; new CandidateSummary(</span>
+<span class="fc" id="L229">                    transformation.transformedExpression(),</span>
+<span class="fc" id="L230">                    transformation.rule(),</span>
+                    &quot;&quot;,
+                    &quot;&quot;,
+                    &quot;&quot;,
+<span class="fc" id="L234">                    Map.of()</span>
+                ));
+        }
+
+        static CandidateSummary fromMove(MoveBackedTransformation moveBackedTransformation) {
+<span class="fc" id="L239">            RewriteMove move = moveBackedTransformation.move();</span>
+<span class="fc" id="L240">            Map&lt;String, String&gt; parameters = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            for (MoveParameter parameter : move.parameters()) {</span>
+<span class="fc" id="L242">                parameters.put(parameter.name(), parameter.value());</span>
+<span class="fc" id="L243">            }</span>
+<span class="fc" id="L244">            return new CandidateSummary(</span>
+<span class="fc" id="L245">                moveBackedTransformation.transformation().transformedExpression(),</span>
+<span class="fc" id="L246">                move.ruleId(),</span>
+<span class="fc" id="L247">                move.operatorId(),</span>
+<span class="fc" id="L248">                move.moveId(),</span>
+<span class="fc" id="L249">                ordinalText(move.ordinal()),</span>
+                parameters
+            );
+        }
+    }
+
+    public record ComparisonReport(
+        String expression,
+        List&lt;CandidateSummary&gt; classicCandidates,
+        List&lt;CandidateSummary&gt; moveCandidates,
+        List&lt;CandidateSummary&gt; overlaps,
+        List&lt;CandidateSummary&gt; moveOnlyCandidates,
+        List&lt;CandidateSummary&gt; classicOnlyCandidates
+    ) {
+<span class="fc" id="L263">        public ComparisonReport {</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            classicCandidates = classicCandidates == null ? List.of() : List.copyOf(classicCandidates);</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            moveCandidates = moveCandidates == null ? List.of() : List.copyOf(moveCandidates);</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">            overlaps = overlaps == null ? List.of() : List.copyOf(overlaps);</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            moveOnlyCandidates = moveOnlyCandidates == null ? List.of() : List.copyOf(moveOnlyCandidates);</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            classicOnlyCandidates = classicOnlyCandidates == null ? List.of() : List.copyOf(classicOnlyCandidates);</span>
+<span class="fc" id="L269">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

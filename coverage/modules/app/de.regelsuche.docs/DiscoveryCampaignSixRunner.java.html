@@ -2,412 +2,456 @@
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.ast.VariableExpr;
-import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
-import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
-import de.regelsuche.parse.ExpressionFormatter;
-import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.moves.MoveCandidateTransformationEngine;
+import de.regelsuche.moves.RewriteMove;
+import de.regelsuche.moves.search.CountableMoveSearchEngine;
+import de.regelsuche.moves.search.CountableMoveSearchEngine.CountableMoveSearchResult;
 import de.regelsuche.util.AtomicJsonFile;
-import de.regelsuche.validation.SymPyDiscoveryOracleAdapter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
-/**
- * Runs Discovery Campaign 6 (Open-Ended Identity Mining).
- *
- * &lt;p&gt;Unlike campaigns 1-5, which validate curated input/target pairs, this campaign lets Regelsuche
- * &lt;em&gt;generate&lt;/em&gt; identity candidates on its own. It seeds known identity families, applies a fixed
- * catalogue of substitutions (for example {@code x+1}, {@code sin(x)}, {@code a+b}, {@code x^2}),
- * checks equivalence deterministically (and corroborates with a SymPy oracle when available), ranks the
- * candidates by brevity, surprise, path length, reusability and difference from the source expression,
- * and reports the Top-20 as possible new macros.
- */
-<span class="fc" id="L37">public final class DiscoveryCampaignSixRunner {</span>
-<span class="fc" id="L38">    private static final ObjectMapper JSON = new ObjectMapper()</span>
-<span class="fc" id="L39">        .findAndRegisterModules()</span>
-<span class="fc" id="L40">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+/** Runs Discovery Campaign 6: Countable Move Search Probe. */
+<span class="fc" id="L23">public final class DiscoveryCampaignSixRunner {</span>
+<span class="fc" id="L24">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L25">        .findAndRegisterModules()</span>
+<span class="fc" id="L26">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
 
-    private static final String PLACEHOLDER = &quot;U&quot;;
-    private static final String ATOM = &quot;u&quot;;
-    private static final int TOP_LIMIT = 20;
-    private static final double BREVITY_NODE_CAP = 14.0;
-    private static final double PROMOTABLE_THRESHOLD = 0.45;
-
-<span class="fc" id="L48">    private final ExpressionParser parser = new ExpressionParser();</span>
-<span class="fc" id="L49">    private final PolynomialNormalFormEquivalenceService equivalence =</span>
-        new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
-<span class="fc" id="L51">    private final SymPyDiscoveryOracleAdapter oracle = new SymPyDiscoveryOracleAdapter();</span>
+<span class="fc" id="L28">    private final MoveCandidateTransformationEngine moveAdapter = new MoveCandidateTransformationEngine();</span>
+<span class="fc" id="L29">    private final CountableMoveSearchEngine moveSearchEngine = new CountableMoveSearchEngine();</span>
+<span class="fc" id="L30">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
 
     public static void main(String[] args) {
-<span class="nc bnc" id="L54" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
-<span class="nc" id="L55">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
-<span class="nc" id="L56">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
-<span class="nc" id="L57">        new DiscoveryCampaignSixRunner()</span>
-<span class="nc" id="L58">            .writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-campaign-6&quot;));</span>
-<span class="nc" id="L59">    }</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L34">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L35">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L36">        new DiscoveryCampaignSixRunner()</span>
+<span class="nc" id="L37">            .writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-campaign-6&quot;));</span>
+<span class="nc" id="L38">    }</span>
 
     public CampaignReport run() {
-<span class="fc" id="L62">        List&lt;Candidate&gt; scored = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (Seed seed : seeds()) {</span>
-<span class="fc bfc" id="L64" title="All 2 branches covered.">            for (Substitution substitution : substitutions()) {</span>
-<span class="fc" id="L65">                scored.add(mine(seed, substitution));</span>
-<span class="fc" id="L66">            }</span>
-<span class="fc" id="L67">        }</span>
-<span class="fc" id="L68">        scored.sort(Comparator</span>
-<span class="fc" id="L69">            .comparingDouble(Candidate::interestingness).reversed()</span>
-<span class="fc" id="L70">            .thenComparing(Candidate::id));</span>
-
-<span class="fc" id="L72">        List&lt;Candidate&gt; ranked = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L73">        int rank = 1;</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        for (Candidate candidate : scored) {</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (rank &gt; TOP_LIMIT) {</span>
-<span class="fc" id="L76">                break;</span>
-            }
-<span class="fc" id="L78">            ranked.add(candidate.withRank(rank));</span>
-<span class="fc" id="L79">            rank++;</span>
-<span class="fc" id="L80">        }</span>
-<span class="fc" id="L81">        long promotable = ranked.stream().filter(Candidate::promotable).count();</span>
-<span class="fc" id="L82">        return new CampaignReport(&quot;discovery-campaign-6&quot;, ranked, scored.size(), (int) promotable);</span>
+<span class="fc" id="L41">        List&lt;CaseResult&gt; results = cases().stream().map(this::evaluate).toList();</span>
+<span class="fc" id="L42">        return new CampaignReport(&quot;discovery-campaign-6&quot;, results, relatedFollowUpIssues(), builtInArchitectureNote());</span>
     }
 
     public CampaignReport writeReport(Path outputDirectory) {
-<span class="fc" id="L86">        return writeReport(outputDirectory, run());</span>
+<span class="fc" id="L46">        return writeReport(outputDirectory, run());</span>
     }
 
     CampaignReport writeReport(Path outputDirectory, CampaignReport report) {
         try {
-<span class="fc" id="L91">            Files.createDirectories(outputDirectory);</span>
-<span class="fc" id="L92">            AtomicJsonFile.writeUtf8(</span>
-<span class="fc" id="L93">                outputDirectory.resolve(&quot;discovery-campaign-6.json&quot;),</span>
-<span class="fc" id="L94">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+<span class="fc" id="L51">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L52">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L53">                outputDirectory.resolve(&quot;discovery-campaign-6.json&quot;),</span>
+<span class="fc" id="L54">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
             );
-<span class="fc" id="L96">            Files.writeString(</span>
-<span class="fc" id="L97">                outputDirectory.resolve(&quot;identity-mining-report.md&quot;),</span>
-<span class="fc" id="L98">                renderMarkdown(report),</span>
+<span class="fc" id="L56">            Files.writeString(</span>
+<span class="fc" id="L57">                outputDirectory.resolve(&quot;countable-move-enumeration-report.md&quot;),</span>
+<span class="fc" id="L58">                renderMarkdown(report),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L101">            return report;</span>
-<span class="nc" id="L102">        } catch (IOException exception) {</span>
-<span class="nc" id="L103">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L61">            return report;</span>
+<span class="nc" id="L62">        } catch (IOException exception) {</span>
+<span class="nc" id="L63">            throw new UncheckedIOException(exception);</span>
         }
     }
 
-    private Candidate mine(Seed seed, Substitution substitution) {
-<span class="fc" id="L108">        String id = seed.id() + &quot;--&quot; + substitution.id();</span>
-<span class="fc" id="L109">        String sourceExpression = instantiate(seed.sourceTemplate(), substitution.expression());</span>
-<span class="fc" id="L110">        String simplifiedExpression = instantiate(seed.simplifiedTemplate(), substitution.expression());</span>
+    private CaseResult evaluate(ProbeCase probeCase) {
+<span class="fc" id="L68">        MoveCandidateTransformationEngine.ComparisonReport comparison = moveAdapter.compare(probeCase.inputExpression());</span>
+<span class="pc bpc" id="L69" title="1 of 5 branches missed.">        boolean expectedMovePresent = switch (probeCase.id()) {</span>
+<span class="fc" id="L70">            case &quot;cancellation-plus-one&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;cancel&quot;, &quot;+1&quot;);</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            case &quot;complete-square&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;shift&quot;, &quot;3&quot;)</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                &amp;&amp; hasParameter(comparison.moveCandidates(), &quot;residue&quot;, &quot;-4&quot;);</span>
+<span class="fc" id="L73">            case &quot;repeated-subexpression&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;x + 1&quot;, &quot;x + 1&quot;);</span>
+<span class="fc" id="L74">            case &quot;common-subexpression&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;y + 1&quot;, &quot;y + 1&quot;);</span>
+<span class="pc" id="L75">            default -&gt; false;</span>
+        };
+<span class="fc" id="L77">        String expectedMoveCoverage = expectedCoverage(comparison, probeCase.id());</span>
 
-        // Deterministic, offline equivalence: the substituted subterm is treated as a single fresh
-        // atom so the family identity reduces to a pure polynomial normal-form comparison.
-<span class="fc" id="L114">        String atomicSource = seed.sourceTemplate().replace(PLACEHOLDER, ATOM);</span>
-<span class="fc" id="L115">        String atomicSimplified = seed.simplifiedTemplate().replace(PLACEHOLDER, ATOM);</span>
-<span class="fc" id="L116">        boolean equivalent = equivalence.arePolynomiallyEquivalent(atomicSource, atomicSimplified);</span>
-<span class="fc" id="L117">        String deterministicEvidence = equivalence.lastResult().detail();</span>
+<span class="fc" id="L79">        CountableMoveSearchResult searchResult = moveSearchEngine.search(</span>
+<span class="fc" id="L80">            probeCase.inputExpression(),</span>
+<span class="fc" id="L81">            probeCase.targetExpression(),</span>
+            4,
+            120
+        );
 
-<span class="fc" id="L119">        SymPyDiscoveryOracleAdapter.OracleResult oracleResult =</span>
-<span class="fc" id="L120">            oracle.equivalence(sourceExpression, simplifiedExpression);</span>
+<span class="fc" id="L86">        List&lt;PathStep&gt; pathSteps = toPathSteps(searchResult);</span>
+<span class="fc" id="L87">        String architectureNote = architectureNote(probeCase, expectedMovePresent, searchResult);</span>
+<span class="fc" id="L88">        Interpretation interpretation = interpretation(probeCase, comparison, searchResult, architectureNote);</span>
 
-<span class="fc" id="L122">        int sourceNodes = nodeCount(sourceExpression);</span>
-<span class="fc" id="L123">        int simplifiedNodes = nodeCount(simplifiedExpression);</span>
-<span class="fc" id="L124">        int baseNodes = nodeCount(instantiate(seed.sourceTemplate(), &quot;x&quot;));</span>
-<span class="fc" id="L125">        Set&lt;String&gt; variables = variablesOf(sourceExpression);</span>
-
-<span class="fc" id="L127">        List&lt;String&gt; path = buildPath(seed, substitution, sourceExpression, simplifiedExpression);</span>
-
-<span class="fc" id="L129">        double brevity = clamp(1.0 - (simplifiedNodes / BREVITY_NODE_CAP));</span>
-<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        double surprise = sourceNodes == 0</span>
-<span class="nc" id="L131">            ? 0.0</span>
-<span class="fc" id="L132">            : clamp((double) (sourceNodes - simplifiedNodes) / sourceNodes);</span>
-<span class="fc" id="L133">        double pathLengthScore = clamp((path.size() - 1) / 3.0);</span>
-<span class="fc" id="L134">        double reusability = clamp(</span>
-<span class="fc" id="L135">            0.5 * clamp((variables.size() - 1) / 2.0) + 0.5 * substitution.generality());</span>
-<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        double differenceFromSource = baseNodes == 0</span>
-<span class="nc" id="L137">            ? 0.0</span>
-<span class="fc" id="L138">            : clamp((double) Math.max(0, sourceNodes - baseNodes) / baseNodes);</span>
-
-<span class="fc" id="L140">        Scores scores = new Scores(brevity, surprise, pathLengthScore, reusability, differenceFromSource);</span>
-<span class="fc" id="L141">        double interestingness = clamp(</span>
-            0.20 * brevity
-                + 0.30 * surprise
-                + 0.15 * pathLengthScore
-                + 0.20 * reusability
-                + 0.15 * differenceFromSource);
-
-<span class="fc" id="L148">        boolean knownSeed = substitution.identity();</span>
-<span class="pc bpc" id="L149" title="1 of 6 branches missed.">        boolean promotable = equivalent</span>
-            &amp;&amp; !knownSeed
-            &amp;&amp; interestingness &gt;= PROMOTABLE_THRESHOLD
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            &amp;&amp; oracleResult.status() != SymPyDiscoveryOracleAdapter.Status.DISAGREE;</span>
-
-<span class="fc" id="L154">        String whyInteresting = explain(seed, substitution, sourceNodes, simplifiedNodes,</span>
-<span class="fc" id="L155">            variables.size(), path.size(), knownSeed, scores);</span>
-
-<span class="fc" id="L157">        return new Candidate(</span>
-            0,
-            id,
-<span class="fc" id="L160">            seed.family(),</span>
-<span class="fc" id="L161">            seed.seedFamilyId(),</span>
-<span class="fc" id="L162">            substitution.expression(),</span>
-            sourceExpression,
-            simplifiedExpression,
-            path,
-            equivalent,
-            deterministicEvidence,
-<span class="fc" id="L168">            oracleResult.status().name(),</span>
-<span class="fc" id="L169">            oracleResult.evidence(),</span>
-            scores,
-            interestingness,
-            promotable,
-            whyInteresting
+<span class="fc" id="L90">        return new CaseResult(</span>
+<span class="fc" id="L91">            probeCase.id(),</span>
+<span class="fc" id="L92">            probeCase.inputExpression(),</span>
+<span class="fc" id="L93">            probeCase.targetExpression(),</span>
+<span class="fc" id="L94">            probeCase.expectation(),</span>
+            new Depth1CandidateProbe(
+                expectedMovePresent,
+                expectedMoveCoverage,
+<span class="fc" id="L98">                comparison.classicCandidates().size(),</span>
+<span class="fc" id="L99">                comparison.moveCandidates().size(),</span>
+<span class="fc" id="L100">                comparison.overlaps().size(),</span>
+<span class="fc" id="L101">                comparison.moveOnlyCandidates().size(),</span>
+<span class="fc" id="L102">                comparison.classicOnlyCandidates().size()</span>
+            ),
+            new MultiStepCountableMoveSearch(
+<span class="fc" id="L105">                searchResult.success(),</span>
+<span class="fc" id="L106">                searchResult.pathLength(),</span>
+<span class="fc" id="L107">                searchResult.pathExpressions(),</span>
+<span class="fc" id="L108">                searchResult.appliedMoves(),</span>
+<span class="fc" id="L109">                searchResult.appliedRuleIds(),</span>
+<span class="fc" id="L110">                ordinalPath(searchResult.appliedMoves()),</span>
+<span class="fc" id="L111">                searchResult.exploredStateCount(),</span>
+<span class="fc" id="L112">                searchResult.uniqueCanonicalStateCount(),</span>
+<span class="fc" id="L113">                searchResult.failureReason().name(),</span>
+                pathSteps
+            ),
+            interpretation,
+            comparison,
+            architectureNote
         );
     }
 
-    private List&lt;String&gt; buildPath(Seed seed, Substitution substitution, String source, String simplified) {
-<span class="fc" id="L178">        List&lt;String&gt; path = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L179">        path.add(&quot;seed:&quot; + seed.family() + &quot; (&quot; + seed.sourceTemplate() + &quot;)&quot;);</span>
-<span class="fc" id="L180">        path.add(&quot;substitute &quot; + PLACEHOLDER + &quot; := &quot; + substitution.expression());</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (!substitution.atomic()) {</span>
-<span class="fc" id="L182">            path.add(&quot;expand to &quot; + source);</span>
+    private List&lt;PathStep&gt; toPathSteps(CountableMoveSearchResult searchResult) {
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">        if (!searchResult.success() || searchResult.appliedMoves().isEmpty()) {</span>
+<span class="fc" id="L124">            return List.of();</span>
         }
-<span class="fc" id="L184">        path.add(&quot;compress to &quot; + simplified);</span>
-<span class="fc" id="L185">        return List.copyOf(path);</span>
+<span class="fc" id="L126">        List&lt;PathStep&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L127">        List&lt;String&gt; path = searchResult.pathExpressions();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (int index = 0; index &lt; searchResult.appliedMoves().size(); index++) {</span>
+<span class="fc" id="L129">            RewriteMove move = searchResult.appliedMoves().get(index);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            String before = index &lt; path.size() ? path.get(index) : &quot;&quot;;</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            String after = index + 1 &lt; path.size() ? path.get(index + 1) : move.targetExpression();</span>
+<span class="fc" id="L132">            steps.add(new PathStep(</span>
+                index + 1,
+                before,
+<span class="fc" id="L135">                move.kind().name(),</span>
+<span class="fc" id="L136">                move.ruleId(),</span>
+<span class="fc" id="L137">                ordinalText(move),</span>
+<span class="fc" id="L138">                renderParameters(move),</span>
+                after
+            ));
+        }
+<span class="fc" id="L142">        return List.copyOf(steps);</span>
     }
 
-    private String explain(Seed seed, Substitution substitution, int sourceNodes, int simplifiedNodes,
-                           int variableCount, int pathSteps, boolean knownSeed, Scores scores) {
-<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (knownSeed) {</span>
-<span class="fc" id="L191">            return &quot;Rediscovers the known &quot; + seed.family() + &quot; identity on its base variable; &quot;</span>
-                + &quot;kept as a seed reference, not promotable.&quot;;
+    private String architectureNote(ProbeCase probeCase, boolean expectedMovePresent, CountableMoveSearchResult searchResult) {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (!expectedMovePresent) {</span>
+<span class="nc" id="L147">            return &quot;Missing parameter enumerator&quot;;</span>
         }
-<span class="fc" id="L194">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc" id="L195">        builder.append(&quot;Substituting &quot;).append(substitution.expression())</span>
-<span class="fc" id="L196">            .append(&quot; into the &quot;).append(seed.family())</span>
-<span class="fc" id="L197">            .append(&quot; family compresses &quot;).append(sourceNodes)</span>
-<span class="fc" id="L198">            .append(&quot; nodes down to &quot;).append(simplifiedNodes).append(&quot; (surprise &quot;)</span>
-<span class="fc" id="L199">            .append(format(scores.surprise())).append(&quot;).&quot;);</span>
-<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (variableCount &gt; 1) {</span>
-<span class="fc" id="L201">            builder.append(&quot; Reusable across &quot;).append(variableCount).append(&quot; free variables.&quot;);</span>
+<span class="fc bfc" id="L149" title="All 4 branches covered.">        if (!searchResult.success() &amp;&amp; &quot;cancellation-plus-one&quot;.equals(probeCase.id())) {</span>
+<span class="fc" id="L150">            return &quot;Missing normalizer&quot;;</span>
         }
-<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (!substitution.atomic()) {</span>
-<span class="fc" id="L204">            builder.append(&quot; Hidden structure revealed after a &quot;).append(pathSteps).append(&quot;-step derivation.&quot;);</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">        if (!searchResult.appliedMoves().isEmpty() &amp;&amp; searchResult.appliedMoves().stream().anyMatch(move -&gt;</span>
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">            move.kind().name().equals(&quot;UNKNOWN&quot;) || move.hasUnresolvedParameters())) {</span>
+<span class="nc" id="L154">            return &quot;Move enumeration needs classic fallback&quot;;</span>
         }
-<span class="fc" id="L206">        return builder.toString();</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (!searchResult.success()) {</span>
+<span class="fc" id="L157">            return &quot;Missing realizer&quot;;</span>
+        }
+<span class="fc" id="L159">        return &quot;Move enumeration is sufficient&quot;;</span>
     }
 
-    private String instantiate(String template, String substitution) {
-<span class="fc" id="L210">        String raw = template.replace(PLACEHOLDER, &quot;(&quot; + substitution + &quot;)&quot;);</span>
-        try {
-<span class="fc" id="L212">            return ExpressionFormatter.format(parser.parseTerm(raw));</span>
-<span class="nc" id="L213">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L214">            return raw;</span>
+    private Interpretation interpretation(
+        ProbeCase probeCase,
+        MoveCandidateTransformationEngine.ComparisonReport comparison,
+        CountableMoveSearchResult searchResult,
+        String architectureNote
+    ) {
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        String suitability = searchResult.success()</span>
+<span class="fc" id="L169">            ? &quot;Mehrstufiger Pfad erreichbar innerhalb des Budgets.&quot;</span>
+<span class="fc" id="L170">            : &quot;Ziel im aktuellen Budget nicht erreicht.&quot;;</span>
+<span class="pc bpc" id="L171" title="2 of 5 branches missed.">        String missingFamily = switch (architectureNote) {</span>
+<span class="nc" id="L172">            case &quot;Missing parameter enumerator&quot; -&gt; &quot;Parameter-Enumerator für den erwarteten Move erweitern.&quot;;</span>
+<span class="fc" id="L173">            case &quot;Missing normalizer&quot; -&gt; &quot;Nachgelagerte Normalisierung (z. B. cancellation -&gt; solve) fehlt.&quot;;</span>
+<span class="fc" id="L174">            case &quot;Missing realizer&quot; -&gt; &quot;Move-Realizer für diesen Fall vervollständigen.&quot;;</span>
+<span class="nc" id="L175">            case &quot;Move enumeration needs classic fallback&quot; -&gt; &quot;Move-Metadatenableitung für klassische Kandidaten verbessern.&quot;;</span>
+<span class="fc" id="L176">            default -&gt; &quot;Keine zusätzliche Move-Familie zwingend.&quot;;</span>
+        };
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        String comparisonText = comparison.moveOnlyCandidates().size() &gt; comparison.classicOnlyCandidates().size()</span>
+<span class="fc" id="L179">            ? &quot;Move-Enumeration ergänzt die klassische Engine sichtbar.&quot;</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            : comparison.moveOnlyCandidates().size() &lt; comparison.classicOnlyCandidates().size()</span>
+<span class="fc" id="L181">                ? &quot;Klassische Engine deckt aktuell noch mehr Kandidaten ab.&quot;</span>
+<span class="pc" id="L182">                : &quot;Move-Enumeration und Classic sind in diesem Fall ähnlich stark.&quot;;</span>
+<span class="pc bpc" id="L183" title="1 of 4 branches missed.">        if (&quot;cancellation-plus-one&quot;.equals(probeCase.id()) &amp;&amp; !searchResult.success()) {</span>
+<span class="fc" id="L184">            comparisonText = &quot;Cancellation-Move ist da, aber Normalisierungsfolge bis x = 1 fehlt noch.&quot;;</span>
         }
+<span class="fc" id="L186">        return new Interpretation(suitability, missingFamily, comparisonText);</span>
     }
 
-    private int nodeCount(String expression) {
-        try {
-<span class="fc" id="L220">            return nodeCount(parser.parseTerm(expression));</span>
-<span class="nc" id="L221">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L222">            return expression.length();</span>
+    private String expectedCoverage(MoveCandidateTransformationEngine.ComparisonReport comparison, String caseId) {
+<span class="pc bpc" id="L190" title="1 of 5 branches missed.">        Set&lt;String&gt; expectedCanonicalTargets = switch (caseId) {</span>
+<span class="fc" id="L191">            case &quot;cancellation-plus-one&quot; -&gt; Set.of(canonical(&quot;x - 1 + 1 = 0 + 1&quot;));</span>
+<span class="fc" id="L192">            case &quot;complete-square&quot; -&gt; Set.of(canonical(&quot;(x + 3)^2 - 4&quot;));</span>
+<span class="fc" id="L193">            case &quot;repeated-subexpression&quot; -&gt; Set.of(canonical(&quot;(x + 1) * x&quot;));</span>
+<span class="fc" id="L194">            case &quot;common-subexpression&quot; -&gt; Set.of(canonical(&quot;(y + 1) * (x + z)&quot;));</span>
+<span class="pc" id="L195">            default -&gt; Set.of();</span>
+        };
+<span class="fc" id="L197">        boolean inMove = comparison.moveCandidates().stream()</span>
+<span class="fc" id="L198">            .map(MoveCandidateTransformationEngine.CandidateSummary::transformedExpression)</span>
+<span class="fc" id="L199">            .map(this::canonical)</span>
+<span class="fc" id="L200">            .anyMatch(expectedCanonicalTargets::contains);</span>
+<span class="fc" id="L201">        boolean inClassic = comparison.classicCandidates().stream()</span>
+<span class="fc" id="L202">            .map(MoveCandidateTransformationEngine.CandidateSummary::transformedExpression)</span>
+<span class="fc" id="L203">            .map(this::canonical)</span>
+<span class="fc" id="L204">            .anyMatch(expectedCanonicalTargets::contains);</span>
+<span class="fc bfc" id="L205" title="All 4 branches covered.">        if (inMove &amp;&amp; inClassic) {</span>
+<span class="fc" id="L206">            return &quot;Overlap&quot;;</span>
         }
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (inMove) {</span>
+<span class="fc" id="L209">            return &quot;Move-only&quot;;</span>
+        }
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (inClassic) {</span>
+<span class="nc" id="L212">            return &quot;Classic-only&quot;;</span>
+        }
+<span class="fc" id="L214">        return &quot;Not-found&quot;;</span>
     }
 
-    private int nodeCount(Expr expression) {
-<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
-<span class="fc" id="L228">            return 1 + nodeCount(binaryExpr.left()) + nodeCount(binaryExpr.right());</span>
-        }
-<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
-<span class="fc" id="L231">            int total = 1;</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
-<span class="fc" id="L233">                total += nodeCount(argument);</span>
-<span class="fc" id="L234">            }</span>
-<span class="fc" id="L235">            return total;</span>
-        }
-<span class="fc" id="L237">        return 1;</span>
+    private String ordinalText(RewriteMove move) {
+<span class="fc" id="L218">        return move.ordinal().ruleOrdinal() + &quot;:&quot; + move.ordinal().occurrenceOrdinal() + &quot;:&quot; + move.ordinal().parameterOrdinals();</span>
     }
 
-    private Set&lt;String&gt; variablesOf(String expression) {
-<span class="fc" id="L241">        Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
-        try {
-<span class="fc" id="L243">            collectVariables(parser.parseTerm(expression), variables);</span>
-<span class="nc" id="L244">        } catch (IllegalArgumentException ignored) {</span>
-            // Leave the accumulated set as-is for unparseable expressions.
-<span class="fc" id="L246">        }</span>
-<span class="fc" id="L247">        return variables;</span>
+    private List&lt;String&gt; ordinalPath(List&lt;RewriteMove&gt; appliedMoves) {
+<span class="fc" id="L222">        return appliedMoves.stream().map(this::ordinalText).toList();</span>
     }
 
-    private void collectVariables(Expr expression, Set&lt;String&gt; variables) {
-<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
-<span class="fc" id="L252">            variables.add(variableExpr.name());</span>
-<span class="fc bfc" id="L253" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr binaryExpr) {</span>
-<span class="fc" id="L254">            collectVariables(binaryExpr.left(), variables);</span>
-<span class="fc" id="L255">            collectVariables(binaryExpr.right(), variables);</span>
-<span class="fc bfc" id="L256" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr functionExpr) {</span>
-<span class="fc bfc" id="L257" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
-<span class="fc" id="L258">                collectVariables(argument, variables);</span>
-<span class="fc" id="L259">            }</span>
+    private String renderParameters(RewriteMove move) {
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (move.parameters().isEmpty()) {</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            return move.hasUnresolvedParameters() ? &quot;parameters-unresolved&quot; : &quot;—&quot;;</span>
         }
-<span class="fc" id="L261">    }</span>
-
-    private double clamp(double value) {
-<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (value &lt; 0.0) {</span>
-<span class="fc" id="L265">            return 0.0;</span>
-        }
-<span class="fc" id="L267">        return Math.min(value, 1.0);</span>
+<span class="nc" id="L229">        List&lt;String&gt; parts = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        for (var parameter : move.parameters()) {</span>
+<span class="nc" id="L231">            parts.add(parameter.name() + &quot;=&quot; + parameter.value());</span>
+<span class="nc" id="L232">        }</span>
+<span class="nc" id="L233">        return String.join(&quot;, &quot;, parts);</span>
     }
 
-    private String format(double value) {
-<span class="fc" id="L271">        return String.format(Locale.ROOT, &quot;%.2f&quot;, value);</span>
+    private boolean hasParameter(
+        List&lt;MoveCandidateTransformationEngine.CandidateSummary&gt; candidates,
+        String name,
+        String value
+    ) {
+<span class="fc" id="L241">        return candidates.stream().anyMatch(candidate -&gt; value.equals(candidate.parameters().get(name)));</span>
     }
 
     private String renderMarkdown(CampaignReport report) {
-<span class="fc" id="L275">        StringBuilder out = new StringBuilder();</span>
-<span class="fc" id="L276">        out.append(&quot;# Discovery Campaign 6: Open-Ended Identity Mining\n\n&quot;);</span>
-<span class="fc" id="L277">        out.append(&quot;Regelsuche generated &quot;).append(report.generatedCount())</span>
-<span class="fc" id="L278">            .append(&quot; identity candidates from seed families and substitutions, then ranked them. &quot;)</span>
-<span class="fc" id="L279">            .append(&quot;The Top &quot;).append(report.topCandidates().size())</span>
-<span class="fc" id="L280">            .append(&quot; are listed below (&quot;).append(report.promotableCount())</span>
-<span class="fc" id="L281">            .append(&quot; promotable as new macros).\n\n&quot;);</span>
-<span class="fc" id="L282">        out.append(&quot;Ranking factors: brevity, surprise, path length, reusability, difference from source.\n\n&quot;);</span>
-<span class="fc" id="L283">        out.append(&quot;| Rank | Candidate | Family | Source | Simplified | Path | Oracle | Equivalent | Score | Promotable | Why interesting |\n&quot;);</span>
-<span class="fc" id="L284">        out.append(&quot;| ---: | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- |\n&quot;);</span>
-<span class="fc bfc" id="L285" title="All 2 branches covered.">        for (Candidate candidate : report.topCandidates()) {</span>
-<span class="fc" id="L286">            out.append(&quot;| &quot;).append(candidate.rank())</span>
-<span class="fc" id="L287">                .append(&quot; | &quot;).append(escape(candidate.id()))</span>
-<span class="fc" id="L288">                .append(&quot; | &quot;).append(escape(candidate.family()))</span>
-<span class="fc" id="L289">                .append(&quot; | &quot;).append(escape(candidate.sourceExpression()))</span>
-<span class="fc" id="L290">                .append(&quot; | &quot;).append(escape(candidate.simplifiedExpression()))</span>
-<span class="fc" id="L291">                .append(&quot; | &quot;).append(escape(String.join(&quot; -&gt; &quot;, candidate.path())))</span>
-<span class="fc" id="L292">                .append(&quot; | &quot;).append(escape(candidate.oracleStatus().toLowerCase(Locale.ROOT)))</span>
-<span class="pc bpc" id="L293" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(candidate.equivalent() ? &quot;yes&quot; : &quot;no&quot;)</span>
-<span class="fc" id="L294">                .append(&quot; | &quot;).append(format(candidate.interestingness()))</span>
-<span class="fc bfc" id="L295" title="All 2 branches covered.">                .append(&quot; | &quot;).append(candidate.promotable() ? &quot;yes&quot; : &quot;no&quot;)</span>
-<span class="fc" id="L296">                .append(&quot; | &quot;).append(escape(candidate.whyInteresting()))</span>
-<span class="fc" id="L297">                .append(&quot; |\n&quot;);</span>
-<span class="fc" id="L298">        }</span>
-<span class="fc" id="L299">        out.append(&quot;\n## Oracle / proof evidence\n\n&quot;);</span>
-<span class="fc bfc" id="L300" title="All 2 branches covered.">        for (Candidate candidate : report.topCandidates()) {</span>
-<span class="fc" id="L301">            out.append(&quot;- **&quot;).append(escape(candidate.id())).append(&quot;**: &quot;)</span>
-<span class="fc" id="L302">                .append(escape(candidate.deterministicEvidence()));</span>
-<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (!candidate.oracleEvidence().isBlank()) {</span>
-<span class="fc" id="L304">                out.append(&quot; — oracle: &quot;).append(escape(candidate.oracleEvidence()));</span>
+<span class="fc" id="L245">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L246">        out.append(&quot;# Discovery Campaign 6: Countable Move Search Probe\n\n&quot;);</span>
+<span class="fc" id="L247">        out.append(&quot;Diese Probe vergleicht Depth-1-Kandidaten und bewertet eine begrenzte mehrstufige Countable-Move-Suche (Depth&lt;=4).\n\n&quot;);</span>
+<span class="fc" id="L248">        out.append(&quot;## Built-in vs. nachladbare Module\n\n&quot;);</span>
+<span class="fc" id="L249">        out.append(report.builtInArchitectureNote()).append(&quot;\n\n&quot;);</span>
+
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        for (CaseResult result : report.cases()) {</span>
+<span class="fc" id="L252">            out.append(&quot;## &quot;).append(result.id()).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L253">            out.append(&quot;- Input: `&quot;).append(result.inputExpression()).append(&quot;`\n&quot;);</span>
+<span class="fc" id="L254">            out.append(&quot;- Target: `&quot;).append(result.targetExpression()).append(&quot;`\n&quot;);</span>
+<span class="fc" id="L255">            out.append(&quot;- Erwartung: &quot;).append(result.expectation()).append(&quot;\n\n&quot;);</span>
+
+<span class="fc" id="L257">            out.append(&quot;### Depth-1 Candidate Summary\n\n&quot;);</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            out.append(&quot;- Erwarteter Move vorhanden: &quot;).append(result.depth1CandidateProbe().expectedMovePresent() ? &quot;ja&quot; : &quot;nein&quot;).append(&quot;\n&quot;);</span>
+<span class="fc" id="L259">            out.append(&quot;- Expected coverage: &quot;).append(result.depth1CandidateProbe().expectedMoveCoverage()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L260">            appendClassicVsMoveSummary(out, result.depth1CandidateProbe());</span>
+
+<span class="fc" id="L262">            out.append(&quot;### Multi-step Search Result\n\n&quot;);</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            out.append(&quot;- Ziel erreichbar: &quot;).append(result.multiStepSearch().success() ? &quot;ja&quot; : &quot;nein&quot;).append(&quot;\n&quot;);</span>
+<span class="fc" id="L264">            out.append(&quot;- Pfadlänge: &quot;).append(result.multiStepSearch().pathLength()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L265">            out.append(&quot;- appliedMoves: &quot;).append(result.multiStepSearch().appliedMoves().size()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L266">            out.append(&quot;- ordinalPath: &quot;).append(escape(String.join(&quot; -&gt; &quot;, result.multiStepSearch().ordinalPath()))).append(&quot;\n&quot;);</span>
+<span class="fc" id="L267">            out.append(&quot;- explored states: &quot;).append(result.multiStepSearch().exploredStateCount()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L268">            out.append(&quot;- unique canonical states: &quot;).append(result.multiStepSearch().uniqueCanonicalStateCount()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L269">            out.append(&quot;- failure reason: &quot;).append(result.multiStepSearch().failureReason()).append(&quot;\n\n&quot;);</span>
+
+<span class="fc" id="L271">            out.append(&quot;### Successful path\n\n&quot;);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">            if (result.multiStepSearch().pathSteps().isEmpty()) {</span>
+<span class="fc" id="L273">                out.append(&quot;_Kein erfolgreicher Pfad._\n\n&quot;);</span>
+            } else {
+<span class="fc" id="L275">                out.append(&quot;| step | before | moveKind | ruleId | ordinal | parameters | after |\n&quot;);</span>
+<span class="fc" id="L276">                out.append(&quot;| --- | --- | --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">                for (PathStep step : result.multiStepSearch().pathSteps()) {</span>
+<span class="fc" id="L278">                    out.append(&quot;| &quot;).append(step.step())</span>
+<span class="fc" id="L279">                        .append(&quot; | &quot;).append(escape(step.before()))</span>
+<span class="fc" id="L280">                        .append(&quot; | &quot;).append(escape(step.moveKind()))</span>
+<span class="fc" id="L281">                        .append(&quot; | &quot;).append(escape(step.ruleId()))</span>
+<span class="fc" id="L282">                        .append(&quot; | &quot;).append(escape(step.ordinal()))</span>
+<span class="fc" id="L283">                        .append(&quot; | &quot;).append(escape(step.parameters()))</span>
+<span class="fc" id="L284">                        .append(&quot; | &quot;).append(escape(step.after()))</span>
+<span class="fc" id="L285">                        .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L286">                }</span>
+<span class="fc" id="L287">                out.append('\n');</span>
             }
-<span class="fc" id="L306">            out.append('\n');</span>
-<span class="fc" id="L307">        }</span>
-<span class="fc" id="L308">        return out.toString();</span>
+
+<span class="fc" id="L290">            out.append(&quot;### Classic-vs-Move Vergleich\n\n&quot;);</span>
+<span class="fc" id="L291">            appendClassicVsMoveSummary(out, result.depth1CandidateProbe());</span>
+
+<span class="fc" id="L293">            out.append(&quot;### Interpretation\n\n&quot;);</span>
+<span class="fc" id="L294">            out.append(&quot;- Tauglichkeit: &quot;).append(result.interpretation().suitability()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L295">            out.append(&quot;- Fehlende Move-Familie: &quot;).append(result.interpretation().missingMoveFamily()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L296">            out.append(&quot;- Enumeration im Vergleich: &quot;).append(result.interpretation().enumerationComparison()).append(&quot;\n\n&quot;);</span>
+
+<span class="fc" id="L298">            out.append(&quot;### Architecture note\n\n&quot;);</span>
+<span class="fc" id="L299">            out.append(&quot;- &quot;).append(result.architectureNote()).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L300">        }</span>
+
+<span class="fc" id="L302">        out.append(&quot;## Related follow-up issues\n\n&quot;);</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        for (String issue : report.relatedFollowUpIssues()) {</span>
+<span class="fc" id="L304">            out.append(&quot;- &quot;).append(issue).append(&quot;\n&quot;);</span>
+<span class="fc" id="L305">        }</span>
+<span class="fc" id="L306">        out.append('\n');</span>
+<span class="fc" id="L307">        return out.toString();</span>
     }
+
+    private void appendClassicVsMoveSummary(StringBuilder out, Depth1CandidateProbe probe) {
+<span class="fc" id="L311">        out.append(&quot;- classic count: &quot;).append(probe.classicCount()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L312">        out.append(&quot;- move count: &quot;).append(probe.moveCount()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L313">        out.append(&quot;- overlap count: &quot;).append(probe.overlapCount()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L314">        out.append(&quot;- move-only count: &quot;).append(probe.moveOnlyCount()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L315">        out.append(&quot;- classic-only count: &quot;).append(probe.classicOnlyCount()).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L316">    }</span>
 
     private String escape(String value) {
-<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L319" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L320">            return &quot;—&quot;;</span>
+        }
+<span class="fc" id="L322">        return value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
     }
 
-    private List&lt;Seed&gt; seeds() {
-<span class="fc" id="L316">        return List.of(</span>
-            new Seed(&quot;complete-square-plus&quot;, &quot;complete-square&quot;, &quot;complete_square&quot;,
-                &quot;U^2 + 2*U + 1&quot;, &quot;(U + 1)^2&quot;),
-            new Seed(&quot;complete-square-minus&quot;, &quot;complete-square&quot;, &quot;complete_square&quot;,
-                &quot;U^2 - 2*U + 1&quot;, &quot;(U - 1)^2&quot;),
-            new Seed(&quot;square-of-sum-two&quot;, &quot;perfect-square&quot;, &quot;perfect_square_trinomial&quot;,
-                &quot;U^2 + 4*U + 4&quot;, &quot;(U + 2)^2&quot;),
-            new Seed(&quot;difference-of-squares&quot;, &quot;difference-of-squares&quot;, &quot;difference_of_squares&quot;,
-                &quot;U^2 - 1&quot;, &quot;(U - 1)*(U + 1)&quot;),
-            new Seed(&quot;binomial-cube-plus&quot;, &quot;binomial-cube&quot;, &quot;binomial_cube&quot;,
-                &quot;U^3 + 3*U^2 + 3*U + 1&quot;, &quot;(U + 1)^3&quot;),
-            new Seed(&quot;binomial-cube-minus&quot;, &quot;binomial-cube&quot;, &quot;binomial_cube&quot;,
-                &quot;U^3 - 3*U^2 + 3*U - 1&quot;, &quot;(U - 1)^3&quot;)
-        );
-    }
-
-    private List&lt;Substitution&gt; substitutions() {
-<span class="fc" id="L333">        return List.of(</span>
-            new Substitution(&quot;x&quot;, &quot;x&quot;, true, true, 0.10),
-            new Substitution(&quot;x-plus-1&quot;, &quot;x + 1&quot;, false, false, 0.30),
-            new Substitution(&quot;x-squared&quot;, &quot;x^2&quot;, false, false, 0.45),
-            new Substitution(&quot;sin-x&quot;, &quot;sin(x)&quot;, true, false, 0.60),
-            new Substitution(&quot;cos-x&quot;, &quot;cos(x)&quot;, true, false, 0.60),
-            new Substitution(&quot;a-plus-b&quot;, &quot;a + b&quot;, false, false, 1.00),
-            new Substitution(&quot;two-x&quot;, &quot;2*x&quot;, false, false, 0.35)
-        );
-    }
-
-    /** A seed identity family parameterised by a single placeholder {@value #PLACEHOLDER}. */
-<span class="fc" id="L345">    public record Seed(String id, String family, String seedFamilyId, String sourceTemplate, String simplifiedTemplate) {</span>
-    }
-
-    /**
-     * A substitution applied to the placeholder.
-     *
-     * @param atomic whether the substitution is a single atom (variable or function call) that does not
-     *               require an explicit expansion step
-     * @param identity whether the substitution leaves the seed on its base variable (a known-rule rediscovery)
-     * @param generality reusability weight in [0,1] reflecting how generic the substitution is
-     */
-<span class="fc" id="L356">    public record Substitution(String id, String expression, boolean atomic, boolean identity, double generality) {</span>
-    }
-
-    /** Per-factor ranking scores, each in [0,1]. */
-<span class="fc" id="L360">    public record Scores(double brevity, double surprise, double pathLength, double reusability,</span>
-                         double differenceFromSource) {
-    }
-
-    /** A mined identity candidate with its evidence and ranking. */
-    public record Candidate(
-        int rank,
-        String id,
-        String family,
-        String seedFamilyId,
-        String substitution,
-        String sourceExpression,
-        String simplifiedExpression,
-        List&lt;String&gt; path,
-        boolean equivalent,
-        String deterministicEvidence,
-        String oracleStatus,
-        String oracleEvidence,
-        Scores scores,
-        double interestingness,
-        boolean promotable,
-        String whyInteresting
-    ) {
-<span class="fc" id="L383">        public Candidate {</span>
-<span class="fc bfc" id="L384" title="All 2 branches covered.">            id = id == null ? &quot;&quot; : id;</span>
-<span class="fc bfc" id="L385" title="All 2 branches covered.">            family = family == null ? &quot;&quot; : family;</span>
-<span class="fc bfc" id="L386" title="All 2 branches covered.">            seedFamilyId = seedFamilyId == null ? &quot;&quot; : seedFamilyId;</span>
-<span class="fc bfc" id="L387" title="All 2 branches covered.">            substitution = substitution == null ? &quot;&quot; : substitution;</span>
-<span class="fc bfc" id="L388" title="All 2 branches covered.">            sourceExpression = sourceExpression == null ? &quot;&quot; : sourceExpression;</span>
-<span class="fc bfc" id="L389" title="All 2 branches covered.">            simplifiedExpression = simplifiedExpression == null ? &quot;&quot; : simplifiedExpression;</span>
-<span class="fc bfc" id="L390" title="All 2 branches covered.">            path = path == null ? List.of() : List.copyOf(path);</span>
-<span class="fc bfc" id="L391" title="All 2 branches covered.">            deterministicEvidence = deterministicEvidence == null ? &quot;&quot; : deterministicEvidence;</span>
-<span class="fc bfc" id="L392" title="All 2 branches covered.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
-<span class="fc bfc" id="L393" title="All 2 branches covered.">            oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
-<span class="fc bfc" id="L394" title="All 2 branches covered.">            scores = scores == null ? new Scores(0.0, 0.0, 0.0, 0.0, 0.0) : scores;</span>
-<span class="fc bfc" id="L395" title="All 2 branches covered.">            whyInteresting = whyInteresting == null ? &quot;&quot; : whyInteresting;</span>
-<span class="fc" id="L396">        }</span>
-
-        Candidate withRank(int newRank) {
-<span class="fc" id="L399">            return new Candidate(newRank, id, family, seedFamilyId, substitution, sourceExpression,</span>
-                simplifiedExpression, path, equivalent, deterministicEvidence, oracleStatus, oracleEvidence,
-                scores, interestingness, promotable, whyInteresting);
+    private String canonical(String expression) {
+        try {
+<span class="fc" id="L327">            return canonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L328">        } catch (RuntimeException exception) {</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">            return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim();</span>
         }
     }
 
-    /** Top-ranked report for Discovery Campaign 6. */
-    public record CampaignReport(String campaignId, List&lt;Candidate&gt; topCandidates, int generatedCount,
-                                int promotableCount) {
-<span class="fc" id="L408">        public CampaignReport {</span>
-<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            topCandidates = topCandidates == null ? List.of() : List.copyOf(topCandidates);</span>
-<span class="fc" id="L410">        }</span>
+    private List&lt;ProbeCase&gt; cases() {
+<span class="fc" id="L334">        return List.of(</span>
+            new ProbeCase(
+                &quot;cancellation-plus-one&quot;,
+                &quot;x - 1 = 0&quot;,
+                &quot;x = 1&quot;,
+                &quot;+1 auf beiden Seiten muss als Move vorkommen; bei Fehlschlag: cancellation vorhanden, normalization follow-up fehlt&quot;
+            ),
+            new ProbeCase(
+                &quot;complete-square&quot;,
+                &quot;x^2 + 6*x + 5&quot;,
+                &quot;(x + 3)^2 - 4&quot;,
+                &quot;complete-square Move mit shift=3 und residue=-4&quot;
+            ),
+            new ProbeCase(
+                &quot;repeated-subexpression&quot;,
+                &quot;(x+1)^2 - (x+1)&quot;,
+                &quot;(x+1)*x&quot;,
+                &quot;repeated-subexpression/factor Move&quot;
+            ),
+            new ProbeCase(
+                &quot;common-subexpression&quot;,
+                &quot;x*(y+1)+z*(y+1)&quot;,
+                &quot;(y+1)*(x+z)&quot;,
+                &quot;common-subexpression Move&quot;
+            )
+        );
+    }
+
+    private List&lt;String&gt; relatedFollowUpIssues() {
+<span class="fc" id="L363">        return List.of(</span>
+            &quot;#102 Discovery Engine Roadmap: durch diesen PR teilweise adressiert (Countable Move Search Probe in Campaign 6).&quot;,
+            &quot;#103 Search Space Intelligence: Priorität steigt, weil explored/unique state Metriken jetzt systematisch vorliegen.&quot;,
+            &quot;#105 Discovery Visualization &amp; Explainability: Priorität bleibt hoch, da Pfad-/Move-Tabellen jetzt reichhaltigere Erklärsignale liefern.&quot;,
+            &quot;#106 Rule Authoring IDE: sollte auf Countable Move Ordinals/Parameter aufbauen statt ältere ruleId-only Sicht.&quot;,
+            &quot;#104 Plugin Ecosystem: für Move-Enumeratoren/Realizer aktuell bewusst zurückgestellt, bis API stabil ist.&quot;
+        );
+    }
+
+    private String builtInArchitectureNote() {
+<span class="fc" id="L373">        return &quot;Aktuell built-in: Cancellation-, Complete-Square-, Repeated- und Common-Subexpression-&quot;</span>
+            + &quot;Move-Familien inkl. ParameterEnumeratoren und MoveRealizer. Spätere Modul-Kandidaten:&quot;
+            + &quot; zusätzliche mathematische Rule Packs und domänenspezifische Move-Familien. Stabil bleiben sollte&quot;
+            + &quot; primär die API aus ParameterEnumerator, MoveRealizer und MoveSearchEngine.&quot;
+            + &quot; Jetzt bleibt alles built-in, weil Move-Modell/Realizer noch eng mit AST/Parser/Canonicalizer gekoppelt sind&quot;
+            + &quot; und eine frühe Plugin-Festlegung unnötig verengen würde.&quot;;
+    }
+
+<span class="fc" id="L381">    record ProbeCase(String id, String inputExpression, String targetExpression, String expectation) {</span>
+    }
+
+<span class="fc" id="L384">    public record Depth1CandidateProbe(</span>
+        boolean expectedMovePresent,
+        String expectedMoveCoverage,
+        int classicCount,
+        int moveCount,
+        int overlapCount,
+        int moveOnlyCount,
+        int classicOnlyCount
+    ) {
+    }
+
+    public record MultiStepCountableMoveSearch(
+        boolean success,
+        int pathLength,
+        List&lt;String&gt; pathExpressions,
+        List&lt;RewriteMove&gt; appliedMoves,
+        List&lt;String&gt; appliedRuleIds,
+        List&lt;String&gt; ordinalPath,
+        int exploredStateCount,
+        int uniqueCanonicalStateCount,
+        String failureReason,
+        List&lt;PathStep&gt; pathSteps
+    ) {
+<span class="fc" id="L407">        public MultiStepCountableMoveSearch {</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">            pathExpressions = pathExpressions == null ? List.of() : List.copyOf(pathExpressions);</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            appliedMoves = appliedMoves == null ? List.of() : List.copyOf(appliedMoves);</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">            ordinalPath = ordinalPath == null ? List.of() : List.copyOf(ordinalPath);</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            pathSteps = pathSteps == null ? List.of() : List.copyOf(pathSteps);</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;NONE&quot; : failureReason;</span>
+<span class="fc" id="L414">        }</span>
+    }
+
+<span class="fc" id="L417">    public record PathStep(</span>
+        int step,
+        String before,
+        String moveKind,
+        String ruleId,
+        String ordinal,
+        String parameters,
+        String after
+    ) {
+    }
+
+<span class="fc" id="L428">    public record Interpretation(String suitability, String missingMoveFamily, String enumerationComparison) {</span>
+    }
+
+<span class="fc" id="L431">    public record CaseResult(</span>
+        String id,
+        String inputExpression,
+        String targetExpression,
+        String expectation,
+        Depth1CandidateProbe depth1CandidateProbe,
+        MultiStepCountableMoveSearch multiStepSearch,
+        Interpretation interpretation,
+        MoveCandidateTransformationEngine.ComparisonReport comparison,
+        String architectureNote
+    ) {
+    }
+
+    public record CampaignReport(
+        String campaignId,
+        List&lt;CaseResult&gt; cases,
+        List&lt;String&gt; relatedFollowUpIssues,
+        String builtInArchitectureNote
+    ) {
+<span class="fc" id="L450">        public CampaignReport {</span>
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">            cases = cases == null ? List.of() : List.copyOf(cases);</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">            relatedFollowUpIssues = relatedFollowUpIssues == null ? List.of() : List.copyOf(relatedFollowUpIssues);</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">            builtInArchitectureNote = builtInArchitectureNote == null ? &quot;&quot; : builtInArchitectureNote;</span>
+<span class="fc" id="L454">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CountableMoveSearchEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.search</a> &gt; <span class="el_source">CountableMoveSearchEngine.java</span></div><h1>CountableMoveSearchEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.search;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.moves.MoveCandidateTransformationEngine;
+import de.regelsuche.moves.MoveOrdinal;
+import de.regelsuche.moves.MoveParameter;
+import de.regelsuche.moves.MoveParameterKind;
+import de.regelsuche.moves.RewriteMove;
+import de.regelsuche.moves.RewriteMoveDeriver;
+import de.regelsuche.moves.RewriteMoveKind;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Deterministic and bounded multi-step search over explicit countable rewrite moves.
+ */
+public final class CountableMoveSearchEngine implements MoveSearchEngine {
+    private static final int MIN_DEPTH = 1;
+    private static final int MAX_DEPTH = 4;
+
+    private final MoveCandidateTransformationEngine transformationEngine;
+    private final ExpressionCanonicalizer canonicalizer;
+    private final ExpressionScorer scorer;
+    private final RewriteMoveDeriver rewriteMoveDeriver;
+
+    public CountableMoveSearchEngine() {
+<span class="fc" id="L35">        this(</span>
+            new MoveCandidateTransformationEngine(),
+            new ExpressionCanonicalizer(),
+            new ExpressionScorer(),
+            new RewriteMoveDeriver()
+        );
+<span class="fc" id="L41">    }</span>
+
+    public CountableMoveSearchEngine(
+        MoveCandidateTransformationEngine transformationEngine,
+        ExpressionCanonicalizer canonicalizer,
+        ExpressionScorer scorer,
+        RewriteMoveDeriver rewriteMoveDeriver
+<span class="fc" id="L48">    ) {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        this.transformationEngine = transformationEngine == null</span>
+<span class="nc" id="L50">            ? new MoveCandidateTransformationEngine()</span>
+<span class="fc" id="L51">            : transformationEngine;</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        this.canonicalizer = canonicalizer == null ? new ExpressionCanonicalizer() : canonicalizer;</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        this.scorer = scorer == null ? new ExpressionScorer() : scorer;</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        this.rewriteMoveDeriver = rewriteMoveDeriver == null ? new RewriteMoveDeriver() : rewriteMoveDeriver;</span>
+<span class="fc" id="L55">    }</span>
+
+    @Override
+    public CountableMoveSearchResult search(
+        String inputExpression,
+        String targetExpression,
+        int maxDepth,
+        int maxStates
+    ) {
+<span class="fc" id="L64">        String input = normalize(inputExpression);</span>
+<span class="fc" id="L65">        String target = normalize(targetExpression);</span>
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">        if (input.isBlank() || target.isBlank()) {</span>
+<span class="nc" id="L67">            return failure(</span>
+                input,
+                target,
+<span class="nc" id="L70">                List.of(input),</span>
+<span class="nc" id="L71">                List.of(),</span>
+<span class="nc" id="L72">                List.of(),</span>
+                0,
+                0,
+                FailureReason.INVALID_INPUT
+            );
+        }
+
+<span class="fc" id="L79">        int depthLimit = Math.max(MIN_DEPTH, Math.min(MAX_DEPTH, maxDepth));</span>
+<span class="fc" id="L80">        int stateBudget = Math.max(1, maxStates);</span>
+<span class="fc" id="L81">        String canonicalTarget = canonical(target);</span>
+
+<span class="fc" id="L83">        SearchNode root = new SearchNode(input, canonical(input), List.of(input), List.of(), List.of(), 0);</span>
+<span class="fc" id="L84">        LinkedHashSet&lt;String&gt; uniqueCanonicals = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L85">        uniqueCanonicals.add(root.canonicalExpression());</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (root.canonicalExpression().equals(canonicalTarget)) {</span>
+<span class="nc" id="L87">            return success(input, target, root.pathExpressions(), root.appliedMoves(), root.appliedRuleIds(), 1, 1);</span>
+        }
+
+<span class="fc" id="L90">        ArrayDeque&lt;SearchNode&gt; frontier = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L91">        frontier.add(root);</span>
+<span class="fc" id="L92">        int exploredStateCount = 0;</span>
+
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        while (!frontier.isEmpty()) {</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (exploredStateCount &gt;= stateBudget) {</span>
+<span class="fc" id="L96">                return failure(</span>
+                    input,
+                    target,
+<span class="fc" id="L99">                    List.of(input),</span>
+<span class="fc" id="L100">                    List.of(),</span>
+<span class="fc" id="L101">                    List.of(),</span>
+                    exploredStateCount,
+<span class="fc" id="L103">                    uniqueCanonicals.size(),</span>
+                    FailureReason.MAX_STATES_REACHED
+                );
+            }
+<span class="fc" id="L107">            SearchNode current = frontier.removeFirst();</span>
+<span class="fc" id="L108">            exploredStateCount++;</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (current.depth() &gt;= depthLimit) {</span>
+<span class="fc" id="L110">                continue;</span>
+            }
+
+<span class="fc" id="L113">            List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(transformationEngine.transform(current.expression()));</span>
+<span class="fc" id="L114">            transformations.sort(Comparator.comparing(Transformation::rule)</span>
+<span class="fc" id="L115">                .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L116">                .thenComparing(Transformation::applicationKey));</span>
+
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
+<span class="fc" id="L119">                String nextExpression = normalize(transformation.transformedExpression());</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                if (nextExpression.equals(current.expression())) {</span>
+<span class="nc" id="L121">                    continue;</span>
+                }
+<span class="fc" id="L123">                String nextCanonical = canonical(nextExpression);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                if (!uniqueCanonicals.add(nextCanonical)) {</span>
+<span class="fc" id="L125">                    continue;</span>
+                }
+
+<span class="fc" id="L128">                RewriteMove move = rewriteMoveFor(current.expression(), transformation);</span>
+<span class="fc" id="L129">                SearchNode next = current.advance(nextExpression, nextCanonical, move, transformation.rule());</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                if (nextCanonical.equals(canonicalTarget)) {</span>
+<span class="fc" id="L131">                    return success(</span>
+                        input,
+                        target,
+<span class="fc" id="L134">                        next.pathExpressions(),</span>
+<span class="fc" id="L135">                        next.appliedMoves(),</span>
+<span class="fc" id="L136">                        next.appliedRuleIds(),</span>
+                        exploredStateCount,
+<span class="fc" id="L138">                        uniqueCanonicals.size()</span>
+                    );
+                }
+<span class="fc" id="L141">                frontier.addLast(next);</span>
+<span class="fc" id="L142">            }</span>
+<span class="fc" id="L143">        }</span>
+
+<span class="fc" id="L145">        return failure(</span>
+            input,
+            target,
+<span class="fc" id="L148">            List.of(input),</span>
+<span class="fc" id="L149">            List.of(),</span>
+<span class="fc" id="L150">            List.of(),</span>
+            exploredStateCount,
+<span class="fc" id="L152">            uniqueCanonicals.size(),</span>
+            FailureReason.TARGET_NOT_REACHED
+        );
+    }
+
+    private RewriteMove rewriteMoveFor(String beforeExpression, Transformation transformation) {
+<span class="fc" id="L158">        Optional&lt;MoveCandidateTransformationEngine.MoveMetadata&gt; metadata =</span>
+<span class="fc" id="L159">            MoveCandidateTransformationEngine.metadataOf(transformation);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (metadata.isPresent()) {</span>
+<span class="fc" id="L161">            return fromMetadata(beforeExpression, transformation, metadata.get());</span>
+        }
+<span class="fc" id="L163">        return rewriteMoveDeriver.derive(new RewriteMoveDeriver.MoveDerivationRequest(</span>
+            beforeExpression,
+<span class="fc" id="L165">            transformation.transformedExpression(),</span>
+<span class="fc" id="L166">            transformation.rule(),</span>
+<span class="fc" id="L167">            transformation.rule(),</span>
+<span class="fc" id="L168">            transformation.assumptions(),</span>
+            &quot;countable-move-search&quot;,
+<span class="fc" id="L170">            List.of(&quot;classic-fallback&quot;)</span>
+        ));
+    }
+
+    private RewriteMove fromMetadata(
+        String beforeExpression,
+        Transformation transformation,
+        MoveCandidateTransformationEngine.MoveMetadata metadata
+    ) {
+<span class="fc" id="L179">        RewriteMoveKind kind = moveKindFromMoveId(metadata.moveId());</span>
+<span class="fc" id="L180">        List&lt;MoveParameter&gt; parameters = metadata.parameters().entrySet().stream()</span>
+<span class="fc" id="L181">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L182">            .map(entry -&gt; new MoveParameter(</span>
+<span class="fc" id="L183">                entry.getKey(),</span>
+                MoveParameterKind.GENERATED,
+<span class="fc" id="L185">                entry.getValue(),</span>
+<span class="fc" id="L186">                entry.getValue(),</span>
+                -1,
+                &quot;move-metadata&quot;
+            ))
+<span class="fc" id="L190">            .toList();</span>
+<span class="fc" id="L191">        int occurrence = parseOccurrence(metadata.ordinal());</span>
+<span class="fc" id="L192">        MoveOrdinal ordinal = MoveOrdinal.of(kind, occurrence, parameters);</span>
+<span class="fc" id="L193">        return RewriteMove.builder(kind)</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            .moveId(metadata.moveId().isBlank() ? kind.name() + &quot;|&quot; + canonical(beforeExpression) + &quot;=&gt;&quot; + canonical(</span>
+<span class="pc" id="L195">                transformation.transformedExpression()) : metadata.moveId())</span>
+<span class="fc" id="L196">            .ruleId(firstNonBlank(metadata.ruleId(), transformation.rule()))</span>
+<span class="fc" id="L197">            .operatorId(firstNonBlank(metadata.operatorId(), transformation.rule()))</span>
+<span class="fc" id="L198">            .sourceExpression(beforeExpression)</span>
+<span class="fc" id="L199">            .targetExpression(transformation.transformedExpression())</span>
+<span class="fc" id="L200">            .canonicalBefore(canonical(beforeExpression))</span>
+<span class="fc" id="L201">            .canonicalAfter(canonical(transformation.transformedExpression()))</span>
+<span class="fc" id="L202">            .ordinal(ordinal)</span>
+<span class="fc" id="L203">            .parameters(parameters)</span>
+<span class="fc" id="L204">            .assumptions(transformation.assumptions())</span>
+<span class="fc" id="L205">            .tags(List.of(&quot;countable-move-search&quot;, &quot;move-metadata&quot;))</span>
+<span class="fc" id="L206">            .build();</span>
+    }
+
+    private RewriteMoveKind moveKindFromMoveId(String moveId) {
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        if (moveId == null || moveId.isBlank()) {</span>
+<span class="nc" id="L211">            return RewriteMoveKind.UNKNOWN;</span>
+        }
+<span class="fc" id="L213">        int separator = moveId.indexOf('|');</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        String prefix = separator &lt; 0 ? moveId : moveId.substring(0, separator);</span>
+        try {
+<span class="fc" id="L216">            return RewriteMoveKind.valueOf(prefix.trim().toUpperCase(Locale.ROOT));</span>
+<span class="nc" id="L217">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L218">            return RewriteMoveKind.UNKNOWN;</span>
+        }
+    }
+
+    private int parseOccurrence(String ordinalText) {
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">        if (ordinalText == null || ordinalText.isBlank()) {</span>
+<span class="nc" id="L224">            return 0;</span>
+        }
+<span class="fc" id="L226">        String[] parts = ordinalText.split(&quot;:&quot;);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (parts.length &lt; 2) {</span>
+<span class="nc" id="L228">            return 0;</span>
+        }
+        try {
+<span class="fc" id="L231">            return Math.max(0, Integer.parseInt(parts[1]));</span>
+<span class="nc" id="L232">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L233">            return 0;</span>
+        }
+    }
+
+    private CountableMoveSearchResult success(
+        String input,
+        String target,
+        List&lt;String&gt; pathExpressions,
+        List&lt;RewriteMove&gt; appliedMoves,
+        List&lt;String&gt; appliedRuleIds,
+        int explored,
+        int uniqueCanonicalStateCount
+    ) {
+<span class="fc" id="L246">        return new CountableMoveSearchResult(</span>
+            true,
+            input,
+            target,
+            pathExpressions,
+            appliedMoves,
+            appliedRuleIds,
+            explored,
+            uniqueCanonicalStateCount,
+            FailureReason.NONE
+        );
+    }
+
+    private CountableMoveSearchResult failure(
+        String input,
+        String target,
+        List&lt;String&gt; pathExpressions,
+        List&lt;RewriteMove&gt; appliedMoves,
+        List&lt;String&gt; appliedRuleIds,
+        int explored,
+        int uniqueCanonicalStateCount,
+        FailureReason reason
+    ) {
+<span class="fc" id="L269">        return new CountableMoveSearchResult(</span>
+            false,
+            input,
+            target,
+            pathExpressions,
+            appliedMoves,
+            appliedRuleIds,
+            explored,
+            uniqueCanonicalStateCount,
+            reason
+        );
+    }
+
+    private String normalize(String expression) {
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L284">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L286">        return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private String canonical(String expression) {
+<span class="fc" id="L290">        String normalized = normalize(expression);</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        if (normalized.isBlank()) {</span>
+<span class="nc" id="L292">            return &quot;&quot;;</span>
+        }
+        try {
+<span class="fc" id="L295">            return canonicalizer.canonicalize(normalized);</span>
+<span class="nc" id="L296">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L297">            scorer.score(normalized);</span>
+<span class="nc" id="L298">            return normalized;</span>
+        }
+    }
+
+    private String firstNonBlank(String preferred, String fallback) {
+<span class="pc bpc" id="L303" title="2 of 4 branches missed.">        if (preferred != null &amp;&amp; !preferred.isBlank()) {</span>
+<span class="fc" id="L304">            return preferred;</span>
+        }
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        return fallback == null ? &quot;&quot; : fallback;</span>
+    }
+
+<span class="fc" id="L309">    public enum FailureReason {</span>
+<span class="fc" id="L310">        NONE,</span>
+<span class="fc" id="L311">        INVALID_INPUT,</span>
+<span class="fc" id="L312">        TARGET_NOT_REACHED,</span>
+<span class="fc" id="L313">        MAX_STATES_REACHED</span>
+    }
+
+<span class="fc" id="L316">    private record SearchNode(</span>
+        String expression,
+        String canonicalExpression,
+        List&lt;String&gt; pathExpressions,
+        List&lt;RewriteMove&gt; appliedMoves,
+        List&lt;String&gt; appliedRuleIds,
+        int depth
+    ) {
+        SearchNode advance(String nextExpression, String nextCanonical, RewriteMove move, String ruleId) {
+<span class="fc" id="L325">            List&lt;String&gt; nextPath = new ArrayList&lt;&gt;(pathExpressions);</span>
+<span class="fc" id="L326">            nextPath.add(nextExpression);</span>
+<span class="fc" id="L327">            List&lt;RewriteMove&gt; moves = new ArrayList&lt;&gt;(appliedMoves);</span>
+<span class="fc" id="L328">            moves.add(move);</span>
+<span class="fc" id="L329">            List&lt;String&gt; rules = new ArrayList&lt;&gt;(appliedRuleIds);</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            rules.add(ruleId == null ? &quot;&quot; : ruleId);</span>
+<span class="fc" id="L331">            return new SearchNode(</span>
+                nextExpression,
+                nextCanonical,
+<span class="fc" id="L334">                List.copyOf(nextPath),</span>
+<span class="fc" id="L335">                List.copyOf(moves),</span>
+<span class="fc" id="L336">                List.copyOf(rules),</span>
+                depth + 1
+            );
+        }
+    }
+
+    public record CountableMoveSearchResult(
+        boolean success,
+        String inputExpression,
+        String targetExpression,
+        List&lt;String&gt; pathExpressions,
+        List&lt;RewriteMove&gt; appliedMoves,
+        List&lt;String&gt; appliedRuleIds,
+        int exploredStateCount,
+        int uniqueCanonicalStateCount,
+        FailureReason failureReason
+    ) {
+<span class="fc" id="L353">        public CountableMoveSearchResult {</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            pathExpressions = pathExpressions == null ? List.of() : List.copyOf(pathExpressions);</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">            appliedMoves = appliedMoves == null ? List.of() : List.copyOf(appliedMoves);</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            failureReason = failureReason == null ? FailureReason.NONE : failureReason;</span>
+<span class="fc" id="L360">        }</span>
+
+        public int pathLength() {
+<span class="fc" id="L363">            return Math.max(0, pathExpressions.size() - 1);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

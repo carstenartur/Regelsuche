@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveComparisonService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves</a> &gt; <span class="el_source">MoveComparisonService.java</span></div><h1>MoveComparisonService.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves;
+
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+/** Builds deterministic classic-vs-move comparison reports. */
+<span class="fc" id="L11">public final class MoveComparisonService {</span>
+
+    public MoveCandidateTransformationEngine.ComparisonReport compare(
+        String expression,
+        List&lt;Transformation&gt; classic,
+        List&lt;MoveCandidateTransformationEngine.MoveBackedTransformation&gt; moveCandidates,
+        Function&lt;String, String&gt; keyCanonicalizer
+    ) {
+<span class="fc" id="L19">        Map&lt;String, MoveCandidateTransformationEngine.CandidateSummary&gt; classicByExpression = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        for (Transformation transformation : classic) {</span>
+<span class="fc" id="L21">            classicByExpression.putIfAbsent(</span>
+<span class="fc" id="L22">                keyCanonicalizer.apply(transformation.transformedExpression()),</span>
+<span class="fc" id="L23">                MoveCandidateTransformationEngine.CandidateSummary.fromClassic(transformation)</span>
+            );
+<span class="fc" id="L25">        }</span>
+
+<span class="fc" id="L27">        Map&lt;String, MoveCandidateTransformationEngine.CandidateSummary&gt; moveByExpression = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        for (MoveCandidateTransformationEngine.MoveBackedTransformation candidate : moveCandidates) {</span>
+<span class="fc" id="L29">            moveByExpression.putIfAbsent(</span>
+<span class="fc" id="L30">                keyCanonicalizer.apply(candidate.transformation().transformedExpression()),</span>
+<span class="fc" id="L31">                MoveCandidateTransformationEngine.CandidateSummary.fromMove(candidate)</span>
+            );
+<span class="fc" id="L33">        }</span>
+
+<span class="fc" id="L35">        List&lt;MoveCandidateTransformationEngine.CandidateSummary&gt; overlaps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L36">        List&lt;MoveCandidateTransformationEngine.CandidateSummary&gt; moveOnly = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (Map.Entry&lt;String, MoveCandidateTransformationEngine.CandidateSummary&gt; entry : moveByExpression.entrySet()) {</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            if (classicByExpression.containsKey(entry.getKey())) {</span>
+<span class="fc" id="L39">                overlaps.add(entry.getValue());</span>
+            } else {
+<span class="fc" id="L41">                moveOnly.add(entry.getValue());</span>
+            }
+<span class="fc" id="L43">        }</span>
+
+<span class="fc" id="L45">        List&lt;MoveCandidateTransformationEngine.CandidateSummary&gt; classicOnly = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (Map.Entry&lt;String, MoveCandidateTransformationEngine.CandidateSummary&gt; entry : classicByExpression.entrySet()) {</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (!moveByExpression.containsKey(entry.getKey())) {</span>
+<span class="fc" id="L48">                classicOnly.add(entry.getValue());</span>
+            }
+<span class="fc" id="L50">        }</span>
+
+<span class="fc" id="L52">        return new MoveCandidateTransformationEngine.ComparisonReport(</span>
+            expression,
+<span class="fc" id="L54">            new ArrayList&lt;&gt;(classicByExpression.values()),</span>
+<span class="fc" id="L55">            new ArrayList&lt;&gt;(moveByExpression.values()),</span>
+            overlaps,
+            moveOnly,
+            classicOnly
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
