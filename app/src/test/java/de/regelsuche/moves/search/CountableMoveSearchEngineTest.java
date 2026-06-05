@@ -4,7 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.moves.MoveCandidateTransformationEngine;
+import de.regelsuche.moves.RewriteMoveDeriver;
 import de.regelsuche.moves.RewriteMoveKind;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CountableMoveSearchEngineTest {
@@ -106,5 +114,70 @@ class CountableMoveSearchEngineTest {
         assertEquals(1, result.exploredStateCount());
         assertEquals(1, result.uniqueCanonicalStateCount());
         assertEquals(1, result.searchSpaceMetrics().exploredStateCount());
+    }
+
+    @Test
+    void supportsConfiguredDepthAboveLegacyDepthFour() {
+        CountableMoveSearchEngine customEngine = chainSearchEngine();
+
+        CountableMoveSearchEngine.CountableMoveSearchResult legacy = customEngine.search("s0", "s5", 4, 50);
+        CountableMoveSearchEngine.CountableMoveSearchResult configured = customEngine.search(
+            "s0",
+            "s5",
+            SearchConfiguration.defaults()
+        );
+
+        assertFalse(legacy.success());
+        assertTrue(configured.success());
+        assertEquals(5, configured.pathLength());
+    }
+
+    @Test
+    void limitsGeneratedMovesPerNodeViaConfiguration() {
+        TransformationEngine branchingEngine = expression -> switch (expression) {
+            case "s0" -> List.of(
+                new Transformation("a", "dead"),
+                new Transformation("b", "s1")
+            );
+            case "s1" -> List.of(new Transformation("c", "goal"));
+            default -> List.of();
+        };
+        CountableMoveSearchEngine customEngine = new CountableMoveSearchEngine(
+            new MoveCandidateTransformationEngine(branchingEngine, new Depth1MoveEnumerator(List.of())),
+            new ExpressionCanonicalizer(),
+            new ExpressionScorer(),
+            new RewriteMoveDeriver()
+        );
+
+        CountableMoveSearchEngine.CountableMoveSearchResult limited = customEngine.search(
+            "s0",
+            "goal",
+            new SearchConfiguration(new MoveSearchOptions(8, 12, 100, 1, 24, 32, true, true, false))
+        );
+        CountableMoveSearchEngine.CountableMoveSearchResult unrestricted = customEngine.search(
+            "s0",
+            "goal",
+            new SearchConfiguration(new MoveSearchOptions(8, 12, 100, 2, 24, 32, true, true, false))
+        );
+
+        assertFalse(limited.success());
+        assertTrue(unrestricted.success());
+    }
+
+    private CountableMoveSearchEngine chainSearchEngine() {
+        TransformationEngine chainEngine = expression -> switch (expression) {
+            case "s0" -> List.of(new Transformation("r1", "s1"));
+            case "s1" -> List.of(new Transformation("r2", "s2"));
+            case "s2" -> List.of(new Transformation("r3", "s3"));
+            case "s3" -> List.of(new Transformation("r4", "s4"));
+            case "s4" -> List.of(new Transformation("r5", "s5"));
+            default -> List.of();
+        };
+        return new CountableMoveSearchEngine(
+            new MoveCandidateTransformationEngine(chainEngine, new Depth1MoveEnumerator(List.of())),
+            new ExpressionCanonicalizer(),
+            new ExpressionScorer(),
+            new RewriteMoveDeriver()
+        );
     }
 }
