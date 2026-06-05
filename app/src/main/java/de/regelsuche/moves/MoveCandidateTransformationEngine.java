@@ -1,12 +1,6 @@
 package de.regelsuche.moves;
 
-import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.BinaryOperator;
-import de.regelsuche.ast.Equation;
-import de.regelsuche.ast.Expr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
-import de.regelsuche.input.InputRequest;
-import de.regelsuche.input.InputType;
 import de.regelsuche.moves.enumerate.Depth1MoveEnumerator;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
@@ -14,15 +8,12 @@ import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.CommonSubexpressionDiscoveryOperator;
 import de.regelsuche.transform.CompleteSquareBridgeOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
-import de.regelsuche.transform.RewriteKind;
-import de.regelsuche.transform.SubstitutionRewriteState;
 import de.regelsuche.transform.SubstitutionIntroductionOperator;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,88 +38,52 @@ public final class MoveCandidateTransformationEngine implements TransformationEn
 
     private final TransformationEngine baseEngine;
     private final Depth1MoveEnumerator enumerator;
-    private final CompleteSquareBridgeOperator completeSquareOperator = new CompleteSquareBridgeOperator();
-    private final CommonSubexpressionDiscoveryOperator commonSubexpressionOperator =
-        new CommonSubexpressionDiscoveryOperator();
-    private final SubstitutionIntroductionOperator substitutionIntroductionOperator =
-        new SubstitutionIntroductionOperator();
+    private final MoveRealizer moveRealizer;
+    private final MoveComparisonService comparisonService;
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final ExpressionParser parser = new ExpressionParser();
 
     public MoveCandidateTransformationEngine() {
-        this(defaultClassicEngine(), new Depth1MoveEnumerator());
+        this(
+            defaultClassicEngine(),
+            new Depth1MoveEnumerator(),
+            new MoveRealizer(),
+            new MoveComparisonService()
+        );
     }
 
     public MoveCandidateTransformationEngine(TransformationEngine baseEngine, Depth1MoveEnumerator enumerator) {
+        this(baseEngine, enumerator, new MoveRealizer(), new MoveComparisonService());
+    }
+
+    public MoveCandidateTransformationEngine(
+        TransformationEngine baseEngine,
+        Depth1MoveEnumerator enumerator,
+        MoveRealizer moveRealizer,
+        MoveComparisonService comparisonService
+    ) {
         this.baseEngine = Objects.requireNonNull(baseEngine, "baseEngine");
         this.enumerator = Objects.requireNonNull(enumerator, "enumerator");
+        this.moveRealizer = Objects.requireNonNull(moveRealizer, "moveRealizer");
+        this.comparisonService = Objects.requireNonNull(comparisonService, "comparisonService");
     }
 
     public List<Transformation> classicCandidates(String expression) {
-        SubstitutionRewriteState.clear();
         List<Transformation> sorted = new ArrayList<>(baseEngine.transform(expression));
         sorted.sort(candidateOrdering());
         return List.copyOf(sorted);
     }
 
     public List<MoveBackedTransformation> moveCandidates(String expression) {
-        List<Depth1MoveEnumerator.CandidateMove> enumerated = enumerator.enumerate(expression);
-        Map<String, MoveBackedTransformation> distinct = new LinkedHashMap<>();
-        addEquationCandidates(expression, enumerated, distinct);
-        addCompleteSquareCandidates(expression, enumerated, distinct);
-        addRepeatedSubexpressionCandidates(expression, enumerated, distinct);
-        List<MoveBackedTransformation> ordered = new ArrayList<>(distinct.values());
-        ordered.sort(Comparator.<MoveBackedTransformation, MoveOrdinal>comparing(
-                candidate -> candidate.move().ordinal(), MoveOrdinal.CANONICAL_ORDER)
-            .thenComparing(candidate -> candidate.transformation().transformedExpression())
-            .thenComparing(candidate -> candidate.move().moveId()));
-        return List.copyOf(ordered);
+        return moveRealizer.realize(expression, enumerator.enumerate(expression));
     }
 
     public ComparisonReport compare(String expression) {
-        List<Transformation> classic = classicCandidates(expression);
-        List<MoveBackedTransformation> moveCandidates = moveCandidates(expression);
-
-        Map<String, CandidateSummary> classicByExpression = new LinkedHashMap<>();
-        for (Transformation transformation : classic) {
-            classicByExpression.putIfAbsent(
-                transformedKey(transformation.transformedExpression()),
-                CandidateSummary.fromClassic(transformation)
-            );
-        }
-
-        Map<String, CandidateSummary> moveByExpression = new LinkedHashMap<>();
-        for (MoveBackedTransformation candidate : moveCandidates) {
-            moveByExpression.putIfAbsent(
-                transformedKey(candidate.transformation().transformedExpression()),
-                CandidateSummary.fromMove(candidate)
-            );
-        }
-
-        List<CandidateSummary> overlaps = new ArrayList<>();
-        List<CandidateSummary> moveOnly = new ArrayList<>();
-        for (Map.Entry<String, CandidateSummary> entry : moveByExpression.entrySet()) {
-            if (classicByExpression.containsKey(entry.getKey())) {
-                overlaps.add(entry.getValue());
-            } else {
-                moveOnly.add(entry.getValue());
-            }
-        }
-
-        List<CandidateSummary> classicOnly = new ArrayList<>();
-        for (Map.Entry<String, CandidateSummary> entry : classicByExpression.entrySet()) {
-            if (!moveByExpression.containsKey(entry.getKey())) {
-                classicOnly.add(entry.getValue());
-            }
-        }
-
-        return new ComparisonReport(
+        return comparisonService.compare(
             expression,
-            new ArrayList<>(classicByExpression.values()),
-            new ArrayList<>(moveByExpression.values()),
-            overlaps,
-            moveOnly,
-            classicOnly
+            classicCandidates(expression),
+            moveCandidates(expression),
+            this::transformedKey
         );
     }
 
@@ -196,209 +151,7 @@ public final class MoveCandidateTransformationEngine implements TransformationEn
         );
     }
 
-    private void addEquationCandidates(
-        String expression,
-        List<Depth1MoveEnumerator.CandidateMove> candidates,
-        Map<String, MoveBackedTransformation> out
-    ) {
-        Equation equation;
-        try {
-            equation = parser.parseEquation(expression);
-        } catch (IllegalArgumentException exception) {
-            return;
-        }
-        int occurrence = 0;
-        for (Depth1MoveEnumerator.CandidateMove candidate : candidates) {
-            if (!"cancellation-candidate".equals(candidate.enumeratorId())) {
-                continue;
-            }
-            String value = candidate.parameter().value();
-            if (value.isBlank()) {
-                continue;
-            }
-            Expr operand = parseSignedOperand(value);
-            BinaryOperator operator = value.startsWith("-") ? BinaryOperator.SUB : BinaryOperator.ADD;
-            Equation transformedEquation = new Equation(
-                new BinaryExpr(equation.left(), operator, operand),
-                new BinaryExpr(equation.right(), operator, operand)
-            );
-            String transformed = ExpressionFormatter.format(transformedEquation);
-            String ruleId = operator == BinaryOperator.ADD
-                ? "equation_add_both_sides"
-                : "equation_subtract_both_sides";
-            RewriteMove move = buildMove(
-                RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES,
-                ruleId,
-                "cancellation-candidate",
-                expression,
-                transformed,
-                List.of(candidate.parameter()),
-                occurrence++,
-                List.of()
-            );
-            Transformation transformation = instrument(
-                move,
-                new Transformation(
-                    ruleId,
-                    transformed,
-                    RewriteKind.SIMPLIFY,
-                    true,
-                    1,
-                    true,
-                    ruleId + "|" + transformed,
-                    List.of()
-                )
-            );
-            out.putIfAbsent(moveKey(move), new MoveBackedTransformation(move, transformation));
-        }
-    }
-
-    private void addCompleteSquareCandidates(
-        String expression,
-        List<Depth1MoveEnumerator.CandidateMove> candidates,
-        Map<String, MoveBackedTransformation> out
-    ) {
-        List<MoveParameter> parameters = candidates.stream()
-            .filter(candidate -> "complete-square".equals(candidate.enumeratorId()))
-            .map(Depth1MoveEnumerator.CandidateMove::parameter)
-            .sorted(MoveParameter.CANONICAL_ORDER)
-            .toList();
-        if (parameters.size() < 2) {
-            return;
-        }
-        String residue = parameters.stream()
-            .filter(parameter -> parameter.name().equals("residue"))
-            .map(MoveParameter::value)
-            .findFirst()
-            .orElse("");
-        Transformation selected = completeSquareOperator.generateCandidates(expression).stream()
-            .sorted(Comparator
-                .comparing((Transformation transformation) -> !matchesResidueLiteral(transformation.transformedExpression(), residue))
-                .thenComparing(Transformation::transformedExpression))
-            .findFirst()
-            .orElse(null);
-        if (selected == null) {
-            return;
-        }
-        RewriteMove move = buildMove(
-            RewriteMoveKind.COMPLETE_SQUARE,
-            selected.rule(),
-            "complete_square_bridge",
-            expression,
-            selected.transformedExpression(),
-            parameters,
-            0,
-            selected.assumptions()
-        );
-        out.putIfAbsent(moveKey(move), new MoveBackedTransformation(move, instrument(move, selected)));
-    }
-
-    private void addRepeatedSubexpressionCandidates(
-        String expression,
-        List<Depth1MoveEnumerator.CandidateMove> candidates,
-        Map<String, MoveBackedTransformation> out
-    ) {
-        int occurrence = 0;
-        for (Depth1MoveEnumerator.CandidateMove candidate : candidates) {
-            if (!"repeated-subexpression".equals(candidate.enumeratorId())) {
-                continue;
-            }
-            Transformation selected = selectCommonSubexpressionTransformation(expression, candidate.parameter().value())
-                .orElse(null);
-            if (selected == null) {
-                continue;
-            }
-            RewriteMove move = buildMove(
-                RewriteMoveKind.COMMON_SUBEXPRESSION,
-                selected.rule(),
-                operatorIdForRule(selected.rule()),
-                expression,
-                selected.transformedExpression(),
-                List.of(candidate.parameter()),
-                occurrence++,
-                selected.assumptions()
-            );
-            out.putIfAbsent(moveKey(move), new MoveBackedTransformation(move, instrument(move, selected)));
-        }
-    }
-
-    private Optional<Transformation> selectCommonSubexpressionTransformation(String expression, String parameterValue) {
-        SubstitutionRewriteState.clear();
-        Optional<Transformation> factored = commonSubexpressionOperator.generateCandidates(expression).stream()
-            .filter(candidate -> candidate.transformedExpression().contains(parameterValue))
-            .findFirst();
-        if (factored.isPresent()) {
-            return factored;
-        }
-        SubstitutionRewriteState.clear();
-        return substitutionIntroductionOperator.generateCandidates(expression).stream()
-            .filter(candidate -> candidate.assumptions().stream()
-                .anyMatch(assumption -> assumption.startsWith("substitution.placeholder.")
-                    && assumption.endsWith("=" + parameterValue)))
-            .findFirst();
-    }
-
-    private RewriteMove buildMove(
-        RewriteMoveKind kind,
-        String ruleId,
-        String operatorId,
-        String beforeExpression,
-        String afterExpression,
-        List<MoveParameter> parameters,
-        int occurrence,
-        List<String> assumptions
-    ) {
-        MoveOrdinal ordinal = MoveOrdinal.of(kind, occurrence, parameters);
-        String canonicalBefore = canonical(beforeExpression);
-        String canonicalAfter = canonical(afterExpression);
-        return RewriteMove.builder(kind)
-            .moveId(moveId(kind, ruleId, operatorId, canonicalBefore, canonicalAfter, ordinal))
-            .ruleId(ruleId)
-            .operatorId(operatorId)
-            .sourceExpression(beforeExpression)
-            .targetExpression(afterExpression)
-            .canonicalBefore(canonicalBefore)
-            .canonicalAfter(canonicalAfter)
-            .ordinal(ordinal)
-            .parameters(parameters)
-            .assumptions(assumptions)
-            .tags(List.of("depth1-move-enumeration"))
-            .build();
-    }
-
-    private Transformation instrument(RewriteMove move, Transformation base) {
-        LinkedHashSet<String> assumptions = new LinkedHashSet<>(base.assumptions());
-        assumptions.add(MOVE_SOURCE + "=depth1-enumerator");
-        assumptions.add(MOVE_RULE_ID + "=" + move.ruleId());
-        assumptions.add(MOVE_OPERATOR_ID + "=" + move.operatorId());
-        assumptions.add(MOVE_ID + "=" + move.moveId());
-        assumptions.add(MOVE_ORDINAL + "=" + ordinalText(move.ordinal()));
-        for (MoveParameter parameter : move.parameters()) {
-            assumptions.add(MOVE_PARAMETER_PREFIX + parameter.name() + "=" + parameter.value());
-        }
-        return new Transformation(
-            base.rule(),
-            base.transformedExpression(),
-            base.kind(),
-            base.mayIncreaseComplexity(),
-            base.estimatedCostDelta(),
-            base.equivalencePreservingByConstruction(),
-            base.applicationKey() + "|moveId=" + move.moveId(),
-            new ArrayList<>(assumptions),
-            base.packId(),
-            base.license()
-        );
-    }
-
-    private Expr parseSignedOperand(String value) {
-        String trimmed = value.trim();
-        String normalized = trimmed.startsWith("+") ? trimmed.substring(1) : trimmed.startsWith("-")
-            ? trimmed.substring(1)
-            : trimmed;
-        return parser.parse(new InputRequest(InputType.TERM, normalized)).terms().getFirst();
-    }
-
-    private String canonical(String expression) {
+    String canonical(String expression) {
         if (expression == null || expression.isBlank()) {
             return "";
         }
@@ -424,48 +177,6 @@ public final class MoveCandidateTransformationEngine implements TransformationEn
         return Comparator.comparing(Transformation::rule)
             .thenComparing(Transformation::transformedExpression)
             .thenComparing(Transformation::applicationKey);
-    }
-
-    private String moveKey(RewriteMove move) {
-        return move.moveId();
-    }
-
-    private String moveId(
-        RewriteMoveKind kind,
-        String ruleId,
-        String operatorId,
-        String canonicalBefore,
-        String canonicalAfter,
-        MoveOrdinal ordinal
-    ) {
-        return kind.name()
-            + "|" + ruleId
-            + "|" + operatorId
-            + "|" + canonicalBefore
-            + "=>" + canonicalAfter
-            + "|" + ordinalText(ordinal);
-    }
-
-    private String operatorIdForRule(String ruleId) {
-        return switch (ruleId) {
-            case CompleteSquareBridgeOperator.RULE_ID -> "complete_square_bridge";
-            case CommonSubexpressionDiscoveryOperator.RULE_ID -> "common_subexpression_discovery";
-            case SubstitutionIntroductionOperator.RULE_ID -> "substitution_introduction";
-            default -> ruleId;
-        };
-    }
-
-    private boolean matchesResidueLiteral(String transformedExpression, String residue) {
-        if (residue == null || residue.isBlank()) {
-            return true;
-        }
-        String normalized = residue.startsWith("+") ? residue.substring(1) : residue;
-        if (normalized.startsWith("-")) {
-            return transformedExpression.contains("- " + normalized.substring(1));
-        }
-        return transformedExpression.contains("+ " + normalized)
-            || transformedExpression.endsWith(normalized)
-            || transformedExpression.contains(" " + normalized + " ");
     }
 
     private static String ordinalText(MoveOrdinal ordinal) {

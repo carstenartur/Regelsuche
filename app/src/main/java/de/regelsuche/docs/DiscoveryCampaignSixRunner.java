@@ -4,12 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.moves.MoveCandidateTransformationEngine;
-import de.regelsuche.moves.enumerate.Depth1MoveEnumerator;
-import de.regelsuche.scoring.ExpressionScorer;
-import de.regelsuche.search.SearchHeuristic;
-import de.regelsuche.search.strategy.BestFirstSearchStrategy;
-import de.regelsuche.search.strategy.SearchProblem;
-import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.moves.RewriteMove;
+import de.regelsuche.moves.search.CountableMoveSearchEngine;
+import de.regelsuche.moves.search.CountableMoveSearchEngine.CountableMoveSearchResult;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -20,17 +17,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-/** Runs Discovery Campaign 6: Countable Move Enumeration Probe. */
+/** Runs Discovery Campaign 6: Countable Move Search Probe. */
 public final class DiscoveryCampaignSixRunner {
     private static final ObjectMapper JSON = new ObjectMapper()
         .findAndRegisterModules()
         .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
-    private final MoveCandidateTransformationEngine engine = new MoveCandidateTransformationEngine(
-        MoveCandidateTransformationEngine.defaultClassicEngine(),
-        new Depth1MoveEnumerator()
-    );
+    private final MoveCandidateTransformationEngine moveAdapter = new MoveCandidateTransformationEngine();
+    private final CountableMoveSearchEngine moveSearchEngine = new CountableMoveSearchEngine();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
 
     public static void main(String[] args) {
@@ -43,7 +39,7 @@ public final class DiscoveryCampaignSixRunner {
 
     public CampaignReport run() {
         List<CaseResult> results = cases().stream().map(this::evaluate).toList();
-        return new CampaignReport("discovery-campaign-6", results);
+        return new CampaignReport("discovery-campaign-6", results, relatedFollowUpIssues(), builtInArchitectureNote());
     }
 
     public CampaignReport writeReport(Path outputDirectory) {
@@ -69,7 +65,7 @@ public final class DiscoveryCampaignSixRunner {
     }
 
     private CaseResult evaluate(ProbeCase probeCase) {
-        MoveCandidateTransformationEngine.ComparisonReport comparison = engine.compare(probeCase.inputExpression());
+        MoveCandidateTransformationEngine.ComparisonReport comparison = moveAdapter.compare(probeCase.inputExpression());
         boolean expectedMovePresent = switch (probeCase.id()) {
             case "cancellation-plus-one" -> hasParameter(comparison.moveCandidates(), "cancel", "+1");
             case "complete-square" -> hasParameter(comparison.moveCandidates(), "shift", "3")
@@ -78,20 +74,163 @@ public final class DiscoveryCampaignSixRunner {
             case "common-subexpression" -> hasParameter(comparison.moveCandidates(), "y + 1", "y + 1");
             default -> false;
         };
-        boolean depth1SearchObserved = depth1SearchExpressions(probeCase.inputExpression()).stream()
-            .map(this::canonical)
-            .anyMatch(expression -> comparison.moveCandidates().stream()
-                .map(MoveCandidateTransformationEngine.CandidateSummary::transformedExpression)
-                .map(this::canonical)
-                .anyMatch(expression::equals));
+        String expectedMoveCoverage = expectedCoverage(comparison, probeCase.id());
+
+        CountableMoveSearchResult searchResult = moveSearchEngine.search(
+            probeCase.inputExpression(),
+            probeCase.targetExpression(),
+            4,
+            120
+        );
+
+        List<PathStep> pathSteps = toPathSteps(searchResult);
+        String architectureNote = architectureNote(probeCase, expectedMovePresent, searchResult);
+        Interpretation interpretation = interpretation(probeCase, comparison, searchResult, architectureNote);
+
         return new CaseResult(
             probeCase.id(),
             probeCase.inputExpression(),
+            probeCase.targetExpression(),
             probeCase.expectation(),
-            expectedMovePresent,
-            depth1SearchObserved,
-            comparison
+            new Depth1CandidateProbe(
+                expectedMovePresent,
+                expectedMoveCoverage,
+                comparison.classicCandidates().size(),
+                comparison.moveCandidates().size(),
+                comparison.overlaps().size(),
+                comparison.moveOnlyCandidates().size(),
+                comparison.classicOnlyCandidates().size()
+            ),
+            new MultiStepCountableMoveSearch(
+                searchResult.success(),
+                searchResult.pathLength(),
+                searchResult.pathExpressions(),
+                searchResult.appliedMoves(),
+                searchResult.appliedRuleIds(),
+                ordinalPath(searchResult.appliedMoves()),
+                searchResult.exploredStateCount(),
+                searchResult.uniqueCanonicalStateCount(),
+                searchResult.failureReason().name(),
+                pathSteps
+            ),
+            interpretation,
+            comparison,
+            architectureNote
         );
+    }
+
+    private List<PathStep> toPathSteps(CountableMoveSearchResult searchResult) {
+        if (!searchResult.success() || searchResult.appliedMoves().isEmpty()) {
+            return List.of();
+        }
+        List<PathStep> steps = new ArrayList<>();
+        List<String> path = searchResult.pathExpressions();
+        for (int index = 0; index < searchResult.appliedMoves().size(); index++) {
+            RewriteMove move = searchResult.appliedMoves().get(index);
+            String before = index < path.size() ? path.get(index) : "";
+            String after = index + 1 < path.size() ? path.get(index + 1) : move.targetExpression();
+            steps.add(new PathStep(
+                index + 1,
+                before,
+                move.kind().name(),
+                move.ruleId(),
+                ordinalText(move),
+                renderParameters(move),
+                after
+            ));
+        }
+        return List.copyOf(steps);
+    }
+
+    private String architectureNote(ProbeCase probeCase, boolean expectedMovePresent, CountableMoveSearchResult searchResult) {
+        if (!expectedMovePresent) {
+            return "Missing parameter enumerator";
+        }
+        if (!searchResult.success() && "cancellation-plus-one".equals(probeCase.id())) {
+            return "Missing normalizer";
+        }
+        if (!searchResult.appliedMoves().isEmpty() && searchResult.appliedMoves().stream().anyMatch(move ->
+            move.kind().name().equals("UNKNOWN") || move.hasUnresolvedParameters())) {
+            return "Move enumeration needs classic fallback";
+        }
+        if (!searchResult.success()) {
+            return "Missing realizer";
+        }
+        return "Move enumeration is sufficient";
+    }
+
+    private Interpretation interpretation(
+        ProbeCase probeCase,
+        MoveCandidateTransformationEngine.ComparisonReport comparison,
+        CountableMoveSearchResult searchResult,
+        String architectureNote
+    ) {
+        String suitability = searchResult.success()
+            ? "Mehrstufiger Pfad erreichbar innerhalb des Budgets."
+            : "Ziel im aktuellen Budget nicht erreicht.";
+        String missingFamily = switch (architectureNote) {
+            case "Missing parameter enumerator" -> "Parameter-Enumerator für den erwarteten Move erweitern.";
+            case "Missing normalizer" -> "Nachgelagerte Normalisierung (z. B. cancellation -> solve) fehlt.";
+            case "Missing realizer" -> "Move-Realizer für diesen Fall vervollständigen.";
+            case "Move enumeration needs classic fallback" -> "Move-Metadatenableitung für klassische Kandidaten verbessern.";
+            default -> "Keine zusätzliche Move-Familie zwingend.";
+        };
+        String comparisonText = comparison.moveOnlyCandidates().size() > comparison.classicOnlyCandidates().size()
+            ? "Move-Enumeration ergänzt die klassische Engine sichtbar."
+            : comparison.moveOnlyCandidates().size() < comparison.classicOnlyCandidates().size()
+                ? "Klassische Engine deckt aktuell noch mehr Kandidaten ab."
+                : "Move-Enumeration und Classic sind in diesem Fall ähnlich stark.";
+        if ("cancellation-plus-one".equals(probeCase.id()) && !searchResult.success()) {
+            comparisonText = "Cancellation-Move ist da, aber Normalisierungsfolge bis x = 1 fehlt noch.";
+        }
+        return new Interpretation(suitability, missingFamily, comparisonText);
+    }
+
+    private String expectedCoverage(MoveCandidateTransformationEngine.ComparisonReport comparison, String caseId) {
+        Set<String> expectedCanonicalTargets = switch (caseId) {
+            case "cancellation-plus-one" -> Set.of(canonical("x - 1 + 1 = 0 + 1"));
+            case "complete-square" -> Set.of(canonical("(x + 3)^2 - 4"));
+            case "repeated-subexpression" -> Set.of(canonical("(x + 1) * x"));
+            case "common-subexpression" -> Set.of(canonical("(y + 1) * (x + z)"));
+            default -> Set.of();
+        };
+        boolean inMove = comparison.moveCandidates().stream()
+            .map(MoveCandidateTransformationEngine.CandidateSummary::transformedExpression)
+            .map(this::canonical)
+            .anyMatch(expectedCanonicalTargets::contains);
+        boolean inClassic = comparison.classicCandidates().stream()
+            .map(MoveCandidateTransformationEngine.CandidateSummary::transformedExpression)
+            .map(this::canonical)
+            .anyMatch(expectedCanonicalTargets::contains);
+        if (inMove && inClassic) {
+            return "Overlap";
+        }
+        if (inMove) {
+            return "Move-only";
+        }
+        if (inClassic) {
+            return "Classic-only";
+        }
+        return "Not-found";
+    }
+
+    private String ordinalText(RewriteMove move) {
+        return move.ordinal().ruleOrdinal() + ":" + move.ordinal().occurrenceOrdinal() + ":" + move.ordinal().parameterOrdinals();
+    }
+
+    private List<String> ordinalPath(List<RewriteMove> appliedMoves) {
+        return appliedMoves.stream().map(this::ordinalText).toList();
+    }
+
+    private String renderParameters(RewriteMove move) {
+        if (move.parameters().isEmpty()) {
+            return move.hasUnresolvedParameters() ? "parameters-unresolved" : "—";
+        }
+        List<String> parts = new ArrayList<>();
+        for (var parameter : move.parameters()) {
+            parts.add(parameter.name() + "=" + parameter.value());
+        }
+        return String.join(", ", parts);
     }
 
     private boolean hasParameter(
@@ -102,73 +241,78 @@ public final class DiscoveryCampaignSixRunner {
         return candidates.stream().anyMatch(candidate -> value.equals(candidate.parameters().get(name)));
     }
 
-    private List<String> depth1SearchExpressions(String expression) {
-        SearchProblem problem = new SearchProblem(
-            expression,
-            engine,
-            new ExpressionScorer(),
-            new ExpressionCanonicalizer(),
-            new SearchHeuristic(1, 40, 1, 2, 20, 12)
-        );
-        return new BestFirstSearchStrategy().search(problem).stream()
-            .filter(state -> state.depth() == 1)
-            .map(SearchState::expression)
-            .toList();
-    }
-
     private String renderMarkdown(CampaignReport report) {
         StringBuilder out = new StringBuilder();
-        out.append("# Discovery Campaign 6: Countable Move Enumeration Probe\n\n");
-        out.append("Vergleicht klassische Depth-1-Kandidaten mit explizit enumerierten RewriteMoves ")
-            .append("und prüft, ob diese Kandidaten im bestehenden BestFirst-Search-Raum auftauchen.\n\n");
+        out.append("# Discovery Campaign 6: Countable Move Search Probe\n\n");
+        out.append("Diese Probe vergleicht Depth-1-Kandidaten und bewertet eine begrenzte mehrstufige Countable-Move-Suche (Depth<=4).\n\n");
+        out.append("## Built-in vs. nachladbare Module\n\n");
+        out.append(report.builtInArchitectureNote()).append("\n\n");
+
         for (CaseResult result : report.cases()) {
             out.append("## ").append(result.id()).append("\n\n");
             out.append("- Input: `").append(result.inputExpression()).append("`\n");
-            out.append("- Erwartung: ").append(result.expectation()).append('\n');
-            out.append("- Erwarteter Move gefunden: ").append(result.expectedMovePresent() ? "ja" : "nein").append('\n');
-            out.append("- In Depth-1-Suche sichtbar: ").append(result.depth1SearchObserved() ? "ja" : "nein").append("\n\n");
-            appendCandidateTable(out, "Klassische Engine-Kandidaten", result.comparison().classicCandidates());
-            appendCandidateTable(out, "Move-Enumerator-Kandidaten", result.comparison().moveCandidates());
-            appendCandidateTable(out, "Überschneidungen", result.comparison().overlaps());
-            appendCandidateTable(out, "Nur aus Move-Enumeration", result.comparison().moveOnlyCandidates());
-            appendCandidateTable(out, "Nur aus alter Engine", result.comparison().classicOnlyCandidates());
+            out.append("- Target: `").append(result.targetExpression()).append("`\n");
+            out.append("- Erwartung: ").append(result.expectation()).append("\n\n");
+
+            out.append("### Depth-1 Candidate Summary\n\n");
+            out.append("- Erwarteter Move vorhanden: ").append(result.depth1CandidateProbe().expectedMovePresent() ? "ja" : "nein").append("\n");
+            out.append("- Expected coverage: ").append(result.depth1CandidateProbe().expectedMoveCoverage()).append("\n");
+            appendClassicVsMoveSummary(out, result.depth1CandidateProbe());
+
+            out.append("### Multi-step Search Result\n\n");
+            out.append("- Ziel erreichbar: ").append(result.multiStepSearch().success() ? "ja" : "nein").append("\n");
+            out.append("- Pfadlänge: ").append(result.multiStepSearch().pathLength()).append("\n");
+            out.append("- appliedMoves: ").append(result.multiStepSearch().appliedMoves().size()).append("\n");
+            out.append("- ordinalPath: ").append(escape(String.join(" -> ", result.multiStepSearch().ordinalPath()))).append("\n");
+            out.append("- explored states: ").append(result.multiStepSearch().exploredStateCount()).append("\n");
+            out.append("- unique canonical states: ").append(result.multiStepSearch().uniqueCanonicalStateCount()).append("\n");
+            out.append("- failure reason: ").append(result.multiStepSearch().failureReason()).append("\n\n");
+
+            out.append("### Successful path\n\n");
+            if (result.multiStepSearch().pathSteps().isEmpty()) {
+                out.append("_Kein erfolgreicher Pfad._\n\n");
+            } else {
+                out.append("| step | before | moveKind | ruleId | ordinal | parameters | after |\n");
+                out.append("| --- | --- | --- | --- | --- | --- | --- |\n");
+                for (PathStep step : result.multiStepSearch().pathSteps()) {
+                    out.append("| ").append(step.step())
+                        .append(" | ").append(escape(step.before()))
+                        .append(" | ").append(escape(step.moveKind()))
+                        .append(" | ").append(escape(step.ruleId()))
+                        .append(" | ").append(escape(step.ordinal()))
+                        .append(" | ").append(escape(step.parameters()))
+                        .append(" | ").append(escape(step.after()))
+                        .append(" |\n");
+                }
+                out.append('\n');
+            }
+
+            out.append("### Classic-vs-Move Vergleich\n\n");
+            appendClassicVsMoveSummary(out, result.depth1CandidateProbe());
+
+            out.append("### Interpretation\n\n");
+            out.append("- Tauglichkeit: ").append(result.interpretation().suitability()).append("\n");
+            out.append("- Fehlende Move-Familie: ").append(result.interpretation().missingMoveFamily()).append("\n");
+            out.append("- Enumeration im Vergleich: ").append(result.interpretation().enumerationComparison()).append("\n\n");
+
+            out.append("### Architecture note\n\n");
+            out.append("- ").append(result.architectureNote()).append("\n\n");
         }
+
+        out.append("## Related follow-up issues\n\n");
+        for (String issue : report.relatedFollowUpIssues()) {
+            out.append("- ").append(issue).append("\n");
+        }
+        out.append('\n');
         return out.toString();
     }
 
-    private void appendCandidateTable(
-        StringBuilder out,
-        String title,
-        List<MoveCandidateTransformationEngine.CandidateSummary> candidates
-    ) {
-        out.append("### ").append(title).append("\n\n");
-        if (candidates.isEmpty()) {
-            out.append("_Keine Kandidaten._\n\n");
-            return;
-        }
-        out.append("| Transformation | Rule | Operator | Move | Ordinal | Parameters |\n");
-        out.append("| --- | --- | --- | --- | --- | --- |\n");
-        for (MoveCandidateTransformationEngine.CandidateSummary candidate : candidates) {
-            out.append("| ").append(escape(candidate.transformedExpression()))
-                .append(" | ").append(escape(candidate.ruleId()))
-                .append(" | ").append(escape(candidate.operatorId()))
-                .append(" | ").append(escape(candidate.moveId()))
-                .append(" | ").append(escape(candidate.ordinal()))
-                .append(" | ").append(escape(renderParameters(candidate.parameters())))
-                .append(" |\n");
-        }
-        out.append('\n');
-    }
-
-    private String renderParameters(Map<String, String> parameters) {
-        if (parameters.isEmpty()) {
-            return "—";
-        }
-        List<String> parts = new ArrayList<>();
-        for (Map.Entry<String, String> entry : new LinkedHashMap<>(parameters).entrySet()) {
-            parts.add(entry.getKey() + "=" + entry.getValue());
-        }
-        return String.join(", ", parts);
+    private void appendClassicVsMoveSummary(StringBuilder out, Depth1CandidateProbe probe) {
+        out.append("- classic count: ").append(probe.classicCount()).append("\n");
+        out.append("- move count: ").append(probe.moveCount()).append("\n");
+        out.append("- overlap count: ").append(probe.overlapCount()).append("\n");
+        out.append("- move-only count: ").append(probe.moveOnlyCount()).append("\n");
+        out.append("- classic-only count: ").append(probe.classicOnlyCount()).append("\n\n");
     }
 
     private String escape(String value) {
@@ -188,29 +332,125 @@ public final class DiscoveryCampaignSixRunner {
 
     private List<ProbeCase> cases() {
         return List.of(
-            new ProbeCase("cancellation-plus-one", "x - 1 = 0", "Kandidat +1"),
-            new ProbeCase("complete-square", "x^2 + 6*x + 5", "shift=3, residue=-4"),
-            new ProbeCase("repeated-subexpression", "(x+1)^2 - (x+1)", "repeated subexpression x+1"),
-            new ProbeCase("common-subexpression", "x*(y+1)+z*(y+1)", "common subexpression y+1")
+            new ProbeCase(
+                "cancellation-plus-one",
+                "x - 1 = 0",
+                "x = 1",
+                "+1 auf beiden Seiten muss als Move vorkommen; bei Fehlschlag: cancellation vorhanden, normalization follow-up fehlt"
+            ),
+            new ProbeCase(
+                "complete-square",
+                "x^2 + 6*x + 5",
+                "(x + 3)^2 - 4",
+                "complete-square Move mit shift=3 und residue=-4"
+            ),
+            new ProbeCase(
+                "repeated-subexpression",
+                "(x+1)^2 - (x+1)",
+                "(x+1)*x",
+                "repeated-subexpression/factor Move"
+            ),
+            new ProbeCase(
+                "common-subexpression",
+                "x*(y+1)+z*(y+1)",
+                "(y+1)*(x+z)",
+                "common-subexpression Move"
+            )
         );
     }
 
-    record ProbeCase(String id, String inputExpression, String expectation) {
+    private List<String> relatedFollowUpIssues() {
+        return List.of(
+            "#102 Discovery Engine Roadmap: durch diesen PR teilweise adressiert (Countable Move Search Probe in Campaign 6).",
+            "#103 Search Space Intelligence: Priorität steigt, weil explored/unique state Metriken jetzt systematisch vorliegen.",
+            "#105 Discovery Visualization & Explainability: Priorität bleibt hoch, da Pfad-/Move-Tabellen jetzt reichhaltigere Erklärsignale liefern.",
+            "#106 Rule Authoring IDE: sollte auf Countable Move Ordinals/Parameter aufbauen statt ältere ruleId-only Sicht.",
+            "#104 Plugin Ecosystem: für Move-Enumeratoren/Realizer aktuell bewusst zurückgestellt, bis API stabil ist."
+        );
+    }
+
+    private String builtInArchitectureNote() {
+        return "Aktuell built-in: Cancellation-, Complete-Square-, Repeated- und Common-Subexpression-"
+            + "Move-Familien inkl. ParameterEnumeratoren und MoveRealizer. Spätere Modul-Kandidaten:"
+            + " zusätzliche mathematische Rule Packs und domänenspezifische Move-Familien. Stabil bleiben sollte"
+            + " primär die API aus ParameterEnumerator, MoveRealizer und MoveSearchEngine."
+            + " Jetzt bleibt alles built-in, weil Move-Modell/Realizer noch eng mit AST/Parser/Canonicalizer gekoppelt sind"
+            + " und eine frühe Plugin-Festlegung unnötig verengen würde.";
+    }
+
+    record ProbeCase(String id, String inputExpression, String targetExpression, String expectation) {
+    }
+
+    public record Depth1CandidateProbe(
+        boolean expectedMovePresent,
+        String expectedMoveCoverage,
+        int classicCount,
+        int moveCount,
+        int overlapCount,
+        int moveOnlyCount,
+        int classicOnlyCount
+    ) {
+    }
+
+    public record MultiStepCountableMoveSearch(
+        boolean success,
+        int pathLength,
+        List<String> pathExpressions,
+        List<RewriteMove> appliedMoves,
+        List<String> appliedRuleIds,
+        List<String> ordinalPath,
+        int exploredStateCount,
+        int uniqueCanonicalStateCount,
+        String failureReason,
+        List<PathStep> pathSteps
+    ) {
+        public MultiStepCountableMoveSearch {
+            pathExpressions = pathExpressions == null ? List.of() : List.copyOf(pathExpressions);
+            appliedMoves = appliedMoves == null ? List.of() : List.copyOf(appliedMoves);
+            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);
+            ordinalPath = ordinalPath == null ? List.of() : List.copyOf(ordinalPath);
+            pathSteps = pathSteps == null ? List.of() : List.copyOf(pathSteps);
+            failureReason = failureReason == null ? "NONE" : failureReason;
+        }
+    }
+
+    public record PathStep(
+        int step,
+        String before,
+        String moveKind,
+        String ruleId,
+        String ordinal,
+        String parameters,
+        String after
+    ) {
+    }
+
+    public record Interpretation(String suitability, String missingMoveFamily, String enumerationComparison) {
     }
 
     public record CaseResult(
         String id,
         String inputExpression,
+        String targetExpression,
         String expectation,
-        boolean expectedMovePresent,
-        boolean depth1SearchObserved,
-        MoveCandidateTransformationEngine.ComparisonReport comparison
+        Depth1CandidateProbe depth1CandidateProbe,
+        MultiStepCountableMoveSearch multiStepSearch,
+        Interpretation interpretation,
+        MoveCandidateTransformationEngine.ComparisonReport comparison,
+        String architectureNote
     ) {
     }
 
-    public record CampaignReport(String campaignId, List<CaseResult> cases) {
+    public record CampaignReport(
+        String campaignId,
+        List<CaseResult> cases,
+        List<String> relatedFollowUpIssues,
+        String builtInArchitectureNote
+    ) {
         public CampaignReport {
             cases = cases == null ? List.of() : List.copyOf(cases);
+            relatedFollowUpIssues = relatedFollowUpIssues == null ? List.of() : List.copyOf(relatedFollowUpIssues);
+            builtInArchitectureNote = builtInArchitectureNote == null ? "" : builtInArchitectureNote;
         }
     }
 }

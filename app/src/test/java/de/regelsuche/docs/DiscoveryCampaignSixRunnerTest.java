@@ -11,41 +11,41 @@ import org.junit.jupiter.api.io.TempDir;
 
 class DiscoveryCampaignSixRunnerTest {
     @Test
-    void reportsCountableMoveEnumerationProbe(@TempDir Path tempDir) throws Exception {
+    void reportsCountableMoveSearchProbe(@TempDir Path tempDir) throws Exception {
         DiscoveryCampaignSixRunner runner = new DiscoveryCampaignSixRunner();
 
         DiscoveryCampaignSixRunner.CampaignReport report = runner.writeReport(tempDir);
 
         assertEquals("discovery-campaign-6", report.campaignId());
         assertEquals(4, report.cases().size());
-        assertTrue(report.cases().stream().allMatch(DiscoveryCampaignSixRunner.CaseResult::expectedMovePresent));
-        assertTrue(report.cases().stream().allMatch(DiscoveryCampaignSixRunner.CaseResult::depth1SearchObserved));
+        assertTrue(report.cases().stream().allMatch(result -> result.depth1CandidateProbe().expectedMovePresent()));
+        assertTrue(report.relatedFollowUpIssues().stream().anyMatch(issue -> issue.contains("#102")));
 
         DiscoveryCampaignSixRunner.CaseResult cancellation = report.cases().stream()
             .filter(result -> result.id().equals("cancellation-plus-one"))
             .findFirst()
             .orElseThrow();
-        assertTrue(cancellation.comparison().moveCandidates().stream()
-            .anyMatch(candidate -> "+1".equals(candidate.parameters().get("cancel"))));
-        assertTrue(cancellation.comparison().moveOnlyCandidates().stream()
-            .anyMatch(candidate -> candidate.transformedExpression().contains("+ 1 = 0 + 1")));
+        assertEquals("Move-only", cancellation.depth1CandidateProbe().expectedMoveCoverage());
+        assertEquals("Missing normalizer", cancellation.architectureNote());
+        assertTrue(cancellation.multiStepSearch().failureReason().contains("TARGET_NOT_REACHED")
+            || cancellation.multiStepSearch().failureReason().contains("MAX_STATES_REACHED"));
 
         DiscoveryCampaignSixRunner.CaseResult completeSquare = report.cases().stream()
             .filter(result -> result.id().equals("complete-square"))
             .findFirst()
             .orElseThrow();
-        assertTrue(completeSquare.comparison().moveCandidates().stream()
-            .anyMatch(candidate -> "3".equals(candidate.parameters().get("shift"))
-                && "-4".equals(candidate.parameters().get("residue"))));
-        assertTrue(completeSquare.comparison().overlaps().stream()
-            .anyMatch(candidate -> candidate.transformedExpression().equals("(x + 3) ^ 2 - 4")));
+        assertTrue(completeSquare.multiStepSearch().success());
+        assertTrue(completeSquare.multiStepSearch().pathLength() >= 1);
+        assertTrue(completeSquare.multiStepSearch().ordinalPath().size() == completeSquare.multiStepSearch().pathLength());
 
         assertTrue(Files.exists(tempDir.resolve("discovery-campaign-6.json")));
         Path markdown = tempDir.resolve("countable-move-enumeration-report.md");
         assertTrue(Files.exists(markdown));
         String rendered = Files.readString(markdown, StandardCharsets.UTF_8);
-        assertTrue(rendered.contains("# Discovery Campaign 6: Countable Move Enumeration Probe"));
-        assertTrue(rendered.contains("Move-Enumerator-Kandidaten"));
-        assertTrue(rendered.contains("Nur aus Move-Enumeration"));
+        assertTrue(rendered.contains("# Discovery Campaign 6: Countable Move Search Probe"));
+        assertTrue(rendered.contains("Depth-1 Candidate Summary"));
+        assertTrue(rendered.contains("Multi-step Search Result"));
+        assertTrue(rendered.contains("Classic-vs-Move Vergleich"));
+        assertTrue(rendered.contains("Related follow-up issues"));
     }
 }
