@@ -111,44 +111,69 @@ record PromotionObservation(
         );
     }
 
+    static PromotionObservation fromCampaignFive(DiscoveryCampaignFiveRunner.CaseResult result, String campaignId) {
+<span class="fc" id="L115">        return new PromotionObservation(</span>
+<span class="fc" id="L116">            result.id(),</span>
+            campaignId,
+<span class="fc" id="L118">            discoveryDateFor(campaignId),</span>
+<span class="fc" id="L119">            result.family(),</span>
+<span class="fc" id="L120">            result.inputExpression(),</span>
+<span class="fc" id="L121">            result.targetExpression(),</span>
+<span class="fc" id="L122">            result.success(),</span>
+<span class="fc" id="L123">            result.oracleStatus(),</span>
+<span class="fc" id="L124">            result.oracleEvidence(),</span>
+<span class="fc" id="L125">            result.ablationStatus(),</span>
+<span class="fc" id="L126">            result.shortcutOperatorId(),</span>
+<span class="fc" id="L127">            result.shortcutPackId(),</span>
+<span class="fc" id="L128">            result.shortcutAssumptions(),</span>
+<span class="fc" id="L129">            rationale(result.notes(), result.failureReason()),</span>
+<span class="fc" id="L130">            result.rulePath(),</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            !result.rulePath().isEmpty(),</span>
+<span class="fc" id="L132">            curatedPathPresent(result.shortcutSource()),</span>
+<span class="fc" id="L133">            fallbackUsed(result.rulePath()),</span>
+<span class="fc" id="L134">            macroOpportunity(result.family(), result.rulePath())</span>
+        );
+    }
+
     static String discoveryDateFor(String campaignId) {
-<span class="pc bpc" id="L115" title="2 of 5 branches missed.">        int month = switch (campaignId) {</span>
-<span class="fc" id="L116">            case &quot;discovery-campaign-1&quot; -&gt; 1;</span>
-<span class="fc" id="L117">            case &quot;discovery-campaign-2&quot; -&gt; 2;</span>
-<span class="fc" id="L118">            case &quot;discovery-campaign-3&quot; -&gt; 3;</span>
-<span class="nc" id="L119">            case &quot;discovery-campaign-4&quot; -&gt; 4;</span>
-<span class="pc" id="L120">            default -&gt; 12;</span>
+<span class="pc bpc" id="L139" title="2 of 6 branches missed.">        int month = switch (campaignId) {</span>
+<span class="fc" id="L140">            case &quot;discovery-campaign-1&quot; -&gt; 1;</span>
+<span class="fc" id="L141">            case &quot;discovery-campaign-2&quot; -&gt; 2;</span>
+<span class="fc" id="L142">            case &quot;discovery-campaign-3&quot; -&gt; 3;</span>
+<span class="nc" id="L143">            case &quot;discovery-campaign-4&quot; -&gt; 4;</span>
+<span class="fc" id="L144">            case &quot;discovery-campaign-5&quot; -&gt; 5;</span>
+<span class="pc" id="L145">            default -&gt; 12;</span>
         };
-<span class="fc" id="L122">        return LocalDate.of(2026, month, 1).toString();</span>
+<span class="fc" id="L147">        return LocalDate.of(2026, month, 1).toString();</span>
     }
 
     private static boolean curatedPathPresent(String source) {
-<span class="pc bpc" id="L126" title="1 of 4 branches missed.">        if (source == null || source.isBlank()) {</span>
-<span class="fc" id="L127">            return false;</span>
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">        if (source == null || source.isBlank()) {</span>
+<span class="fc" id="L152">            return false;</span>
         }
-<span class="fc" id="L129">        String normalized = source.toLowerCase(Locale.ROOT);</span>
-<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        return normalized.equals(&quot;scenario&quot;)</span>
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            || normalized.equals(&quot;scenario-generic&quot;)</span>
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            || normalized.equals(&quot;hardcoded&quot;)</span>
-<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            || normalized.contains(&quot;scenario-exact-path&quot;);</span>
+<span class="fc" id="L154">        String normalized = source.toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        return normalized.equals(&quot;scenario&quot;)</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            || normalized.equals(&quot;scenario-generic&quot;)</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            || normalized.equals(&quot;hardcoded&quot;)</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            || normalized.contains(&quot;scenario-exact-path&quot;);</span>
     }
 
     private static boolean fallbackUsed(List&lt;String&gt; rulePath) {
-<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        return rulePath != null &amp;&amp; rulePath.stream()</span>
-<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            .filter(ruleId -&gt; ruleId != null)</span>
-<span class="fc" id="L139">            .map(ruleId -&gt; ruleId.toLowerCase(Locale.ROOT))</span>
-<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            .anyMatch(ruleId -&gt; ruleId.contains(&quot;fallback&quot;));</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        return rulePath != null &amp;&amp; rulePath.stream()</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            .filter(ruleId -&gt; ruleId != null)</span>
+<span class="fc" id="L164">            .map(ruleId -&gt; ruleId.toLowerCase(Locale.ROOT))</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            .anyMatch(ruleId -&gt; ruleId.contains(&quot;fallback&quot;));</span>
     }
 
     private static boolean macroOpportunity(String family, List&lt;String&gt; rulePath) {
-<span class="pc bpc" id="L144" title="1 of 6 branches missed.">        return &quot;substitution&quot;.equals(family) || (rulePath != null &amp;&amp; rulePath.size() &gt;= 2);</span>
+<span class="pc bpc" id="L169" title="1 of 6 branches missed.">        return &quot;substitution&quot;.equals(family) || (rulePath != null &amp;&amp; rulePath.size() &gt;= 2);</span>
     }
 
     private static String rationale(String notes, String failureReason) {
-<span class="pc bpc" id="L148" title="2 of 4 branches missed.">        if (notes != null &amp;&amp; !notes.isBlank()) {</span>
-<span class="fc" id="L149">            return notes;</span>
+<span class="pc bpc" id="L173" title="2 of 4 branches missed.">        if (notes != null &amp;&amp; !notes.isBlank()) {</span>
+<span class="fc" id="L174">            return notes;</span>
         }
-<span class="nc bnc" id="L151" title="All 2 branches missed.">        return failureReason == null ? &quot;&quot; : failureReason;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        return failureReason == null ? &quot;&quot; : failureReason;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

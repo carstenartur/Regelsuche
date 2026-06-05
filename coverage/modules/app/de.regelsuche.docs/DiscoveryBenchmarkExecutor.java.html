@@ -24,6 +24,7 @@ import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.SubstitutionRewriteState;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.SymPyDiscoveryOracleAdapter;
@@ -47,112 +48,113 @@ public final class DiscoveryBenchmarkExecutor {
     private final SymPyDiscoveryOracleAdapter oracle;
 
     public DiscoveryBenchmarkExecutor() {
-<span class="fc" id="L50">        this(new DiscoveryBenchmarkScenarioLoader(), new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()));</span>
-<span class="fc" id="L51">    }</span>
+<span class="fc" id="L51">        this(new DiscoveryBenchmarkScenarioLoader(), new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()));</span>
+<span class="fc" id="L52">    }</span>
 
     DiscoveryBenchmarkExecutor(DiscoveryBenchmarkScenarioLoader loader) {
-<span class="fc" id="L54">        this(loader, new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()));</span>
-<span class="fc" id="L55">    }</span>
+<span class="fc" id="L55">        this(loader, new DiscoveryOperatorRegistry().register(new DefaultDiscoveryOperatorProvider()));</span>
+<span class="fc" id="L56">    }</span>
 
-<span class="fc" id="L57">    DiscoveryBenchmarkExecutor(DiscoveryBenchmarkScenarioLoader loader, DiscoveryOperatorRegistry operatorRegistry) {</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (loader == null) {</span>
-<span class="fc" id="L59">            throw new IllegalArgumentException(&quot;Loader must not be null&quot;);</span>
+<span class="fc" id="L58">    DiscoveryBenchmarkExecutor(DiscoveryBenchmarkScenarioLoader loader, DiscoveryOperatorRegistry operatorRegistry) {</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (loader == null) {</span>
+<span class="fc" id="L60">            throw new IllegalArgumentException(&quot;Loader must not be null&quot;);</span>
         }
-<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (operatorRegistry == null) {</span>
-<span class="fc" id="L62">            throw new IllegalArgumentException(&quot;Operator registry must not be null&quot;);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (operatorRegistry == null) {</span>
+<span class="fc" id="L63">            throw new IllegalArgumentException(&quot;Operator registry must not be null&quot;);</span>
         }
-<span class="fc" id="L64">        this.loader = loader;</span>
-<span class="fc" id="L65">        this.operatorRegistry = operatorRegistry;</span>
-<span class="fc" id="L66">        this.operatorRuleIds = operatorRegistry.operatorRuleIds();</span>
-<span class="fc" id="L67">        this.traceCollector = new SearchTraceCollector(operatorRegistry);</span>
-<span class="fc" id="L68">        this.oracle = new SymPyDiscoveryOracleAdapter();</span>
-<span class="fc" id="L69">    }</span>
+<span class="fc" id="L65">        this.loader = loader;</span>
+<span class="fc" id="L66">        this.operatorRegistry = operatorRegistry;</span>
+<span class="fc" id="L67">        this.operatorRuleIds = operatorRegistry.operatorRuleIds();</span>
+<span class="fc" id="L68">        this.traceCollector = new SearchTraceCollector(operatorRegistry);</span>
+<span class="fc" id="L69">        this.oracle = new SymPyDiscoveryOracleAdapter();</span>
+<span class="fc" id="L70">    }</span>
 
     public DiscoveryBenchmarkEvidence execute(DiscoveryBenchmarkScenario scenario) {
-<span class="fc" id="L72">        List&lt;ScenarioRulePack&gt; packs = loader.loadRulePacks(scenario);</span>
-<span class="fc" id="L73">        Map&lt;String, ScenarioRule&gt; rulesById = packs.stream()</span>
-<span class="fc" id="L74">                .flatMap(pack -&gt; pack.rules().stream())</span>
-<span class="pc" id="L75">                .collect(Collectors.toMap(ScenarioRule::id, Function.identity(), (left, right) -&gt; left, LinkedHashMap::new));</span>
-<span class="fc" id="L76">        Map&lt;String, String&gt; ruleIdToPackId = buildRuleIdToPackId(packs);</span>
-<span class="fc" id="L77">        Set&lt;String&gt; enabledOperators = Set.copyOf(scenario.enabledOperators());</span>
-<span class="fc" id="L78">        TransformationEngine baseEngine = engineFor(scenario, packs);</span>
-<span class="fc" id="L79">        SearchRun withoutMacro = run(scenario, baseEngine);</span>
-<span class="fc bfc" id="L80" title="All 4 branches covered.">        MacroLearningRun macroLearningRun = scenario.macroLearning().enabled() &amp;&amp; withoutMacro.success()</span>
-<span class="fc" id="L81">                ? learnMacros(scenario, baseEngine, withoutMacro)</span>
-<span class="fc" id="L82">                : new MacroLearningRun(List.of(), Map.of(), new InMemoryRuleInventoryRepository());</span>
-<span class="fc" id="L83">        List&lt;String&gt; learnedMacros = macroLearningRun.learnedMacros().stream().map(ReusableRule::id).toList();</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">        String macroGoalExpression = withoutMacro.path().isEmpty() ? scenario.targetExpression() : withoutMacro.path().getLast();</span>
-<span class="fc" id="L85">        boolean macroReuseRequired = scenario.expectations().contains(DiscoveryExpectation.MACRO_REUSE_REQUIRED);</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">        SearchRun withMacro = scenario.macroLearning().enabled()</span>
-<span class="fc bfc" id="L87" title="All 2 branches covered.">                ? (!learnedMacros.isEmpty()</span>
-<span class="fc" id="L88">                        ? runMacroRerun(</span>
+<span class="fc" id="L73">        SubstitutionRewriteState.clear();</span>
+<span class="fc" id="L74">        List&lt;ScenarioRulePack&gt; packs = loader.loadRulePacks(scenario);</span>
+<span class="fc" id="L75">        Map&lt;String, ScenarioRule&gt; rulesById = packs.stream()</span>
+<span class="fc" id="L76">                .flatMap(pack -&gt; pack.rules().stream())</span>
+<span class="pc" id="L77">                .collect(Collectors.toMap(ScenarioRule::id, Function.identity(), (left, right) -&gt; left, LinkedHashMap::new));</span>
+<span class="fc" id="L78">        Map&lt;String, String&gt; ruleIdToPackId = buildRuleIdToPackId(packs);</span>
+<span class="fc" id="L79">        Set&lt;String&gt; enabledOperators = Set.copyOf(scenario.enabledOperators());</span>
+<span class="fc" id="L80">        TransformationEngine baseEngine = engineFor(scenario, packs);</span>
+<span class="fc" id="L81">        SearchRun withoutMacro = run(scenario, baseEngine);</span>
+<span class="fc bfc" id="L82" title="All 4 branches covered.">        MacroLearningRun macroLearningRun = scenario.macroLearning().enabled() &amp;&amp; withoutMacro.success()</span>
+<span class="fc" id="L83">                ? learnMacros(scenario, baseEngine, withoutMacro)</span>
+<span class="fc" id="L84">                : new MacroLearningRun(List.of(), Map.of(), new InMemoryRuleInventoryRepository());</span>
+<span class="fc" id="L85">        List&lt;String&gt; learnedMacros = macroLearningRun.learnedMacros().stream().map(ReusableRule::id).toList();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        String macroGoalExpression = withoutMacro.path().isEmpty() ? scenario.targetExpression() : withoutMacro.path().getLast();</span>
+<span class="fc" id="L87">        boolean macroReuseRequired = scenario.expectations().contains(DiscoveryExpectation.MACRO_REUSE_REQUIRED);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        SearchRun withMacro = scenario.macroLearning().enabled()</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                ? (!learnedMacros.isEmpty()</span>
+<span class="fc" id="L90">                        ? runMacroRerun(</span>
                                 scenario,
                                 baseEngine,
                                 macroLearningRun,
                                 learnedMacros,
                                 macroGoalExpression,
                                 macroReuseRequired)
-<span class="fc" id="L95">                        : new SearchRun(false, &quot;Macro learning required but no macro was learned&quot;, List.of(), List.of(), List.of(), List.of()))</span>
-<span class="fc" id="L96">                : new SearchRun(false, &quot;Macro learning disabled&quot;, List.of(), List.of(), List.of(), List.of());</span>
-<span class="fc" id="L97">        List&lt;String&gt; bridgeRules = bridgeRules(withoutMacro.appliedRuleIds(), scenario, rulesById);</span>
-<span class="fc" id="L98">        List&lt;String&gt; ruleFamilies = ruleFamilies(withoutMacro.appliedRuleIds(), rulesById);</span>
-<span class="fc" id="L99">        SearchSpaceAnalytics withoutAnalytics = analyticsFor(withoutMacro.steps(), bridgeRules, rulesById);</span>
-<span class="fc" id="L100">        SearchSpaceAnalytics withAnalytics = analyticsFor(withMacro.steps(), learnedMacros, rulesById);</span>
-<span class="fc" id="L101">        SearchSpaceAnalytics combinedAnalytics = combine(withoutAnalytics, withAnalytics);</span>
-<span class="fc" id="L102">        List&lt;String&gt; reusedMacros = withMacro.appliedRuleIds().stream().filter(learnedMacros::contains).toList();</span>
-<span class="fc" id="L103">        SymPyDiscoveryOracleAdapter.OracleResult oracleResult =</span>
-<span class="fc" id="L104">                oracle.equivalence(scenario.inputExpression(), scenario.targetExpression());</span>
-<span class="fc bfc" id="L105" title="All 2 branches covered.">        boolean promotionEligible = withoutMacro.success()</span>
-<span class="fc bfc" id="L106" title="All 4 branches covered.">                &amp;&amp; (!scenario.macroLearning().enabled() || withMacro.success())</span>
-<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                &amp;&amp; oracleResult.status() != SymPyDiscoveryOracleAdapter.Status.DISAGREE;</span>
-<span class="fc" id="L108">        List&lt;List&lt;String&gt;&gt; paths = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (!withoutMacro.path().isEmpty()) {</span>
-<span class="fc" id="L110">            paths.add(withoutMacro.path());</span>
+<span class="fc" id="L97">                        : new SearchRun(false, &quot;Macro learning required but no macro was learned&quot;, List.of(), List.of(), List.of(), List.of()))</span>
+<span class="fc" id="L98">                : new SearchRun(false, &quot;Macro learning disabled&quot;, List.of(), List.of(), List.of(), List.of());</span>
+<span class="fc" id="L99">        List&lt;String&gt; bridgeRules = bridgeRules(withoutMacro.appliedRuleIds(), scenario, rulesById);</span>
+<span class="fc" id="L100">        List&lt;String&gt; ruleFamilies = ruleFamilies(withoutMacro.appliedRuleIds(), rulesById);</span>
+<span class="fc" id="L101">        SearchSpaceAnalytics withoutAnalytics = analyticsFor(withoutMacro.steps(), bridgeRules, rulesById);</span>
+<span class="fc" id="L102">        SearchSpaceAnalytics withAnalytics = analyticsFor(withMacro.steps(), learnedMacros, rulesById);</span>
+<span class="fc" id="L103">        SearchSpaceAnalytics combinedAnalytics = combine(withoutAnalytics, withAnalytics);</span>
+<span class="fc" id="L104">        List&lt;String&gt; reusedMacros = withMacro.appliedRuleIds().stream().filter(learnedMacros::contains).toList();</span>
+<span class="fc" id="L105">        SymPyDiscoveryOracleAdapter.OracleResult oracleResult =</span>
+<span class="fc" id="L106">                oracle.equivalence(scenario.inputExpression(), scenario.targetExpression());</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        boolean promotionEligible = withoutMacro.success()</span>
+<span class="fc bfc" id="L108" title="All 4 branches covered.">                &amp;&amp; (!scenario.macroLearning().enabled() || withMacro.success())</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                &amp;&amp; oracleResult.status() != SymPyDiscoveryOracleAdapter.Status.DISAGREE;</span>
+<span class="fc" id="L110">        List&lt;List&lt;String&gt;&gt; paths = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (!withoutMacro.path().isEmpty()) {</span>
+<span class="fc" id="L112">            paths.add(withoutMacro.path());</span>
         }
-<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (!withMacro.path().isEmpty()) {</span>
-<span class="fc" id="L113">            paths.add(withMacro.path());</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (!withMacro.path().isEmpty()) {</span>
+<span class="fc" id="L115">            paths.add(withMacro.path());</span>
         }
-<span class="fc" id="L115">        List&lt;String&gt; convergentStates = convergentStates(paths);</span>
-<span class="fc" id="L116">        SearchRun withoutMacroTraceRun = ensureMeaningfulGraphCoverage(scenario, baseEngine, withoutMacro);</span>
-<span class="fc" id="L117">        SearchTraceCollector.TraceGraph traceGraph = traceCollector.collect(</span>
+<span class="fc" id="L117">        List&lt;String&gt; convergentStates = convergentStates(paths);</span>
+<span class="fc" id="L118">        SearchRun withoutMacroTraceRun = ensureMeaningfulGraphCoverage(scenario, baseEngine, withoutMacro);</span>
+<span class="fc" id="L119">        SearchTraceCollector.TraceGraph traceGraph = traceCollector.collect(</span>
                 scenario,
                 new SearchTraceCollector.SearchRunTrace(
-<span class="fc" id="L120">                        withoutMacro.success(),</span>
-<span class="fc" id="L121">                        withoutMacroTraceRun.exploredStates(),</span>
-<span class="fc" id="L122">                        withoutMacro.path(),</span>
-<span class="fc" id="L123">                        withoutMacro.appliedRuleIds()),</span>
+<span class="fc" id="L122">                        withoutMacro.success(),</span>
+<span class="fc" id="L123">                        withoutMacroTraceRun.exploredStates(),</span>
+<span class="fc" id="L124">                        withoutMacro.path(),</span>
+<span class="fc" id="L125">                        withoutMacro.appliedRuleIds()),</span>
                 new SearchTraceCollector.SearchRunTrace(
-<span class="fc" id="L125">                        withMacro.success(),</span>
-<span class="fc" id="L126">                        withMacro.exploredStates(),</span>
-<span class="fc" id="L127">                        withMacro.path(),</span>
-<span class="fc" id="L128">                        withMacro.appliedRuleIds()),</span>
+<span class="fc" id="L127">                        withMacro.success(),</span>
+<span class="fc" id="L128">                        withMacro.exploredStates(),</span>
+<span class="fc" id="L129">                        withMacro.path(),</span>
+<span class="fc" id="L130">                        withMacro.appliedRuleIds()),</span>
                 learnedMacros,
                 bridgeRules,
                 rulesById,
                 ruleIdToPackId,
                 enabledOperators);
-<span class="fc" id="L134">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; nodes = traceGraph.nodes();</span>
-<span class="fc" id="L135">        List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; edges = traceGraph.edges();</span>
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        boolean success = withoutMacro.success()</span>
-<span class="fc bfc" id="L137" title="All 4 branches covered.">                &amp;&amp; (!scenario.macroLearning().enabled() || withMacro.success())</span>
-<span class="fc bfc" id="L138" title="All 4 branches covered.">                &amp;&amp; expectationSatisfied(scenario, DiscoveryExpectation.BRIDGE_REQUIRED, !bridgeRules.isEmpty())</span>
-<span class="pc bpc" id="L139" title="1 of 4 branches missed.">                &amp;&amp; expectationSatisfied(scenario, DiscoveryExpectation.CONVERGENCE_REQUIRED, !convergentStates.isEmpty())</span>
-<span class="pc bpc" id="L140" title="1 of 4 branches missed.">                &amp;&amp; expectationSatisfied(scenario, DiscoveryExpectation.MACRO_LEARNING_REQUIRED, !learnedMacros.isEmpty())</span>
-<span class="pc bpc" id="L141" title="1 of 4 branches missed.">                &amp;&amp; expectationSatisfied(scenario, DiscoveryExpectation.MACRO_REUSE_REQUIRED, !reusedMacros.isEmpty());</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">        String failureReason = success ? &quot;&quot; : failureReason(scenario, withoutMacro, withMacro, bridgeRules, convergentStates, learnedMacros, reusedMacros);</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">        String smallGraphMessage = nodes.size() &lt; scenario.gallery().minVisibleNodes()</span>
-<span class="fc" id="L144">                ? &quot;Search produced only &quot; + nodes.size() + &quot; visible states under this budget.&quot;</span>
-<span class="fc" id="L145">                : &quot;&quot;;</span>
-<span class="fc" id="L146">        return new DiscoveryBenchmarkEvidence(</span>
-<span class="fc" id="L147">                scenario.id(),</span>
-<span class="fc" id="L148">                scenario.inputExpression(),</span>
-<span class="fc" id="L149">                scenario.targetExpression(),</span>
+<span class="fc" id="L136">        List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; nodes = traceGraph.nodes();</span>
+<span class="fc" id="L137">        List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; edges = traceGraph.edges();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        boolean success = withoutMacro.success()</span>
+<span class="fc bfc" id="L139" title="All 4 branches covered.">                &amp;&amp; (!scenario.macroLearning().enabled() || withMacro.success())</span>
+<span class="fc bfc" id="L140" title="All 4 branches covered.">                &amp;&amp; expectationSatisfied(scenario, DiscoveryExpectation.BRIDGE_REQUIRED, !bridgeRules.isEmpty())</span>
+<span class="pc bpc" id="L141" title="1 of 4 branches missed.">                &amp;&amp; expectationSatisfied(scenario, DiscoveryExpectation.CONVERGENCE_REQUIRED, !convergentStates.isEmpty())</span>
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">                &amp;&amp; expectationSatisfied(scenario, DiscoveryExpectation.MACRO_LEARNING_REQUIRED, !learnedMacros.isEmpty())</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">                &amp;&amp; expectationSatisfied(scenario, DiscoveryExpectation.MACRO_REUSE_REQUIRED, !reusedMacros.isEmpty());</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        String failureReason = success ? &quot;&quot; : failureReason(scenario, withoutMacro, withMacro, bridgeRules, convergentStates, learnedMacros, reusedMacros);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        String smallGraphMessage = nodes.size() &lt; scenario.gallery().minVisibleNodes()</span>
+<span class="fc" id="L146">                ? &quot;Search produced only &quot; + nodes.size() + &quot; visible states under this budget.&quot;</span>
+<span class="fc" id="L147">                : &quot;&quot;;</span>
+<span class="fc" id="L148">        return new DiscoveryBenchmarkEvidence(</span>
+<span class="fc" id="L149">                scenario.id(),</span>
+<span class="fc" id="L150">                scenario.inputExpression(),</span>
+<span class="fc" id="L151">                scenario.targetExpression(),</span>
                 success,
                 failureReason,
                 new DiscoveryBenchmarkEvidence.SearchRunEvidence(
-<span class="fc" id="L153">                        withoutMacro.success(), withoutMacro.failureReason(), withoutMacro.path(), withoutMacro.appliedRuleIds(), withoutAnalytics),</span>
+<span class="fc" id="L155">                        withoutMacro.success(), withoutMacro.failureReason(), withoutMacro.path(), withoutMacro.appliedRuleIds(), withoutAnalytics),</span>
                 new DiscoveryBenchmarkEvidence.SearchRunEvidence(
-<span class="fc" id="L155">                        withMacro.success(), withMacro.failureReason(), withMacro.path(), withMacro.appliedRuleIds(), withAnalytics),</span>
+<span class="fc" id="L157">                        withMacro.success(), withMacro.failureReason(), withMacro.path(), withMacro.appliedRuleIds(), withAnalytics),</span>
                 paths,
                 bridgeRules,
                 ruleFamilies,
@@ -160,9 +162,9 @@ public final class DiscoveryBenchmarkExecutor {
                 learnedMacros,
                 reusedMacros,
                 combinedAnalytics,
-<span class="fc bfc" id="L163" title="All 2 branches covered.">                success ? &quot;PASS&quot; : &quot;FAIL&quot;,</span>
-<span class="fc" id="L164">                oracleResult.status().name(),</span>
-<span class="fc" id="L165">                oracleResult.evidence(),</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                success ? &quot;PASS&quot; : &quot;FAIL&quot;,</span>
+<span class="fc" id="L166">                oracleResult.status().name(),</span>
+<span class="fc" id="L167">                oracleResult.evidence(),</span>
                 promotionEligible,
                 nodes,
                 edges,
@@ -173,39 +175,39 @@ public final class DiscoveryBenchmarkExecutor {
             DiscoveryBenchmarkScenario scenario,
             TransformationEngine engine,
             SearchRun baselineRun) {
-<span class="fc" id="L176">        int minVisibleNodes = Math.max(1, scenario.gallery().minVisibleNodes());</span>
-<span class="fc" id="L177">        SearchRun bestCoverage = baselineRun;</span>
-<span class="fc" id="L178">        int bestNodeCount = uniqueNodeCount(baselineRun.exploredStates());</span>
-<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (bestNodeCount &gt;= minVisibleNodes) {</span>
-<span class="fc" id="L180">            return bestCoverage;</span>
+<span class="fc" id="L178">        int minVisibleNodes = Math.max(1, scenario.gallery().minVisibleNodes());</span>
+<span class="fc" id="L179">        SearchRun bestCoverage = baselineRun;</span>
+<span class="fc" id="L180">        int bestNodeCount = uniqueNodeCount(baselineRun.exploredStates());</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (bestNodeCount &gt;= minVisibleNodes) {</span>
+<span class="fc" id="L182">            return bestCoverage;</span>
         }
-<span class="fc" id="L182">        int maxDepth = Math.max(1, scenario.budgets().maxDepth());</span>
-<span class="fc" id="L183">        int maxStates = Math.max(1, scenario.budgets().maxStates());</span>
-<span class="pc bpc" id="L184" title="1 of 4 branches missed.">        for (int attempt = 0; attempt &lt; 3 &amp;&amp; bestNodeCount &lt; minVisibleNodes; attempt++) {</span>
-<span class="fc" id="L185">            maxDepth = maxDepth + 2;</span>
-<span class="fc" id="L186">            maxStates = maxStates * 2;</span>
-<span class="fc" id="L187">            SearchRun expandedRun = run(scenario, engine, maxDepth, maxStates);</span>
-<span class="fc" id="L188">            int expandedNodeCount = uniqueNodeCount(expandedRun.exploredStates());</span>
-<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (expandedNodeCount &gt; bestNodeCount) {</span>
-<span class="nc" id="L190">                bestCoverage = new SearchRun(</span>
-<span class="nc" id="L191">                        baselineRun.success(),</span>
-<span class="nc" id="L192">                        baselineRun.failureReason(),</span>
-<span class="nc" id="L193">                        baselineRun.path(),</span>
-<span class="nc" id="L194">                        baselineRun.appliedRuleIds(),</span>
-<span class="nc" id="L195">                        baselineRun.steps(),</span>
-<span class="nc" id="L196">                        expandedRun.exploredStates());</span>
-<span class="nc" id="L197">                bestNodeCount = expandedNodeCount;</span>
+<span class="fc" id="L184">        int maxDepth = Math.max(1, scenario.budgets().maxDepth());</span>
+<span class="fc" id="L185">        int maxStates = Math.max(1, scenario.budgets().maxStates());</span>
+<span class="pc bpc" id="L186" title="1 of 4 branches missed.">        for (int attempt = 0; attempt &lt; 3 &amp;&amp; bestNodeCount &lt; minVisibleNodes; attempt++) {</span>
+<span class="fc" id="L187">            maxDepth = maxDepth + 2;</span>
+<span class="fc" id="L188">            maxStates = maxStates * 2;</span>
+<span class="fc" id="L189">            SearchRun expandedRun = run(scenario, engine, maxDepth, maxStates);</span>
+<span class="fc" id="L190">            int expandedNodeCount = uniqueNodeCount(expandedRun.exploredStates());</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (expandedNodeCount &gt; bestNodeCount) {</span>
+<span class="nc" id="L192">                bestCoverage = new SearchRun(</span>
+<span class="nc" id="L193">                        baselineRun.success(),</span>
+<span class="nc" id="L194">                        baselineRun.failureReason(),</span>
+<span class="nc" id="L195">                        baselineRun.path(),</span>
+<span class="nc" id="L196">                        baselineRun.appliedRuleIds(),</span>
+<span class="nc" id="L197">                        baselineRun.steps(),</span>
+<span class="nc" id="L198">                        expandedRun.exploredStates());</span>
+<span class="nc" id="L199">                bestNodeCount = expandedNodeCount;</span>
             }
         }
-<span class="fc" id="L200">        return bestCoverage;</span>
+<span class="fc" id="L202">        return bestCoverage;</span>
     }
 
     private int uniqueNodeCount(List&lt;SearchState&gt; states) {
-<span class="fc" id="L204">        HashSet&lt;String&gt; ids = new HashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (SearchState state : states) {</span>
-<span class="fc" id="L206">            ids.add(canonical(state.expression()));</span>
-<span class="fc" id="L207">        }</span>
-<span class="fc" id="L208">        return ids.size();</span>
+<span class="fc" id="L206">        HashSet&lt;String&gt; ids = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (SearchState state : states) {</span>
+<span class="fc" id="L208">            ids.add(canonical(state.expression()));</span>
+<span class="fc" id="L209">        }</span>
+<span class="fc" id="L210">        return ids.size();</span>
     }
 
     private SearchRun runMacroRerun(
@@ -215,204 +217,204 @@ public final class DiscoveryBenchmarkExecutor {
             List&lt;String&gt; learnedMacros,
             String macroGoalExpression,
             boolean macroReuseRequired) {
-<span class="fc" id="L218">        GoalAwareMacroMoveSelector selector = new GoalAwareMacroMoveSelector(macroLearningRun.inventory());</span>
-<span class="fc" id="L219">        SearchRun goalAwareRun = run(scenario, new MacroMoveTransformationEngine(</span>
+<span class="fc" id="L220">        GoalAwareMacroMoveSelector selector = new GoalAwareMacroMoveSelector(macroLearningRun.inventory());</span>
+<span class="fc" id="L221">        SearchRun goalAwareRun = run(scenario, new MacroMoveTransformationEngine(</span>
                 baseEngine,
                 selector,
                 macroGoalExpression,
-<span class="fc" id="L223">                macroLearningRun.atomicStepsByRuleId(),</span>
-<span class="fc" id="L224">                macroLearningRun.learnedMacros().getFirst().assumptions()));</span>
-<span class="pc bpc" id="L225" title="1 of 4 branches missed.">        if (!macroReuseRequired || goalAwareRun.appliedRuleIds().stream().anyMatch(learnedMacros::contains)) {</span>
-<span class="fc" id="L226">            return goalAwareRun;</span>
+<span class="fc" id="L225">                macroLearningRun.atomicStepsByRuleId(),</span>
+<span class="fc" id="L226">                macroLearningRun.learnedMacros().getFirst().assumptions()));</span>
+<span class="pc bpc" id="L227" title="1 of 4 branches missed.">        if (!macroReuseRequired || goalAwareRun.appliedRuleIds().stream().anyMatch(learnedMacros::contains)) {</span>
+<span class="fc" id="L228">            return goalAwareRun;</span>
         }
-<span class="fc" id="L228">        SearchRun fallbackRun = run(scenario, new MacroMoveTransformationEngine(</span>
+<span class="fc" id="L230">        SearchRun fallbackRun = run(scenario, new MacroMoveTransformationEngine(</span>
                 baseEngine,
                 selector,
                 null,
-<span class="fc" id="L232">                macroLearningRun.atomicStepsByRuleId(),</span>
-<span class="fc" id="L233">                macroLearningRun.learnedMacros().getFirst().assumptions()));</span>
-<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        return fallbackRun.appliedRuleIds().stream().anyMatch(learnedMacros::contains) ? fallbackRun : goalAwareRun;</span>
+<span class="fc" id="L234">                macroLearningRun.atomicStepsByRuleId(),</span>
+<span class="fc" id="L235">                macroLearningRun.learnedMacros().getFirst().assumptions()));</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        return fallbackRun.appliedRuleIds().stream().anyMatch(learnedMacros::contains) ? fallbackRun : goalAwareRun;</span>
     }
 
     private TransformationEngine engineFor(DiscoveryBenchmarkScenario scenario, List&lt;ScenarioRulePack&gt; scenarioPacks) {
-<span class="fc" id="L238">        KnowledgePackSelection selection = new KnowledgePackSelection(null, Set.copyOf(scenario.enabledRulePacks()), Set.of());</span>
-<span class="fc" id="L239">        TransformationEngine astEngine = AstRewriteTransformationEngine.withKnowledgePacks(selection);</span>
-<span class="fc bfc" id="L240" title="All 2 branches covered.">        TransformationEngine ruleEngine = scenarioPacks.isEmpty()</span>
-<span class="fc" id="L241">                ? astEngine</span>
-<span class="fc" id="L242">                : new CompositeTransformationEngine(List.of(astEngine, new ScenarioRuleTransformationEngine(scenarioPacks)));</span>
-<span class="fc" id="L243">        List&lt;HypothesisOperator&gt; operators = operatorsFor(scenario);</span>
-<span class="fc bfc" id="L244" title="All 2 branches covered.">        return operators.isEmpty() ? ruleEngine : new HypothesisTransformationEngine(ruleEngine, operators, 16);</span>
+<span class="fc" id="L240">        KnowledgePackSelection selection = new KnowledgePackSelection(null, Set.copyOf(scenario.enabledRulePacks()), Set.of());</span>
+<span class="fc" id="L241">        TransformationEngine astEngine = AstRewriteTransformationEngine.withKnowledgePacks(selection);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        TransformationEngine ruleEngine = scenarioPacks.isEmpty()</span>
+<span class="fc" id="L243">                ? astEngine</span>
+<span class="fc" id="L244">                : new CompositeTransformationEngine(List.of(astEngine, new ScenarioRuleTransformationEngine(scenarioPacks)));</span>
+<span class="fc" id="L245">        List&lt;HypothesisOperator&gt; operators = operatorsFor(scenario);</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        return operators.isEmpty() ? ruleEngine : new HypothesisTransformationEngine(ruleEngine, operators, 16);</span>
     }
 
     private List&lt;HypothesisOperator&gt; operatorsFor(DiscoveryBenchmarkScenario scenario) {
-<span class="fc" id="L248">        return operatorRegistry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(scenario.enabledOperators()));</span>
+<span class="fc" id="L250">        return operatorRegistry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(scenario.enabledOperators()));</span>
     }
 
     private static Map&lt;String, String&gt; buildRuleIdToPackId(List&lt;ScenarioRulePack&gt; packs) {
-<span class="fc" id="L252">        Map&lt;String, String&gt; map = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L253" title="All 2 branches covered.">        for (ScenarioRulePack pack : packs) {</span>
-<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            for (ScenarioRule rule : pack.rules()) {</span>
-<span class="nc" id="L255">                map.putIfAbsent(rule.id(), pack.id());</span>
-<span class="nc" id="L256">            }</span>
-<span class="fc" id="L257">        }</span>
-<span class="fc" id="L258">        return Map.copyOf(map);</span>
+<span class="fc" id="L254">        Map&lt;String, String&gt; map = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (ScenarioRulePack pack : packs) {</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            for (ScenarioRule rule : pack.rules()) {</span>
+<span class="nc" id="L257">                map.putIfAbsent(rule.id(), pack.id());</span>
+<span class="nc" id="L258">            }</span>
+<span class="fc" id="L259">        }</span>
+<span class="fc" id="L260">        return Map.copyOf(map);</span>
     }
 
     private MacroLearningRun learnMacros(DiscoveryBenchmarkScenario scenario, TransformationEngine baseEngine, SearchRun withoutMacro) {
-<span class="fc" id="L262">        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();</span>
-<span class="fc" id="L263">        SuccessfulTransformationPath path = new SuccessfulTransformationPath(</span>
-<span class="fc" id="L264">                scenario.id() + &quot;-discovered-path&quot;,</span>
-<span class="fc" id="L265">                withoutMacro.path().getFirst(),</span>
-<span class="fc" id="L266">                withoutMacro.path().getLast(),</span>
-<span class="fc" id="L267">                withoutMacro.path(),</span>
-<span class="fc" id="L268">                withoutMacro.appliedRuleIds(),</span>
-<span class="fc" id="L269">                new ExpressionScorer().score(withoutMacro.path().getFirst()),</span>
-<span class="fc" id="L270">                new ExpressionScorer().score(withoutMacro.path().getLast()),</span>
+<span class="fc" id="L264">        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();</span>
+<span class="fc" id="L265">        SuccessfulTransformationPath path = new SuccessfulTransformationPath(</span>
+<span class="fc" id="L266">                scenario.id() + &quot;-discovered-path&quot;,</span>
+<span class="fc" id="L267">                withoutMacro.path().getFirst(),</span>
+<span class="fc" id="L268">                withoutMacro.path().getLast(),</span>
+<span class="fc" id="L269">                withoutMacro.path(),</span>
+<span class="fc" id="L270">                withoutMacro.appliedRuleIds(),</span>
+<span class="fc" id="L271">                new ExpressionScorer().score(withoutMacro.path().getFirst()),</span>
+<span class="fc" id="L272">                new ExpressionScorer().score(withoutMacro.path().getLast()),</span>
                 true,
                 &quot;scenario-driven discovery path&quot;,
-<span class="fc" id="L273">                Map.of(&quot;source&quot;, &quot;DiscoveryBenchmarkExecutor&quot;));</span>
-<span class="fc" id="L274">        MacroLearningResult result = new MacroLearningPipeline(inventory).learn(List.of(path));</span>
-<span class="fc" id="L275">        List&lt;ReusableRule&gt; learned = result.newlyActivated();</span>
-<span class="fc" id="L276">        Map&lt;String, List&lt;TransformationStep&gt;&gt; atomicSteps = learned.stream()</span>
-<span class="pc" id="L277">                .collect(Collectors.toMap(ReusableRule::id, rule -&gt; atomicSteps(withoutMacro), (left, right) -&gt; left, LinkedHashMap::new));</span>
-<span class="fc" id="L278">        return new MacroLearningRun(learned, atomicSteps, inventory);</span>
+<span class="fc" id="L275">                Map.of(&quot;source&quot;, &quot;DiscoveryBenchmarkExecutor&quot;));</span>
+<span class="fc" id="L276">        MacroLearningResult result = new MacroLearningPipeline(inventory).learn(List.of(path));</span>
+<span class="fc" id="L277">        List&lt;ReusableRule&gt; learned = result.newlyActivated();</span>
+<span class="fc" id="L278">        Map&lt;String, List&lt;TransformationStep&gt;&gt; atomicSteps = learned.stream()</span>
+<span class="pc" id="L279">                .collect(Collectors.toMap(ReusableRule::id, rule -&gt; atomicSteps(withoutMacro), (left, right) -&gt; left, LinkedHashMap::new));</span>
+<span class="fc" id="L280">        return new MacroLearningRun(learned, atomicSteps, inventory);</span>
     }
 
     private List&lt;TransformationStep&gt; atomicSteps(SearchRun run) {
-<span class="fc" id="L282">        List&lt;TransformationStep&gt; steps = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L283">        ExpressionScorer scorer = new ExpressionScorer();</span>
-<span class="fc bfc" id="L284" title="All 2 branches covered.">        for (int index = 0; index &lt; run.appliedRuleIds().size(); index++) {</span>
-<span class="fc" id="L285">            String before = run.path().get(index);</span>
-<span class="fc" id="L286">            String after = run.path().get(index + 1);</span>
-<span class="fc" id="L287">            steps.add(new TransformationStep(</span>
+<span class="fc" id="L284">        List&lt;TransformationStep&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L285">        ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        for (int index = 0; index &lt; run.appliedRuleIds().size(); index++) {</span>
+<span class="fc" id="L287">            String before = run.path().get(index);</span>
+<span class="fc" id="L288">            String after = run.path().get(index + 1);</span>
+<span class="fc" id="L289">            steps.add(new TransformationStep(</span>
                     index,
                     before,
                     after,
-<span class="fc" id="L291">                    run.appliedRuleIds().get(index),</span>
+<span class="fc" id="L293">                    run.appliedRuleIds().get(index),</span>
                     RewriteKind.NORMALIZE,
-<span class="fc" id="L293">                    scorer.score(before).weightedTotal(),</span>
-<span class="fc" id="L294">                    scorer.score(after).weightedTotal(),</span>
+<span class="fc" id="L295">                    scorer.score(before).weightedTotal(),</span>
+<span class="fc" id="L296">                    scorer.score(after).weightedTotal(),</span>
                     true,
-<span class="fc" id="L296">                    run.appliedRuleIds().get(index),</span>
-<span class="fc" id="L297">                    List.of()));</span>
+<span class="fc" id="L298">                    run.appliedRuleIds().get(index),</span>
+<span class="fc" id="L299">                    List.of()));</span>
         }
-<span class="fc" id="L299">        return List.copyOf(steps);</span>
+<span class="fc" id="L301">        return List.copyOf(steps);</span>
     }
 
     private SearchRun run(DiscoveryBenchmarkScenario scenario, TransformationEngine engine) {
-<span class="fc" id="L303">        return run(scenario, engine, scenario.budgets().maxDepth(), scenario.budgets().maxStates());</span>
+<span class="fc" id="L305">        return run(scenario, engine, scenario.budgets().maxDepth(), scenario.budgets().maxStates());</span>
     }
 
     private SearchRun run(DiscoveryBenchmarkScenario scenario, TransformationEngine engine, int maxDepth, int maxStates) {
-<span class="fc" id="L307">        SearchProblem problem = new SearchProblem(</span>
-<span class="fc" id="L308">                scenario.inputExpression(),</span>
+<span class="fc" id="L309">        SearchProblem problem = new SearchProblem(</span>
+<span class="fc" id="L310">                scenario.inputExpression(),</span>
                 engine,
                 new ExpressionScorer(),
                 new ExpressionCanonicalizer(),
                 new SearchHeuristic(maxDepth, maxStates, 1, 4, 80, 12));
-<span class="fc" id="L313">        String normalizedTarget = normalizeExpression(scenario.targetExpression());</span>
-<span class="fc" id="L314">        List&lt;SearchState&gt; explored = new BestFirstSearchStrategy().search(problem.withGoal(TransformationGoal.FACTORIZE));</span>
-<span class="fc" id="L315">        return explored.stream()</span>
-<span class="fc bfc" id="L316" title="All 4 branches covered.">                .filter(state -&gt; state.depth() &gt; 0 &amp;&amp; normalizeExpression(state.expression()).equals(normalizedTarget))</span>
-<span class="fc" id="L317">                .sorted(Comparator.comparingInt(state -&gt; pathPreference(state.appliedRuleIds())))</span>
-<span class="fc" id="L318">                .findFirst().map(state -&gt; toRun(state, true, &quot;&quot;, explored))</span>
-<span class="fc" id="L319">                .orElse(new SearchRun(</span>
+<span class="fc" id="L315">        String normalizedTarget = normalizeExpression(scenario.targetExpression());</span>
+<span class="fc" id="L316">        List&lt;SearchState&gt; explored = new BestFirstSearchStrategy().search(problem.withGoal(TransformationGoal.FACTORIZE));</span>
+<span class="fc" id="L317">        return explored.stream()</span>
+<span class="fc bfc" id="L318" title="All 4 branches covered.">                .filter(state -&gt; state.depth() &gt; 0 &amp;&amp; normalizeExpression(state.expression()).equals(normalizedTarget))</span>
+<span class="fc" id="L319">                .sorted(Comparator.comparingInt(state -&gt; pathPreference(state.appliedRuleIds())))</span>
+<span class="fc" id="L320">                .findFirst().map(state -&gt; toRun(state, true, &quot;&quot;, explored))</span>
+<span class="fc" id="L321">                .orElse(new SearchRun(</span>
                         false,
-<span class="fc" id="L321">                        &quot;Target expression was not reached: &quot; + scenario.targetExpression(),</span>
-<span class="fc" id="L322">                        List.of(),</span>
-<span class="fc" id="L323">                        List.of(),</span>
+<span class="fc" id="L323">                        &quot;Target expression was not reached: &quot; + scenario.targetExpression(),</span>
 <span class="fc" id="L324">                        List.of(),</span>
+<span class="fc" id="L325">                        List.of(),</span>
+<span class="fc" id="L326">                        List.of(),</span>
                         explored));
     }
 
     private int pathPreference(List&lt;String&gt; appliedRuleIds) {
-<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (appliedRuleIds.stream().anyMatch(rule -&gt; rule.toLowerCase(Locale.ROOT).contains(&quot;macro&quot;))) {</span>
-<span class="fc" id="L330">            return 0;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        if (appliedRuleIds.stream().anyMatch(rule -&gt; rule.toLowerCase(Locale.ROOT).contains(&quot;macro&quot;))) {</span>
+<span class="fc" id="L332">            return 0;</span>
         }
-<span class="fc bfc" id="L332" title="All 2 branches covered.">        return appliedRuleIds.contains(&quot;ast_linear_offset_simplify&quot;) ? 1 : 2;</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        return appliedRuleIds.contains(&quot;ast_linear_offset_simplify&quot;) ? 1 : 2;</span>
     }
 
     private SearchRun toRun(SearchState targetState, boolean success, String failureReason, List&lt;SearchState&gt; exploredStates) {
-<span class="fc" id="L336">        List&lt;ProofStep&gt; steps = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L337" title="All 2 branches covered.">        for (int i = 1; i &lt; targetState.path().size(); i++) {</span>
-<span class="fc" id="L338">            steps.add(new ProofStep(</span>
-<span class="fc" id="L339">                    targetState.path().get(i - 1),</span>
-<span class="fc" id="L340">                    targetState.path().get(i),</span>
-<span class="fc" id="L341">                    targetState.appliedRuleIds().get(i - 1)));</span>
+<span class="fc" id="L338">        List&lt;ProofStep&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (int i = 1; i &lt; targetState.path().size(); i++) {</span>
+<span class="fc" id="L340">            steps.add(new ProofStep(</span>
+<span class="fc" id="L341">                    targetState.path().get(i - 1),</span>
+<span class="fc" id="L342">                    targetState.path().get(i),</span>
+<span class="fc" id="L343">                    targetState.appliedRuleIds().get(i - 1)));</span>
         }
-<span class="fc" id="L343">        return new SearchRun(success, failureReason, targetState.path(), targetState.appliedRuleIds(), steps, exploredStates);</span>
+<span class="fc" id="L345">        return new SearchRun(success, failureReason, targetState.path(), targetState.appliedRuleIds(), steps, exploredStates);</span>
     }
 
     private List&lt;String&gt; bridgeRules(List&lt;String&gt; appliedRuleIds, DiscoveryBenchmarkScenario scenario, Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="fc" id="L347">        LinkedHashSet&lt;String&gt; bridgeRules = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L348" title="All 2 branches covered.">        for (String ruleId : appliedRuleIds) {</span>
-<span class="fc" id="L349">            ScenarioRule rule = rulesById.get(ruleId);</span>
-<span class="fc bfc" id="L350" title="All 2 branches covered.">            if (scenario.requiredBridgeRules().contains(ruleId)</span>
-<span class="pc bpc" id="L351" title="1 of 2 branches missed.">                    || ruleId.toLowerCase(Locale.ROOT).contains(&quot;bridge&quot;)</span>
-<span class="pc bpc" id="L352" title="2 of 4 branches missed.">                    || operatorRuleIds.contains(ruleId)</span>
-<span class="nc bnc" id="L353" title="All 2 branches missed.">                    || (rule != null &amp;&amp; rule.effects().contains(SearchEffect.BRIDGING))) {</span>
-<span class="fc" id="L354">                bridgeRules.add(ruleId);</span>
+<span class="fc" id="L349">        LinkedHashSet&lt;String&gt; bridgeRules = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        for (String ruleId : appliedRuleIds) {</span>
+<span class="fc" id="L351">            ScenarioRule rule = rulesById.get(ruleId);</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">            if (scenario.requiredBridgeRules().contains(ruleId)</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">                    || ruleId.toLowerCase(Locale.ROOT).contains(&quot;bridge&quot;)</span>
+<span class="pc bpc" id="L354" title="2 of 4 branches missed.">                    || operatorRuleIds.contains(ruleId)</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                    || (rule != null &amp;&amp; rule.effects().contains(SearchEffect.BRIDGING))) {</span>
+<span class="fc" id="L356">                bridgeRules.add(ruleId);</span>
             }
-<span class="fc" id="L356">        }</span>
-<span class="fc" id="L357">        return List.copyOf(bridgeRules);</span>
+<span class="fc" id="L358">        }</span>
+<span class="fc" id="L359">        return List.copyOf(bridgeRules);</span>
     }
 
     private List&lt;String&gt; ruleFamilies(List&lt;String&gt; appliedRuleIds, Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="fc" id="L361">        LinkedHashSet&lt;String&gt; families = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L362" title="All 2 branches covered.">        for (String ruleId : appliedRuleIds) {</span>
-<span class="fc" id="L363">            ScenarioRule rule = rulesById.get(ruleId);</span>
-<span class="pc bpc" id="L364" title="3 of 4 branches missed.">            if (rule != null &amp;&amp; !rule.family().isBlank()) {</span>
-<span class="nc" id="L365">                families.add(rule.family());</span>
+<span class="fc" id="L363">        LinkedHashSet&lt;String&gt; families = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        for (String ruleId : appliedRuleIds) {</span>
+<span class="fc" id="L365">            ScenarioRule rule = rulesById.get(ruleId);</span>
+<span class="pc bpc" id="L366" title="3 of 4 branches missed.">            if (rule != null &amp;&amp; !rule.family().isBlank()) {</span>
+<span class="nc" id="L367">                families.add(rule.family());</span>
             }
-<span class="fc" id="L367">        }</span>
-<span class="fc" id="L368">        return List.copyOf(families);</span>
+<span class="fc" id="L369">        }</span>
+<span class="fc" id="L370">        return List.copyOf(families);</span>
     }
 
     private SearchSpaceAnalytics analyticsFor(List&lt;ProofStep&gt; steps, List&lt;String&gt; specialRules, Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="fc" id="L372">        Map&lt;String, Long&gt; generatedStateCounts = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L373">        Map&lt;String, Long&gt; ruleUsage = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L374">        Map&lt;String, Set&lt;SearchEffect&gt;&gt; ruleEffects = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L375" title="All 2 branches covered.">        if (!steps.isEmpty()) {</span>
-<span class="fc" id="L376">            generatedStateCounts.merge(canonical(steps.get(0).from()), 1L, Long::sum);</span>
+<span class="fc" id="L374">        Map&lt;String, Long&gt; generatedStateCounts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L375">        Map&lt;String, Long&gt; ruleUsage = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L376">        Map&lt;String, Set&lt;SearchEffect&gt;&gt; ruleEffects = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        if (!steps.isEmpty()) {</span>
+<span class="fc" id="L378">            generatedStateCounts.merge(canonical(steps.get(0).from()), 1L, Long::sum);</span>
         }
-<span class="fc bfc" id="L378" title="All 2 branches covered.">        for (ProofStep step : steps) {</span>
-<span class="fc" id="L379">            generatedStateCounts.merge(canonical(step.to()), 1L, Long::sum);</span>
-<span class="fc" id="L380">            ruleUsage.merge(step.ruleId(), 1L, Long::sum);</span>
-<span class="fc" id="L381">            LinkedHashSet&lt;SearchEffect&gt; effects = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L382">            ScenarioRule rule = rulesById.get(step.ruleId());</span>
-<span class="pc bpc" id="L383" title="1 of 2 branches missed.">            if (rule != null) {</span>
-<span class="nc" id="L384">                effects.addAll(rule.effects());</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        for (ProofStep step : steps) {</span>
+<span class="fc" id="L381">            generatedStateCounts.merge(canonical(step.to()), 1L, Long::sum);</span>
+<span class="fc" id="L382">            ruleUsage.merge(step.ruleId(), 1L, Long::sum);</span>
+<span class="fc" id="L383">            LinkedHashSet&lt;SearchEffect&gt; effects = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L384">            ScenarioRule rule = rulesById.get(step.ruleId());</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">            if (rule != null) {</span>
+<span class="nc" id="L386">                effects.addAll(rule.effects());</span>
             }
-<span class="fc" id="L386">            effects.addAll(inferredEffects(step.ruleId()));</span>
-<span class="fc bfc" id="L387" title="All 4 branches covered.">            if (specialRules.contains(step.ruleId()) &amp;&amp; step.ruleId().toLowerCase(Locale.ROOT).contains(&quot;macro&quot;)) {</span>
-<span class="fc" id="L388">                effects.add(SearchEffect.NORMALIZING);</span>
+<span class="fc" id="L388">            effects.addAll(inferredEffects(step.ruleId()));</span>
+<span class="fc bfc" id="L389" title="All 4 branches covered.">            if (specialRules.contains(step.ruleId()) &amp;&amp; step.ruleId().toLowerCase(Locale.ROOT).contains(&quot;macro&quot;)) {</span>
+<span class="fc" id="L390">                effects.add(SearchEffect.NORMALIZING);</span>
             }
-<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            if (!effects.isEmpty()) {</span>
-<span class="fc" id="L391">                ruleEffects.put(step.ruleId(), effects);</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">            if (!effects.isEmpty()) {</span>
+<span class="fc" id="L393">                ruleEffects.put(step.ruleId(), effects);</span>
             }
-<span class="fc" id="L393">        }</span>
-<span class="fc" id="L394">        long macroApplications = ruleUsage.keySet().stream().filter(rule -&gt; rule.toLowerCase(Locale.ROOT).contains(&quot;macro&quot;))</span>
-<span class="fc" id="L395">                .mapToLong(ruleUsage::get).sum();</span>
-<span class="fc" id="L396">        return SearchSpaceAnalytics.from(generatedStateCounts, ruleUsage, macroApplications, ruleEffects);</span>
+<span class="fc" id="L395">        }</span>
+<span class="fc" id="L396">        long macroApplications = ruleUsage.keySet().stream().filter(rule -&gt; rule.toLowerCase(Locale.ROOT).contains(&quot;macro&quot;))</span>
+<span class="fc" id="L397">                .mapToLong(ruleUsage::get).sum();</span>
+<span class="fc" id="L398">        return SearchSpaceAnalytics.from(generatedStateCounts, ruleUsage, macroApplications, ruleEffects);</span>
     }
 
     private SearchSpaceAnalytics combine(SearchSpaceAnalytics left, SearchSpaceAnalytics right) {
-<span class="fc" id="L400">        Map&lt;String, Long&gt; rules = new LinkedHashMap&lt;&gt;(left.ruleUsage());</span>
-<span class="fc" id="L401">        right.ruleUsage().forEach((key, value) -&gt; rules.merge(key, value, Long::sum));</span>
-<span class="fc" id="L402">        Map&lt;String, Long&gt; bridgeRules = new LinkedHashMap&lt;&gt;(left.topBridgeRules());</span>
-<span class="pc" id="L403">        right.topBridgeRules().forEach((key, value) -&gt; bridgeRules.merge(key, value, Long::sum));</span>
-<span class="fc" id="L404">        Map&lt;String, Long&gt; factorRules = new LinkedHashMap&lt;&gt;(left.topFactorizationRules());</span>
-<span class="pc" id="L405">        right.topFactorizationRules().forEach((key, value) -&gt; factorRules.merge(key, value, Long::sum));</span>
-<span class="fc" id="L406">        Map&lt;String, Long&gt; simplifyRules = new LinkedHashMap&lt;&gt;(left.topSimplificationRules());</span>
-<span class="pc" id="L407">        right.topSimplificationRules().forEach((key, value) -&gt; simplifyRules.merge(key, value, Long::sum));</span>
-<span class="fc" id="L408">        Map&lt;String, Long&gt; convergentNodes = new LinkedHashMap&lt;&gt;(left.topConvergentNodes());</span>
-<span class="pc" id="L409">        right.topConvergentNodes().forEach((key, value) -&gt; convergentNodes.merge(key, value, Long::sum));</span>
-<span class="fc bfc" id="L410" title="All 4 branches covered.">        int overlappingStartState = left.statesExplored() &gt; 0 &amp;&amp; right.statesExplored() &gt; 0 ? 1 : 0;</span>
-<span class="fc" id="L411">        return new SearchSpaceAnalytics(</span>
-<span class="fc" id="L412">                left.statesExplored() + right.statesExplored() - overlappingStartState,</span>
-<span class="fc" id="L413">                left.uniqueCanonicalStates() + right.uniqueCanonicalStates() - overlappingStartState,</span>
-<span class="fc" id="L414">                left.convergentStates() + right.convergentStates(),</span>
-<span class="fc" id="L415">                left.learnedMacroUsage() + right.learnedMacroUsage(),</span>
+<span class="fc" id="L402">        Map&lt;String, Long&gt; rules = new LinkedHashMap&lt;&gt;(left.ruleUsage());</span>
+<span class="fc" id="L403">        right.ruleUsage().forEach((key, value) -&gt; rules.merge(key, value, Long::sum));</span>
+<span class="fc" id="L404">        Map&lt;String, Long&gt; bridgeRules = new LinkedHashMap&lt;&gt;(left.topBridgeRules());</span>
+<span class="pc" id="L405">        right.topBridgeRules().forEach((key, value) -&gt; bridgeRules.merge(key, value, Long::sum));</span>
+<span class="fc" id="L406">        Map&lt;String, Long&gt; factorRules = new LinkedHashMap&lt;&gt;(left.topFactorizationRules());</span>
+<span class="pc" id="L407">        right.topFactorizationRules().forEach((key, value) -&gt; factorRules.merge(key, value, Long::sum));</span>
+<span class="fc" id="L408">        Map&lt;String, Long&gt; simplifyRules = new LinkedHashMap&lt;&gt;(left.topSimplificationRules());</span>
+<span class="pc" id="L409">        right.topSimplificationRules().forEach((key, value) -&gt; simplifyRules.merge(key, value, Long::sum));</span>
+<span class="fc" id="L410">        Map&lt;String, Long&gt; convergentNodes = new LinkedHashMap&lt;&gt;(left.topConvergentNodes());</span>
+<span class="pc" id="L411">        right.topConvergentNodes().forEach((key, value) -&gt; convergentNodes.merge(key, value, Long::sum));</span>
+<span class="fc bfc" id="L412" title="All 4 branches covered.">        int overlappingStartState = left.statesExplored() &gt; 0 &amp;&amp; right.statesExplored() &gt; 0 ? 1 : 0;</span>
+<span class="fc" id="L413">        return new SearchSpaceAnalytics(</span>
+<span class="fc" id="L414">                left.statesExplored() + right.statesExplored() - overlappingStartState,</span>
+<span class="fc" id="L415">                left.uniqueCanonicalStates() + right.uniqueCanonicalStates() - overlappingStartState,</span>
+<span class="fc" id="L416">                left.convergentStates() + right.convergentStates(),</span>
+<span class="fc" id="L417">                left.learnedMacroUsage() + right.learnedMacroUsage(),</span>
                 0.0d,
                 rules,
                 bridgeRules,
@@ -422,25 +424,25 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     private List&lt;String&gt; convergentStates(List&lt;List&lt;String&gt;&gt; paths) {
-<span class="fc" id="L425">        return paths.stream()</span>
-<span class="fc" id="L426">                .flatMap(List::stream)</span>
-<span class="fc" id="L427">                .collect(Collectors.groupingBy(this::canonical, LinkedHashMap::new, Collectors.counting()))</span>
-<span class="fc" id="L428">                .entrySet().stream()</span>
-<span class="fc bfc" id="L429" title="All 2 branches covered.">                .filter(entry -&gt; entry.getValue() &gt; 1)</span>
-<span class="fc" id="L430">                .map(Map.Entry::getKey)</span>
-<span class="fc" id="L431">                .toList();</span>
+<span class="fc" id="L427">        return paths.stream()</span>
+<span class="fc" id="L428">                .flatMap(List::stream)</span>
+<span class="fc" id="L429">                .collect(Collectors.groupingBy(this::canonical, LinkedHashMap::new, Collectors.counting()))</span>
+<span class="fc" id="L430">                .entrySet().stream()</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">                .filter(entry -&gt; entry.getValue() &gt; 1)</span>
+<span class="fc" id="L432">                .map(Map.Entry::getKey)</span>
+<span class="fc" id="L433">                .toList();</span>
     }
 
     private List&lt;DiscoveryBenchmarkEvidence.EvidenceNode&gt; evidenceNodes(DiscoveryBenchmarkScenario scenario, List&lt;List&lt;String&gt;&gt; paths) {
-<span class="nc" id="L435">        LinkedHashMap&lt;String, DiscoveryBenchmarkEvidence.EvidenceNode&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
-<span class="nc bnc" id="L436" title="All 2 branches missed.">        for (List&lt;String&gt; path : paths) {</span>
-<span class="nc bnc" id="L437" title="All 2 branches missed.">            for (String expression : path) {</span>
-<span class="nc" id="L438">                String id = canonical(expression);</span>
-<span class="nc bnc" id="L439" title="All 2 branches missed.">                String kind = normalizeExpression(expression).equals(normalizeExpression(scenario.targetExpression())) ? &quot;target&quot; : &quot;state&quot;;</span>
-<span class="nc" id="L440">                nodes.putIfAbsent(id, new DiscoveryBenchmarkEvidence.EvidenceNode(id, expression, kind));</span>
-<span class="nc" id="L441">            }</span>
-<span class="nc" id="L442">        }</span>
-<span class="nc" id="L443">        return List.copyOf(nodes.values());</span>
+<span class="nc" id="L437">        LinkedHashMap&lt;String, DiscoveryBenchmarkEvidence.EvidenceNode&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        for (List&lt;String&gt; path : paths) {</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">            for (String expression : path) {</span>
+<span class="nc" id="L440">                String id = canonical(expression);</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">                String kind = normalizeExpression(expression).equals(normalizeExpression(scenario.targetExpression())) ? &quot;target&quot; : &quot;state&quot;;</span>
+<span class="nc" id="L442">                nodes.putIfAbsent(id, new DiscoveryBenchmarkEvidence.EvidenceNode(id, expression, kind));</span>
+<span class="nc" id="L443">            }</span>
+<span class="nc" id="L444">        }</span>
+<span class="nc" id="L445">        return List.copyOf(nodes.values());</span>
     }
 
     private List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; evidenceEdges(
@@ -449,10 +451,10 @@ public final class DiscoveryBenchmarkExecutor {
             List&lt;String&gt; learnedMacros,
             List&lt;String&gt; bridgeRules,
             Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="nc" id="L452">        List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; edges = new ArrayList&lt;&gt;();</span>
-<span class="nc" id="L453">        appendEdges(edges, withoutMacro, learnedMacros, bridgeRules, rulesById);</span>
-<span class="nc" id="L454">        appendEdges(edges, withMacro, learnedMacros, bridgeRules, rulesById);</span>
-<span class="nc" id="L455">        return List.copyOf(edges);</span>
+<span class="nc" id="L454">        List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L455">        appendEdges(edges, withoutMacro, learnedMacros, bridgeRules, rulesById);</span>
+<span class="nc" id="L456">        appendEdges(edges, withMacro, learnedMacros, bridgeRules, rulesById);</span>
+<span class="nc" id="L457">        return List.copyOf(edges);</span>
     }
 
     private void appendEdges(
@@ -461,57 +463,57 @@ public final class DiscoveryBenchmarkExecutor {
             List&lt;String&gt; learnedMacros,
             List&lt;String&gt; bridgeRules,
             Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="nc bnc" id="L464" title="All 2 branches missed.">        for (int i = 0; i &lt; run.appliedRuleIds().size(); i++) {</span>
-<span class="nc" id="L465">            String ruleId = run.appliedRuleIds().get(i);</span>
-<span class="nc bnc" id="L466" title="All 4 branches missed.">            String kind = learnedMacros.contains(ruleId) ? &quot;macro&quot; : bridgeRules.contains(ruleId) ? &quot;bridge&quot; : &quot;rule&quot;;</span>
-<span class="nc" id="L467">            edges.add(new DiscoveryBenchmarkEvidence.EvidenceEdge(</span>
-<span class="nc" id="L468">                    canonical(run.path().get(i)),</span>
-<span class="nc" id="L469">                    canonical(run.path().get(i + 1)),</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">        for (int i = 0; i &lt; run.appliedRuleIds().size(); i++) {</span>
+<span class="nc" id="L467">            String ruleId = run.appliedRuleIds().get(i);</span>
+<span class="nc bnc" id="L468" title="All 4 branches missed.">            String kind = learnedMacros.contains(ruleId) ? &quot;macro&quot; : bridgeRules.contains(ruleId) ? &quot;bridge&quot; : &quot;rule&quot;;</span>
+<span class="nc" id="L469">            edges.add(new DiscoveryBenchmarkEvidence.EvidenceEdge(</span>
+<span class="nc" id="L470">                    canonical(run.path().get(i)),</span>
+<span class="nc" id="L471">                    canonical(run.path().get(i + 1)),</span>
                     ruleId,
                     kind,
-<span class="nc" id="L472">                    sourceFor(ruleId, learnedMacros, rulesById),</span>
-<span class="nc" id="L473">                    packIdFor(ruleId, rulesById),</span>
-<span class="nc" id="L474">                    List.copyOf(inferredEffects(ruleId))));</span>
+<span class="nc" id="L474">                    sourceFor(ruleId, learnedMacros, rulesById),</span>
+<span class="nc" id="L475">                    packIdFor(ruleId, rulesById),</span>
+<span class="nc" id="L476">                    List.copyOf(inferredEffects(ruleId))));</span>
         }
-<span class="nc" id="L476">    }</span>
+<span class="nc" id="L478">    }</span>
 
     private String sourceFor(String ruleId, List&lt;String&gt; learnedMacros, Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="nc bnc" id="L479" title="All 2 branches missed.">        if (learnedMacros.contains(ruleId)) {</span>
-<span class="nc" id="L480">            return &quot;macro&quot;;</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">        if (learnedMacros.contains(ruleId)) {</span>
+<span class="nc" id="L482">            return &quot;macro&quot;;</span>
         }
-<span class="nc bnc" id="L482" title="All 2 branches missed.">        if (operatorRuleIds.contains(ruleId)) {</span>
-<span class="nc" id="L483">            return &quot;operator&quot;;</span>
+<span class="nc bnc" id="L484" title="All 2 branches missed.">        if (operatorRuleIds.contains(ruleId)) {</span>
+<span class="nc" id="L485">            return &quot;operator&quot;;</span>
         }
-<span class="nc bnc" id="L485" title="All 2 branches missed.">        return rulesById.containsKey(ruleId) ? &quot;scenario-generic&quot; : &quot;core&quot;;</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        return rulesById.containsKey(ruleId) ? &quot;scenario-generic&quot; : &quot;core&quot;;</span>
     }
 
     private String packIdFor(String ruleId, Map&lt;String, ScenarioRule&gt; rulesById) {
-<span class="nc bnc" id="L489" title="All 2 branches missed.">        return rulesById.containsKey(ruleId) ? &quot;scenario-generic&quot; : &quot;core&quot;;</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        return rulesById.containsKey(ruleId) ? &quot;scenario-generic&quot; : &quot;core&quot;;</span>
     }
 
     private Set&lt;SearchEffect&gt; inferredEffects(String ruleId) {
-<span class="fc" id="L493">        LinkedHashSet&lt;SearchEffect&gt; effects = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L494">        String lower = ruleId.toLowerCase(Locale.ROOT);</span>
-<span class="pc bpc" id="L495" title="1 of 4 branches missed.">        if (operatorRuleIds.contains(ruleId) || lower.contains(&quot;bridge&quot;)) {</span>
-<span class="fc" id="L496">            effects.add(SearchEffect.BRIDGING);</span>
+<span class="fc" id="L495">        LinkedHashSet&lt;SearchEffect&gt; effects = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L496">        String lower = ruleId.toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L497" title="1 of 4 branches missed.">        if (operatorRuleIds.contains(ruleId) || lower.contains(&quot;bridge&quot;)) {</span>
+<span class="fc" id="L498">            effects.add(SearchEffect.BRIDGING);</span>
         }
-<span class="fc bfc" id="L498" title="All 2 branches covered.">        if (lower.contains(&quot;factor&quot;)) {</span>
-<span class="fc" id="L499">            effects.add(SearchEffect.FACTORIZING);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (lower.contains(&quot;factor&quot;)) {</span>
+<span class="fc" id="L501">            effects.add(SearchEffect.FACTORIZING);</span>
         }
-<span class="fc bfc" id="L501" title="All 2 branches covered.">        if (lower.contains(&quot;simplify&quot;)) {</span>
-<span class="fc" id="L502">            effects.add(SearchEffect.SIMPLIFYING);</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        if (lower.contains(&quot;simplify&quot;)) {</span>
+<span class="fc" id="L504">            effects.add(SearchEffect.SIMPLIFYING);</span>
         }
-<span class="fc bfc" id="L504" title="All 4 branches covered.">        if (lower.contains(&quot;normalize&quot;) || lower.contains(&quot;macro&quot;)) {</span>
-<span class="fc" id="L505">            effects.add(SearchEffect.NORMALIZING);</span>
+<span class="fc bfc" id="L506" title="All 4 branches covered.">        if (lower.contains(&quot;normalize&quot;) || lower.contains(&quot;macro&quot;)) {</span>
+<span class="fc" id="L507">            effects.add(SearchEffect.NORMALIZING);</span>
         }
-<span class="pc bpc" id="L507" title="1 of 2 branches missed.">        if (lower.contains(&quot;expand&quot;)) {</span>
-<span class="nc" id="L508">            effects.add(SearchEffect.EXPANDING);</span>
+<span class="pc bpc" id="L509" title="1 of 2 branches missed.">        if (lower.contains(&quot;expand&quot;)) {</span>
+<span class="nc" id="L510">            effects.add(SearchEffect.EXPANDING);</span>
         }
-<span class="fc" id="L510">        return effects;</span>
+<span class="fc" id="L512">        return effects;</span>
     }
 
     private boolean expectationSatisfied(DiscoveryBenchmarkScenario scenario, DiscoveryExpectation expectation, boolean actual) {
-<span class="fc bfc" id="L514" title="All 4 branches covered.">        return !scenario.expectations().contains(expectation) || actual;</span>
+<span class="fc bfc" id="L516" title="All 4 branches covered.">        return !scenario.expectations().contains(expectation) || actual;</span>
     }
 
     private String failureReason(
@@ -522,40 +524,40 @@ public final class DiscoveryBenchmarkExecutor {
             List&lt;String&gt; convergentStates,
             List&lt;String&gt; learnedMacros,
             List&lt;String&gt; reusedMacros) {
-<span class="fc" id="L525">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L526" title="All 2 branches covered.">        if (!withoutMacro.success()) {</span>
-<span class="fc" id="L527">            reasons.add(withoutMacro.failureReason());</span>
+<span class="fc" id="L527">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L528" title="All 2 branches covered.">        if (!withoutMacro.success()) {</span>
+<span class="fc" id="L529">            reasons.add(withoutMacro.failureReason());</span>
         }
-<span class="pc bpc" id="L529" title="1 of 4 branches missed.">        if (scenario.macroLearning().enabled() &amp;&amp; !withMacro.success()) {</span>
-<span class="fc" id="L530">            reasons.add(withMacro.failureReason());</span>
+<span class="pc bpc" id="L531" title="1 of 4 branches missed.">        if (scenario.macroLearning().enabled() &amp;&amp; !withMacro.success()) {</span>
+<span class="fc" id="L532">            reasons.add(withMacro.failureReason());</span>
         }
-<span class="pc bpc" id="L532" title="1 of 4 branches missed.">        if (!expectationSatisfied(scenario, DiscoveryExpectation.BRIDGE_REQUIRED, !bridgeRules.isEmpty())) {</span>
-<span class="fc" id="L533">            reasons.add(&quot;No bridge rule was used&quot;);</span>
+<span class="pc bpc" id="L534" title="1 of 4 branches missed.">        if (!expectationSatisfied(scenario, DiscoveryExpectation.BRIDGE_REQUIRED, !bridgeRules.isEmpty())) {</span>
+<span class="fc" id="L535">            reasons.add(&quot;No bridge rule was used&quot;);</span>
         }
-<span class="pc bpc" id="L535" title="1 of 4 branches missed.">        if (!expectationSatisfied(scenario, DiscoveryExpectation.CONVERGENCE_REQUIRED, !convergentStates.isEmpty())) {</span>
-<span class="fc" id="L536">            reasons.add(&quot;No convergent state was observed&quot;);</span>
+<span class="pc bpc" id="L537" title="1 of 4 branches missed.">        if (!expectationSatisfied(scenario, DiscoveryExpectation.CONVERGENCE_REQUIRED, !convergentStates.isEmpty())) {</span>
+<span class="fc" id="L538">            reasons.add(&quot;No convergent state was observed&quot;);</span>
         }
-<span class="pc bpc" id="L538" title="1 of 4 branches missed.">        if (!expectationSatisfied(scenario, DiscoveryExpectation.MACRO_LEARNING_REQUIRED, !learnedMacros.isEmpty())) {</span>
-<span class="fc" id="L539">            reasons.add(&quot;No macro was learned&quot;);</span>
+<span class="pc bpc" id="L540" title="1 of 4 branches missed.">        if (!expectationSatisfied(scenario, DiscoveryExpectation.MACRO_LEARNING_REQUIRED, !learnedMacros.isEmpty())) {</span>
+<span class="fc" id="L541">            reasons.add(&quot;No macro was learned&quot;);</span>
         }
-<span class="pc bpc" id="L541" title="1 of 4 branches missed.">        if (!expectationSatisfied(scenario, DiscoveryExpectation.MACRO_REUSE_REQUIRED, !reusedMacros.isEmpty())) {</span>
-<span class="fc" id="L542">            reasons.add(&quot;No macro was reused&quot;);</span>
+<span class="pc bpc" id="L543" title="1 of 4 branches missed.">        if (!expectationSatisfied(scenario, DiscoveryExpectation.MACRO_REUSE_REQUIRED, !reusedMacros.isEmpty())) {</span>
+<span class="fc" id="L544">            reasons.add(&quot;No macro was reused&quot;);</span>
         }
-<span class="fc" id="L544">        return String.join(&quot;; &quot;, reasons);</span>
+<span class="fc" id="L546">        return String.join(&quot;; &quot;, reasons);</span>
     }
 
     private String canonical(String expression) {
-<span class="pc bpc" id="L548" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
     }
 
     private String normalizeExpression(String expression) {
-<span class="pc bpc" id="L552" title="1 of 2 branches missed.">        if (expression == null) {</span>
-<span class="nc" id="L553">            return &quot;&quot;;</span>
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L555">            return &quot;&quot;;</span>
         }
         try {
-<span class="fc" id="L556">            return new ExpressionCanonicalizer().canonicalize(expression);</span>
-<span class="nc" id="L557">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L558">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L558">            return new ExpressionCanonicalizer().canonicalize(expression);</span>
+<span class="nc" id="L559">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L560">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
         }
     }
 
@@ -566,34 +568,34 @@ public final class DiscoveryBenchmarkExecutor {
             List&lt;String&gt; appliedRuleIds,
             List&lt;ProofStep&gt; steps,
             List&lt;SearchState&gt; exploredStates) {
-<span class="fc" id="L569">        private SearchRun {</span>
-<span class="pc bpc" id="L570" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
-<span class="pc bpc" id="L571" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
-<span class="pc bpc" id="L572" title="1 of 2 branches missed.">            steps = steps == null ? List.of() : List.copyOf(steps);</span>
-<span class="pc bpc" id="L573" title="1 of 2 branches missed.">            exploredStates = exploredStates == null ? List.of() : List.copyOf(exploredStates);</span>
-<span class="fc" id="L574">        }</span>
+<span class="fc" id="L571">        private SearchRun {</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">            steps = steps == null ? List.of() : List.copyOf(steps);</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">            exploredStates = exploredStates == null ? List.of() : List.copyOf(exploredStates);</span>
+<span class="fc" id="L576">        }</span>
     }
 
     private record MacroLearningRun(
             List&lt;ReusableRule&gt; learnedMacros,
             Map&lt;String, List&lt;TransformationStep&gt;&gt; atomicStepsByRuleId,
             InMemoryRuleInventoryRepository inventory) {
-<span class="fc" id="L581">        private MacroLearningRun {</span>
-<span class="pc bpc" id="L582" title="1 of 2 branches missed.">            learnedMacros = learnedMacros == null ? List.of() : List.copyOf(learnedMacros);</span>
-<span class="pc bpc" id="L583" title="1 of 2 branches missed.">            atomicStepsByRuleId = atomicStepsByRuleId == null ? Map.of() : Map.copyOf(atomicStepsByRuleId);</span>
-<span class="fc" id="L584">        }</span>
+<span class="fc" id="L583">        private MacroLearningRun {</span>
+<span class="pc bpc" id="L584" title="1 of 2 branches missed.">            learnedMacros = learnedMacros == null ? List.of() : List.copyOf(learnedMacros);</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">            atomicStepsByRuleId = atomicStepsByRuleId == null ? Map.of() : Map.copyOf(atomicStepsByRuleId);</span>
+<span class="fc" id="L586">        }</span>
     }
 
     private static final class CompositeTransformationEngine implements TransformationEngine {
         private final List&lt;TransformationEngine&gt; engines;
 
-<span class="fc" id="L590">        private CompositeTransformationEngine(List&lt;TransformationEngine&gt; engines) {</span>
-<span class="fc" id="L591">            this.engines = List.copyOf(engines);</span>
-<span class="fc" id="L592">        }</span>
+<span class="fc" id="L592">        private CompositeTransformationEngine(List&lt;TransformationEngine&gt; engines) {</span>
+<span class="fc" id="L593">            this.engines = List.copyOf(engines);</span>
+<span class="fc" id="L594">        }</span>
 
         @Override
         public List&lt;Transformation&gt; transform(String expression) {
-<span class="fc" id="L596">            return engines.stream().flatMap(engine -&gt; engine.transform(expression).stream()).toList();</span>
+<span class="fc" id="L598">            return engines.stream().flatMap(engine -&gt; engine.transform(expression).stream()).toList();</span>
         }
     }
 }

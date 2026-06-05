@@ -143,22 +143,34 @@ import java.util.Set;
                 &quot;discovery-campaign-1&quot;,
                 &quot;sophie-germain&quot;,
                 &quot;discovery-scenarios/sophie-germain.yaml&quot;
+            ),
+            new ReuseCase(
+                &quot;b-complete-square-plus-rest&quot;,
+                &quot;discovery-campaign-5&quot;,
+                &quot;complete-square-factorization&quot;,
+                &quot;discovery-scenarios/complete-square.yaml&quot;
+            ),
+            new ReuseCase(
+                &quot;d-sophie-germain-xy&quot;,
+                &quot;discovery-campaign-5&quot;,
+                &quot;sophie-germain&quot;,
+                &quot;discovery-scenarios/sophie-germain.yaml&quot;
             )
         );
     }
 
     private String orDash(String value) {
-<span class="pc bpc" id="L151" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
     }
 
     private String escape(String value) {
-<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
     }
 
     public record CampaignReport(String campaignId, List&lt;CaseResult&gt; results, long improvedCandidates) {
-<span class="fc" id="L159">        public CampaignReport {</span>
-<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            results = results == null ? List.of() : List.copyOf(results);</span>
-<span class="fc" id="L161">        }</span>
+<span class="fc" id="L171">        public CampaignReport {</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            results = results == null ? List.of() : List.copyOf(results);</span>
+<span class="fc" id="L173">        }</span>
     }
 
     public record CaseResult(
@@ -172,16 +184,16 @@ import java.util.Set;
         RunMetrics macroEnabled,
         boolean measuredImprovement
     ) {
-<span class="fc" id="L175">        public CaseResult {</span>
-<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            generatedMacroId = generatedMacroId == null ? &quot;&quot; : generatedMacroId;</span>
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            reusedMacroIds = reusedMacroIds == null ? List.of() : List.copyOf(reusedMacroIds);</span>
-<span class="fc" id="L178">        }</span>
+<span class="fc" id="L187">        public CaseResult {</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            generatedMacroId = generatedMacroId == null ? &quot;&quot; : generatedMacroId;</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            reusedMacroIds = reusedMacroIds == null ? List.of() : List.copyOf(reusedMacroIds);</span>
+<span class="fc" id="L190">        }</span>
     }
 
-<span class="fc" id="L181">    public record RunMetrics(boolean success, int pathLength, long statesExplored, int bridgeCount) {</span>
+<span class="fc" id="L193">    public record RunMetrics(boolean success, int pathLength, long statesExplored, int bridgeCount) {</span>
     }
 
-<span class="fc" id="L184">    private record ReuseCase(String candidateId, String sourceCampaign, String scenarioId, String scenarioResource) {</span>
+<span class="fc" id="L196">    private record ReuseCase(String candidateId, String sourceCampaign, String scenarioId, String scenarioResource) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
