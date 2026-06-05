@@ -83,15 +83,29 @@ class RewriteMoveDeriverTest {
     }
 
     @Test
-    void malformedSubstitutionEvidenceIsTaggedAsUnresolved() {
-        RewriteMove move = deriver.derive(new RewriteMoveDeriver.MoveDerivationRequest(
+    void sameInputProducesIdenticalMoveIdAndOrdinal() {
+        RewriteMoveDeriver.MoveDerivationRequest request = new RewriteMoveDeriver.MoveDerivationRequest(
                 "sin(x)^2 + 2*sin(x) + 1",
                 "A^2 + 2*A + 1",
                 "substitution_introduction",
                 "",
-                List.of("substitution.placeholder.A")));
-        assertEquals(RewriteMoveKind.SUBSTITUTE_INTRODUCE, move.kind());
-        assertTrue(move.parameters().isEmpty());
-        assertTrue(move.hasUnresolvedParameters());
+                List.of(
+                        "substitution.placeholder.A=sin(x)",
+                        "substitution.occurrences.A=2",
+                        "substitution.substituted=A^2 + 2*A + 1"));
+        RewriteMove first = deriver.derive(request);
+        RewriteMove second = deriver.derive(request);
+        assertEquals(first.moveId(), second.moveId());
+        assertEquals(first.ordinal(), second.ordinal());
+        assertEquals(first.parameters(), second.parameters());
+        assertEquals(first.tags(), second.tags());
+    }
+
+    @Test
+    void tagsAreCanonicallySortedAndDistinct() {
+        RewriteMove move = deriver.derive(new RewriteMoveDeriver.MoveDerivationRequest(
+                "a + b", "b + a", "totally_made_up_rule", "",
+                List.of(), "", List.of("selected-path", "alternative-branch", "selected-path")));
+        assertEquals(List.of("alternative-branch", "parameters-unresolved", "selected-path"), move.tags());
     }
 }

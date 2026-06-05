@@ -1,5 +1,7 @@
 package de.regelsuche.moves;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -46,10 +48,10 @@ public record RewriteMove(
         canonicalBefore = canonicalBefore == null ? "" : canonicalBefore;
         canonicalAfter = canonicalAfter == null ? "" : canonicalAfter;
         ordinal = ordinal == null ? MoveOrdinal.of(kind, 0, List.of()) : ordinal;
-        parameters = parameters == null ? List.of() : List.copyOf(parameters);
+        parameters = canonicalParameters(parameters);
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
-        tags = tags == null ? List.of() : List.copyOf(tags);
-        expandedMoves = expandedMoves == null ? List.of() : List.copyOf(expandedMoves);
+        tags = canonicalTags(tags);
+        expandedMoves = canonicalExpandedMoves(expandedMoves);
         macroId = macroId == null ? "" : macroId;
         learnedFromPathId = learnedFromPathId == null ? "" : learnedFromPathId;
         validationStatus = validationStatus == null ? "" : validationStatus;
@@ -58,6 +60,32 @@ public record RewriteMove(
     /** @return whether this move carries no resolved parameters. */
     public boolean hasUnresolvedParameters() {
         return tags.contains("parameters-unresolved");
+    }
+
+    private static List<MoveParameter> canonicalParameters(List<MoveParameter> parameters) {
+        if (parameters == null || parameters.isEmpty()) {
+            return List.of();
+        }
+        List<MoveParameter> sorted = new ArrayList<>(parameters);
+        sorted.sort(MoveParameter.CANONICAL_ORDER);
+        return List.copyOf(sorted);
+    }
+
+    private static List<String> canonicalTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return List.of();
+        }
+        return tags.stream().distinct().sorted().toList();
+    }
+
+    private static List<RewriteMove> canonicalExpandedMoves(List<RewriteMove> expandedMoves) {
+        if (expandedMoves == null || expandedMoves.isEmpty()) {
+            return List.of();
+        }
+        List<RewriteMove> sorted = new ArrayList<>(expandedMoves);
+        sorted.sort(Comparator.comparing(RewriteMove::ordinal, MoveOrdinal.CANONICAL_ORDER)
+                .thenComparing(RewriteMove::moveId));
+        return List.copyOf(sorted);
     }
 
     /** @return whether this move is a (non-atomic) macro move. */

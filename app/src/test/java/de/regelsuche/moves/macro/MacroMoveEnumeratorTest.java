@@ -98,4 +98,25 @@ class MacroMoveEnumeratorTest {
         RewriteMove move = enumerator.enumerate(List.of(curated), "a^2 + 2*a + 1").getFirst();
         assertEquals(RewriteMoveKind.CURATED_MACRO, move.kind());
     }
+
+    @Test
+    void macroMoveOrderIsStableRegardlessOfInputOrder() {
+        ReusableRule alpha = learnedMacro("sin(x)^2 + 2*sin(x) + 1", "(sin(x) + 1)^2");
+        ReusableRule beta = new ReusableRule(
+                "macro_alpha_binomial",
+                "cos(x)^2 - 1",
+                "-sin(x)^2",
+                List.of(),
+                CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+                RuleStatus.NEW,
+                1,
+                1.0,
+                Instant.parse("2020-01-01T00:00:00Z"));
+
+        List<String> forward = enumerator.enumerate(List.of(alpha, beta), "sin(x)^2 + 2*sin(x) + 1")
+                .stream().map(RewriteMove::macroId).toList();
+        List<String> reversed = enumerator.enumerate(List.of(beta, alpha), "sin(x)^2 + 2*sin(x) + 1")
+                .stream().map(RewriteMove::macroId).toList();
+        assertEquals(forward, reversed, "macro move order must be independent of input order");
+    }
 }

@@ -107,12 +107,36 @@ public final class MoveTreeReportAssembler {
 
         return new MoveTreeReport(
                 scenarioId,
-                List.copyOf(nodes.values()),
-                List.copyOf(edges),
+                sortedNodes(nodes.values()),
+                sortedEdges(edges),
                 List.copyOf(pathMoves),
                 depth1,
                 macroMoves,
                 List.copyOf(unresolved));
+    }
+
+    private List<MoveTreeReport.MoveNode> sortedNodes(java.util.Collection<MoveTreeReport.MoveNode> nodes) {
+        List<MoveTreeReport.MoveNode> sorted = new ArrayList<>(nodes);
+        sorted.sort(java.util.Comparator.comparingInt(MoveTreeReport.MoveNode::depth)
+                .thenComparing(MoveTreeReport.MoveNode::canonicalExpression)
+                .thenComparing(MoveTreeReport.MoveNode::nodeId));
+        return List.copyOf(sorted);
+    }
+
+    private List<MoveTreeReport.MoveEdge> sortedEdges(List<MoveTreeReport.MoveEdge> edges) {
+        List<MoveTreeReport.MoveEdge> sorted = new ArrayList<>(edges);
+        sorted.sort(java.util.Comparator.comparing(MoveTreeReport.MoveEdge::fromNodeId)
+                .thenComparing(MoveTreeReport.MoveEdge::toNodeId)
+                .thenComparing(this::ordinalPathKey)
+                .thenComparing(edge -> edge.rewriteMove() == null ? "" : edge.rewriteMove().moveId()));
+        return List.copyOf(sorted);
+    }
+
+    private String ordinalPathKey(MoveTreeReport.MoveEdge edge) {
+        return edge.ordinalPath().stream()
+                .map(ordinal -> ordinal.ruleOrdinal() + ":" + ordinal.occurrenceOrdinal()
+                        + ":" + ordinal.parameterOrdinals())
+                .collect(java.util.stream.Collectors.joining(">"));
     }
 
     private int depthOf(String id, Map<String, MoveTreeReport.MoveNode> nodes) {
