@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EquationIsolationHypothesisGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">EquationIsolationHypothesisGenerator.java</span></div><h1>EquationIsolationHypothesisGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.moves.RewriteMoveKind;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Recognises equations and proposes the inverse operations that isolate a
+ * variable.
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@code x - T = 0} → {@code +T} (additive inverse, both sides)&lt;/li&gt;
+ *   &lt;li&gt;{@code A*x = B} → {@code /A} (multiplicative inverse, when allowed)&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+<span class="fc" id="L21">public final class EquationIsolationHypothesisGenerator implements ParameterHypothesisGenerator {</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L25">        return &quot;equation-isolation&quot;;</span>
+    }
+
+    @Override
+    public List&lt;ParameterHypothesis&gt; propose(ParameterContext context) {
+<span class="fc" id="L30">        Equation equation = context.inputEquation().orElse(null);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (equation == null) {</span>
+<span class="fc" id="L32">            return List.of();</span>
+        }
+<span class="fc" id="L34">        Map&lt;String, ParameterHypothesis&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (context.allows(RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES)) {</span>
+<span class="fc" id="L36">            additiveInverses(equation, distinct);</span>
+        }
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (context.allows(RewriteMoveKind.MULTIPLY_SAME_TERM_BOTH_SIDES)) {</span>
+<span class="fc" id="L39">            multiplicativeInverses(equation, distinct);</span>
+        }
+<span class="fc" id="L41">        List&lt;ParameterHypothesis&gt; result = new ArrayList&lt;&gt;(distinct.values());</span>
+<span class="fc" id="L42">        result.sort(ParameterHypothesis.CANONICAL_ORDER);</span>
+<span class="fc" id="L43">        return List.copyOf(result);</span>
+    }
+
+    private void additiveInverses(Equation equation, Map&lt;String, ParameterHypothesis&gt; out) {
+<span class="fc" id="L47">        List&lt;HypothesisExpressions.SignedTerm&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L48">        terms.addAll(HypothesisExpressions.additiveTerms(equation.left()));</span>
+<span class="fc" id="L49">        terms.addAll(HypothesisExpressions.additiveTerms(equation.right()));</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (HypothesisExpressions.SignedTerm term : terms) {</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (HypothesisExpressions.isZero(term.expr())) {</span>
+<span class="fc" id="L52">                continue;</span>
+            }
+<span class="fc" id="L54">            Expr expr = term.expr();</span>
+            String value;
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (expr instanceof NumberExpr number) {</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                double signed = term.positive() ? number.value() : -number.value();</span>
+<span class="fc" id="L58">                double inverse = -signed;</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                value = (inverse &gt; 0 ? &quot;+&quot; : &quot;&quot;) + HypothesisExpressions.formatNumber(inverse);</span>
+<span class="fc" id="L60">            } else {</span>
+<span class="fc" id="L61">                String canonical = HypothesisExpressions.format(expr);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                String body = HypothesisExpressions.isComposite(expr) ? &quot;(&quot; + canonical + &quot;)&quot; : canonical;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                value = (term.positive() ? &quot;-&quot; : &quot;+&quot;) + body;</span>
+            }
+<span class="fc" id="L65">            ParameterHypothesis hypothesis = new ParameterHypothesis(</span>
+                    RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES,
+                    &quot;isolate&quot;,
+                    value,
+                    value,
+                    HypothesisSource.EQUATION_ISOLATION,
+                    0.9,
+<span class="fc" id="L72">                    &quot;moves summand &quot; + HypothesisExpressions.format(expr) + &quot; to the other side&quot;,</span>
+<span class="fc" id="L73">                    List.of(&quot;summand=&quot; + HypothesisExpressions.format(expr)));</span>
+<span class="fc" id="L74">            out.putIfAbsent(hypothesis.dedupeKey(), hypothesis);</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">    }</span>
+
+    private void multiplicativeInverses(Equation equation, Map&lt;String, ParameterHypothesis&gt; out) {
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (Expr side : List.of(equation.left(), equation.right())) {</span>
+<span class="fc" id="L80">            List&lt;Expr&gt; factors = HypothesisExpressions.multiplicativeFactors(side);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if (factors.size() &lt; 2) {</span>
+<span class="fc" id="L82">                continue;</span>
+            }
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            for (Expr factor : factors) {</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                if (HypothesisExpressions.isZero(factor)) {</span>
+<span class="nc" id="L86">                    continue;</span>
+                }
+<span class="nc" id="L88">                String canonical = HypothesisExpressions.format(factor);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                String body = HypothesisExpressions.isComposite(factor) ? &quot;(&quot; + canonical + &quot;)&quot; : canonical;</span>
+<span class="nc" id="L90">                String value = &quot;/&quot; + body;</span>
+<span class="nc" id="L91">                ParameterHypothesis hypothesis = new ParameterHypothesis(</span>
+                        RewriteMoveKind.MULTIPLY_SAME_TERM_BOTH_SIDES,
+                        &quot;isolate&quot;,
+                        value,
+                        value,
+                        HypothesisSource.EQUATION_ISOLATION,
+                        0.85,
+                        &quot;divides both sides by factor &quot; + canonical,
+<span class="nc" id="L99">                        List.of(&quot;factor=&quot; + canonical));</span>
+<span class="nc" id="L100">                out.putIfAbsent(hypothesis.dedupeKey(), hypothesis);</span>
+<span class="nc" id="L101">            }</span>
+<span class="nc" id="L102">        }</span>
+<span class="fc" id="L103">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

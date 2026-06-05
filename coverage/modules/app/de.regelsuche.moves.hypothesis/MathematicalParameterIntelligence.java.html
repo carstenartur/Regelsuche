@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MathematicalParameterIntelligence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">MathematicalParameterIntelligence.java</span></div><h1>MathematicalParameterIntelligence.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/**
+ * Mathematical Parameter Intelligence: derives rewrite-move parameters from the
+ * structure of an expression (and optional target) instead of blindly
+ * enumerating them.
+ *
+ * &lt;p&gt;It runs every {@link ParameterHypothesisGenerator}, merges and deduplicates
+ * their {@link ParameterHypothesis hypotheses}, sorts them deterministically and
+ * exposes &quot;Search Space Intelligence&quot;: for every parameter it records the
+ * {@link HypothesisSource mathematical source} it was derived from.&lt;/p&gt;
+ */
+public final class MathematicalParameterIntelligence {
+
+    private final List&lt;ParameterHypothesisGenerator&gt; generators;
+
+    /** Creates the intelligence with the full, deterministically ordered generator set. */
+    public MathematicalParameterIntelligence() {
+<span class="fc" id="L26">        this(List.of(</span>
+                new CancellationHypothesisGenerator(),
+                new CommonFactorHypothesisGenerator(),
+                new RepeatedSubtreeHypothesisGenerator(),
+                new CompleteSquareHypothesisGenerator(),
+                new TargetDifferenceHypothesisGenerator(),
+                new EquationIsolationHypothesisGenerator()));
+<span class="fc" id="L33">    }</span>
+
+<span class="fc" id="L35">    public MathematicalParameterIntelligence(List&lt;ParameterHypothesisGenerator&gt; generators) {</span>
+<span class="fc" id="L36">        this.generators = List.copyOf(generators);</span>
+<span class="fc" id="L37">    }</span>
+
+    /** Analyses an input expression with no target, using default bounds. */
+    public HypothesisReport analyse(String inputExpression) {
+<span class="fc" id="L41">        return analyse(ParameterContext.of(inputExpression));</span>
+    }
+
+    /** Analyses an input/target pair, using default bounds. */
+    public HypothesisReport analyse(String inputExpression, String targetExpression) {
+<span class="fc" id="L46">        return analyse(ParameterContext.of(inputExpression, targetExpression));</span>
+    }
+
+    /** Analyses a fully specified context. */
+    public HypothesisReport analyse(ParameterContext context) {
+<span class="fc" id="L51">        Map&lt;String, ParameterHypothesis&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L52">        TreeMap&lt;String, Integer&gt; generatorHistogram = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        for (ParameterHypothesisGenerator generator : generators) {</span>
+<span class="fc" id="L54">            List&lt;ParameterHypothesis&gt; proposed = generator.propose(context);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            for (ParameterHypothesis hypothesis : proposed) {</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                if (distinct.putIfAbsent(hypothesis.dedupeKey(), hypothesis) == null) {</span>
+<span class="fc" id="L57">                    generatorHistogram.merge(generator.id(), 1, Integer::sum);</span>
+                }
+<span class="fc" id="L59">            }</span>
+<span class="fc" id="L60">        }</span>
+<span class="fc" id="L61">        List&lt;ParameterHypothesis&gt; hypotheses = new ArrayList&lt;&gt;(distinct.values());</span>
+<span class="fc" id="L62">        hypotheses.sort(ParameterHypothesis.CANONICAL_ORDER);</span>
+
+<span class="fc" id="L64">        TreeMap&lt;String, Integer&gt; sourceHistogram = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (ParameterHypothesis hypothesis : hypotheses) {</span>
+<span class="fc" id="L66">            sourceHistogram.merge(hypothesis.source().name(), 1, Integer::sum);</span>
+<span class="fc" id="L67">        }</span>
+<span class="fc" id="L68">        return new HypothesisReport(</span>
+<span class="fc" id="L69">                List.copyOf(hypotheses),</span>
+                new LinkedHashMap&lt;&gt;(sourceHistogram),
+                new LinkedHashMap&lt;&gt;(generatorHistogram));
+    }
+
+    /**
+     * The deterministic result of one analysis run: the sorted hypotheses plus
+     * the Search Space Intelligence histograms.
+     *
+     * @param hypotheses         deterministically sorted, deduplicated hypotheses
+     * @param sourceHistogram    count of hypotheses per {@link HypothesisSource}
+     * @param generatorHistogram count of hypotheses contributed per generator id
+     */
+    public record HypothesisReport(
+            List&lt;ParameterHypothesis&gt; hypotheses,
+            Map&lt;String, Integer&gt; sourceHistogram,
+            Map&lt;String, Integer&gt; generatorHistogram) {
+
+<span class="fc" id="L87">        public HypothesisReport {</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            hypotheses = hypotheses == null ? List.of() : List.copyOf(hypotheses);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            sourceHistogram = sourceHistogram == null ? Map.of() : Map.copyOf(sourceHistogram);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            generatorHistogram = generatorHistogram == null ? Map.of() : Map.copyOf(generatorHistogram);</span>
+<span class="fc" id="L91">        }</span>
+
+        /** @return hypotheses derived from the given source, in canonical order. */
+        public List&lt;ParameterHypothesis&gt; bySource(HypothesisSource source) {
+<span class="fc" id="L95">            List&lt;ParameterHypothesis&gt; filtered = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            for (ParameterHypothesis hypothesis : hypotheses) {</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                if (hypothesis.source() == source) {</span>
+<span class="fc" id="L98">                    filtered.add(hypothesis);</span>
+                }
+<span class="fc" id="L100">            }</span>
+<span class="fc" id="L101">            return List.copyOf(filtered);</span>
+        }
+
+        /** @return the distinct sources that contributed at least one hypothesis. */
+        public Set&lt;String&gt; sources() {
+<span class="fc" id="L106">            return sourceHistogram.keySet();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

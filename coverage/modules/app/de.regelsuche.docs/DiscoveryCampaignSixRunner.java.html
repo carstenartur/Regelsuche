@@ -7,6 +7,7 @@ import de.regelsuche.moves.MoveCandidateTransformationEngine;
 import de.regelsuche.moves.RewriteMove;
 import de.regelsuche.moves.search.CountableMoveSearchEngine;
 import de.regelsuche.moves.search.CountableMoveSearchEngine.CountableMoveSearchResult;
+import de.regelsuche.moves.search.SearchConfiguration;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -20,76 +21,75 @@ import java.util.Map;
 import java.util.Set;
 
 /** Runs Discovery Campaign 6: Countable Move Search Probe. */
-<span class="fc" id="L23">public final class DiscoveryCampaignSixRunner {</span>
-<span class="fc" id="L24">    private static final ObjectMapper JSON = new ObjectMapper()</span>
-<span class="fc" id="L25">        .findAndRegisterModules()</span>
-<span class="fc" id="L26">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+<span class="fc" id="L24">public final class DiscoveryCampaignSixRunner {</span>
+<span class="fc" id="L25">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L26">        .findAndRegisterModules()</span>
+<span class="fc" id="L27">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
 
-<span class="fc" id="L28">    private final MoveCandidateTransformationEngine moveAdapter = new MoveCandidateTransformationEngine();</span>
-<span class="fc" id="L29">    private final CountableMoveSearchEngine moveSearchEngine = new CountableMoveSearchEngine();</span>
-<span class="fc" id="L30">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L29">    private final MoveCandidateTransformationEngine moveAdapter = new MoveCandidateTransformationEngine();</span>
+<span class="fc" id="L30">    private final CountableMoveSearchEngine moveSearchEngine = new CountableMoveSearchEngine();</span>
+<span class="fc" id="L31">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
 
     /** Explored-state count at or below which a successful search space counts as &quot;ausreichend klein&quot;. */
     private static final int SMALL_SEARCH_SPACE_THRESHOLD = 64;
 
     public static void main(String[] args) {
-<span class="nc bnc" id="L36" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
-<span class="nc" id="L37">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
-<span class="nc" id="L38">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
-<span class="nc" id="L39">        new DiscoveryCampaignSixRunner()</span>
-<span class="nc" id="L40">            .writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-campaign-6&quot;));</span>
-<span class="nc" id="L41">    }</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L38">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L39">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L40">        new DiscoveryCampaignSixRunner()</span>
+<span class="nc" id="L41">            .writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-campaign-6&quot;));</span>
+<span class="nc" id="L42">    }</span>
 
     public CampaignReport run() {
-<span class="fc" id="L44">        List&lt;CaseResult&gt; results = cases().stream().map(this::evaluate).toList();</span>
-<span class="fc" id="L45">        return new CampaignReport(</span>
+<span class="fc" id="L45">        List&lt;CaseResult&gt; results = cases().stream().map(this::evaluate).toList();</span>
+<span class="fc" id="L46">        return new CampaignReport(</span>
             &quot;discovery-campaign-6&quot;,
             results,
-<span class="fc" id="L48">            summarize(results),</span>
-<span class="fc" id="L49">            relatedFollowUpIssues(),</span>
-<span class="fc" id="L50">            builtInArchitectureNote()</span>
+<span class="fc" id="L49">            summarize(results),</span>
+<span class="fc" id="L50">            relatedFollowUpIssues(),</span>
+<span class="fc" id="L51">            builtInArchitectureNote()</span>
         );
     }
 
     public CampaignReport writeReport(Path outputDirectory) {
-<span class="fc" id="L55">        return writeReport(outputDirectory, run());</span>
+<span class="fc" id="L56">        return writeReport(outputDirectory, run());</span>
     }
 
     CampaignReport writeReport(Path outputDirectory, CampaignReport report) {
         try {
-<span class="fc" id="L60">            Files.createDirectories(outputDirectory);</span>
-<span class="fc" id="L61">            AtomicJsonFile.writeUtf8(</span>
-<span class="fc" id="L62">                outputDirectory.resolve(&quot;discovery-campaign-6.json&quot;),</span>
-<span class="fc" id="L63">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+<span class="fc" id="L61">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L62">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L63">                outputDirectory.resolve(&quot;discovery-campaign-6.json&quot;),</span>
+<span class="fc" id="L64">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
             );
-<span class="fc" id="L65">            Files.writeString(</span>
-<span class="fc" id="L66">                outputDirectory.resolve(&quot;countable-move-enumeration-report.md&quot;),</span>
-<span class="fc" id="L67">                renderMarkdown(report),</span>
+<span class="fc" id="L66">            Files.writeString(</span>
+<span class="fc" id="L67">                outputDirectory.resolve(&quot;countable-move-enumeration-report.md&quot;),</span>
+<span class="fc" id="L68">                renderMarkdown(report),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L70">            return report;</span>
-<span class="nc" id="L71">        } catch (IOException exception) {</span>
-<span class="nc" id="L72">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L71">            return report;</span>
+<span class="nc" id="L72">        } catch (IOException exception) {</span>
+<span class="nc" id="L73">            throw new UncheckedIOException(exception);</span>
         }
     }
 
     private CaseResult evaluate(ProbeCase probeCase) {
-<span class="fc" id="L77">        MoveCandidateTransformationEngine.ComparisonReport comparison = moveAdapter.compare(probeCase.inputExpression());</span>
-<span class="pc bpc" id="L78" title="1 of 5 branches missed.">        boolean expectedMovePresent = switch (probeCase.id()) {</span>
-<span class="fc" id="L79">            case &quot;cancellation-plus-one&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;cancel&quot;, &quot;+1&quot;);</span>
-<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            case &quot;complete-square&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;shift&quot;, &quot;3&quot;)</span>
-<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                &amp;&amp; hasParameter(comparison.moveCandidates(), &quot;residue&quot;, &quot;-4&quot;);</span>
-<span class="fc" id="L82">            case &quot;repeated-subexpression&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;x + 1&quot;, &quot;x + 1&quot;);</span>
-<span class="fc" id="L83">            case &quot;common-subexpression&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;y + 1&quot;, &quot;y + 1&quot;);</span>
-<span class="pc" id="L84">            default -&gt; false;</span>
+<span class="fc" id="L78">        MoveCandidateTransformationEngine.ComparisonReport comparison = moveAdapter.compare(probeCase.inputExpression());</span>
+<span class="pc bpc" id="L79" title="1 of 5 branches missed.">        boolean expectedMovePresent = switch (probeCase.id()) {</span>
+<span class="fc" id="L80">            case &quot;cancellation-plus-one&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;cancel&quot;, &quot;+1&quot;);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            case &quot;complete-square&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;shift&quot;, &quot;3&quot;)</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                &amp;&amp; hasParameter(comparison.moveCandidates(), &quot;residue&quot;, &quot;-4&quot;);</span>
+<span class="fc" id="L83">            case &quot;repeated-subexpression&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;x + 1&quot;, &quot;x + 1&quot;);</span>
+<span class="fc" id="L84">            case &quot;common-subexpression&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;y + 1&quot;, &quot;y + 1&quot;);</span>
+<span class="pc" id="L85">            default -&gt; false;</span>
         };
-<span class="fc" id="L86">        String expectedMoveCoverage = expectedCoverage(comparison, probeCase.id());</span>
+<span class="fc" id="L87">        String expectedMoveCoverage = expectedCoverage(comparison, probeCase.id());</span>
 
-<span class="fc" id="L88">        CountableMoveSearchResult searchResult = moveSearchEngine.search(</span>
-<span class="fc" id="L89">            probeCase.inputExpression(),</span>
-<span class="fc" id="L90">            probeCase.targetExpression(),</span>
-            4,
-            120
+<span class="fc" id="L89">        CountableMoveSearchResult searchResult = moveSearchEngine.search(</span>
+<span class="fc" id="L90">            probeCase.inputExpression(),</span>
+<span class="fc" id="L91">            probeCase.targetExpression(),</span>
+<span class="fc" id="L92">            SearchConfiguration.campaignSixConservative()</span>
         );
 
 <span class="fc" id="L95">        List&lt;PathStep&gt; pathSteps = toPathSteps(searchResult);</span>

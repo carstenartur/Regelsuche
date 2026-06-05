@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParameterHypothesis.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">ParameterHypothesis.java</span></div><h1>ParameterHypothesis.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import de.regelsuche.moves.RewriteMoveKind;
+import java.util.Comparator;
+import java.util.List;
+
+/**
+ * A mathematically derived hypothesis for a rewrite-move parameter.
+ *
+ * &lt;p&gt;Unlike a blindly enumerated candidate, a hypothesis always carries the
+ * {@link HypothesisSource} it was derived from, a human-readable {@code reason}
+ * and the structural {@code evidence} that justifies it.&lt;/p&gt;
+ *
+ * @param moveKind       the rewrite move this parameter would feed
+ * @param parameterName  the name of the parameter (e.g. {@code shift}, {@code factor})
+ * @param value          the raw value (e.g. {@code +1}, {@code a + b})
+ * @param canonicalValue canonicalised value used for deterministic ordering
+ * @param source         the mathematical source of the hypothesis
+ * @param confidence     a [0,1] confidence used only for reporting, never for ordering
+ * @param reason         a short explanation of why this parameter is plausible
+ * @param evidence       structural evidence (subterms, skeletons, paths)
+ */
+public record ParameterHypothesis(
+        RewriteMoveKind moveKind,
+        String parameterName,
+        String value,
+        String canonicalValue,
+        HypothesisSource source,
+        double confidence,
+        String reason,
+        List&lt;String&gt; evidence) {
+
+    /**
+     * Deterministic ordering independent of confidence: by source, then move
+     * kind, then canonical value, parameter name and finally raw value. This
+     * guarantees reproducible hypothesis lists across runs.
+     */
+<span class="fc" id="L38">    public static final Comparator&lt;ParameterHypothesis&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L39">            Comparator.&lt;ParameterHypothesis&gt;comparingInt(hypothesis -&gt; hypothesis.source().ordinal())</span>
+<span class="fc" id="L40">                    .thenComparingInt(hypothesis -&gt; hypothesis.moveKind().ordinal())</span>
+<span class="fc" id="L41">                    .thenComparing(ParameterHypothesis::canonicalValue)</span>
+<span class="fc" id="L42">                    .thenComparing(ParameterHypothesis::parameterName)</span>
+<span class="fc" id="L43">                    .thenComparing(ParameterHypothesis::value);</span>
+
+<span class="fc" id="L45">    public ParameterHypothesis {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (moveKind == null) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;moveKind must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;source must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        parameterName = parameterName == null ? &quot;&quot; : parameterName;</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        value = value == null ? &quot;&quot; : value;</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        canonicalValue = canonicalValue == null || canonicalValue.isBlank() ? value : canonicalValue;</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        reason = reason == null ? &quot;&quot; : reason;</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        evidence = evidence == null ? List.of() : List.copyOf(evidence);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (confidence &lt; 0.0) {</span>
+<span class="nc" id="L58">            confidence = 0.0;</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        } else if (confidence &gt; 1.0) {</span>
+<span class="nc" id="L60">            confidence = 1.0;</span>
+        }
+<span class="fc" id="L62">    }</span>
+
+    /** @return a stable identity key used to deduplicate hypotheses. */
+    public String dedupeKey() {
+<span class="fc" id="L66">        return source.name() + '|' + moveKind.name() + '|' + parameterName + '|' + canonicalValue + '|' + value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetDifferenceHypothesisGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">TargetDifferenceHypothesisGenerator.java</span></div><h1>TargetDifferenceHypothesisGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.moves.RewriteMoveKind;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * Uses the target expression (when present) to propose parameters that explain
+ * the structural difference between input and target.
+ *
+ * &lt;p&gt;It reduces both input and target to a signed multiset of additive summands
+ * (equations are folded to {@code left - right}) and proposes {@code +T} for
+ * summands the target gains and {@code -T} for summands it drops.&lt;/p&gt;
+ *
+ * &lt;p&gt;Example: input {@code x}, target {@code x + 1} → {@code +1}.&lt;/p&gt;
+ */
+<span class="fc" id="L21">public final class TargetDifferenceHypothesisGenerator implements ParameterHypothesisGenerator {</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L25">        return &quot;target-difference&quot;;</span>
+    }
+
+    @Override
+    public List&lt;ParameterHypothesis&gt; propose(ParameterContext context) {
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (!context.allows(RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES)) {</span>
+<span class="fc" id="L31">            return List.of();</span>
+        }
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (context.targetExpression().isEmpty()) {</span>
+<span class="fc" id="L34">            return List.of();</span>
+        }
+<span class="fc" id="L36">        Map&lt;String, Integer&gt; input = signedMultiset(context.inputAst().orElse(null), context.inputEquation().orElse(null));</span>
+<span class="fc" id="L37">        Map&lt;String, Integer&gt; target = signedMultiset(context.targetAst().orElse(null), context.targetEquation().orElse(null));</span>
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">        if (input == null || target == null) {</span>
+<span class="nc" id="L39">            return List.of();</span>
+        }
+
+<span class="fc" id="L42">        TreeMap&lt;String, Integer&gt; delta = new TreeMap&lt;&gt;(target);</span>
+<span class="fc" id="L43">        input.forEach((key, count) -&gt; delta.merge(key, -count, Integer::sum));</span>
+
+<span class="fc" id="L45">        List&lt;ParameterHypothesis&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (Map.Entry&lt;String, Integer&gt; entry : delta.entrySet()) {</span>
+<span class="fc" id="L47">            int net = entry.getValue();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (net == 0) {</span>
+<span class="fc" id="L49">                continue;</span>
+            }
+<span class="fc" id="L51">            String canonical = entry.getKey();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            String body = canonical.indexOf(' ') &gt;= 0 ? &quot;(&quot; + canonical + &quot;)&quot; : canonical;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            String value = (net &gt; 0 ? &quot;+&quot; : &quot;-&quot;) + body;</span>
+<span class="fc" id="L54">            result.add(new ParameterHypothesis(</span>
+                    RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES,
+                    &quot;target-delta&quot;,
+                    value,
+                    value,
+                    HypothesisSource.TARGET_DIFF,
+                    0.95,
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                    net &gt; 0 ? &quot;target gains summand &quot; + canonical : &quot;target drops summand &quot; + canonical,</span>
+<span class="fc" id="L62">                    List.of(&quot;net=&quot; + net)));</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">        result.sort(ParameterHypothesis.CANONICAL_ORDER);</span>
+<span class="fc" id="L65">        return List.copyOf(result);</span>
+    }
+
+    /** @return a canonical -&gt; net-sign map, or {@code null} when nothing parsed. */
+    private Map&lt;String, Integer&gt; signedMultiset(Expr ast, Equation equation) {
+        List&lt;HypothesisExpressions.SignedTerm&gt; terms;
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (equation != null) {</span>
+<span class="nc" id="L72">            terms = new ArrayList&lt;&gt;(HypothesisExpressions.additiveTerms(equation.left()));</span>
+            // Fold &quot;left = right&quot; into &quot;left - right&quot; so both sides contribute.
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            for (HypothesisExpressions.SignedTerm right : HypothesisExpressions.additiveTerms(equation.right())) {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                terms.add(new HypothesisExpressions.SignedTerm(!right.positive(), right.expr()));</span>
+<span class="nc" id="L76">            }</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        } else if (ast != null) {</span>
+<span class="fc" id="L78">            terms = HypothesisExpressions.additiveTerms(ast);</span>
+        } else {
+<span class="nc" id="L80">            return null;</span>
+        }
+<span class="fc" id="L82">        TreeMap&lt;String, Integer&gt; multiset = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (HypothesisExpressions.SignedTerm term : terms) {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (HypothesisExpressions.isZero(term.expr())) {</span>
+<span class="nc" id="L85">                continue;</span>
+            }
+<span class="fc" id="L87">            String canonical = HypothesisExpressions.format(term.expr());</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            multiset.merge(canonical, term.positive() ? 1 : -1, Integer::sum);</span>
+<span class="fc" id="L89">        }</span>
+<span class="fc" id="L90">        return multiset;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

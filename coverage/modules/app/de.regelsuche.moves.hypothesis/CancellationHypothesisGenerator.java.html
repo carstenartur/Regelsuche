@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CancellationHypothesisGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">CancellationHypothesisGenerator.java</span></div><h1>CancellationHypothesisGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.moves.RewriteMoveKind;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Finds additive terms {@code +T}/{@code -T} that neutralise a summand of the
+ * expression. The cancelling term is the additive inverse of the summand and is
+ * deliberately structural: {@code T} may be a number, a variable or an arbitrary
+ * complex subtree.
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@code x - 1 = 0} → {@code +1}&lt;/li&gt;
+ *   &lt;li&gt;{@code x - T = 0} → {@code +T}&lt;/li&gt;
+ *   &lt;li&gt;{@code x + a = b} → {@code -a}&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+<span class="fc" id="L24">public final class CancellationHypothesisGenerator implements ParameterHypothesisGenerator {</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L28">        return &quot;cancellation&quot;;</span>
+    }
+
+    @Override
+    public List&lt;ParameterHypothesis&gt; propose(ParameterContext context) {
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (!context.allows(RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES)) {</span>
+<span class="fc" id="L34">            return List.of();</span>
+        }
+<span class="fc" id="L36">        List&lt;HypothesisExpressions.SignedTerm&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L37">        Equation equation = context.inputEquation().orElse(null);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (equation != null) {</span>
+<span class="fc" id="L39">            terms.addAll(HypothesisExpressions.additiveTerms(equation.left()));</span>
+<span class="fc" id="L40">            terms.addAll(HypothesisExpressions.additiveTerms(equation.right()));</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        } else if (context.inputAst().isPresent()) {</span>
+<span class="fc" id="L42">            terms.addAll(HypothesisExpressions.additiveTerms(context.inputAst().get()));</span>
+        } else {
+<span class="nc" id="L44">            return List.of();</span>
+        }
+
+<span class="fc" id="L47">        Map&lt;String, ParameterHypothesis&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (HypothesisExpressions.SignedTerm term : terms) {</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (HypothesisExpressions.isZero(term.expr())) {</span>
+<span class="fc" id="L50">                continue;</span>
+            }
+<span class="fc" id="L52">            ParameterHypothesis hypothesis = cancellationFor(term);</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (hypothesis != null) {</span>
+<span class="fc" id="L54">                distinct.putIfAbsent(hypothesis.canonicalValue(), hypothesis);</span>
+            }
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        List&lt;ParameterHypothesis&gt; result = new ArrayList&lt;&gt;(distinct.values());</span>
+<span class="fc" id="L58">        result.sort(ParameterHypothesis.CANONICAL_ORDER);</span>
+<span class="fc" id="L59">        return List.copyOf(result);</span>
+    }
+
+    private ParameterHypothesis cancellationFor(HypothesisExpressions.SignedTerm term) {
+<span class="fc" id="L63">        Expr expr = term.expr();</span>
+        String value;
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (expr instanceof NumberExpr number) {</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            double signed = term.positive() ? number.value() : -number.value();</span>
+<span class="fc" id="L67">            double cancellation = -signed;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            value = (cancellation &gt; 0 ? &quot;+&quot; : &quot;&quot;) + HypothesisExpressions.formatNumber(cancellation);</span>
+<span class="fc" id="L69">        } else {</span>
+            // To cancel a positive summand we subtract it; to cancel a negative
+            // summand we add it.
+<span class="fc" id="L72">            String canonical = HypothesisExpressions.format(expr);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            String body = HypothesisExpressions.isComposite(expr) ? &quot;(&quot; + canonical + &quot;)&quot; : canonical;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            value = (term.positive() ? &quot;-&quot; : &quot;+&quot;) + body;</span>
+        }
+<span class="fc" id="L76">        return new ParameterHypothesis(</span>
+                RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES,
+                &quot;cancel&quot;,
+                value,
+                value,
+                HypothesisSource.CANCELLATION,
+                0.85,
+<span class="fc" id="L83">                &quot;neutralises summand &quot; + HypothesisExpressions.format(expr),</span>
+<span class="fc" id="L84">                List.of(&quot;summand=&quot; + HypothesisExpressions.format(expr)));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

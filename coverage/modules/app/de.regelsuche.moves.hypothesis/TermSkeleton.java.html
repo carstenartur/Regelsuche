@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TermSkeleton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">TermSkeleton.java</span></div><h1>TermSkeleton.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import de.regelsuche.ast.Expr;
+
+/**
+ * A skeleton of an expression in which a complex subtree (the &lt;em&gt;atom&lt;/em&gt;) is
+ * replaced by a single placeholder symbol.
+ *
+ * &lt;p&gt;Example: {@code (a+b)^2 + 6*(a+b) + 5} with atom {@code a + b} becomes the
+ * skeleton {@code A^2 + 6*A + 5}. This lets known patterns be recognised
+ * independently of how complex the underlying subtree is.&lt;/p&gt;
+ *
+ * @param placeholder   the placeholder variable name used in the skeleton
+ * @param atomCanonical canonical form of the replaced atom
+ * @param atomOriginal  original form of the replaced atom
+ * @param skeleton      the skeleton AST (atom replaced by {@code placeholder})
+ */
+public record TermSkeleton(String placeholder, String atomCanonical, String atomOriginal, Expr skeleton) {
+
+<span class="fc" id="L20">    public TermSkeleton {</span>
+<span class="pc bpc" id="L21" title="2 of 4 branches missed.">        if (placeholder == null || placeholder.isBlank()) {</span>
+<span class="nc" id="L22">            throw new IllegalArgumentException(&quot;placeholder must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (skeleton == null) {</span>
+<span class="nc" id="L25">            throw new IllegalArgumentException(&quot;skeleton must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        atomCanonical = atomCanonical == null ? &quot;&quot; : atomCanonical;</span>
+<span class="pc bpc" id="L28" title="2 of 4 branches missed.">        atomOriginal = atomOriginal == null || atomOriginal.isBlank() ? atomCanonical : atomOriginal;</span>
+<span class="fc" id="L29">    }</span>
+
+    /** Builds a skeleton by replacing all occurrences of {@code atom} in {@code root}. */
+    public static TermSkeleton forAtom(Expr root, Expr atom, String placeholder) {
+<span class="fc" id="L33">        String atomCanonical = HypothesisExpressions.format(atom);</span>
+<span class="fc" id="L34">        Expr skeleton = HypothesisExpressions.replaceAtom(root, atom, placeholder);</span>
+<span class="fc" id="L35">        return new TermSkeleton(placeholder, atomCanonical, atomCanonical, skeleton);</span>
+    }
+
+    /** @return the skeleton rendered back into infix form, e.g. {@code A^2 + 6*A + 5}. */
+    public String skeletonText() {
+<span class="fc" id="L40">        return HypothesisExpressions.format(skeleton);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

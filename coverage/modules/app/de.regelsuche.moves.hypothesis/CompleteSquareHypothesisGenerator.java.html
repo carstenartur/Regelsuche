@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompleteSquareHypothesisGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">CompleteSquareHypothesisGenerator.java</span></div><h1>CompleteSquareHypothesisGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.moves.RewriteMoveKind;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Recognises the completing-the-square pattern {@code A^2 + b*A + c} on the
+ * {@link TermSkeleton skeleton} level, where {@code A} may be an arbitrary
+ * subtree.
+ *
+ * &lt;p&gt;For a matching skeleton it emits {@code shift = b/2} and
+ * {@code residue = c - (b/2)^2}, plus a {@link HypothesisSource#SKELETON_MATCH}
+ * hypothesis naming the atom that was abstracted.&lt;/p&gt;
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@code x^2 + 6*x + 5} (A = x) → shift 3, residue -4&lt;/li&gt;
+ *   &lt;li&gt;{@code (a+b)^2 + 6*(a+b) + 5} (A = a+b) → shift 3, residue -4&lt;/li&gt;
+ *   &lt;li&gt;{@code (sin(x)+cos(x))^2 + 2*(sin(x)+cos(x)) + 1} → shift 1, residue 0&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+<span class="fc" id="L31">public final class CompleteSquareHypothesisGenerator implements ParameterHypothesisGenerator {</span>
+
+    private static final int MAX_DEGREE = 8;
+
+    @Override
+    public String id() {
+<span class="fc" id="L37">        return &quot;complete-square&quot;;</span>
+    }
+
+    @Override
+    public List&lt;ParameterHypothesis&gt; propose(ParameterContext context) {
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (!context.allows(RewriteMoveKind.COMPLETE_SQUARE)) {</span>
+<span class="fc" id="L43">            return List.of();</span>
+        }
+<span class="fc" id="L45">        List&lt;ParameterHypothesis&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L46">        Set&lt;String&gt; matchedAtoms = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (TermSkeleton skeleton : context.skeletons()) {</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (!matchedAtoms.add(skeleton.atomCanonical())) {</span>
+<span class="nc" id="L49">                continue;</span>
+            }
+<span class="fc" id="L51">            Quadratic quadratic = analyse(skeleton.skeleton(), skeleton.placeholder());</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (quadratic == null) {</span>
+<span class="fc" id="L53">                continue;</span>
+            }
+<span class="fc" id="L55">            double shift = quadratic.b() / 2.0;</span>
+<span class="fc" id="L56">            double residue = quadratic.c() - shift * shift;</span>
+<span class="fc" id="L57">            String atom = skeleton.atomCanonical();</span>
+<span class="fc" id="L58">            List&lt;String&gt; evidence = List.of(</span>
+                    &quot;atom=&quot; + atom,
+<span class="fc" id="L60">                    &quot;skeleton=&quot; + skeleton.skeletonText());</span>
+<span class="fc" id="L61">            result.add(new ParameterHypothesis(</span>
+                    RewriteMoveKind.COMPLETE_SQUARE,
+                    &quot;shift&quot;,
+<span class="fc" id="L64">                    HypothesisExpressions.formatNumber(shift),</span>
+<span class="fc" id="L65">                    HypothesisExpressions.formatNumber(shift),</span>
+                    HypothesisSource.COMPLETE_SQUARE,
+                    0.9,
+                    &quot;complete square on &quot; + atom,
+                    evidence));
+<span class="fc" id="L70">            result.add(new ParameterHypothesis(</span>
+                    RewriteMoveKind.COMPLETE_SQUARE,
+                    &quot;residue&quot;,
+<span class="fc" id="L73">                    HypothesisExpressions.formatNumber(residue),</span>
+<span class="fc" id="L74">                    HypothesisExpressions.formatNumber(residue),</span>
+                    HypothesisSource.COMPLETE_SQUARE,
+                    0.9,
+                    &quot;complete square on &quot; + atom,
+                    evidence));
+<span class="fc" id="L79">            result.add(new ParameterHypothesis(</span>
+                    RewriteMoveKind.COMPLETE_SQUARE,
+                    &quot;atom&quot;,
+                    atom,
+                    atom,
+                    HypothesisSource.SKELETON_MATCH,
+                    0.9,
+<span class="fc" id="L86">                    &quot;quadratic skeleton &quot; + skeleton.skeletonText(),</span>
+                    evidence));
+<span class="fc" id="L88">        }</span>
+<span class="fc" id="L89">        result.sort(ParameterHypothesis.CANONICAL_ORDER);</span>
+<span class="fc" id="L90">        return List.copyOf(result);</span>
+    }
+
+    /** Analyses a skeleton as a quadratic in the single placeholder variable. */
+    private Quadratic analyse(Expr skeleton, String placeholder) {
+<span class="fc" id="L95">        Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L96">        collectVariables(skeleton, variables);</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">        if (variables.size() != 1 || !variables.contains(placeholder)) {</span>
+<span class="fc" id="L98">            return null;</span>
+        }
+<span class="fc" id="L100">        Map&lt;Integer, Double&gt; polynomial = toPolynomial(skeleton);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (polynomial == null) {</span>
+<span class="fc" id="L102">            return null;</span>
+        }
+<span class="fc" id="L104">        double leading = polynomial.getOrDefault(2, 0.0);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (leading == 0.0) {</span>
+<span class="fc" id="L106">            return null;</span>
+        }
+        // Reject anything of degree higher than 2.
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (Integer degree : polynomial.keySet()) {</span>
+<span class="pc bpc" id="L110" title="3 of 4 branches missed.">            if (degree &gt; 2 &amp;&amp; polynomial.get(degree) != 0.0) {</span>
+<span class="nc" id="L111">                return null;</span>
+            }
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">        double b = polynomial.getOrDefault(1, 0.0) / leading;</span>
+<span class="fc" id="L115">        double c = polynomial.getOrDefault(0, 0.0) / leading;</span>
+<span class="fc" id="L116">        return new Quadratic(b, c);</span>
+    }
+
+    private void collectVariables(Expr expr, Set&lt;String&gt; out) {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
+<span class="fc" id="L121">            out.add(variable.name());</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        } else if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L123">            collectVariables(binary.left(), out);</span>
+<span class="fc" id="L124">            collectVariables(binary.right(), out);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        } else if (expr instanceof FunctionExpr function) {</span>
+<span class="fc" id="L126">            function.arguments().forEach(argument -&gt; collectVariables(argument, out));</span>
+        }
+<span class="fc" id="L128">    }</span>
+
+    private Map&lt;Integer, Double&gt; toPolynomial(Expr expr) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (expr instanceof NumberExpr number) {</span>
+<span class="fc" id="L132">            return Map.of(0, number.value());</span>
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (expr instanceof VariableExpr) {</span>
+<span class="fc" id="L135">            return Map.of(1, 1.0);</span>
+        }
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L138">            Map&lt;Integer, Double&gt; left = toPolynomial(binary.left());</span>
+<span class="fc" id="L139">            Map&lt;Integer, Double&gt; right = toPolynomial(binary.right());</span>
+<span class="fc bfc" id="L140" title="All 4 branches covered.">            if (left == null || right == null) {</span>
+<span class="fc" id="L141">                return null;</span>
+            }
+<span class="pc bpc" id="L143" title="2 of 5 branches missed.">            return switch (binary.operator()) {</span>
+<span class="fc" id="L144">                case ADD -&gt; add(left, right, 1.0);</span>
+<span class="nc" id="L145">                case SUB -&gt; add(left, right, -1.0);</span>
+<span class="fc" id="L146">                case MUL -&gt; multiply(left, right);</span>
+<span class="nc" id="L147">                case DIV -&gt; divide(left, right);</span>
+<span class="fc" id="L148">                case POW -&gt; power(left, right);</span>
+            };
+        }
+<span class="fc" id="L151">        return null;</span>
+    }
+
+    private Map&lt;Integer, Double&gt; add(Map&lt;Integer, Double&gt; left, Map&lt;Integer, Double&gt; right, double sign) {
+<span class="fc" id="L155">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;(left);</span>
+<span class="fc" id="L156">        right.forEach((degree, coefficient) -&gt; result.merge(degree, sign * coefficient, Double::sum));</span>
+<span class="fc" id="L157">        return result;</span>
+    }
+
+    private Map&lt;Integer, Double&gt; multiply(Map&lt;Integer, Double&gt; left, Map&lt;Integer, Double&gt; right) {
+<span class="fc" id="L161">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, Double&gt; leftEntry : left.entrySet()) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (Map.Entry&lt;Integer, Double&gt; rightEntry : right.entrySet()) {</span>
+<span class="fc" id="L164">                int degree = leftEntry.getKey() + rightEntry.getKey();</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                if (degree &gt; MAX_DEGREE) {</span>
+<span class="nc" id="L166">                    return null;</span>
+                }
+<span class="fc" id="L168">                result.merge(degree, leftEntry.getValue() * rightEntry.getValue(), Double::sum);</span>
+<span class="fc" id="L169">            }</span>
+<span class="fc" id="L170">        }</span>
+<span class="fc" id="L171">        return result;</span>
+    }
+
+    private Map&lt;Integer, Double&gt; divide(Map&lt;Integer, Double&gt; left, Map&lt;Integer, Double&gt; right) {
+<span class="nc bnc" id="L175" title="All 4 branches missed.">        if (right.size() != 1 || !right.containsKey(0)) {</span>
+<span class="nc" id="L176">            return null;</span>
+        }
+<span class="nc" id="L178">        double divisor = right.get(0);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (divisor == 0.0) {</span>
+<span class="nc" id="L180">            return null;</span>
+        }
+<span class="nc" id="L182">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L183">        left.forEach((degree, coefficient) -&gt; result.put(degree, coefficient / divisor));</span>
+<span class="nc" id="L184">        return result;</span>
+    }
+
+    private Map&lt;Integer, Double&gt; power(Map&lt;Integer, Double&gt; base, Map&lt;Integer, Double&gt; exponent) {
+<span class="pc bpc" id="L188" title="2 of 4 branches missed.">        if (exponent.size() != 1 || !exponent.containsKey(0)) {</span>
+<span class="nc" id="L189">            return null;</span>
+        }
+<span class="fc" id="L191">        double raw = exponent.get(0);</span>
+<span class="pc bpc" id="L192" title="3 of 6 branches missed.">        if (raw != Math.rint(raw) || raw &lt; 0 || raw &gt; MAX_DEGREE) {</span>
+<span class="nc" id="L193">            return null;</span>
+        }
+<span class="fc" id="L195">        int power = (int) raw;</span>
+<span class="fc" id="L196">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;(Map.of(0, 1.0));</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (int i = 0; i &lt; power; i++) {</span>
+<span class="fc" id="L198">            result = multiply(result, base);</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (result == null) {</span>
+<span class="nc" id="L200">                return null;</span>
+            }
+        }
+<span class="fc" id="L203">        return result;</span>
+    }
+
+<span class="fc" id="L206">    private record Quadratic(double b, double c) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

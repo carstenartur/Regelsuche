@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TermOccurrenceIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">TermOccurrenceIndex.java</span></div><h1>TermOccurrenceIndex.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Collects every subterm of an expression together with the structural metadata
+ * ({@link TermOccurrence}) required to derive plausible parameters.
+ *
+ * &lt;p&gt;The index treats complex subtrees as first-class atoms: a pattern that
+ * works for {@code x} works equally for {@code x + 1}, {@code sin(t)} or
+ * {@code (p*q + r)^2}, as long as the subtree sits at the right structural
+ * position.&lt;/p&gt;
+ */
+public final class TermOccurrenceIndex {
+
+    private final List&lt;TermOccurrence&gt; occurrences;
+    private final Map&lt;String, Integer&gt; countsByCanonical;
+
+<span class="fc" id="L27">    private TermOccurrenceIndex(List&lt;TermOccurrence&gt; rawOccurrences) {</span>
+<span class="fc" id="L28">        Map&lt;String, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (TermOccurrence occurrence : rawOccurrences) {</span>
+<span class="fc" id="L30">            counts.merge(occurrence.canonicalValue(), 1, Integer::sum);</span>
+<span class="fc" id="L31">        }</span>
+<span class="fc" id="L32">        List&lt;TermOccurrence&gt; enriched = new ArrayList&lt;&gt;(rawOccurrences.size());</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        for (TermOccurrence occurrence : rawOccurrences) {</span>
+<span class="fc" id="L34">            enriched.add(occurrence.withOccurrenceCount(counts.get(occurrence.canonicalValue())));</span>
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">        enriched.sort(TermOccurrence.CANONICAL_ORDER);</span>
+<span class="fc" id="L37">        this.occurrences = List.copyOf(enriched);</span>
+<span class="fc" id="L38">        this.countsByCanonical = Map.copyOf(counts);</span>
+<span class="fc" id="L39">    }</span>
+
+    /** Builds an index over a single term. */
+    public static TermOccurrenceIndex forExpression(Expr root) {
+<span class="fc" id="L43">        List&lt;TermOccurrence&gt; raw = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L44">        collect(root, TermRole.ROOT, &quot;&quot;, 0, &quot;&quot;, raw);</span>
+<span class="fc" id="L45">        return new TermOccurrenceIndex(raw);</span>
+    }
+
+    /** Builds an index over an equation, marking each side as {@link TermRole#EQUATION_SIDE}. */
+    public static TermOccurrenceIndex forEquation(Equation equation) {
+<span class="fc" id="L50">        List&lt;TermOccurrence&gt; raw = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L51">        collect(equation.left(), TermRole.EQUATION_SIDE, &quot;=&quot;, 0, &quot;L&quot;, raw);</span>
+<span class="fc" id="L52">        collect(equation.right(), TermRole.EQUATION_SIDE, &quot;=&quot;, 0, &quot;R&quot;, raw);</span>
+<span class="fc" id="L53">        return new TermOccurrenceIndex(raw);</span>
+    }
+
+    /** @return all occurrences, deterministically ordered. */
+    public List&lt;TermOccurrence&gt; occurrences() {
+<span class="fc" id="L58">        return occurrences;</span>
+    }
+
+    /** @return one occurrence per distinct canonical value (first in canonical order). */
+    public List&lt;TermOccurrence&gt; distinctByCanonical() {
+<span class="fc" id="L63">        Map&lt;String, TermOccurrence&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (TermOccurrence occurrence : occurrences) {</span>
+<span class="fc" id="L65">            distinct.putIfAbsent(occurrence.canonicalValue(), occurrence);</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        return List.copyOf(distinct.values());</span>
+    }
+
+    /** @return distinct composite subterms occurring at least twice (substitution candidates). */
+    public List&lt;TermOccurrence&gt; repeatedComposites() {
+<span class="fc" id="L72">        List&lt;TermOccurrence&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (TermOccurrence occurrence : distinctByCanonical()) {</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">            if (occurrence.occurrenceCount() &gt;= 2 &amp;&amp; occurrence.isComposite()) {</span>
+<span class="fc" id="L75">                result.add(occurrence);</span>
+            }
+<span class="fc" id="L77">        }</span>
+<span class="fc" id="L78">        return List.copyOf(result);</span>
+    }
+
+    /** @return how often the canonical value occurs (0 when absent). */
+    public int occurrenceCount(String canonicalValue) {
+<span class="fc" id="L83">        return countsByCanonical.getOrDefault(canonicalValue, 0);</span>
+    }
+
+    /** @return whether the canonical value occurs at all. */
+    public boolean contains(String canonicalValue) {
+<span class="nc" id="L88">        return countsByCanonical.containsKey(canonicalValue);</span>
+    }
+
+    private static void collect(Expr expr, TermRole role, String parentOperator, int depth, String path,
+            List&lt;TermOccurrence&gt; out) {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (expr == null) {</span>
+<span class="nc" id="L94">            return;</span>
+        }
+<span class="fc" id="L96">        String formatted = HypothesisExpressions.format(expr);</span>
+<span class="fc" id="L97">        out.add(new TermOccurrence(formatted, formatted, depth, 1, parentOperator, role, path));</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L99">            BinaryOperator operator = binary.operator();</span>
+<span class="fc" id="L100">            TermRole leftRole = leftRole(operator);</span>
+<span class="fc" id="L101">            TermRole rightRole = rightRole(operator);</span>
+<span class="fc" id="L102">            collect(binary.left(), leftRole, operator.symbol(), depth + 1, child(path, 0), out);</span>
+<span class="fc" id="L103">            collect(binary.right(), rightRole, operator.symbol(), depth + 1, child(path, 1), out);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        } else if (expr instanceof FunctionExpr function) {</span>
+<span class="fc" id="L105">            String op = &quot;fn:&quot; + function.name();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            for (int i = 0; i &lt; function.arguments().size(); i++) {</span>
+<span class="fc" id="L107">                collect(function.arguments().get(i), TermRole.ARGUMENT, op, depth + 1, child(path, i), out);</span>
+            }
+        }
+<span class="fc" id="L110">    }</span>
+
+    private static TermRole leftRole(BinaryOperator operator) {
+<span class="fc bfc" id="L113" title="All 3 branches covered.">        return switch (operator) {</span>
+<span class="fc" id="L114">            case ADD, SUB -&gt; TermRole.SUMMAND;</span>
+<span class="fc" id="L115">            case MUL, DIV -&gt; TermRole.FACTOR;</span>
+<span class="fc" id="L116">            case POW -&gt; TermRole.EXPONENT_BASE;</span>
+        };
+    }
+
+    private static TermRole rightRole(BinaryOperator operator) {
+<span class="fc bfc" id="L121" title="All 3 branches covered.">        return switch (operator) {</span>
+<span class="fc" id="L122">            case ADD, SUB -&gt; TermRole.SUMMAND;</span>
+<span class="fc" id="L123">            case MUL, DIV -&gt; TermRole.FACTOR;</span>
+<span class="fc" id="L124">            case POW -&gt; TermRole.EXPONENT;</span>
+        };
+    }
+
+    private static String child(String path, int index) {
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        return path.isEmpty() ? Integer.toString(index) : path + &quot;.&quot; + index;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

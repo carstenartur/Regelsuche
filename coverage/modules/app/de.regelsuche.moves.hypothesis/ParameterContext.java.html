@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParameterContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">ParameterContext.java</span></div><h1>ParameterContext.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.moves.RewriteMoveKind;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * The immutable input passed to every {@link ParameterHypothesisGenerator}.
+ *
+ * &lt;p&gt;It bundles the parsed input (and optional target) expression, their
+ * {@link TermOccurrenceIndex term occurrence indices}, the precomputed
+ * {@link TermSkeleton skeletons} (complex subtrees replaced by placeholders), a
+ * complexity bound and the set of allowed move kinds.&lt;/p&gt;
+ */
+public final class ParameterContext {
+
+    private static final int DEFAULT_MAX_COMPLEXITY = 32;
+
+    private final String inputExpression;
+    private final String targetExpression;
+    private final Expr inputAst;
+    private final Equation inputEquation;
+    private final Expr targetAst;
+    private final Equation targetEquation;
+    private final TermOccurrenceIndex inputIndex;
+    private final TermOccurrenceIndex targetIndex;
+    private final List&lt;TermSkeleton&gt; skeletons;
+    private final int maxComplexity;
+    private final Set&lt;RewriteMoveKind&gt; allowedMoveKinds;
+
+    private ParameterContext(
+            String inputExpression,
+            String targetExpression,
+            Expr inputAst,
+            Equation inputEquation,
+            Expr targetAst,
+            Equation targetEquation,
+            TermOccurrenceIndex inputIndex,
+            TermOccurrenceIndex targetIndex,
+            List&lt;TermSkeleton&gt; skeletons,
+            int maxComplexity,
+<span class="fc" id="L47">            Set&lt;RewriteMoveKind&gt; allowedMoveKinds) {</span>
+<span class="fc" id="L48">        this.inputExpression = inputExpression;</span>
+<span class="fc" id="L49">        this.targetExpression = targetExpression;</span>
+<span class="fc" id="L50">        this.inputAst = inputAst;</span>
+<span class="fc" id="L51">        this.inputEquation = inputEquation;</span>
+<span class="fc" id="L52">        this.targetAst = targetAst;</span>
+<span class="fc" id="L53">        this.targetEquation = targetEquation;</span>
+<span class="fc" id="L54">        this.inputIndex = inputIndex;</span>
+<span class="fc" id="L55">        this.targetIndex = targetIndex;</span>
+<span class="fc" id="L56">        this.skeletons = skeletons;</span>
+<span class="fc" id="L57">        this.maxComplexity = maxComplexity;</span>
+<span class="fc" id="L58">        this.allowedMoveKinds = allowedMoveKinds;</span>
+<span class="fc" id="L59">    }</span>
+
+    /** Builds a context for an input with no target and the default bounds. */
+    public static ParameterContext of(String inputExpression) {
+<span class="fc" id="L63">        return of(inputExpression, null, DEFAULT_MAX_COMPLEXITY, allMoveKinds());</span>
+    }
+
+    /** Builds a context for an input and an optional target with the default bounds. */
+    public static ParameterContext of(String inputExpression, String targetExpression) {
+<span class="fc" id="L68">        return of(inputExpression, targetExpression, DEFAULT_MAX_COMPLEXITY, allMoveKinds());</span>
+    }
+
+    /** Builds a fully specified context. */
+    public static ParameterContext of(
+            String inputExpression,
+            String targetExpression,
+            int maxComplexity,
+            Set&lt;RewriteMoveKind&gt; allowedMoveKinds) {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        String input = inputExpression == null ? &quot;&quot; : inputExpression.trim();</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        String target = targetExpression == null ? &quot;&quot; : targetExpression.trim();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        int complexity = maxComplexity &lt; 1 ? DEFAULT_MAX_COMPLEXITY : maxComplexity;</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        Set&lt;RewriteMoveKind&gt; kinds = allowedMoveKinds == null || allowedMoveKinds.isEmpty()</span>
+<span class="nc" id="L81">                ? allMoveKinds()</span>
+<span class="fc" id="L82">                : Set.copyOf(allowedMoveKinds);</span>
+
+<span class="fc" id="L84">        Equation inputEquation = HypothesisExpressions.parseEquation(input).orElse(null);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        Expr inputAst = inputEquation == null ? HypothesisExpressions.parseTerm(input).orElse(null) : null;</span>
+<span class="fc" id="L86">        Equation targetEquation = HypothesisExpressions.parseEquation(target).orElse(null);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        Expr targetAst = targetEquation == null ? HypothesisExpressions.parseTerm(target).orElse(null) : null;</span>
+
+<span class="fc" id="L89">        TermOccurrenceIndex inputIndex = buildIndex(inputAst, inputEquation);</span>
+<span class="fc" id="L90">        TermOccurrenceIndex targetIndex = buildIndex(targetAst, targetEquation);</span>
+<span class="fc" id="L91">        List&lt;TermSkeleton&gt; skeletons = buildSkeletons(inputAst, inputIndex, complexity);</span>
+
+<span class="fc" id="L93">        return new ParameterContext(</span>
+                input,
+                target,
+                inputAst,
+                inputEquation,
+                targetAst,
+                targetEquation,
+                inputIndex,
+                targetIndex,
+                skeletons,
+                complexity,
+                kinds);
+    }
+
+    private static Set&lt;RewriteMoveKind&gt; allMoveKinds() {
+<span class="fc" id="L108">        return Set.of(RewriteMoveKind.values());</span>
+    }
+
+    private static TermOccurrenceIndex buildIndex(Expr ast, Equation equation) {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (equation != null) {</span>
+<span class="fc" id="L113">            return TermOccurrenceIndex.forEquation(equation);</span>
+        }
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (ast != null) {</span>
+<span class="fc" id="L116">            return TermOccurrenceIndex.forExpression(ast);</span>
+        }
+<span class="fc" id="L118">        return null;</span>
+    }
+
+    /**
+     * Builds one skeleton per distinct atom candidate (composite subtree or
+     * variable), bounded by {@code maxComplexity}. Placeholder names are assigned
+     * deterministically ({@code A}, {@code B}, ...).
+     */
+    private static List&lt;TermSkeleton&gt; buildSkeletons(Expr inputAst, TermOccurrenceIndex inputIndex, int maxComplexity) {
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">        if (inputAst == null || inputIndex == null) {</span>
+<span class="fc" id="L128">            return List.of();</span>
+        }
+<span class="fc" id="L130">        String rootCanonical = HypothesisExpressions.format(inputAst);</span>
+<span class="fc" id="L131">        Set&lt;String&gt; atoms = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (TermOccurrence occurrence : inputIndex.distinctByCanonical()) {</span>
+<span class="fc" id="L133">            String canonical = occurrence.canonicalValue();</span>
+            // Whole-expression and pure numbers are not useful substitution atoms.
+<span class="fc bfc" id="L135" title="All 4 branches covered.">            if (canonical.equals(rootCanonical) || isNumeric(canonical)) {</span>
+<span class="fc" id="L136">                continue;</span>
+            }
+<span class="fc" id="L138">            atoms.add(canonical);</span>
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">        List&lt;TermSkeleton&gt; skeletons = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L141">        int placeholderIndex = 0;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (String atomCanonical : atoms) {</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            if (skeletons.size() &gt;= maxComplexity) {</span>
+<span class="nc" id="L144">                break;</span>
+            }
+<span class="fc" id="L146">            Optional&lt;Expr&gt; atom = HypothesisExpressions.parseTerm(atomCanonical);</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">            if (atom.isEmpty() || !HypothesisExpressions.isAtomCandidate(atom.get())) {</span>
+<span class="nc" id="L148">                continue;</span>
+            }
+<span class="fc" id="L150">            String placeholder = placeholderName(placeholderIndex++);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            while (atoms.contains(placeholder)) {</span>
+<span class="fc" id="L152">                placeholder = placeholderName(placeholderIndex++);</span>
+            }
+<span class="fc" id="L154">            skeletons.add(TermSkeleton.forAtom(inputAst, atom.get(), placeholder));</span>
+<span class="fc" id="L155">        }</span>
+<span class="fc" id="L156">        return List.copyOf(skeletons);</span>
+    }
+
+    private static boolean isNumeric(String canonical) {
+        try {
+<span class="fc" id="L161">            Double.parseDouble(canonical);</span>
+<span class="fc" id="L162">            return true;</span>
+<span class="fc" id="L163">        } catch (NumberFormatException exception) {</span>
+<span class="fc" id="L164">            return false;</span>
+        }
+    }
+
+    private static String placeholderName(int index) {
+        // A, B, ... Z, then A1, B1, ...; caller skips names already present in atoms.
+<span class="fc" id="L170">        char letter = (char) ('A' + (index % 26));</span>
+<span class="fc" id="L171">        int suffix = index / 26;</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        return suffix == 0 ? Character.toString(letter) : letter + Integer.toString(suffix);</span>
+    }
+
+    public String inputExpression() {
+<span class="nc" id="L176">        return inputExpression;</span>
+    }
+
+    public Optional&lt;String&gt; targetExpression() {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        return targetExpression.isBlank() ? Optional.empty() : Optional.of(targetExpression);</span>
+    }
+
+    public Optional&lt;Expr&gt; inputAst() {
+<span class="fc" id="L184">        return Optional.ofNullable(inputAst);</span>
+    }
+
+    public Optional&lt;Equation&gt; inputEquation() {
+<span class="fc" id="L188">        return Optional.ofNullable(inputEquation);</span>
+    }
+
+    public Optional&lt;Expr&gt; targetAst() {
+<span class="fc" id="L192">        return Optional.ofNullable(targetAst);</span>
+    }
+
+    public Optional&lt;Equation&gt; targetEquation() {
+<span class="fc" id="L196">        return Optional.ofNullable(targetEquation);</span>
+    }
+
+    public Optional&lt;TermOccurrenceIndex&gt; inputIndex() {
+<span class="fc" id="L200">        return Optional.ofNullable(inputIndex);</span>
+    }
+
+    public Optional&lt;TermOccurrenceIndex&gt; targetIndex() {
+<span class="nc" id="L204">        return Optional.ofNullable(targetIndex);</span>
+    }
+
+    public List&lt;TermSkeleton&gt; skeletons() {
+<span class="fc" id="L208">        return skeletons;</span>
+    }
+
+    public int maxComplexity() {
+<span class="nc" id="L212">        return maxComplexity;</span>
+    }
+
+    public Set&lt;RewriteMoveKind&gt; allowedMoveKinds() {
+<span class="nc" id="L216">        return allowedMoveKinds;</span>
+    }
+
+    /** @return whether the given move kind is allowed in this context. */
+    public boolean allows(RewriteMoveKind kind) {
+<span class="fc" id="L221">        return allowedMoveKinds.contains(kind);</span>
+    }
+
+    /** @return whether the input is a (parseable) equation. */
+    public boolean hasEquation() {
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        return inputEquation != null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

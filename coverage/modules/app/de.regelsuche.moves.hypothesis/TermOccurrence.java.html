@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TermOccurrence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">TermOccurrence.java</span></div><h1>TermOccurrence.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import java.util.Comparator;
+
+/**
+ * A single occurrence of a subterm inside an expression, enriched with the
+ * structural metadata needed to reason about plausible parameters.
+ *
+ * @param canonicalValue  canonical (formatted) form used for matching/ordering
+ * @param originalValue   the form as it appeared in the source expression
+ * @param depth           distance from the root (root is {@code 0})
+ * @param occurrenceCount how often {@code canonicalValue} occurs in the whole expression
+ * @param parentOperator  operator of the parent ({@code +}, {@code *}, {@code ^},
+ *                        {@code fn:sin}, {@code =}), or empty for the root
+ * @param role            structural role within the parent
+ * @param path            stable AST path from the root (e.g. {@code &quot;0.1&quot;})
+ */
+public record TermOccurrence(
+        String canonicalValue,
+        String originalValue,
+        int depth,
+        int occurrenceCount,
+        String parentOperator,
+        TermRole role,
+        String path) {
+
+    /** Deterministic ordering: by path, then role, then canonical value. */
+<span class="fc" id="L28">    public static final Comparator&lt;TermOccurrence&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L29">            Comparator.comparing(TermOccurrence::path)</span>
+<span class="pc" id="L30">                    .thenComparingInt(occurrence -&gt; occurrence.role().ordinal())</span>
+<span class="fc" id="L31">                    .thenComparing(TermOccurrence::canonicalValue)</span>
+<span class="fc" id="L32">                    .thenComparingInt(TermOccurrence::depth);</span>
+
+<span class="fc" id="L34">    public TermOccurrence {</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        canonicalValue = canonicalValue == null ? &quot;&quot; : canonicalValue;</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">        originalValue = originalValue == null || originalValue.isBlank() ? canonicalValue : originalValue;</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        parentOperator = parentOperator == null ? &quot;&quot; : parentOperator;</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        role = role == null ? TermRole.ROOT : role;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        path = path == null ? &quot;&quot; : path;</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (depth &lt; 0) {</span>
+<span class="nc" id="L41">            depth = 0;</span>
+        }
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (occurrenceCount &lt; 1) {</span>
+<span class="nc" id="L44">            occurrenceCount = 1;</span>
+        }
+<span class="fc" id="L46">    }</span>
+
+    /** @return a copy of this occurrence with the aggregated {@code occurrenceCount}. */
+    TermOccurrence withOccurrenceCount(int count) {
+<span class="fc" id="L50">        return new TermOccurrence(canonicalValue, originalValue, depth, count, parentOperator, role, path);</span>
+    }
+
+    /** @return {@code true} when this occurrence is a composite term (binary/function). */
+    public boolean isComposite() {
+        // Composite forms contain an operator symbol or a function call.
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        return canonicalValue.indexOf('(') &gt;= 0</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                || canonicalValue.indexOf(' ') &gt;= 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

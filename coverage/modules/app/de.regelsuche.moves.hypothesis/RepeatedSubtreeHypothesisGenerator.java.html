@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepeatedSubtreeHypothesisGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.hypothesis</a> &gt; <span class="el_source">RepeatedSubtreeHypothesisGenerator.java</span></div><h1>RepeatedSubtreeHypothesisGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.hypothesis;
+
+import de.regelsuche.moves.RewriteMoveKind;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Finds subtrees occurring more than once and proposes them as substitution
+ * atoms. The repeated subtree may be arbitrarily complex.
+ *
+ * &lt;p&gt;Example: {@code (sin(x)+cos(x))^2 + 2*(sin(x)+cos(x)) + 1} →
+ * {@code A = sin(x) + cos(x)}.&lt;/p&gt;
+ */
+<span class="fc" id="L14">public final class RepeatedSubtreeHypothesisGenerator implements ParameterHypothesisGenerator {</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L18">        return &quot;repeated-subtree&quot;;</span>
+    }
+
+    @Override
+    public List&lt;ParameterHypothesis&gt; propose(ParameterContext context) {
+<span class="pc bpc" id="L23" title="1 of 4 branches missed.">        if (!context.allows(RewriteMoveKind.SUBSTITUTE_INTRODUCE) || context.inputIndex().isEmpty()) {</span>
+<span class="fc" id="L24">            return List.of();</span>
+        }
+<span class="fc" id="L26">        List&lt;ParameterHypothesis&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (TermOccurrence occurrence : context.inputIndex().get().repeatedComposites()) {</span>
+<span class="fc" id="L28">            String canonical = occurrence.canonicalValue();</span>
+<span class="fc" id="L29">            result.add(new ParameterHypothesis(</span>
+                    RewriteMoveKind.SUBSTITUTE_INTRODUCE,
+                    &quot;atom&quot;,
+                    canonical,
+                    canonical,
+                    HypothesisSource.REPEATED_SUBTREE,
+                    0.7,
+<span class="fc" id="L36">                    &quot;subtree occurs &quot; + occurrence.occurrenceCount() + &quot; times&quot;,</span>
+<span class="fc" id="L37">                    List.of(&quot;occurrences=&quot; + occurrence.occurrenceCount())));</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        result.sort(ParameterHypothesis.CANONICAL_ORDER);</span>
+<span class="fc" id="L40">        return List.copyOf(result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
