@@ -165,16 +165,39 @@ public final class DiscoveryCampaignFiveRunner {
             .filter(edge -> edge.tags().contains("selected-path"))
             .toList();
         if ("substitution".equals(campaignCase.family())) {
-            Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> substitutionEdge = firstMatching(selected, this::hasSubstitutionEvidence);
+            List<DiscoveryBenchmarkEvidence.EvidenceEdge> allEdges = evidence.edges();
+            Comparator<DiscoveryBenchmarkEvidence.EvidenceEdge> substitutionOrdering = substitutionEdgeOrdering(campaignCase);
+            Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> substitutionEdge = firstMatching(
+                allEdges,
+                edge -> SubstitutionIntroductionOperator.RULE_ID.equals(edge.ruleId()) && hasSubstitutionEvidence(edge),
+                substitutionOrdering
+            );
             if (substitutionEdge.isPresent()) {
                 return substitutionEdge;
             }
             Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> substitutionOperatorEdge = firstMatching(
-                selected,
-                edge -> hasAnySubstitutionEvidence(edge) && campaignCase.operatorIds().contains(edge.operatorId())
+                allEdges,
+                edge -> campaignCase.operatorIds().contains(edge.operatorId()) && hasSubstitutionEvidence(edge),
+                substitutionOrdering
             );
             if (substitutionOperatorEdge.isPresent()) {
                 return substitutionOperatorEdge;
+            }
+            Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> substitutionEvidenceEdge = firstMatching(
+                allEdges,
+                this::hasSubstitutionEvidence,
+                substitutionOrdering
+            );
+            if (substitutionEvidenceEdge.isPresent()) {
+                return substitutionEvidenceEdge;
+            }
+            Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> partialSubstitutionEvidenceEdge = firstMatching(
+                allEdges,
+                edge -> campaignCase.operatorIds().contains(edge.operatorId()) && hasAnySubstitutionEvidence(edge),
+                substitutionOrdering
+            );
+            if (partialSubstitutionEvidenceEdge.isPresent()) {
+                return partialSubstitutionEvidenceEdge;
             }
         }
         return firstMatching(selected, edge -> !campaignCase.expectedRuleId().isBlank() && edge.ruleId().equals(campaignCase.expectedRuleId()))
@@ -187,10 +210,27 @@ public final class DiscoveryCampaignFiveRunner {
         List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges,
         java.util.function.Predicate<DiscoveryBenchmarkEvidence.EvidenceEdge> predicate
     ) {
+        return firstMatching(edges, predicate, edgeOrdering());
+    }
+
+    private Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> firstMatching(
+        List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges,
+        java.util.function.Predicate<DiscoveryBenchmarkEvidence.EvidenceEdge> predicate,
+        Comparator<DiscoveryBenchmarkEvidence.EvidenceEdge> ordering
+    ) {
         return edges.stream()
             .filter(predicate)
-            .sorted(edgeOrdering())
+            .sorted(ordering)
             .findFirst();
+    }
+
+    private Comparator<DiscoveryBenchmarkEvidence.EvidenceEdge> substitutionEdgeOrdering(CampaignCase campaignCase) {
+        return Comparator
+            .comparing((DiscoveryBenchmarkEvidence.EvidenceEdge edge) -> !edge.tags().contains("selected-path"))
+            .thenComparing(edge -> !SubstitutionIntroductionOperator.RULE_ID.equals(edge.ruleId()))
+            .thenComparing(edge -> !campaignCase.operatorIds().contains(edge.operatorId()))
+            .thenComparingInt(edge -> edge.assumptions().size())
+            .thenComparing(edgeOrdering());
     }
 
     private Comparator<DiscoveryBenchmarkEvidence.EvidenceEdge> edgeOrdering() {

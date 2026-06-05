@@ -8,7 +8,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,6 +22,8 @@ class DiscoveryCampaignFiveRunnerTest {
         DiscoveryCampaignFiveRunner runner = new DiscoveryCampaignFiveRunner();
 
         DiscoveryCampaignFiveRunner.CampaignReport report = runner.writeReport(tempDir);
+        Map<String, DiscoveryCampaignFiveRunner.CaseResult> resultsById = report.results().stream()
+            .collect(Collectors.toMap(DiscoveryCampaignFiveRunner.CaseResult::id, Function.identity()));
 
         assertTrue(report.results().size() >= 20, "campaign 5 should contain at least 20 cases");
         assertTrue(report.results().size() <= 30, "campaign 5 should stay in curated 20-30 range");
@@ -37,6 +42,14 @@ class DiscoveryCampaignFiveRunnerTest {
         assertTrue(report.results().stream().anyMatch(result ->
             result.shortcutAssumptions().stream().anyMatch(assumption -> assumption.startsWith("substitution."))),
             "expected at least one case with substitution evidence on selected shortcut edge");
+
+        DiscoveryCampaignFiveRunner.CaseResult completeSquarePlusRest = resultsById.get("b-complete-square-plus-rest");
+        assertTrue(completeSquarePlusRest.shortcutAssumptions().stream()
+            .anyMatch(assumption -> assumption.startsWith("substitution.placeholder.")), completeSquarePlusRest.shortcutAssumptions().toString());
+        assertTrue(completeSquarePlusRest.shortcutAssumptions().stream()
+            .anyMatch(assumption -> assumption.startsWith("substitution.occurrences.")), completeSquarePlusRest.shortcutAssumptions().toString());
+        assertTrue(completeSquarePlusRest.shortcutAssumptions().stream()
+            .anyMatch(assumption -> assumption.startsWith("substitution.substituted")), completeSquarePlusRest.shortcutAssumptions().toString());
 
         assertTrue(report.results().stream().anyMatch(result -> result.rulePath().size() >= 2),
             "expected at least one case with multi-step rule path");
