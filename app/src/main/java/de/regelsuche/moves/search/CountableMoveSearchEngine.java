@@ -24,7 +24,6 @@ import java.util.Optional;
  */
 public final class CountableMoveSearchEngine implements MoveSearchEngine {
     private static final int MIN_DEPTH = 1;
-    private static final int MAX_DEPTH = 4;
 
     private final MoveCandidateTransformationEngine transformationEngine;
     private final ExpressionCanonicalizer canonicalizer;
@@ -61,8 +60,20 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         int maxDepth,
         int maxStates
     ) {
+        return search(inputExpression, targetExpression, SearchConfiguration.fromLegacyBounds(maxDepth, maxStates));
+    }
+
+    public CountableMoveSearchResult search(
+        String inputExpression,
+        String targetExpression,
+        SearchConfiguration searchConfiguration
+    ) {
         String input = normalize(inputExpression);
         String target = normalize(targetExpression);
+        SearchConfiguration configuration = searchConfiguration == null
+            ? SearchConfiguration.defaults()
+            : searchConfiguration;
+        MoveSearchOptions options = configuration.moveSearchOptions();
         MetricsAccumulator metrics = new MetricsAccumulator();
         if (input.isBlank() || target.isBlank()) {
             return failure(
@@ -76,8 +87,9 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
             );
         }
 
-        int depthLimit = Math.max(MIN_DEPTH, Math.min(MAX_DEPTH, maxDepth));
-        int stateBudget = Math.max(1, maxStates);
+        int depthLimit = Math.max(MIN_DEPTH, options.effectiveDepthLimit());
+        int stateBudget = options.maxStates();
+        int moveBudgetPerNode = options.maxGeneratedMovesPerNode();
         String canonicalTarget = canonical(target);
 
         SearchNode root = new SearchNode(input, canonical(input), List.of(input), List.of(), List.of(), 0);
@@ -123,6 +135,9 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
             transformations.sort(Comparator.comparing(Transformation::rule)
                 .thenComparing(Transformation::transformedExpression)
                 .thenComparing(Transformation::applicationKey));
+            if (transformations.size() > moveBudgetPerNode) {
+                transformations = new ArrayList<>(transformations.subList(0, moveBudgetPerNode));
+            }
 
             metrics.beginNodeExpansion(current.depth());
             for (Transformation transformation : transformations) {

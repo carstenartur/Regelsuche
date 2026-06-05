@@ -7,6 +7,7 @@ import de.regelsuche.moves.MoveCandidateTransformationEngine;
 import de.regelsuche.moves.RewriteMove;
 import de.regelsuche.moves.search.CountableMoveSearchEngine;
 import de.regelsuche.moves.search.CountableMoveSearchEngine.CountableMoveSearchResult;
+import de.regelsuche.moves.search.SearchConfiguration;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -88,8 +89,7 @@ public final class DiscoveryCampaignSixRunner {
         CountableMoveSearchResult searchResult = moveSearchEngine.search(
             probeCase.inputExpression(),
             probeCase.targetExpression(),
-            4,
-            120
+            SearchConfiguration.campaignSixConservative()
         );
 
         List<PathStep> pathSteps = toPathSteps(searchResult);
