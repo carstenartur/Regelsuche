@@ -37,9 +37,10 @@ public final class RewriteMoveDeriver {
         }
         RewriteMoveKind kind = detectKind(request);
         List<MoveParameter> parameters = substitutionParameters(request.assumptions());
+        boolean hasSubstitutionEvidence = hasSubstitutionEvidence(request.assumptions());
 
         LinkedHashSet<String> tags = new LinkedHashSet<>(request.tags());
-        if (parameters.isEmpty()) {
+        if (kind == RewriteMoveKind.UNKNOWN || (hasSubstitutionEvidence && parameters.isEmpty())) {
             tags.add(UNRESOLVED_TAG);
         }
 
@@ -216,6 +217,15 @@ public final class RewriteMoveDeriver {
             return first;
         }
         return second == null ? "" : second;
+    }
+
+    private boolean hasSubstitutionEvidence(List<String> assumptions) {
+        for (String assumption : assumptions) {
+            if (assumption != null && assumption.trim().startsWith("substitution.")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

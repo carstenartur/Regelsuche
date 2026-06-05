@@ -3,6 +3,7 @@ package de.regelsuche.moves.report;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.moves.RewriteMoveKind;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -79,5 +80,29 @@ class MoveTreeReportWriterTest {
                 null);
         assertTrue(quadraticReport.depth1Candidates().stream()
                 .anyMatch(candidate -> candidate.kind() == RewriteMoveKind.COMPLETE_SQUARE));
+    }
+
+    @Test
+    void selfLoopKeepsFirstSeenNodeDepth() {
+        MoveTreeReport report = new MoveTreeReportAssembler().assemble(
+                "self-loop",
+                List.of(new MoveTreeReportAssembler.PathStep(
+                                "x + 0",
+                                "x+0",
+                                "ast_linear_offset_simplify"),
+                        new MoveTreeReportAssembler.PathStep(
+                                "x+0",
+                                "x",
+                                "ast_linear_offset_simplify")),
+                List.of(),
+                null);
+
+        String id = new ExpressionCanonicalizer().canonicalize("x+0");
+        MoveTreeReport.MoveNode node = report.nodes().stream()
+                .filter(candidate -> candidate.nodeId().equals(id))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(node.depth() == 0, () -> "expected first-seen self-loop node depth 0 but was " + node.depth());
+        assertTrue(node.expression().equals("x + 0"), () -> "expected first-seen node expression to be preserved");
     }
 }

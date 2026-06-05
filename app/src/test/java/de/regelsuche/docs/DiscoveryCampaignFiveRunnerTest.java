@@ -102,6 +102,9 @@ class DiscoveryCampaignFiveRunnerTest {
             assertFalse(move.canonicalBefore().isBlank());
             assertFalse(move.canonicalAfter().isBlank());
         }
+        assertTrue(moveTree.successfulPathMoves().stream().anyMatch(move ->
+                !move.operatorId().isBlank() || !move.assumptions().isEmpty()),
+            "expected successful-path moves to retain edge metadata");
     }
 
     private Set<String> existingInputTargetPairs() {

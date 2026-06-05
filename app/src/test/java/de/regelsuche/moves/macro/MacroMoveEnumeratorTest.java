@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.moves.RewriteMove;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 class MacroMoveEnumeratorTest {
 
     private final MacroMoveEnumerator enumerator = new MacroMoveEnumerator();
+    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
 
     private ReusableRule learnedMacro(String left, String right) {
         return new ReusableRule(
@@ -60,6 +62,16 @@ class MacroMoveEnumeratorTest {
         RewriteMove partial = enumerator.enumerate(
                 List.of(learnedMacro("", "")), "sin(x)^2 + 2*sin(x) + 1").getFirst();
         assertTrue(partial.tags().contains("macro-expansion-partial"));
+    }
+
+    @Test
+    void expandedAtomicMoveUsesCanonicalizedBeforeAndAfterExpressions() {
+        RewriteMove macroMove = enumerator.enumerate(
+                List.of(learnedMacro("sin(x)^2 + 2*sin(x) + 1", "(sin(x) + 1)^2")),
+                "sin(x)^2 + 2*sin(x) + 1").getFirst();
+        RewriteMove atomic = macroMove.expandedMoves().getFirst();
+        assertEquals(canonicalizer.canonicalize(atomic.sourceExpression()), atomic.canonicalBefore());
+        assertEquals(canonicalizer.canonicalize(atomic.targetExpression()), atomic.canonicalAfter());
     }
 
     @Test

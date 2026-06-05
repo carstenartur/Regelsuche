@@ -113,7 +113,7 @@ public final class DiscoveryCampaignFiveRunner {
         DiscoveryBenchmarkEvidence evidence, List<String> path, List<String> rules) {
         java.util.Map<String, DiscoveryBenchmarkEvidence.EvidenceEdge> edgesByKey = new java.util.LinkedHashMap<>();
         for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges()) {
-            edgesByKey.putIfAbsent(edge.from() + "->" + edge.to() + "|" + edge.ruleId(), edge);
+            edgesByKey.putIfAbsent(edgeKey(edge.from(), edge.to(), edge.ruleId()), edge);
         }
         List<MoveTreeReportAssembler.PathStep> steps = new ArrayList<>();
         int stepCount = Math.min(rules.size(), path.size() - 1);
@@ -121,7 +121,7 @@ public final class DiscoveryCampaignFiveRunner {
             String before = path.get(i);
             String after = path.get(i + 1);
             String ruleId = rules.get(i);
-            String key = stripWhitespace(before) + "->" + stripWhitespace(after) + "|" + ruleId;
+            String key = edgeKey(before, after, ruleId);
             DiscoveryBenchmarkEvidence.EvidenceEdge edge = edgesByKey.get(key);
             steps.add(new MoveTreeReportAssembler.PathStep(
                 before,
@@ -132,6 +132,10 @@ public final class DiscoveryCampaignFiveRunner {
                 edge == null ? "" : edge.source()));
         }
         return steps;
+    }
+
+    private String edgeKey(String from, String to, String ruleId) {
+        return stripWhitespace(from) + "->" + stripWhitespace(to) + "|" + (ruleId == null ? "" : ruleId);
     }
 
     private String stripWhitespace(String value) {

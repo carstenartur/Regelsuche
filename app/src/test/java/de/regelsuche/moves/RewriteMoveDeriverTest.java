@@ -79,5 +79,19 @@ class RewriteMoveDeriverTest {
         RewriteMove move = deriver.derive(new RewriteMoveDeriver.MoveDerivationRequest(
                 "x + 1 - 1", "x", "ast_linear_offset_simplify", "", List.of()));
         assertEquals(RewriteMoveKind.NORMALIZE, move.kind());
+        assertFalse(move.hasUnresolvedParameters());
+    }
+
+    @Test
+    void malformedSubstitutionEvidenceIsTaggedAsUnresolved() {
+        RewriteMove move = deriver.derive(new RewriteMoveDeriver.MoveDerivationRequest(
+                "sin(x)^2 + 2*sin(x) + 1",
+                "A^2 + 2*A + 1",
+                "substitution_introduction",
+                "",
+                List.of("substitution.placeholder.A")));
+        assertEquals(RewriteMoveKind.SUBSTITUTE_INTRODUCE, move.kind());
+        assertTrue(move.parameters().isEmpty());
+        assertTrue(move.hasUnresolvedParameters());
     }
 }

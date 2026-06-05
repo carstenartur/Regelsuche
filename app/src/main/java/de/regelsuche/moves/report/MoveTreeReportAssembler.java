@@ -77,7 +77,8 @@ public final class MoveTreeReportAssembler {
                     List.of()));
             pathMoves.add(move);
             ordinalPath.add(move.ordinal());
-            nodes.put(toId, node(toId, step.after(), depth + 1, safeScorer));
+            int toDepth = depth + 1;
+            nodes.computeIfAbsent(toId, id -> node(id, step.after(), toDepth, safeScorer));
             edges.add(new MoveTreeReport.MoveEdge(
                     fromId,
                     toId,
