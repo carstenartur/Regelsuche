@@ -63,16 +63,16 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
     ) {
 <span class="fc" id="L64">        String input = normalize(inputExpression);</span>
 <span class="fc" id="L65">        String target = normalize(targetExpression);</span>
-<span class="pc bpc" id="L66" title="2 of 4 branches missed.">        if (input.isBlank() || target.isBlank()) {</span>
-<span class="nc" id="L67">            return failure(</span>
+<span class="fc" id="L66">        MetricsAccumulator metrics = new MetricsAccumulator();</span>
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">        if (input.isBlank() || target.isBlank()) {</span>
+<span class="nc" id="L68">            return failure(</span>
                 input,
                 target,
-<span class="nc" id="L70">                List.of(input),</span>
-<span class="nc" id="L71">                List.of(),</span>
+<span class="nc" id="L71">                List.of(input),</span>
 <span class="nc" id="L72">                List.of(),</span>
-                0,
-                0,
-                FailureReason.INVALID_INPUT
+<span class="nc" id="L73">                List.of(),</span>
+                FailureReason.INVALID_INPUT,
+                metrics
             );
         }
 
@@ -83,91 +83,102 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
 <span class="fc" id="L83">        SearchNode root = new SearchNode(input, canonical(input), List.of(input), List.of(), List.of(), 0);</span>
 <span class="fc" id="L84">        LinkedHashSet&lt;String&gt; uniqueCanonicals = new LinkedHashSet&lt;&gt;();</span>
 <span class="fc" id="L85">        uniqueCanonicals.add(root.canonicalExpression());</span>
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (root.canonicalExpression().equals(canonicalTarget)) {</span>
-<span class="nc" id="L87">            return success(input, target, root.pathExpressions(), root.appliedMoves(), root.appliedRuleIds(), 1, 1);</span>
+<span class="fc" id="L86">        metrics.recordUniqueState();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (root.canonicalExpression().equals(canonicalTarget)) {</span>
+<span class="fc" id="L88">            metrics.recordExploredState();</span>
+<span class="fc" id="L89">            return success(</span>
+                input,
+                target,
+<span class="fc" id="L92">                root.pathExpressions(),</span>
+<span class="fc" id="L93">                root.appliedMoves(),</span>
+<span class="fc" id="L94">                root.appliedRuleIds(),</span>
+                metrics
+            );
         }
 
-<span class="fc" id="L90">        ArrayDeque&lt;SearchNode&gt; frontier = new ArrayDeque&lt;&gt;();</span>
-<span class="fc" id="L91">        frontier.add(root);</span>
-<span class="fc" id="L92">        int exploredStateCount = 0;</span>
+<span class="fc" id="L99">        ArrayDeque&lt;SearchNode&gt; frontier = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L100">        frontier.add(root);</span>
 
-<span class="fc bfc" id="L94" title="All 2 branches covered.">        while (!frontier.isEmpty()) {</span>
-<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (exploredStateCount &gt;= stateBudget) {</span>
-<span class="fc" id="L96">                return failure(</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        while (!frontier.isEmpty()) {</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (metrics.exploredStateCount() &gt;= stateBudget) {</span>
+<span class="fc" id="L104">                metrics.recordStateBudgetPruned(frontier.size());</span>
+<span class="fc" id="L105">                return failure(</span>
                     input,
                     target,
-<span class="fc" id="L99">                    List.of(input),</span>
-<span class="fc" id="L100">                    List.of(),</span>
-<span class="fc" id="L101">                    List.of(),</span>
-                    exploredStateCount,
-<span class="fc" id="L103">                    uniqueCanonicals.size(),</span>
-                    FailureReason.MAX_STATES_REACHED
+<span class="fc" id="L108">                    List.of(input),</span>
+<span class="fc" id="L109">                    List.of(),</span>
+<span class="fc" id="L110">                    List.of(),</span>
+                    FailureReason.MAX_STATES_REACHED,
+                    metrics
                 );
             }
-<span class="fc" id="L107">            SearchNode current = frontier.removeFirst();</span>
-<span class="fc" id="L108">            exploredStateCount++;</span>
-<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (current.depth() &gt;= depthLimit) {</span>
-<span class="fc" id="L110">                continue;</span>
+<span class="fc" id="L115">            SearchNode current = frontier.removeFirst();</span>
+<span class="fc" id="L116">            metrics.recordExploredState();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (current.depth() &gt;= depthLimit) {</span>
+<span class="fc" id="L118">                metrics.recordDepthPruned();</span>
+<span class="fc" id="L119">                continue;</span>
             }
 
-<span class="fc" id="L113">            List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(transformationEngine.transform(current.expression()));</span>
-<span class="fc" id="L114">            transformations.sort(Comparator.comparing(Transformation::rule)</span>
-<span class="fc" id="L115">                .thenComparing(Transformation::transformedExpression)</span>
-<span class="fc" id="L116">                .thenComparing(Transformation::applicationKey));</span>
+<span class="fc" id="L122">            List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(transformationEngine.transform(current.expression()));</span>
+<span class="fc" id="L123">            transformations.sort(Comparator.comparing(Transformation::rule)</span>
+<span class="fc" id="L124">                .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L125">                .thenComparing(Transformation::applicationKey));</span>
 
-<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
-<span class="fc" id="L119">                String nextExpression = normalize(transformation.transformedExpression());</span>
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                if (nextExpression.equals(current.expression())) {</span>
-<span class="nc" id="L121">                    continue;</span>
+<span class="fc" id="L127">            metrics.beginNodeExpansion(current.depth());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
+<span class="fc" id="L129">                String nextExpression = normalize(transformation.transformedExpression());</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                if (nextExpression.equals(current.expression())) {</span>
+<span class="nc" id="L131">                    continue;</span>
                 }
-<span class="fc" id="L123">                String nextCanonical = canonical(nextExpression);</span>
-<span class="fc bfc" id="L124" title="All 2 branches covered.">                if (!uniqueCanonicals.add(nextCanonical)) {</span>
-<span class="fc" id="L125">                    continue;</span>
+<span class="fc" id="L133">                String nextCanonical = canonical(nextExpression);</span>
+<span class="fc" id="L134">                RewriteMove move = rewriteMoveFor(current.expression(), transformation);</span>
+<span class="fc" id="L135">                metrics.recordGeneratedMove(current.depth(), move);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (!uniqueCanonicals.add(nextCanonical)) {</span>
+<span class="fc" id="L137">                    metrics.recordDuplicateState();</span>
+<span class="fc" id="L138">                    continue;</span>
                 }
+<span class="fc" id="L140">                metrics.recordUniqueState();</span>
 
-<span class="fc" id="L128">                RewriteMove move = rewriteMoveFor(current.expression(), transformation);</span>
-<span class="fc" id="L129">                SearchNode next = current.advance(nextExpression, nextCanonical, move, transformation.rule());</span>
-<span class="fc bfc" id="L130" title="All 2 branches covered.">                if (nextCanonical.equals(canonicalTarget)) {</span>
-<span class="fc" id="L131">                    return success(</span>
+<span class="fc" id="L142">                SearchNode next = current.advance(nextExpression, nextCanonical, move, transformation.rule());</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                if (nextCanonical.equals(canonicalTarget)) {</span>
+<span class="fc" id="L144">                    return success(</span>
                         input,
                         target,
-<span class="fc" id="L134">                        next.pathExpressions(),</span>
-<span class="fc" id="L135">                        next.appliedMoves(),</span>
-<span class="fc" id="L136">                        next.appliedRuleIds(),</span>
-                        exploredStateCount,
-<span class="fc" id="L138">                        uniqueCanonicals.size()</span>
+<span class="fc" id="L147">                        next.pathExpressions(),</span>
+<span class="fc" id="L148">                        next.appliedMoves(),</span>
+<span class="fc" id="L149">                        next.appliedRuleIds(),</span>
+                        metrics
                     );
                 }
-<span class="fc" id="L141">                frontier.addLast(next);</span>
-<span class="fc" id="L142">            }</span>
-<span class="fc" id="L143">        }</span>
+<span class="fc" id="L153">                frontier.addLast(next);</span>
+<span class="fc" id="L154">            }</span>
+<span class="fc" id="L155">        }</span>
 
-<span class="fc" id="L145">        return failure(</span>
+<span class="fc" id="L157">        return failure(</span>
             input,
             target,
-<span class="fc" id="L148">            List.of(input),</span>
-<span class="fc" id="L149">            List.of(),</span>
-<span class="fc" id="L150">            List.of(),</span>
-            exploredStateCount,
-<span class="fc" id="L152">            uniqueCanonicals.size(),</span>
-            FailureReason.TARGET_NOT_REACHED
+<span class="fc" id="L160">            List.of(input),</span>
+<span class="fc" id="L161">            List.of(),</span>
+<span class="fc" id="L162">            List.of(),</span>
+            FailureReason.TARGET_NOT_REACHED,
+            metrics
         );
     }
 
     private RewriteMove rewriteMoveFor(String beforeExpression, Transformation transformation) {
-<span class="fc" id="L158">        Optional&lt;MoveCandidateTransformationEngine.MoveMetadata&gt; metadata =</span>
-<span class="fc" id="L159">            MoveCandidateTransformationEngine.metadataOf(transformation);</span>
-<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (metadata.isPresent()) {</span>
-<span class="fc" id="L161">            return fromMetadata(beforeExpression, transformation, metadata.get());</span>
+<span class="fc" id="L169">        Optional&lt;MoveCandidateTransformationEngine.MoveMetadata&gt; metadata =</span>
+<span class="fc" id="L170">            MoveCandidateTransformationEngine.metadataOf(transformation);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (metadata.isPresent()) {</span>
+<span class="fc" id="L172">            return fromMetadata(beforeExpression, transformation, metadata.get());</span>
         }
-<span class="fc" id="L163">        return rewriteMoveDeriver.derive(new RewriteMoveDeriver.MoveDerivationRequest(</span>
+<span class="fc" id="L174">        return rewriteMoveDeriver.derive(new RewriteMoveDeriver.MoveDerivationRequest(</span>
             beforeExpression,
-<span class="fc" id="L165">            transformation.transformedExpression(),</span>
-<span class="fc" id="L166">            transformation.rule(),</span>
-<span class="fc" id="L167">            transformation.rule(),</span>
-<span class="fc" id="L168">            transformation.assumptions(),</span>
+<span class="fc" id="L176">            transformation.transformedExpression(),</span>
+<span class="fc" id="L177">            transformation.rule(),</span>
+<span class="fc" id="L178">            transformation.rule(),</span>
+<span class="fc" id="L179">            transformation.assumptions(),</span>
             &quot;countable-move-search&quot;,
-<span class="fc" id="L170">            List.of(&quot;classic-fallback&quot;)</span>
+<span class="fc" id="L181">            List.of(&quot;classic-fallback&quot;)</span>
         ));
     }
 
@@ -176,61 +187,61 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         Transformation transformation,
         MoveCandidateTransformationEngine.MoveMetadata metadata
     ) {
-<span class="fc" id="L179">        RewriteMoveKind kind = moveKindFromMoveId(metadata.moveId());</span>
-<span class="fc" id="L180">        List&lt;MoveParameter&gt; parameters = metadata.parameters().entrySet().stream()</span>
-<span class="fc" id="L181">            .sorted(Map.Entry.comparingByKey())</span>
-<span class="fc" id="L182">            .map(entry -&gt; new MoveParameter(</span>
-<span class="fc" id="L183">                entry.getKey(),</span>
+<span class="fc" id="L190">        RewriteMoveKind kind = moveKindFromMoveId(metadata.moveId());</span>
+<span class="fc" id="L191">        List&lt;MoveParameter&gt; parameters = metadata.parameters().entrySet().stream()</span>
+<span class="fc" id="L192">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L193">            .map(entry -&gt; new MoveParameter(</span>
+<span class="fc" id="L194">                entry.getKey(),</span>
                 MoveParameterKind.GENERATED,
-<span class="fc" id="L185">                entry.getValue(),</span>
-<span class="fc" id="L186">                entry.getValue(),</span>
+<span class="fc" id="L196">                entry.getValue(),</span>
+<span class="fc" id="L197">                entry.getValue(),</span>
                 -1,
                 &quot;move-metadata&quot;
             ))
-<span class="fc" id="L190">            .toList();</span>
-<span class="fc" id="L191">        int occurrence = parseOccurrence(metadata.ordinal());</span>
-<span class="fc" id="L192">        MoveOrdinal ordinal = MoveOrdinal.of(kind, occurrence, parameters);</span>
-<span class="fc" id="L193">        return RewriteMove.builder(kind)</span>
-<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            .moveId(metadata.moveId().isBlank() ? kind.name() + &quot;|&quot; + canonical(beforeExpression) + &quot;=&gt;&quot; + canonical(</span>
-<span class="pc" id="L195">                transformation.transformedExpression()) : metadata.moveId())</span>
-<span class="fc" id="L196">            .ruleId(firstNonBlank(metadata.ruleId(), transformation.rule()))</span>
-<span class="fc" id="L197">            .operatorId(firstNonBlank(metadata.operatorId(), transformation.rule()))</span>
-<span class="fc" id="L198">            .sourceExpression(beforeExpression)</span>
-<span class="fc" id="L199">            .targetExpression(transformation.transformedExpression())</span>
-<span class="fc" id="L200">            .canonicalBefore(canonical(beforeExpression))</span>
-<span class="fc" id="L201">            .canonicalAfter(canonical(transformation.transformedExpression()))</span>
-<span class="fc" id="L202">            .ordinal(ordinal)</span>
-<span class="fc" id="L203">            .parameters(parameters)</span>
-<span class="fc" id="L204">            .assumptions(transformation.assumptions())</span>
-<span class="fc" id="L205">            .tags(List.of(&quot;countable-move-search&quot;, &quot;move-metadata&quot;))</span>
-<span class="fc" id="L206">            .build();</span>
+<span class="fc" id="L201">            .toList();</span>
+<span class="fc" id="L202">        int occurrence = parseOccurrence(metadata.ordinal());</span>
+<span class="fc" id="L203">        MoveOrdinal ordinal = MoveOrdinal.of(kind, occurrence, parameters);</span>
+<span class="fc" id="L204">        return RewriteMove.builder(kind)</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            .moveId(metadata.moveId().isBlank() ? kind.name() + &quot;|&quot; + canonical(beforeExpression) + &quot;=&gt;&quot; + canonical(</span>
+<span class="pc" id="L206">                transformation.transformedExpression()) : metadata.moveId())</span>
+<span class="fc" id="L207">            .ruleId(firstNonBlank(metadata.ruleId(), transformation.rule()))</span>
+<span class="fc" id="L208">            .operatorId(firstNonBlank(metadata.operatorId(), transformation.rule()))</span>
+<span class="fc" id="L209">            .sourceExpression(beforeExpression)</span>
+<span class="fc" id="L210">            .targetExpression(transformation.transformedExpression())</span>
+<span class="fc" id="L211">            .canonicalBefore(canonical(beforeExpression))</span>
+<span class="fc" id="L212">            .canonicalAfter(canonical(transformation.transformedExpression()))</span>
+<span class="fc" id="L213">            .ordinal(ordinal)</span>
+<span class="fc" id="L214">            .parameters(parameters)</span>
+<span class="fc" id="L215">            .assumptions(transformation.assumptions())</span>
+<span class="fc" id="L216">            .tags(List.of(&quot;countable-move-search&quot;, &quot;move-metadata&quot;))</span>
+<span class="fc" id="L217">            .build();</span>
     }
 
     private RewriteMoveKind moveKindFromMoveId(String moveId) {
-<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        if (moveId == null || moveId.isBlank()) {</span>
-<span class="nc" id="L211">            return RewriteMoveKind.UNKNOWN;</span>
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">        if (moveId == null || moveId.isBlank()) {</span>
+<span class="nc" id="L222">            return RewriteMoveKind.UNKNOWN;</span>
         }
-<span class="fc" id="L213">        int separator = moveId.indexOf('|');</span>
-<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        String prefix = separator &lt; 0 ? moveId : moveId.substring(0, separator);</span>
+<span class="fc" id="L224">        int separator = moveId.indexOf('|');</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        String prefix = separator &lt; 0 ? moveId : moveId.substring(0, separator);</span>
         try {
-<span class="fc" id="L216">            return RewriteMoveKind.valueOf(prefix.trim().toUpperCase(Locale.ROOT));</span>
-<span class="nc" id="L217">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L218">            return RewriteMoveKind.UNKNOWN;</span>
+<span class="fc" id="L227">            return RewriteMoveKind.valueOf(prefix.trim().toUpperCase(Locale.ROOT));</span>
+<span class="nc" id="L228">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L229">            return RewriteMoveKind.UNKNOWN;</span>
         }
     }
 
     private int parseOccurrence(String ordinalText) {
-<span class="pc bpc" id="L223" title="2 of 4 branches missed.">        if (ordinalText == null || ordinalText.isBlank()) {</span>
-<span class="nc" id="L224">            return 0;</span>
+<span class="pc bpc" id="L234" title="2 of 4 branches missed.">        if (ordinalText == null || ordinalText.isBlank()) {</span>
+<span class="nc" id="L235">            return 0;</span>
         }
-<span class="fc" id="L226">        String[] parts = ordinalText.split(&quot;:&quot;);</span>
-<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (parts.length &lt; 2) {</span>
-<span class="nc" id="L228">            return 0;</span>
+<span class="fc" id="L237">        String[] parts = ordinalText.split(&quot;:&quot;);</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (parts.length &lt; 2) {</span>
+<span class="nc" id="L239">            return 0;</span>
         }
         try {
-<span class="fc" id="L231">            return Math.max(0, Integer.parseInt(parts[1]));</span>
-<span class="nc" id="L232">        } catch (NumberFormatException exception) {</span>
-<span class="nc" id="L233">            return 0;</span>
+<span class="fc" id="L242">            return Math.max(0, Integer.parseInt(parts[1]));</span>
+<span class="nc" id="L243">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L244">            return 0;</span>
         }
     }
 
@@ -240,19 +251,20 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         List&lt;String&gt; pathExpressions,
         List&lt;RewriteMove&gt; appliedMoves,
         List&lt;String&gt; appliedRuleIds,
-        int explored,
-        int uniqueCanonicalStateCount
+        MetricsAccumulator metrics
     ) {
-<span class="fc" id="L246">        return new CountableMoveSearchResult(</span>
+<span class="fc" id="L256">        SearchSpaceMetrics searchSpaceMetrics = metrics.build(appliedMoves);</span>
+<span class="fc" id="L257">        return new CountableMoveSearchResult(</span>
             true,
             input,
             target,
             pathExpressions,
             appliedMoves,
             appliedRuleIds,
-            explored,
-            uniqueCanonicalStateCount,
-            FailureReason.NONE
+<span class="fc" id="L264">            searchSpaceMetrics.exploredStateCount(),</span>
+<span class="fc" id="L265">            searchSpaceMetrics.uniqueCanonicalStateCount(),</span>
+            FailureReason.NONE,
+            searchSpaceMetrics
         );
     }
 
@@ -262,58 +274,59 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         List&lt;String&gt; pathExpressions,
         List&lt;RewriteMove&gt; appliedMoves,
         List&lt;String&gt; appliedRuleIds,
-        int explored,
-        int uniqueCanonicalStateCount,
-        FailureReason reason
+        FailureReason reason,
+        MetricsAccumulator metrics
     ) {
-<span class="fc" id="L269">        return new CountableMoveSearchResult(</span>
+<span class="fc" id="L280">        SearchSpaceMetrics searchSpaceMetrics = metrics.build(appliedMoves);</span>
+<span class="fc" id="L281">        return new CountableMoveSearchResult(</span>
             false,
             input,
             target,
             pathExpressions,
             appliedMoves,
             appliedRuleIds,
-            explored,
-            uniqueCanonicalStateCount,
-            reason
+<span class="fc" id="L288">            searchSpaceMetrics.exploredStateCount(),</span>
+<span class="fc" id="L289">            searchSpaceMetrics.uniqueCanonicalStateCount(),</span>
+            reason,
+            searchSpaceMetrics
         );
     }
 
     private String normalize(String expression) {
-<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (expression == null) {</span>
-<span class="nc" id="L284">            return &quot;&quot;;</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L297">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L286">        return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L299">        return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
     private String canonical(String expression) {
-<span class="fc" id="L290">        String normalized = normalize(expression);</span>
-<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        if (normalized.isBlank()) {</span>
-<span class="nc" id="L292">            return &quot;&quot;;</span>
+<span class="fc" id="L303">        String normalized = normalize(expression);</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (normalized.isBlank()) {</span>
+<span class="nc" id="L305">            return &quot;&quot;;</span>
         }
         try {
-<span class="fc" id="L295">            return canonicalizer.canonicalize(normalized);</span>
-<span class="nc" id="L296">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L297">            scorer.score(normalized);</span>
-<span class="nc" id="L298">            return normalized;</span>
+<span class="fc" id="L308">            return canonicalizer.canonicalize(normalized);</span>
+<span class="nc" id="L309">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L310">            scorer.score(normalized);</span>
+<span class="nc" id="L311">            return normalized;</span>
         }
     }
 
     private String firstNonBlank(String preferred, String fallback) {
-<span class="pc bpc" id="L303" title="2 of 4 branches missed.">        if (preferred != null &amp;&amp; !preferred.isBlank()) {</span>
-<span class="fc" id="L304">            return preferred;</span>
+<span class="pc bpc" id="L316" title="2 of 4 branches missed.">        if (preferred != null &amp;&amp; !preferred.isBlank()) {</span>
+<span class="fc" id="L317">            return preferred;</span>
         }
-<span class="nc bnc" id="L306" title="All 2 branches missed.">        return fallback == null ? &quot;&quot; : fallback;</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        return fallback == null ? &quot;&quot; : fallback;</span>
     }
 
-<span class="fc" id="L309">    public enum FailureReason {</span>
-<span class="fc" id="L310">        NONE,</span>
-<span class="fc" id="L311">        INVALID_INPUT,</span>
-<span class="fc" id="L312">        TARGET_NOT_REACHED,</span>
-<span class="fc" id="L313">        MAX_STATES_REACHED</span>
+<span class="fc" id="L322">    public enum FailureReason {</span>
+<span class="fc" id="L323">        NONE,</span>
+<span class="fc" id="L324">        INVALID_INPUT,</span>
+<span class="fc" id="L325">        TARGET_NOT_REACHED,</span>
+<span class="fc" id="L326">        MAX_STATES_REACHED</span>
     }
 
-<span class="fc" id="L316">    private record SearchNode(</span>
+<span class="fc" id="L329">    private record SearchNode(</span>
         String expression,
         String canonicalExpression,
         List&lt;String&gt; pathExpressions,
@@ -322,18 +335,18 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         int depth
     ) {
         SearchNode advance(String nextExpression, String nextCanonical, RewriteMove move, String ruleId) {
-<span class="fc" id="L325">            List&lt;String&gt; nextPath = new ArrayList&lt;&gt;(pathExpressions);</span>
-<span class="fc" id="L326">            nextPath.add(nextExpression);</span>
-<span class="fc" id="L327">            List&lt;RewriteMove&gt; moves = new ArrayList&lt;&gt;(appliedMoves);</span>
-<span class="fc" id="L328">            moves.add(move);</span>
-<span class="fc" id="L329">            List&lt;String&gt; rules = new ArrayList&lt;&gt;(appliedRuleIds);</span>
-<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            rules.add(ruleId == null ? &quot;&quot; : ruleId);</span>
-<span class="fc" id="L331">            return new SearchNode(</span>
+<span class="fc" id="L338">            List&lt;String&gt; nextPath = new ArrayList&lt;&gt;(pathExpressions);</span>
+<span class="fc" id="L339">            nextPath.add(nextExpression);</span>
+<span class="fc" id="L340">            List&lt;RewriteMove&gt; moves = new ArrayList&lt;&gt;(appliedMoves);</span>
+<span class="fc" id="L341">            moves.add(move);</span>
+<span class="fc" id="L342">            List&lt;String&gt; rules = new ArrayList&lt;&gt;(appliedRuleIds);</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">            rules.add(ruleId == null ? &quot;&quot; : ruleId);</span>
+<span class="fc" id="L344">            return new SearchNode(</span>
                 nextExpression,
                 nextCanonical,
-<span class="fc" id="L334">                List.copyOf(nextPath),</span>
-<span class="fc" id="L335">                List.copyOf(moves),</span>
-<span class="fc" id="L336">                List.copyOf(rules),</span>
+<span class="fc" id="L347">                List.copyOf(nextPath),</span>
+<span class="fc" id="L348">                List.copyOf(moves),</span>
+<span class="fc" id="L349">                List.copyOf(rules),</span>
                 depth + 1
             );
         }
@@ -348,19 +361,160 @@ public final class CountableMoveSearchEngine implements MoveSearchEngine {
         List&lt;String&gt; appliedRuleIds,
         int exploredStateCount,
         int uniqueCanonicalStateCount,
-        FailureReason failureReason
+        FailureReason failureReason,
+        SearchSpaceMetrics searchSpaceMetrics
     ) {
-<span class="fc" id="L353">        public CountableMoveSearchResult {</span>
-<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
-<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
-<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            pathExpressions = pathExpressions == null ? List.of() : List.copyOf(pathExpressions);</span>
-<span class="pc bpc" id="L357" title="1 of 2 branches missed.">            appliedMoves = appliedMoves == null ? List.of() : List.copyOf(appliedMoves);</span>
-<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
-<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            failureReason = failureReason == null ? FailureReason.NONE : failureReason;</span>
-<span class="fc" id="L360">        }</span>
+<span class="fc" id="L367">        public CountableMoveSearchResult {</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            pathExpressions = pathExpressions == null ? List.of() : List.copyOf(pathExpressions);</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            appliedMoves = appliedMoves == null ? List.of() : List.copyOf(appliedMoves);</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            failureReason = failureReason == null ? FailureReason.NONE : failureReason;</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">            searchSpaceMetrics = searchSpaceMetrics == null ? SearchSpaceMetrics.empty() : searchSpaceMetrics;</span>
+<span class="fc" id="L375">        }</span>
 
         public int pathLength() {
-<span class="fc" id="L363">            return Math.max(0, pathExpressions.size() - 1);</span>
+<span class="fc" id="L378">            return Math.max(0, pathExpressions.size() - 1);</span>
+        }
+    }
+
+    /** Per-depth branching factor: how many moves a node at this depth produced on average. */
+<span class="fc" id="L383">    public record DepthBranchingFactor(int depth, int expandedNodeCount, int generatedMoveCount, double branchingFactor) {</span>
+    }
+
+    /**
+     * Search Space Intelligence metrics for a single bounded search run. Captures how the search
+     * space grew and which move kinds/enumerators were useful (Issue #103).
+     */
+    public record SearchSpaceMetrics(
+        int exploredStateCount,
+        int uniqueCanonicalStateCount,
+        int generatedMoveCount,
+        int duplicateStateCount,
+        int prunedByDepthCount,
+        int prunedByStateBudgetCount,
+        List&lt;DepthBranchingFactor&gt; branchingFactorByDepth,
+        Map&lt;String, Integer&gt; moveKindHistogram,
+        Map&lt;String, Integer&gt; enumeratorHistogram,
+        List&lt;String&gt; successfulPathMoveKinds,
+        int classicFallbackMoveCount,
+        int unknownMoveCount,
+        int unresolvedParameterMoveCount
+    ) {
+<span class="fc" id="L405">        public SearchSpaceMetrics {</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">            branchingFactorByDepth = branchingFactorByDepth == null ? List.of() : List.copyOf(branchingFactorByDepth);</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            moveKindHistogram = moveKindHistogram == null ? Map.of() : Map.copyOf(moveKindHistogram);</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">            enumeratorHistogram = enumeratorHistogram == null ? Map.of() : Map.copyOf(enumeratorHistogram);</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            successfulPathMoveKinds = successfulPathMoveKinds == null ? List.of() : List.copyOf(successfulPathMoveKinds);</span>
+<span class="fc" id="L410">        }</span>
+
+        public static SearchSpaceMetrics empty() {
+<span class="nc" id="L413">            return new SearchSpaceMetrics(0, 0, 0, 0, 0, 0, List.of(), Map.of(), Map.of(), List.of(), 0, 0, 0);</span>
+        }
+    }
+
+    /** Tag identifying moves produced by the classic fallback derivation. */
+    static final String CLASSIC_FALLBACK_TAG = &quot;classic-fallback&quot;;
+    /** Tag identifying moves produced from move-enumerator metadata. */
+    static final String MOVE_METADATA_TAG = &quot;move-metadata&quot;;
+
+    /** Mutable, deterministic accumulator for {@link SearchSpaceMetrics}. */
+<span class="fc" id="L423">    private static final class MetricsAccumulator {</span>
+        private int exploredStateCount;
+        private int uniqueCanonicalStateCount;
+        private int generatedMoveCount;
+        private int duplicateStateCount;
+        private int prunedByDepthCount;
+        private int prunedByStateBudgetCount;
+        private int classicFallbackMoveCount;
+        private int unknownMoveCount;
+        private int unresolvedParameterMoveCount;
+<span class="fc" id="L433">        private final java.util.TreeMap&lt;Integer, int[]&gt; branchingByDepth = new java.util.TreeMap&lt;&gt;();</span>
+<span class="fc" id="L434">        private final java.util.TreeMap&lt;String, Integer&gt; moveKindHistogram = new java.util.TreeMap&lt;&gt;();</span>
+<span class="fc" id="L435">        private final java.util.TreeMap&lt;String, Integer&gt; enumeratorHistogram = new java.util.TreeMap&lt;&gt;();</span>
+
+        int exploredStateCount() {
+<span class="fc" id="L438">            return exploredStateCount;</span>
+        }
+
+        void recordExploredState() {
+<span class="fc" id="L442">            exploredStateCount++;</span>
+<span class="fc" id="L443">        }</span>
+
+        void recordUniqueState() {
+<span class="fc" id="L446">            uniqueCanonicalStateCount++;</span>
+<span class="fc" id="L447">        }</span>
+
+        void recordDuplicateState() {
+<span class="fc" id="L450">            duplicateStateCount++;</span>
+<span class="fc" id="L451">        }</span>
+
+        void recordDepthPruned() {
+<span class="fc" id="L454">            prunedByDepthCount++;</span>
+<span class="fc" id="L455">        }</span>
+
+        void recordStateBudgetPruned(int remainingFrontier) {
+<span class="fc" id="L458">            prunedByStateBudgetCount += Math.max(0, remainingFrontier);</span>
+<span class="fc" id="L459">        }</span>
+
+        void beginNodeExpansion(int depth) {
+<span class="fc" id="L462">            branchingByDepth.computeIfAbsent(depth, key -&gt; new int[2])[0]++;</span>
+<span class="fc" id="L463">        }</span>
+
+        void recordGeneratedMove(int depth, RewriteMove move) {
+<span class="fc" id="L466">            generatedMoveCount++;</span>
+<span class="pc" id="L467">            branchingByDepth.computeIfAbsent(depth, key -&gt; new int[2])[1]++;</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">            String kind = move.kind() == null ? RewriteMoveKind.UNKNOWN.name() : move.kind().name();</span>
+<span class="fc" id="L469">            moveKindHistogram.merge(kind, 1, Integer::sum);</span>
+<span class="fc" id="L470">            enumeratorHistogram.merge(enumeratorOf(move), 1, Integer::sum);</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">            if (move.kind() == RewriteMoveKind.UNKNOWN) {</span>
+<span class="fc" id="L472">                unknownMoveCount++;</span>
+            }
+<span class="fc bfc" id="L474" title="All 2 branches covered.">            if (move.hasUnresolvedParameters()) {</span>
+<span class="fc" id="L475">                unresolvedParameterMoveCount++;</span>
+            }
+<span class="fc bfc" id="L477" title="All 2 branches covered.">            if (move.tags().contains(CLASSIC_FALLBACK_TAG)) {</span>
+<span class="fc" id="L478">                classicFallbackMoveCount++;</span>
+            }
+<span class="fc" id="L480">        }</span>
+
+        private String enumeratorOf(RewriteMove move) {
+<span class="fc bfc" id="L483" title="All 2 branches covered.">            if (move.tags().contains(CLASSIC_FALLBACK_TAG)) {</span>
+<span class="fc" id="L484">                return CLASSIC_FALLBACK_TAG;</span>
+            }
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">            if (move.tags().contains(MOVE_METADATA_TAG)) {</span>
+<span class="fc" id="L487">                return MOVE_METADATA_TAG;</span>
+            }
+<span class="nc" id="L489">            return &quot;unclassified&quot;;</span>
+        }
+
+        SearchSpaceMetrics build(List&lt;RewriteMove&gt; successfulPathMoves) {
+<span class="fc" id="L493">            List&lt;DepthBranchingFactor&gt; branching = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L494" title="All 2 branches covered.">            for (Map.Entry&lt;Integer, int[]&gt; entry : branchingByDepth.entrySet()) {</span>
+<span class="fc" id="L495">                int expandedNodes = entry.getValue()[0];</span>
+<span class="fc" id="L496">                int generated = entry.getValue()[1];</span>
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">                double factor = expandedNodes == 0 ? 0.0 : (double) generated / expandedNodes;</span>
+<span class="fc" id="L498">                branching.add(new DepthBranchingFactor(entry.getKey(), expandedNodes, generated, factor));</span>
+<span class="fc" id="L499">            }</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">            List&lt;String&gt; successfulKinds = successfulPathMoves == null ? List.of() : successfulPathMoves.stream()</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">                .map(move -&gt; move.kind() == null ? RewriteMoveKind.UNKNOWN.name() : move.kind().name())</span>
+<span class="fc" id="L502">                .toList();</span>
+<span class="fc" id="L503">            return new SearchSpaceMetrics(</span>
+                exploredStateCount,
+                uniqueCanonicalStateCount,
+                generatedMoveCount,
+                duplicateStateCount,
+                prunedByDepthCount,
+                prunedByStateBudgetCount,
+<span class="fc" id="L510">                List.copyOf(branching),</span>
+                new java.util.LinkedHashMap&lt;&gt;(moveKindHistogram),
+                new java.util.LinkedHashMap&lt;&gt;(enumeratorHistogram),
+                successfulKinds,
+                classicFallbackMoveCount,
+                unknownMoveCount,
+                unresolvedParameterMoveCount
+            );
         }
     }
 }
