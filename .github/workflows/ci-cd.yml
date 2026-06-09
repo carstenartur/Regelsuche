@@ -246,13 +246,13 @@ jobs:
           EOF
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: '**/build/reports/jacoco/**'
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unit-test-reports
           path: '**/build/reports/tests/**'
@@ -318,7 +318,7 @@ jobs:
         run: ./gradlew e2eTest -Pregelsuche.skipPlaywrightInstall=true
       - name: Upload E2E reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-test-reports
           path: |
@@ -326,7 +326,7 @@ jobs:
             app/build/test-results/e2eTest/**
       - name: Upload replay/report artifacts from E2E
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-e2e-replay-report-artifacts
           path: |
@@ -403,12 +403,12 @@ jobs:
           merge-method: squash
       - name: Upload screenshots artifact
         if: steps.screenshot_changes.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-screenshots
           path: docs/assets/screenshots/**
       - name: Upload videos
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-videos
           path: docs/assets/videos/**
@@ -427,12 +427,12 @@ jobs:
       - name: Run benchmark + render report
         run: ./gradlew benchmarkReport
       - name: Upload benchmark report (Markdown)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-report
           path: docs/benchmark-report.md
       - name: Upload benchmark summary (JSON)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-summary
           path: docs/assets/benchmark-summary.json
@@ -495,7 +495,7 @@ jobs:
         run: ./gradlew dockerE2eTest
       - name: Upload Docker E2E reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docker-e2e-test-reports
           path: |
@@ -503,7 +503,7 @@ jobs:
             app/build/test-results/dockerE2eTest/**
       - name: Upload scientific discovery artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scientific-discovery-artifacts
           path: app/build/discovery-artifacts/**
