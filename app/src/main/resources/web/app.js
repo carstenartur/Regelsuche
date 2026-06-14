@@ -2419,7 +2419,7 @@
         return inspectData.positions[index];
     }
 
-    function runInspect(expression) {
+    function runInspect(expression, selectedPathKey) {
         const statusEl = $('inspectStatus');
         const resultEl = $('inspectResult');
         const matchPanel = $('inspectMatchPanel');
@@ -2430,7 +2430,11 @@
         applyStatus('');
         applyInFlight = false;
 
-        fetch('/api/inspect/tree?expression=' + encodeURIComponent(expression))
+        const params = new URLSearchParams({ expression: expression });
+        if (selectedPathKey) {
+            params.set('selectedPathKey', selectedPathKey);
+        }
+        fetch('/api/inspect/tree?' + params.toString())
             .then((r) => r.ok ? r.json() : r.text().then((t) => Promise.reject(t)))
             .then((json) => {
                 inspectData = json;
@@ -2594,7 +2598,7 @@
             body: JSON.stringify({
                 expression: expression,
                 pathKey: pos.pathKey,
-                matchIndex: selectedMatchIndex
+                matchId: match.matchId
             })
         })
             .then((r) => r.ok ? r.json() : r.text().then((t) => Promise.reject(t)))
@@ -2628,7 +2632,7 @@
                 e.preventDefault();
                 const exprEl = $('inspectExpression');
                 const expression = exprEl ? exprEl.value.trim() : '';
-                if (expression) { runInspect(expression); }
+                if (expression) { runInspect(expression, null); }
             });
         }
         const applyBtn = $('inspectApplySelected');

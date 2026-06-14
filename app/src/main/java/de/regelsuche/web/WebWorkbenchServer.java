@@ -1347,12 +1347,15 @@ public class WebWorkbenchServer {
      * Rule Authoring IDE – tree-local rule inspection endpoint.
      *
      * <ul>
-     *   <li>{@code GET /api/inspect/tree?expression=...} — returns all
-     *       tree-position grouped rule matches for the given expression,
-     *       including bindings and rewrite previews.</li>
+     *   <li>{@code GET /api/inspect/tree?expression=...&selectedPathKey=...} —
+     *       returns all tree-position grouped rule matches for the given
+     *       expression, including bindings and rewrite previews; when
+     *       {@code selectedPathKey} is provided, that position is marked as
+     *       selected in the response.</li>
      *   <li>{@code POST /api/inspect/tree/apply} — applies a selected match
-     *       identified by {@code expression}, {@code pathKey}, and
-     *       {@code matchIndex}, then returns the rewritten expression plus a
+     *       identified by {@code expression}, {@code pathKey}, and stable
+     *       {@code matchId}; the legacy {@code matchIndex} is still accepted for
+     *       compatibility. The response returns the rewritten expression plus a
      *       refreshed inspection model.</li>
      * </ul>
      */
@@ -1376,8 +1379,11 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 400, "expression query parameter is required");
             return;
         }
+        String selectedPathKey = queryParam(exchange, "selectedPathKey", "");
         de.regelsuche.ide.RuleInspectionDto dto =
-                new de.regelsuche.ide.RuleInspectionService().inspect(expression);
+                new de.regelsuche.ide.RuleInspectionService().inspect(
+                        expression,
+                        selectedPathKey.isBlank() ? null : selectedPathKey);
         sendJson(exchange, 200, ruleInspectionToJson(dto));
     }
 
@@ -1389,14 +1395,15 @@ public class WebWorkbenchServer {
         Map<String, Object> body = readJsonObject(exchange);
         String expression = stringValue(body, "expression", "");
         String pathKey = stringValue(body, "pathKey", "");
+        String matchId = stringValue(body, "matchId", "");
         int matchIndex = intValue(body, "matchIndex", -1);
-        if (expression.isBlank() || pathKey.isBlank() || matchIndex < 0) {
-            sendStatus(exchange, 400, "expression, pathKey and matchIndex are required");
+        if (expression.isBlank() || pathKey.isBlank() || (matchId.isBlank() && matchIndex < 0)) {
+            sendStatus(exchange, 400, "expression, pathKey and matchId (or legacy matchIndex) are required");
             return;
         }
 
         de.regelsuche.ide.RuleInspectionService service = new de.regelsuche.ide.RuleInspectionService();
-        de.regelsuche.ide.RuleInspectionDto inspection = service.inspect(expression);
+        de.regelsuche.ide.RuleInspectionDto inspection = service.inspect(expression, pathKey);
         var selectedPosition = inspection.positions().stream()
                 .filter(position -> pathKey.equals(position.pathKey()))
                 .findFirst();
@@ -1408,19 +1415,38 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 409, "selected match no longer exists");
             return;
         }
-        de.regelsuche.ide.RuleInspectionDto.RuleMatch match = selectedPosition.get().matches().get(matchIndex);
+        de.regelsuche.ide.RuleInspectionDto.RuleMatch match = null;
+        int resolvedMatchIndex = -1;
+        if (!matchId.isBlank()) {
+            for (int i = 0; i < selectedPosition.get().matches().size(); i++) {
+                de.regelsuche.ide.RuleInspectionDto.RuleMatch candidate = selectedPosition.get().matches().get(i);
+                if (matchId.equals(candidate.matchId())) {
+                    match = candidate;
+                    resolvedMatchIndex = i;
+                    break;
+                }
+            }
+            if (match == null) {
+                sendStatus(exchange, 409, "selected match no longer exists");
+                return;
+            }
+        } else {
+            match = selectedPosition.get().matches().get(matchIndex);
+            resolvedMatchIndex = matchIndex;
+        }
         if (!match.applicable() || match.expressionAfter() == null || match.expressionAfter().isBlank()) {
             sendStatus(exchange, 409, "selected match is not applicable");
             return;
         }
-        de.regelsuche.ide.RuleInspectionDto refreshed = service.inspect(match.expressionAfter());
+        de.regelsuche.ide.RuleInspectionDto refreshed = service.inspect(match.expressionAfter(), pathKey);
 
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("expressionBefore", expression);
         writer.property("expressionAfter", match.expressionAfter());
         writer.property("pathKey", pathKey);
-        writer.property("matchIndex", matchIndex);
+        writer.property("matchId", match.matchId());
+        writer.property("matchIndex", resolvedMatchIndex);
         writer.property("kind", match.kind());
         writer.object("inspection", inspectionWriter -> writeRuleInspection(inspectionWriter, refreshed));
         writer.endObject();
@@ -1444,9 +1470,10 @@ public class WebWorkbenchServer {
                     pobj.property("selected", pos.selected());
                     pobj.array("matches", mw -> pos.matches().forEach(match ->
                             mw.objectValue(mobj -> {
-                                mobj.property("enumeratorId", match.enumeratorId());
-                                mobj.property("kind", match.kind());
-                                mobj.property("applicable", match.applicable());
+                        mobj.property("matchId", match.matchId());
+                        mobj.property("enumeratorId", match.enumeratorId());
+                        mobj.property("kind", match.kind());
+                        mobj.property("applicable", match.applicable());
                                 mobj.property("rewriteBefore", match.rewriteBefore());
                                 mobj.property("rewriteAfter", match.rewriteAfter());
                                 mobj.property("subtreeBefore", match.subtreeBefore());

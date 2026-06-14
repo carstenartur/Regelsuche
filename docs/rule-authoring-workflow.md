@@ -17,10 +17,12 @@ Expression
 
 2. **Position auswählen**  
    Die Inspektion zeigt alle gefundenen Baumpositionen.  
-   Wähle die relevante Position (z. B. den quadratischen Teilbaum) aus.
+   Wähle die relevante Position (z. B. den quadratischen Teilbaum) aus.  
+   Falls ein bestimmter Teilbaum serverseitig als aktiv markiert werden soll, kann die API optional `selectedPathKey` entgegennehmen.
 
 3. **Match inspizieren**  
    Für die ausgewählte Position werden alle Regelmatches angezeigt inklusive:
+   - `matchId`
    - `kind` / `enumeratorId`
    - `bindings`
    - `subtreeBefore`
@@ -29,7 +31,7 @@ Expression
 
 4. **Rewrite anwenden (Apply)**  
    Wähle ein anwendbares Match und klicke `Apply`.  
-   Der Rewrite wird serverseitig angewendet und der neue Ausdruck ohne Seiten-Reload als neuer Working Expression gesetzt.
+   Der Rewrite wird serverseitig über die stabile `matchId` angewendet und der neue Ausdruck ohne Seiten-Reload als neuer Working Expression gesetzt.
 
 5. **Mit neuem Ausdruck weiterarbeiten**  
    Nach dem Apply wird die Inspektion auf dem neuen Ausdruck erneut geladen, sodass direkt weiter iteriert werden kann.
@@ -40,4 +42,3 @@ Expression
 - Position: quadratischer Teilbaum
 - Match: `COMPLETE_SQUARE`
 - Ergebnis nach Apply: `sin((x + 3) ^ 2 - 4)`
-

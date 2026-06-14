@@ -60,6 +60,7 @@ class RuleInspectApiTest {
     void includesBindingsAndRewritePreview() throws IOException {
         String body = get("/api/inspect/tree?expression=x%5E2+%2B+6*x+%2B+5");
         assertTrue(body.contains("\"bindings\""), body);
+        assertTrue(body.contains("\"matchId\""), body);
         assertTrue(body.contains("\"applicable\""), body);
         assertTrue(body.contains("\"rewriteBefore\""), body);
         assertTrue(body.contains("\"rewriteAfter\""), body);
@@ -77,23 +78,35 @@ class RuleInspectApiTest {
                 .orElseThrow();
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> matches = (List<Map<String, Object>>) selectedPosition.get("matches");
-        int completeSquareIndex = -1;
-        for (int i = 0; i < matches.size(); i++) {
-            if ("COMPLETE_SQUARE".equals(String.valueOf(matches.get(i).get("kind")))) {
-                completeSquareIndex = i;
-                break;
-            }
-        }
-        assertTrue(completeSquareIndex >= 0, "COMPLETE_SQUARE match expected");
+        Map<String, Object> completeSquareMatch = matches.stream()
+                .filter(m -> "COMPLETE_SQUARE".equals(String.valueOf(m.get("kind"))))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("COMPLETE_SQUARE match expected"));
+        String matchId = String.valueOf(completeSquareMatch.get("matchId"));
+        assertTrue(!matchId.isBlank(), "COMPLETE_SQUARE matchId expected");
 
         String body = postJson("/api/inspect/tree/apply", """
-                {"expression":"sin(x^2 + 6*x + 5)","pathKey":"000","matchIndex":%d}
-                """.formatted(completeSquareIndex));
+                {"expression":"sin(x^2 + 6*x + 5)","pathKey":"000","matchId":"%s"}
+                """.formatted(matchId));
         Map<String, Object> applyJson = new JsonReader(body).readObject();
+        assertEquals(matchId, applyJson.get("matchId"));
         assertEquals("sin((x + 3) ^ 2 - 4)", applyJson.get("expressionAfter"));
         @SuppressWarnings("unchecked")
         Map<String, Object> refreshedInspection = (Map<String, Object>) applyJson.get("inspection");
         assertEquals("sin((x + 3) ^ 2 - 4)", refreshedInspection.get("expression"));
+    }
+
+    @Test
+    void selectedPathKeyMarksRequestedPosition() throws IOException {
+        String body = get("/api/inspect/tree?expression=sin(x%5E2+%2B+6*x+%2B+5)&selectedPathKey=000");
+        Map<String, Object> inspectJson = new JsonReader(body).readObject();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> positions = (List<Map<String, Object>>) inspectJson.get("positions");
+        Map<String, Object> selectedPosition = positions.stream()
+                .filter(p -> "000".equals(String.valueOf(p.get("pathKey"))))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(Boolean.TRUE, selectedPosition.get("selected"));
     }
 
     @Test

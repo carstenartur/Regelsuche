@@ -48,6 +48,7 @@ public record RuleInspectionDto(
     /**
      * A single rule match including bindings and rewrite preview.
      *
+     * @param matchId        stable identifier for this logical match within the inspection result
      * @param enumeratorId   id of the parameter enumerator that produced the match
      * @param kind           human-readable move kind (e.g. {@code "COMPLETE_SQUARE"})
      * @param bindings       parameter name→value pairs extracted by the enumerator
@@ -60,6 +61,7 @@ public record RuleInspectionDto(
      * @param applicable    whether this match can currently be applied
      */
     public record RuleMatch(
+            String matchId,
             String enumeratorId,
             String kind,
             List<Binding> bindings,
@@ -71,6 +73,7 @@ public record RuleInspectionDto(
             boolean applicable) {
 
         public RuleMatch {
+            matchId = matchId == null ? "" : matchId;
             bindings = bindings == null ? List.of() : List.copyOf(bindings);
             subtreeBefore = subtreeBefore == null ? (rewriteBefore == null ? "" : rewriteBefore) : subtreeBefore;
             subtreeAfter = subtreeAfter == null ? rewriteAfter : subtreeAfter;
@@ -86,7 +89,7 @@ public record RuleInspectionDto(
                 List<Binding> bindings,
                 String rewriteBefore,
                 String rewriteAfter) {
-            this(enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, rewriteBefore, rewriteAfter, null, false);
+            this("", enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, rewriteBefore, rewriteAfter, null, false);
         }
 
         public RuleMatch(
@@ -98,7 +101,7 @@ public record RuleInspectionDto(
                 String subtreeBefore,
                 String subtreeAfter,
                 String expressionAfter) {
-            this(enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, subtreeBefore, subtreeAfter, expressionAfter, false);
+            this("", enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, subtreeBefore, subtreeAfter, expressionAfter, false);
         }
     }
 

@@ -50,6 +50,18 @@ public final class RuleInspectionService {
      * @return inspection result; positions list is empty for unparseable input
      */
     public RuleInspectionDto inspect(String expression) {
+        return inspect(expression, null);
+    }
+
+    /**
+     * Inspects the given {@code expression} and marks the requested position as
+     * selected when present.
+     *
+     * @param expression infix expression to inspect
+     * @param selectedPathKey optional path key that should be marked selected
+     * @return inspection result; positions list is empty for unparseable input
+     */
+    public RuleInspectionDto inspect(String expression, String selectedPathKey) {
         if (expression == null || expression.isBlank()) {
             return new RuleInspectionDto(expression == null ? "" : expression, List.of());
         }
@@ -97,7 +109,14 @@ public final class RuleInspectionService {
                             expression,
                             pos,
                             enumeratorCandidates.stream().map(LocalCandidateMove::move).toList());
+                    String matchId = stableMatchId(
+                            enumeratorId,
+                            first.kind().name(),
+                            bindings,
+                            result.subtreeAfter(),
+                            result.expressionAfter());
                     matches.add(new RuleMatch(
+                            matchId,
                             enumeratorId,
                             first.kind().name(),
                             bindings,
@@ -115,10 +134,17 @@ public final class RuleInspectionService {
                     for (LocalCandidateMove candidate : enumeratorCandidates) {
                         CandidateMove move = candidate.move();
                         LocalRewriteApplier.LocalRewriteResult result = localRewriteApplier.apply(expression, pos, move);
+                        List<Binding> realizedBindings = bindings(result.bindings());
                         matches.add(new RuleMatch(
+                                stableMatchId(
+                                        move.enumeratorId(),
+                                        move.kind().name(),
+                                        realizedBindings,
+                                        result.subtreeAfter(),
+                                        result.expressionAfter()),
                                 move.enumeratorId(),
                                 move.kind().name(),
-                                bindings(result.bindings()),
+                                realizedBindings,
                                 result.subtreeBefore(),
                                 result.subtreeAfter(),
                                 result.subtreeBefore(),
@@ -128,7 +154,11 @@ public final class RuleInspectionService {
                     }
                 }
             }
-            positions.add(new PositionResult(pos.pathKey(), pos.text(), matches, positions.isEmpty()));
+            positions.add(new PositionResult(
+                    pos.pathKey(),
+                    pos.text(),
+                    matches,
+                    selectedPathKey != null && selectedPathKey.equals(pos.pathKey())));
         }
 
         return new RuleInspectionDto(expression, positions);
@@ -146,5 +176,27 @@ public final class RuleInspectionService {
         }
         return (result.expressionAfter() != null && !result.expressionAfter().isBlank())
                 || (result.subtreeAfter() != null && !result.subtreeAfter().isBlank());
+    }
+
+    private static String stableMatchId(
+            String enumeratorId,
+            String kind,
+            List<Binding> bindings,
+            String subtreeAfter,
+            String expressionAfter) {
+        String bindingKey = bindings.stream()
+                .map(binding -> segment(binding.name()) + segment(binding.value()) + segment(binding.kind()))
+                .sorted()
+                .reduce("", String::concat);
+        return segment(enumeratorId)
+                + segment(kind)
+                + segment(bindingKey)
+                + segment(subtreeAfter)
+                + segment(expressionAfter);
+    }
+
+    private static String segment(String value) {
+        String safe = value == null ? "" : value;
+        return safe.length() + ":" + safe;
     }
 }
