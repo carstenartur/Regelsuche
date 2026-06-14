@@ -105,7 +105,8 @@ public final class RuleInspectionService {
                             result.subtreeAfter(),
                             result.subtreeBefore(),
                             result.subtreeAfter(),
-                            result.expressionAfter()));
+                            result.expressionAfter(),
+                            applicable(result)));
                 } else {
                     // Each candidate is an independent logical match. Match rewriteAfter by
                     // parameter value to correctly distinguish multiple realized moves of the
@@ -122,11 +123,12 @@ public final class RuleInspectionService {
                                 result.subtreeAfter(),
                                 result.subtreeBefore(),
                                 result.subtreeAfter(),
-                                result.expressionAfter()));
+                                result.expressionAfter(),
+                                applicable(result)));
                     }
                 }
             }
-            positions.add(new PositionResult(pos.pathKey(), pos.text(), matches));
+            positions.add(new PositionResult(pos.pathKey(), pos.text(), matches, positions.isEmpty()));
         }
 
         return new RuleInspectionDto(expression, positions);
@@ -136,5 +138,13 @@ public final class RuleInspectionService {
         return parameters.stream()
                 .map(parameter -> new Binding(parameter.name(), parameter.value(), parameter.kind().name()))
                 .toList();
+    }
+
+    private static boolean applicable(LocalRewriteApplier.LocalRewriteResult result) {
+        if (result == null) {
+            return false;
+        }
+        return (result.expressionAfter() != null && !result.expressionAfter().isBlank())
+                || (result.subtreeAfter() != null && !result.subtreeAfter().isBlank());
     }
 }

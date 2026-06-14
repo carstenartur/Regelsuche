@@ -29,10 +29,18 @@ public record RuleInspectionDto(
     public record PositionResult(
             String pathKey,
             String subtree,
-            List<RuleMatch> matches) {
+            List<RuleMatch> matches,
+            boolean selected) {
 
         public PositionResult {
             matches = matches == null ? List.of() : List.copyOf(matches);
+        }
+
+        public PositionResult(
+                String pathKey,
+                String subtree,
+                List<RuleMatch> matches) {
+            this(pathKey, subtree, matches, false);
         }
     }
 
@@ -57,7 +65,8 @@ public record RuleInspectionDto(
             String rewriteAfter,
             String subtreeBefore,
             String subtreeAfter,
-            String expressionAfter) {
+            String expressionAfter,
+            boolean applicable) {
 
         public RuleMatch {
             bindings = bindings == null ? List.of() : List.copyOf(bindings);
@@ -65,6 +74,8 @@ public record RuleInspectionDto(
             subtreeAfter = subtreeAfter == null ? rewriteAfter : subtreeAfter;
             rewriteBefore = rewriteBefore == null ? subtreeBefore : rewriteBefore;
             rewriteAfter = rewriteAfter == null ? subtreeAfter : rewriteAfter;
+            applicable = applicable || (expressionAfter != null && !expressionAfter.isBlank())
+                    || (subtreeAfter != null && !subtreeAfter.isBlank());
         }
 
         public RuleMatch(
@@ -73,7 +84,19 @@ public record RuleInspectionDto(
                 List<Binding> bindings,
                 String rewriteBefore,
                 String rewriteAfter) {
-            this(enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, rewriteBefore, rewriteAfter, null);
+            this(enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, rewriteBefore, rewriteAfter, null, false);
+        }
+
+        public RuleMatch(
+                String enumeratorId,
+                String kind,
+                List<Binding> bindings,
+                String rewriteBefore,
+                String rewriteAfter,
+                String subtreeBefore,
+                String subtreeAfter,
+                String expressionAfter) {
+            this(enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, subtreeBefore, subtreeAfter, expressionAfter, false);
         }
     }
 

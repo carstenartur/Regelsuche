@@ -43,6 +43,7 @@ class RuleInspectApiTest {
         assertTrue(body.contains("\"positions\""), body);
         assertTrue(body.contains("\"pathKey\""), body);
         assertTrue(body.contains("\"subtree\""), body);
+        assertTrue(body.contains("\"selected\""), body);
         assertTrue(body.contains("\"matches\""), body);
     }
 
@@ -56,8 +57,19 @@ class RuleInspectApiTest {
     void includesBindingsAndRewritePreview() throws IOException {
         String body = get("/api/inspect/tree?expression=x%5E2+%2B+6*x+%2B+5");
         assertTrue(body.contains("\"bindings\""), body);
+        assertTrue(body.contains("\"applicable\""), body);
         assertTrue(body.contains("\"rewriteBefore\""), body);
         assertTrue(body.contains("\"rewriteAfter\""), body);
+    }
+
+    @Test
+    void applyEndpointReturnsUpdatedExpressionAndInspection() throws IOException {
+        String body = postJson("/api/inspect/tree/apply", """
+                {"expression":"sin(x^2 + 6*x + 5)","pathKey":"000","matchIndex":0}
+                """);
+        assertTrue(body.contains("\"expressionAfter\""), body);
+        assertTrue(body.contains("sin((x + 3) ^ 2 - 4)"), body);
+        assertTrue(body.contains("\"inspection\""), body);
     }
 
     @Test
@@ -101,6 +113,12 @@ class RuleInspectApiTest {
         assertEquals(405, conn.getResponseCode());
     }
 
+    @Test
+    void applyReturns400ForMissingFields() throws IOException {
+        HttpURLConnection conn = openPost("/api/inspect/tree/apply", "{}");
+        assertEquals(400, conn.getResponseCode());
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private String get(String path) throws IOException {
@@ -117,6 +135,28 @@ class RuleInspectApiTest {
         conn.setConnectTimeout(2000);
         conn.setReadTimeout(15000);
         conn.setRequestMethod("GET");
+        return conn;
+    }
+
+    private String postJson(String path, String json) throws IOException {
+        HttpURLConnection conn = openPost(path, json);
+        assertEquals(200, conn.getResponseCode(), () -> "expected 200 from " + path);
+        try (var in = conn.getInputStream()) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private HttpURLConnection openPost(String path, String json) throws IOException {
+        URI uri = URI.create("http://127.0.0.1:" + server.boundPort() + path);
+        HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
+        conn.setConnectTimeout(2000);
+        conn.setReadTimeout(15000);
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setDoOutput(true);
+        try (var out = conn.getOutputStream()) {
+            out.write(json.getBytes(StandardCharsets.UTF_8));
+        }
         return conn;
     }
 }

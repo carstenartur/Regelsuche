@@ -33,6 +33,8 @@ class RuleInspectionServiceTest {
         RuleInspectionDto dto = service.inspect("x^2 + 6*x + 5");
         assertNotNull(dto);
         assertEquals("x^2 + 6*x + 5", dto.expression());
+        assertTrue(dto.positions().stream().anyMatch(PositionResult::selected),
+                "expected one selected position by default");
         assertTrue(
                 dto.positions().stream().anyMatch(p -> "root".equals(p.pathKey())),
                 "expected a root position: " + dto.positions().stream().map(PositionResult::pathKey).toList());
@@ -151,6 +153,7 @@ class RuleInspectionServiceTest {
         assertEquals("x ^ 2 + 6 * x + 5", match.subtreeBefore());
         assertEquals("(x + 3) ^ 2 - 4", match.subtreeAfter());
         assertEquals("sin((x + 3) ^ 2 - 4)", match.expressionAfter());
+        assertTrue(match.applicable(), "complete-square preview should be applicable");
     }
 
     // ── Edge cases ──────────────────────────────────────────────────────────

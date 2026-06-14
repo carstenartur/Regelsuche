@@ -532,6 +532,11 @@
             <div id="inspectMatchPanel" class="card" style="display:none;">
                 <h3>Regelmatches für Position: <code id="inspectSelectedPosition"></code></h3>
                 <p>Teilbaum: <strong id="inspectSelectedSubtree"></strong></p>
+                <div class="actions">
+                    <button id="inspectApplySelected" type="button" class="primary" disabled>Apply ausgewähltes Match</button>
+                    <span id="inspectSelectedMatchLabel" class="hint">Kein Match ausgewählt.</span>
+                </div>
+                <div id="inspectApplyStatus" class="status"></div>
                 <div id="inspectMatchList"></div>
             </div>
         </div>

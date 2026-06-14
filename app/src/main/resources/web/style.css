@@ -507,3 +507,74 @@ table.compare thead th { background: #eff6ff; }
 .math-fallback { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }
 .math-fallback code { background: transparent; padding: 0; }
+
+/* Rule-IDE authoring workflow */
+.inspect-positions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.inspect-pos-btn {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+.inspect-pos-btn.is-active {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+}
+.inspect-match {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.7rem;
+  margin-bottom: 0.65rem;
+  background: #fafbfc;
+}
+.inspect-match.selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+.inspect-match-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+.inspect-match-actions {
+  margin: 0.3rem 0 0.5rem;
+}
+.inspect-rewrite {
+  margin-bottom: 0.45rem;
+}
+.inspect-rewrite-label {
+  font-weight: 600;
+}
+.inspect-bindings {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.inspect-bindings th,
+.inspect-bindings td {
+  border: 1px solid #e5e7eb;
+  padding: 0.3rem 0.45rem;
+  text-align: left;
+}
+.inspect-bindings thead th {
+  background: #f3f4f6;
+}
+.badge-applicable {
+  background: #ecfdf5;
+  color: #065f46;
+}
+.badge-not-applicable {
+  background: #f3f4f6;
+  color: #4b5563;
+}
