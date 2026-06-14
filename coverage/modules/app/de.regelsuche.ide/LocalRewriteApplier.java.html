@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalRewriteApplier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ide</a> &gt; <span class="el_source">LocalRewriteApplier.java</span></div><h1>LocalRewriteApplier.java</h1><pre class="source lang-java linenums">package de.regelsuche.ide;
+
+import de.regelsuche.moves.MoveRealizer;
+import de.regelsuche.moves.apply.LocalRewriteApplier.LocalRewriteResult;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
+import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.List;
+
+/**
+ * @deprecated Use {@link de.regelsuche.moves.apply.LocalRewriteApplier} instead.
+ *             This class is a thin forwarding wrapper kept for binary compatibility
+ *             while callers migrate to the new, more central package.
+ */
+@Deprecated(forRemoval = true)
+public final class LocalRewriteApplier {
+
+    private final de.regelsuche.moves.apply.LocalRewriteApplier delegate;
+
+<span class="nc" id="L20">    public LocalRewriteApplier() {</span>
+<span class="nc" id="L21">        this.delegate = new de.regelsuche.moves.apply.LocalRewriteApplier();</span>
+<span class="nc" id="L22">    }</span>
+
+<span class="nc" id="L24">    public LocalRewriteApplier(MoveRealizer realizer, ExpressionParser parser) {</span>
+<span class="nc" id="L25">        this.delegate = new de.regelsuche.moves.apply.LocalRewriteApplier(realizer, parser);</span>
+<span class="nc" id="L26">    }</span>
+
+    public LocalRewriteResult apply(
+            String rootExpression, TreePosition position, CandidateMove candidate) {
+<span class="nc" id="L30">        return delegate.apply(rootExpression, position, candidate);</span>
+    }
+
+    public LocalRewriteResult apply(
+            String rootExpression, TreePosition position, List&lt;CandidateMove&gt; candidates) {
+<span class="nc" id="L35">        return delegate.apply(rootExpression, position, candidates);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

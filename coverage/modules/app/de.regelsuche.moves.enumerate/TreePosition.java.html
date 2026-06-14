@@ -11,6 +11,27 @@ import java.util.stream.Collectors;
  * &lt;p&gt;An empty {@code path} denotes the whole expression (the root). Child paths
  * use {@code 0}/{@code 1} for the left/right operands of a binary node and the
  * argument index for a function node, so the path is reproducible across runs.&lt;/p&gt;
+ *
+ * &lt;h3&gt;Why does {@code TreePosition} carry {@code text}?&lt;/h3&gt;
+ * &lt;p&gt;The {@code text} field serves as a &lt;em&gt;staleness guard&lt;/em&gt;: when a
+ * {@code TreePosition} is created from an enumeration result and later handed
+ * back to {@link de.regelsuche.moves.apply.LocalRewriteApplier}, the applier
+ * compares {@code text} against the formatted subtree it finds at {@code path}
+ * in the live expression. If they differ (e.g. the expression was edited between
+ * enumeration and application), the rewrite is rejected with a {@code &quot;position
+ * is stale&quot;} failure rather than silently rewriting the wrong subtree.&lt;/p&gt;
+ *
+ * &lt;p&gt;Carrying text also makes positions self-describing for display in the Rule
+ * Authoring IDE and for JSON serialisation: a client receives a
+ * {@link de.regelsuche.ide.RuleInspectionDto.PositionResult} and can render the
+ * subtree label without an additional tree-walk.&lt;/p&gt;
+ *
+ * &lt;h3&gt;Should {@code text} remain here long-term?&lt;/h3&gt;
+ * &lt;p&gt;The coupling is intentional and should stay. Alternatives (e.g. a separate
+ * snapshot field, or a version counter) are more complex and offer no practical
+ * advantage given that the text is cheap to produce at enumeration time and small
+ * relative to the position record as a whole. If the formatter ever becomes
+ * expensive, caching at the call site is preferable to removing the guard.&lt;/p&gt;
  */
 public record TreePosition(List&lt;Integer&gt; path, String text) implements Comparable&lt;TreePosition&gt; {
 
@@ -19,17 +40,17 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * for deterministic ordering. Compares path lists directly so that the root
      * (empty path) always precedes non-root positions regardless of their display form.
      */
-<span class="fc" id="L22">    public static final Comparator&lt;TreePosition&gt; CANONICAL_ORDER =</span>
-<span class="fc" id="L23">            Comparator.&lt;TreePosition, List&lt;Integer&gt;&gt;comparing(TreePosition::path, TreePosition::comparePaths)</span>
-<span class="fc" id="L24">                    .thenComparing(TreePosition::text);</span>
+<span class="fc" id="L43">    public static final Comparator&lt;TreePosition&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L44">            Comparator.&lt;TreePosition, List&lt;Integer&gt;&gt;comparing(TreePosition::path, TreePosition::comparePaths)</span>
+<span class="fc" id="L45">                    .thenComparing(TreePosition::text);</span>
 
-<span class="fc" id="L26">    public TreePosition {</span>
-<span class="fc" id="L27">        path = List.copyOf(path);</span>
-<span class="fc" id="L28">    }</span>
+<span class="fc" id="L47">    public TreePosition {</span>
+<span class="fc" id="L48">        path = List.copyOf(path);</span>
+<span class="fc" id="L49">    }</span>
 
     /** {@code true} when this position denotes the whole expression. */
     public boolean isRoot() {
-<span class="fc" id="L32">        return path.isEmpty();</span>
+<span class="fc" id="L53">        return path.isEmpty();</span>
     }
 
     /**
@@ -39,28 +60,28 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * indices below 1000.
      */
     public String pathKey() {
-<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
-<span class="fc" id="L43">            return &quot;root&quot;;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L64">            return &quot;root&quot;;</span>
         }
-<span class="fc" id="L45">        return path.stream()</span>
-<span class="fc" id="L46">                .map(index -&gt; String.format(&quot;%03d&quot;, index))</span>
-<span class="fc" id="L47">                .collect(Collectors.joining(&quot;.&quot;));</span>
+<span class="fc" id="L66">        return path.stream()</span>
+<span class="fc" id="L67">                .map(index -&gt; String.format(&quot;%03d&quot;, index))</span>
+<span class="fc" id="L68">                .collect(Collectors.joining(&quot;.&quot;));</span>
     }
 
     @Override
     public int compareTo(TreePosition other) {
-<span class="nc" id="L52">        return CANONICAL_ORDER.compare(this, other);</span>
+<span class="nc" id="L73">        return CANONICAL_ORDER.compare(this, other);</span>
     }
 
     private static int comparePaths(List&lt;Integer&gt; a, List&lt;Integer&gt; b) {
-<span class="fc" id="L56">        int min = Math.min(a.size(), b.size());</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (int i = 0; i &lt; min; i++) {</span>
-<span class="fc" id="L58">            int cmp = Integer.compare(a.get(i), b.get(i));</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (cmp != 0) {</span>
-<span class="fc" id="L60">                return cmp;</span>
+<span class="fc" id="L77">        int min = Math.min(a.size(), b.size());</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int i = 0; i &lt; min; i++) {</span>
+<span class="fc" id="L79">            int cmp = Integer.compare(a.get(i), b.get(i));</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (cmp != 0) {</span>
+<span class="fc" id="L81">                return cmp;</span>
             }
         }
-<span class="fc" id="L63">        return Integer.compare(a.size(), b.size());</span>
+<span class="fc" id="L84">        return Integer.compare(a.size(), b.size());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

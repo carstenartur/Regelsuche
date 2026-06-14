@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleInspectionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ide</a> &gt; <span class="el_source">RuleInspectionService.java</span></div><h1>RuleInspectionService.java</h1><pre class="source lang-java linenums">package de.regelsuche.ide;
+
+import de.regelsuche.ide.RuleInspectionDto.Binding;
+import de.regelsuche.ide.RuleInspectionDto.PositionResult;
+import de.regelsuche.ide.RuleInspectionDto.RuleMatch;
+import de.regelsuche.moves.MoveRealizer;
+import de.regelsuche.moves.MoveParameter;
+import de.regelsuche.moves.apply.LocalRewriteApplier;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
+import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator;
+import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator.LocalCandidateMove;
+import de.regelsuche.moves.enumerate.TreePosition;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Inspects an expression tree-locally and returns, for each subtree position,
+ * the rule candidates that matched together with their bindings and a
+ * before/after rewrite preview.
+ *
+ * &lt;p&gt;This is the backend for the Rule Authoring IDE: callers obtain a full
+ * {@link RuleInspectionDto} and can then display, filter or drill into any
+ * position without a round-trip to the server.&lt;/p&gt;
+ */
+public final class RuleInspectionService {
+
+    private final TreeLocalMoveEnumerator enumerator;
+    private final LocalRewriteApplier localRewriteApplier;
+
+    public RuleInspectionService() {
+<span class="fc" id="L33">        this(new TreeLocalMoveEnumerator(), new LocalRewriteApplier());</span>
+<span class="fc" id="L34">    }</span>
+
+    public RuleInspectionService(TreeLocalMoveEnumerator enumerator, MoveRealizer realizer) {
+<span class="nc" id="L37">        this(enumerator, new LocalRewriteApplier(realizer, null));</span>
+<span class="nc" id="L38">    }</span>
+
+<span class="fc" id="L40">    public RuleInspectionService(TreeLocalMoveEnumerator enumerator, LocalRewriteApplier localRewriteApplier) {</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        this.enumerator = enumerator == null ? new TreeLocalMoveEnumerator() : enumerator;</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        this.localRewriteApplier = localRewriteApplier == null ? new LocalRewriteApplier() : localRewriteApplier;</span>
+<span class="fc" id="L43">    }</span>
+
+    /**
+     * Inspects the given {@code expression} and returns rule matches grouped by
+     * tree position.
+     *
+     * @param expression infix expression to inspect
+     * @return inspection result; positions list is empty for unparseable input
+     */
+    public RuleInspectionDto inspect(String expression) {
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            return new RuleInspectionDto(expression == null ? &quot;&quot; : expression, List.of());</span>
+        }
+
+<span class="fc" id="L57">        List&lt;LocalCandidateMove&gt; allCandidates = enumerator.enumerate(expression);</span>
+
+        // Group candidates by position (preserving CANONICAL_ORDER via LinkedHashMap)
+<span class="fc" id="L60">        Map&lt;TreePosition, List&lt;LocalCandidateMove&gt;&gt; byPosition = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (LocalCandidateMove candidate : allCandidates) {</span>
+<span class="fc" id="L62">            byPosition.computeIfAbsent(candidate.position(), p -&gt; new ArrayList&lt;&gt;()).add(candidate);</span>
+<span class="fc" id="L63">        }</span>
+
+<span class="fc" id="L65">        List&lt;PositionResult&gt; positions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (Map.Entry&lt;TreePosition, List&lt;LocalCandidateMove&gt;&gt; entry : byPosition.entrySet()) {</span>
+<span class="fc" id="L67">            TreePosition pos = entry.getKey();</span>
+<span class="fc" id="L68">            List&lt;LocalCandidateMove&gt; atPosition = entry.getValue();</span>
+
+<span class="fc" id="L70">            List&lt;RuleMatch&gt; matches = new ArrayList&lt;&gt;();</span>
+
+            // Group candidates by enumeratorId: complete-square emits shift + residue as
+            // two separate CandidateMoves that belong to one logical match; all other
+            // enumerators emit one CandidateMove per independent logical match.
+<span class="fc" id="L75">            Map&lt;String, List&lt;LocalCandidateMove&gt;&gt; byEnumerator = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            for (LocalCandidateMove candidate : atPosition) {</span>
+<span class="fc" id="L77">                byEnumerator.computeIfAbsent(candidate.move().enumeratorId(), id -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L78">                        .add(candidate);</span>
+<span class="fc" id="L79">            }</span>
+
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            for (Map.Entry&lt;String, List&lt;LocalCandidateMove&gt;&gt; enumeratorEntry : byEnumerator.entrySet()) {</span>
+<span class="fc" id="L82">                String enumeratorId = enumeratorEntry.getKey();</span>
+<span class="fc" id="L83">                List&lt;LocalCandidateMove&gt; enumeratorCandidates = enumeratorEntry.getValue();</span>
+<span class="fc" id="L84">                CandidateMove first = enumeratorCandidates.get(0).move();</span>
+
+<span class="fc bfc" id="L86" title="All 2 branches covered.">                if (&quot;complete-square&quot;.equals(enumeratorId)) {</span>
+                    // Collapse all complete-square parameters into one RuleMatch so that
+                    // both shift and residue appear together as a single logical match.
+<span class="fc" id="L89">                    List&lt;Binding&gt; bindings = enumeratorCandidates.stream()</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                            .filter(c -&gt; c.move().parameter() != null)</span>
+<span class="fc" id="L91">                            .map(c -&gt; new Binding(</span>
+<span class="fc" id="L92">                                    c.move().parameter().name(),</span>
+<span class="fc" id="L93">                                    c.move().parameter().value(),</span>
+<span class="fc" id="L94">                                    c.move().parameter().kind().name()))</span>
+<span class="fc" id="L95">                            .toList();</span>
+<span class="fc" id="L96">                    LocalRewriteApplier.LocalRewriteResult result = localRewriteApplier.apply(</span>
+                            expression,
+                            pos,
+<span class="fc" id="L99">                            enumeratorCandidates.stream().map(LocalCandidateMove::move).toList());</span>
+<span class="fc" id="L100">                    matches.add(new RuleMatch(</span>
+                            enumeratorId,
+<span class="fc" id="L102">                            first.kind().name(),</span>
+                            bindings,
+<span class="fc" id="L104">                            result.subtreeBefore(),</span>
+<span class="fc" id="L105">                            result.subtreeAfter(),</span>
+<span class="fc" id="L106">                            result.subtreeBefore(),</span>
+<span class="fc" id="L107">                            result.subtreeAfter(),</span>
+<span class="fc" id="L108">                            result.expressionAfter()));</span>
+<span class="fc" id="L109">                } else {</span>
+                    // Each candidate is an independent logical match. Match rewriteAfter by
+                    // parameter value to correctly distinguish multiple realized moves of the
+                    // same kind (e.g. several cancellation-candidate or repeated-subexpression
+                    // moves at the same position).
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                    for (LocalCandidateMove candidate : enumeratorCandidates) {</span>
+<span class="fc" id="L115">                        CandidateMove move = candidate.move();</span>
+<span class="fc" id="L116">                        LocalRewriteApplier.LocalRewriteResult result = localRewriteApplier.apply(expression, pos, move);</span>
+<span class="fc" id="L117">                        matches.add(new RuleMatch(</span>
+<span class="fc" id="L118">                                move.enumeratorId(),</span>
+<span class="fc" id="L119">                                move.kind().name(),</span>
+<span class="fc" id="L120">                                bindings(result.bindings()),</span>
+<span class="fc" id="L121">                                result.subtreeBefore(),</span>
+<span class="fc" id="L122">                                result.subtreeAfter(),</span>
+<span class="fc" id="L123">                                result.subtreeBefore(),</span>
+<span class="fc" id="L124">                                result.subtreeAfter(),</span>
+<span class="fc" id="L125">                                result.expressionAfter()));</span>
+<span class="fc" id="L126">                    }</span>
+                }
+<span class="fc" id="L128">            }</span>
+<span class="fc" id="L129">            positions.add(new PositionResult(pos.pathKey(), pos.text(), matches));</span>
+<span class="fc" id="L130">        }</span>
+
+<span class="fc" id="L132">        return new RuleInspectionDto(expression, positions);</span>
+    }
+
+    private static List&lt;Binding&gt; bindings(List&lt;MoveParameter&gt; parameters) {
+<span class="fc" id="L136">        return parameters.stream()</span>
+<span class="fc" id="L137">                .map(parameter -&gt; new Binding(parameter.name(), parameter.value(), parameter.kind().name()))</span>
+<span class="fc" id="L138">                .toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

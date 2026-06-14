@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalRewriteApplier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.apply</a> &gt; <span class="el_source">LocalRewriteApplier.java</span></div><h1>LocalRewriteApplier.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.apply;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.moves.MoveCandidateTransformationEngine;
+import de.regelsuche.moves.MoveParameter;
+import de.regelsuche.moves.MoveRealizer;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
+import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Applies tree-local candidate moves to a full root expression.
+ *
+ * &lt;p&gt;The applier is intentionally framework-free: it depends only on the AST,
+ * move enumeration/realization infrastructure and parser/formatter. Internally
+ * it navigates and replaces subtrees by {@link TreePosition#path()}, while
+ * strings are used only at the parser/formatter boundary and in the returned
+ * {@link LocalRewriteResult}.&lt;/p&gt;
+ *
+ * &lt;p&gt;Two entry-point families are provided:
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;b&gt;String-based&lt;/b&gt; ({@code apply(String, ...)}) — parses the root
+ *       expression first, then delegates to the {@code Expr}-based path.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Expr-based&lt;/b&gt; ({@code apply(Expr, ...)}) — accepts an already-parsed
+ *       AST root and skips the parse step. Prefer this overload when the caller
+ *       already holds the parsed tree to avoid redundant round-trips through the
+ *       parser.&lt;/li&gt;
+ * &lt;/ul&gt;
+ * Both families return the same {@link LocalRewriteResult} record.&lt;/p&gt;
+ */
+public final class LocalRewriteApplier {
+
+    private final MoveRealizer realizer;
+    private final ExpressionParser parser;
+
+    public LocalRewriteApplier() {
+<span class="fc" id="L42">        this(new MoveRealizer(), new ExpressionParser());</span>
+<span class="fc" id="L43">    }</span>
+
+<span class="fc" id="L45">    public LocalRewriteApplier(MoveRealizer realizer, ExpressionParser parser) {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        this.realizer = realizer == null ? new MoveRealizer() : realizer;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        this.parser = parser == null ? new ExpressionParser() : parser;</span>
+<span class="fc" id="L48">    }</span>
+
+    // ── String-based entry points ─────────────────────────────────────────────
+
+    /**
+     * Applies a single candidate move to the subtree at {@code position} within
+     * {@code rootExpression}.
+     *
+     * @param rootExpression infix string for the full root expression
+     * @param position       subtree position to rewrite
+     * @param candidate      candidate move to apply
+     * @return rewrite result; check {@link LocalRewriteResult#success()} for outcome
+     */
+    public LocalRewriteResult apply(String rootExpression, TreePosition position, CandidateMove candidate) {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        return apply(rootExpression, position, candidate == null ? List.of() : List.of(candidate));</span>
+    }
+
+    /**
+     * Applies a group of candidate moves (representing a single logical match)
+     * to the subtree at {@code position} within {@code rootExpression}.
+     *
+     * @param rootExpression infix string for the full root expression
+     * @param position       subtree position to rewrite
+     * @param candidates     candidate moves belonging to one logical match
+     * @return rewrite result; check {@link LocalRewriteResult#success()} for outcome
+     */
+    public LocalRewriteResult apply(String rootExpression, TreePosition position, List&lt;CandidateMove&gt; candidates) {
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        List&lt;CandidateMove&gt; source = candidates == null ? List.of() : List.copyOf(candidates);</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">        if (rootExpression == null || rootExpression.isBlank()) {</span>
+<span class="nc" id="L77">            return failure(rootExpression, position, source, &quot;&quot;, &quot;root expression is blank&quot;);</span>
+        }
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (position == null) {</span>
+<span class="nc" id="L80">            return failure(rootExpression, null, source, &quot;&quot;, &quot;position is missing&quot;);</span>
+        }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (source.isEmpty()) {</span>
+<span class="nc" id="L83">            return failure(rootExpression, position, source, &quot;&quot;, &quot;candidate move is missing&quot;);</span>
+        }
+
+        Expr root;
+        try {
+<span class="fc" id="L88">            root = parser.parseTerm(rootExpression);</span>
+<span class="nc" id="L89">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L90">            return failure(rootExpression, position, source, &quot;&quot;, &quot;root expression is not parseable&quot;);</span>
+<span class="fc" id="L91">        }</span>
+
+<span class="fc" id="L93">        return applyToExpr(root, rootExpression, position, source);</span>
+    }
+
+    // ── Expr-based entry points ───────────────────────────────────────────────
+
+    /**
+     * Applies a single candidate move to the subtree at {@code position} within
+     * an already-parsed {@code root} AST.
+     *
+     * &lt;p&gt;Use this overload when the caller already holds a parsed {@link Expr} to
+     * avoid an unnecessary parse round-trip. The {@link LocalRewriteResult#originalExpression()}
+     * field is populated by formatting the provided root.&lt;/p&gt;
+     *
+     * @param root      already-parsed root expression
+     * @param position  subtree position to rewrite
+     * @param candidate candidate move to apply
+     * @return rewrite result; check {@link LocalRewriteResult#success()} for outcome
+     */
+    public LocalRewriteResult apply(Expr root, TreePosition position, CandidateMove candidate) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        return apply(root, position, candidate == null ? List.of() : List.of(candidate));</span>
+    }
+
+    /**
+     * Applies a group of candidate moves (representing a single logical match)
+     * to the subtree at {@code position} within an already-parsed {@code root} AST.
+     *
+     * @param root       already-parsed root expression
+     * @param position   subtree position to rewrite
+     * @param candidates candidate moves belonging to one logical match
+     * @return rewrite result; check {@link LocalRewriteResult#success()} for outcome
+     */
+    public LocalRewriteResult apply(Expr root, TreePosition position, List&lt;CandidateMove&gt; candidates) {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        List&lt;CandidateMove&gt; source = candidates == null ? List.of() : List.copyOf(candidates);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (root == null) {</span>
+<span class="fc" id="L127">            return failure(null, position, source, &quot;&quot;, &quot;root expression is missing&quot;);</span>
+        }
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (position == null) {</span>
+<span class="nc" id="L130">            return failure(ExpressionFormatter.format(root), null, source, &quot;&quot;, &quot;position is missing&quot;);</span>
+        }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (source.isEmpty()) {</span>
+<span class="nc" id="L133">            return failure(ExpressionFormatter.format(root), position, source, &quot;&quot;, &quot;candidate move is missing&quot;);</span>
+        }
+
+<span class="fc" id="L136">        String rootExpression = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L137">        return applyToExpr(root, rootExpression, position, source);</span>
+    }
+
+    // ── Core implementation ───────────────────────────────────────────────────
+
+    private LocalRewriteResult applyToExpr(
+            Expr root,
+            String rootExpression,
+            TreePosition position,
+            List&lt;CandidateMove&gt; source) {
+<span class="fc" id="L147">        Expr subtree = subtreeAt(root, position.path());</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (subtree == null) {</span>
+<span class="fc" id="L149">            return failure(rootExpression, position, source, &quot;&quot;, &quot;position is not present in expression&quot;);</span>
+        }
+<span class="fc" id="L151">        String subtreeBefore = ExpressionFormatter.format(subtree);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (!subtreeBefore.equals(position.text())) {</span>
+<span class="nc" id="L153">            return failure(rootExpression, position, source, subtreeBefore, &quot;position is stale&quot;);</span>
+        }
+
+<span class="fc" id="L156">        MoveCandidateTransformationEngine.MoveBackedTransformation realized = selectRealizedMove(subtreeBefore, source);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (realized == null) {</span>
+<span class="fc" id="L158">            return failure(rootExpression, position, source, subtreeBefore, &quot;candidate could not be realized&quot;);</span>
+        }
+
+<span class="fc" id="L161">        String subtreeAfter = realized.transformation().transformedExpression();</span>
+        Expr replacement;
+        try {
+<span class="fc" id="L164">            replacement = parser.parseTerm(subtreeAfter);</span>
+<span class="nc" id="L165">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L166">            return failure(rootExpression, position, source, subtreeBefore, &quot;realized subtree is not parseable&quot;);</span>
+<span class="fc" id="L167">        }</span>
+
+<span class="fc" id="L169">        Expr rewrittenRoot = replaceAt(root, position.path(), replacement);</span>
+<span class="fc" id="L170">        String expressionAfter = ExpressionFormatter.format(rewrittenRoot);</span>
+<span class="fc" id="L171">        CandidateMove first = source.getFirst();</span>
+<span class="fc" id="L172">        return new LocalRewriteResult(</span>
+                rootExpression,
+                position,
+                subtreeBefore,
+                subtreeAfter,
+                expressionAfter,
+<span class="fc" id="L178">                first.kind().name(),</span>
+<span class="fc" id="L179">                bindings(source),</span>
+                true,
+                &quot;&quot;);
+    }
+
+    private MoveCandidateTransformationEngine.MoveBackedTransformation selectRealizedMove(
+            String subtreeBefore,
+            List&lt;CandidateMove&gt; candidates) {
+<span class="fc" id="L187">        List&lt;MoveCandidateTransformationEngine.MoveBackedTransformation&gt; realized =</span>
+<span class="fc" id="L188">                realizer.realize(subtreeBefore, candidates);</span>
+<span class="fc" id="L189">        CandidateMove first = candidates.getFirst();</span>
+<span class="fc" id="L190">        List&lt;String&gt; values = candidates.stream()</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                .filter(candidate -&gt; candidate.parameter() != null)</span>
+<span class="fc" id="L192">                .map(candidate -&gt; candidate.parameter().value())</span>
+<span class="fc" id="L193">                .toList();</span>
+<span class="fc" id="L194">        return realized.stream()</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                .filter(candidate -&gt; candidate.move().kind() == first.kind())</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                .filter(candidate -&gt; values.isEmpty()</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                        || values.stream().allMatch(value -&gt; candidate.move().parameters().stream()</span>
+<span class="fc" id="L198">                                .anyMatch(parameter -&gt; value.equals(parameter.value()))))</span>
+<span class="fc" id="L199">                .findFirst()</span>
+<span class="fc" id="L200">                .orElse(null);</span>
+    }
+
+    private static Expr subtreeAt(Expr expr, List&lt;Integer&gt; path) {
+<span class="fc" id="L204">        Expr current = expr;</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (int index : path) {</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            if (current instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L207" title="1 of 3 branches missed.">                current = switch (index) {</span>
+<span class="fc" id="L208">                    case 0 -&gt; binary.left();</span>
+<span class="fc" id="L209">                    case 1 -&gt; binary.right();</span>
+<span class="pc" id="L210">                    default -&gt; null;</span>
+                };
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            } else if (current instanceof FunctionExpr function) {</span>
+<span class="pc bpc" id="L213" title="1 of 4 branches missed.">                current = index &gt;= 0 &amp;&amp; index &lt; function.arguments().size()</span>
+<span class="fc" id="L214">                        ? function.arguments().get(index)</span>
+<span class="fc" id="L215">                        : null;</span>
+            } else {
+<span class="nc" id="L217">                return null;</span>
+            }
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (current == null) {</span>
+<span class="fc" id="L220">                return null;</span>
+            }
+<span class="fc" id="L222">        }</span>
+<span class="fc" id="L223">        return current;</span>
+    }
+
+    private static Expr replaceAt(Expr expr, List&lt;Integer&gt; path, Expr replacement) {
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L228">            return replacement;</span>
+        }
+<span class="fc" id="L230">        int index = path.getFirst();</span>
+<span class="fc" id="L231">        List&lt;Integer&gt; tail = path.subList(1, path.size());</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L233" title="1 of 3 branches missed.">            return switch (index) {</span>
+<span class="fc" id="L234">                case 0 -&gt; new BinaryExpr(replaceAt(binary.left(), tail, replacement), binary.operator(), binary.right());</span>
+<span class="fc" id="L235">                case 1 -&gt; new BinaryExpr(binary.left(), binary.operator(), replaceAt(binary.right(), tail, replacement));</span>
+<span class="nc" id="L236">                default -&gt; throw new IllegalArgumentException(&quot;invalid binary path index: &quot; + index);</span>
+            };
+        }
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (expr instanceof FunctionExpr function) {</span>
+<span class="fc" id="L240">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="fc" id="L241">            arguments.set(index, replaceAt(arguments.get(index), tail, replacement));</span>
+<span class="fc" id="L242">            return new FunctionExpr(function.name(), arguments);</span>
+        }
+<span class="nc" id="L244">        throw new IllegalArgumentException(&quot;path descends into a leaf expression&quot;);</span>
+    }
+
+    private static List&lt;MoveParameter&gt; bindings(List&lt;CandidateMove&gt; candidates) {
+<span class="fc" id="L248">        return candidates.stream()</span>
+<span class="fc" id="L249">                .map(CandidateMove::parameter)</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                .filter(parameter -&gt; parameter != null)</span>
+<span class="fc" id="L251">                .toList();</span>
+    }
+
+    private static LocalRewriteResult failure(
+            String rootExpression,
+            TreePosition position,
+            List&lt;CandidateMove&gt; candidates,
+            String subtreeBefore,
+            String reason) {
+<span class="pc bpc" id="L260" title="2 of 4 branches missed.">        CandidateMove first = candidates == null || candidates.isEmpty() ? null : candidates.getFirst();</span>
+<span class="fc" id="L261">        return new LocalRewriteResult(</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                rootExpression == null ? &quot;&quot; : rootExpression,</span>
+                position,
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">                subtreeBefore == null ? &quot;&quot; : subtreeBefore,</span>
+                null,
+                null,
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                first == null ? &quot;&quot; : first.kind().name(),</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                candidates == null ? List.of() : bindings(candidates),</span>
+                false,
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">                reason == null ? &quot;&quot; : reason);</span>
+    }
+
+    /**
+     * The result of a local rewrite attempt.
+     *
+     * @param originalExpression the root expression before rewriting (infix string)
+     * @param position           the subtree position that was targeted
+     * @param subtreeBefore      the subtree text before applying the rule
+     * @param subtreeAfter       the subtree text after applying the rule
+     *                           ({@code null} when the rewrite failed)
+     * @param expressionAfter    the full root expression after the local rewrite
+     *                           ({@code null} when the rewrite failed)
+     * @param kind               move kind name (e.g. {@code &quot;COMPLETE_SQUARE&quot;})
+     * @param bindings           parameter name→value pairs extracted by the enumerator
+     * @param success            {@code true} iff the rewrite was applied successfully
+     * @param failureReason      human-readable reason string; empty when successful
+     */
+    public record LocalRewriteResult(
+            String originalExpression,
+            TreePosition position,
+            String subtreeBefore,
+            String subtreeAfter,
+            String expressionAfter,
+            String kind,
+            List&lt;MoveParameter&gt; bindings,
+            boolean success,
+            String failureReason) {
+
+<span class="fc" id="L299">        public LocalRewriteResult {</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            originalExpression = originalExpression == null ? &quot;&quot; : originalExpression;</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            subtreeBefore = subtreeBefore == null ? &quot;&quot; : subtreeBefore;</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            kind = kind == null ? &quot;&quot; : kind;</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            bindings = bindings == null ? List.of() : List.copyOf(bindings);</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;&quot; : failureReason;</span>
+<span class="fc" id="L305">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
