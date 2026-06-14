@@ -1,5 +1,6 @@
 package de.regelsuche.moves.enumerate;
 
+import de.regelsuche.ast.Expr;
 import de.regelsuche.moves.MoveOrdinal;
 import de.regelsuche.moves.MoveParameter;
 import de.regelsuche.moves.RewriteMoveKind;
@@ -41,6 +42,31 @@ public final class Depth1MoveEnumerator {
             RewriteMoveKind kind = kindFor(enumerator.id());
             int occurrence = 0;
             for (MoveParameter parameter : enumerator.enumerate(expression)) {
+                candidates.add(new CandidateMove(
+                        enumerator.id(),
+                        kind,
+                        parameter,
+                        MoveOrdinal.of(kind, occurrence, List.of(parameter))));
+                occurrence++;
+            }
+        }
+        candidates.sort(CandidateMove.CANONICAL_ORDER);
+        return List.copyOf(candidates);
+    }
+
+    /**
+     * Enumerates candidate moves directly from an already-parsed {@link Expr} node,
+     * avoiding a re-parse of each subtree's text form.
+     *
+     * @param root the already-parsed expression node
+     * @return a deterministically ordered list of candidate moves
+     */
+    public List<CandidateMove> enumerate(Expr root) {
+        List<CandidateMove> candidates = new ArrayList<>();
+        for (ParameterEnumerator enumerator : enumerators) {
+            RewriteMoveKind kind = kindFor(enumerator.id());
+            int occurrence = 0;
+            for (MoveParameter parameter : enumerator.enumerate(root)) {
                 candidates.add(new CandidateMove(
                         enumerator.id(),
                         kind,

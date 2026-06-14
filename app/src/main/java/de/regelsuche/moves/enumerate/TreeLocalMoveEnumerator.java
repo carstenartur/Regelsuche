@@ -46,7 +46,7 @@ public final class TreeLocalMoveEnumerator {
         for (PositionedExpr positioned : MoveExpressions.positionedSubexpressions(root)) {
             String text = MoveExpressions.format(positioned.expr());
             TreePosition position = new TreePosition(positioned.path(), text);
-            for (CandidateMove move : delegate.enumerate(text)) {
+            for (CandidateMove move : delegate.enumerate(positioned.expr())) {
                 candidates.add(new LocalCandidateMove(position, move));
             }
         }

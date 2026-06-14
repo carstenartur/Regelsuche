@@ -37,10 +37,15 @@ public final class CancellationCandidateEnumerator implements ParameterEnumerato
                 // Fall back to the term-only parser below.
             }
         }
-        return MoveExpressions.parse(expression).map(this::enumerate).orElseGet(List::of);
+        return MoveExpressions.parse(expression).map(this::fromExpr).orElseGet(List::of);
     }
 
-    private List<MoveParameter> enumerate(Expr root) {
+    @Override
+    public List<MoveParameter> enumerate(Expr expr) {
+        return fromExpr(expr);
+    }
+
+    private List<MoveParameter> fromExpr(Expr root) {
         List<SignedTerm> terms = new ArrayList<>();
         flatten(root, true, terms);
         return parametersForTerms(terms);

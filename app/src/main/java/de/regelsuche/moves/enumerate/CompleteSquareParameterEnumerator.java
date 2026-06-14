@@ -33,11 +33,16 @@ public final class CompleteSquareParameterEnumerator implements ParameterEnumera
     @Override
     public List<MoveParameter> enumerate(String expression) {
         return MoveExpressions.parse(expression)
-                .flatMap(this::enumerate)
+                .flatMap(this::fromExpr)
                 .orElseGet(List::of);
     }
 
-    private Optional<List<MoveParameter>> enumerate(Expr root) {
+    @Override
+    public List<MoveParameter> enumerate(Expr expr) {
+        return fromExpr(expr).orElseGet(List::of);
+    }
+
+    private Optional<List<MoveParameter>> fromExpr(Expr root) {
         Set<String> variables = new LinkedHashSet<>();
         collectVariables(root, variables);
         if (variables.size() != 1) {
