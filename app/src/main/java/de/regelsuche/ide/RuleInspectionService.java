@@ -68,35 +68,92 @@ public final class RuleInspectionService {
                     realizer.realize(pos.text(), moves);
 
             List<RuleMatch> matches = new ArrayList<>();
+
+            // Group candidates by enumeratorId: complete-square emits shift + residue as
+            // two separate CandidateMoves that belong to one logical match; all other
+            // enumerators emit one CandidateMove per independent logical match.
+            Map<String, List<LocalCandidateMove>> byEnumerator = new LinkedHashMap<>();
             for (LocalCandidateMove candidate : atPosition) {
-                CandidateMove move = candidate.move();
-                List<Binding> bindings = move.parameter() == null
-                        ? List.of()
-                        : List.of(new Binding(
-                                move.parameter().name(),
-                                move.parameter().value(),
-                                move.parameter().kind().name()));
+                byEnumerator.computeIfAbsent(candidate.move().enumeratorId(), id -> new ArrayList<>())
+                        .add(candidate);
+            }
 
-                // Find a realized rewrite for this candidate kind.
-                // MoveRealizer rebuilds its own ordinals from the aggregated parameters,
-                // so matching by move kind (which is stable across both paths) is more
-                // reliable than comparing ordinals directly.
-                String rewriteAfter = realized.stream()
-                        .filter(r -> r.move().kind() == move.kind())
-                        .map(r -> r.transformation().transformedExpression())
-                        .findFirst()
-                        .orElse(null);
+            for (Map.Entry<String, List<LocalCandidateMove>> enumeratorEntry : byEnumerator.entrySet()) {
+                String enumeratorId = enumeratorEntry.getKey();
+                List<LocalCandidateMove> enumeratorCandidates = enumeratorEntry.getValue();
+                CandidateMove first = enumeratorCandidates.get(0).move();
 
-                matches.add(new RuleMatch(
-                        move.enumeratorId(),
-                        move.kind().name(),
-                        bindings,
-                        pos.text(),
-                        rewriteAfter));
+                if ("complete-square".equals(enumeratorId)) {
+                    // Collapse all complete-square parameters into one RuleMatch so that
+                    // both shift and residue appear together as a single logical match.
+                    List<Binding> bindings = enumeratorCandidates.stream()
+                            .filter(c -> c.move().parameter() != null)
+                            .map(c -> new Binding(
+                                    c.move().parameter().name(),
+                                    c.move().parameter().value(),
+                                    c.move().parameter().kind().name()))
+                            .toList();
+                    String rewriteAfter = realized.stream()
+                            .filter(r -> r.move().kind() == first.kind())
+                            .map(r -> r.transformation().transformedExpression())
+                            .findFirst()
+                            .orElse(null);
+                    matches.add(new RuleMatch(
+                            enumeratorId, first.kind().name(), bindings, pos.text(), rewriteAfter));
+                } else {
+                    // Each candidate is an independent logical match. Match rewriteAfter by
+                    // parameter value to correctly distinguish multiple realized moves of the
+                    // same kind (e.g. several cancellation-candidate or repeated-subexpression
+                    // moves at the same position).
+                    for (LocalCandidateMove candidate : enumeratorCandidates) {
+                        CandidateMove move = candidate.move();
+                        List<Binding> bindings = move.parameter() == null
+                                ? List.of()
+                                : List.of(new Binding(
+                                        move.parameter().name(),
+                                        move.parameter().value(),
+                                        move.parameter().kind().name()));
+                        String rewriteAfter = findRewriteAfter(realized, move);
+                        matches.add(new RuleMatch(
+                                move.enumeratorId(),
+                                move.kind().name(),
+                                bindings,
+                                pos.text(),
+                                rewriteAfter));
+                    }
+                }
             }
             positions.add(new PositionResult(pos.pathKey(), pos.text(), matches));
         }
 
         return new RuleInspectionDto(expression, positions);
+    }
+
+    /**
+     * Finds the {@code transformedExpression} for the realized move that corresponds
+     * to {@code candidate}.
+     *
+     * <p>When the candidate carries a parameter, the match is narrowed by parameter
+     * value so that multiple realized moves of the same kind (e.g. two distinct
+     * {@code cancellation-candidate} moves) are correctly distinguished.  When no
+     * parameter is present, a kind-only match is used as a fallback.</p>
+     */
+    private static String findRewriteAfter(
+            List<MoveCandidateTransformationEngine.MoveBackedTransformation> realized,
+            CandidateMove candidate) {
+        if (candidate.parameter() == null) {
+            return realized.stream()
+                    .filter(r -> r.move().kind() == candidate.kind())
+                    .map(r -> r.transformation().transformedExpression())
+                    .findFirst()
+                    .orElse(null);
+        }
+        String value = candidate.parameter().value();
+        return realized.stream()
+                .filter(r -> r.move().kind() == candidate.kind())
+                .filter(r -> r.move().parameters().stream().anyMatch(p -> value.equals(p.value())))
+                .map(r -> r.transformation().transformedExpression())
+                .findFirst()
+                .orElse(null);
     }
 }

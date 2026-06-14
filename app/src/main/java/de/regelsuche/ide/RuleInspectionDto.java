@@ -56,7 +56,6 @@ public record RuleInspectionDto(
         public RuleMatch {
             bindings = bindings == null ? List.of() : List.copyOf(bindings);
             rewriteBefore = rewriteBefore == null ? "" : rewriteBefore;
-            rewriteAfter = rewriteAfter == null ? "" : rewriteAfter;
         }
     }
 
