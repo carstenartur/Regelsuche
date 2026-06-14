@@ -22,11 +22,16 @@ public final class SubtermParameterEnumerator implements ParameterEnumerator {
     @Override
     public List<MoveParameter> enumerate(String expression) {
         return MoveExpressions.parse(expression)
-                .map(this::enumerate)
+                .map(this::fromExpr)
                 .orElseGet(List::of);
     }
 
-    private List<MoveParameter> enumerate(Expr root) {
+    @Override
+    public List<MoveParameter> enumerate(Expr expr) {
+        return fromExpr(expr);
+    }
+
+    private List<MoveParameter> fromExpr(Expr root) {
         Map<String, MoveParameter> distinct = new LinkedHashMap<>();
         for (Expr node : MoveExpressions.subexpressions(root)) {
             String text = MoveExpressions.format(node);

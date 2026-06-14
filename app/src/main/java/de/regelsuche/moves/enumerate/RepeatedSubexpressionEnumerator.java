@@ -23,11 +23,16 @@ public final class RepeatedSubexpressionEnumerator implements ParameterEnumerato
     @Override
     public List<MoveParameter> enumerate(String expression) {
         return MoveExpressions.parse(expression)
-                .map(this::enumerate)
+                .map(this::fromExpr)
                 .orElseGet(List::of);
     }
 
-    private List<MoveParameter> enumerate(Expr root) {
+    @Override
+    public List<MoveParameter> enumerate(Expr root) {
+        return fromExpr(root);
+    }
+
+    private List<MoveParameter> fromExpr(Expr root) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (Expr node : MoveExpressions.subexpressions(root)) {
             if (!isInteresting(node)) {
