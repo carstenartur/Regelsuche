@@ -1350,6 +1350,10 @@ public class WebWorkbenchServer {
      *   <li>{@code GET /api/inspect/tree?expression=...} — returns all
      *       tree-position grouped rule matches for the given expression,
      *       including bindings and rewrite previews.</li>
+     *   <li>{@code POST /api/inspect/tree/apply} — applies a selected match
+     *       identified by {@code expression}, {@code pathKey}, and
+     *       {@code matchIndex}, then returns the rewritten expression plus a
+     *       refreshed inspection model.</li>
      * </ul>
      */
     private void handleInspect(HttpExchange exchange) throws IOException {

@@ -89,9 +89,11 @@ class RuleInspectApiTest {
         String body = postJson("/api/inspect/tree/apply", """
                 {"expression":"sin(x^2 + 6*x + 5)","pathKey":"000","matchIndex":%d}
                 """.formatted(completeSquareIndex));
-        assertTrue(body.contains("\"expressionAfter\""), body);
-        assertTrue(body.contains("sin((x + 3) ^ 2 - 4)"), body);
-        assertTrue(body.contains("\"inspection\""), body);
+        Map<String, Object> applyJson = new JsonReader(body).readObject();
+        assertEquals("sin((x + 3) ^ 2 - 4)", applyJson.get("expressionAfter"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> refreshedInspection = (Map<String, Object>) applyJson.get("inspection");
+        assertEquals("sin((x + 3) ^ 2 - 4)", refreshedInspection.get("expression"));
     }
 
     @Test

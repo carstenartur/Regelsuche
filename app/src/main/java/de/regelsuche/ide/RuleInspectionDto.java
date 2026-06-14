@@ -25,6 +25,7 @@ public record RuleInspectionDto(
      *                   dot-separated zero-padded indices, e.g. {@code "000.001"})
      * @param subtree    infix text of the subtree at this position
      * @param matches    every rule candidate that fired at this position
+     * @param selected   whether this position is currently selected in the UI
      */
     public record PositionResult(
             String pathKey,
@@ -56,6 +57,7 @@ public record RuleInspectionDto(
      * @param subtreeBefore  the subtree text before applying the rule
      * @param subtreeAfter   the subtree text after applying the rule
      * @param expressionAfter the full expression after applying the local rewrite
+     * @param applicable    whether this match can currently be applied
      */
     public record RuleMatch(
             String enumeratorId,
