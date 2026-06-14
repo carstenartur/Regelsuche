@@ -95,7 +95,9 @@ class RuleInspectApiTest {
         HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
-        conn.getOutputStream().write("{}".getBytes(StandardCharsets.UTF_8));
+        try (var out = conn.getOutputStream()) {
+            out.write("{}".getBytes(StandardCharsets.UTF_8));
+        }
         assertEquals(405, conn.getResponseCode());
     }
 
@@ -104,7 +106,9 @@ class RuleInspectApiTest {
     private String get(String path) throws IOException {
         HttpURLConnection conn = openGet(path);
         assertEquals(200, conn.getResponseCode(), () -> "expected 200 from " + path);
-        return new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        try (var in = conn.getInputStream()) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private HttpURLConnection openGet(String path) throws IOException {
