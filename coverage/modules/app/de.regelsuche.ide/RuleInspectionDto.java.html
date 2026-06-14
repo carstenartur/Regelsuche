@@ -25,20 +25,30 @@ public record RuleInspectionDto(
      *                   dot-separated zero-padded indices, e.g. {@code &quot;000.001&quot;})
      * @param subtree    infix text of the subtree at this position
      * @param matches    every rule candidate that fired at this position
+     * @param selected   whether this position is currently selected in the UI
      */
     public record PositionResult(
             String pathKey,
             String subtree,
-            List&lt;RuleMatch&gt; matches) {
+            List&lt;RuleMatch&gt; matches,
+            boolean selected) {
 
-<span class="fc" id="L34">        public PositionResult {</span>
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            matches = matches == null ? List.of() : List.copyOf(matches);</span>
-<span class="fc" id="L36">        }</span>
+<span class="fc" id="L36">        public PositionResult {</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            matches = matches == null ? List.of() : List.copyOf(matches);</span>
+<span class="fc" id="L38">        }</span>
+
+        public PositionResult(
+                String pathKey,
+                String subtree,
+                List&lt;RuleMatch&gt; matches) {
+<span class="nc" id="L44">            this(pathKey, subtree, matches, false);</span>
+<span class="nc" id="L45">        }</span>
     }
 
     /**
      * A single rule match including bindings and rewrite preview.
      *
+     * @param matchId        stable identifier for this logical match within the inspection result
      * @param enumeratorId   id of the parameter enumerator that produced the match
      * @param kind           human-readable move kind (e.g. {@code &quot;COMPLETE_SQUARE&quot;})
      * @param bindings       parameter name→value pairs extracted by the enumerator
@@ -48,8 +58,10 @@ public record RuleInspectionDto(
      * @param subtreeBefore  the subtree text before applying the rule
      * @param subtreeAfter   the subtree text after applying the rule
      * @param expressionAfter the full expression after applying the local rewrite
+     * @param applicable    whether this match can currently be applied
      */
     public record RuleMatch(
+            String matchId,
             String enumeratorId,
             String kind,
             List&lt;Binding&gt; bindings,
@@ -57,15 +69,19 @@ public record RuleInspectionDto(
             String rewriteAfter,
             String subtreeBefore,
             String subtreeAfter,
-            String expressionAfter) {
+            String expressionAfter,
+            boolean applicable) {
 
-<span class="fc" id="L62">        public RuleMatch {</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            bindings = bindings == null ? List.of() : List.copyOf(bindings);</span>
-<span class="pc bpc" id="L64" title="3 of 4 branches missed.">            subtreeBefore = subtreeBefore == null ? (rewriteBefore == null ? &quot;&quot; : rewriteBefore) : subtreeBefore;</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">            subtreeAfter = subtreeAfter == null ? rewriteAfter : subtreeAfter;</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            rewriteBefore = rewriteBefore == null ? subtreeBefore : rewriteBefore;</span>
-<span class="fc bfc" id="L67" title="All 2 branches covered.">            rewriteAfter = rewriteAfter == null ? subtreeAfter : rewriteAfter;</span>
-<span class="fc" id="L68">        }</span>
+<span class="fc" id="L75">        public RuleMatch {</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            matchId = matchId == null ? &quot;&quot; : matchId;</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            bindings = bindings == null ? List.of() : List.copyOf(bindings);</span>
+<span class="pc bpc" id="L78" title="3 of 4 branches missed.">            subtreeBefore = subtreeBefore == null ? (rewriteBefore == null ? &quot;&quot; : rewriteBefore) : subtreeBefore;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            subtreeAfter = subtreeAfter == null ? rewriteAfter : subtreeAfter;</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            rewriteBefore = rewriteBefore == null ? subtreeBefore : rewriteBefore;</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            rewriteAfter = rewriteAfter == null ? subtreeAfter : rewriteAfter;</span>
+<span class="pc bpc" id="L82" title="4 of 8 branches missed.">            applicable = applicable || (expressionAfter != null &amp;&amp; !expressionAfter.isBlank())</span>
+<span class="pc bnc" id="L83" title="All 2 branches missed.">                    || (subtreeAfter != null &amp;&amp; !subtreeAfter.isBlank());</span>
+<span class="fc" id="L84">        }</span>
 
         public RuleMatch(
                 String enumeratorId,
@@ -73,8 +89,20 @@ public record RuleInspectionDto(
                 List&lt;Binding&gt; bindings,
                 String rewriteBefore,
                 String rewriteAfter) {
-<span class="nc" id="L76">            this(enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, rewriteBefore, rewriteAfter, null);</span>
-<span class="nc" id="L77">        }</span>
+<span class="nc" id="L92">            this(&quot;&quot;, enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, rewriteBefore, rewriteAfter, null, false);</span>
+<span class="nc" id="L93">        }</span>
+
+        public RuleMatch(
+                String enumeratorId,
+                String kind,
+                List&lt;Binding&gt; bindings,
+                String rewriteBefore,
+                String rewriteAfter,
+                String subtreeBefore,
+                String subtreeAfter,
+                String expressionAfter) {
+<span class="nc" id="L104">            this(&quot;&quot;, enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, subtreeBefore, subtreeAfter, expressionAfter, false);</span>
+<span class="nc" id="L105">        }</span>
     }
 
     /**
@@ -85,11 +113,11 @@ public record RuleInspectionDto(
      * @param kind  parameter classification
      */
     public record Binding(String name, String value, String kind) {
-<span class="fc" id="L88">        public Binding {</span>
-<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            name = name == null ? &quot;&quot; : name;</span>
-<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            value = value == null ? &quot;&quot; : value;</span>
-<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            kind = kind == null ? &quot;&quot; : kind;</span>
-<span class="fc" id="L92">        }</span>
+<span class="fc" id="L116">        public Binding {</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            name = name == null ? &quot;&quot; : name;</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            value = value == null ? &quot;&quot; : value;</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            kind = kind == null ? &quot;&quot; : kind;</span>
+<span class="fc" id="L120">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
