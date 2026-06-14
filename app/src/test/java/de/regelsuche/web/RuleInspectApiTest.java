@@ -6,10 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.json.JsonReader;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,9 +67,28 @@ class RuleInspectApiTest {
 
     @Test
     void applyEndpointReturnsUpdatedExpressionAndInspection() throws IOException {
+        String inspect = get("/api/inspect/tree?expression=sin(x%5E2+%2B+6*x+%2B+5)");
+        Map<String, Object> inspectJson = new JsonReader(inspect).readObject();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> positions = (List<Map<String, Object>>) inspectJson.get("positions");
+        Map<String, Object> selectedPosition = positions.stream()
+                .filter(p -> "000".equals(String.valueOf(p.get("pathKey"))))
+                .findFirst()
+                .orElseThrow();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> matches = (List<Map<String, Object>>) selectedPosition.get("matches");
+        int completeSquareIndex = -1;
+        for (int i = 0; i < matches.size(); i++) {
+            if ("COMPLETE_SQUARE".equals(String.valueOf(matches.get(i).get("kind")))) {
+                completeSquareIndex = i;
+                break;
+            }
+        }
+        assertTrue(completeSquareIndex >= 0, "COMPLETE_SQUARE match expected");
+
         String body = postJson("/api/inspect/tree/apply", """
-                {"expression":"sin(x^2 + 6*x + 5)","pathKey":"000","matchIndex":0}
-                """);
+                {"expression":"sin(x^2 + 6*x + 5)","pathKey":"000","matchIndex":%d}
+                """.formatted(completeSquareIndex));
         assertTrue(body.contains("\"expressionAfter\""), body);
         assertTrue(body.contains("sin((x + 3) ^ 2 - 4)"), body);
         assertTrue(body.contains("\"inspection\""), body);
