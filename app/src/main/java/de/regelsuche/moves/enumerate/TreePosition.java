@@ -11,6 +11,27 @@ import java.util.stream.Collectors;
  * <p>An empty {@code path} denotes the whole expression (the root). Child paths
  * use {@code 0}/{@code 1} for the left/right operands of a binary node and the
  * argument index for a function node, so the path is reproducible across runs.</p>
+ *
+ * <h3>Why does {@code TreePosition} carry {@code text}?</h3>
+ * <p>The {@code text} field serves as a <em>staleness guard</em>: when a
+ * {@code TreePosition} is created from an enumeration result and later handed
+ * back to {@link de.regelsuche.moves.apply.LocalRewriteApplier}, the applier
+ * compares {@code text} against the formatted subtree it finds at {@code path}
+ * in the live expression. If they differ (e.g. the expression was edited between
+ * enumeration and application), the rewrite is rejected with a {@code "position
+ * is stale"} failure rather than silently rewriting the wrong subtree.</p>
+ *
+ * <p>Carrying text also makes positions self-describing for display in the Rule
+ * Authoring IDE and for JSON serialisation: a client receives a
+ * {@link de.regelsuche.ide.RuleInspectionDto.PositionResult} and can render the
+ * subtree label without an additional tree-walk.</p>
+ *
+ * <h3>Should {@code text} remain here long-term?</h3>
+ * <p>The coupling is intentional and should stay. Alternatives (e.g. a separate
+ * snapshot field, or a version counter) are more complex and offer no practical
+ * advantage given that the text is cheap to produce at enumeration time and small
+ * relative to the position record as a whole. If the formatter ever becomes
+ * expensive, caching at the call site is preferable to removing the guard.</p>
  */
 public record TreePosition(List<Integer> path, String text) implements Comparable<TreePosition> {
 

@@ -2347,3 +2347,145 @@
         }
     });
 })();
+
+// ─────────── Rule-IDE: tree-local rule inspection ───────────
+(() => {
+    function $(id) { return document.getElementById(id); }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    let inspectData = null;
+
+    function runInspect(expression) {
+        const statusEl = $('inspectStatus');
+        const resultEl = $('inspectResult');
+        const matchPanel = $('inspectMatchPanel');
+        if (!statusEl || !resultEl) { return; }
+        statusEl.textContent = 'Lade …';
+        resultEl.style.display = 'none';
+        if (matchPanel) { matchPanel.style.display = 'none'; }
+
+        fetch('/api/inspect/tree?expression=' + encodeURIComponent(expression))
+            .then((r) => r.ok ? r.json() : r.text().then((t) => Promise.reject(t)))
+            .then((json) => {
+                inspectData = json;
+                statusEl.textContent = '';
+                renderPositionList(json);
+                resultEl.style.display = '';
+            })
+            .catch((err) => {
+                statusEl.textContent = 'Fehler: ' + String(err);
+            });
+    }
+
+    function renderPositionList(json) {
+        const listEl = $('inspectPositionList');
+        if (!listEl) { return; }
+        if (!json.positions || json.positions.length === 0) {
+            listEl.innerHTML = '<p class="hint">Keine Regelmatches gefunden.</p>';
+            return;
+        }
+        const ul = document.createElement('ul');
+        ul.className = 'inspect-positions';
+        json.positions.forEach((pos, idx) => {
+            const li = document.createElement('li');
+            const matchCount = pos.matches ? pos.matches.length : 0;
+            li.innerHTML = '<button class="inspect-pos-btn" data-idx="' + idx + '">'
+                + '<code>' + escapeHtml(pos.pathKey) + '</code>'
+                + ' — <em>' + escapeHtml(pos.subtree) + '</em>'
+                + ' <span class="badge">' + matchCount + ' Match' + (matchCount === 1 ? '' : 'es') + '</span>'
+                + '</button>';
+            ul.appendChild(li);
+        });
+        listEl.innerHTML = '';
+        listEl.appendChild(ul);
+
+        listEl.querySelectorAll('.inspect-pos-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.idx, 10);
+                renderMatchPanel(json.positions[idx]);
+            });
+        });
+    }
+
+    function renderMatchPanel(pos) {
+        const panel = $('inspectMatchPanel');
+        const selectedPos = $('inspectSelectedPosition');
+        const selectedSubtree = $('inspectSelectedSubtree');
+        const matchList = $('inspectMatchList');
+        if (!panel || !matchList) { return; }
+
+        if (selectedPos) { selectedPos.textContent = pos.pathKey; }
+        if (selectedSubtree) { selectedSubtree.textContent = pos.subtree; }
+
+        if (!pos.matches || pos.matches.length === 0) {
+            matchList.innerHTML = '<p class="hint">Keine Regelmatches an dieser Position.</p>';
+        } else {
+            let html = '';
+            pos.matches.forEach((match) => {
+                html += '<div class="inspect-match">';
+                html += '<div class="inspect-match-header">'
+                    + '<span class="badge-kind">' + escapeHtml(match.kind) + '</span>'
+                    + ' <code class="inspect-enumerator">' + escapeHtml(match.enumeratorId) + '</code>'
+                    + '</div>';
+
+                // Rewrite preview
+                const subtreeBefore = match.subtreeBefore || match.rewriteBefore;
+                const subtreeAfter = match.subtreeAfter || match.rewriteAfter;
+                if (subtreeAfter) {
+                    html += '<div class="inspect-rewrite">'
+                        + '<span class="inspect-rewrite-label">Teilbaum vorher:</span> <code>' + escapeHtml(subtreeBefore) + '</code>'
+                        + ' → '
+                        + '<span class="inspect-rewrite-label">Teilbaum nachher:</span> <code>' + escapeHtml(subtreeAfter) + '</code>'
+                        + '</div>';
+                    if (match.expressionAfter) {
+                        html += '<div class="inspect-rewrite inspect-expression-after">'
+                            + '<span class="inspect-rewrite-label">Gesamtausdruck nachher:</span> '
+                            + '<code>' + escapeHtml(match.expressionAfter) + '</code>'
+                            + '</div>';
+                    }
+                } else {
+                    html += '<div class="inspect-rewrite hint">Kein konkreter Rewrite verfügbar.</div>';
+                }
+
+                // Bindings
+                if (match.bindings && match.bindings.length > 0) {
+                    html += '<table class="inspect-bindings"><thead><tr>'
+                        + '<th>Name</th><th>Wert</th><th>Typ</th>'
+                        + '</tr></thead><tbody>';
+                    match.bindings.forEach((b) => {
+                        html += '<tr>'
+                            + '<td><code>' + escapeHtml(b.name) + '</code></td>'
+                            + '<td><code>' + escapeHtml(b.value) + '</code></td>'
+                            + '<td>' + escapeHtml(b.kind) + '</td>'
+                            + '</tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+
+                html += '</div>';
+            });
+            matchList.innerHTML = html;
+        }
+
+        panel.style.display = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = $('inspectForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const exprEl = $('inspectExpression');
+                const expression = exprEl ? exprEl.value.trim() : '';
+                if (expression) { runInspect(expression); }
+            });
+        }
+    });
+})();

@@ -30,6 +30,7 @@
         <button class="tab" data-tab="proofJobs">Proof-Jobs</button>
         <button class="tab" data-tab="exports">Exporte</button>
         <button class="tab" data-tab="didaktik">Didaktik</button>
+        <button class="tab" data-tab="ruleIde">Rule-IDE</button>
         <button class="tab" data-tab="help">Hilfe</button>
     </nav>
 </header>
@@ -508,6 +509,34 @@
         </div>
     </section>
 
+    <!-- ─────────── Rule-IDE tab ─────────── -->
+    <section id="tab-ruleIde" class="tab-panel">
+        <h2>Rule-IDE – Baumbasierte Regelinspektion</h2>
+        <div class="card">
+            <form id="inspectForm">
+                <label class="field">
+                    <span>Ausdruck</span>
+                    <input type="text" id="inspectExpression" value="sin(x^2 + 6*x + 5)"
+                           placeholder="z.B. sin(x^2 + 6*x + 5), x^2 + 6*x + 5">
+                </label>
+                <button type="submit">Bauminspektion starten</button>
+            </form>
+        </div>
+        <div id="inspectStatus" class="status"></div>
+        <div id="inspectResult" style="display:none;">
+            <div class="card">
+                <h3>Baumposition auswählen</h3>
+                <p class="hint">Wähle eine Position, um die Regelmatches und Bindings für diesen Teilbaum zu sehen.</p>
+                <div id="inspectPositionList" class="inspect-position-list"></div>
+            </div>
+            <div id="inspectMatchPanel" class="card" style="display:none;">
+                <h3>Regelmatches für Position: <code id="inspectSelectedPosition"></code></h3>
+                <p>Teilbaum: <strong id="inspectSelectedSubtree"></strong></p>
+                <div id="inspectMatchList"></div>
+            </div>
+        </div>
+    </section>
+
     <!-- ─────────── Help tab ─────────── -->
     <section id="tab-help" class="tab-panel">
         <div class="card help">
@@ -529,6 +558,7 @@
                     (inkl. <em>Assumptions</em>).</li>
                 <li>Im Tab <strong>Inventar</strong> wiederverwendbare Regeln aktivieren/deaktivieren/taggen.</li>
                 <li>Im Tab <strong>Exporte</strong> Bundles für Doku oder Proof-Bridge herunterladen.</li>
+                <li>Im Tab <strong>Rule-IDE</strong> Regelmatches baumlokal visualisieren und Rewrites vorab prüfen.</li>
             </ol>
         </div>
     </section>
