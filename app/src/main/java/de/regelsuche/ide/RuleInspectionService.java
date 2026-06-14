@@ -5,6 +5,7 @@ import de.regelsuche.ide.RuleInspectionDto.PositionResult;
 import de.regelsuche.ide.RuleInspectionDto.RuleMatch;
 import de.regelsuche.moves.MoveRealizer;
 import de.regelsuche.moves.MoveParameter;
+import de.regelsuche.moves.apply.LocalRewriteApplier;
 import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
 import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator;
 import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator.LocalCandidateMove;
