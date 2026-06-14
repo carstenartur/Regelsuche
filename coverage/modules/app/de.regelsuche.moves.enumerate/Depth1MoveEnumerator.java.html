@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Depth1MoveEnumerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.enumerate</a> &gt; <span class="el_source">Depth1MoveEnumerator.java</span></div><h1>Depth1MoveEnumerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.enumerate;
 
+import de.regelsuche.ast.Expr;
 import de.regelsuche.moves.MoveOrdinal;
 import de.regelsuche.moves.MoveParameter;
 import de.regelsuche.moves.RewriteMoveKind;
@@ -19,46 +20,71 @@ public final class Depth1MoveEnumerator {
     private final List&lt;ParameterEnumerator&gt; enumerators;
 
     public Depth1MoveEnumerator() {
-<span class="fc" id="L22">        this(List.of(</span>
+<span class="fc" id="L23">        this(List.of(</span>
                 new SubtermParameterEnumerator(),
                 new RepeatedSubexpressionEnumerator(),
                 new SmallConstantEnumerator(),
                 new CancellationCandidateEnumerator(),
                 new CompleteSquareParameterEnumerator()));
-<span class="fc" id="L28">    }</span>
+<span class="fc" id="L29">    }</span>
 
-<span class="fc" id="L30">    public Depth1MoveEnumerator(List&lt;ParameterEnumerator&gt; enumerators) {</span>
-<span class="fc" id="L31">        this.enumerators = List.copyOf(enumerators);</span>
-<span class="fc" id="L32">    }</span>
+<span class="fc" id="L31">    public Depth1MoveEnumerator(List&lt;ParameterEnumerator&gt; enumerators) {</span>
+<span class="fc" id="L32">        this.enumerators = List.copyOf(enumerators);</span>
+<span class="fc" id="L33">    }</span>
 
     /**
      * @param expression the current expression
      * @return a deterministically ordered list of candidate moves
      */
     public List&lt;CandidateMove&gt; enumerate(String expression) {
-<span class="fc" id="L39">        List&lt;CandidateMove&gt; candidates = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (ParameterEnumerator enumerator : enumerators) {</span>
-<span class="fc" id="L41">            RewriteMoveKind kind = kindFor(enumerator.id());</span>
-<span class="fc" id="L42">            int occurrence = 0;</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">            for (MoveParameter parameter : enumerator.enumerate(expression)) {</span>
-<span class="fc" id="L44">                candidates.add(new CandidateMove(</span>
-<span class="fc" id="L45">                        enumerator.id(),</span>
+<span class="fc" id="L40">        List&lt;CandidateMove&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (ParameterEnumerator enumerator : enumerators) {</span>
+<span class="fc" id="L42">            RewriteMoveKind kind = kindFor(enumerator.id());</span>
+<span class="fc" id="L43">            int occurrence = 0;</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            for (MoveParameter parameter : enumerator.enumerate(expression)) {</span>
+<span class="fc" id="L45">                candidates.add(new CandidateMove(</span>
+<span class="fc" id="L46">                        enumerator.id(),</span>
                         kind,
                         parameter,
-<span class="fc" id="L48">                        MoveOrdinal.of(kind, occurrence, List.of(parameter))));</span>
-<span class="fc" id="L49">                occurrence++;</span>
-<span class="fc" id="L50">            }</span>
-<span class="fc" id="L51">        }</span>
-<span class="fc" id="L52">        candidates.sort(CandidateMove.CANONICAL_ORDER);</span>
-<span class="fc" id="L53">        return List.copyOf(candidates);</span>
+<span class="fc" id="L49">                        MoveOrdinal.of(kind, occurrence, List.of(parameter))));</span>
+<span class="fc" id="L50">                occurrence++;</span>
+<span class="fc" id="L51">            }</span>
+<span class="fc" id="L52">        }</span>
+<span class="fc" id="L53">        candidates.sort(CandidateMove.CANONICAL_ORDER);</span>
+<span class="fc" id="L54">        return List.copyOf(candidates);</span>
+    }
+
+    /**
+     * Enumerates candidate moves directly from an already-parsed {@link Expr} node,
+     * avoiding a re-parse of each subtree's text form.
+     *
+     * @param root the already-parsed expression node
+     * @return a deterministically ordered list of candidate moves
+     */
+    public List&lt;CandidateMove&gt; enumerate(Expr root) {
+<span class="fc" id="L65">        List&lt;CandidateMove&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (ParameterEnumerator enumerator : enumerators) {</span>
+<span class="fc" id="L67">            RewriteMoveKind kind = kindFor(enumerator.id());</span>
+<span class="fc" id="L68">            int occurrence = 0;</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (MoveParameter parameter : enumerator.enumerate(root)) {</span>
+<span class="fc" id="L70">                candidates.add(new CandidateMove(</span>
+<span class="fc" id="L71">                        enumerator.id(),</span>
+                        kind,
+                        parameter,
+<span class="fc" id="L74">                        MoveOrdinal.of(kind, occurrence, List.of(parameter))));</span>
+<span class="fc" id="L75">                occurrence++;</span>
+<span class="fc" id="L76">            }</span>
+<span class="fc" id="L77">        }</span>
+<span class="fc" id="L78">        candidates.sort(CandidateMove.CANONICAL_ORDER);</span>
+<span class="fc" id="L79">        return List.copyOf(candidates);</span>
     }
 
     private RewriteMoveKind kindFor(String enumeratorId) {
-<span class="fc bfc" id="L57" title="All 4 branches covered.">        return switch (enumeratorId) {</span>
-<span class="fc" id="L58">            case &quot;complete-square&quot; -&gt; RewriteMoveKind.COMPLETE_SQUARE;</span>
-<span class="fc" id="L59">            case &quot;cancellation-candidate&quot; -&gt; RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES;</span>
-<span class="fc" id="L60">            case &quot;repeated-subexpression&quot; -&gt; RewriteMoveKind.COMMON_SUBEXPRESSION;</span>
-<span class="fc" id="L61">            default -&gt; RewriteMoveKind.UNKNOWN;</span>
+<span class="fc bfc" id="L83" title="All 4 branches covered.">        return switch (enumeratorId) {</span>
+<span class="fc" id="L84">            case &quot;complete-square&quot; -&gt; RewriteMoveKind.COMPLETE_SQUARE;</span>
+<span class="fc" id="L85">            case &quot;cancellation-candidate&quot; -&gt; RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES;</span>
+<span class="fc" id="L86">            case &quot;repeated-subexpression&quot; -&gt; RewriteMoveKind.COMMON_SUBEXPRESSION;</span>
+<span class="fc" id="L87">            default -&gt; RewriteMoveKind.UNKNOWN;</span>
         };
     }
 
@@ -66,16 +92,16 @@ public final class Depth1MoveEnumerator {
      * A single depth-1 candidate move: the enumerator that produced it, the
      * suggested move kind, the candidate parameter and its reproducible ordinal.
      */
-<span class="fc" id="L69">    public record CandidateMove(</span>
+<span class="fc" id="L95">    public record CandidateMove(</span>
             String enumeratorId,
             RewriteMoveKind kind,
             MoveParameter parameter,
             MoveOrdinal ordinal) {
 
-<span class="fc" id="L75">        static final Comparator&lt;CandidateMove&gt; CANONICAL_ORDER =</span>
-<span class="fc" id="L76">                Comparator.comparing(CandidateMove::enumeratorId)</span>
-<span class="fc" id="L77">                        .thenComparing(CandidateMove::ordinal, MoveOrdinal.CANONICAL_ORDER)</span>
-<span class="pc" id="L78">                        .thenComparing(candidate -&gt; candidate.parameter().canonicalValue());</span>
+<span class="fc" id="L101">        static final Comparator&lt;CandidateMove&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L102">                Comparator.comparing(CandidateMove::enumeratorId)</span>
+<span class="fc" id="L103">                        .thenComparing(CandidateMove::ordinal, MoveOrdinal.CANONICAL_ORDER)</span>
+<span class="pc" id="L104">                        .thenComparing(candidate -&gt; candidate.parameter().canonicalValue());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

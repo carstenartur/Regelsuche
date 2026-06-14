@@ -33,126 +33,131 @@ import java.util.Set;
     @Override
     public List&lt;MoveParameter&gt; enumerate(String expression) {
 <span class="fc" id="L35">        return MoveExpressions.parse(expression)</span>
-<span class="fc" id="L36">                .flatMap(this::enumerate)</span>
+<span class="fc" id="L36">                .flatMap(this::fromExpr)</span>
 <span class="fc" id="L37">                .orElseGet(List::of);</span>
     }
 
-    private Optional&lt;List&lt;MoveParameter&gt;&gt; enumerate(Expr root) {
-<span class="fc" id="L41">        Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L42">        collectVariables(root, variables);</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (variables.size() != 1) {</span>
-<span class="fc" id="L44">            return Optional.empty();</span>
+    @Override
+    public List&lt;MoveParameter&gt; enumerate(Expr expr) {
+<span class="fc" id="L42">        return fromExpr(expr).orElseGet(List::of);</span>
+    }
+
+    private Optional&lt;List&lt;MoveParameter&gt;&gt; fromExpr(Expr root) {
+<span class="fc" id="L46">        Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L47">        collectVariables(root, variables);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (variables.size() != 1) {</span>
+<span class="fc" id="L49">            return Optional.empty();</span>
         }
-<span class="fc" id="L46">        Map&lt;Integer, Double&gt; polynomial = toPolynomial(root);</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (polynomial == null) {</span>
-<span class="fc" id="L48">            return Optional.empty();</span>
+<span class="fc" id="L51">        Map&lt;Integer, Double&gt; polynomial = toPolynomial(root);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (polynomial == null) {</span>
+<span class="fc" id="L53">            return Optional.empty();</span>
         }
-<span class="fc" id="L50">        double leading = polynomial.getOrDefault(2, 0.0);</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (leading == 0.0) {</span>
-<span class="fc" id="L52">            return Optional.empty();</span>
+<span class="fc" id="L55">        double leading = polynomial.getOrDefault(2, 0.0);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (leading == 0.0) {</span>
+<span class="fc" id="L57">            return Optional.empty();</span>
         }
-<span class="fc" id="L54">        double b = polynomial.getOrDefault(1, 0.0) / leading;</span>
-<span class="fc" id="L55">        double c = polynomial.getOrDefault(0, 0.0) / leading;</span>
-<span class="fc" id="L56">        double shift = b / 2.0;</span>
-<span class="fc" id="L57">        double residue = c - shift * shift;</span>
-<span class="fc" id="L58">        return Optional.of(List.of(</span>
-<span class="fc" id="L59">                new MoveParameter(&quot;shift&quot;, MoveParameterKind.GENERATED, format(shift), format(shift), 0, id()),</span>
-<span class="fc" id="L60">                new MoveParameter(&quot;residue&quot;, MoveParameterKind.GENERATED, format(residue), format(residue), 1, id())));</span>
+<span class="fc" id="L59">        double b = polynomial.getOrDefault(1, 0.0) / leading;</span>
+<span class="fc" id="L60">        double c = polynomial.getOrDefault(0, 0.0) / leading;</span>
+<span class="fc" id="L61">        double shift = b / 2.0;</span>
+<span class="fc" id="L62">        double residue = c - shift * shift;</span>
+<span class="fc" id="L63">        return Optional.of(List.of(</span>
+<span class="fc" id="L64">                new MoveParameter(&quot;shift&quot;, MoveParameterKind.GENERATED, format(shift), format(shift), 0, id()),</span>
+<span class="fc" id="L65">                new MoveParameter(&quot;residue&quot;, MoveParameterKind.GENERATED, format(residue), format(residue), 1, id())));</span>
     }
 
     private void collectVariables(Expr expr, Set&lt;String&gt; out) {
-<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
-<span class="fc" id="L65">            out.add(variable.name());</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">        } else if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L67">            collectVariables(binary.left(), out);</span>
-<span class="fc" id="L68">            collectVariables(binary.right(), out);</span>
-<span class="fc bfc" id="L69" title="All 2 branches covered.">        } else if (expr instanceof FunctionExpr function) {</span>
-<span class="fc" id="L70">            function.arguments().forEach(argument -&gt; collectVariables(argument, out));</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
+<span class="fc" id="L70">            out.add(variable.name());</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        } else if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L72">            collectVariables(binary.left(), out);</span>
+<span class="fc" id="L73">            collectVariables(binary.right(), out);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        } else if (expr instanceof FunctionExpr function) {</span>
+<span class="fc" id="L75">            function.arguments().forEach(argument -&gt; collectVariables(argument, out));</span>
         }
-<span class="fc" id="L72">    }</span>
+<span class="fc" id="L77">    }</span>
 
     /** @return the polynomial as degree -&gt; coefficient, or {@code null} when not a univariate polynomial. */
     private Map&lt;Integer, Double&gt; toPolynomial(Expr expr) {
-<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (expr instanceof NumberExpr number) {</span>
-<span class="fc" id="L77">            return Map.of(0, number.value());</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (expr instanceof NumberExpr number) {</span>
+<span class="fc" id="L82">            return Map.of(0, number.value());</span>
         }
-<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (expr instanceof VariableExpr) {</span>
-<span class="fc" id="L80">            return Map.of(1, 1.0);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (expr instanceof VariableExpr) {</span>
+<span class="fc" id="L85">            return Map.of(1, 1.0);</span>
         }
-<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L83">            Map&lt;Integer, Double&gt; left = toPolynomial(binary.left());</span>
-<span class="fc" id="L84">            Map&lt;Integer, Double&gt; right = toPolynomial(binary.right());</span>
-<span class="fc bfc" id="L85" title="All 4 branches covered.">            if (left == null || right == null) {</span>
-<span class="fc" id="L86">                return null;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L88">            Map&lt;Integer, Double&gt; left = toPolynomial(binary.left());</span>
+<span class="fc" id="L89">            Map&lt;Integer, Double&gt; right = toPolynomial(binary.right());</span>
+<span class="fc bfc" id="L90" title="All 4 branches covered.">            if (left == null || right == null) {</span>
+<span class="fc" id="L91">                return null;</span>
             }
-<span class="pc bpc" id="L88" title="1 of 5 branches missed.">            return switch (binary.operator()) {</span>
-<span class="fc" id="L89">                case ADD -&gt; add(left, right, 1.0);</span>
-<span class="fc" id="L90">                case SUB -&gt; add(left, right, -1.0);</span>
-<span class="fc" id="L91">                case MUL -&gt; multiply(left, right);</span>
-<span class="nc" id="L92">                case DIV -&gt; divide(left, right);</span>
-<span class="fc" id="L93">                case POW -&gt; power(left, right);</span>
+<span class="pc bpc" id="L93" title="1 of 5 branches missed.">            return switch (binary.operator()) {</span>
+<span class="fc" id="L94">                case ADD -&gt; add(left, right, 1.0);</span>
+<span class="fc" id="L95">                case SUB -&gt; add(left, right, -1.0);</span>
+<span class="fc" id="L96">                case MUL -&gt; multiply(left, right);</span>
+<span class="nc" id="L97">                case DIV -&gt; divide(left, right);</span>
+<span class="fc" id="L98">                case POW -&gt; power(left, right);</span>
             };
         }
-<span class="fc" id="L96">        return null;</span>
+<span class="fc" id="L101">        return null;</span>
     }
 
     private Map&lt;Integer, Double&gt; add(Map&lt;Integer, Double&gt; left, Map&lt;Integer, Double&gt; right, double sign) {
-<span class="fc" id="L100">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;(left);</span>
-<span class="fc" id="L101">        right.forEach((degree, coefficient) -&gt; result.merge(degree, sign * coefficient, Double::sum));</span>
-<span class="fc" id="L102">        return result;</span>
+<span class="fc" id="L105">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;(left);</span>
+<span class="fc" id="L106">        right.forEach((degree, coefficient) -&gt; result.merge(degree, sign * coefficient, Double::sum));</span>
+<span class="fc" id="L107">        return result;</span>
     }
 
     private Map&lt;Integer, Double&gt; multiply(Map&lt;Integer, Double&gt; left, Map&lt;Integer, Double&gt; right) {
-<span class="fc" id="L106">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, Double&gt; leftEntry : left.entrySet()) {</span>
-<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (Map.Entry&lt;Integer, Double&gt; rightEntry : right.entrySet()) {</span>
-<span class="fc" id="L109">                int degree = leftEntry.getKey() + rightEntry.getKey();</span>
-<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                if (degree &gt; 8) {</span>
-<span class="nc" id="L111">                    return null;</span>
+<span class="fc" id="L111">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, Double&gt; leftEntry : left.entrySet()) {</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            for (Map.Entry&lt;Integer, Double&gt; rightEntry : right.entrySet()) {</span>
+<span class="fc" id="L114">                int degree = leftEntry.getKey() + rightEntry.getKey();</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                if (degree &gt; 8) {</span>
+<span class="nc" id="L116">                    return null;</span>
                 }
-<span class="fc" id="L113">                result.merge(degree, leftEntry.getValue() * rightEntry.getValue(), Double::sum);</span>
-<span class="fc" id="L114">            }</span>
-<span class="fc" id="L115">        }</span>
-<span class="fc" id="L116">        return result;</span>
+<span class="fc" id="L118">                result.merge(degree, leftEntry.getValue() * rightEntry.getValue(), Double::sum);</span>
+<span class="fc" id="L119">            }</span>
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        return result;</span>
     }
 
     private Map&lt;Integer, Double&gt; divide(Map&lt;Integer, Double&gt; left, Map&lt;Integer, Double&gt; right) {
-<span class="nc bnc" id="L120" title="All 4 branches missed.">        if (right.size() != 1 || !right.containsKey(0)) {</span>
-<span class="nc" id="L121">            return null;</span>
+<span class="nc bnc" id="L125" title="All 4 branches missed.">        if (right.size() != 1 || !right.containsKey(0)) {</span>
+<span class="nc" id="L126">            return null;</span>
         }
-<span class="nc" id="L123">        double divisor = right.get(0);</span>
-<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (divisor == 0.0) {</span>
-<span class="nc" id="L125">            return null;</span>
+<span class="nc" id="L128">        double divisor = right.get(0);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (divisor == 0.0) {</span>
+<span class="nc" id="L130">            return null;</span>
         }
-<span class="nc" id="L127">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;();</span>
-<span class="nc" id="L128">        left.forEach((degree, coefficient) -&gt; result.put(degree, coefficient / divisor));</span>
-<span class="nc" id="L129">        return result;</span>
+<span class="nc" id="L132">        Map&lt;Integer, Double&gt; result = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L133">        left.forEach((degree, coefficient) -&gt; result.put(degree, coefficient / divisor));</span>
+<span class="nc" id="L134">        return result;</span>
     }
 
     private Map&lt;Integer, Double&gt; power(Map&lt;Integer, Double&gt; base, Map&lt;Integer, Double&gt; exponent) {
-<span class="pc bpc" id="L133" title="2 of 4 branches missed.">        if (exponent.size() != 1 || !exponent.containsKey(0)) {</span>
-<span class="nc" id="L134">            return null;</span>
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">        if (exponent.size() != 1 || !exponent.containsKey(0)) {</span>
+<span class="nc" id="L139">            return null;</span>
         }
-<span class="fc" id="L136">        double raw = exponent.get(0);</span>
-<span class="pc bpc" id="L137" title="3 of 6 branches missed.">        if (raw != Math.rint(raw) || raw &lt; 0 || raw &gt; 8) {</span>
-<span class="nc" id="L138">            return null;</span>
+<span class="fc" id="L141">        double raw = exponent.get(0);</span>
+<span class="pc bpc" id="L142" title="3 of 6 branches missed.">        if (raw != Math.rint(raw) || raw &lt; 0 || raw &gt; 8) {</span>
+<span class="nc" id="L143">            return null;</span>
         }
-<span class="fc" id="L140">        int power = (int) raw;</span>
-<span class="fc" id="L141">        Map&lt;Integer, Double&gt; result = Map.of(0, 1.0);</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (int i = 0; i &lt; power; i++) {</span>
-<span class="fc" id="L143">            result = multiply(result, base);</span>
-<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (result == null) {</span>
-<span class="nc" id="L145">                return null;</span>
+<span class="fc" id="L145">        int power = (int) raw;</span>
+<span class="fc" id="L146">        Map&lt;Integer, Double&gt; result = Map.of(0, 1.0);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (int i = 0; i &lt; power; i++) {</span>
+<span class="fc" id="L148">            result = multiply(result, base);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (result == null) {</span>
+<span class="nc" id="L150">                return null;</span>
             }
         }
-<span class="fc" id="L148">        return result;</span>
+<span class="fc" id="L153">        return result;</span>
     }
 
     private String format(double value) {
-<span class="pc bpc" id="L152" title="1 of 4 branches missed.">        if (value == Math.rint(value) &amp;&amp; !Double.isInfinite(value)) {</span>
-<span class="fc" id="L153">            return Long.toString((long) value);</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        if (value == Math.rint(value) &amp;&amp; !Double.isInfinite(value)) {</span>
+<span class="fc" id="L158">            return Long.toString((long) value);</span>
         }
-<span class="fc" id="L155">        return Double.toString(value);</span>
+<span class="fc" id="L160">        return Double.toString(value);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

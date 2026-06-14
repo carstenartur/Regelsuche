@@ -22,25 +22,30 @@ import java.util.Map;
     @Override
     public List&lt;MoveParameter&gt; enumerate(String expression) {
 <span class="fc" id="L24">        return MoveExpressions.parse(expression)</span>
-<span class="fc" id="L25">                .map(this::enumerate)</span>
+<span class="fc" id="L25">                .map(this::fromExpr)</span>
 <span class="fc" id="L26">                .orElseGet(List::of);</span>
     }
 
-    private List&lt;MoveParameter&gt; enumerate(Expr root) {
-<span class="fc" id="L30">        Map&lt;String, MoveParameter&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L31" title="All 2 branches covered.">        for (Expr node : MoveExpressions.subexpressions(root)) {</span>
-<span class="fc" id="L32">            String text = MoveExpressions.format(node);</span>
-<span class="fc" id="L33">            distinct.putIfAbsent(text, new MoveParameter(</span>
+    @Override
+    public List&lt;MoveParameter&gt; enumerate(Expr expr) {
+<span class="fc" id="L31">        return fromExpr(expr);</span>
+    }
+
+    private List&lt;MoveParameter&gt; fromExpr(Expr root) {
+<span class="fc" id="L35">        Map&lt;String, MoveParameter&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (Expr node : MoveExpressions.subexpressions(root)) {</span>
+<span class="fc" id="L37">            String text = MoveExpressions.format(node);</span>
+<span class="fc" id="L38">            distinct.putIfAbsent(text, new MoveParameter(</span>
                     text,
                     MoveParameterKind.SUBTERM,
                     text,
                     text,
                     MoveParameter.UNSPECIFIED_INDEX,
-<span class="fc" id="L39">                    id()));</span>
-<span class="fc" id="L40">        }</span>
-<span class="fc" id="L41">        List&lt;MoveParameter&gt; parameters = new ArrayList&lt;&gt;(distinct.values());</span>
-<span class="fc" id="L42">        parameters.sort(MoveParameter.CANONICAL_ORDER);</span>
-<span class="fc" id="L43">        return List.copyOf(parameters);</span>
+<span class="fc" id="L44">                    id()));</span>
+<span class="fc" id="L45">        }</span>
+<span class="fc" id="L46">        List&lt;MoveParameter&gt; parameters = new ArrayList&lt;&gt;(distinct.values());</span>
+<span class="fc" id="L47">        parameters.sort(MoveParameter.CANONICAL_ORDER);</span>
+<span class="fc" id="L48">        return List.copyOf(parameters);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

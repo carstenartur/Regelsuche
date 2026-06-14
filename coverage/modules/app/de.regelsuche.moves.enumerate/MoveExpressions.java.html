@@ -55,5 +55,42 @@ final class MoveExpressions {
 <span class="fc" id="L55">            }</span>
         }
 <span class="fc" id="L57">    }</span>
+
+    /**
+     * Collects every subexpression node together with its stable child-index
+     * path from the root (an empty path denotes the root itself). The traversal
+     * order mirrors {@link #subexpressions(Expr)} (pre-order, left to right).
+     */
+    static List&lt;PositionedExpr&gt; positionedSubexpressions(Expr root) {
+<span class="fc" id="L65">        List&lt;PositionedExpr&gt; collected = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L66">        collectPositioned(root, new ArrayList&lt;&gt;(), collected);</span>
+<span class="fc" id="L67">        return collected;</span>
+    }
+
+    private static void collectPositioned(Expr expr, List&lt;Integer&gt; path, List&lt;PositionedExpr&gt; out) {
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (expr == null) {</span>
+<span class="nc" id="L72">            return;</span>
+        }
+<span class="fc" id="L74">        out.add(new PositionedExpr(List.copyOf(path), expr));</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L76">            descend(binary.left(), path, 0, out);</span>
+<span class="fc" id="L77">            descend(binary.right(), path, 1, out);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        } else if (expr instanceof FunctionExpr function) {</span>
+<span class="fc" id="L79">            List&lt;Expr&gt; arguments = function.arguments();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
+<span class="fc" id="L81">                descend(arguments.get(index), path, index, out);</span>
+            }
+        }
+<span class="fc" id="L84">    }</span>
+
+    private static void descend(Expr child, List&lt;Integer&gt; path, int index, List&lt;PositionedExpr&gt; out) {
+<span class="fc" id="L87">        path.add(index);</span>
+<span class="fc" id="L88">        collectPositioned(child, path, out);</span>
+<span class="fc" id="L89">        path.remove(path.size() - 1);</span>
+<span class="fc" id="L90">    }</span>
+
+    /** A subexpression paired with its stable child-index path from the root. */
+<span class="fc" id="L93">    record PositionedExpr(List&lt;Integer&gt; path, Expr expr) {</span>
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

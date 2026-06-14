@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TreeLocalMoveEnumerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.enumerate</a> &gt; <span class="el_source">TreeLocalMoveEnumerator.java</span></div><h1>TreeLocalMoveEnumerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.enumerate;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
+import de.regelsuche.moves.enumerate.MoveExpressions.PositionedExpr;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+/**
+ * Enumerates depth-1 candidate moves &lt;em&gt;tree-locally&lt;/em&gt;: instead of treating
+ * the expression as a single flat string, it visits every subtree position and
+ * runs the finite parameter enumerators on that subtree, tagging each candidate
+ * with the {@link TreePosition} it applies to.
+ *
+ * &lt;p&gt;This makes move enumeration position-aware (e.g. the same {@code complete
+ * square} candidate can surface independently inside the left and right operands
+ * of an equation) while remaining fully deterministic and reproducible: the
+ * result is canonically ordered by position and then by the underlying
+ * {@link CandidateMove} ordering.&lt;/p&gt;
+ */
+public final class TreeLocalMoveEnumerator {
+
+    private final Depth1MoveEnumerator delegate;
+
+    public TreeLocalMoveEnumerator() {
+<span class="fc" id="L27">        this(new Depth1MoveEnumerator());</span>
+<span class="fc" id="L28">    }</span>
+
+<span class="fc" id="L30">    public TreeLocalMoveEnumerator(Depth1MoveEnumerator delegate) {</span>
+<span class="fc" id="L31">        this.delegate = delegate;</span>
+<span class="fc" id="L32">    }</span>
+
+    /**
+     * @param expression the current expression
+     * @return a deterministically ordered list of position-tagged candidate moves
+     */
+    public List&lt;LocalCandidateMove&gt; enumerate(String expression) {
+<span class="fc" id="L39">        return MoveExpressions.parse(expression)</span>
+<span class="fc" id="L40">                .map(this::enumerateTree)</span>
+<span class="fc" id="L41">                .orElseGet(List::of);</span>
+    }
+
+    private List&lt;LocalCandidateMove&gt; enumerateTree(Expr root) {
+<span class="fc" id="L45">        List&lt;LocalCandidateMove&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (PositionedExpr positioned : MoveExpressions.positionedSubexpressions(root)) {</span>
+<span class="fc" id="L47">            String text = MoveExpressions.format(positioned.expr());</span>
+<span class="fc" id="L48">            TreePosition position = new TreePosition(positioned.path(), text);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            for (CandidateMove move : delegate.enumerate(positioned.expr())) {</span>
+<span class="fc" id="L50">                candidates.add(new LocalCandidateMove(position, move));</span>
+<span class="fc" id="L51">            }</span>
+<span class="fc" id="L52">        }</span>
+<span class="fc" id="L53">        candidates.sort(LocalCandidateMove.CANONICAL_ORDER);</span>
+<span class="fc" id="L54">        return List.copyOf(candidates);</span>
+    }
+
+    /**
+     * A depth-1 candidate move together with the subtree {@link TreePosition} it
+     * was enumerated for.
+     */
+<span class="fc" id="L61">    public record LocalCandidateMove(TreePosition position, CandidateMove move) {</span>
+
+<span class="fc" id="L63">        static final Comparator&lt;LocalCandidateMove&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L64">                Comparator.comparing(LocalCandidateMove::position, TreePosition.CANONICAL_ORDER)</span>
+<span class="fc" id="L65">                        .thenComparing(LocalCandidateMove::move, CandidateMove.CANONICAL_ORDER);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

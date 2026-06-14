@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TreePosition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.enumerate</a> &gt; <span class="el_source">TreePosition.java</span></div><h1>TreePosition.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.enumerate;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Identifies a single subtree within an expression by its stable child-index
+ * {@code path} from the root together with the subtree's infix {@code text}.
+ *
+ * &lt;p&gt;An empty {@code path} denotes the whole expression (the root). Child paths
+ * use {@code 0}/{@code 1} for the left/right operands of a binary node and the
+ * argument index for a function node, so the path is reproducible across runs.&lt;/p&gt;
+ */
+public record TreePosition(List&lt;Integer&gt; path, String text) implements Comparable&lt;TreePosition&gt; {
+
+    /**
+     * Numeric path order (root/empty first, then element-wise), then by subtree text,
+     * for deterministic ordering. Compares path lists directly so that the root
+     * (empty path) always precedes non-root positions regardless of their display form.
+     */
+<span class="fc" id="L22">    public static final Comparator&lt;TreePosition&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L23">            Comparator.&lt;TreePosition, List&lt;Integer&gt;&gt;comparing(TreePosition::path, TreePosition::comparePaths)</span>
+<span class="fc" id="L24">                    .thenComparing(TreePosition::text);</span>
+
+<span class="fc" id="L26">    public TreePosition {</span>
+<span class="fc" id="L27">        path = List.copyOf(path);</span>
+<span class="fc" id="L28">    }</span>
+
+    /** {@code true} when this position denotes the whole expression. */
+    public boolean isRoot() {
+<span class="fc" id="L32">        return path.isEmpty();</span>
+    }
+
+    /**
+     * A stable, sortable rendering of the path, e.g. {@code &quot;root&quot;} for the root
+     * or {@code &quot;000.001&quot;} for {@code root.left.right}. Each index is zero-padded so
+     * that lexicographic comparison matches numeric order for paths up to depth
+     * indices below 1000.
+     */
+    public String pathKey() {
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L43">            return &quot;root&quot;;</span>
+        }
+<span class="fc" id="L45">        return path.stream()</span>
+<span class="fc" id="L46">                .map(index -&gt; String.format(&quot;%03d&quot;, index))</span>
+<span class="fc" id="L47">                .collect(Collectors.joining(&quot;.&quot;));</span>
+    }
+
+    @Override
+    public int compareTo(TreePosition other) {
+<span class="nc" id="L52">        return CANONICAL_ORDER.compare(this, other);</span>
+    }
+
+    private static int comparePaths(List&lt;Integer&gt; a, List&lt;Integer&gt; b) {
+<span class="fc" id="L56">        int min = Math.min(a.size(), b.size());</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (int i = 0; i &lt; min; i++) {</span>
+<span class="fc" id="L58">            int cmp = Integer.compare(a.get(i), b.get(i));</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (cmp != 0) {</span>
+<span class="fc" id="L60">                return cmp;</span>
+            }
+        }
+<span class="fc" id="L63">        return Integer.compare(a.size(), b.size());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
