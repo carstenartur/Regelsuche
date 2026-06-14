@@ -1387,6 +1387,9 @@ public class WebWorkbenchServer {
                         mobj.property("kind", match.kind());
                         mobj.property("rewriteBefore", match.rewriteBefore());
                         mobj.property("rewriteAfter", match.rewriteAfter());
+                        mobj.property("subtreeBefore", match.subtreeBefore());
+                        mobj.property("subtreeAfter", match.subtreeAfter());
+                        mobj.property("expressionAfter", match.expressionAfter());
                         mobj.array("bindings", bw -> match.bindings().forEach(binding ->
                             bw.objectValue(bobj -> {
                                 bobj.property("name", binding.name());

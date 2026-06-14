@@ -42,20 +42,38 @@ public record RuleInspectionDto(
      * @param enumeratorId   id of the parameter enumerator that produced the match
      * @param kind           human-readable move kind (e.g. {@code "COMPLETE_SQUARE"})
      * @param bindings       parameter name→value pairs extracted by the enumerator
-     * @param rewriteBefore  the subtree text before applying the rule
-     * @param rewriteAfter   the subtree text after applying the rule
+     * @param rewriteBefore  compatibility alias for {@code subtreeBefore}
+     * @param rewriteAfter   compatibility alias for {@code subtreeAfter}
      *                       ({@code null} when no concrete rewrite could be generated)
+     * @param subtreeBefore  the subtree text before applying the rule
+     * @param subtreeAfter   the subtree text after applying the rule
+     * @param expressionAfter the full expression after applying the local rewrite
      */
     public record RuleMatch(
             String enumeratorId,
             String kind,
             List<Binding> bindings,
             String rewriteBefore,
-            String rewriteAfter) {
+            String rewriteAfter,
+            String subtreeBefore,
+            String subtreeAfter,
+            String expressionAfter) {
 
         public RuleMatch {
             bindings = bindings == null ? List.of() : List.copyOf(bindings);
-            rewriteBefore = rewriteBefore == null ? "" : rewriteBefore;
+            subtreeBefore = subtreeBefore == null ? (rewriteBefore == null ? "" : rewriteBefore) : subtreeBefore;
+            subtreeAfter = subtreeAfter == null ? rewriteAfter : subtreeAfter;
+            rewriteBefore = rewriteBefore == null ? subtreeBefore : rewriteBefore;
+            rewriteAfter = rewriteAfter == null ? subtreeAfter : rewriteAfter;
+        }
+
+        public RuleMatch(
+                String enumeratorId,
+                String kind,
+                List<Binding> bindings,
+                String rewriteBefore,
+                String rewriteAfter) {
+            this(enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, rewriteBefore, rewriteAfter, null);
         }
     }
 

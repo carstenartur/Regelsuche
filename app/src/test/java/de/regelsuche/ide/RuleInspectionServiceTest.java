@@ -138,6 +138,21 @@ class RuleInspectionServiceTest {
         assertTrue(hasPreview, "at least one match should have a non-empty rewriteAfter");
     }
 
+    @Test
+    void completeSquareMatchIncludesSubtreeAndFullExpressionAfter() {
+        RuleInspectionDto dto = service.inspect("sin(x^2 + 6*x + 5)");
+        RuleMatch match = dto.positions().stream()
+                .filter(p -> "000".equals(p.pathKey()))
+                .flatMap(p -> p.matches().stream())
+                .filter(m -> "COMPLETE_SQUARE".equals(m.kind()))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("x ^ 2 + 6 * x + 5", match.subtreeBefore());
+        assertEquals("(x + 3) ^ 2 - 4", match.subtreeAfter());
+        assertEquals("sin((x + 3) ^ 2 - 4)", match.expressionAfter());
+    }
+
     // ── Edge cases ──────────────────────────────────────────────────────────
 
     @Test

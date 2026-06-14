@@ -3,8 +3,8 @@ package de.regelsuche.ide;
 import de.regelsuche.ide.RuleInspectionDto.Binding;
 import de.regelsuche.ide.RuleInspectionDto.PositionResult;
 import de.regelsuche.ide.RuleInspectionDto.RuleMatch;
-import de.regelsuche.moves.MoveCandidateTransformationEngine;
 import de.regelsuche.moves.MoveRealizer;
+import de.regelsuche.moves.MoveParameter;
 import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
 import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator;
 import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator.LocalCandidateMove;
@@ -26,15 +26,19 @@ import java.util.Map;
 public final class RuleInspectionService {
 
     private final TreeLocalMoveEnumerator enumerator;
-    private final MoveRealizer realizer;
+    private final LocalRewriteApplier localRewriteApplier;
 
     public RuleInspectionService() {
-        this(new TreeLocalMoveEnumerator(), new MoveRealizer());
+        this(new TreeLocalMoveEnumerator(), new LocalRewriteApplier());
     }
 
     public RuleInspectionService(TreeLocalMoveEnumerator enumerator, MoveRealizer realizer) {
+        this(enumerator, new LocalRewriteApplier(realizer, null));
+    }
+
+    public RuleInspectionService(TreeLocalMoveEnumerator enumerator, LocalRewriteApplier localRewriteApplier) {
         this.enumerator = enumerator == null ? new TreeLocalMoveEnumerator() : enumerator;
-        this.realizer = realizer == null ? new MoveRealizer() : realizer;
+        this.localRewriteApplier = localRewriteApplier == null ? new LocalRewriteApplier() : localRewriteApplier;
     }
 
     /**
@@ -62,11 +66,6 @@ public final class RuleInspectionService {
             TreePosition pos = entry.getKey();
             List<LocalCandidateMove> atPosition = entry.getValue();
 
-            // Realize rewrites for this specific subtree
-            List<CandidateMove> moves = atPosition.stream().map(LocalCandidateMove::move).toList();
-            List<MoveCandidateTransformationEngine.MoveBackedTransformation> realized =
-                    realizer.realize(pos.text(), moves);
-
             List<RuleMatch> matches = new ArrayList<>();
 
             // Group candidates by enumeratorId: complete-square emits shift + residue as
@@ -93,13 +92,19 @@ public final class RuleInspectionService {
                                     c.move().parameter().value(),
                                     c.move().parameter().kind().name()))
                             .toList();
-                    String rewriteAfter = realized.stream()
-                            .filter(r -> r.move().kind() == first.kind())
-                            .map(r -> r.transformation().transformedExpression())
-                            .findFirst()
-                            .orElse(null);
+                    LocalRewriteApplier.LocalRewriteResult result = localRewriteApplier.apply(
+                            expression,
+                            pos,
+                            enumeratorCandidates.stream().map(LocalCandidateMove::move).toList());
                     matches.add(new RuleMatch(
-                            enumeratorId, first.kind().name(), bindings, pos.text(), rewriteAfter));
+                            enumeratorId,
+                            first.kind().name(),
+                            bindings,
+                            result.subtreeBefore(),
+                            result.subtreeAfter(),
+                            result.subtreeBefore(),
+                            result.subtreeAfter(),
+                            result.expressionAfter()));
                 } else {
                     // Each candidate is an independent logical match. Match rewriteAfter by
                     // parameter value to correctly distinguish multiple realized moves of the
@@ -107,19 +112,16 @@ public final class RuleInspectionService {
                     // moves at the same position).
                     for (LocalCandidateMove candidate : enumeratorCandidates) {
                         CandidateMove move = candidate.move();
-                        List<Binding> bindings = move.parameter() == null
-                                ? List.of()
-                                : List.of(new Binding(
-                                        move.parameter().name(),
-                                        move.parameter().value(),
-                                        move.parameter().kind().name()));
-                        String rewriteAfter = findRewriteAfter(realized, move);
+                        LocalRewriteApplier.LocalRewriteResult result = localRewriteApplier.apply(expression, pos, move);
                         matches.add(new RuleMatch(
                                 move.enumeratorId(),
                                 move.kind().name(),
-                                bindings,
-                                pos.text(),
-                                rewriteAfter));
+                                bindings(result.bindings()),
+                                result.subtreeBefore(),
+                                result.subtreeAfter(),
+                                result.subtreeBefore(),
+                                result.subtreeAfter(),
+                                result.expressionAfter()));
                     }
                 }
             }
@@ -129,31 +131,9 @@ public final class RuleInspectionService {
         return new RuleInspectionDto(expression, positions);
     }
 
-    /**
-     * Finds the {@code transformedExpression} for the realized move that corresponds
-     * to {@code candidate}.
-     *
-     * <p>When the candidate carries a parameter, the match is narrowed by parameter
-     * value so that multiple realized moves of the same kind (e.g. two distinct
-     * {@code cancellation-candidate} moves) are correctly distinguished.  When no
-     * parameter is present, a kind-only match is used as a fallback.</p>
-     */
-    private static String findRewriteAfter(
-            List<MoveCandidateTransformationEngine.MoveBackedTransformation> realized,
-            CandidateMove candidate) {
-        if (candidate.parameter() == null) {
-            return realized.stream()
-                    .filter(r -> r.move().kind() == candidate.kind())
-                    .map(r -> r.transformation().transformedExpression())
-                    .findFirst()
-                    .orElse(null);
-        }
-        String value = candidate.parameter().value();
-        return realized.stream()
-                .filter(r -> r.move().kind() == candidate.kind())
-                .filter(r -> r.move().parameters().stream().anyMatch(p -> value.equals(p.value())))
-                .map(r -> r.transformation().transformedExpression())
-                .findFirst()
-                .orElse(null);
+    private static List<Binding> bindings(List<MoveParameter> parameters) {
+        return parameters.stream()
+                .map(parameter -> new Binding(parameter.name(), parameter.value(), parameter.kind().name()))
+                .toList();
     }
 }

@@ -61,6 +61,15 @@ class RuleInspectApiTest {
     }
 
     @Test
+    void includesFullExpressionAfterForNestedRewrite() throws IOException {
+        String body = get("/api/inspect/tree?expression=sin(x%5E2+%2B+6*x+%2B+5)");
+        assertTrue(body.contains("\"subtreeBefore\""), body);
+        assertTrue(body.contains("\"subtreeAfter\""), body);
+        assertTrue(body.contains("\"expressionAfter\""), body);
+        assertTrue(body.contains("sin((x + 3) ^ 2 - 4)"), body);
+    }
+
+    @Test
     void returnsNonRootPositionForNestedExpression() throws IOException {
         String body = get("/api/inspect/tree?expression=sin(x%5E2+%2B+6*x+%2B+5)");
         // At least one position must not be root

@@ -2436,12 +2436,20 @@
                     + '</div>';
 
                 // Rewrite preview
-                if (match.rewriteAfter) {
+                const subtreeBefore = match.subtreeBefore || match.rewriteBefore;
+                const subtreeAfter = match.subtreeAfter || match.rewriteAfter;
+                if (subtreeAfter) {
                     html += '<div class="inspect-rewrite">'
-                        + '<span class="inspect-rewrite-label">Vorher:</span> <code>' + escapeHtml(match.rewriteBefore) + '</code>'
+                        + '<span class="inspect-rewrite-label">Teilbaum vorher:</span> <code>' + escapeHtml(subtreeBefore) + '</code>'
                         + ' → '
-                        + '<span class="inspect-rewrite-label">Nachher:</span> <code>' + escapeHtml(match.rewriteAfter) + '</code>'
+                        + '<span class="inspect-rewrite-label">Teilbaum nachher:</span> <code>' + escapeHtml(subtreeAfter) + '</code>'
                         + '</div>';
+                    if (match.expressionAfter) {
+                        html += '<div class="inspect-rewrite inspect-expression-after">'
+                            + '<span class="inspect-rewrite-label">Gesamtausdruck nachher:</span> '
+                            + '<code>' + escapeHtml(match.expressionAfter) + '</code>'
+                            + '</div>';
+                    }
                 } else {
                     html += '<div class="inspect-rewrite hint">Kein konkreter Rewrite verfügbar.</div>';
                 }
