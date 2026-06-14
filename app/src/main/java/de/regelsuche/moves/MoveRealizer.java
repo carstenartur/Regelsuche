@@ -12,6 +12,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.CommonSubexpressionDiscoveryOperator;
 import de.regelsuche.transform.CompleteSquareBridgeOperator;
+import de.regelsuche.transform.QuadraticFactorizationHypothesisOperator;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.SubstitutionIntroductionOperator;
 import de.regelsuche.transform.SubstitutionRewriteState;
@@ -32,6 +33,8 @@ public final class MoveRealizer {
         new CommonSubexpressionDiscoveryOperator();
     private final SubstitutionIntroductionOperator substitutionIntroductionOperator =
         new SubstitutionIntroductionOperator();
+    private final QuadraticFactorizationHypothesisOperator factorCandidateOperator =
+        new QuadraticFactorizationHypothesisOperator();
     private final ExpressionCanonicalizer canonicalizer;
     private final ExpressionParser parser;
 
@@ -53,6 +56,7 @@ public final class MoveRealizer {
         addEquationCandidates(expression, source, distinct);
         addCompleteSquareCandidates(expression, source, distinct);
         addRepeatedSubexpressionCandidates(expression, source, distinct);
+        addFactorCandidates(expression, source, distinct);
         List<MoveCandidateTransformationEngine.MoveBackedTransformation> ordered = new ArrayList<>(distinct.values());
         ordered.sort(Comparator.<MoveCandidateTransformationEngine.MoveBackedTransformation, MoveOrdinal>comparing(
                 candidate -> candidate.move().ordinal(), MoveOrdinal.CANONICAL_ORDER)
@@ -180,6 +184,48 @@ public final class MoveRealizer {
                 RewriteMoveKind.COMMON_SUBEXPRESSION,
                 selected.rule(),
                 operatorIdForRule(selected.rule()),
+                expression,
+                selected.transformedExpression(),
+                List.of(candidate.parameter()),
+                occurrence++,
+                selected.assumptions()
+            );
+            out.putIfAbsent(
+                move.moveId(),
+                new MoveCandidateTransformationEngine.MoveBackedTransformation(move, instrument(move, selected))
+            );
+        }
+    }
+
+    private void addFactorCandidates(
+        String expression,
+        List<Depth1MoveEnumerator.CandidateMove> candidates,
+        Map<String, MoveCandidateTransformationEngine.MoveBackedTransformation> out
+    ) {
+        List<Depth1MoveEnumerator.CandidateMove> factorMoveCandidates = candidates.stream()
+            .filter(candidate -> "factor-candidate".equals(candidate.enumeratorId()))
+            .toList();
+        if (factorMoveCandidates.isEmpty()) {
+            return;
+        }
+        Map<String, Transformation> byTransformedExpression = new LinkedHashMap<>();
+        List<Transformation> factorTransformations = new ArrayList<>(factorCandidateOperator.generateCandidates(expression));
+        factorTransformations.sort(Comparator.comparing(Transformation::rule)
+            .thenComparing(Transformation::transformedExpression)
+            .thenComparing(Transformation::applicationKey));
+        for (Transformation transformation : factorTransformations) {
+            byTransformedExpression.putIfAbsent(transformation.transformedExpression(), transformation);
+        }
+        int occurrence = 0;
+        for (Depth1MoveEnumerator.CandidateMove candidate : factorMoveCandidates) {
+            Transformation selected = byTransformedExpression.get(candidate.parameter().value());
+            if (selected == null) {
+                continue;
+            }
+            RewriteMove move = buildMove(
+                RewriteMoveKind.FACTOR,
+                selected.rule(),
+                selected.rule(),
                 expression,
                 selected.transformedExpression(),
                 List.of(candidate.parameter()),
