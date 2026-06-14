@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -275,6 +276,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/proof/jobs", this::handleProofJobs));
         secure(server.createContext("/api/benchmark", this::handleBenchmark));
         secure(server.createContext("/api/didactic", this::handleDidactic));
+        secure(server.createContext("/api/inspect", this::handleInspect));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
         server.start();
@@ -1339,6 +1341,62 @@ public class WebWorkbenchServer {
         de.regelsuche.analyze.MoveAnalysisDto analysis =
             new de.regelsuche.analyze.MoveAnalysisService().analyze(graph, expression);
         sendJson(exchange, 200, moveAnalysisToJson(analysis));
+    }
+
+    /**
+     * Rule Authoring IDE – tree-local rule inspection endpoint.
+     *
+     * <ul>
+     *   <li>{@code GET /api/inspect/tree?expression=...} — returns all
+     *       tree-position grouped rule matches for the given expression,
+     *       including bindings and rewrite previews.</li>
+     * </ul>
+     */
+    private void handleInspect(HttpExchange exchange) throws IOException {
+        String apiPath = exchange.getRequestURI().getPath();
+        String suffix = apiPath.substring("/api/inspect".length()).replaceFirst("^/", "");
+        if (!"tree".equals(suffix)) {
+            sendStatus(exchange, 404, "expected /api/inspect/tree?expression=...");
+            return;
+        }
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendStatus(exchange, 405, "method not allowed");
+            return;
+        }
+        String expression = queryParam(exchange, "expression", "");
+        if (expression.isBlank()) {
+            sendStatus(exchange, 400, "expression query parameter is required");
+            return;
+        }
+        de.regelsuche.ide.RuleInspectionDto dto =
+                new de.regelsuche.ide.RuleInspectionService().inspect(expression);
+        sendJson(exchange, 200, ruleInspectionToJson(dto));
+    }
+
+    private String ruleInspectionToJson(de.regelsuche.ide.RuleInspectionDto dto) {
+        JsonWriter writer = new JsonWriter();
+        writer.beginObject();
+        writer.property("expression", dto.expression());
+        writer.array("positions", pw -> dto.positions().forEach(pos ->
+            pw.objectValue(pobj -> {
+                pobj.property("pathKey", pos.pathKey());
+                pobj.property("subtree", pos.subtree());
+                pobj.array("matches", mw -> pos.matches().forEach(match ->
+                    mw.objectValue(mobj -> {
+                        mobj.property("enumeratorId", match.enumeratorId());
+                        mobj.property("kind", match.kind());
+                        mobj.property("rewriteBefore", match.rewriteBefore());
+                        mobj.property("rewriteAfter", match.rewriteAfter());
+                        mobj.array("bindings", bw -> match.bindings().forEach(binding ->
+                            bw.objectValue(bobj -> {
+                                bobj.property("name", binding.name());
+                                bobj.property("value", binding.value());
+                                bobj.property("kind", binding.kind());
+                            })));
+                    })));
+            })));
+        writer.endObject();
+        return writer.toString();
     }
 
     /**
@@ -2698,7 +2756,14 @@ public class WebWorkbenchServer {
         for (String part : query.split("&")) {
             int idx = part.indexOf('=');
             if (idx > 0) {
-                parsed.put(part.substring(0, idx), part.substring(idx + 1));
+                String rawValue = part.substring(idx + 1);
+                String decoded;
+                try {
+                    decoded = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);
+                } catch (IllegalArgumentException ex) {
+                    decoded = rawValue;
+                }
+                parsed.put(part.substring(0, idx), decoded);
             }
         }
         return parsed.getOrDefault(name, fallback);
