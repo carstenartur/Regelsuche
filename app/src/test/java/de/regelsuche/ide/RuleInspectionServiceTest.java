@@ -33,9 +33,21 @@ class RuleInspectionServiceTest {
         RuleInspectionDto dto = service.inspect("x^2 + 6*x + 5");
         assertNotNull(dto);
         assertEquals("x^2 + 6*x + 5", dto.expression());
+        assertFalse(dto.positions().stream().anyMatch(PositionResult::selected),
+                "selection should remain client-driven unless selectedPathKey is requested");
         assertTrue(
                 dto.positions().stream().anyMatch(p -> "root".equals(p.pathKey())),
                 "expected a root position: " + dto.positions().stream().map(PositionResult::pathKey).toList());
+    }
+
+    @Test
+    void marksRequestedSelectedPath() {
+        RuleInspectionDto dto = service.inspect("sin(x^2 + 6*x + 5)", "000");
+        assertTrue(dto.positions().stream().anyMatch(p -> "000".equals(p.pathKey()) && p.selected()),
+                "requested path should be marked selected");
+        assertFalse(dto.positions().stream()
+                .filter(p -> !"000".equals(p.pathKey()))
+                .anyMatch(PositionResult::selected), "only requested path should be selected");
     }
 
     @Test
@@ -79,6 +91,15 @@ class RuleInspectionServiceTest {
                         .flatMap(p -> p.matches().stream())
                         .allMatch(m -> m.kind() != null && !m.kind().isBlank()),
                 "every match must have a kind");
+    }
+
+    @Test
+    void matchIdIsPopulatedForEveryMatch() {
+        RuleInspectionDto dto = service.inspect("x^2 + 6*x + 5");
+        assertTrue(dto.positions().stream()
+                        .flatMap(p -> p.matches().stream())
+                        .allMatch(m -> m.matchId() != null && !m.matchId().isBlank()),
+                "every match must have a stable matchId");
     }
 
     @Test
@@ -151,6 +172,7 @@ class RuleInspectionServiceTest {
         assertEquals("x ^ 2 + 6 * x + 5", match.subtreeBefore());
         assertEquals("(x + 3) ^ 2 - 4", match.subtreeAfter());
         assertEquals("sin((x + 3) ^ 2 - 4)", match.expressionAfter());
+        assertTrue(match.applicable(), "complete-square preview should be applicable");
     }
 
     // ── Edge cases ──────────────────────────────────────────────────────────

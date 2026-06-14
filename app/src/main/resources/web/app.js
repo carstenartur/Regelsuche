@@ -2361,8 +2361,65 @@
     }
 
     let inspectData = null;
+    let selectedPositionIndex = -1;
+    let selectedMatchIndex = -1;
+    let applyInFlight = false;
 
-    function runInspect(expression) {
+    function applyStatus(message, isError) {
+        const status = $('inspectApplyStatus');
+        if (!status) { return; }
+        status.textContent = message || '';
+        status.classList.toggle('error', !!isError);
+        status.classList.toggle('ok', !!message && !isError);
+    }
+
+    function selectedPosition() {
+        if (!inspectData || !inspectData.positions || selectedPositionIndex < 0) { return null; }
+        return inspectData.positions[selectedPositionIndex] || null;
+    }
+
+    function selectedMatch() {
+        const pos = selectedPosition();
+        if (!pos || !pos.matches || selectedMatchIndex < 0) { return null; }
+        return pos.matches[selectedMatchIndex] || null;
+    }
+
+    function syncApplyUi() {
+        const applyBtn = $('inspectApplySelected');
+        const label = $('inspectSelectedMatchLabel');
+        const pos = selectedPosition();
+        const match = selectedMatch();
+        if (applyBtn) {
+            applyBtn.disabled = applyInFlight || !match || !match.applicable;
+        }
+        if (!label) { return; }
+        if (!pos || !match) {
+            label.textContent = 'Kein Match ausgewählt.';
+            return;
+        }
+        const applicability = match.applicable ? 'anwendbar' : 'nicht anwendbar';
+        label.textContent = match.kind + ' #' + (selectedMatchIndex + 1) + ' (' + applicability + ')';
+    }
+
+    function selectPosition(index) {
+        if (!inspectData || !inspectData.positions || index < 0 || index >= inspectData.positions.length) {
+            selectedPositionIndex = -1;
+            selectedMatchIndex = -1;
+            return null;
+        }
+        selectedPositionIndex = index;
+        inspectData.positions.forEach((pos, idx) => {
+            pos.selected = idx === index;
+        });
+        const matches = inspectData.positions[index].matches || [];
+        selectedMatchIndex = matches.findIndex((m) => m && m.applicable);
+        if (selectedMatchIndex < 0) {
+            selectedMatchIndex = matches.length > 0 ? 0 : -1;
+        }
+        return inspectData.positions[index];
+    }
+
+    function runInspect(expression, selectedPathKey) {
         const statusEl = $('inspectStatus');
         const resultEl = $('inspectResult');
         const matchPanel = $('inspectMatchPanel');
@@ -2370,13 +2427,25 @@
         statusEl.textContent = 'Lade …';
         resultEl.style.display = 'none';
         if (matchPanel) { matchPanel.style.display = 'none'; }
+        applyStatus('');
+        applyInFlight = false;
 
-        fetch('/api/inspect/tree?expression=' + encodeURIComponent(expression))
+        const params = new URLSearchParams({ expression: expression });
+        if (selectedPathKey) {
+            params.set('selectedPathKey', selectedPathKey);
+        }
+        fetch('/api/inspect/tree?' + params.toString())
             .then((r) => r.ok ? r.json() : r.text().then((t) => Promise.reject(t)))
             .then((json) => {
                 inspectData = json;
+                const selected = (json.positions || []).findIndex((pos) => !!pos.selected);
+                selectPosition(selected >= 0 ? selected : 0);
                 statusEl.textContent = '';
                 renderPositionList(json);
+                const pos = selectedPosition();
+                if (pos) {
+                    renderMatchPanel(pos);
+                }
                 resultEl.style.display = '';
             })
             .catch((err) => {
@@ -2396,7 +2465,9 @@
         json.positions.forEach((pos, idx) => {
             const li = document.createElement('li');
             const matchCount = pos.matches ? pos.matches.length : 0;
-            li.innerHTML = '<button class="inspect-pos-btn" data-idx="' + idx + '">'
+            const activeClass = pos.selected ? ' is-active' : '';
+            li.innerHTML = '<button class="inspect-pos-btn' + activeClass + '" data-idx="' + idx + '"'
+                + (pos.selected ? ' aria-current="true"' : '') + '>'
                 + '<code>' + escapeHtml(pos.pathKey) + '</code>'
                 + ' — <em>' + escapeHtml(pos.subtree) + '</em>'
                 + ' <span class="badge">' + matchCount + ' Match' + (matchCount === 1 ? '' : 'es') + '</span>'
@@ -2409,7 +2480,11 @@
         listEl.querySelectorAll('.inspect-pos-btn').forEach((btn) => {
             btn.addEventListener('click', () => {
                 const idx = parseInt(btn.dataset.idx, 10);
-                renderMatchPanel(json.positions[idx]);
+                const pos = selectPosition(idx);
+                renderPositionList(json);
+                if (pos) {
+                    renderMatchPanel(pos);
+                }
             });
         });
     }
@@ -2423,16 +2498,27 @@
 
         if (selectedPos) { selectedPos.textContent = pos.pathKey; }
         if (selectedSubtree) { selectedSubtree.textContent = pos.subtree; }
+        applyStatus('');
 
         if (!pos.matches || pos.matches.length === 0) {
             matchList.innerHTML = '<p class="hint">Keine Regelmatches an dieser Position.</p>';
+            selectedMatchIndex = -1;
         } else {
             let html = '';
-            pos.matches.forEach((match) => {
-                html += '<div class="inspect-match">';
+            pos.matches.forEach((match, idx) => {
+                const applicable = !!match.applicable;
+                const selectedClass = idx === selectedMatchIndex ? ' selected' : '';
+                html += '<div class="inspect-match' + selectedClass + '" data-match-idx="' + idx + '">';
                 html += '<div class="inspect-match-header">'
                     + '<span class="badge-kind">' + escapeHtml(match.kind) + '</span>'
                     + ' <code class="inspect-enumerator">' + escapeHtml(match.enumeratorId) + '</code>'
+                    + ' <span class="badge ' + (applicable ? 'badge-applicable' : 'badge-not-applicable') + '">'
+                    + (applicable ? 'anwendbar' : 'nicht anwendbar') + '</span>'
+                    + '</div>';
+                html += '<div class="actions inspect-match-actions">'
+                    + '<button type="button" class="inspect-select-match" data-match-idx="' + idx + '">Auswählen</button>'
+                    + '<button type="button" class="primary inspect-apply-match" data-match-idx="' + idx + '"'
+                    + (applicable ? '' : ' disabled') + '>Apply</button>'
                     + '</div>';
 
                 // Rewrite preview
@@ -2472,9 +2558,71 @@
                 html += '</div>';
             });
             matchList.innerHTML = html;
+            matchList.querySelectorAll('.inspect-select-match').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    selectedMatchIndex = parseInt(btn.dataset.matchIdx, 10);
+                    renderMatchPanel(pos);
+                });
+            });
+            matchList.querySelectorAll('.inspect-apply-match').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    selectedMatchIndex = parseInt(btn.dataset.matchIdx, 10);
+                    syncApplyUi();
+                    applySelectedMatch();
+                });
+            });
         }
 
+        syncApplyUi();
         panel.style.display = '';
+    }
+
+    function applySelectedMatch() {
+        const pos = selectedPosition();
+        const match = selectedMatch();
+        const exprEl = $('inspectExpression');
+        if (!pos || !match) { return; }
+        if (!match.applicable) {
+            applyStatus('Dieses Match ist nicht anwendbar.', true);
+            return;
+        }
+        const expression = inspectData && inspectData.expression
+            ? inspectData.expression
+            : (exprEl ? exprEl.value.trim() : '');
+        applyInFlight = true;
+        syncApplyUi();
+        applyStatus('Wende Rewrite an …');
+        fetch('/api/inspect/tree/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                expression: expression,
+                pathKey: pos.pathKey,
+                matchId: match.matchId
+            })
+        })
+            .then((r) => r.ok ? r.json() : r.text().then((t) => Promise.reject(t)))
+            .then((json) => {
+                inspectData = json.inspection;
+                const nextExpression = json.expressionAfter || '';
+                if (exprEl) {
+                    exprEl.value = nextExpression;
+                }
+                const selected = (inspectData.positions || []).findIndex((p) => !!p.selected);
+                const posAfter = selectPosition(selected >= 0 ? selected : 0);
+                renderPositionList(inspectData);
+                if (posAfter) {
+                    renderMatchPanel(posAfter);
+                }
+                applyStatus('Rewrite angewendet: ' + (json.kind || match.kind), false);
+            })
+            .catch((err) => {
+                applyStatus('Fehler beim Anwenden: ' + String(err), true);
+            })
+            .finally(() => {
+                applyInFlight = false;
+                syncApplyUi();
+            });
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -2484,8 +2632,12 @@
                 e.preventDefault();
                 const exprEl = $('inspectExpression');
                 const expression = exprEl ? exprEl.value.trim() : '';
-                if (expression) { runInspect(expression); }
+                if (expression) { runInspect(expression, null); }
             });
+        }
+        const applyBtn = $('inspectApplySelected');
+        if (applyBtn) {
+            applyBtn.addEventListener('click', () => applySelectedMatch());
         }
     });
 })();

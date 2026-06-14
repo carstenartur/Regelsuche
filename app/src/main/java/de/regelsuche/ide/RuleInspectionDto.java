@@ -25,20 +25,30 @@ public record RuleInspectionDto(
      *                   dot-separated zero-padded indices, e.g. {@code "000.001"})
      * @param subtree    infix text of the subtree at this position
      * @param matches    every rule candidate that fired at this position
+     * @param selected   whether this position is currently selected in the UI
      */
     public record PositionResult(
             String pathKey,
             String subtree,
-            List<RuleMatch> matches) {
+            List<RuleMatch> matches,
+            boolean selected) {
 
         public PositionResult {
             matches = matches == null ? List.of() : List.copyOf(matches);
+        }
+
+        public PositionResult(
+                String pathKey,
+                String subtree,
+                List<RuleMatch> matches) {
+            this(pathKey, subtree, matches, false);
         }
     }
 
     /**
      * A single rule match including bindings and rewrite preview.
      *
+     * @param matchId        stable identifier for this logical match within the inspection result
      * @param enumeratorId   id of the parameter enumerator that produced the match
      * @param kind           human-readable move kind (e.g. {@code "COMPLETE_SQUARE"})
      * @param bindings       parameter name→value pairs extracted by the enumerator
@@ -48,8 +58,10 @@ public record RuleInspectionDto(
      * @param subtreeBefore  the subtree text before applying the rule
      * @param subtreeAfter   the subtree text after applying the rule
      * @param expressionAfter the full expression after applying the local rewrite
+     * @param applicable    whether this match can currently be applied
      */
     public record RuleMatch(
+            String matchId,
             String enumeratorId,
             String kind,
             List<Binding> bindings,
@@ -57,14 +69,18 @@ public record RuleInspectionDto(
             String rewriteAfter,
             String subtreeBefore,
             String subtreeAfter,
-            String expressionAfter) {
+            String expressionAfter,
+            boolean applicable) {
 
         public RuleMatch {
+            matchId = matchId == null ? "" : matchId;
             bindings = bindings == null ? List.of() : List.copyOf(bindings);
             subtreeBefore = subtreeBefore == null ? (rewriteBefore == null ? "" : rewriteBefore) : subtreeBefore;
             subtreeAfter = subtreeAfter == null ? rewriteAfter : subtreeAfter;
             rewriteBefore = rewriteBefore == null ? subtreeBefore : rewriteBefore;
             rewriteAfter = rewriteAfter == null ? subtreeAfter : rewriteAfter;
+            applicable = applicable || (expressionAfter != null && !expressionAfter.isBlank())
+                    || (subtreeAfter != null && !subtreeAfter.isBlank());
         }
 
         public RuleMatch(
@@ -73,7 +89,19 @@ public record RuleInspectionDto(
                 List<Binding> bindings,
                 String rewriteBefore,
                 String rewriteAfter) {
-            this(enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, rewriteBefore, rewriteAfter, null);
+            this("", enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, rewriteBefore, rewriteAfter, null, false);
+        }
+
+        public RuleMatch(
+                String enumeratorId,
+                String kind,
+                List<Binding> bindings,
+                String rewriteBefore,
+                String rewriteAfter,
+                String subtreeBefore,
+                String subtreeAfter,
+                String expressionAfter) {
+            this("", enumeratorId, kind, bindings, rewriteBefore, rewriteAfter, subtreeBefore, subtreeAfter, expressionAfter, false);
         }
     }
 
