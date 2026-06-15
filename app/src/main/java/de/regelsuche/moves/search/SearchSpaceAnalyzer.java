@@ -1,6 +1,7 @@
 package de.regelsuche.moves.search;
 
 import de.regelsuche.moves.search.SearchSuccessorGenerator.SearchSuccessorState;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,8 +53,8 @@ public final class SearchSpaceAnalyzer {
             branchingFactor = Math.max(0d, branchingFactor);
             uniqueSuccessorCount = Math.max(0, uniqueSuccessorCount);
             successorDistributionByRule = successorDistributionByRule == null
-                    ? Map.of()
-                    : Map.copyOf(new LinkedHashMap<>(successorDistributionByRule));
+                    ? Collections.unmodifiableMap(new LinkedHashMap<>())
+                    : Collections.unmodifiableMap(new LinkedHashMap<>(successorDistributionByRule));
         }
     }
 }
