@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FactorParameterEnumerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.enumerate</a> &gt; <span class="el_source">FactorParameterEnumerator.java</span></div><h1>FactorParameterEnumerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.enumerate;
+
+import de.regelsuche.moves.MoveParameter;
+import de.regelsuche.moves.MoveParameterKind;
+import de.regelsuche.transform.QuadraticFactorizationHypothesisOperator;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+
+/**
+ * Enumerates factorization candidates that the classic transformation engine can
+ * realize for the current expression.
+ */
+public final class FactorParameterEnumerator implements ParameterEnumerator {
+
+    private final QuadraticFactorizationHypothesisOperator factorCandidateOperator;
+
+    public FactorParameterEnumerator() {
+<span class="fc" id="L21">        this(new QuadraticFactorizationHypothesisOperator());</span>
+<span class="fc" id="L22">    }</span>
+
+<span class="fc" id="L24">    FactorParameterEnumerator(QuadraticFactorizationHypothesisOperator factorCandidateOperator) {</span>
+<span class="fc" id="L25">        this.factorCandidateOperator = factorCandidateOperator;</span>
+<span class="fc" id="L26">    }</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L30">        return &quot;factor-candidate&quot;;</span>
+    }
+
+    @Override
+    public List&lt;MoveParameter&gt; enumerate(String expression) {
+<span class="pc bpc" id="L35" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L36">            return List.of();</span>
+        }
+<span class="fc" id="L38">        List&lt;Transformation&gt; ordered = new ArrayList&lt;&gt;(factorCandidateOperator.generateCandidates(expression));</span>
+<span class="fc" id="L39">        ordered.sort(Comparator.comparing(Transformation::rule)</span>
+<span class="fc" id="L40">                .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L41">                .thenComparing(Transformation::applicationKey));</span>
+
+<span class="fc" id="L43">        LinkedHashMap&lt;String, MoveParameter&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L44">        int index = 0;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (Transformation transformation : ordered) {</span>
+<span class="fc" id="L46">            String transformed = transformation.transformedExpression();</span>
+<span class="fc" id="L47">            distinct.putIfAbsent(</span>
+                    transformed,
+                    new MoveParameter(
+                            &quot;target&quot;,
+                            MoveParameterKind.REPLACEMENT,
+                            transformed,
+                            transformed,
+                            index++,
+<span class="fc" id="L55">                            id()));</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        return List.copyOf(distinct.values());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -275,9 +275,9 @@ import java.util.Set;
         };
 <span class="fc bfc" id="L276" title="All 2 branches covered.">        String comparisonText = comparison.moveOnlyCandidates().size() &gt; comparison.classicOnlyCandidates().size()</span>
 <span class="fc" id="L277">            ? &quot;Move-Enumeration ergänzt die klassische Engine sichtbar.&quot;</span>
-<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            : comparison.moveOnlyCandidates().size() &lt; comparison.classicOnlyCandidates().size()</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            : comparison.moveOnlyCandidates().size() &lt; comparison.classicOnlyCandidates().size()</span>
 <span class="fc" id="L279">                ? &quot;Klassische Engine deckt aktuell noch mehr Kandidaten ab.&quot;</span>
-<span class="pc" id="L280">                : &quot;Move-Enumeration und Classic sind in diesem Fall ähnlich stark.&quot;;</span>
+<span class="fc" id="L280">                : &quot;Move-Enumeration und Classic sind in diesem Fall ähnlich stark.&quot;;</span>
 <span class="pc bpc" id="L281" title="1 of 4 branches missed.">        if (&quot;cancellation-plus-one&quot;.equals(probeCase.id()) &amp;&amp; !searchResult.success()) {</span>
 <span class="fc" id="L282">            comparisonText = &quot;Cancellation-Move ist da, aber Normalisierungsfolge bis x = 1 fehlt noch.&quot;;</span>
         }

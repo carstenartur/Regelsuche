@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSuccessorGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.search</a> &gt; <span class="el_source">SearchSuccessorGenerator.java</span></div><h1>SearchSuccessorGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.search;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.moves.apply.LocalRewriteApplier;
+import de.regelsuche.moves.apply.LocalRewriteApplier.LocalRewriteResult;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
+import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator;
+import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator.LocalCandidateMove;
+import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Generates direct successor states from tree-local candidate moves.
+ *
+ * &lt;p&gt;Determinism: candidates are consumed in {@link TreeLocalMoveEnumerator}
+ * canonical order, grouped by position and enumerator id with stable insertion
+ * order. Deduplication keeps the first generated successor per resulting
+ * expression and discards later duplicates.&lt;/p&gt;
+ */
+public final class SearchSuccessorGenerator {
+
+    private final TreeLocalMoveEnumerator enumerator;
+    private final LocalRewriteApplier applier;
+    private final ExpressionParser parser;
+
+    public SearchSuccessorGenerator() {
+<span class="fc" id="L31">        this(new TreeLocalMoveEnumerator(), new LocalRewriteApplier(), new ExpressionParser());</span>
+<span class="fc" id="L32">    }</span>
+
+    public SearchSuccessorGenerator(TreeLocalMoveEnumerator enumerator, LocalRewriteApplier applier) {
+<span class="nc" id="L35">        this(enumerator, applier, new ExpressionParser());</span>
+<span class="nc" id="L36">    }</span>
+
+    public SearchSuccessorGenerator(
+            TreeLocalMoveEnumerator enumerator,
+            LocalRewriteApplier applier,
+<span class="fc" id="L41">            ExpressionParser parser) {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        this.enumerator = enumerator == null ? new TreeLocalMoveEnumerator() : enumerator;</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        this.applier = applier == null ? new LocalRewriteApplier() : applier;</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        this.parser = parser == null ? new ExpressionParser() : parser;</span>
+<span class="fc" id="L45">    }</span>
+
+    /** Returns unique direct successors reachable in one local rewrite step. */
+    public List&lt;SearchSuccessorState&gt; generate(String expression) {
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L50">            return List.of();</span>
+        }
+        Expr root;
+        try {
+<span class="fc" id="L54">            root = parser.parseTerm(expression);</span>
+<span class="nc" id="L55">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L56">            return List.of();</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        List&lt;LocalCandidateMove&gt; localCandidates = enumerator.enumerate(expression);</span>
+<span class="fc" id="L59">        Map&lt;String, SearchSuccessorState&gt; uniqueByExpression = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (PositionMatch match : logicalMatches(localCandidates)) {</span>
+<span class="fc" id="L61">            LocalRewriteResult rewrite = applier.apply(root, match.position(), match.candidates());</span>
+<span class="pc bpc" id="L62" title="2 of 6 branches missed.">            if (!rewrite.success() || rewrite.expressionAfter() == null || rewrite.expressionAfter().isBlank()) {</span>
+<span class="nc" id="L63">                continue;</span>
+            }
+<span class="fc" id="L65">            CandidateMove first = match.candidates().getFirst();</span>
+<span class="fc" id="L66">            uniqueByExpression.putIfAbsent(</span>
+<span class="fc" id="L67">                    rewrite.expressionAfter(),</span>
+                    new SearchSuccessorState(
+                            expression,
+<span class="fc" id="L70">                            rewrite.expressionAfter(),</span>
+<span class="fc" id="L71">                            match.position(),</span>
+<span class="fc" id="L72">                            first.enumeratorId(),</span>
+<span class="fc" id="L73">                            first.kind().name(),</span>
+<span class="fc" id="L74">                            match.candidates(),</span>
+                            rewrite));
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">        return List.copyOf(uniqueByExpression.values());</span>
+    }
+
+    private static List&lt;PositionMatch&gt; logicalMatches(List&lt;LocalCandidateMove&gt; candidates) {
+<span class="fc" id="L81">        Map&lt;TreePosition, List&lt;LocalCandidateMove&gt;&gt; byPosition = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (LocalCandidateMove candidate : candidates) {</span>
+<span class="fc" id="L83">            byPosition.computeIfAbsent(candidate.position(), unused -&gt; new ArrayList&lt;&gt;()).add(candidate);</span>
+<span class="fc" id="L84">        }</span>
+
+<span class="fc" id="L86">        List&lt;PositionMatch&gt; matches = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (Map.Entry&lt;TreePosition, List&lt;LocalCandidateMove&gt;&gt; positionEntry : byPosition.entrySet()) {</span>
+<span class="fc" id="L88">            TreePosition position = positionEntry.getKey();</span>
+<span class="fc" id="L89">            Map&lt;String, List&lt;LocalCandidateMove&gt;&gt; byEnumerator = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (LocalCandidateMove candidate : positionEntry.getValue()) {</span>
+<span class="fc" id="L91">                byEnumerator.computeIfAbsent(candidate.move().enumeratorId(), unused -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L92">                        .add(candidate);</span>
+<span class="fc" id="L93">            }</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            for (Map.Entry&lt;String, List&lt;LocalCandidateMove&gt;&gt; enumeratorEntry : byEnumerator.entrySet()) {</span>
+<span class="fc" id="L95">                String enumeratorId = enumeratorEntry.getKey();</span>
+<span class="fc" id="L96">                List&lt;LocalCandidateMove&gt; localMoves = enumeratorEntry.getValue();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                if (&quot;complete-square&quot;.equals(enumeratorId)) {</span>
+<span class="fc" id="L98">                    matches.add(new PositionMatch(</span>
+                            position,
+<span class="fc" id="L100">                            localMoves.stream().map(LocalCandidateMove::move).toList()));</span>
+                } else {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                    for (LocalCandidateMove move : localMoves) {</span>
+<span class="fc" id="L103">                        matches.add(new PositionMatch(position, List.of(move.move())));</span>
+<span class="fc" id="L104">                    }</span>
+                }
+<span class="fc" id="L106">            }</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc" id="L108">        return List.copyOf(matches);</span>
+    }
+
+<span class="fc" id="L111">    private record PositionMatch(TreePosition position, List&lt;CandidateMove&gt; candidates) {</span>
+    }
+
+    public record SearchSuccessorState(
+            String sourceExpression,
+            String successorExpression,
+            TreePosition position,
+            String enumeratorId,
+            String moveKind,
+            List&lt;CandidateMove&gt; candidateMoves,
+            LocalRewriteResult rewrite) {
+
+<span class="fc" id="L123">        public SearchSuccessorState {</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            sourceExpression = sourceExpression == null ? &quot;&quot; : sourceExpression;</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            successorExpression = successorExpression == null ? &quot;&quot; : successorExpression;</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            enumeratorId = enumeratorId == null ? &quot;&quot; : enumeratorId;</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            moveKind = moveKind == null ? &quot;&quot; : moveKind;</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            candidateMoves = candidateMoves == null ? List.of() : List.copyOf(candidateMoves);</span>
+<span class="fc" id="L129">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
