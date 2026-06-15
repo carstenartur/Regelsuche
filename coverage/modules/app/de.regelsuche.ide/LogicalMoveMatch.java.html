@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LogicalMoveMatch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ide</a> &gt; <span class="el_source">LogicalMoveMatch.java</span></div><h1>LogicalMoveMatch.java</h1><pre class="source lang-java linenums">package de.regelsuche.ide;
+
+import de.regelsuche.moves.MoveParameter;
+import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator.LocalCandidateMove;
+import de.regelsuche.moves.enumerate.TreePosition;
+import java.util.List;
+
+/** One logical match, potentially composed of multiple local candidate moves. */
+public record LogicalMoveMatch(
+        TreePosition position,
+        String enumeratorId,
+        String kind,
+        List&lt;LocalCandidateMove&gt; candidates,
+        List&lt;MoveParameter&gt; bindings,
+        boolean composite) {
+
+<span class="fc" id="L17">    public LogicalMoveMatch {</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        enumeratorId = enumeratorId == null ? &quot;&quot; : enumeratorId;</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        kind = kind == null ? &quot;&quot; : kind;</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        candidates = candidates == null ? List.of() : List.copyOf(candidates);</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        bindings = bindings == null ? List.of() : List.copyOf(bindings);</span>
+<span class="fc" id="L22">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
