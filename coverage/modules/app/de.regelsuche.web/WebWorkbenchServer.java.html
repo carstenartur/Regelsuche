@@ -1367,8 +1367,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1367">            return;</span>
         }
 <span class="fc bfc" id="L1369" title="All 2 branches covered.">        if (!&quot;tree&quot;.equals(suffix)) {</span>
-<span class="fc" id="L1370">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
-<span class="fc" id="L1371">            return;</span>
+<span class="nc" id="L1370">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
+<span class="nc" id="L1371">            return;</span>
         }
 <span class="fc bfc" id="L1373" title="All 2 branches covered.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
 <span class="fc" id="L1374">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
@@ -1627,8 +1627,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1627">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1628">            .findFirst();</span>
 <span class="fc bfc" id="L1629" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="fc" id="L1630">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="fc" id="L1631">            return;</span>
+<span class="nc" id="L1630">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1631">            return;</span>
         }
 <span class="fc" id="L1633">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
 <span class="fc" id="L1634">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>
@@ -1716,8 +1716,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1716">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1717">            .findFirst();</span>
 <span class="fc bfc" id="L1718" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="nc" id="L1719">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="nc" id="L1720">            return;</span>
+<span class="fc" id="L1719">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="fc" id="L1720">            return;</span>
         }
 <span class="fc" id="L1722">        var derivation = match.get();</span>
 <span class="fc" id="L1723">        JsonWriter writer = new JsonWriter();</span>
@@ -2448,8 +2448,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L2448">        String left = stringValue(body, &quot;leftPattern&quot;, &quot;&quot;).trim();</span>
 <span class="fc" id="L2449">        String right = stringValue(body, &quot;rightPattern&quot;, &quot;&quot;).trim();</span>
 <span class="pc bpc" id="L2450" title="1 of 4 branches missed.">        if (left.isBlank() || right.isBlank()) {</span>
-<span class="fc" id="L2451">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
-<span class="fc" id="L2452">            return;</span>
+<span class="nc" id="L2451">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
+<span class="nc" id="L2452">            return;</span>
         }
 <span class="fc" id="L2454">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
 <span class="fc bfc" id="L2455" title="All 2 branches covered.">        if (priority &lt; 0) {</span>

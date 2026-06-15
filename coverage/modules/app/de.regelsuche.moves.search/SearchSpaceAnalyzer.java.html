@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.search</a> &gt; <span class="el_source">SearchSpaceAnalyzer.java</span></div><h1>SearchSpaceAnalyzer.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.search;
+
+import de.regelsuche.moves.search.SearchSuccessorGenerator.SearchSuccessorState;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+
+/** Computes first-level search-space metrics from direct successors of an expression. */
+public final class SearchSpaceAnalyzer {
+
+    /** Warning emitted when the branching factor exceeds {@value #HIGH_BRANCHING_FACTOR_THRESHOLD}. */
+    public static final String WARNING_HIGH_BRANCHING_FACTOR = &quot;HIGH_BRANCHING_FACTOR&quot;;
+
+    /** Warning emitted when more than half of all successors are duplicates. */
+    public static final String WARNING_DUPLICATE_HEAVY = &quot;DUPLICATE_HEAVY&quot;;
+
+    /** Warning emitted when a single rule produces {@value #DOMINANT_RULE_SHARE_THRESHOLD} or more of all successors. */
+    public static final String WARNING_SINGLE_DOMINANT_RULE = &quot;SINGLE_DOMINANT_RULE&quot;;
+
+    static final int HIGH_BRANCHING_FACTOR_THRESHOLD = 10;
+    static final double DUPLICATE_RATE_THRESHOLD = 0.5;
+    static final double DOMINANT_RULE_SHARE_THRESHOLD = 0.8;
+
+    private final Function&lt;String, List&lt;SearchSuccessorState&gt;&gt; successorSupplier;
+
+    public SearchSpaceAnalyzer() {
+<span class="fc" id="L31">        this(new SearchSuccessorGenerator());</span>
+<span class="fc" id="L32">    }</span>
+
+<span class="fc" id="L34">    public SearchSpaceAnalyzer(SearchSuccessorGenerator successorGenerator) {</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        SearchSuccessorGenerator gen = successorGenerator == null ? new SearchSuccessorGenerator() : successorGenerator;</span>
+<span class="fc" id="L36">        this.successorSupplier = gen::generate;</span>
+<span class="fc" id="L37">    }</span>
+
+<span class="fc" id="L39">    SearchSpaceAnalyzer(Function&lt;String, List&lt;SearchSuccessorState&gt;&gt; successorSupplier) {</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        this.successorSupplier = successorSupplier == null ? __ -&gt; List.of() : successorSupplier;</span>
+<span class="fc" id="L41">    }</span>
+
+    public SearchSpaceReport analyze(String expression) {
+<span class="fc" id="L44">        List&lt;SearchSuccessorState&gt; successors = successorSupplier.apply(expression);</span>
+<span class="fc" id="L45">        Map&lt;String, Integer&gt; successorDistributionByRule = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (SearchSuccessorState successor : successors) {</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            String rule = successor.moveKind().isBlank() ? successor.enumeratorId() : successor.moveKind();</span>
+<span class="fc" id="L48">            successorDistributionByRule.merge(rule, 1, Integer::sum);</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        int successorCount = successors.size();</span>
+<span class="fc" id="L51">        int uniqueSuccessorCount = (int) successors.stream()</span>
+<span class="fc" id="L52">                .map(SearchSuccessorState::successorExpression)</span>
+<span class="fc" id="L53">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L54">                .distinct()</span>
+<span class="fc" id="L55">                .count();</span>
+<span class="fc" id="L56">        int duplicateSuccessorCount = successorCount - uniqueSuccessorCount;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        double duplicateRate = successorCount &gt; 0 ? (double) duplicateSuccessorCount / successorCount : 0.0;</span>
+<span class="fc" id="L58">        String dominantRule = successorDistributionByRule.entrySet().stream()</span>
+<span class="fc" id="L59">                .max(Map.Entry.comparingByValue())</span>
+<span class="fc" id="L60">                .map(Map.Entry::getKey)</span>
+<span class="fc" id="L61">                .orElse(&quot;&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 4 branches missed.">        double dominantRuleShare = (!dominantRule.isEmpty() &amp;&amp; successorCount &gt; 0)</span>
+<span class="fc" id="L63">                ? (double) successorDistributionByRule.get(dominantRule) / successorCount</span>
+<span class="fc" id="L64">                : 0.0;</span>
+<span class="fc" id="L65">        List&lt;String&gt; warnings = buildWarnings(successorCount, duplicateRate, dominantRuleShare);</span>
+<span class="fc" id="L66">        return new SearchSpaceReport(</span>
+                expression,
+                successorCount,
+                successorCount,
+                uniqueSuccessorCount,
+                duplicateSuccessorCount,
+                duplicateRate,
+                dominantRule,
+                dominantRuleShare,
+                warnings,
+                successorDistributionByRule);
+    }
+
+    private static List&lt;String&gt; buildWarnings(
+            int successorCount, double duplicateRate, double dominantRuleShare) {
+<span class="fc" id="L81">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (successorCount &gt; HIGH_BRANCHING_FACTOR_THRESHOLD) {</span>
+<span class="fc" id="L83">            warnings.add(WARNING_HIGH_BRANCHING_FACTOR);</span>
+        }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (duplicateRate &gt; DUPLICATE_RATE_THRESHOLD) {</span>
+<span class="fc" id="L86">            warnings.add(WARNING_DUPLICATE_HEAVY);</span>
+        }
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        if (successorCount &gt; 0 &amp;&amp; dominantRuleShare &gt;= DOMINANT_RULE_SHARE_THRESHOLD) {</span>
+<span class="fc" id="L89">            warnings.add(WARNING_SINGLE_DOMINANT_RULE);</span>
+        }
+<span class="fc" id="L91">        return Collections.unmodifiableList(warnings);</span>
+    }
+
+    public record SearchSpaceReport(
+            String sourceExpression,
+            int successorCount,
+            double branchingFactor,
+            int uniqueSuccessorCount,
+            int duplicateSuccessorCount,
+            double duplicateRate,
+            String dominantRule,
+            double dominantRuleShare,
+            List&lt;String&gt; warnings,
+            Map&lt;String, Integer&gt; successorDistributionByRule) {
+<span class="fc" id="L105">        public SearchSpaceReport {</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            sourceExpression = sourceExpression == null ? &quot;&quot; : sourceExpression;</span>
+<span class="fc" id="L107">            successorCount = Math.max(0, successorCount);</span>
+<span class="fc" id="L108">            branchingFactor = Math.max(0d, branchingFactor);</span>
+<span class="fc" id="L109">            uniqueSuccessorCount = Math.max(0, uniqueSuccessorCount);</span>
+<span class="fc" id="L110">            duplicateSuccessorCount = Math.max(0, duplicateSuccessorCount);</span>
+<span class="fc" id="L111">            duplicateRate = Math.max(0d, Math.min(1d, duplicateRate));</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            dominantRule = dominantRule == null ? &quot;&quot; : dominantRule;</span>
+<span class="fc" id="L113">            dominantRuleShare = Math.max(0d, Math.min(1d, dominantRuleShare));</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            warnings = warnings == null ? List.of() : List.copyOf(warnings);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            successorDistributionByRule = successorDistributionByRule == null</span>
+<span class="nc" id="L116">                    ? Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;())</span>
+<span class="fc" id="L117">                    : Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(successorDistributionByRule));</span>
+<span class="fc" id="L118">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
