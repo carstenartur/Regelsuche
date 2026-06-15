@@ -73,12 +73,10 @@ public final class BoundedSearchExplorer {
         }
         List<SearchSuccessorState> successors = generator.generate(expression);
         int branchCount = successors.size();
-        if (branchCount > 0) {
-            accum.totalExpanded++;
-            accum.totalSuccessors += branchCount;
-            if (branchCount > accum.maxBranchingFactor) {
-                accum.maxBranchingFactor = branchCount;
-            }
+        accum.totalExpanded++;
+        accum.totalSuccessors += branchCount;
+        if (branchCount > accum.maxBranchingFactor) {
+            accum.maxBranchingFactor = branchCount;
         }
         for (SearchSuccessorState successor : successors) {
             if (accum.exploredStates >= budget) {
