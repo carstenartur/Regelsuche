@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.ide.RuleInspectionDto.PositionResult;
 import de.regelsuche.ide.RuleInspectionDto.RuleMatch;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -133,6 +134,17 @@ class RuleInspectionServiceTest {
         assertFalse(csMatches.isEmpty(), "expected COMPLETE_SQUARE matches");
         assertTrue(csMatches.stream().anyMatch(m -> !m.bindings().isEmpty()),
                 "expected at least one COMPLETE_SQUARE match with bindings");
+    }
+
+    @Test
+    void completeSquareShiftAndResidueAreGroupedIntoSingleLogicalMatch() {
+        RuleInspectionDto dto = service.inspect("x^2 + 6*x + 5");
+        assertTrue(dto.positions().stream()
+                        .flatMap(p -> p.matches().stream())
+                        .filter(m -> "COMPLETE_SQUARE".equals(m.kind()))
+                        .map(m -> m.bindings().stream().map(binding -> binding.name()).collect(java.util.stream.Collectors.toSet()))
+                        .anyMatch(names -> names.containsAll(Set.of("shift", "residue"))),
+                "expected one COMPLETE_SQUARE logical match containing both shift and residue bindings");
     }
 
     // ── Rewrite Preview per position ────────────────────────────────────────

@@ -6,7 +6,6 @@ import de.regelsuche.ide.RuleInspectionDto.RuleMatch;
 import de.regelsuche.moves.MoveRealizer;
 import de.regelsuche.moves.MoveParameter;
 import de.regelsuche.moves.apply.LocalRewriteApplier;
-import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
 import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator;
 import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator.LocalCandidateMove;
 import de.regelsuche.moves.enumerate.TreePosition;
@@ -28,18 +27,27 @@ public final class RuleInspectionService {
 
     private final TreeLocalMoveEnumerator enumerator;
     private final LocalRewriteApplier localRewriteApplier;
+    private final LogicalMoveGrouper logicalMoveGrouper;
 
     public RuleInspectionService() {
-        this(new TreeLocalMoveEnumerator(), new LocalRewriteApplier());
+        this(new TreeLocalMoveEnumerator(), new LocalRewriteApplier(), new DefaultLogicalMoveGrouper());
     }
 
     public RuleInspectionService(TreeLocalMoveEnumerator enumerator, MoveRealizer realizer) {
-        this(enumerator, new LocalRewriteApplier(realizer, null));
+        this(enumerator, new LocalRewriteApplier(realizer, null), new DefaultLogicalMoveGrouper());
     }
 
     public RuleInspectionService(TreeLocalMoveEnumerator enumerator, LocalRewriteApplier localRewriteApplier) {
+        this(enumerator, localRewriteApplier, new DefaultLogicalMoveGrouper());
+    }
+
+    public RuleInspectionService(
+            TreeLocalMoveEnumerator enumerator,
+            LocalRewriteApplier localRewriteApplier,
+            LogicalMoveGrouper logicalMoveGrouper) {
         this.enumerator = enumerator == null ? new TreeLocalMoveEnumerator() : enumerator;
         this.localRewriteApplier = localRewriteApplier == null ? new LocalRewriteApplier() : localRewriteApplier;
+        this.logicalMoveGrouper = logicalMoveGrouper == null ? new DefaultLogicalMoveGrouper() : logicalMoveGrouper;
     }
 
     /**
@@ -80,79 +88,32 @@ public final class RuleInspectionService {
             List<LocalCandidateMove> atPosition = entry.getValue();
 
             List<RuleMatch> matches = new ArrayList<>();
-
-            // Group candidates by enumeratorId: complete-square emits shift + residue as
-            // two separate CandidateMoves that belong to one logical match; all other
-            // enumerators emit one CandidateMove per independent logical match.
-            Map<String, List<LocalCandidateMove>> byEnumerator = new LinkedHashMap<>();
-            for (LocalCandidateMove candidate : atPosition) {
-                byEnumerator.computeIfAbsent(candidate.move().enumeratorId(), id -> new ArrayList<>())
-                        .add(candidate);
-            }
-
-            for (Map.Entry<String, List<LocalCandidateMove>> enumeratorEntry : byEnumerator.entrySet()) {
-                String enumeratorId = enumeratorEntry.getKey();
-                List<LocalCandidateMove> enumeratorCandidates = enumeratorEntry.getValue();
-                CandidateMove first = enumeratorCandidates.get(0).move();
-
-                if ("complete-square".equals(enumeratorId)) {
-                    // Collapse all complete-square parameters into one RuleMatch so that
-                    // both shift and residue appear together as a single logical match.
-                    List<Binding> bindings = enumeratorCandidates.stream()
-                            .filter(c -> c.move().parameter() != null)
-                            .map(c -> new Binding(
-                                    c.move().parameter().name(),
-                                    c.move().parameter().value(),
-                                    c.move().parameter().kind().name()))
-                            .toList();
-                    LocalRewriteApplier.LocalRewriteResult result = localRewriteApplier.apply(
-                            expression,
-                            pos,
-                            enumeratorCandidates.stream().map(LocalCandidateMove::move).toList());
-                    String matchId = stableMatchId(
-                            enumeratorId,
-                            first.kind().name(),
-                            bindings,
-                            result.subtreeAfter(),
-                            result.expressionAfter());
-                    matches.add(new RuleMatch(
-                            matchId,
-                            enumeratorId,
-                            first.kind().name(),
-                            bindings,
-                            result.subtreeBefore(),
-                            result.subtreeAfter(),
-                            result.subtreeBefore(),
-                            result.subtreeAfter(),
-                            result.expressionAfter(),
-                            applicable(result)));
-                } else {
-                    // Each candidate is an independent logical match. Match rewriteAfter by
-                    // parameter value to correctly distinguish multiple realized moves of the
-                    // same kind (e.g. several cancellation-candidate or repeated-subexpression
-                    // moves at the same position).
-                    for (LocalCandidateMove candidate : enumeratorCandidates) {
-                        CandidateMove move = candidate.move();
-                        LocalRewriteApplier.LocalRewriteResult result = localRewriteApplier.apply(expression, pos, move);
-                        List<Binding> realizedBindings = bindings(result.bindings());
-                        matches.add(new RuleMatch(
-                                stableMatchId(
-                                        move.enumeratorId(),
-                                        move.kind().name(),
-                                        realizedBindings,
-                                        result.subtreeAfter(),
-                                        result.expressionAfter()),
-                                move.enumeratorId(),
-                                move.kind().name(),
-                                realizedBindings,
-                                result.subtreeBefore(),
+            for (LogicalMoveMatch logicalMatch : logicalMoveGrouper.group(pos, atPosition)) {
+                LocalRewriteApplier.LocalRewriteResult result = localRewriteApplier.apply(
+                        expression,
+                        pos,
+                        logicalMatch.candidates().stream().map(LocalCandidateMove::move).toList());
+                List<Binding> realizedBindings = bindings(result.bindings());
+                List<Binding> groupedBindings = bindings(logicalMatch.bindings());
+                List<Binding> matchBindings = logicalMatch.composite() && !groupedBindings.isEmpty()
+                        ? groupedBindings
+                        : realizedBindings;
+                matches.add(new RuleMatch(
+                        stableMatchId(
+                                logicalMatch.enumeratorId(),
+                                logicalMatch.kind(),
+                                matchBindings,
                                 result.subtreeAfter(),
-                                result.subtreeBefore(),
-                                result.subtreeAfter(),
-                                result.expressionAfter(),
-                                applicable(result)));
-                    }
-                }
+                                result.expressionAfter()),
+                        logicalMatch.enumeratorId(),
+                        logicalMatch.kind(),
+                        matchBindings,
+                        result.subtreeBefore(),
+                        result.subtreeAfter(),
+                        result.subtreeBefore(),
+                        result.subtreeAfter(),
+                        result.expressionAfter(),
+                        applicable(result)));
             }
             positions.add(new PositionResult(
                     pos.pathKey(),
