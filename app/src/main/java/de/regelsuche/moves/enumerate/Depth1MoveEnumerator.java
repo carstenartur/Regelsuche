@@ -25,6 +25,7 @@ public final class Depth1MoveEnumerator {
                 new RepeatedSubexpressionEnumerator(),
                 new SmallConstantEnumerator(),
                 new CancellationCandidateEnumerator(),
+                new FactorParameterEnumerator(),
                 new CompleteSquareParameterEnumerator()));
     }
 
@@ -82,6 +83,7 @@ public final class Depth1MoveEnumerator {
     private RewriteMoveKind kindFor(String enumeratorId) {
         return switch (enumeratorId) {
             case "complete-square" -> RewriteMoveKind.COMPLETE_SQUARE;
+            case "factor-candidate" -> RewriteMoveKind.FACTOR;
             case "cancellation-candidate" -> RewriteMoveKind.ADD_SAME_TERM_BOTH_SIDES;
             case "repeated-subexpression" -> RewriteMoveKind.COMMON_SUBEXPRESSION;
             default -> RewriteMoveKind.UNKNOWN;
