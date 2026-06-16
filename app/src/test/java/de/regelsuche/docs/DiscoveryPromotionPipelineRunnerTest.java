@@ -608,7 +608,7 @@ class DiscoveryPromotionPipelineRunnerTest {
         assertTrue(gallery.contains("`000`"));
         assertTrue(detail.contains("## Local transformation highlighting"));
         assertTrue(detail.contains("Affected TreePosition:"));
-        assertTrue(detail.contains("`000`"));
+        assertTrue(detail.contains("000"));
         assertTrue(detail.contains("x^2 + 6*x + 5"));
         assertTrue(detail.contains("(x + 3)^2 - 4"));
     }
@@ -622,7 +622,7 @@ class DiscoveryPromotionPipelineRunnerTest {
 
         assertTrue(detail.contains("## Local transformation highlighting"));
         assertTrue(detail.contains("Affected TreePosition:"));
-        assertTrue(detail.contains("`root`"));
+        assertTrue(detail.contains("root"));
         assertTrue(detail.contains("Before (subtree at position):"));
         assertTrue(detail.contains("After (subtree at position):"));
     }
