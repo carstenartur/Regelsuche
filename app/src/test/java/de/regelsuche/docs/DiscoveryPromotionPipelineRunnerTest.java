@@ -229,6 +229,56 @@ class DiscoveryPromotionPipelineRunnerTest {
     }
 
     @Test
+    void detailReportRendersStructuredExplanationDataForLocalTransformationHighlighting() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        DiscoveryExplanationFactory factory = new DiscoveryExplanationFactory();
+        PromotionRecord record = new PromotionRecord(
+            "structured-highlight",
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.PROMOTED,
+            "x^2 + 6*x + 5",
+            "(x + 3)^2 - 4",
+            "AGREE",
+            "oracle",
+            "DEGRADED",
+            "complete_square_bridge",
+            "sympy-polynomial-basic",
+            List.of(
+                "treePosition.pathKey=000",
+                "treePosition.before=x^2 + 6*x + 5",
+                "treePosition.after=(x + 3)^2 - 4"
+            ),
+            "rationale",
+            List.of("COMPLETE_SQUARE"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            true,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+
+        String renderedExplanation = runner.renderLocalTransformationHighlighting(
+            factory.buildTransformationExplanation(record)
+        );
+        String details = runner.renderDetailReport(record);
+
+        assertTrue(details.contains("## Local transformation highlighting"));
+        assertTrue(details.contains(renderedExplanation));
+        assertTrue(details.contains("**Affected TreePosition:** 000"));
+        assertTrue(details.contains("**Before (subtree at position):** x^2 + 6*x + 5"));
+        assertTrue(details.contains("**After (subtree at position):** (x + 3)^2 - 4"));
+        assertTrue(details.contains("**Transformation/operator path:** COMPLETE_SQUARE"));
+        assertTrue(details.contains("**Why path works:** oracle agrees"));
+    }
+
+    @Test
     void detailReportsUseUniqueSlugWhenCandidateIdsCollide(@TempDir Path tempDir) throws Exception {
         DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
         List<PromotionRecord> records = List.of(
@@ -558,7 +608,7 @@ class DiscoveryPromotionPipelineRunnerTest {
         assertTrue(gallery.contains("`000`"));
         assertTrue(detail.contains("## Local transformation highlighting"));
         assertTrue(detail.contains("Affected TreePosition:"));
-        assertTrue(detail.contains("`000`"));
+        assertTrue(detail.contains("000"));
         assertTrue(detail.contains("x^2 + 6*x + 5"));
         assertTrue(detail.contains("(x + 3)^2 - 4"));
     }
@@ -572,7 +622,7 @@ class DiscoveryPromotionPipelineRunnerTest {
 
         assertTrue(detail.contains("## Local transformation highlighting"));
         assertTrue(detail.contains("Affected TreePosition:"));
-        assertTrue(detail.contains("`root`"));
+        assertTrue(detail.contains("root"));
         assertTrue(detail.contains("Before (subtree at position):"));
         assertTrue(detail.contains("After (subtree at position):"));
     }

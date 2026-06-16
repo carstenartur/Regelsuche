@@ -2,6 +2,11 @@ package de.regelsuche.docs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.explanation.Explanation;
+import de.regelsuche.explanation.ExplanationFact;
+import de.regelsuche.explanation.ExplanationSection;
+import de.regelsuche.explanation.MarkdownExplanationRenderer;
+import de.regelsuche.explanation.TransformationExplanation;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -31,6 +36,8 @@ public final class DiscoveryPromotionPipelineRunner {
     private final PromotionRegistry registry = new PromotionRegistry();
     private final DiscoveryCampaignFiveRunner campaignFiveRunner = new DiscoveryCampaignFiveRunner();
     private final DiscoveryCampaignFourRunner campaignFourRunner = new DiscoveryCampaignFourRunner();
+    private final DiscoveryExplanationFactory explanationFactory = new DiscoveryExplanationFactory();
+    private final MarkdownExplanationRenderer markdownExplanationRenderer = new MarkdownExplanationRenderer();
 
     public static void main(String[] args) {
         Path repoRoot = args.length == 0
@@ -209,6 +216,7 @@ public final class DiscoveryPromotionPipelineRunner {
 
     String renderDetailReport(PromotionRecord record) {
         DiscoveryHighlightModel highlightModel = highlightModel(record);
+        TransformationExplanation transformationExplanation = explanationFactory.buildTransformationExplanation(record);
         return """
             # Discovery detail: %s
 
@@ -258,9 +266,7 @@ public final class DiscoveryPromotionPipelineRunner {
 
             ## Local transformation highlighting
 
-            - Affected TreePosition: %s
-            - Before (subtree at position): %s
-            - After (subtree at position): %s
+            %s
             """
             .formatted(
                 escapeMarkdownInline(record.candidateId()),
@@ -294,12 +300,35 @@ public final class DiscoveryPromotionPipelineRunner {
                 escapeMarkdownInline(orDash(highlightModel.rewrittenBefore())),
                 escapeMarkdownInline(orDash(highlightModel.rewrittenAfter())),
                 escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel))),
-                inlineCodeOrDash(highlightModel.affectedPathKey().isBlank() ? "root" : highlightModel.affectedPathKey()),
-                inlineCodeOrDash(highlightModel.positionBefore().isBlank()
-                    ? record.originalExpression() : highlightModel.positionBefore()),
-                inlineCodeOrDash(highlightModel.positionAfter().isBlank()
-                    ? record.discoveredStructure() : highlightModel.positionAfter())
+                renderLocalTransformationHighlighting(transformationExplanation)
             );
+    }
+
+    String renderLocalTransformationHighlighting(TransformationExplanation transformationExplanation) {
+        return markdownExplanationRenderer.renderSections(
+            localTransformationHighlightExplanation(transformationExplanation),
+            3
+        ).stripTrailing();
+    }
+
+    Explanation localTransformationHighlightExplanation(TransformationExplanation transformationExplanation) {
+        List<ExplanationFact> facts = new ArrayList<>();
+        facts.add(new ExplanationFact(
+            "Affected TreePosition",
+            transformationExplanation.position().isBlank() ? "root" : transformationExplanation.position()
+        ));
+        facts.add(new ExplanationFact("Before (subtree at position)", transformationExplanation.before()));
+        facts.add(new ExplanationFact("After (subtree at position)", transformationExplanation.after()));
+        for (String rulePathStep : transformationExplanation.rulePath()) {
+            facts.add(new ExplanationFact("Transformation/operator path", rulePathStep));
+        }
+        for (String pathReason : transformationExplanation.pathReasons()) {
+            facts.add(new ExplanationFact("Why path works", pathReason));
+        }
+        return new Explanation(
+            transformationExplanation.candidateId(),
+            List.of(new ExplanationSection("Transformation", facts, List.of(), List.of()))
+        );
     }
 
     private String timelineMiddle(PromotionRecord record) {
@@ -638,39 +667,14 @@ public final class DiscoveryPromotionPipelineRunner {
     }
 
     private String galleryInterestReason(PromotionRecord record) {
-        List<String> reasons = new ArrayList<>();
-        if (record.stage().atLeast(PromotionStage.REUSED)) {
-            reasons.add("macro reused");
-        } else if (record.stage().atLeast(PromotionStage.PROMOTED)) {
-            reasons.add("promotion-eligible: oracle and ablation confirmed");
-        }
-        if (record.measuredImprovement()) {
-            reasons.add("expression score improved");
-        }
-        if (!record.reusedMacroIds().isEmpty()) {
-            reasons.add("reused macros: " + String.join(", ", record.reusedMacroIds()));
-        }
-        if (!record.oracleEvidence().isBlank()) {
-            reasons.add("oracle evidence: " + record.oracleEvidence());
-        }
-        return reasons.isEmpty() ? "gallery-eligible by stage and promotion criteria" : String.join("; ", reasons);
+        return markdownExplanationRenderer.renderReasons(
+            explanationFactory.buildInterestReasons(record),
+            "gallery-eligible by stage and promotion criteria"
+        );
     }
 
     private String galleryPathReason(PromotionRecord record) {
-        List<String> reasons = new ArrayList<>();
-        String oracleStatus = record.oracleStatus();
-        if ("AGREE".equalsIgnoreCase(oracleStatus)) {
-            reasons.add("oracle agrees");
-        } else if (!"UNAVAILABLE".equalsIgnoreCase(oracleStatus)) {
-            reasons.add("oracle=" + oracleStatus);
-        }
-        if (record.evidenceExists()) {
-            reasons.add("evidence present");
-        }
-        if (!record.ablationStatus().isBlank() && !"N/A".equals(record.ablationStatus())) {
-            reasons.add("ablation=" + record.ablationStatus());
-        }
-        return reasons.isEmpty() ? "—" : String.join("; ", reasons);
+        return markdownExplanationRenderer.renderReasons(explanationFactory.buildPathReasons(record), "—");
     }
 
     private String renderBlockedCandidates(List<PromotionRecord> records) {
