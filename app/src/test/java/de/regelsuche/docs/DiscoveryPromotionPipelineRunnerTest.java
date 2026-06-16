@@ -464,4 +464,215 @@ class DiscoveryPromotionPipelineRunnerTest {
         method.invoke(runner, detailsDir, records);
     }
 
+    @Test
+    void galleryIncludesRichDetailsForEligibleEntries() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        PromotionRecord record = new PromotionRecord(
+            "complete-square",
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.REUSED,
+            "x^2 + 6*x + 5",
+            "A^2 + 6*A + 5",
+            "AGREE",
+            "matches quadratic",
+            "DEGRADED",
+            "substitution_introduction",
+            "sympy-polynomial-basic",
+            List.of(
+                "substitution.placeholder.A=x+1",
+                "substitution.occurrences.A=2",
+                "substitution.substituted=A^2 + 6*A + 5"
+            ),
+            "rationale",
+            List.of("substitution_introduction", "complete_square_bridge"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            true,
+            "macro.id",
+            List.of("macro.id"),
+            true,
+            "discovery-campaign-4"
+        );
+
+        String gallery = runner.renderGallery(List.of(record));
+
+        assertTrue(gallery.contains("## Entry details"));
+        assertTrue(gallery.contains("### complete-square"));
+        assertTrue(gallery.contains("**Why interesting?**"));
+        assertTrue(gallery.contains("**Detected structure:**"));
+        assertTrue(gallery.contains("**Hidden structure abstraction:**"));
+        assertTrue(gallery.contains("A -> x+1"));
+        assertTrue(gallery.contains("**Bridge/operator used:**"));
+        assertTrue(gallery.contains("**Affected TreePosition:**"));
+        assertTrue(gallery.contains("`root`"));
+        assertTrue(gallery.contains("**Why path works:**"));
+        assertTrue(gallery.contains("oracle agrees"));
+        assertTrue(gallery.contains("**Ablation:**"));
+        assertTrue(gallery.contains("DEGRADED"));
+    }
+
+    @Test
+    void galleryShowsExplicitTreePositionWhenPresentInAssumptions() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        PromotionRecord record = new PromotionRecord(
+            "local-transform",
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.PROMOTED,
+            "sin(x^2 + 6*x + 5)",
+            "sin((x + 3)^2 - 4)",
+            "AGREE",
+            "ok",
+            "DEGRADED",
+            "complete_square",
+            "sympy-polynomial-basic",
+            List.of(
+                "substitution.placeholder.A=x",
+                "treePosition.pathKey=000",
+                "treePosition.before=x^2 + 6*x + 5",
+                "treePosition.after=(x + 3)^2 - 4"
+            ),
+            "rationale",
+            List.of("complete_square"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            false,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+
+        String gallery = runner.renderGallery(List.of(record));
+        String detail = runner.renderDetailReport(record);
+
+        assertTrue(gallery.contains("`000`"));
+        assertTrue(detail.contains("## Local transformation highlighting"));
+        assertTrue(detail.contains("Affected TreePosition:"));
+        assertTrue(detail.contains("`000`"));
+        assertTrue(detail.contains("x^2 + 6*x + 5"));
+        assertTrue(detail.contains("(x + 3)^2 - 4"));
+    }
+
+    @Test
+    void detailReportIncludesLocalTransformationHighlightingSection() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        PromotionRecord record = promotedRecord("complete-square-family", "A^2 + 6*A + 5");
+
+        String detail = runner.renderDetailReport(record);
+
+        assertTrue(detail.contains("## Local transformation highlighting"));
+        assertTrue(detail.contains("Affected TreePosition:"));
+        assertTrue(detail.contains("`root`"));
+        assertTrue(detail.contains("Before (subtree at position):"));
+        assertTrue(detail.contains("After (subtree at position):"));
+    }
+
+    @Test
+    void operatorImpactViewShowsHelpingBlockingAndImprovingOperators() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        PromotionRecord promoted = new PromotionRecord(
+            "promoted-case",
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.PROMOTED,
+            "x + x",
+            "2*x",
+            "AGREE",
+            "ok",
+            "DEGRADED",
+            "factor_common",
+            "pack",
+            List.of(),
+            "rationale",
+            List.of("factor_common"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            true,
+            "",
+            List.of(),
+            true,
+            ""
+        );
+        PromotionRecord blocked = new PromotionRecord(
+            "blocked-case",
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.OBSERVED,
+            "y + y",
+            "y + y",
+            "UNAVAILABLE",
+            "",
+            "N/A",
+            "unknown_op",
+            "pack",
+            List.of(),
+            "no path found",
+            List.of(),
+            false,
+            List.of("no-path"),
+            false,
+            false,
+            false,
+            false,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+
+        String impact = runner.renderOperatorImpactView(List.of(promoted, blocked));
+
+        assertTrue(impact.contains("# Operator impact"));
+        assertTrue(impact.contains("## Operators that help"));
+        assertTrue(impact.contains("factor_common: promoted=1"));
+        assertTrue(impact.contains("## Operators that block"));
+        assertTrue(impact.contains("unknown_op: blocked=1"));
+        assertTrue(impact.contains("## Operators with measured improvement"));
+        assertTrue(impact.contains("factor_common: measured-improvement=1"));
+    }
+
+    @Test
+    void operatorImpactViewShowsNoneWhenNoData() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+
+        String impact = runner.renderOperatorImpactView(List.of());
+
+        assertTrue(impact.contains("# Operator impact"));
+        assertTrue(impact.contains("## Operators that help"));
+        assertTrue(impact.contains("## Operators that block"));
+        assertTrue(impact.contains("## Operators with measured improvement"));
+        assertTrue(impact.contains("- none"));
+    }
+
+    @Test
+    void dashboardIncludesOracleContradictionsAndCampaignProgress(@TempDir Path tempDir) throws Exception {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+
+        runner.writeReport(tempDir);
+
+        String dashboard = Files.readString(tempDir.resolve("promotion-dashboard.md"), StandardCharsets.UTF_8);
+        assertTrue(dashboard.contains("## Oracle contradictions"));
+        assertTrue(dashboard.contains("oracle-disagree count:"));
+        assertTrue(dashboard.contains("## Campaign progress"));
+        assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("operator-impact.md")));
+        String operatorImpact = Files.readString(
+            tempDir.resolve("discovery-backlog").resolve("operator-impact.md"), StandardCharsets.UTF_8);
+        assertTrue(operatorImpact.contains("# Operator impact"));
+    }
+
 }
