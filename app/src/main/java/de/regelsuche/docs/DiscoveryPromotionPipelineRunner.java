@@ -3,6 +3,8 @@ package de.regelsuche.docs;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.explanation.Explanation;
+import de.regelsuche.explanation.ExplanationFact;
+import de.regelsuche.explanation.ExplanationSection;
 import de.regelsuche.explanation.MarkdownExplanationRenderer;
 import de.regelsuche.explanation.TransformationExplanation;
 import de.regelsuche.util.AtomicJsonFile;
@@ -215,7 +217,6 @@ public final class DiscoveryPromotionPipelineRunner {
     String renderDetailReport(PromotionRecord record) {
         DiscoveryHighlightModel highlightModel = highlightModel(record);
         TransformationExplanation transformationExplanation = explanationFactory.buildTransformationExplanation(record);
-        Explanation explanation = transformationExplanation.toExplanation();
         return """
             # Discovery detail: %s
 
@@ -299,8 +300,35 @@ public final class DiscoveryPromotionPipelineRunner {
                 escapeMarkdownInline(orDash(highlightModel.rewrittenBefore())),
                 escapeMarkdownInline(orDash(highlightModel.rewrittenAfter())),
                 escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel))),
-                markdownExplanationRenderer.renderSections(explanation, 3).stripTrailing()
+                renderLocalTransformationHighlighting(transformationExplanation)
             );
+    }
+
+    String renderLocalTransformationHighlighting(TransformationExplanation transformationExplanation) {
+        return markdownExplanationRenderer.renderSections(
+            localTransformationHighlightExplanation(transformationExplanation),
+            3
+        ).stripTrailing();
+    }
+
+    Explanation localTransformationHighlightExplanation(TransformationExplanation transformationExplanation) {
+        List<ExplanationFact> facts = new ArrayList<>();
+        facts.add(new ExplanationFact(
+            "Affected TreePosition",
+            transformationExplanation.position().isBlank() ? "root" : transformationExplanation.position()
+        ));
+        facts.add(new ExplanationFact("Before (subtree at position)", transformationExplanation.before()));
+        facts.add(new ExplanationFact("After (subtree at position)", transformationExplanation.after()));
+        for (String rulePathStep : transformationExplanation.rulePath()) {
+            facts.add(new ExplanationFact("Transformation/operator path", rulePathStep));
+        }
+        for (String pathReason : transformationExplanation.pathReasons()) {
+            facts.add(new ExplanationFact("Why path works", pathReason));
+        }
+        return new Explanation(
+            transformationExplanation.candidateId(),
+            List.of(new ExplanationSection("Transformation", facts, List.of(), List.of()))
+        );
     }
 
     private String timelineMiddle(PromotionRecord record) {

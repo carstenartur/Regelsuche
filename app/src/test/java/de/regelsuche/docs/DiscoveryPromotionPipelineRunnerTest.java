@@ -6,8 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.regelsuche.explanation.Explanation;
-import de.regelsuche.explanation.MarkdownExplanationRenderer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -234,7 +232,6 @@ class DiscoveryPromotionPipelineRunnerTest {
     void detailReportRendersStructuredExplanationDataForLocalTransformationHighlighting() {
         DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
         DiscoveryExplanationFactory factory = new DiscoveryExplanationFactory();
-        MarkdownExplanationRenderer renderer = new MarkdownExplanationRenderer();
         PromotionRecord record = new PromotionRecord(
             "structured-highlight",
             "campaign",
@@ -267,17 +264,18 @@ class DiscoveryPromotionPipelineRunnerTest {
             ""
         );
 
-        Explanation explanation = factory.buildTransformationExplanation(record).toExplanation();
-        String renderedExplanation = renderer.renderSections(explanation, 3).stripTrailing();
+        String renderedExplanation = runner.renderLocalTransformationHighlighting(
+            factory.buildTransformationExplanation(record)
+        );
         String details = runner.renderDetailReport(record);
 
         assertTrue(details.contains("## Local transformation highlighting"));
         assertTrue(details.contains(renderedExplanation));
-        assertTrue(details.contains("**position:** 000"));
-        assertTrue(details.contains("**before:** x^2 + 6*x + 5"));
-        assertTrue(details.contains("**after:** (x + 3)^2 - 4"));
-        assertTrue(details.contains("**rulePath:** COMPLETE_SQUARE"));
-        assertTrue(details.contains("**pathReason:** oracle agrees"));
+        assertTrue(details.contains("**Affected TreePosition:** 000"));
+        assertTrue(details.contains("**Before (subtree at position):** x^2 + 6*x + 5"));
+        assertTrue(details.contains("**After (subtree at position):** (x + 3)^2 - 4"));
+        assertTrue(details.contains("**Transformation/operator path:** COMPLETE_SQUARE"));
+        assertTrue(details.contains("**Why path works:** oracle agrees"));
     }
 
     @Test
