@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransformationExplanation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.explanation</a> &gt; <span class="el_source">TransformationExplanation.java</span></div><h1>TransformationExplanation.java</h1><pre class="source lang-java linenums">package de.regelsuche.explanation;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Structured explanation for a single mathematical transformation discovery.
+ *
+ * &lt;p&gt;Captures the before/after expressions at a specific tree position, the
+ * rule / operator path, and evidence-based reasons without any rendering
+ * concern. Use {@link #toExplanation()} to convert this into a generic
+ * {@link Explanation} that can be passed to any {@link ExplanationRenderer}.
+ *
+ * &lt;p&gt;Example:
+ * &lt;pre&gt;
+ *   TransformationExplanation
+ *   - position: 000
+ *   - before: x^2 + 6*x + 5
+ *   - after: (x + 3)^2 - 4
+ *   - rulePath: [COMPLETE_SQUARE]
+ *   - interestReasons: [promotion-eligible: oracle and ablation confirmed]
+ *   - pathReasons: [oracle agrees, evidence present]
+ * &lt;/pre&gt;
+ */
+public record TransformationExplanation(
+    String candidateId,
+    String position,
+    String before,
+    String after,
+    List&lt;String&gt; rulePath,
+    List&lt;String&gt; interestReasons,
+    List&lt;String&gt; pathReasons,
+    String oracleStatus,
+    String ablationStatus,
+    boolean evidenceExists,
+    boolean measuredImprovement,
+    List&lt;String&gt; reusedMacroIds
+) {
+<span class="fc" id="L39">    public TransformationExplanation {</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        candidateId = candidateId == null ? &quot;&quot; : candidateId;</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        position = position == null ? &quot;&quot; : position;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        before = before == null ? &quot;&quot; : before;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        after = after == null ? &quot;&quot; : after;</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        interestReasons = interestReasons == null ? List.of() : List.copyOf(interestReasons);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        pathReasons = pathReasons == null ? List.of() : List.copyOf(pathReasons);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        oracleStatus = oracleStatus == null ? &quot;&quot; : oracleStatus;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        ablationStatus = ablationStatus == null ? &quot;&quot; : ablationStatus;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        reusedMacroIds = reusedMacroIds == null ? List.of() : List.copyOf(reusedMacroIds);</span>
+<span class="fc" id="L50">    }</span>
+
+    /**
+     * Converts this domain-specific explanation into the generic
+     * {@link Explanation} structure so that any {@link ExplanationRenderer}
+     * can render it without knowing about discovery internals.
+     */
+    public Explanation toExplanation() {
+<span class="fc" id="L58">        List&lt;ExplanationSection&gt; sections = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L60">        List&lt;ExplanationFact&gt; transformFacts = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        transformFacts.add(new ExplanationFact(&quot;position&quot;, position.isBlank() ? &quot;root&quot; : position));</span>
+<span class="fc" id="L62">        transformFacts.add(new ExplanationFact(&quot;before&quot;, before));</span>
+<span class="fc" id="L63">        transformFacts.add(new ExplanationFact(&quot;after&quot;, after));</span>
+<span class="fc" id="L64">        addFacts(transformFacts, &quot;rulePath&quot;, rulePath);</span>
+<span class="fc" id="L65">        sections.add(new ExplanationSection(&quot;Transformation&quot;, transformFacts, List.of(), List.of()));</span>
+
+<span class="fc" id="L67">        List&lt;ExplanationFact&gt; reasonFacts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L68">        addFacts(reasonFacts, &quot;interestReason&quot;, interestReasons);</span>
+<span class="fc" id="L69">        addFacts(reasonFacts, &quot;pathReason&quot;, pathReasons);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (!reasonFacts.isEmpty()) {</span>
+<span class="fc" id="L71">            sections.add(new ExplanationSection(&quot;Reasons&quot;, reasonFacts, List.of(), List.of()));</span>
+        }
+
+<span class="fc" id="L74">        List&lt;ExplanationFact&gt; evidenceFacts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L75">        evidenceFacts.add(new ExplanationFact(&quot;oracle&quot;, oracleStatus));</span>
+<span class="fc" id="L76">        evidenceFacts.add(new ExplanationFact(&quot;ablation&quot;, ablationStatus));</span>
+<span class="fc" id="L77">        evidenceFacts.add(new ExplanationFact(&quot;evidencePresent&quot;, String.valueOf(evidenceExists)));</span>
+<span class="fc" id="L78">        List&lt;ExplanationMetric&gt; evidenceMetrics = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (measuredImprovement) {</span>
+<span class="fc" id="L80">            evidenceMetrics.add(new ExplanationMetric(&quot;measuredImprovement&quot;, 1));</span>
+        }
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (!reusedMacroIds.isEmpty()) {</span>
+<span class="fc" id="L83">            evidenceMetrics.add(new ExplanationMetric(&quot;reusedMacros&quot;, reusedMacroIds.size()));</span>
+        }
+<span class="fc" id="L85">        sections.add(new ExplanationSection(&quot;Evidence&quot;, evidenceFacts, evidenceMetrics, List.of()));</span>
+
+<span class="fc" id="L87">        return new Explanation(candidateId, sections);</span>
+    }
+
+    private static void addFacts(List&lt;ExplanationFact&gt; facts, String key, List&lt;String&gt; values) {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L92">            facts.add(new ExplanationFact(key, value));</span>
+<span class="fc" id="L93">        }</span>
+<span class="fc" id="L94">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

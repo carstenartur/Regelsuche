@@ -354,8 +354,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L354">        String profileName = stringValue(body, &quot;profile&quot;, SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);</span>
 <span class="fc" id="L355">        String goalName = stringValue(body, &quot;goal&quot;, &quot;&quot;).toUpperCase(Locale.ROOT);</span>
 <span class="fc bfc" id="L356" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="fc" id="L357">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
-<span class="fc" id="L358">            return;</span>
+<span class="nc" id="L357">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
+<span class="nc" id="L358">            return;</span>
         }
         InputType type;
         SearchProfile profile;
@@ -1627,8 +1627,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1627">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1628">            .findFirst();</span>
 <span class="fc bfc" id="L1629" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="fc" id="L1630">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="fc" id="L1631">            return;</span>
+<span class="nc" id="L1630">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1631">            return;</span>
         }
 <span class="fc" id="L1633">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
 <span class="fc" id="L1634">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>

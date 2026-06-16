@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryExplanationFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryExplanationFactory.java</span></div><h1>DiscoveryExplanationFactory.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.explanation.TransformationExplanation;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Builds structured {@link TransformationExplanation} objects from
+ * {@link PromotionRecord} data.
+ *
+ * &lt;p&gt;This factory encapsulates the domain logic that determines &lt;em&gt;why&lt;/em&gt; a
+ * discovery candidate is interesting and &lt;em&gt;why&lt;/em&gt; its rule path works. The
+ * result is a pure data object with no rendering concern; callers can pass it
+ * to any {@link de.regelsuche.explanation.ExplanationRenderer} to obtain a
+ * concrete text representation.
+ */
+<span class="fc" id="L17">public final class DiscoveryExplanationFactory {</span>
+
+    /**
+     * Builds a {@link TransformationExplanation} for a single discovery
+     * candidate record.
+     *
+     * @param record the promotion record to explain
+     * @return structured explanation capturing position, before/after, rules,
+     *         interest reasons, path reasons, and evidence
+     */
+    public TransformationExplanation buildTransformationExplanation(PromotionRecord record) {
+<span class="fc" id="L28">        List&lt;String&gt; interestReasons = buildInterestReasons(record);</span>
+<span class="fc" id="L29">        List&lt;String&gt; pathReasons = buildPathReasons(record);</span>
+<span class="fc" id="L30">        PositionAssumptions positionAssumptions = PositionAssumptions.from(record.assumptions());</span>
+
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        String before = positionAssumptions.before().isBlank() ? record.originalExpression() : positionAssumptions.before();</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        String after = positionAssumptions.after().isBlank() ? record.discoveredStructure() : positionAssumptions.after();</span>
+
+<span class="fc" id="L35">        return new TransformationExplanation(</span>
+<span class="fc" id="L36">            record.candidateId(),</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            positionAssumptions.pathKey().isBlank() ? &quot;root&quot; : positionAssumptions.pathKey(),</span>
+            before,
+            after,
+<span class="fc" id="L40">            record.rulePath(),</span>
+            interestReasons,
+            pathReasons,
+<span class="fc" id="L43">            record.oracleStatus(),</span>
+<span class="fc" id="L44">            record.ablationStatus(),</span>
+<span class="fc" id="L45">            record.evidenceExists(),</span>
+<span class="fc" id="L46">            record.measuredImprovement(),</span>
+<span class="fc" id="L47">            record.reusedMacroIds()</span>
+        );
+    }
+
+    /**
+     * Computes the list of reasons why a gallery candidate is interesting.
+     * Each element is a self-contained plain-text statement; joining them is
+     * the responsibility of the renderer.
+     */
+    List&lt;String&gt; buildInterestReasons(PromotionRecord record) {
+<span class="fc" id="L57">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (record.stage().atLeast(PromotionStage.REUSED)) {</span>
+<span class="fc" id="L59">            reasons.add(&quot;macro reused&quot;);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        } else if (record.stage().atLeast(PromotionStage.PROMOTED)) {</span>
+<span class="fc" id="L61">            reasons.add(&quot;promotion-eligible: oracle and ablation confirmed&quot;);</span>
+        }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (record.measuredImprovement()) {</span>
+<span class="fc" id="L64">            reasons.add(&quot;expression score improved&quot;);</span>
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (!record.reusedMacroIds().isEmpty()) {</span>
+<span class="fc" id="L67">            reasons.add(&quot;reused macros: &quot; + String.join(&quot;, &quot;, record.reusedMacroIds()));</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (!record.oracleEvidence().isBlank()) {</span>
+<span class="fc" id="L70">            reasons.add(&quot;oracle evidence: &quot; + record.oracleEvidence());</span>
+        }
+<span class="fc" id="L72">        return List.copyOf(reasons);</span>
+    }
+
+    /**
+     * Computes the list of reasons why the rule path for a candidate is
+     * considered valid. Each element is a self-contained plain-text statement.
+     */
+    List&lt;String&gt; buildPathReasons(PromotionRecord record) {
+<span class="fc" id="L80">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L81">        String oracleStatus = record.oracleStatus();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (&quot;AGREE&quot;.equalsIgnoreCase(oracleStatus)) {</span>
+<span class="fc" id="L83">            reasons.add(&quot;oracle agrees&quot;);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        } else if (!&quot;UNAVAILABLE&quot;.equalsIgnoreCase(oracleStatus)) {</span>
+<span class="nc" id="L85">            reasons.add(&quot;oracle=&quot; + oracleStatus);</span>
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (record.evidenceExists()) {</span>
+<span class="fc" id="L88">            reasons.add(&quot;evidence present&quot;);</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">        if (!record.ablationStatus().isBlank() &amp;&amp; !&quot;N/A&quot;.equals(record.ablationStatus())) {</span>
+<span class="fc" id="L91">            reasons.add(&quot;ablation=&quot; + record.ablationStatus());</span>
+        }
+<span class="fc" id="L93">        return List.copyOf(reasons);</span>
+    }
+
+<span class="fc" id="L96">    private record PositionAssumptions(String pathKey, String before, String after) {</span>
+        private static final String PATH_KEY_PREFIX = &quot;treePosition.pathKey=&quot;;
+        private static final String BEFORE_PREFIX = &quot;treePosition.before=&quot;;
+        private static final String AFTER_PREFIX = &quot;treePosition.after=&quot;;
+
+        private static PositionAssumptions from(List&lt;String&gt; assumptions) {
+<span class="fc" id="L102">            String pathKey = &quot;&quot;;</span>
+<span class="fc" id="L103">            String before = &quot;&quot;;</span>
+<span class="fc" id="L104">            String after = &quot;&quot;;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (String assumption : assumptions) {</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                if (assumption == null) {</span>
+<span class="nc" id="L107">                    continue;</span>
+                }
+<span class="fc bfc" id="L109" title="All 4 branches covered.">                if (pathKey.isBlank() &amp;&amp; assumption.startsWith(PATH_KEY_PREFIX)) {</span>
+<span class="fc" id="L110">                    pathKey = assumption.substring(PATH_KEY_PREFIX.length());</span>
+<span class="fc bfc" id="L111" title="All 4 branches covered.">                } else if (before.isBlank() &amp;&amp; assumption.startsWith(BEFORE_PREFIX)) {</span>
+<span class="fc" id="L112">                    before = assumption.substring(BEFORE_PREFIX.length());</span>
+<span class="pc bpc" id="L113" title="1 of 4 branches missed.">                } else if (after.isBlank() &amp;&amp; assumption.startsWith(AFTER_PREFIX)) {</span>
+<span class="fc" id="L114">                    after = assumption.substring(AFTER_PREFIX.length());</span>
+                }
+<span class="fc" id="L116">            }</span>
+<span class="fc" id="L117">            return new PositionAssumptions(pathKey, before, after);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

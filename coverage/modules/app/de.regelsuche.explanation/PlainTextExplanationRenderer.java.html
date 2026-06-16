@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlainTextExplanationRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.explanation</a> &gt; <span class="el_source">PlainTextExplanationRenderer.java</span></div><h1>PlainTextExplanationRenderer.java</h1><pre class="source lang-java linenums">package de.regelsuche.explanation;
+
+/**
+ * Renders an {@link Explanation} as plain text (no Markdown markup).
+ *
+ * &lt;p&gt;This renderer demonstrates that the explanation model is not coupled to
+ * any particular output format. It is intentionally minimal and can serve as a
+ * basis for accessibility readers, terminal output, or test assertions.
+ */
+<span class="fc" id="L10">public final class PlainTextExplanationRenderer implements ExplanationRenderer {</span>
+
+    @Override
+    public String render(Explanation explanation) {
+<span class="fc" id="L14">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L15">        out.append(explanation.title()).append('\n');</span>
+<span class="fc" id="L16">        out.append(&quot;=&quot;.repeat(Math.min(explanation.title().length(), 60))).append('\n');</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        for (ExplanationSection section : explanation.sections()) {</span>
+<span class="fc" id="L18">            out.append('\n').append(section.title()).append('\n');</span>
+<span class="fc" id="L19">            out.append(&quot;-&quot;.repeat(Math.min(section.title().length(), 40))).append('\n');</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">            for (ExplanationFact fact : section.facts()) {</span>
+<span class="fc" id="L21">                out.append(fact.key()).append(&quot;: &quot;).append(fact.value()).append('\n');</span>
+<span class="fc" id="L22">            }</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            for (ExplanationMetric metric : section.metrics()) {</span>
+<span class="nc" id="L24">                out.append(metric.name()).append(&quot;: &quot;).append(metric.count()).append('\n');</span>
+<span class="nc" id="L25">            }</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            for (ExplanationWarning warning : section.warnings()) {</span>
+<span class="nc" id="L27">                out.append(&quot;WARNING: &quot;).append(warning.message()).append('\n');</span>
+<span class="nc" id="L28">            }</span>
+<span class="fc" id="L29">        }</span>
+<span class="fc" id="L30">        return out.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
