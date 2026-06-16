@@ -7,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.HashSet;
 
 /**
  * Recursively explores the reachable search space from a given expression
@@ -78,12 +79,20 @@ public final class BoundedSearchExplorer {
         if (branchCount > accum.maxBranchingFactor) {
             accum.maxBranchingFactor = branchCount;
         }
+        if (branchCount == 0) {
+            accum.deadEndCount++;
+        }
+        accum.currentPath.add(expression);
         for (SearchSuccessorState successor : successors) {
             if (accum.exploredStates >= budget) {
                 break;
             }
+            if (accum.currentPath.contains(successor.successorExpression())) {
+                accum.cycleCount++;
+            }
             recurse(successor.successorExpression(), depth + 1, maxDepth, accum, budget);
         }
+        accum.currentPath.remove(expression);
     }
 
     /**
@@ -96,6 +105,11 @@ public final class BoundedSearchExplorer {
      * @param averageBranchingFactor mean successor count over all expanded states
      * @param growthPerDepth       number of unique new states discovered at each depth level,
      *                             keyed by depth (0 = root)
+     * @param cycleCount           number of successor edges that point back to an ancestor
+     *                             in the current DFS path (true back-edges)
+     * @param cycleRate            {@code cycleCount / totalEdges} if any edges were explored,
+     *                             otherwise {@code 0.0}
+     * @param deadEndCount         unique states that were fully expanded but had no successors
      */
     public record ExplorationResult(
             int exploredStates,
@@ -103,16 +117,22 @@ public final class BoundedSearchExplorer {
             int duplicateStates,
             int maxBranchingFactor,
             double averageBranchingFactor,
-            Map<Integer, Integer> growthPerDepth) {
+            Map<Integer, Integer> growthPerDepth,
+            int cycleCount,
+            double cycleRate,
+            int deadEndCount) {
 
         public ExplorationResult {
             growthPerDepth = growthPerDepth == null
                     ? Map.of()
                     : Collections.unmodifiableMap(new LinkedHashMap<>(growthPerDepth));
+            cycleCount = Math.max(0, cycleCount);
+            cycleRate = Math.max(0d, Math.min(1d, cycleRate));
+            deadEndCount = Math.max(0, deadEndCount);
         }
 
         public static ExplorationResult empty() {
-            return new ExplorationResult(0, 0, 0, 0, 0.0, Map.of());
+            return new ExplorationResult(0, 0, 0, 0, 0.0, Map.of(), 0, 0.0, 0);
         }
     }
 
@@ -123,18 +143,25 @@ public final class BoundedSearchExplorer {
         int maxBranchingFactor;
         int totalExpanded;
         int totalSuccessors;
+        int cycleCount;
+        int deadEndCount;
         final LinkedHashSet<String> visited = new LinkedHashSet<>();
+        final HashSet<String> currentPath = new HashSet<>();
         final TreeMap<Integer, Integer> growthPerDepth = new TreeMap<>();
 
         ExplorationResult build() {
             double avg = totalExpanded > 0 ? (double) totalSuccessors / totalExpanded : 0.0;
+            double cr = totalSuccessors > 0 ? (double) cycleCount / totalSuccessors : 0.0;
             return new ExplorationResult(
                     exploredStates,
                     uniqueStates,
                     duplicateStates,
                     maxBranchingFactor,
                     avg,
-                    new LinkedHashMap<>(growthPerDepth));
+                    new LinkedHashMap<>(growthPerDepth),
+                    cycleCount,
+                    cr,
+                    deadEndCount);
         }
     }
 }
