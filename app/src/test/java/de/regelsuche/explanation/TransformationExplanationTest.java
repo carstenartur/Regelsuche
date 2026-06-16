@@ -50,9 +50,9 @@ class TransformationExplanationTest {
             "01",
             "x + x",
             "2*x",
-            List.of("factor_out"),
+            List.of("factor_out", "normalize"),
             List.of("macro reused"),
-            List.of("oracle agrees"),
+            List.of("oracle agrees", "evidence present"),
             "AGREE",
             "DEGRADED",
             true,
@@ -70,10 +70,12 @@ class TransformationExplanationTest {
         assertTrue(hasFact(transformSection, "before", "x + x"));
         assertTrue(hasFact(transformSection, "after", "2*x"));
         assertTrue(hasFact(transformSection, "rulePath", "factor_out"));
+        assertTrue(hasFact(transformSection, "rulePath", "normalize"));
 
         ExplanationSection reasonSection = findSection(explanation, "Reasons");
         assertTrue(hasFact(reasonSection, "interestReason", "macro reused"));
         assertTrue(hasFact(reasonSection, "pathReason", "oracle agrees"));
+        assertTrue(hasFact(reasonSection, "pathReason", "evidence present"));
 
         ExplanationSection evidenceSection = findSection(explanation, "Evidence");
         assertTrue(hasFact(evidenceSection, "oracle", "AGREE"));

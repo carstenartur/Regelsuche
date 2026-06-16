@@ -57,29 +57,20 @@ public record TransformationExplanation(
     public Explanation toExplanation() {
         List<ExplanationSection> sections = new ArrayList<>();
 
-        // Transformation section
         List<ExplanationFact> transformFacts = new ArrayList<>();
         transformFacts.add(new ExplanationFact("position", position.isBlank() ? "root" : position));
         transformFacts.add(new ExplanationFact("before", before));
         transformFacts.add(new ExplanationFact("after", after));
-        if (!rulePath.isEmpty()) {
-            transformFacts.add(new ExplanationFact("rulePath", String.join(" -> ", rulePath)));
-        }
+        addFacts(transformFacts, "rulePath", rulePath);
         sections.add(new ExplanationSection("Transformation", transformFacts, List.of(), List.of()));
 
-        // Interest / path reasons section
         List<ExplanationFact> reasonFacts = new ArrayList<>();
-        if (!interestReasons.isEmpty()) {
-            reasonFacts.add(new ExplanationFact("interestReason", String.join("; ", interestReasons)));
-        }
-        if (!pathReasons.isEmpty()) {
-            reasonFacts.add(new ExplanationFact("pathReason", String.join("; ", pathReasons)));
-        }
+        addFacts(reasonFacts, "interestReason", interestReasons);
+        addFacts(reasonFacts, "pathReason", pathReasons);
         if (!reasonFacts.isEmpty()) {
             sections.add(new ExplanationSection("Reasons", reasonFacts, List.of(), List.of()));
         }
 
-        // Evidence section
         List<ExplanationFact> evidenceFacts = new ArrayList<>();
         evidenceFacts.add(new ExplanationFact("oracle", oracleStatus));
         evidenceFacts.add(new ExplanationFact("ablation", ablationStatus));
@@ -94,5 +85,11 @@ public record TransformationExplanation(
         sections.add(new ExplanationSection("Evidence", evidenceFacts, evidenceMetrics, List.of()));
 
         return new Explanation(candidateId, sections);
+    }
+
+    private static void addFacts(List<ExplanationFact> facts, String key, List<String> values) {
+        for (String value : values) {
+            facts.add(new ExplanationFact(key, value));
+        }
     }
 }

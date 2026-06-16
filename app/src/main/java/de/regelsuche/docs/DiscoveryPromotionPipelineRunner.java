@@ -642,16 +642,14 @@ public final class DiscoveryPromotionPipelineRunner {
     }
 
     private String galleryInterestReason(PromotionRecord record) {
-        TransformationExplanation explanation = explanationFactory.buildTransformationExplanation(record);
         return markdownExplanationRenderer.renderReasons(
-            explanation.interestReasons(),
+            explanationFactory.buildInterestReasons(record),
             "gallery-eligible by stage and promotion criteria"
         );
     }
 
     private String galleryPathReason(PromotionRecord record) {
-        TransformationExplanation explanation = explanationFactory.buildTransformationExplanation(record);
-        return markdownExplanationRenderer.renderReasons(explanation.pathReasons(), "—");
+        return markdownExplanationRenderer.renderReasons(explanationFactory.buildPathReasons(record), "—");
     }
 
     private String renderBlockedCandidates(List<PromotionRecord> records) {

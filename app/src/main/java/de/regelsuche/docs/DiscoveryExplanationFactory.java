@@ -27,29 +27,14 @@ public final class DiscoveryExplanationFactory {
     public TransformationExplanation buildTransformationExplanation(PromotionRecord record) {
         List<String> interestReasons = buildInterestReasons(record);
         List<String> pathReasons = buildPathReasons(record);
+        PositionAssumptions positionAssumptions = PositionAssumptions.from(record.assumptions());
 
-        String pathKey = record.assumptions().stream()
-            .filter(a -> a != null && a.startsWith("treePosition.pathKey="))
-            .map(a -> a.substring("treePosition.pathKey=".length()))
-            .findFirst()
-            .orElse("");
-        String positionBefore = record.assumptions().stream()
-            .filter(a -> a != null && a.startsWith("treePosition.before="))
-            .map(a -> a.substring("treePosition.before=".length()))
-            .findFirst()
-            .orElse("");
-        String positionAfter = record.assumptions().stream()
-            .filter(a -> a != null && a.startsWith("treePosition.after="))
-            .map(a -> a.substring("treePosition.after=".length()))
-            .findFirst()
-            .orElse("");
-
-        String before = positionBefore.isBlank() ? record.originalExpression() : positionBefore;
-        String after = positionAfter.isBlank() ? record.discoveredStructure() : positionAfter;
+        String before = positionAssumptions.before().isBlank() ? record.originalExpression() : positionAssumptions.before();
+        String after = positionAssumptions.after().isBlank() ? record.discoveredStructure() : positionAssumptions.after();
 
         return new TransformationExplanation(
             record.candidateId(),
-            pathKey.isBlank() ? "root" : pathKey,
+            positionAssumptions.pathKey().isBlank() ? "root" : positionAssumptions.pathKey(),
             before,
             after,
             record.rulePath(),
@@ -106,5 +91,30 @@ public final class DiscoveryExplanationFactory {
             reasons.add("ablation=" + record.ablationStatus());
         }
         return List.copyOf(reasons);
+    }
+
+    private record PositionAssumptions(String pathKey, String before, String after) {
+        private static final String PATH_KEY_PREFIX = "treePosition.pathKey=";
+        private static final String BEFORE_PREFIX = "treePosition.before=";
+        private static final String AFTER_PREFIX = "treePosition.after=";
+
+        private static PositionAssumptions from(List<String> assumptions) {
+            String pathKey = "";
+            String before = "";
+            String after = "";
+            for (String assumption : assumptions) {
+                if (assumption == null) {
+                    continue;
+                }
+                if (pathKey.isBlank() && assumption.startsWith(PATH_KEY_PREFIX)) {
+                    pathKey = assumption.substring(PATH_KEY_PREFIX.length());
+                } else if (before.isBlank() && assumption.startsWith(BEFORE_PREFIX)) {
+                    before = assumption.substring(BEFORE_PREFIX.length());
+                } else if (after.isBlank() && assumption.startsWith(AFTER_PREFIX)) {
+                    after = assumption.substring(AFTER_PREFIX.length());
+                }
+            }
+            return new PositionAssumptions(pathKey, before, after);
+        }
     }
 }
