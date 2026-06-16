@@ -639,7 +639,7 @@ class DiscoveryPromotionPipelineRunnerTest {
 
         assertTrue(impact.contains("# Operator impact"));
         assertTrue(impact.contains("## Operators that help"));
-        assertTrue(impact.contains("factor_common: promoted=1"));
+        assertTrue(impact.contains("factor_common: promoted-or-reused=1"));
         assertTrue(impact.contains("## Operators that block"));
         assertTrue(impact.contains("unknown_op: blocked=1"));
         assertTrue(impact.contains("## Operators with measured improvement"));
@@ -669,6 +669,9 @@ class DiscoveryPromotionPipelineRunnerTest {
         assertTrue(dashboard.contains("## Oracle contradictions"));
         assertTrue(dashboard.contains("oracle-disagree count:"));
         assertTrue(dashboard.contains("## Campaign progress"));
+        String dashboardJson = Files.readString(tempDir.resolve("promotion-dashboard.json"), StandardCharsets.UTF_8);
+        assertTrue(dashboardJson.contains("\"oracleContradictions\""));
+        assertTrue(dashboardJson.contains("\"campaignProgress\""));
         assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("operator-impact.md")));
         String operatorImpact = Files.readString(
             tempDir.resolve("discovery-backlog").resolve("operator-impact.md"), StandardCharsets.UTF_8);

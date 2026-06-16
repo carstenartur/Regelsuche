@@ -640,7 +640,7 @@ public final class DiscoveryPromotionPipelineRunner {
     private String galleryInterestReason(PromotionRecord record) {
         List<String> reasons = new ArrayList<>();
         if (record.stage().atLeast(PromotionStage.REUSED)) {
-            reasons.add("macro reused with measured improvement");
+            reasons.add("macro reused");
         } else if (record.stage().atLeast(PromotionStage.PROMOTED)) {
             reasons.add("promotion-eligible: oracle and ablation confirmed");
         }
@@ -757,7 +757,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed()
                     .thenComparing(Map.Entry.comparingByKey()))
                 .forEach(entry -> out.append("- ").append(escapeMarkdownInline(entry.getKey()))
-                    .append(": promoted=").append(entry.getValue()).append('\n'));
+                    .append(": promoted-or-reused=").append(entry.getValue()).append('\n'));
         }
 
         out.append("\n## Operators that block (appear in unresolved records)\n\n");
