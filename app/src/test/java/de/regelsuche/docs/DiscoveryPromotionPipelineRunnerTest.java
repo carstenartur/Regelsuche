@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.explanation.Explanation;
+import de.regelsuche.explanation.MarkdownExplanationRenderer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -226,6 +228,56 @@ class DiscoveryPromotionPipelineRunnerTest {
         assertTrue(details.contains("Placeholder mappings: A -> y + 2 (occurrences=2)"));
         assertTrue(details.contains("Substituted expression: A * z + A"));
         assertFalse(details.contains("Abstracted subexpression: (x + 1)"));
+    }
+
+    @Test
+    void detailReportRendersStructuredExplanationDataForLocalTransformationHighlighting() {
+        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+        DiscoveryExplanationFactory factory = new DiscoveryExplanationFactory();
+        MarkdownExplanationRenderer renderer = new MarkdownExplanationRenderer();
+        PromotionRecord record = new PromotionRecord(
+            "structured-highlight",
+            "campaign",
+            "2026-01-01",
+            "substitution",
+            PromotionStage.PROMOTED,
+            "x^2 + 6*x + 5",
+            "(x + 3)^2 - 4",
+            "AGREE",
+            "oracle",
+            "DEGRADED",
+            "complete_square_bridge",
+            "sympy-polynomial-basic",
+            List.of(
+                "treePosition.pathKey=000",
+                "treePosition.before=x^2 + 6*x + 5",
+                "treePosition.after=(x + 3)^2 - 4"
+            ),
+            "rationale",
+            List.of("COMPLETE_SQUARE"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            true,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+
+        Explanation explanation = factory.buildTransformationExplanation(record).toExplanation();
+        String renderedExplanation = renderer.renderSections(explanation, 3).stripTrailing();
+        String details = runner.renderDetailReport(record);
+
+        assertTrue(details.contains("## Local transformation highlighting"));
+        assertTrue(details.contains(renderedExplanation));
+        assertTrue(details.contains("**position:** 000"));
+        assertTrue(details.contains("**before:** x^2 + 6*x + 5"));
+        assertTrue(details.contains("**after:** (x + 3)^2 - 4"));
+        assertTrue(details.contains("**rulePath:** COMPLETE_SQUARE"));
+        assertTrue(details.contains("**pathReason:** oracle agrees"));
     }
 
     @Test

@@ -106,13 +106,20 @@ class TransformationExplanationTest {
 
     @Test
     void plainTextRendererProducesDifferentFormatFromMarkdown() {
-        Explanation explanation = new Explanation("my-candidate", List.of(
-            new ExplanationSection("Transformation",
-                List.of(new ExplanationFact("before", "a + b"), new ExplanationFact("after", "b + a")),
-                List.of(),
-                List.of()
-            )
-        ));
+        Explanation explanation = new TransformationExplanation(
+            "my-candidate",
+            "000",
+            "a + b",
+            "b + a",
+            List.of("commute_add"),
+            List.of("promotion-eligible: oracle and ablation confirmed"),
+            List.of("oracle agrees"),
+            "AGREE",
+            "DEGRADED",
+            true,
+            false,
+            List.of()
+        ).toExplanation();
 
         String markdown = new MarkdownExplanationRenderer().render(explanation);
         String plainText = new PlainTextExplanationRenderer().render(explanation);
@@ -120,8 +127,11 @@ class TransformationExplanationTest {
         // Both contain the same data
         assertTrue(plainText.contains("my-candidate"));
         assertTrue(plainText.contains("Transformation"));
+        assertTrue(plainText.contains("position: 000"));
         assertTrue(plainText.contains("before: a + b"));
         assertTrue(plainText.contains("after: b + a"));
+        assertTrue(plainText.contains("rulePath: commute_add"));
+        assertTrue(plainText.contains("pathReason: oracle agrees"));
 
         // But plainText has no Markdown markup
         assertFalse(plainText.contains("**"));
@@ -156,6 +166,36 @@ class TransformationExplanationTest {
         // Verify the data is accessible without any renderer
         assertEquals("test", explanation.title());
         assertEquals(3, explanation.sections().size()); // Transformation + Reasons + Evidence
+    }
+
+    @Test
+    void explanationModelRetainsPositionAndReasonsInGenericFacts() {
+        TransformationExplanation explanation = new TransformationExplanation(
+            "candidate",
+            "001",
+            "x^2",
+            "(x + 1)^2 - 1",
+            List.of("COMPLETE_SQUARE", "normalize"),
+            List.of("promotion-eligible: oracle and ablation confirmed"),
+            List.of("oracle agrees", "evidence present"),
+            "AGREE",
+            "DEGRADED",
+            true,
+            false,
+            List.of()
+        );
+
+        Explanation generic = explanation.toExplanation();
+        ExplanationSection transformation = findSection(generic, "Transformation");
+        ExplanationSection reasons = findSection(generic, "Reasons");
+
+        assertTrue(hasFact(transformation, "position", "001"));
+        assertTrue(hasFact(transformation, "before", "x^2"));
+        assertTrue(hasFact(transformation, "after", "(x + 1)^2 - 1"));
+        assertTrue(hasFact(transformation, "rulePath", "COMPLETE_SQUARE"));
+        assertTrue(hasFact(transformation, "rulePath", "normalize"));
+        assertTrue(hasFact(reasons, "pathReason", "oracle agrees"));
+        assertTrue(hasFact(reasons, "pathReason", "evidence present"));
     }
 
     @Test

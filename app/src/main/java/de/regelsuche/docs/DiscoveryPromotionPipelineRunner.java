@@ -2,6 +2,7 @@ package de.regelsuche.docs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.explanation.Explanation;
 import de.regelsuche.explanation.MarkdownExplanationRenderer;
 import de.regelsuche.explanation.TransformationExplanation;
 import de.regelsuche.util.AtomicJsonFile;
@@ -213,6 +214,8 @@ public final class DiscoveryPromotionPipelineRunner {
 
     String renderDetailReport(PromotionRecord record) {
         DiscoveryHighlightModel highlightModel = highlightModel(record);
+        TransformationExplanation transformationExplanation = explanationFactory.buildTransformationExplanation(record);
+        Explanation explanation = transformationExplanation.toExplanation();
         return """
             # Discovery detail: %s
 
@@ -262,9 +265,7 @@ public final class DiscoveryPromotionPipelineRunner {
 
             ## Local transformation highlighting
 
-            - Affected TreePosition: %s
-            - Before (subtree at position): %s
-            - After (subtree at position): %s
+            %s
             """
             .formatted(
                 escapeMarkdownInline(record.candidateId()),
@@ -298,11 +299,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 escapeMarkdownInline(orDash(highlightModel.rewrittenBefore())),
                 escapeMarkdownInline(orDash(highlightModel.rewrittenAfter())),
                 escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel))),
-                inlineCodeOrDash(highlightModel.affectedPathKey().isBlank() ? "root" : highlightModel.affectedPathKey()),
-                inlineCodeOrDash(highlightModel.positionBefore().isBlank()
-                    ? record.originalExpression() : highlightModel.positionBefore()),
-                inlineCodeOrDash(highlightModel.positionAfter().isBlank()
-                    ? record.discoveredStructure() : highlightModel.positionAfter())
+                markdownExplanationRenderer.renderSections(explanation, 3).stripTrailing()
             );
     }
 

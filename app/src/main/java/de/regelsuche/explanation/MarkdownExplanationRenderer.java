@@ -16,19 +16,13 @@ public final class MarkdownExplanationRenderer implements ExplanationRenderer {
     public String render(Explanation explanation) {
         StringBuilder out = new StringBuilder();
         out.append("# ").append(explanation.title()).append("\n\n");
-        for (ExplanationSection section : explanation.sections()) {
-            out.append("## ").append(section.title()).append("\n\n");
-            for (ExplanationFact fact : section.facts()) {
-                out.append("- **").append(fact.key()).append(":** ").append(fact.value()).append('\n');
-            }
-            for (ExplanationMetric metric : section.metrics()) {
-                out.append("- **").append(metric.name()).append(":** ").append(metric.count()).append('\n');
-            }
-            for (ExplanationWarning warning : section.warnings()) {
-                out.append("> ⚠ ").append(warning.message()).append('\n');
-            }
-            out.append('\n');
-        }
+        appendSections(out, explanation.sections(), 2);
+        return out.toString();
+    }
+
+    public String renderSections(Explanation explanation, int headingLevel) {
+        StringBuilder out = new StringBuilder();
+        appendSections(out, explanation.sections(), headingLevel);
         return out.toString();
     }
 
@@ -46,5 +40,22 @@ public final class MarkdownExplanationRenderer implements ExplanationRenderer {
      */
     public String renderReasons(List<String> reasons, String fallback) {
         return reasons == null || reasons.isEmpty() ? fallback : String.join("; ", reasons);
+    }
+
+    private void appendSections(StringBuilder out, List<ExplanationSection> sections, int headingLevel) {
+        String headingPrefix = "#".repeat(Math.max(1, headingLevel));
+        for (ExplanationSection section : sections) {
+            out.append(headingPrefix).append(' ').append(section.title()).append("\n\n");
+            for (ExplanationFact fact : section.facts()) {
+                out.append("- **").append(fact.key()).append(":** ").append(fact.value()).append('\n');
+            }
+            for (ExplanationMetric metric : section.metrics()) {
+                out.append("- **").append(metric.name()).append(":** ").append(metric.count()).append('\n');
+            }
+            for (ExplanationWarning warning : section.warnings()) {
+                out.append("> ⚠ ").append(warning.message()).append('\n');
+            }
+            out.append('\n');
+        }
     }
 }
