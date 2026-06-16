@@ -115,96 +115,101 @@ import java.util.stream.Stream;
 <span class="fc" id="L115">                renderMacroOpportunities(report.promotionRecords()),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L118">            PromotionDashboard dashboard = buildDashboard(report.promotionRecords());</span>
-<span class="fc" id="L119">            AtomicJsonFile.writeUtf8(</span>
-<span class="fc" id="L120">                outputDirectory.resolve(&quot;promotion-dashboard.json&quot;),</span>
-<span class="fc" id="L121">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(dashboard)</span>
-            );
-<span class="fc" id="L123">            Files.writeString(</span>
-<span class="fc" id="L124">                outputDirectory.resolve(&quot;promotion-dashboard.md&quot;),</span>
-<span class="fc" id="L125">                renderDashboard(dashboard),</span>
+<span class="fc" id="L118">            Files.writeString(</span>
+<span class="fc" id="L119">                backlogDirectory.resolve(&quot;operator-impact.md&quot;),</span>
+<span class="fc" id="L120">                renderOperatorImpactView(report.promotionRecords()),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L128">            writeDiscoveryDetailReports(outputDirectory.resolve(&quot;discovery-details&quot;), report.promotionRecords());</span>
-<span class="fc" id="L129">            Files.writeString(</span>
-<span class="fc" id="L130">                outputDirectory.resolve(&quot;gallery-2.0.md&quot;),</span>
-<span class="fc" id="L131">                renderGallery(report.promotionRecords()),</span>
+<span class="fc" id="L123">            PromotionDashboard dashboard = buildDashboard(report.promotionRecords());</span>
+<span class="fc" id="L124">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L125">                outputDirectory.resolve(&quot;promotion-dashboard.json&quot;),</span>
+<span class="fc" id="L126">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(dashboard)</span>
+            );
+<span class="fc" id="L128">            Files.writeString(</span>
+<span class="fc" id="L129">                outputDirectory.resolve(&quot;promotion-dashboard.md&quot;),</span>
+<span class="fc" id="L130">                renderDashboard(dashboard),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L134">            campaignFiveRunner.writeReport(outputDirectory.resolve(&quot;discovery-campaign-5&quot;), report.campaignFive());</span>
-<span class="fc" id="L135">            campaignFourRunner.writeReport(outputDirectory.resolve(&quot;discovery-campaign-4&quot;), report.promotionRecords());</span>
-<span class="fc" id="L136">            return report;</span>
-<span class="nc" id="L137">        } catch (IOException exception) {</span>
-<span class="nc" id="L138">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L133">            writeDiscoveryDetailReports(outputDirectory.resolve(&quot;discovery-details&quot;), report.promotionRecords());</span>
+<span class="fc" id="L134">            Files.writeString(</span>
+<span class="fc" id="L135">                outputDirectory.resolve(&quot;gallery-2.0.md&quot;),</span>
+<span class="fc" id="L136">                renderGallery(report.promotionRecords()),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L139">            campaignFiveRunner.writeReport(outputDirectory.resolve(&quot;discovery-campaign-5&quot;), report.campaignFive());</span>
+<span class="fc" id="L140">            campaignFourRunner.writeReport(outputDirectory.resolve(&quot;discovery-campaign-4&quot;), report.promotionRecords());</span>
+<span class="fc" id="L141">            return report;</span>
+<span class="nc" id="L142">        } catch (IOException exception) {</span>
+<span class="nc" id="L143">            throw new UncheckedIOException(exception);</span>
         }
     }
 
     private List&lt;CampaignMetric&gt; campaignMetrics(List&lt;PromotionRecord&gt; records) {
-<span class="fc" id="L143">        return records.stream()</span>
-<span class="fc" id="L144">            .collect(java.util.stream.Collectors.groupingBy(</span>
+<span class="fc" id="L148">        return records.stream()</span>
+<span class="fc" id="L149">            .collect(java.util.stream.Collectors.groupingBy(</span>
                 PromotionRecord::sourceCampaign,
                 LinkedHashMap::new,
-<span class="fc" id="L147">                java.util.stream.Collectors.toList()))</span>
-<span class="fc" id="L148">            .entrySet().stream()</span>
-<span class="fc" id="L149">            .map(entry -&gt; metric(entry.getKey(), entry.getValue()))</span>
-<span class="fc" id="L150">            .sorted(Comparator.comparing(CampaignMetric::campaign))</span>
-<span class="fc" id="L151">            .toList();</span>
+<span class="fc" id="L152">                java.util.stream.Collectors.toList()))</span>
+<span class="fc" id="L153">            .entrySet().stream()</span>
+<span class="fc" id="L154">            .map(entry -&gt; metric(entry.getKey(), entry.getValue()))</span>
+<span class="fc" id="L155">            .sorted(Comparator.comparing(CampaignMetric::campaign))</span>
+<span class="fc" id="L156">            .toList();</span>
     }
 
     private CampaignMetric metric(String campaignId, List&lt;PromotionRecord&gt; records) {
-<span class="fc" id="L155">        long observed = records.size();</span>
-<span class="fc" id="L156">        long candidate = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.CANDIDATE)).count();</span>
-<span class="fc" id="L157">        long validated = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.VALIDATED)).count();</span>
-<span class="fc" id="L158">        long promoted = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED)).count();</span>
-<span class="fc" id="L159">        long reused = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.REUSED)).count();</span>
-<span class="fc" id="L160">        return new CampaignMetric(</span>
+<span class="fc" id="L160">        long observed = records.size();</span>
+<span class="fc" id="L161">        long candidate = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.CANDIDATE)).count();</span>
+<span class="fc" id="L162">        long validated = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.VALIDATED)).count();</span>
+<span class="fc" id="L163">        long promoted = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED)).count();</span>
+<span class="fc" id="L164">        long reused = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.REUSED)).count();</span>
+<span class="fc" id="L165">        return new CampaignMetric(</span>
             campaignId,
             observed,
             candidate,
             validated,
             promoted,
             reused,
-<span class="fc" id="L167">            conversionRates(observed, candidate, validated, promoted, reused)</span>
+<span class="fc" id="L172">            conversionRates(observed, candidate, validated, promoted, reused)</span>
         );
     }
 
     private Map&lt;String, Double&gt; conversionRates(long observed, long candidate, long validated, long promoted, long reused) {
-<span class="fc" id="L172">        Map&lt;String, Double&gt; rates = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L173">        rates.put(&quot;candidatePerObserved&quot;, ratio(candidate, observed));</span>
-<span class="fc" id="L174">        rates.put(&quot;validatedPerCandidate&quot;, ratio(validated, candidate));</span>
-<span class="fc" id="L175">        rates.put(&quot;promotedPerValidated&quot;, ratio(promoted, validated));</span>
-<span class="fc" id="L176">        rates.put(&quot;reusedPerPromoted&quot;, ratio(reused, promoted));</span>
-<span class="fc" id="L177">        return Map.copyOf(rates);</span>
+<span class="fc" id="L177">        Map&lt;String, Double&gt; rates = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L178">        rates.put(&quot;candidatePerObserved&quot;, ratio(candidate, observed));</span>
+<span class="fc" id="L179">        rates.put(&quot;validatedPerCandidate&quot;, ratio(validated, candidate));</span>
+<span class="fc" id="L180">        rates.put(&quot;promotedPerValidated&quot;, ratio(promoted, validated));</span>
+<span class="fc" id="L181">        rates.put(&quot;reusedPerPromoted&quot;, ratio(reused, promoted));</span>
+<span class="fc" id="L182">        return Map.copyOf(rates);</span>
     }
 
     private double ratio(long numerator, long denominator) {
-<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        return denominator == 0L ? 0.0d : numerator / (double) denominator;</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        return denominator == 0L ? 0.0d : numerator / (double) denominator;</span>
     }
 
     private void writeDiscoveryDetailReports(Path detailsDirectory, List&lt;PromotionRecord&gt; records) throws IOException {
-<span class="fc" id="L185">        Files.createDirectories(detailsDirectory);</span>
-<span class="fc" id="L186">        List&lt;PromotionRecord&gt; explainable = records.stream()</span>
-<span class="fc" id="L187">            .filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED))</span>
-<span class="fc" id="L188">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
-<span class="fc" id="L189">            .toList();</span>
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (explainable.isEmpty()) {</span>
-<span class="nc" id="L191">            Files.writeString(detailsDirectory.resolve(&quot;README.md&quot;), &quot;# Discovery details\n\n- none\n&quot;, StandardCharsets.UTF_8);</span>
-<span class="nc" id="L192">            return;</span>
+<span class="fc" id="L190">        Files.createDirectories(detailsDirectory);</span>
+<span class="fc" id="L191">        List&lt;PromotionRecord&gt; explainable = records.stream()</span>
+<span class="fc" id="L192">            .filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED))</span>
+<span class="fc" id="L193">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L194">            .toList();</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (explainable.isEmpty()) {</span>
+<span class="nc" id="L196">            Files.writeString(detailsDirectory.resolve(&quot;README.md&quot;), &quot;# Discovery details\n\n- none\n&quot;, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L197">            return;</span>
         }
-<span class="fc" id="L194">        StringBuilder index = new StringBuilder(&quot;# Discovery details\n\n&quot;);</span>
-<span class="fc" id="L195">        Map&lt;String, Integer&gt; slugCounts = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (PromotionRecord record : explainable) {</span>
-<span class="fc" id="L197">            String fileSlug = uniqueSlug(slug(record.candidateId()), slugCounts);</span>
-<span class="fc" id="L198">            Files.writeString(detailsDirectory.resolve(fileSlug + &quot;.md&quot;), renderDetailReport(record), StandardCharsets.UTF_8);</span>
-<span class="fc" id="L199">            index.append(&quot;- [&quot;).append(escapeMarkdownInline(record.candidateId())).append(&quot;](&quot;)</span>
-<span class="fc" id="L200">                .append(fileSlug).append(&quot;.md)\n&quot;);</span>
-<span class="fc" id="L201">        }</span>
-<span class="fc" id="L202">        Files.writeString(detailsDirectory.resolve(&quot;README.md&quot;), index.toString(), StandardCharsets.UTF_8);</span>
-<span class="fc" id="L203">    }</span>
+<span class="fc" id="L199">        StringBuilder index = new StringBuilder(&quot;# Discovery details\n\n&quot;);</span>
+<span class="fc" id="L200">        Map&lt;String, Integer&gt; slugCounts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (PromotionRecord record : explainable) {</span>
+<span class="fc" id="L202">            String fileSlug = uniqueSlug(slug(record.candidateId()), slugCounts);</span>
+<span class="fc" id="L203">            Files.writeString(detailsDirectory.resolve(fileSlug + &quot;.md&quot;), renderDetailReport(record), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L204">            index.append(&quot;- [&quot;).append(escapeMarkdownInline(record.candidateId())).append(&quot;](&quot;)</span>
+<span class="fc" id="L205">                .append(fileSlug).append(&quot;.md)\n&quot;);</span>
+<span class="fc" id="L206">        }</span>
+<span class="fc" id="L207">        Files.writeString(detailsDirectory.resolve(&quot;README.md&quot;), index.toString(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L208">    }</span>
 
     String renderDetailReport(PromotionRecord record) {
-<span class="fc" id="L206">        DiscoveryHighlightModel highlightModel = highlightModel(record);</span>
-<span class="fc" id="L207">        return &quot;&quot;&quot;</span>
+<span class="fc" id="L211">        DiscoveryHighlightModel highlightModel = highlightModel(record);</span>
+<span class="fc" id="L212">        return &quot;&quot;&quot;</span>
             # Discovery detail: %s
 
             ## Discovery summary
@@ -250,458 +255,614 @@ import java.util.stream.Stream;
               - after: %s
             - Source evidence: %s
             - Token-safe placeholder expansion: only whole placeholder tokens are replaced; identifiers like `ABC` or `A1` stay unchanged when replacing placeholder `A`.
+
+            ## Local transformation highlighting
+
+            - Affected TreePosition: %s
+            - Before (subtree at position): %s
+            - After (subtree at position): %s
             &quot;&quot;&quot;
-<span class="fc" id="L254">            .formatted(</span>
-<span class="fc" id="L255">                escapeMarkdownInline(record.candidateId()),</span>
-<span class="fc" id="L256">                inlineCodeOrDash(record.originalExpression()),</span>
-<span class="fc" id="L257">                inlineCodeOrDash(highlightModel.discoveredStructure()),</span>
-<span class="fc" id="L258">                escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel))),</span>
-<span class="fc" id="L259">                escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),</span>
-<span class="fc" id="L260">                escapeMarkdownInline(inlinePath(record.rulePath())),</span>
-<span class="fc" id="L261">                escapeMarkdownInline(promotionDecision(record)),</span>
-<span class="fc" id="L262">                escapeMarkdownInline(missingPieces(record)),</span>
-<span class="fc" id="L263">                inlineCodeOrDash(record.originalExpression()),</span>
-<span class="fc" id="L264">                inlineCodeOrDash(highlightModel.discoveredStructure()),</span>
-<span class="fc" id="L265">                escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),</span>
-<span class="fc" id="L266">                escapeMarkdownInline(inlinePath(record.rulePath())),</span>
-<span class="fc" id="L267">                inlineCodeOrDash(record.oracleStatus()),</span>
-<span class="fc" id="L268">                inlineCodeOrDash(orDash(record.oracleEvidence())),</span>
-<span class="fc" id="L269">                inlineCodeOrDash(record.ablationStatus()),</span>
-<span class="fc" id="L270">                inlineCodeOrDash(record.stage().name().toLowerCase(Locale.ROOT)),</span>
-<span class="fc bfc" id="L271" title="All 2 branches covered.">                record.measuredImprovement() ? &quot;improved&quot; : &quot;not-measured&quot;,</span>
-<span class="fc" id="L272">                inlineCodeOrDash(record.originalExpression()),</span>
-<span class="fc" id="L273">                inlineCodeOrDash(timelineAbstraction(highlightModel)),</span>
-<span class="fc" id="L274">                inlineCodeOrDash(timelineMiddle(record)),</span>
-<span class="fc" id="L275">                inlineCodeOrDash(record.discoveredStructure()),</span>
-<span class="fc" id="L276">                inlineCodeOrDash(timelineReuse(record)),</span>
-<span class="fc" id="L277">                inlineCodeOrDash(highlightModel.originalExpression()),</span>
-<span class="fc" id="L278">                inlineCodeOrDash(highlightModel.discoveredStructure()),</span>
-<span class="fc" id="L279">                escapeMarkdownInline(orDash(abstractedSubexpression(highlightModel))),</span>
-<span class="fc" id="L280">                escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),</span>
-<span class="fc" id="L281">                escapeMarkdownInline(orDash(highlightModel.substitutedExpression())),</span>
-<span class="fc" id="L282">                escapeMarkdownInline(orDash(highlightModel.expandedExpression())),</span>
-<span class="fc" id="L283">                escapeMarkdownInline(orDash(highlightModel.rewrittenBefore())),</span>
-<span class="fc" id="L284">                escapeMarkdownInline(orDash(highlightModel.rewrittenAfter())),</span>
-<span class="fc" id="L285">                escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel)))</span>
+<span class="fc" id="L265">            .formatted(</span>
+<span class="fc" id="L266">                escapeMarkdownInline(record.candidateId()),</span>
+<span class="fc" id="L267">                inlineCodeOrDash(record.originalExpression()),</span>
+<span class="fc" id="L268">                inlineCodeOrDash(highlightModel.discoveredStructure()),</span>
+<span class="fc" id="L269">                escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel))),</span>
+<span class="fc" id="L270">                escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),</span>
+<span class="fc" id="L271">                escapeMarkdownInline(inlinePath(record.rulePath())),</span>
+<span class="fc" id="L272">                escapeMarkdownInline(promotionDecision(record)),</span>
+<span class="fc" id="L273">                escapeMarkdownInline(missingPieces(record)),</span>
+<span class="fc" id="L274">                inlineCodeOrDash(record.originalExpression()),</span>
+<span class="fc" id="L275">                inlineCodeOrDash(highlightModel.discoveredStructure()),</span>
+<span class="fc" id="L276">                escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),</span>
+<span class="fc" id="L277">                escapeMarkdownInline(inlinePath(record.rulePath())),</span>
+<span class="fc" id="L278">                inlineCodeOrDash(record.oracleStatus()),</span>
+<span class="fc" id="L279">                inlineCodeOrDash(orDash(record.oracleEvidence())),</span>
+<span class="fc" id="L280">                inlineCodeOrDash(record.ablationStatus()),</span>
+<span class="fc" id="L281">                inlineCodeOrDash(record.stage().name().toLowerCase(Locale.ROOT)),</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">                record.measuredImprovement() ? &quot;improved&quot; : &quot;not-measured&quot;,</span>
+<span class="fc" id="L283">                inlineCodeOrDash(record.originalExpression()),</span>
+<span class="fc" id="L284">                inlineCodeOrDash(timelineAbstraction(highlightModel)),</span>
+<span class="fc" id="L285">                inlineCodeOrDash(timelineMiddle(record)),</span>
+<span class="fc" id="L286">                inlineCodeOrDash(record.discoveredStructure()),</span>
+<span class="fc" id="L287">                inlineCodeOrDash(timelineReuse(record)),</span>
+<span class="fc" id="L288">                inlineCodeOrDash(highlightModel.originalExpression()),</span>
+<span class="fc" id="L289">                inlineCodeOrDash(highlightModel.discoveredStructure()),</span>
+<span class="fc" id="L290">                escapeMarkdownInline(orDash(abstractedSubexpression(highlightModel))),</span>
+<span class="fc" id="L291">                escapeMarkdownInline(orDash(renderPlaceholderMappings(highlightModel))),</span>
+<span class="fc" id="L292">                escapeMarkdownInline(orDash(highlightModel.substitutedExpression())),</span>
+<span class="fc" id="L293">                escapeMarkdownInline(orDash(highlightModel.expandedExpression())),</span>
+<span class="fc" id="L294">                escapeMarkdownInline(orDash(highlightModel.rewrittenBefore())),</span>
+<span class="fc" id="L295">                escapeMarkdownInline(orDash(highlightModel.rewrittenAfter())),</span>
+<span class="fc" id="L296">                escapeMarkdownInline(orDash(renderSourceEvidence(highlightModel))),</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">                inlineCodeOrDash(highlightModel.affectedPathKey().isBlank() ? &quot;root&quot; : highlightModel.affectedPathKey()),</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">                inlineCodeOrDash(highlightModel.positionBefore().isBlank()</span>
+<span class="fc" id="L299">                    ? record.originalExpression() : highlightModel.positionBefore()),</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">                inlineCodeOrDash(highlightModel.positionAfter().isBlank()</span>
+<span class="fc" id="L301">                    ? record.discoveredStructure() : highlightModel.positionAfter())</span>
             );
     }
 
     private String timelineMiddle(PromotionRecord record) {
-<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (!record.sourceOperator().isBlank()) {</span>
-<span class="fc" id="L291">            return record.sourceOperator();</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">        if (!record.sourceOperator().isBlank()) {</span>
+<span class="fc" id="L307">            return record.sourceOperator();</span>
         }
-<span class="nc bnc" id="L293" title="All 2 branches missed.">        if (!record.rulePath().isEmpty()) {</span>
-<span class="nc" id="L294">            return String.join(&quot; -&gt; &quot;, record.rulePath());</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">        if (!record.rulePath().isEmpty()) {</span>
+<span class="nc" id="L310">            return String.join(&quot; -&gt; &quot;, record.rulePath());</span>
         }
-<span class="nc" id="L296">        return &quot;substitution/bridge&quot;;</span>
+<span class="nc" id="L312">        return &quot;substitution/bridge&quot;;</span>
     }
 
     private String timelineReuse(PromotionRecord record) {
-<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (!record.reusedMacroIds().isEmpty()) {</span>
-<span class="fc" id="L301">            return &quot;macro reuse: &quot; + String.join(&quot;, &quot;, record.reusedMacroIds());</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (!record.reusedMacroIds().isEmpty()) {</span>
+<span class="fc" id="L317">            return &quot;macro reuse: &quot; + String.join(&quot;, &quot;, record.reusedMacroIds());</span>
         }
-<span class="pc bpc" id="L303" title="1 of 2 branches missed.">        if (!record.generatedMacroId().isBlank()) {</span>
-<span class="nc" id="L304">            return &quot;generated macro: &quot; + record.generatedMacroId();</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        if (!record.generatedMacroId().isBlank()) {</span>
+<span class="nc" id="L320">            return &quot;generated macro: &quot; + record.generatedMacroId();</span>
         }
-<span class="fc" id="L306">        return &quot;macro reuse pending&quot;;</span>
+<span class="fc" id="L322">        return &quot;macro reuse pending&quot;;</span>
     }
 
     private String timelineAbstraction(DiscoveryHighlightModel highlightModel) {
-<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (!highlightModel.substitutedExpression().isBlank()) {</span>
-<span class="fc" id="L311">            return highlightModel.substitutedExpression();</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        if (!highlightModel.substitutedExpression().isBlank()) {</span>
+<span class="fc" id="L327">            return highlightModel.substitutedExpression();</span>
         }
-<span class="fc bfc" id="L313" title="All 2 branches covered.">        if (!highlightModel.placeholderMappings().isEmpty()) {</span>
-<span class="fc" id="L314">            return &quot;placeholder mappings: &quot; + renderPlaceholderMappings(highlightModel);</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (!highlightModel.placeholderMappings().isEmpty()) {</span>
+<span class="fc" id="L330">            return &quot;placeholder mappings: &quot; + renderPlaceholderMappings(highlightModel);</span>
         }
-<span class="fc" id="L316">        return &quot;no substitution evidence&quot;;</span>
+<span class="fc" id="L332">        return &quot;no substitution evidence&quot;;</span>
     }
 
     private DiscoveryHighlightModel highlightModel(PromotionRecord record) {
-<span class="fc" id="L320">        Map&lt;String, String&gt; placeholderMappings = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L321">        Map&lt;String, Integer&gt; placeholderOccurrences = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L322">        Map&lt;String, String&gt; invalidPlaceholderOccurrences = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L323">        Set&lt;String&gt; expandedPlaceholders = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L324">        List&lt;String&gt; sourceEvidence = record.assumptions().stream()</span>
-<span class="pc bpc" id="L325" title="1 of 4 branches missed.">            .filter(assumption -&gt; assumption != null &amp;&amp; assumption.startsWith(&quot;substitution.&quot;))</span>
-<span class="fc" id="L326">            .toList();</span>
-<span class="fc" id="L327">        String substitutedExpression = &quot;&quot;;</span>
-<span class="fc bfc" id="L328" title="All 2 branches covered.">        for (String assumption : sourceEvidence) {</span>
-<span class="fc" id="L329">            int separatorIndex = assumption.indexOf('=');</span>
-<span class="fc bfc" id="L330" title="All 2 branches covered.">            if (separatorIndex &lt; 0) {</span>
-<span class="fc" id="L331">                continue;</span>
+<span class="fc" id="L336">        Map&lt;String, String&gt; placeholderMappings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L337">        Map&lt;String, Integer&gt; placeholderOccurrences = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L338">        Map&lt;String, String&gt; invalidPlaceholderOccurrences = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L339">        Set&lt;String&gt; expandedPlaceholders = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L340">        List&lt;String&gt; sourceEvidence = record.assumptions().stream()</span>
+<span class="pc bpc" id="L341" title="1 of 4 branches missed.">            .filter(assumption -&gt; assumption != null &amp;&amp; assumption.startsWith(&quot;substitution.&quot;))</span>
+<span class="fc" id="L342">            .toList();</span>
+<span class="fc" id="L343">        String substitutedExpression = &quot;&quot;;</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        for (String assumption : sourceEvidence) {</span>
+<span class="fc" id="L345">            int separatorIndex = assumption.indexOf('=');</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            if (separatorIndex &lt; 0) {</span>
+<span class="fc" id="L347">                continue;</span>
             }
-<span class="fc" id="L333">            String key = assumption.substring(0, separatorIndex);</span>
-<span class="fc" id="L334">            String value = assumption.substring(separatorIndex + 1);</span>
-<span class="fc bfc" id="L335" title="All 2 branches covered.">            if (key.startsWith(&quot;substitution.placeholder.&quot;)) {</span>
-<span class="fc" id="L336">                placeholderMappings.put(key.substring(&quot;substitution.placeholder.&quot;.length()), value);</span>
-<span class="fc" id="L337">                continue;</span>
+<span class="fc" id="L349">            String key = assumption.substring(0, separatorIndex);</span>
+<span class="fc" id="L350">            String value = assumption.substring(separatorIndex + 1);</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">            if (key.startsWith(&quot;substitution.placeholder.&quot;)) {</span>
+<span class="fc" id="L352">                placeholderMappings.put(key.substring(&quot;substitution.placeholder.&quot;.length()), value);</span>
+<span class="fc" id="L353">                continue;</span>
             }
-<span class="fc bfc" id="L339" title="All 2 branches covered.">            if (key.startsWith(&quot;substitution.occurrences.&quot;)) {</span>
-<span class="fc" id="L340">                String placeholder = key.substring(&quot;substitution.occurrences.&quot;.length());</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">            if (key.startsWith(&quot;substitution.occurrences.&quot;)) {</span>
+<span class="fc" id="L356">                String placeholder = key.substring(&quot;substitution.occurrences.&quot;.length());</span>
                 try {
-<span class="fc" id="L342">                    placeholderOccurrences.put(placeholder, Integer.parseInt(value));</span>
-<span class="fc" id="L343">                } catch (NumberFormatException ignored) {</span>
-<span class="fc" id="L344">                    invalidPlaceholderOccurrences.put(placeholder, value);</span>
-<span class="fc" id="L345">                }</span>
-<span class="fc" id="L346">                continue;</span>
+<span class="fc" id="L358">                    placeholderOccurrences.put(placeholder, Integer.parseInt(value));</span>
+<span class="fc" id="L359">                } catch (NumberFormatException ignored) {</span>
+<span class="fc" id="L360">                    invalidPlaceholderOccurrences.put(placeholder, value);</span>
+<span class="fc" id="L361">                }</span>
+<span class="fc" id="L362">                continue;</span>
             }
-<span class="fc bfc" id="L348" title="All 2 branches covered.">            if (key.equals(&quot;substitution.substituted&quot;)) {</span>
-<span class="fc" id="L349">                substitutedExpression = value;</span>
-<span class="fc" id="L350">                continue;</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">            if (key.equals(&quot;substitution.substituted&quot;)) {</span>
+<span class="fc" id="L365">                substitutedExpression = value;</span>
+<span class="fc" id="L366">                continue;</span>
             }
-<span class="pc bpc" id="L352" title="2 of 4 branches missed.">            if (key.startsWith(&quot;substitution.expanded.&quot;) &amp;&amp; &quot;true&quot;.equalsIgnoreCase(value)) {</span>
-<span class="fc" id="L353">                expandedPlaceholders.add(key.substring(&quot;substitution.expanded.&quot;.length()));</span>
+<span class="pc bpc" id="L368" title="2 of 4 branches missed.">            if (key.startsWith(&quot;substitution.expanded.&quot;) &amp;&amp; &quot;true&quot;.equalsIgnoreCase(value)) {</span>
+<span class="fc" id="L369">                expandedPlaceholders.add(key.substring(&quot;substitution.expanded.&quot;.length()));</span>
             }
-<span class="fc" id="L355">        }</span>
-<span class="fc bfc" id="L356" title="All 2 branches covered.">        String discoveredStructure = !substitutedExpression.isBlank()</span>
-<span class="fc" id="L357">            ? substitutedExpression</span>
-<span class="fc" id="L358">            : record.discoveredStructure();</span>
-<span class="fc bfc" id="L359" title="All 2 branches covered.">        Map&lt;String, String&gt; placeholdersToExpand = expandedPlaceholders.isEmpty()</span>
-<span class="fc" id="L360">            ? Map.of()</span>
-<span class="fc" id="L361">            : placeholderMappings.entrySet().stream()</span>
-<span class="fc" id="L362">                .filter(entry -&gt; expandedPlaceholders.contains(entry.getKey()))</span>
-<span class="fc" id="L363">                .collect(Collectors.toMap(</span>
+<span class="fc" id="L371">        }</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">        String discoveredStructure = !substitutedExpression.isBlank()</span>
+<span class="fc" id="L373">            ? substitutedExpression</span>
+<span class="fc" id="L374">            : record.discoveredStructure();</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">        Map&lt;String, String&gt; placeholdersToExpand = expandedPlaceholders.isEmpty()</span>
+<span class="fc" id="L376">            ? Map.of()</span>
+<span class="fc" id="L377">            : placeholderMappings.entrySet().stream()</span>
+<span class="fc" id="L378">                .filter(entry -&gt; expandedPlaceholders.contains(entry.getKey()))</span>
+<span class="fc" id="L379">                .collect(Collectors.toMap(</span>
                     Map.Entry::getKey,
                     Map.Entry::getValue,
-<span class="nc" id="L366">                    (left, right) -&gt; left,</span>
+<span class="nc" id="L382">                    (left, right) -&gt; left,</span>
                     LinkedHashMap::new
                 ));
-<span class="fc bfc" id="L369" title="All 2 branches covered.">        String expandedExpression = placeholdersToExpand.isEmpty()</span>
-<span class="fc" id="L370">            ? &quot;&quot;</span>
-<span class="fc" id="L371">            : expandPlaceholders(</span>
-<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                substitutedExpression.isBlank() ? record.discoveredStructure() : substitutedExpression,</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        String expandedExpression = placeholdersToExpand.isEmpty()</span>
+<span class="fc" id="L386">            ? &quot;&quot;</span>
+<span class="fc" id="L387">            : expandPlaceholders(</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">                substitutedExpression.isBlank() ? record.discoveredStructure() : substitutedExpression,</span>
                 placeholdersToExpand
             );
-<span class="fc bfc" id="L375" title="All 2 branches covered.">        String rewrittenAfter = !substitutedExpression.isBlank()</span>
-<span class="fc" id="L376">            ? substitutedExpression</span>
-<span class="fc" id="L377">            : record.discoveredStructure();</span>
-<span class="fc" id="L378">        return new DiscoveryHighlightModel(</span>
-<span class="fc" id="L379">            record.originalExpression(),</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        String rewrittenAfter = !substitutedExpression.isBlank()</span>
+<span class="fc" id="L392">            ? substitutedExpression</span>
+<span class="fc" id="L393">            : record.discoveredStructure();</span>
+<span class="fc" id="L394">        String affectedPathKey = record.assumptions().stream()</span>
+<span class="pc bpc" id="L395" title="1 of 4 branches missed.">            .filter(a -&gt; a != null &amp;&amp; a.startsWith(&quot;treePosition.pathKey=&quot;))</span>
+<span class="fc" id="L396">            .map(a -&gt; a.substring(&quot;treePosition.pathKey=&quot;.length()))</span>
+<span class="fc" id="L397">            .findFirst()</span>
+<span class="fc" id="L398">            .orElse(&quot;&quot;);</span>
+<span class="fc" id="L399">        String positionBefore = record.assumptions().stream()</span>
+<span class="pc bpc" id="L400" title="1 of 4 branches missed.">            .filter(a -&gt; a != null &amp;&amp; a.startsWith(&quot;treePosition.before=&quot;))</span>
+<span class="fc" id="L401">            .map(a -&gt; a.substring(&quot;treePosition.before=&quot;.length()))</span>
+<span class="fc" id="L402">            .findFirst()</span>
+<span class="fc" id="L403">            .orElse(&quot;&quot;);</span>
+<span class="fc" id="L404">        String positionAfter = record.assumptions().stream()</span>
+<span class="pc bpc" id="L405" title="1 of 4 branches missed.">            .filter(a -&gt; a != null &amp;&amp; a.startsWith(&quot;treePosition.after=&quot;))</span>
+<span class="fc" id="L406">            .map(a -&gt; a.substring(&quot;treePosition.after=&quot;.length()))</span>
+<span class="fc" id="L407">            .findFirst()</span>
+<span class="fc" id="L408">            .orElse(&quot;&quot;);</span>
+<span class="fc" id="L409">        return new DiscoveryHighlightModel(</span>
+<span class="fc" id="L410">            record.originalExpression(),</span>
             discoveredStructure,
             placeholderMappings,
             placeholderOccurrences,
             invalidPlaceholderOccurrences,
             substitutedExpression,
             expandedExpression,
-<span class="fc" id="L386">            record.originalExpression(),</span>
+<span class="fc" id="L417">            record.originalExpression(),</span>
             rewrittenAfter,
-            sourceEvidence
+            sourceEvidence,
+            affectedPathKey,
+            positionBefore,
+            positionAfter
         );
     }
 
     private String expandPlaceholders(String expression, Map&lt;String, String&gt; placeholderMappings) {
-<span class="pc bpc" id="L393" title="3 of 6 branches missed.">        if (expression == null || expression.isBlank() || placeholderMappings.isEmpty()) {</span>
-<span class="nc" id="L394">            return &quot;&quot;;</span>
+<span class="pc bpc" id="L427" title="3 of 6 branches missed.">        if (expression == null || expression.isBlank() || placeholderMappings.isEmpty()) {</span>
+<span class="nc" id="L428">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L396">        String expanded = expression;</span>
-<span class="fc" id="L397">        List&lt;Map.Entry&lt;String, String&gt;&gt; orderedMappings = placeholderMappings.entrySet().stream()</span>
-<span class="fc" id="L398">            .sorted((left, right) -&gt; Integer.compare(right.getKey().length(), left.getKey().length()))</span>
-<span class="fc" id="L399">            .toList();</span>
-<span class="fc bfc" id="L400" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : orderedMappings) {</span>
-<span class="fc" id="L401">            String placeholder = entry.getKey();</span>
-<span class="pc bpc" id="L402" title="2 of 4 branches missed.">            if (placeholder == null || placeholder.isBlank()) {</span>
-<span class="nc" id="L403">                continue;</span>
+<span class="fc" id="L430">        String expanded = expression;</span>
+<span class="fc" id="L431">        List&lt;Map.Entry&lt;String, String&gt;&gt; orderedMappings = placeholderMappings.entrySet().stream()</span>
+<span class="fc" id="L432">            .sorted((left, right) -&gt; Integer.compare(right.getKey().length(), left.getKey().length()))</span>
+<span class="fc" id="L433">            .toList();</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : orderedMappings) {</span>
+<span class="fc" id="L435">            String placeholder = entry.getKey();</span>
+<span class="pc bpc" id="L436" title="2 of 4 branches missed.">            if (placeholder == null || placeholder.isBlank()) {</span>
+<span class="nc" id="L437">                continue;</span>
             }
-<span class="fc" id="L405">            Pattern tokenPattern = Pattern.compile(&quot;(?&lt;![A-Za-z0-9_])&quot; + Pattern.quote(placeholder) + &quot;(?![A-Za-z0-9_])&quot;);</span>
-<span class="fc" id="L406">            Matcher matcher = tokenPattern.matcher(expanded);</span>
-<span class="fc" id="L407">            expanded = matcher.replaceAll(Matcher.quoteReplacement(&quot;(&quot; + entry.getValue() + &quot;)&quot;));</span>
-<span class="fc" id="L408">        }</span>
-<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        return expanded.equals(expression) ? &quot;&quot; : expanded;</span>
+<span class="fc" id="L439">            Pattern tokenPattern = Pattern.compile(&quot;(?&lt;![A-Za-z0-9_])&quot; + Pattern.quote(placeholder) + &quot;(?![A-Za-z0-9_])&quot;);</span>
+<span class="fc" id="L440">            Matcher matcher = tokenPattern.matcher(expanded);</span>
+<span class="fc" id="L441">            expanded = matcher.replaceAll(Matcher.quoteReplacement(&quot;(&quot; + entry.getValue() + &quot;)&quot;));</span>
+<span class="fc" id="L442">        }</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">        return expanded.equals(expression) ? &quot;&quot; : expanded;</span>
     }
 
     private String abstractedSubexpression(DiscoveryHighlightModel highlightModel) {
-<span class="fc bfc" id="L413" title="All 2 branches covered.">        if (highlightModel.placeholderMappings().isEmpty()) {</span>
-<span class="fc" id="L414">            return &quot;&quot;;</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        if (highlightModel.placeholderMappings().isEmpty()) {</span>
+<span class="fc" id="L448">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L416">        return highlightModel.placeholderMappings().entrySet().stream()</span>
-<span class="fc" id="L417">            .map(entry -&gt; {</span>
-<span class="fc" id="L418">                String placeholder = entry.getKey();</span>
-<span class="fc" id="L419">                String mapping = placeholder + &quot; -&gt; &quot; + entry.getValue();</span>
-<span class="fc" id="L420">                Integer occurrences = highlightModel.placeholderOccurrences().get(placeholder);</span>
-<span class="fc bfc" id="L421" title="All 2 branches covered.">                return occurrences == null ? mapping : mapping + &quot; (occurrences=&quot; + occurrences + &quot;)&quot;;</span>
+<span class="fc" id="L450">        return highlightModel.placeholderMappings().entrySet().stream()</span>
+<span class="fc" id="L451">            .map(entry -&gt; {</span>
+<span class="fc" id="L452">                String placeholder = entry.getKey();</span>
+<span class="fc" id="L453">                String mapping = placeholder + &quot; -&gt; &quot; + entry.getValue();</span>
+<span class="fc" id="L454">                Integer occurrences = highlightModel.placeholderOccurrences().get(placeholder);</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">                return occurrences == null ? mapping : mapping + &quot; (occurrences=&quot; + occurrences + &quot;)&quot;;</span>
             })
-<span class="fc" id="L423">            .findFirst()</span>
-<span class="fc" id="L424">            .orElse(&quot;&quot;);</span>
+<span class="fc" id="L457">            .findFirst()</span>
+<span class="fc" id="L458">            .orElse(&quot;&quot;);</span>
     }
 
     private String renderPlaceholderMappings(DiscoveryHighlightModel highlightModel) {
-<span class="fc bfc" id="L428" title="All 2 branches covered.">        if (highlightModel.placeholderMappings().isEmpty()) {</span>
-<span class="fc" id="L429">            return &quot;no substitution evidence recorded&quot;;</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (highlightModel.placeholderMappings().isEmpty()) {</span>
+<span class="fc" id="L463">            return &quot;no substitution evidence recorded&quot;;</span>
         }
-<span class="fc" id="L431">        return highlightModel.placeholderMappings().entrySet().stream()</span>
-<span class="fc" id="L432">            .map(entry -&gt; {</span>
-<span class="fc" id="L433">                String placeholder = entry.getKey();</span>
-<span class="fc" id="L434">                Integer occurrences = highlightModel.placeholderOccurrences().get(placeholder);</span>
-<span class="fc bfc" id="L435" title="All 2 branches covered.">                return occurrences == null</span>
-<span class="fc" id="L436">                    ? placeholder + &quot; -&gt; &quot; + entry.getValue()</span>
-<span class="fc" id="L437">                    : placeholder + &quot; -&gt; &quot; + entry.getValue() + &quot; (occurrences=&quot; + occurrences + &quot;)&quot;;</span>
+<span class="fc" id="L465">        return highlightModel.placeholderMappings().entrySet().stream()</span>
+<span class="fc" id="L466">            .map(entry -&gt; {</span>
+<span class="fc" id="L467">                String placeholder = entry.getKey();</span>
+<span class="fc" id="L468">                Integer occurrences = highlightModel.placeholderOccurrences().get(placeholder);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">                return occurrences == null</span>
+<span class="fc" id="L470">                    ? placeholder + &quot; -&gt; &quot; + entry.getValue()</span>
+<span class="fc" id="L471">                    : placeholder + &quot; -&gt; &quot; + entry.getValue() + &quot; (occurrences=&quot; + occurrences + &quot;)&quot;;</span>
             })
-<span class="fc" id="L439">            .reduce((left, right) -&gt; left + &quot;; &quot; + right)</span>
-<span class="fc" id="L440">            .orElse(&quot;no substitution evidence recorded&quot;);</span>
+<span class="fc" id="L473">            .reduce((left, right) -&gt; left + &quot;; &quot; + right)</span>
+<span class="fc" id="L474">            .orElse(&quot;no substitution evidence recorded&quot;);</span>
     }
 
     private String renderSourceEvidence(DiscoveryHighlightModel highlightModel) {
-<span class="fc" id="L444">        List&lt;String&gt; evidence = new ArrayList&lt;&gt;(highlightModel.sourceEvidence());</span>
-<span class="fc bfc" id="L445" title="All 2 branches covered.">        if (!highlightModel.invalidPlaceholderOccurrences().isEmpty()) {</span>
-<span class="fc" id="L446">            String invalid = highlightModel.invalidPlaceholderOccurrences().entrySet().stream()</span>
-<span class="fc" id="L447">                .map(entry -&gt; entry.getKey() + &quot;=&quot; + entry.getValue())</span>
-<span class="pc" id="L448">                .reduce((left, right) -&gt; left + &quot;, &quot; + right)</span>
-<span class="fc" id="L449">                .orElse(&quot;&quot;);</span>
-<span class="fc" id="L450">            evidence.add(&quot;ignored.invalid.occurrences=&quot; + invalid);</span>
+<span class="fc" id="L478">        List&lt;String&gt; evidence = new ArrayList&lt;&gt;(highlightModel.sourceEvidence());</span>
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        if (!highlightModel.invalidPlaceholderOccurrences().isEmpty()) {</span>
+<span class="fc" id="L480">            String invalid = highlightModel.invalidPlaceholderOccurrences().entrySet().stream()</span>
+<span class="fc" id="L481">                .map(entry -&gt; entry.getKey() + &quot;=&quot; + entry.getValue())</span>
+<span class="pc" id="L482">                .reduce((left, right) -&gt; left + &quot;, &quot; + right)</span>
+<span class="fc" id="L483">                .orElse(&quot;&quot;);</span>
+<span class="fc" id="L484">            evidence.add(&quot;ignored.invalid.occurrences=&quot; + invalid);</span>
         }
-<span class="fc bfc" id="L452" title="All 2 branches covered.">        if (evidence.isEmpty()) {</span>
-<span class="fc" id="L453">            return &quot;none&quot;;</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        if (evidence.isEmpty()) {</span>
+<span class="fc" id="L487">            return &quot;none&quot;;</span>
         }
-<span class="fc" id="L455">        return String.join(&quot;; &quot;, evidence);</span>
+<span class="fc" id="L489">        return String.join(&quot;; &quot;, evidence);</span>
     }
 
     private PromotionDashboard buildDashboard(List&lt;PromotionRecord&gt; records) {
-<span class="fc" id="L459">        long observed = records.size();</span>
-<span class="fc" id="L460">        long candidate = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.CANDIDATE)).count();</span>
-<span class="fc" id="L461">        long validated = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.VALIDATED)).count();</span>
-<span class="fc" id="L462">        long promoted = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED)).count();</span>
-<span class="fc" id="L463">        long reused = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.REUSED)).count();</span>
-<span class="fc" id="L464">        List&lt;TopCandidate&gt; topPromoted = records.stream()</span>
-<span class="fc" id="L465">            .filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED))</span>
-<span class="fc" id="L466">            .sorted(Comparator.comparing(PromotionRecord::stage).reversed()</span>
-<span class="fc bfc" id="L467" title="All 2 branches covered.">                .thenComparing(record -&gt; record.measuredImprovement() ? 0 : 1)</span>
-<span class="fc" id="L468">                .thenComparing(record -&gt; -record.rulePath().size())</span>
-<span class="fc" id="L469">                .thenComparing(PromotionRecord::candidateId))</span>
-<span class="fc" id="L470">            .limit(5)</span>
-<span class="fc" id="L471">            .map(record -&gt; new TopCandidate(</span>
-<span class="fc" id="L472">                record.candidateId(),</span>
-<span class="fc" id="L473">                record.stage(),</span>
-<span class="fc" id="L474">                record.oracleStatus(),</span>
-<span class="fc" id="L475">                record.ablationStatus(),</span>
-<span class="fc" id="L476">                record.measuredImprovement()))</span>
-<span class="fc" id="L477">            .toList();</span>
-<span class="fc" id="L478">        List&lt;UnresolvedBlocker&gt; unresolved = records.stream()</span>
-<span class="fc" id="L479">            .filter(PromotionRecord::unresolved)</span>
-<span class="fc" id="L480">            .map(record -&gt; new UnresolvedBlocker(</span>
-<span class="fc" id="L481">                record.candidateId(),</span>
-<span class="fc" id="L482">                record.stage(),</span>
-<span class="pc bpc" id="L483" title="1 of 2 branches missed.">                record.promotionBlockers().isEmpty() ? List.of(orDash(record.rationale())) : record.promotionBlockers()))</span>
-<span class="fc" id="L484">            .toList();</span>
-<span class="fc" id="L485">        return new PromotionDashboard(</span>
+<span class="fc" id="L493">        long observed = records.size();</span>
+<span class="fc" id="L494">        long candidate = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.CANDIDATE)).count();</span>
+<span class="fc" id="L495">        long validated = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.VALIDATED)).count();</span>
+<span class="fc" id="L496">        long promoted = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED)).count();</span>
+<span class="fc" id="L497">        long reused = records.stream().filter(record -&gt; record.stage().atLeast(PromotionStage.REUSED)).count();</span>
+<span class="fc" id="L498">        long oracleContradictions = records.stream()</span>
+<span class="fc" id="L499">            .filter(record -&gt; &quot;DISAGREE&quot;.equalsIgnoreCase(record.oracleStatus()))</span>
+<span class="fc" id="L500">            .count();</span>
+<span class="fc" id="L501">        List&lt;TopCandidate&gt; topPromoted = records.stream()</span>
+<span class="fc" id="L502">            .filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED))</span>
+<span class="fc" id="L503">            .sorted(Comparator.comparing(PromotionRecord::stage).reversed()</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">                .thenComparing(record -&gt; record.measuredImprovement() ? 0 : 1)</span>
+<span class="fc" id="L505">                .thenComparing(record -&gt; -record.rulePath().size())</span>
+<span class="fc" id="L506">                .thenComparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L507">            .limit(5)</span>
+<span class="fc" id="L508">            .map(record -&gt; new TopCandidate(</span>
+<span class="fc" id="L509">                record.candidateId(),</span>
+<span class="fc" id="L510">                record.stage(),</span>
+<span class="fc" id="L511">                record.oracleStatus(),</span>
+<span class="fc" id="L512">                record.ablationStatus(),</span>
+<span class="fc" id="L513">                record.measuredImprovement()))</span>
+<span class="fc" id="L514">            .toList();</span>
+<span class="fc" id="L515">        List&lt;UnresolvedBlocker&gt; unresolved = records.stream()</span>
+<span class="fc" id="L516">            .filter(PromotionRecord::unresolved)</span>
+<span class="fc" id="L517">            .map(record -&gt; new UnresolvedBlocker(</span>
+<span class="fc" id="L518">                record.candidateId(),</span>
+<span class="fc" id="L519">                record.stage(),</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">                record.promotionBlockers().isEmpty() ? List.of(orDash(record.rationale())) : record.promotionBlockers()))</span>
+<span class="fc" id="L521">            .toList();</span>
+<span class="fc" id="L522">        List&lt;CampaignMetric&gt; campaignProgress = campaignMetrics(records);</span>
+<span class="fc" id="L523">        return new PromotionDashboard(</span>
             observed,
             candidate,
             validated,
             promoted,
             reused,
-<span class="fc" id="L491">            conversionRates(observed, candidate, validated, promoted, reused),</span>
+<span class="fc" id="L529">            conversionRates(observed, candidate, validated, promoted, reused),</span>
             topPromoted,
-            unresolved
+            unresolved,
+            oracleContradictions,
+            campaignProgress
         );
     }
 
     private String renderDashboard(PromotionDashboard dashboard) {
-<span class="fc" id="L498">        StringBuilder out = new StringBuilder(&quot;# Promotion dashboard\n\n&quot;);</span>
-<span class="fc" id="L499">        out.append(&quot;| observed | candidate | validated | promoted | reused |\n&quot;)</span>
-<span class="fc" id="L500">            .append(&quot;| ---: | ---: | ---: | ---: | ---: |\n&quot;)</span>
-<span class="fc" id="L501">            .append(&quot;| &quot;).append(dashboard.observed())</span>
-<span class="fc" id="L502">            .append(&quot; | &quot;).append(dashboard.candidate())</span>
-<span class="fc" id="L503">            .append(&quot; | &quot;).append(dashboard.validated())</span>
-<span class="fc" id="L504">            .append(&quot; | &quot;).append(dashboard.promoted())</span>
-<span class="fc" id="L505">            .append(&quot; | &quot;).append(dashboard.reused())</span>
-<span class="fc" id="L506">            .append(&quot; |\n\n&quot;);</span>
-<span class="fc" id="L507">        out.append(&quot;## Conversion rates\n\n&quot;);</span>
-<span class="fc" id="L508">        dashboard.conversionRates().forEach((key, value) -&gt; out.append(&quot;- &quot;)</span>
-<span class="fc" id="L509">            .append(key).append(&quot;: &quot;)</span>
-<span class="fc" id="L510">            .append(String.format(Locale.ROOT, &quot;%.3f&quot;, value)).append('\n'));</span>
-<span class="fc" id="L511">        out.append(&quot;\n## Top promoted candidates\n\n&quot;);</span>
-<span class="pc bpc" id="L512" title="1 of 2 branches missed.">        if (dashboard.topPromotedCandidates().isEmpty()) {</span>
-<span class="nc" id="L513">            out.append(&quot;- none\n&quot;);</span>
+<span class="fc" id="L538">        StringBuilder out = new StringBuilder(&quot;# Promotion dashboard\n\n&quot;);</span>
+<span class="fc" id="L539">        out.append(&quot;| observed | candidate | validated | promoted | reused |\n&quot;)</span>
+<span class="fc" id="L540">            .append(&quot;| ---: | ---: | ---: | ---: | ---: |\n&quot;)</span>
+<span class="fc" id="L541">            .append(&quot;| &quot;).append(dashboard.observed())</span>
+<span class="fc" id="L542">            .append(&quot; | &quot;).append(dashboard.candidate())</span>
+<span class="fc" id="L543">            .append(&quot; | &quot;).append(dashboard.validated())</span>
+<span class="fc" id="L544">            .append(&quot; | &quot;).append(dashboard.promoted())</span>
+<span class="fc" id="L545">            .append(&quot; | &quot;).append(dashboard.reused())</span>
+<span class="fc" id="L546">            .append(&quot; |\n\n&quot;);</span>
+<span class="fc" id="L547">        out.append(&quot;## Conversion rates\n\n&quot;);</span>
+<span class="fc" id="L548">        dashboard.conversionRates().forEach((key, value) -&gt; out.append(&quot;- &quot;)</span>
+<span class="fc" id="L549">            .append(key).append(&quot;: &quot;)</span>
+<span class="fc" id="L550">            .append(String.format(Locale.ROOT, &quot;%.3f&quot;, value)).append('\n'));</span>
+<span class="fc" id="L551">        out.append(&quot;\n## Top promoted candidates\n\n&quot;);</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">        if (dashboard.topPromotedCandidates().isEmpty()) {</span>
+<span class="nc" id="L553">            out.append(&quot;- none\n&quot;);</span>
         } else {
-<span class="fc bfc" id="L515" title="All 2 branches covered.">            for (TopCandidate candidate : dashboard.topPromotedCandidates()) {</span>
-<span class="fc" id="L516">                    out.append(&quot;- &quot;).append(escapeMarkdownInline(candidate.candidateId()))</span>
-<span class="fc" id="L517">                    .append(&quot; [&quot;).append(candidate.stage().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
-<span class="fc" id="L518">                        .append(&quot; oracle=&quot;).append(escapeMarkdownInline(candidate.oracleStatus()))</span>
-<span class="fc" id="L519">                        .append(&quot; ablation=&quot;).append(escapeMarkdownInline(candidate.ablationStatus()))</span>
-<span class="fc bfc" id="L520" title="All 2 branches covered.">                    .append(&quot; reuseImprovement=&quot;).append(candidate.measuredImprovement() ? &quot;yes&quot; : &quot;no&quot;)</span>
-<span class="fc" id="L521">                    .append('\n');</span>
-<span class="fc" id="L522">            }</span>
+<span class="fc bfc" id="L555" title="All 2 branches covered.">            for (TopCandidate candidate : dashboard.topPromotedCandidates()) {</span>
+<span class="fc" id="L556">                    out.append(&quot;- &quot;).append(escapeMarkdownInline(candidate.candidateId()))</span>
+<span class="fc" id="L557">                    .append(&quot; [&quot;).append(candidate.stage().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
+<span class="fc" id="L558">                        .append(&quot; oracle=&quot;).append(escapeMarkdownInline(candidate.oracleStatus()))</span>
+<span class="fc" id="L559">                        .append(&quot; ablation=&quot;).append(escapeMarkdownInline(candidate.ablationStatus()))</span>
+<span class="fc bfc" id="L560" title="All 2 branches covered.">                    .append(&quot; reuseImprovement=&quot;).append(candidate.measuredImprovement() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc" id="L561">                    .append('\n');</span>
+<span class="fc" id="L562">            }</span>
         }
-<span class="fc" id="L524">        out.append(&quot;\n## Unresolved blockers\n\n&quot;);</span>
-<span class="pc bpc" id="L525" title="1 of 2 branches missed.">        if (dashboard.unresolvedBlockers().isEmpty()) {</span>
-<span class="nc" id="L526">            out.append(&quot;- none\n&quot;);</span>
+<span class="fc" id="L564">        out.append(&quot;\n## Unresolved blockers\n\n&quot;);</span>
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">        if (dashboard.unresolvedBlockers().isEmpty()) {</span>
+<span class="nc" id="L566">            out.append(&quot;- none\n&quot;);</span>
         } else {
-<span class="fc bfc" id="L528" title="All 2 branches covered.">            for (UnresolvedBlocker blocker : dashboard.unresolvedBlockers()) {</span>
-<span class="fc" id="L529">                out.append(&quot;- &quot;).append(escapeMarkdownInline(blocker.candidateId()))</span>
-<span class="fc" id="L530">                    .append(&quot; [&quot;).append(blocker.stage().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
-<span class="fc" id="L531">                    .append(&quot;: &quot;).append(escapeMarkdownInline(String.join(&quot;, &quot;, blocker.blockers())))</span>
-<span class="fc" id="L532">                    .append('\n');</span>
-<span class="fc" id="L533">            }</span>
+<span class="fc bfc" id="L568" title="All 2 branches covered.">            for (UnresolvedBlocker blocker : dashboard.unresolvedBlockers()) {</span>
+<span class="fc" id="L569">                out.append(&quot;- &quot;).append(escapeMarkdownInline(blocker.candidateId()))</span>
+<span class="fc" id="L570">                    .append(&quot; [&quot;).append(blocker.stage().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
+<span class="fc" id="L571">                    .append(&quot;: &quot;).append(escapeMarkdownInline(String.join(&quot;, &quot;, blocker.blockers())))</span>
+<span class="fc" id="L572">                    .append('\n');</span>
+<span class="fc" id="L573">            }</span>
         }
-<span class="fc" id="L535">        return out.toString();</span>
+<span class="fc" id="L575">        out.append(&quot;\n## Oracle contradictions\n\n&quot;);</span>
+<span class="fc" id="L576">        out.append(&quot;- oracle-disagree count: &quot;).append(dashboard.oracleContradictions()).append('\n');</span>
+<span class="fc" id="L577">        out.append(&quot;\n## Campaign progress\n\n&quot;);</span>
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">        if (dashboard.campaignProgress().isEmpty()) {</span>
+<span class="nc" id="L579">            out.append(&quot;- none\n&quot;);</span>
+        } else {
+<span class="fc" id="L581">            out.append(&quot;| Campaign | Observed | Candidate | Validated | Promoted | Reused |\n&quot;)</span>
+<span class="fc" id="L582">                .append(&quot;| --- | ---: | ---: | ---: | ---: | ---: |\n&quot;);</span>
+<span class="fc bfc" id="L583" title="All 2 branches covered.">            for (CampaignMetric m : dashboard.campaignProgress()) {</span>
+<span class="fc" id="L584">                out.append(&quot;| &quot;).append(escapeMarkdownTableCell(m.campaign()))</span>
+<span class="fc" id="L585">                    .append(&quot; | &quot;).append(m.observed())</span>
+<span class="fc" id="L586">                    .append(&quot; | &quot;).append(m.candidate())</span>
+<span class="fc" id="L587">                    .append(&quot; | &quot;).append(m.validated())</span>
+<span class="fc" id="L588">                    .append(&quot; | &quot;).append(m.promoted())</span>
+<span class="fc" id="L589">                    .append(&quot; | &quot;).append(m.reused())</span>
+<span class="fc" id="L590">                    .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L591">            }</span>
+        }
+<span class="fc" id="L593">        return out.toString();</span>
     }
 
     String renderGallery(List&lt;PromotionRecord&gt; records) {
-<span class="fc" id="L539">        StringBuilder out = new StringBuilder(&quot;# Gallery 2.0\n\n&quot;);</span>
-<span class="fc" id="L540">        out.append(&quot;## Selection policy\n\n&quot;)</span>
-<span class="fc" id="L541">            .append(&quot;- Candidate is selected only if `fallbackUsed=false` and `curatedPathPresent=false`.\n&quot;)</span>
-<span class="fc" id="L542">            .append(&quot;- Additionally, candidate must be `promotionEligible=true` or have stage `reused` (or higher).\n\n&quot;);</span>
-<span class="fc" id="L543">        List&lt;PromotionRecord&gt; selected = records.stream()</span>
-<span class="fc" id="L544">            .filter(PromotionRecord::galleryEligible)</span>
-<span class="fc" id="L545">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
-<span class="fc" id="L546">            .toList();</span>
-<span class="pc bpc" id="L547" title="1 of 2 branches missed.">        if (selected.isEmpty()) {</span>
-<span class="nc" id="L548">            out.append(&quot;- none\n&quot;);</span>
-<span class="nc" id="L549">            return out.toString();</span>
+<span class="fc" id="L597">        StringBuilder out = new StringBuilder(&quot;# Gallery 2.0\n\n&quot;);</span>
+<span class="fc" id="L598">        out.append(&quot;## Selection policy\n\n&quot;)</span>
+<span class="fc" id="L599">            .append(&quot;- Candidate is selected only if `fallbackUsed=false` and `curatedPathPresent=false`.\n&quot;)</span>
+<span class="fc" id="L600">            .append(&quot;- Additionally, candidate must be `promotionEligible=true` or have stage `reused` (or higher).\n\n&quot;);</span>
+<span class="fc" id="L601">        List&lt;PromotionRecord&gt; selected = records.stream()</span>
+<span class="fc" id="L602">            .filter(PromotionRecord::galleryEligible)</span>
+<span class="fc" id="L603">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L604">            .toList();</span>
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">        if (selected.isEmpty()) {</span>
+<span class="nc" id="L606">            out.append(&quot;- none\n&quot;);</span>
+<span class="nc" id="L607">            return out.toString();</span>
         }
-<span class="fc" id="L551">        out.append(&quot;| Candidate | Stage | Original | Result | Operator path | Reused macros |\n&quot;)</span>
-<span class="fc" id="L552">            .append(&quot;| --- | --- | --- | --- | --- | --- |\n&quot;);</span>
-<span class="fc bfc" id="L553" title="All 2 branches covered.">        for (PromotionRecord record : selected) {</span>
-<span class="fc" id="L554">            out.append(&quot;| &quot;).append(escapeMarkdownTableCell(record.candidateId()))</span>
-<span class="fc" id="L555">                .append(&quot; | &quot;).append(record.stage().name().toLowerCase(Locale.ROOT))</span>
-<span class="fc" id="L556">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(inlineCodeOrDash(record.originalExpression())))</span>
-<span class="fc" id="L557">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(inlineCodeOrDash(record.discoveredStructure())))</span>
-<span class="fc" id="L558">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(inlinePath(record.rulePath())))</span>
-<span class="fc" id="L559">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(</span>
-<span class="fc bfc" id="L560" title="All 2 branches covered.">                    record.reusedMacroIds().isEmpty() ? &quot;—&quot; : String.join(&quot;, &quot;, record.reusedMacroIds())))</span>
-<span class="fc" id="L561">                .append(&quot; |\n&quot;);</span>
-<span class="fc" id="L562">        }</span>
-<span class="fc" id="L563">        return out.toString();</span>
+<span class="fc" id="L609">        out.append(&quot;| Candidate | Stage | Original | Result | Operator path | Reused macros |\n&quot;)</span>
+<span class="fc" id="L610">            .append(&quot;| --- | --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L611" title="All 2 branches covered.">        for (PromotionRecord record : selected) {</span>
+<span class="fc" id="L612">            out.append(&quot;| &quot;).append(escapeMarkdownTableCell(record.candidateId()))</span>
+<span class="fc" id="L613">                .append(&quot; | &quot;).append(record.stage().name().toLowerCase(Locale.ROOT))</span>
+<span class="fc" id="L614">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(inlineCodeOrDash(record.originalExpression())))</span>
+<span class="fc" id="L615">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(inlineCodeOrDash(record.discoveredStructure())))</span>
+<span class="fc" id="L616">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(inlinePath(record.rulePath())))</span>
+<span class="fc" id="L617">                .append(&quot; | &quot;).append(escapeMarkdownTableCell(</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">                    record.reusedMacroIds().isEmpty() ? &quot;—&quot; : String.join(&quot;, &quot;, record.reusedMacroIds())))</span>
+<span class="fc" id="L619">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L620">        }</span>
+<span class="fc" id="L621">        out.append(&quot;\n## Entry details\n\n&quot;);</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">        for (PromotionRecord record : selected) {</span>
+<span class="fc" id="L623">            DiscoveryHighlightModel highlightModel = highlightModel(record);</span>
+<span class="fc" id="L624">            out.append(&quot;### &quot;).append(escapeMarkdownInline(record.candidateId())).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L625">            out.append(&quot;- **Why interesting?** &quot;).append(escapeMarkdownInline(galleryInterestReason(record))).append('\n');</span>
+<span class="fc" id="L626">            out.append(&quot;- **Detected structure:** &quot;).append(inlineCodeOrDash(highlightModel.discoveredStructure())).append('\n');</span>
+<span class="fc bfc" id="L627" title="All 2 branches covered.">            if (!highlightModel.placeholderMappings().isEmpty()) {</span>
+<span class="fc" id="L628">                out.append(&quot;- **Hidden structure abstraction:** &quot;).append(escapeMarkdownInline(renderPlaceholderMappings(highlightModel))).append('\n');</span>
+            }
+<span class="fc" id="L630">            out.append(&quot;- **Bridge/operator used:** &quot;).append(escapeMarkdownInline(orDash(timelineMiddle(record)))).append('\n');</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">            String pathKey = highlightModel.affectedPathKey().isBlank() ? &quot;root&quot; : highlightModel.affectedPathKey();</span>
+<span class="fc" id="L632">            out.append(&quot;- **Affected TreePosition:** &quot;).append(inlineCodeOrDash(pathKey)).append('\n');</span>
+<span class="fc" id="L633">            out.append(&quot;- **Why path works:** &quot;).append(escapeMarkdownInline(galleryPathReason(record))).append('\n');</span>
+<span class="fc" id="L634">            out.append(&quot;- **Ablation:** &quot;).append(escapeMarkdownInline(record.ablationStatus())).append('\n');</span>
+<span class="fc" id="L635">            out.append('\n');</span>
+<span class="fc" id="L636">        }</span>
+<span class="fc" id="L637">        return out.toString();</span>
+    }
+
+    private String galleryInterestReason(PromotionRecord record) {
+<span class="fc" id="L641">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">        if (record.stage().atLeast(PromotionStage.REUSED)) {</span>
+<span class="fc" id="L643">            reasons.add(&quot;macro reused&quot;);</span>
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">        } else if (record.stage().atLeast(PromotionStage.PROMOTED)) {</span>
+<span class="fc" id="L645">            reasons.add(&quot;promotion-eligible: oracle and ablation confirmed&quot;);</span>
+        }
+<span class="fc bfc" id="L647" title="All 2 branches covered.">        if (record.measuredImprovement()) {</span>
+<span class="fc" id="L648">            reasons.add(&quot;expression score improved&quot;);</span>
+        }
+<span class="fc bfc" id="L650" title="All 2 branches covered.">        if (!record.reusedMacroIds().isEmpty()) {</span>
+<span class="fc" id="L651">            reasons.add(&quot;reused macros: &quot; + String.join(&quot;, &quot;, record.reusedMacroIds()));</span>
+        }
+<span class="pc bpc" id="L653" title="1 of 2 branches missed.">        if (!record.oracleEvidence().isBlank()) {</span>
+<span class="fc" id="L654">            reasons.add(&quot;oracle evidence: &quot; + record.oracleEvidence());</span>
+        }
+<span class="pc bpc" id="L656" title="1 of 2 branches missed.">        return reasons.isEmpty() ? &quot;gallery-eligible by stage and promotion criteria&quot; : String.join(&quot;; &quot;, reasons);</span>
+    }
+
+    private String galleryPathReason(PromotionRecord record) {
+<span class="fc" id="L660">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L661">        String oracleStatus = record.oracleStatus();</span>
+<span class="fc bfc" id="L662" title="All 2 branches covered.">        if (&quot;AGREE&quot;.equalsIgnoreCase(oracleStatus)) {</span>
+<span class="fc" id="L663">            reasons.add(&quot;oracle agrees&quot;);</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">        } else if (!&quot;UNAVAILABLE&quot;.equalsIgnoreCase(oracleStatus)) {</span>
+<span class="nc" id="L665">            reasons.add(&quot;oracle=&quot; + oracleStatus);</span>
+        }
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">        if (record.evidenceExists()) {</span>
+<span class="fc" id="L668">            reasons.add(&quot;evidence present&quot;);</span>
+        }
+<span class="pc bpc" id="L670" title="2 of 4 branches missed.">        if (!record.ablationStatus().isBlank() &amp;&amp; !&quot;N/A&quot;.equals(record.ablationStatus())) {</span>
+<span class="fc" id="L671">            reasons.add(&quot;ablation=&quot; + record.ablationStatus());</span>
+        }
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">        return reasons.isEmpty() ? &quot;—&quot; : String.join(&quot;; &quot;, reasons);</span>
     }
 
     private String renderBlockedCandidates(List&lt;PromotionRecord&gt; records) {
-<span class="fc" id="L567">        StringBuilder out = new StringBuilder(&quot;# Blocked candidates\n\n&quot;);</span>
-<span class="fc" id="L568">        List&lt;PromotionRecord&gt; blocked = records.stream()</span>
-<span class="fc" id="L569">            .filter(PromotionRecord::unresolved)</span>
-<span class="fc" id="L570">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
-<span class="fc" id="L571">            .toList();</span>
-<span class="pc bpc" id="L572" title="1 of 2 branches missed.">        if (blocked.isEmpty()) {</span>
-<span class="nc" id="L573">            out.append(&quot;- none\n&quot;);</span>
-<span class="nc" id="L574">            return out.toString();</span>
+<span class="fc" id="L677">        StringBuilder out = new StringBuilder(&quot;# Blocked candidates\n\n&quot;);</span>
+<span class="fc" id="L678">        List&lt;PromotionRecord&gt; blocked = records.stream()</span>
+<span class="fc" id="L679">            .filter(PromotionRecord::unresolved)</span>
+<span class="fc" id="L680">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L681">            .toList();</span>
+<span class="pc bpc" id="L682" title="1 of 2 branches missed.">        if (blocked.isEmpty()) {</span>
+<span class="nc" id="L683">            out.append(&quot;- none\n&quot;);</span>
+<span class="nc" id="L684">            return out.toString();</span>
         }
-<span class="fc bfc" id="L576" title="All 2 branches covered.">        for (PromotionRecord record : blocked) {</span>
-<span class="fc" id="L577">            out.append(&quot;- &quot;).append(escapeMarkdownInline(record.candidateId()))</span>
-<span class="fc" id="L578">                .append(&quot; [&quot;).append(record.stage().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
-<span class="pc bpc" id="L579" title="1 of 2 branches missed.">                .append(&quot;: &quot;).append(escapeMarkdownInline(record.promotionBlockers().isEmpty()</span>
-<span class="nc" id="L580">                    ? record.rationale()</span>
-<span class="fc" id="L581">                    : String.join(&quot;, &quot;, record.promotionBlockers())))</span>
-<span class="fc" id="L582">                .append('\n');</span>
-<span class="fc" id="L583">        }</span>
-<span class="fc" id="L584">        return out.toString();</span>
+<span class="fc bfc" id="L686" title="All 2 branches covered.">        for (PromotionRecord record : blocked) {</span>
+<span class="fc" id="L687">            out.append(&quot;- &quot;).append(escapeMarkdownInline(record.candidateId()))</span>
+<span class="fc" id="L688">                .append(&quot; [&quot;).append(record.stage().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
+<span class="pc bpc" id="L689" title="1 of 2 branches missed.">                .append(&quot;: &quot;).append(escapeMarkdownInline(record.promotionBlockers().isEmpty()</span>
+<span class="nc" id="L690">                    ? record.rationale()</span>
+<span class="fc" id="L691">                    : String.join(&quot;, &quot;, record.promotionBlockers())))</span>
+<span class="fc" id="L692">                .append('\n');</span>
+<span class="fc" id="L693">        }</span>
+<span class="fc" id="L694">        return out.toString();</span>
     }
 
     private String renderOperatorOpportunities(List&lt;PromotionRecord&gt; records) {
-<span class="fc" id="L588">        StringBuilder out = new StringBuilder(&quot;# Operator opportunities\n\n&quot;);</span>
-<span class="fc" id="L589">        List&lt;PromotionRecord&gt; opportunities = records.stream()</span>
-<span class="fc" id="L590">            .filter(PromotionRecord::unresolved)</span>
-<span class="pc bpc" id="L591" title="1 of 4 branches missed.">            .filter(record -&gt; record.sourceOperator().isBlank() || record.stage() == PromotionStage.OBSERVED)</span>
-<span class="fc" id="L592">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
-<span class="fc" id="L593">            .toList();</span>
-<span class="pc bpc" id="L594" title="1 of 2 branches missed.">        if (opportunities.isEmpty()) {</span>
-<span class="nc" id="L595">            out.append(&quot;- none\n&quot;);</span>
-<span class="nc" id="L596">            return out.toString();</span>
+<span class="fc" id="L698">        StringBuilder out = new StringBuilder(&quot;# Operator opportunities\n\n&quot;);</span>
+<span class="fc" id="L699">        List&lt;PromotionRecord&gt; opportunities = records.stream()</span>
+<span class="fc" id="L700">            .filter(PromotionRecord::unresolved)</span>
+<span class="pc bpc" id="L701" title="1 of 4 branches missed.">            .filter(record -&gt; record.sourceOperator().isBlank() || record.stage() == PromotionStage.OBSERVED)</span>
+<span class="fc" id="L702">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L703">            .toList();</span>
+<span class="pc bpc" id="L704" title="1 of 2 branches missed.">        if (opportunities.isEmpty()) {</span>
+<span class="nc" id="L705">            out.append(&quot;- none\n&quot;);</span>
+<span class="nc" id="L706">            return out.toString();</span>
         }
-<span class="fc bfc" id="L598" title="All 2 branches covered.">        for (PromotionRecord record : opportunities) {</span>
-<span class="fc" id="L599">            out.append(&quot;- &quot;).append(escapeMarkdownInline(record.candidateId()))</span>
-<span class="fc" id="L600">                .append(&quot;: investigate operator support for family &quot;)</span>
-<span class="fc" id="L601">                .append(escapeMarkdownInline(record.family()))</span>
-<span class="fc" id="L602">                .append(&quot; (campaign=&quot;).append(escapeMarkdownInline(record.sourceCampaign())).append(&quot;)\n&quot;);</span>
-<span class="fc" id="L603">        }</span>
-<span class="fc" id="L604">        return out.toString();</span>
+<span class="fc bfc" id="L708" title="All 2 branches covered.">        for (PromotionRecord record : opportunities) {</span>
+<span class="fc" id="L709">            out.append(&quot;- &quot;).append(escapeMarkdownInline(record.candidateId()))</span>
+<span class="fc" id="L710">                .append(&quot;: investigate operator support for family &quot;)</span>
+<span class="fc" id="L711">                .append(escapeMarkdownInline(record.family()))</span>
+<span class="fc" id="L712">                .append(&quot; (campaign=&quot;).append(escapeMarkdownInline(record.sourceCampaign())).append(&quot;)\n&quot;);</span>
+<span class="fc" id="L713">        }</span>
+<span class="fc" id="L714">        return out.toString();</span>
     }
 
     private String renderMacroOpportunities(List&lt;PromotionRecord&gt; records) {
-<span class="fc" id="L608">        StringBuilder out = new StringBuilder(&quot;# Macro opportunities\n\n&quot;);</span>
-<span class="fc" id="L609">        List&lt;PromotionRecord&gt; opportunities = records.stream()</span>
-<span class="fc" id="L610">            .filter(PromotionRecord::unresolved)</span>
-<span class="fc" id="L611">            .filter(PromotionRecord::macroOpportunity)</span>
-<span class="fc" id="L612">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
-<span class="fc" id="L613">            .toList();</span>
-<span class="pc bpc" id="L614" title="1 of 2 branches missed.">        if (opportunities.isEmpty()) {</span>
-<span class="nc" id="L615">            out.append(&quot;- none\n&quot;);</span>
-<span class="nc" id="L616">            return out.toString();</span>
+<span class="fc" id="L718">        StringBuilder out = new StringBuilder(&quot;# Macro opportunities\n\n&quot;);</span>
+<span class="fc" id="L719">        List&lt;PromotionRecord&gt; opportunities = records.stream()</span>
+<span class="fc" id="L720">            .filter(PromotionRecord::unresolved)</span>
+<span class="fc" id="L721">            .filter(PromotionRecord::macroOpportunity)</span>
+<span class="fc" id="L722">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
+<span class="fc" id="L723">            .toList();</span>
+<span class="pc bpc" id="L724" title="1 of 2 branches missed.">        if (opportunities.isEmpty()) {</span>
+<span class="nc" id="L725">            out.append(&quot;- none\n&quot;);</span>
+<span class="nc" id="L726">            return out.toString();</span>
         }
-<span class="fc bfc" id="L618" title="All 2 branches covered.">        for (PromotionRecord record : opportunities) {</span>
-<span class="fc" id="L619">            out.append(&quot;- &quot;).append(escapeMarkdownInline(record.candidateId()))</span>
-<span class="fc" id="L620">                .append(&quot;: &quot;).append(escapeMarkdownInline(String.join(&quot; -&gt; &quot;, record.rulePath())))</span>
-<span class="fc" id="L621">                .append(&quot; (stage=&quot;).append(record.stage().name().toLowerCase(Locale.ROOT)).append(&quot;)\n&quot;);</span>
-<span class="fc" id="L622">        }</span>
-<span class="fc" id="L623">        return out.toString();</span>
+<span class="fc bfc" id="L728" title="All 2 branches covered.">        for (PromotionRecord record : opportunities) {</span>
+<span class="fc" id="L729">            out.append(&quot;- &quot;).append(escapeMarkdownInline(record.candidateId()))</span>
+<span class="fc" id="L730">                .append(&quot;: &quot;).append(escapeMarkdownInline(String.join(&quot; -&gt; &quot;, record.rulePath())))</span>
+<span class="fc" id="L731">                .append(&quot; (stage=&quot;).append(record.stage().name().toLowerCase(Locale.ROOT)).append(&quot;)\n&quot;);</span>
+<span class="fc" id="L732">        }</span>
+<span class="fc" id="L733">        return out.toString();</span>
+    }
+
+    String renderOperatorImpactView(List&lt;PromotionRecord&gt; records) {
+<span class="fc" id="L737">        StringBuilder out = new StringBuilder(&quot;# Operator impact\n\n&quot;);</span>
+
+<span class="fc" id="L739">        Map&lt;String, Long&gt; helpingCounts = records.stream()</span>
+<span class="fc" id="L740">            .filter(record -&gt; record.stage().atLeast(PromotionStage.PROMOTED))</span>
+<span class="pc bpc" id="L741" title="1 of 2 branches missed.">            .filter(record -&gt; !record.sourceOperator().isBlank())</span>
+<span class="fc" id="L742">            .collect(Collectors.groupingBy(PromotionRecord::sourceOperator, Collectors.counting()));</span>
+<span class="fc" id="L743">        Map&lt;String, Long&gt; blockingCounts = records.stream()</span>
+<span class="fc" id="L744">            .filter(PromotionRecord::unresolved)</span>
+<span class="fc bfc" id="L745" title="All 2 branches covered.">            .filter(record -&gt; !record.sourceOperator().isBlank())</span>
+<span class="fc" id="L746">            .collect(Collectors.groupingBy(PromotionRecord::sourceOperator, Collectors.counting()));</span>
+<span class="fc" id="L747">        Map&lt;String, Long&gt; improvingCounts = records.stream()</span>
+<span class="fc" id="L748">            .filter(PromotionRecord::measuredImprovement)</span>
+<span class="pc bpc" id="L749" title="1 of 2 branches missed.">            .filter(record -&gt; !record.sourceOperator().isBlank())</span>
+<span class="fc" id="L750">            .collect(Collectors.groupingBy(PromotionRecord::sourceOperator, Collectors.counting()));</span>
+
+<span class="fc" id="L752">        out.append(&quot;## Operators that help (appear in promoted or reused records)\n\n&quot;);</span>
+<span class="fc bfc" id="L753" title="All 2 branches covered.">        if (helpingCounts.isEmpty()) {</span>
+<span class="fc" id="L754">            out.append(&quot;- none\n&quot;);</span>
+        } else {
+<span class="fc" id="L756">            helpingCounts.entrySet().stream()</span>
+<span class="fc" id="L757">                .sorted(Map.Entry.&lt;String, Long&gt;comparingByValue().reversed()</span>
+<span class="fc" id="L758">                    .thenComparing(Map.Entry.comparingByKey()))</span>
+<span class="fc" id="L759">                .forEach(entry -&gt; out.append(&quot;- &quot;).append(escapeMarkdownInline(entry.getKey()))</span>
+<span class="fc" id="L760">                    .append(&quot;: promoted-or-reused=&quot;).append(entry.getValue()).append('\n'));</span>
+        }
+
+<span class="fc" id="L763">        out.append(&quot;\n## Operators that block (appear in unresolved records)\n\n&quot;);</span>
+<span class="fc bfc" id="L764" title="All 2 branches covered.">        if (blockingCounts.isEmpty()) {</span>
+<span class="fc" id="L765">            out.append(&quot;- none\n&quot;);</span>
+        } else {
+<span class="fc" id="L767">            blockingCounts.entrySet().stream()</span>
+<span class="fc" id="L768">                .sorted(Map.Entry.&lt;String, Long&gt;comparingByValue().reversed()</span>
+<span class="fc" id="L769">                    .thenComparing(Map.Entry.comparingByKey()))</span>
+<span class="fc" id="L770">                .forEach(entry -&gt; out.append(&quot;- &quot;).append(escapeMarkdownInline(entry.getKey()))</span>
+<span class="fc" id="L771">                    .append(&quot;: blocked=&quot;).append(entry.getValue()).append('\n'));</span>
+        }
+
+<span class="fc" id="L774">        out.append(&quot;\n## Operators with measured improvement\n\n&quot;);</span>
+<span class="fc bfc" id="L775" title="All 2 branches covered.">        if (improvingCounts.isEmpty()) {</span>
+<span class="fc" id="L776">            out.append(&quot;- none\n&quot;);</span>
+        } else {
+<span class="fc" id="L778">            improvingCounts.entrySet().stream()</span>
+<span class="fc" id="L779">                .sorted(Map.Entry.&lt;String, Long&gt;comparingByValue().reversed()</span>
+<span class="fc" id="L780">                    .thenComparing(Map.Entry.comparingByKey()))</span>
+<span class="fc" id="L781">                .forEach(entry -&gt; out.append(&quot;- &quot;).append(escapeMarkdownInline(entry.getKey()))</span>
+<span class="fc" id="L782">                    .append(&quot;: measured-improvement=&quot;).append(entry.getValue()).append('\n'));</span>
+        }
+<span class="fc" id="L784">        return out.toString();</span>
     }
 
     private String inlinePath(List&lt;String&gt; path) {
-<span class="pc bpc" id="L627" title="2 of 4 branches missed.">        return path == null || path.isEmpty() ? &quot;—&quot; : String.join(&quot; -&gt; &quot;, path);</span>
+<span class="pc bpc" id="L788" title="2 of 4 branches missed.">        return path == null || path.isEmpty() ? &quot;—&quot; : String.join(&quot; -&gt; &quot;, path);</span>
     }
 
     private String orDash(String value) {
-<span class="pc bpc" id="L631" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
+<span class="pc bpc" id="L792" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
     }
 
     private String slug(String value) {
-<span class="pc bpc" id="L635" title="1 of 2 branches missed.">        String normalized = value == null ? &quot;candidate&quot; : value.toLowerCase(Locale.ROOT);</span>
-<span class="fc" id="L636">        String slug = normalized.replaceAll(&quot;[^a-z0-9]+&quot;, &quot;-&quot;).replaceAll(&quot;^-+|-+$&quot;, &quot;&quot;);</span>
-<span class="pc bpc" id="L637" title="1 of 2 branches missed.">        return slug.isBlank() ? &quot;candidate&quot; : slug;</span>
+<span class="pc bpc" id="L796" title="1 of 2 branches missed.">        String normalized = value == null ? &quot;candidate&quot; : value.toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L797">        String slug = normalized.replaceAll(&quot;[^a-z0-9]+&quot;, &quot;-&quot;).replaceAll(&quot;^-+|-+$&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L798" title="1 of 2 branches missed.">        return slug.isBlank() ? &quot;candidate&quot; : slug;</span>
     }
 
     private String uniqueSlug(String baseSlug, Map&lt;String, Integer&gt; slugCounts) {
-<span class="fc" id="L641">        int occurrence = slugCounts.merge(baseSlug, 1, Integer::sum);</span>
-<span class="fc bfc" id="L642" title="All 2 branches covered.">        return occurrence == 1 ? baseSlug : baseSlug + &quot;-&quot; + occurrence;</span>
+<span class="fc" id="L802">        int occurrence = slugCounts.merge(baseSlug, 1, Integer::sum);</span>
+<span class="fc bfc" id="L803" title="All 2 branches covered.">        return occurrence == 1 ? baseSlug : baseSlug + &quot;-&quot; + occurrence;</span>
     }
 
     private String promotionDecision(PromotionRecord record) {
-<span class="fc bfc" id="L646" title="All 2 branches covered.">        if (record.promotionEligible()) {</span>
-<span class="fc" id="L647">            return &quot;eligible: oracle and ablation checks are satisfied for promotion&quot;;</span>
+<span class="fc bfc" id="L807" title="All 2 branches covered.">        if (record.promotionEligible()) {</span>
+<span class="fc" id="L808">            return &quot;eligible: oracle and ablation checks are satisfied for promotion&quot;;</span>
         }
-<span class="pc bpc" id="L649" title="1 of 2 branches missed.">        if (!record.promotionBlockers().isEmpty()) {</span>
-<span class="fc" id="L650">            return &quot;not eligible: &quot; + String.join(&quot;, &quot;, record.promotionBlockers());</span>
+<span class="pc bpc" id="L810" title="1 of 2 branches missed.">        if (!record.promotionBlockers().isEmpty()) {</span>
+<span class="fc" id="L811">            return &quot;not eligible: &quot; + String.join(&quot;, &quot;, record.promotionBlockers());</span>
         }
-<span class="nc" id="L652">        return &quot;not eligible: promotion evidence is incomplete&quot;;</span>
+<span class="nc" id="L813">        return &quot;not eligible: promotion evidence is incomplete&quot;;</span>
     }
 
     private String missingPieces(PromotionRecord record) {
-<span class="fc bfc" id="L656" title="All 2 branches covered.">        if (record.promotionEligible()) {</span>
-<span class="fc" id="L657">            return &quot;none&quot;;</span>
+<span class="fc bfc" id="L817" title="All 2 branches covered.">        if (record.promotionEligible()) {</span>
+<span class="fc" id="L818">            return &quot;none&quot;;</span>
         }
-<span class="pc bpc" id="L659" title="1 of 2 branches missed.">        if (!record.promotionBlockers().isEmpty()) {</span>
-<span class="fc" id="L660">            return String.join(&quot;, &quot;, record.promotionBlockers());</span>
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">        if (!record.promotionBlockers().isEmpty()) {</span>
+<span class="fc" id="L821">            return String.join(&quot;, &quot;, record.promotionBlockers());</span>
         }
-<span class="nc" id="L662">        return orDash(record.rationale());</span>
+<span class="nc" id="L823">        return orDash(record.rationale());</span>
     }
 
     private String inlineCodeOrDash(String value) {
-<span class="fc" id="L666">        String normalized = normalizeMarkdownText(orDash(value));</span>
-<span class="pc bpc" id="L667" title="1 of 2 branches missed.">        if (normalized.equals(&quot;—&quot;)) {</span>
-<span class="nc" id="L668">            return &quot;—&quot;;</span>
+<span class="fc" id="L827">        String normalized = normalizeMarkdownText(orDash(value));</span>
+<span class="pc bpc" id="L828" title="1 of 2 branches missed.">        if (normalized.equals(&quot;—&quot;)) {</span>
+<span class="nc" id="L829">            return &quot;—&quot;;</span>
         }
-<span class="fc" id="L670">        int longestRun = longestBacktickRun(normalized);</span>
-<span class="fc" id="L671">        String fence = &quot;`&quot;.repeat(longestRun + 1);</span>
-<span class="fc" id="L672">        return fence + normalized + fence;</span>
+<span class="fc" id="L831">        int longestRun = longestBacktickRun(normalized);</span>
+<span class="fc" id="L832">        String fence = &quot;`&quot;.repeat(longestRun + 1);</span>
+<span class="fc" id="L833">        return fence + normalized + fence;</span>
     }
 
     private int longestBacktickRun(String value) {
-<span class="fc" id="L676">        int longest = 0;</span>
-<span class="fc" id="L677">        int current = 0;</span>
-<span class="fc bfc" id="L678" title="All 2 branches covered.">        for (int index = 0; index &lt; value.length(); index++) {</span>
-<span class="fc bfc" id="L679" title="All 2 branches covered.">            if (value.charAt(index) == '`') {</span>
-<span class="fc" id="L680">                current++;</span>
-<span class="fc" id="L681">                longest = Math.max(longest, current);</span>
+<span class="fc" id="L837">        int longest = 0;</span>
+<span class="fc" id="L838">        int current = 0;</span>
+<span class="fc bfc" id="L839" title="All 2 branches covered.">        for (int index = 0; index &lt; value.length(); index++) {</span>
+<span class="fc bfc" id="L840" title="All 2 branches covered.">            if (value.charAt(index) == '`') {</span>
+<span class="fc" id="L841">                current++;</span>
+<span class="fc" id="L842">                longest = Math.max(longest, current);</span>
             } else {
-<span class="fc" id="L683">                current = 0;</span>
+<span class="fc" id="L844">                current = 0;</span>
             }
         }
-<span class="fc" id="L686">        return longest;</span>
+<span class="fc" id="L847">        return longest;</span>
     }
 
     private String normalizeMarkdownText(String value) {
-<span class="pc bpc" id="L690" title="1 of 2 branches missed.">        if (value == null) {</span>
-<span class="nc" id="L691">            return &quot;&quot;;</span>
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L852">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L693">        return value</span>
-<span class="fc" id="L694">            .replace(&quot;\r\n&quot;, &quot;\n&quot;)</span>
-<span class="fc" id="L695">            .replace('\r', '\n')</span>
-<span class="fc" id="L696">            .replace('\n', ' ');</span>
+<span class="fc" id="L854">        return value</span>
+<span class="fc" id="L855">            .replace(&quot;\r\n&quot;, &quot;\n&quot;)</span>
+<span class="fc" id="L856">            .replace('\r', '\n')</span>
+<span class="fc" id="L857">            .replace('\n', ' ');</span>
     }
 
     private String escapeMarkdownInline(String value) {
-<span class="fc" id="L700">        return normalizeMarkdownText(value);</span>
+<span class="fc" id="L861">        return normalizeMarkdownText(value);</span>
     }
 
     private String escapeMarkdownTableCell(String value) {
-<span class="fc" id="L704">        return normalizeMarkdownText(value).replace(&quot;|&quot;, &quot;\\|&quot;);</span>
+<span class="fc" id="L865">        return normalizeMarkdownText(value).replace(&quot;|&quot;, &quot;\\|&quot;);</span>
     }
 
     record PipelineReport(
@@ -711,10 +872,10 @@ import java.util.stream.Stream;
         DiscoveryCampaignFourRunner.CampaignReport campaignFour,
         List&lt;CampaignMetric&gt; campaignMetrics
     ) {
-<span class="fc" id="L714">        PipelineReport {</span>
-<span class="pc bpc" id="L715" title="1 of 2 branches missed.">            promotionRecords = promotionRecords == null ? List.of() : List.copyOf(promotionRecords);</span>
-<span class="pc bpc" id="L716" title="1 of 2 branches missed.">            campaignMetrics = campaignMetrics == null ? List.of() : List.copyOf(campaignMetrics);</span>
-<span class="fc" id="L717">        }</span>
+<span class="fc" id="L875">        PipelineReport {</span>
+<span class="pc bpc" id="L876" title="1 of 2 branches missed.">            promotionRecords = promotionRecords == null ? List.of() : List.copyOf(promotionRecords);</span>
+<span class="pc bpc" id="L877" title="1 of 2 branches missed.">            campaignMetrics = campaignMetrics == null ? List.of() : List.copyOf(campaignMetrics);</span>
+<span class="fc" id="L878">        }</span>
     }
 
     record CampaignMetric(
@@ -726,9 +887,9 @@ import java.util.stream.Stream;
         long reused,
         Map&lt;String, Double&gt; conversionRates
     ) {
-<span class="fc" id="L729">        CampaignMetric {</span>
-<span class="pc bpc" id="L730" title="1 of 2 branches missed.">            conversionRates = conversionRates == null ? Map.of() : Map.copyOf(conversionRates);</span>
-<span class="fc" id="L731">        }</span>
+<span class="fc" id="L890">        CampaignMetric {</span>
+<span class="pc bpc" id="L891" title="1 of 2 branches missed.">            conversionRates = conversionRates == null ? Map.of() : Map.copyOf(conversionRates);</span>
+<span class="fc" id="L892">        }</span>
     }
 
     record PromotionDashboard(
@@ -739,16 +900,19 @@ import java.util.stream.Stream;
         long reused,
         Map&lt;String, Double&gt; conversionRates,
         List&lt;TopCandidate&gt; topPromotedCandidates,
-        List&lt;UnresolvedBlocker&gt; unresolvedBlockers
+        List&lt;UnresolvedBlocker&gt; unresolvedBlockers,
+        long oracleContradictions,
+        List&lt;CampaignMetric&gt; campaignProgress
     ) {
-<span class="fc" id="L744">        PromotionDashboard {</span>
-<span class="pc bpc" id="L745" title="1 of 2 branches missed.">            conversionRates = conversionRates == null ? Map.of() : Map.copyOf(conversionRates);</span>
-<span class="pc bpc" id="L746" title="1 of 2 branches missed.">            topPromotedCandidates = topPromotedCandidates == null ? List.of() : List.copyOf(topPromotedCandidates);</span>
-<span class="pc bpc" id="L747" title="1 of 2 branches missed.">            unresolvedBlockers = unresolvedBlockers == null ? List.of() : List.copyOf(unresolvedBlockers);</span>
-<span class="fc" id="L748">        }</span>
+<span class="fc" id="L907">        PromotionDashboard {</span>
+<span class="pc bpc" id="L908" title="1 of 2 branches missed.">            conversionRates = conversionRates == null ? Map.of() : Map.copyOf(conversionRates);</span>
+<span class="pc bpc" id="L909" title="1 of 2 branches missed.">            topPromotedCandidates = topPromotedCandidates == null ? List.of() : List.copyOf(topPromotedCandidates);</span>
+<span class="pc bpc" id="L910" title="1 of 2 branches missed.">            unresolvedBlockers = unresolvedBlockers == null ? List.of() : List.copyOf(unresolvedBlockers);</span>
+<span class="pc bpc" id="L911" title="1 of 2 branches missed.">            campaignProgress = campaignProgress == null ? List.of() : List.copyOf(campaignProgress);</span>
+<span class="fc" id="L912">        }</span>
     }
 
-<span class="fc" id="L751">    record TopCandidate(</span>
+<span class="fc" id="L915">    record TopCandidate(</span>
         String candidateId,
         PromotionStage stage,
         String oracleStatus,
@@ -758,9 +922,9 @@ import java.util.stream.Stream;
     }
 
     record UnresolvedBlocker(String candidateId, PromotionStage stage, List&lt;String&gt; blockers) {
-<span class="fc" id="L761">        UnresolvedBlocker {</span>
-<span class="pc bpc" id="L762" title="1 of 2 branches missed.">            blockers = blockers == null ? List.of() : List.copyOf(blockers);</span>
-<span class="fc" id="L763">        }</span>
+<span class="fc" id="L925">        UnresolvedBlocker {</span>
+<span class="pc bpc" id="L926" title="1 of 2 branches missed.">            blockers = blockers == null ? List.of() : List.copyOf(blockers);</span>
+<span class="fc" id="L927">        }</span>
     }
 
     record DiscoveryHighlightModel(
@@ -773,16 +937,22 @@ import java.util.stream.Stream;
         String expandedExpression,
         String rewrittenBefore,
         String rewrittenAfter,
-        List&lt;String&gt; sourceEvidence
+        List&lt;String&gt; sourceEvidence,
+        String affectedPathKey,
+        String positionBefore,
+        String positionAfter
     ) {
-<span class="fc" id="L778">        DiscoveryHighlightModel {</span>
-<span class="pc bpc" id="L779" title="1 of 2 branches missed.">            placeholderMappings = placeholderMappings == null ? Map.of() : Map.copyOf(placeholderMappings);</span>
-<span class="pc bpc" id="L780" title="1 of 2 branches missed.">            placeholderOccurrences = placeholderOccurrences == null ? Map.of() : Map.copyOf(placeholderOccurrences);</span>
-<span class="pc bpc" id="L781" title="1 of 2 branches missed.">            invalidPlaceholderOccurrences = invalidPlaceholderOccurrences == null</span>
-<span class="nc" id="L782">                ? Map.of()</span>
-<span class="fc" id="L783">                : Map.copyOf(invalidPlaceholderOccurrences);</span>
-<span class="pc bpc" id="L784" title="1 of 2 branches missed.">            sourceEvidence = sourceEvidence == null ? List.of() : List.copyOf(sourceEvidence);</span>
-<span class="fc" id="L785">        }</span>
+<span class="fc" id="L945">        DiscoveryHighlightModel {</span>
+<span class="pc bpc" id="L946" title="1 of 2 branches missed.">            placeholderMappings = placeholderMappings == null ? Map.of() : Map.copyOf(placeholderMappings);</span>
+<span class="pc bpc" id="L947" title="1 of 2 branches missed.">            placeholderOccurrences = placeholderOccurrences == null ? Map.of() : Map.copyOf(placeholderOccurrences);</span>
+<span class="pc bpc" id="L948" title="1 of 2 branches missed.">            invalidPlaceholderOccurrences = invalidPlaceholderOccurrences == null</span>
+<span class="nc" id="L949">                ? Map.of()</span>
+<span class="fc" id="L950">                : Map.copyOf(invalidPlaceholderOccurrences);</span>
+<span class="pc bpc" id="L951" title="1 of 2 branches missed.">            sourceEvidence = sourceEvidence == null ? List.of() : List.copyOf(sourceEvidence);</span>
+<span class="pc bpc" id="L952" title="1 of 2 branches missed.">            affectedPathKey = affectedPathKey == null ? &quot;&quot; : affectedPathKey;</span>
+<span class="pc bpc" id="L953" title="1 of 2 branches missed.">            positionBefore = positionBefore == null ? &quot;&quot; : positionBefore;</span>
+<span class="pc bpc" id="L954" title="1 of 2 branches missed.">            positionAfter = positionAfter == null ? &quot;&quot; : positionAfter;</span>
+<span class="fc" id="L955">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
