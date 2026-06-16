@@ -109,11 +109,7 @@ class SearchSpaceIntelligenceTest {
     // -----------------------------------------------------------------------
 
     @Test
-    void warningHighBranchingFactorEmittedWhenAverageBranchingExceedsThreshold() {
-        // Use a BoundedSearchExplorer that expands root into many successors
-        // We do this by using a real expression with a very large branching factor.
-        // Instead of mocking, we verify the warning constant is defined and the
-        // threshold is rational.
+    void warningHighBranchingFactorConstantIsDefined() {
         assertTrue(SearchSpaceIntelligence.HIGH_BRANCHING_FACTOR_THRESHOLD > 0.0);
         assertEquals(WARNING_HIGH_BRANCHING_FACTOR, "HIGH_BRANCHING_FACTOR");
     }
@@ -184,14 +180,14 @@ class SearchSpaceIntelligenceTest {
     }
 
     @Test
-    void duplicateHeavySearchSpaceIsTrueWhenDuplicateRateExceedsHalf() {
-        // With depth 4 and many rewrites the search space typically has some duplicates;
-        // we just verify the field reflects the computed value consistently (>0.5 <=> true)
+    void duplicateHeavySearchSpaceMatchesDuplicateRateWarning() {
+        // duplicateHeavySearchSpace and WARNING_HIGH_DUPLICATE_RATE are both derived
+        // from the same threshold, so they must always agree.
         IntelligenceReport report = intelligence.analyze("x^2 + 6*x + 5", 4, 500);
 
-        // Whether it's true or false, it must be consistent with duplicateRate > 0.5
-        // (we can't assert the exact value without knowing the rule set, but we can
-        //  at least confirm no exception is thrown and the field is a valid boolean)
-        assertTrue(report.duplicateHeavySearchSpace() || !report.duplicateHeavySearchSpace());
+        assertEquals(
+                report.warnings().contains(WARNING_HIGH_DUPLICATE_RATE),
+                report.duplicateHeavySearchSpace(),
+                "duplicateHeavySearchSpace must match presence of HIGH_DUPLICATE_RATE warning");
     }
 }

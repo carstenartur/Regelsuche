@@ -211,7 +211,9 @@ public final class SearchSpaceIntelligence {
      *                                  {@code dominantRule} (in [0, 1])
      * @param duplicateHeavySearchSpace {@code true} if more than half of explored states were duplicates
      * @param estimatedGrowth           projected reachable-state count at the configured depth
-     *                                  ({@code averageBranchingFactor ^ maxDepth}); &ge; 0
+     *                                  ({@code averageBranchingFactor ^ maxDepth});
+     *                                  returns {@code 1.0} when {@code averageBranchingFactor <= 0}
+     *                                  or {@code maxDepth <= 0}; &ge; 0
      * @param warnings                  immutable list of active warning codes
      */
     public record IntelligenceReport(

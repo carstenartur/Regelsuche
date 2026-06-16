@@ -134,12 +134,10 @@ class SearchDiagnosticsAnalyzerTest {
     // -----------------------------------------------------------------------
 
     @Test
-    void cycleCountAndRateAreZeroWhenNoBackEdgesExist() {
-        // Single expression with a unique successor that itself has no successors
-        // → no back-edges possible
+    void cycleCountAndRateAreNonNegative() {
+        // Verify non-negativity of cycle metrics for a shallow exploration
         DiagnosticsReport report = analyzer.analyze("x^2 + 6*x + 5", 1, 100);
 
-        // We can assert non-negative; actual zero depends on the rule set
         assertTrue(report.cycleCount() >= 0);
         assertTrue(report.cycleRate() >= 0.0);
     }
