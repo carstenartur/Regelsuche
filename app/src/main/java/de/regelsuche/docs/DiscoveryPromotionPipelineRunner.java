@@ -2,6 +2,8 @@ package de.regelsuche.docs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.explanation.MarkdownExplanationRenderer;
+import de.regelsuche.explanation.TransformationExplanation;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -31,6 +33,8 @@ public final class DiscoveryPromotionPipelineRunner {
     private final PromotionRegistry registry = new PromotionRegistry();
     private final DiscoveryCampaignFiveRunner campaignFiveRunner = new DiscoveryCampaignFiveRunner();
     private final DiscoveryCampaignFourRunner campaignFourRunner = new DiscoveryCampaignFourRunner();
+    private final DiscoveryExplanationFactory explanationFactory = new DiscoveryExplanationFactory();
+    private final MarkdownExplanationRenderer markdownExplanationRenderer = new MarkdownExplanationRenderer();
 
     public static void main(String[] args) {
         Path repoRoot = args.length == 0
@@ -638,39 +642,16 @@ public final class DiscoveryPromotionPipelineRunner {
     }
 
     private String galleryInterestReason(PromotionRecord record) {
-        List<String> reasons = new ArrayList<>();
-        if (record.stage().atLeast(PromotionStage.REUSED)) {
-            reasons.add("macro reused");
-        } else if (record.stage().atLeast(PromotionStage.PROMOTED)) {
-            reasons.add("promotion-eligible: oracle and ablation confirmed");
-        }
-        if (record.measuredImprovement()) {
-            reasons.add("expression score improved");
-        }
-        if (!record.reusedMacroIds().isEmpty()) {
-            reasons.add("reused macros: " + String.join(", ", record.reusedMacroIds()));
-        }
-        if (!record.oracleEvidence().isBlank()) {
-            reasons.add("oracle evidence: " + record.oracleEvidence());
-        }
-        return reasons.isEmpty() ? "gallery-eligible by stage and promotion criteria" : String.join("; ", reasons);
+        TransformationExplanation explanation = explanationFactory.buildTransformationExplanation(record);
+        return markdownExplanationRenderer.renderReasons(
+            explanation.interestReasons(),
+            "gallery-eligible by stage and promotion criteria"
+        );
     }
 
     private String galleryPathReason(PromotionRecord record) {
-        List<String> reasons = new ArrayList<>();
-        String oracleStatus = record.oracleStatus();
-        if ("AGREE".equalsIgnoreCase(oracleStatus)) {
-            reasons.add("oracle agrees");
-        } else if (!"UNAVAILABLE".equalsIgnoreCase(oracleStatus)) {
-            reasons.add("oracle=" + oracleStatus);
-        }
-        if (record.evidenceExists()) {
-            reasons.add("evidence present");
-        }
-        if (!record.ablationStatus().isBlank() && !"N/A".equals(record.ablationStatus())) {
-            reasons.add("ablation=" + record.ablationStatus());
-        }
-        return reasons.isEmpty() ? "—" : String.join("; ", reasons);
+        TransformationExplanation explanation = explanationFactory.buildTransformationExplanation(record);
+        return markdownExplanationRenderer.renderReasons(explanation.pathReasons(), "—");
     }
 
     private String renderBlockedCandidates(List<PromotionRecord> records) {
