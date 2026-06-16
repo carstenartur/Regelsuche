@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchDiagnosticsAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.search</a> &gt; <span class="el_source">SearchDiagnosticsAnalyzer.java</span></div><h1>SearchDiagnosticsAnalyzer.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.search;
+
+import de.regelsuche.moves.search.BoundedSearchExplorer.ExplorationResult;
+import java.util.Map;
+
+/**
+ * Computes Phase-3 search diagnostics from a bounded exploration of the
+ * reachable search space.
+ *
+ * &lt;p&gt;Delegates exploration to {@link BoundedSearchExplorer} and derives
+ * the following metrics:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;b&gt;reachableStates&lt;/b&gt; – unique expressions reachable from the root&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;duplicateRate&lt;/b&gt; – fraction of explored states that were already seen&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;cycleCount&lt;/b&gt; – DFS back-edges (successor points back to an ancestor in the
+ *       current path)&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;cycleRate&lt;/b&gt; – fraction of successor edges that are back-edges&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;deadEnds&lt;/b&gt; – unique states fully expanded with zero successors&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;averageDepth&lt;/b&gt; – depth-weighted mean over all unique discovered states&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public final class SearchDiagnosticsAnalyzer {
+
+    /** Default exploration depth used by the no-argument {@link #analyze(String)} overload. */
+    public static final int DEFAULT_MAX_DEPTH = 4;
+
+    /** Default state budget used by the no-argument {@link #analyze(String)} overload. */
+    public static final int DEFAULT_MAX_STATES = 500;
+
+    private final BoundedSearchExplorer explorer;
+
+    public SearchDiagnosticsAnalyzer() {
+<span class="fc" id="L33">        this(new BoundedSearchExplorer());</span>
+<span class="fc" id="L34">    }</span>
+
+<span class="fc" id="L36">    public SearchDiagnosticsAnalyzer(BoundedSearchExplorer explorer) {</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        this.explorer = explorer == null ? new BoundedSearchExplorer() : explorer;</span>
+<span class="fc" id="L38">    }</span>
+
+    /**
+     * Analyses the search space reachable from {@code expression} using
+     * {@link #DEFAULT_MAX_DEPTH} and {@link #DEFAULT_MAX_STATES}.
+     *
+     * @param expression the starting expression
+     * @return a {@link DiagnosticsReport} with Phase-3 metrics
+     */
+    public DiagnosticsReport analyze(String expression) {
+<span class="nc" id="L48">        return analyze(expression, DEFAULT_MAX_DEPTH, DEFAULT_MAX_STATES);</span>
+    }
+
+    /**
+     * Analyses the search space reachable from {@code expression} up to
+     * {@code maxDepth} rewrite steps, visiting at most {@code maxStates} states.
+     *
+     * @param expression the starting expression
+     * @param maxDepth   maximum rewrite depth (passed through to the explorer)
+     * @param maxStates  maximum state budget (passed through to the explorer)
+     * @return a {@link DiagnosticsReport} with Phase-3 metrics
+     */
+    public DiagnosticsReport analyze(String expression, int maxDepth, int maxStates) {
+<span class="fc" id="L61">        ExplorationResult result = explorer.explore(expression, maxDepth, maxStates);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        double duplicateRate = result.exploredStates() &gt; 0</span>
+<span class="fc" id="L63">                ? (double) result.duplicateStates() / result.exploredStates()</span>
+<span class="fc" id="L64">                : 0.0;</span>
+<span class="fc" id="L65">        double averageDepth = computeAverageDepth(result.growthPerDepth());</span>
+<span class="fc" id="L66">        return new DiagnosticsReport(</span>
+<span class="fc" id="L67">                result.uniqueStates(),</span>
+                duplicateRate,
+<span class="fc" id="L69">                result.cycleCount(),</span>
+<span class="fc" id="L70">                result.cycleRate(),</span>
+<span class="fc" id="L71">                result.deadEndCount(),</span>
+                averageDepth);
+    }
+
+    private static double computeAverageDepth(Map&lt;Integer, Integer&gt; growthPerDepth) {
+<span class="fc" id="L76">        long weightedSum = 0;</span>
+<span class="fc" id="L77">        int total = 0;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, Integer&gt; entry : growthPerDepth.entrySet()) {</span>
+<span class="fc" id="L79">            weightedSum += (long) entry.getKey() * entry.getValue();</span>
+<span class="fc" id="L80">            total += entry.getValue();</span>
+<span class="fc" id="L81">        }</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        return total &gt; 0 ? (double) weightedSum / total : 0.0;</span>
+    }
+
+    /**
+     * Phase-3 search diagnostics.
+     *
+     * @param reachableStates unique expressions discovered during exploration
+     * @param duplicateRate   fraction of explored states that were already seen
+     *                        ({@code duplicateStates / exploredStates})
+     * @param cycleCount      number of DFS back-edges detected
+     * @param cycleRate       fraction of successor edges that are back-edges
+     *                        ({@code cycleCount / totalEdges})
+     * @param deadEnds        unique states fully expanded with zero successors
+     * @param averageDepth    depth-weighted mean of all unique discovered states
+     */
+    public record DiagnosticsReport(
+            int reachableStates,
+            double duplicateRate,
+            int cycleCount,
+            double cycleRate,
+            int deadEnds,
+            double averageDepth) {
+
+<span class="fc" id="L105">        public DiagnosticsReport {</span>
+<span class="fc" id="L106">            reachableStates = Math.max(0, reachableStates);</span>
+<span class="fc" id="L107">            duplicateRate = Math.max(0d, Math.min(1d, duplicateRate));</span>
+<span class="fc" id="L108">            cycleCount = Math.max(0, cycleCount);</span>
+<span class="fc" id="L109">            cycleRate = Math.max(0d, Math.min(1d, cycleRate));</span>
+<span class="fc" id="L110">            deadEnds = Math.max(0, deadEnds);</span>
+<span class="fc" id="L111">            averageDepth = Math.max(0d, averageDepth);</span>
+<span class="fc" id="L112">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

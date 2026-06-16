@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleImpactAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.search</a> &gt; <span class="el_source">RuleImpactAnalyzer.java</span></div><h1>RuleImpactAnalyzer.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.search;
+
+import de.regelsuche.moves.search.SearchSuccessorGenerator.SearchSuccessorState;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+/**
+ * Phase-4 Rule Impact Analysis: measures the contribution of each individual
+ * rewrite rule during a bounded depth-first exploration of the search space.
+ *
+ * &lt;p&gt;For every rule encountered during exploration the following per-rule
+ * metrics are collected:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;b&gt;successorsGenerated&lt;/b&gt; – total successor edges produced by this rule&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;duplicatesGenerated&lt;/b&gt; – successor edges that reached an already-visited state&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;cyclesGenerated&lt;/b&gt; – successor edges that were DFS back-edges (point back to an
+ *       ancestor in the current path)&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;uniqueStatesAdded&lt;/b&gt; – successor edges that discovered a previously unseen state
+ *       ({@code successorsGenerated == uniqueStatesAdded + duplicatesGenerated + cyclesGenerated})&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;averageReductionImpact&lt;/b&gt; – mean character-length delta
+ *       ({@code sourceLength − successorLength}) per generated successor; positive means
+ *       the rule shrinks expressions on average&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public final class RuleImpactAnalyzer {
+
+    /** Default exploration depth for the no-argument {@link #analyze(String)} overload. */
+    public static final int DEFAULT_MAX_DEPTH = 4;
+
+    /** Default state budget for the no-argument {@link #analyze(String)} overload. */
+    public static final int DEFAULT_MAX_STATES = 500;
+
+    private final Function&lt;String, List&lt;SearchSuccessorState&gt;&gt; successorSupplier;
+
+    public RuleImpactAnalyzer() {
+<span class="fc" id="L41">        this(new SearchSuccessorGenerator());</span>
+<span class="fc" id="L42">    }</span>
+
+<span class="fc" id="L44">    public RuleImpactAnalyzer(SearchSuccessorGenerator generator) {</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        SearchSuccessorGenerator g = generator == null ? new SearchSuccessorGenerator() : generator;</span>
+<span class="fc" id="L46">        this.successorSupplier = g::generate;</span>
+<span class="fc" id="L47">    }</span>
+
+<span class="fc" id="L49">    RuleImpactAnalyzer(Function&lt;String, List&lt;SearchSuccessorState&gt;&gt; successorSupplier) {</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        this.successorSupplier = successorSupplier == null ? __ -&gt; List.of() : successorSupplier;</span>
+<span class="fc" id="L51">    }</span>
+
+    /**
+     * Analyses rule impact using {@link #DEFAULT_MAX_DEPTH} and {@link #DEFAULT_MAX_STATES}.
+     *
+     * @param expression the starting expression
+     * @return a {@link RuleImpactReport} with per-rule metrics
+     */
+    public RuleImpactReport analyze(String expression) {
+<span class="nc" id="L60">        return analyze(expression, DEFAULT_MAX_DEPTH, DEFAULT_MAX_STATES);</span>
+    }
+
+    /**
+     * Analyses rule impact up to {@code maxDepth} rewrite steps visiting at most
+     * {@code maxStates} states.
+     *
+     * @param expression the starting expression
+     * @param maxDepth   maximum rewrite depth (clamped to &amp;ge; 0)
+     * @param maxStates  maximum state budget (clamped to &amp;ge; 1)
+     * @return a {@link RuleImpactReport} with per-rule metrics
+     */
+    public RuleImpactReport analyze(String expression, int maxDepth, int maxStates) {
+<span class="fc bfc" id="L73" title="All 4 branches covered.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L74">            return RuleImpactReport.empty();</span>
+        }
+<span class="fc" id="L76">        int depth = Math.max(0, maxDepth);</span>
+<span class="fc" id="L77">        int budget = Math.max(1, maxStates);</span>
+<span class="fc" id="L78">        ImpactAccumulator accum = new ImpactAccumulator();</span>
+<span class="fc" id="L79">        recurse(expression.trim(), 0, depth, accum, budget);</span>
+<span class="fc" id="L80">        return accum.build();</span>
+    }
+
+    private void recurse(
+            String expression,
+            int depth,
+            int maxDepth,
+            ImpactAccumulator accum,
+            int budget) {
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (accum.exploredStates &gt;= budget) {</span>
+<span class="nc" id="L90">            return;</span>
+        }
+<span class="fc" id="L92">        accum.exploredStates++;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (!accum.visited.add(expression)) {</span>
+<span class="fc" id="L94">            return;</span>
+        }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (depth &gt;= maxDepth) {</span>
+<span class="fc" id="L97">            return;</span>
+        }
+<span class="fc" id="L99">        List&lt;SearchSuccessorState&gt; successors = successorSupplier.apply(expression);</span>
+<span class="fc" id="L100">        accum.currentPath.add(expression);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (SearchSuccessorState successor : successors) {</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (accum.exploredStates &gt;= budget) {</span>
+<span class="nc" id="L103">                break;</span>
+            }
+<span class="fc" id="L105">            String rule = ruleLabel(successor);</span>
+<span class="fc" id="L106">            RuleAccumulator ra = accum.byRule.computeIfAbsent(rule, k -&gt; new RuleAccumulator());</span>
+<span class="fc" id="L107">            ra.successorsGenerated++;</span>
+<span class="fc" id="L108">            ra.totalReductionImpact += (long) expression.length() - successor.successorExpression().length();</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (accum.currentPath.contains(successor.successorExpression())) {</span>
+<span class="nc" id="L110">                ra.cyclesGenerated++;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            } else if (accum.visited.contains(successor.successorExpression())) {</span>
+<span class="fc" id="L112">                ra.duplicatesGenerated++;</span>
+            } else {
+<span class="fc" id="L114">                ra.uniqueStatesAdded++;</span>
+            }
+<span class="fc" id="L116">            recurse(successor.successorExpression(), depth + 1, maxDepth, accum, budget);</span>
+<span class="fc" id="L117">        }</span>
+<span class="fc" id="L118">        accum.currentPath.remove(expression);</span>
+<span class="fc" id="L119">    }</span>
+
+    private static String ruleLabel(SearchSuccessorState s) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        return s.moveKind().isBlank() ? s.enumeratorId() : s.moveKind();</span>
+    }
+
+    // -------------------------------------------------------------------------
+    // Public records
+    // -------------------------------------------------------------------------
+
+    /**
+     * Per-rule impact metrics for a single rewrite rule.
+     *
+     * @param successorsGenerated    total successor edges produced by this rule
+     * @param duplicatesGenerated    edges that reached an already-visited state
+     * @param cyclesGenerated        edges that were DFS back-edges
+     * @param uniqueStatesAdded      edges that discovered a previously unseen state
+     * @param averageReductionImpact mean {@code (sourceLength − successorLength)} per generated
+     *                               successor; positive = rule shrinks expressions
+     */
+    public record RuleStats(
+            int successorsGenerated,
+            int duplicatesGenerated,
+            int cyclesGenerated,
+            int uniqueStatesAdded,
+            double averageReductionImpact) {
+
+<span class="fc" id="L146">        public RuleStats {</span>
+<span class="fc" id="L147">            successorsGenerated = Math.max(0, successorsGenerated);</span>
+<span class="fc" id="L148">            duplicatesGenerated = Math.max(0, duplicatesGenerated);</span>
+<span class="fc" id="L149">            cyclesGenerated = Math.max(0, cyclesGenerated);</span>
+<span class="fc" id="L150">            uniqueStatesAdded = Math.max(0, uniqueStatesAdded);</span>
+<span class="fc" id="L151">        }</span>
+    }
+
+    /**
+     * Aggregated rule-level impact data from a bounded exploration run.
+     *
+     * @param ruleStats per-rule metrics keyed by rule label (moveKind, or enumeratorId as fallback)
+     */
+    public record RuleImpactReport(Map&lt;String, RuleStats&gt; ruleStats) {
+
+<span class="fc" id="L161">        public RuleImpactReport {</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            ruleStats = ruleStats == null</span>
+<span class="nc" id="L163">                    ? Map.of()</span>
+<span class="fc" id="L164">                    : Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(ruleStats));</span>
+<span class="fc" id="L165">        }</span>
+
+        public static RuleImpactReport empty() {
+<span class="fc" id="L168">            return new RuleImpactReport(Map.of());</span>
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private static final class RuleAccumulator {
+        int successorsGenerated;
+        int duplicatesGenerated;
+        int cyclesGenerated;
+        int uniqueStatesAdded;
+        long totalReductionImpact;
+
+        RuleStats build() {
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            double avg = successorsGenerated &gt; 0</span>
+<span class="fc" id="L185">                    ? (double) totalReductionImpact / successorsGenerated</span>
+<span class="pc" id="L186">                    : 0.0;</span>
+<span class="fc" id="L187">            return new RuleStats(</span>
+                    successorsGenerated, duplicatesGenerated, cyclesGenerated, uniqueStatesAdded, avg);
+        }
+    }
+
+<span class="fc" id="L192">    private static final class ImpactAccumulator {</span>
+        int exploredStates;
+<span class="fc" id="L194">        final LinkedHashSet&lt;String&gt; visited = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L195">        final HashSet&lt;String&gt; currentPath = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L196">        final LinkedHashMap&lt;String, RuleAccumulator&gt; byRule = new LinkedHashMap&lt;&gt;();</span>
+
+        RuleImpactReport build() {
+<span class="fc" id="L199">            Map&lt;String, RuleStats&gt; stats = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            for (Map.Entry&lt;String, RuleAccumulator&gt; entry : byRule.entrySet()) {</span>
+<span class="fc" id="L201">                stats.put(entry.getKey(), entry.getValue().build());</span>
+<span class="fc" id="L202">            }</span>
+<span class="fc" id="L203">            return new RuleImpactReport(stats);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

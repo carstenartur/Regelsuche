@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpaceIntelligence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.search</a> &gt; <span class="el_source">SearchSpaceIntelligence.java</span></div><h1>SearchSpaceIntelligence.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.search;
+
+import de.regelsuche.moves.search.BoundedSearchExplorer.ExplorationResult;
+import de.regelsuche.moves.search.RuleImpactAnalyzer.RuleImpactReport;
+import de.regelsuche.moves.search.RuleImpactAnalyzer.RuleStats;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Phase-5 Search Space Intelligence: interprets exploration metrics and emits
+ * actionable warnings about the structure of the reachable search space.
+ *
+ * &lt;p&gt;Internally runs {@link BoundedSearchExplorer} (Phases 2–3) and
+ * {@link RuleImpactAnalyzer} (Phase 4) and produces higher-level intelligence:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Warnings about structural problems (high branching, explosion, dominant rules, etc.)&lt;/li&gt;
+ *   &lt;li&gt;{@code dominantRule} / {@code dominantRuleShare} – the rule driving the most growth&lt;/li&gt;
+ *   &lt;li&gt;{@code duplicateHeavySearchSpace} – quick boolean flag for heavily duplicate spaces&lt;/li&gt;
+ *   &lt;li&gt;{@code estimatedGrowth} – projected state count at the configured depth
+ *       ({@code averageBranchingFactor ^ maxDepth})&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public final class SearchSpaceIntelligence {
+
+    // -------------------------------------------------------------------------
+    // Warning constants
+    // -------------------------------------------------------------------------
+
+    /**
+     * Emitted when the average branching factor across the explored space exceeds
+     * {@value #HIGH_BRANCHING_FACTOR_THRESHOLD}.
+     */
+    public static final String WARNING_HIGH_BRANCHING_FACTOR = &quot;HIGH_BRANCHING_FACTOR&quot;;
+
+    /**
+     * Emitted when {@link IntelligenceReport#estimatedGrowth()} exceeds
+     * {@value #SEARCH_SPACE_EXPLOSION_THRESHOLD} projected states.
+     */
+    public static final String WARNING_SEARCH_SPACE_EXPLOSION = &quot;SEARCH_SPACE_EXPLOSION&quot;;
+
+    /**
+     * Emitted when a single rule is responsible for at least
+     * {@value #DOMINANT_RULE_SHARE_THRESHOLD} of all generated successor edges.
+     */
+    public static final String WARNING_DOMINANT_RULE = &quot;DOMINANT_RULE&quot;;
+
+    /** Emitted when more than half of all explored states were already-visited duplicates. */
+    public static final String WARNING_HIGH_DUPLICATE_RATE = &quot;HIGH_DUPLICATE_RATE&quot;;
+
+    /**
+     * Emitted when the fraction of DFS back-edges (cycles) among all successor edges
+     * exceeds {@value #CYCLE_HEAVY_THRESHOLD}.
+     */
+    public static final String WARNING_CYCLE_HEAVY = &quot;CYCLE_HEAVY&quot;;
+
+    // -------------------------------------------------------------------------
+    // Thresholds (package-visible for tests)
+    // -------------------------------------------------------------------------
+
+    static final double HIGH_BRANCHING_FACTOR_THRESHOLD = 5.0;
+    static final double SEARCH_SPACE_EXPLOSION_THRESHOLD = 1_000.0;
+    static final double DOMINANT_RULE_SHARE_THRESHOLD = 0.8;
+    static final double HIGH_DUPLICATE_RATE_THRESHOLD = 0.5;
+    static final double CYCLE_HEAVY_THRESHOLD = 0.1;
+
+    /** Default exploration depth for the no-argument {@link #analyze(String)} overload. */
+    public static final int DEFAULT_MAX_DEPTH = 4;
+
+    /** Default state budget for the no-argument {@link #analyze(String)} overload. */
+    public static final int DEFAULT_MAX_STATES = 500;
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private final BoundedSearchExplorer explorer;
+    private final RuleImpactAnalyzer ruleImpactAnalyzer;
+
+    public SearchSpaceIntelligence() {
+<span class="fc" id="L82">        this(new BoundedSearchExplorer(), new RuleImpactAnalyzer());</span>
+<span class="fc" id="L83">    }</span>
+
+<span class="fc" id="L85">    public SearchSpaceIntelligence(BoundedSearchExplorer explorer, RuleImpactAnalyzer ruleImpactAnalyzer) {</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        this.explorer = explorer == null ? new BoundedSearchExplorer() : explorer;</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        this.ruleImpactAnalyzer = ruleImpactAnalyzer == null ? new RuleImpactAnalyzer() : ruleImpactAnalyzer;</span>
+<span class="fc" id="L88">    }</span>
+
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
+    /**
+     * Analyses the search space of {@code expression} using {@link #DEFAULT_MAX_DEPTH}
+     * and {@link #DEFAULT_MAX_STATES}.
+     *
+     * @param expression the starting expression
+     * @return an {@link IntelligenceReport} with Phase-5 intelligence
+     */
+    public IntelligenceReport analyze(String expression) {
+<span class="fc" id="L102">        return analyze(expression, DEFAULT_MAX_DEPTH, DEFAULT_MAX_STATES);</span>
+    }
+
+    /**
+     * Analyses the search space of {@code expression} up to {@code maxDepth} steps,
+     * visiting at most {@code maxStates} states.
+     *
+     * @param expression the starting expression
+     * @param maxDepth   maximum rewrite depth (passed through to sub-analysers)
+     * @param maxStates  maximum state budget (passed through to sub-analysers)
+     * @return an {@link IntelligenceReport} with Phase-5 intelligence
+     */
+    public IntelligenceReport analyze(String expression, int maxDepth, int maxStates) {
+<span class="fc bfc" id="L115" title="All 4 branches covered.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L116">            return IntelligenceReport.empty();</span>
+        }
+<span class="fc" id="L118">        ExplorationResult exploration = explorer.explore(expression, maxDepth, maxStates);</span>
+<span class="fc" id="L119">        RuleImpactReport ruleImpact = ruleImpactAnalyzer.analyze(expression, maxDepth, maxStates);</span>
+
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        double duplicateRate = exploration.exploredStates() &gt; 0</span>
+<span class="fc" id="L122">                ? (double) exploration.duplicateStates() / exploration.exploredStates()</span>
+<span class="pc" id="L123">                : 0.0;</span>
+<span class="fc" id="L124">        double avgBranching = exploration.averageBranchingFactor();</span>
+<span class="fc" id="L125">        double estimatedGrowth = computeEstimatedGrowth(avgBranching, Math.max(0, maxDepth));</span>
+
+<span class="fc" id="L127">        String dominantRule = computeDominantRule(ruleImpact.ruleStats());</span>
+<span class="fc" id="L128">        double dominantRuleShare = computeDominantRuleShare(ruleImpact.ruleStats(), dominantRule);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        boolean duplicateHeavy = duplicateRate &gt; HIGH_DUPLICATE_RATE_THRESHOLD;</span>
+
+<span class="fc" id="L131">        List&lt;String&gt; warnings = buildWarnings(</span>
+                avgBranching, estimatedGrowth, dominantRuleShare,
+<span class="fc" id="L133">                duplicateRate, exploration.cycleRate());</span>
+
+<span class="fc" id="L135">        return new IntelligenceReport(</span>
+                dominantRule,
+                dominantRuleShare,
+                duplicateHeavy,
+                estimatedGrowth,
+                warnings);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private static double computeEstimatedGrowth(double avgBranching, int maxDepth) {
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">        if (avgBranching &lt;= 0.0 || maxDepth &lt;= 0) {</span>
+<span class="fc" id="L149">            return 1.0;</span>
+        }
+<span class="fc" id="L151">        return Math.pow(avgBranching, maxDepth);</span>
+    }
+
+    private static String computeDominantRule(Map&lt;String, RuleStats&gt; ruleStats) {
+<span class="fc" id="L155">        return ruleStats.entrySet().stream()</span>
+<span class="fc" id="L156">                .max((a, b) -&gt; Integer.compare(</span>
+<span class="fc" id="L157">                        a.getValue().successorsGenerated(),</span>
+<span class="fc" id="L158">                        b.getValue().successorsGenerated()))</span>
+<span class="fc" id="L159">                .map(Map.Entry::getKey)</span>
+<span class="fc" id="L160">                .orElse(&quot;&quot;);</span>
+    }
+
+    private static double computeDominantRuleShare(
+            Map&lt;String, RuleStats&gt; ruleStats, String dominantRule) {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (dominantRule.isEmpty()) {</span>
+<span class="fc" id="L166">            return 0.0;</span>
+        }
+<span class="fc" id="L168">        int total = ruleStats.values().stream()</span>
+<span class="fc" id="L169">                .mapToInt(RuleStats::successorsGenerated)</span>
+<span class="fc" id="L170">                .sum();</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (total == 0) {</span>
+<span class="nc" id="L172">            return 0.0;</span>
+        }
+<span class="fc" id="L174">        return (double) ruleStats.get(dominantRule).successorsGenerated() / total;</span>
+    }
+
+    private static List&lt;String&gt; buildWarnings(
+            double avgBranching,
+            double estimatedGrowth,
+            double dominantRuleShare,
+            double duplicateRate,
+            double cycleRate) {
+<span class="fc" id="L183">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (avgBranching &gt; HIGH_BRANCHING_FACTOR_THRESHOLD) {</span>
+<span class="nc" id="L185">            warnings.add(WARNING_HIGH_BRANCHING_FACTOR);</span>
+        }
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (estimatedGrowth &gt; SEARCH_SPACE_EXPLOSION_THRESHOLD) {</span>
+<span class="nc" id="L188">            warnings.add(WARNING_SEARCH_SPACE_EXPLOSION);</span>
+        }
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (dominantRuleShare &gt;= DOMINANT_RULE_SHARE_THRESHOLD) {</span>
+<span class="nc" id="L191">            warnings.add(WARNING_DOMINANT_RULE);</span>
+        }
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (duplicateRate &gt; HIGH_DUPLICATE_RATE_THRESHOLD) {</span>
+<span class="nc" id="L194">            warnings.add(WARNING_HIGH_DUPLICATE_RATE);</span>
+        }
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (cycleRate &gt; CYCLE_HEAVY_THRESHOLD) {</span>
+<span class="nc" id="L197">            warnings.add(WARNING_CYCLE_HEAVY);</span>
+        }
+<span class="fc" id="L199">        return Collections.unmodifiableList(warnings);</span>
+    }
+
+    // -------------------------------------------------------------------------
+    // Output record
+    // -------------------------------------------------------------------------
+
+    /**
+     * Phase-5 intelligence report.
+     *
+     * @param dominantRule              the rule generating the most successor edges, or {@code &quot;&quot;}
+     * @param dominantRuleShare         fraction of all successor edges attributable to
+     *                                  {@code dominantRule} (in [0, 1])
+     * @param duplicateHeavySearchSpace {@code true} if more than half of explored states were duplicates
+     * @param estimatedGrowth           projected reachable-state count at the configured depth
+     *                                  ({@code averageBranchingFactor ^ maxDepth});
+     *                                  returns {@code 1.0} when {@code averageBranchingFactor &lt;= 0}
+     *                                  or {@code maxDepth &lt;= 0}; &amp;ge; 0
+     * @param warnings                  immutable list of active warning codes
+     */
+    public record IntelligenceReport(
+            String dominantRule,
+            double dominantRuleShare,
+            boolean duplicateHeavySearchSpace,
+            double estimatedGrowth,
+            List&lt;String&gt; warnings) {
+
+<span class="fc" id="L226">        public IntelligenceReport {</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            dominantRule = dominantRule == null ? &quot;&quot; : dominantRule;</span>
+<span class="fc" id="L228">            dominantRuleShare = Math.max(0d, Math.min(1d, dominantRuleShare));</span>
+<span class="fc" id="L229">            estimatedGrowth = Math.max(0d, estimatedGrowth);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            warnings = warnings == null ? List.of() : List.copyOf(warnings);</span>
+<span class="fc" id="L231">        }</span>
+
+        public static IntelligenceReport empty() {
+<span class="fc" id="L234">            return new IntelligenceReport(&quot;&quot;, 0.0, false, 0.0, List.of());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

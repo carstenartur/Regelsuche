@@ -354,8 +354,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L354">        String profileName = stringValue(body, &quot;profile&quot;, SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);</span>
 <span class="fc" id="L355">        String goalName = stringValue(body, &quot;goal&quot;, &quot;&quot;).toUpperCase(Locale.ROOT);</span>
 <span class="fc bfc" id="L356" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="fc" id="L357">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
-<span class="fc" id="L358">            return;</span>
+<span class="nc" id="L357">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
+<span class="nc" id="L358">            return;</span>
         }
         InputType type;
         SearchProfile profile;
@@ -1371,8 +1371,8 @@ public class WebWorkbenchServer {
 <span class="nc" id="L1371">            return;</span>
         }
 <span class="fc bfc" id="L1373" title="All 2 branches covered.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L1374">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="nc" id="L1375">            return;</span>
+<span class="fc" id="L1374">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="fc" id="L1375">            return;</span>
         }
 <span class="fc" id="L1377">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc bfc" id="L1378" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
@@ -1716,8 +1716,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1716">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1717">            .findFirst();</span>
 <span class="fc bfc" id="L1718" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="fc" id="L1719">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="fc" id="L1720">            return;</span>
+<span class="nc" id="L1719">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1720">            return;</span>
         }
 <span class="fc" id="L1722">        var derivation = match.get();</span>
 <span class="fc" id="L1723">        JsonWriter writer = new JsonWriter();</span>
@@ -2430,8 +2430,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2431">            return;</span>
         }
-<span class="fc" id="L2433">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="fc" id="L2434">    }</span>
+<span class="nc" id="L2433">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="nc" id="L2434">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2437">        var jobs = proofWorkbenchService.listJobs();</span>
