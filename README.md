@@ -22,36 +22,40 @@
 
 Why “Mathematics is a Game”?
 
-Most computer algebra systems are designed to compute a result.
+Regelsuche is based on the idea that mathematics can be treated as a rule-based game.
 
-Regelsuche starts from a different perspective:
+A mathematical expression is a position in the game.
 
-Mathematics can be viewed as a game whose moves are mathematical transformation rules.
+A transformation rule is a legal move.
 
-A mathematical expression represents a game position.
+A sequence of transformations is a line of play.
 
-Every valid transformation corresponds to a legal move.
+Unlike chess, the mathematical game space is not finite. Mathematical expressions form an effectively infinite search space with infinitely many possible structures, values, substitutions and levels of abstraction.
 
-Instead of following a single predefined algorithm, Regelsuche explores the space of all reachable positions.
+Regelsuche does not try to enumerate this space naively.
 
-The objective is not merely to simplify an expression, but to systematically search the space of mathematical possibilities.
+Instead, it searches for and applies parametrized transformation patterns over mathematical abstract syntax trees.
 
-This perspective is inspired by techniques from game playing:
+A transformation rule consists of two parts:
 
-* expressions correspond to positions
-* transformation rules correspond to legal moves
-* transformation sequences correspond to game lines
-* search trees correspond to game trees
-* evaluation functions guide the exploration
-* repeated positions are merged into a graph
-* successful sequences become reusable strategies
+1. a recognition pattern that matches a class of AST structures,
+2. an application step that creates an equivalent transformed structure.
 
-The long-term vision is that mathematical discoveries become the result of systematic search rather than isolated insight.
+In this sense, transformation rules behave like regular expressions over mathematical syntax trees: they can describe infinitely many concrete expressions with a finite pattern.
 
-Just as chess programs search millions of legal continuations, Regelsuche explores mathematical transformation spaces.
+For example, a single rule can represent all instances of a structure such as:
 
-The challenge is that, unlike chess, mathematical search spaces are often infinite. Therefore, efficient pruning, evaluation and search strategies become the central research topic.
+a² + 2ab + b²  →  (a + b)²
 
+The variables in the rule allow it to match entire families of expressions instead of only one concrete expression.
+
+This is what makes systematic search possible even inside very large or infinite mathematical spaces.
+
+Regelsuche can also expand its own stock of transformations. If the system repeatedly discovers that a sequence of smaller transformations leads to useful simplifications, that sequence can become a higher-level transformation strategy.
+
+The nested sequence of recognized and applied transformations forms a proof of the complete transformation.
+
+The long-term vision is that mathematical discovery becomes less dependent on isolated intuition and more the result of systematic exploration: the system searches the game tree of possible transformations, identifies useful paths, reuses successful strategies, and turns repeated discoveries into new rules.
 
 ## Discovery evidence
 
