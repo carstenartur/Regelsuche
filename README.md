@@ -20,6 +20,39 @@
 > Knoten sind Ausdrücke, Kanten sind Umformungen, Pfade sind Rechenwege —
 > mit Replay, Proof-Bridge und einem klickbaren Web-Workbench.
 
+Why “Mathematics is a Game”?
+
+Most computer algebra systems are designed to compute a result.
+
+Regelsuche starts from a different perspective:
+
+Mathematics can be viewed as a game whose moves are mathematical transformation rules.
+
+A mathematical expression represents a game position.
+
+Every valid transformation corresponds to a legal move.
+
+Instead of following a single predefined algorithm, Regelsuche explores the space of all reachable positions.
+
+The objective is not merely to simplify an expression, but to systematically search the space of mathematical possibilities.
+
+This perspective is inspired by techniques from game playing:
+
+* expressions correspond to positions
+* transformation rules correspond to legal moves
+* transformation sequences correspond to game lines
+* search trees correspond to game trees
+* evaluation functions guide the exploration
+* repeated positions are merged into a graph
+* successful sequences become reusable strategies
+
+The long-term vision is that mathematical discoveries become the result of systematic search rather than isolated insight.
+
+Just as chess programs search millions of legal continuations, Regelsuche explores mathematical transformation spaces.
+
+The challenge is that, unlike chess, mathematical search spaces are often infinite. Therefore, efficient pruning, evaluation and search strategies become the central research topic.
+
+
 ## Discovery evidence
 
 Regelsuche records mathematical transformation searches as replayable evidence.
