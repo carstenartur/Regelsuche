@@ -1,2 +1,3 @@
 #!/usr/bin/env python3
-print('placeholder')
+from pathlib import Path
+Path('foo.txt').write_text('hi')
