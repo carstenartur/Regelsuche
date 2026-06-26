@@ -1,26 +1,28 @@
 name: Release
 
-# Inspired by the release workflow of the sibling Taxonomy project
-# (https://github.com/carstenartur/Taxonomy/blob/main/.github/workflows/deploy-release.yml),
-# adapted for Regelsuche's Gradle build (no Maven SNAPSHOT versioning).
-#
-# Trigger: manual via "Actions → Release → Run workflow", or by pushing a
-# semver tag (e.g. `git tag v1.2.0 && git push --tags`).
+# Gradle-native release workflow for Regelsuche.
+# It keeps CITATION.cff, .zenodo.json and codemeta.json aligned with the
+# released version and opens a follow-up PR for the next development version.
 
 on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Release version in semver, e.g. 1.0.0 (no leading "v")'
+        description: 'Release version in semver, e.g. 0.1.0 (no leading "v")'
         required: true
         type: string
+      next_development_version:
+        description: 'Next development version, e.g. 0.1.1-SNAPSHOT. Leave empty to increment patch.'
+        required: false
+        type: string
+        default: ''
       skip_tests:
         description: 'Skip ./gradlew test during the release build'
         required: false
         type: boolean
         default: false
       dry_run:
-        description: 'Dry run – build & validate but do not create a tag or release'
+        description: 'Dry run: build and validate but do not create a tag, release or follow-up PR'
         required: false
         type: boolean
         default: false
@@ -30,9 +32,14 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 env:
   GH_TOKEN: ${{ github.token }}
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   preflight:
@@ -40,12 +47,14 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_version: ${{ steps.resolve.outputs.release_version }}
+      next_development_version: ${{ steps.resolve.outputs.next_development_version }}
       tag_name: ${{ steps.resolve.outputs.tag_name }}
+      maintenance_branch: ${{ steps.resolve.outputs.maintenance_branch }}
       dry_run: ${{ steps.resolve.outputs.dry_run }}
       skip_tests: ${{ steps.resolve.outputs.skip_tests }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -58,11 +67,13 @@ jobs:
             RELEASE_VERSION="${TAG_NAME#v}"
             DRY_RUN="false"
             SKIP_TESTS="false"
+            NEXT_VERSION=""
           else
             RELEASE_VERSION="${{ inputs.release_version }}"
             TAG_NAME="v${RELEASE_VERSION}"
             DRY_RUN="${{ inputs.dry_run }}"
             SKIP_TESTS="${{ inputs.skip_tests }}"
+            NEXT_VERSION="${{ inputs.next_development_version }}"
           fi
 
           if ! [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -70,10 +81,43 @@ jobs:
             exit 1
           fi
 
+          if [[ -z "${NEXT_VERSION}" ]]; then
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${RELEASE_VERSION}"
+            NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
+          fi
+          if ! [[ "${NEXT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]]; then
+            echo "::error::Invalid next development version: '${NEXT_VERSION}'"
+            exit 1
+          fi
+
+          MAJOR_MINOR="${RELEASE_VERSION%.*}"
           echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag_name=${TAG_NAME}"              >> "$GITHUB_OUTPUT"
-          echo "dry_run=${DRY_RUN}"                >> "$GITHUB_OUTPUT"
-          echo "skip_tests=${SKIP_TESTS}"          >> "$GITHUB_OUTPUT"
+          echo "next_development_version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "maintenance_branch=maintenance/${MAJOR_MINOR}.x" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+          echo "skip_tests=${SKIP_TESTS}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release metadata base version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          CURRENT=$(grep -E '^version=' release.properties | head -n 1 | cut -d'=' -f2 | tr -d '[:space:]')
+          if [[ -z "${CURRENT}" ]]; then
+            echo "::error::release.properties must contain version=..."
+            exit 1
+          fi
+          if [[ "${CURRENT}" != *-SNAPSHOT ]]; then
+            echo "::error::release.properties must contain a development SNAPSHOT version"
+            exit 1
+          fi
+          if [[ "${CURRENT%-SNAPSHOT}" != "${{ steps.resolve.outputs.release_version }}" && "${{ steps.resolve.outputs.dry_run }}" != "true" ]]; then
+            echo "::error::release_version must match release.properties base version (${CURRENT%-SNAPSHOT})"
+            exit 1
+          fi
+          grep -q "version: \"${CURRENT}\"" CITATION.cff
+          grep -q "\"version\": \"${CURRENT}\"" .zenodo.json
+          grep -q "\"version\": \"${CURRENT}\"" codemeta.json
 
       - name: Reject if tag already exists (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
@@ -83,7 +127,7 @@ jobs:
             echo "::error::Tag ${TAG} already exists on origin"
             exit 1
           fi
-          echo "Tag ${TAG} is free ✅"
+          echo "Tag ${TAG} is free"
 
       - name: Preflight summary
         run: |
@@ -94,7 +138,9 @@ jobs:
             echo "|-------|-------|";
             echo "| Trigger | ${{ github.event_name }} |";
             echo "| Release version | ${{ steps.resolve.outputs.release_version }} |";
+            echo "| Next development version | ${{ steps.resolve.outputs.next_development_version }} |";
             echo "| Tag | ${{ steps.resolve.outputs.tag_name }} |";
+            echo "| Maintenance branch | ${{ steps.resolve.outputs.maintenance_branch }} |";
             echo "| Dry run | ${{ steps.resolve.outputs.dry_run }} |";
             echo "| Skip tests | ${{ steps.resolve.outputs.skip_tests }} |";
           } >> "$GITHUB_STEP_SUMMARY"
@@ -107,7 +153,7 @@ jobs:
       artifact_name: ${{ steps.collect.outputs.artifact_name }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -133,15 +179,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
-          # Application plugin produces tar/zip distributions under app/build/distributions.
           shopt -s nullglob
-          for f in app/build/distributions/*.zip app/build/distributions/*.tar; do
+          for f in app/build/distributions/*.zip app/build/distributions/*.tar app/build/libs/*.jar; do
             cp "$f" release-artifacts/
           done
-          # Also include the plain JAR for convenience.
-          for f in app/build/libs/*.jar; do
-            cp "$f" release-artifacts/
-          done
+          shopt -u nullglob
+          if ! compgen -G 'release-artifacts/*' > /dev/null; then
+            echo "::error::No release artifacts were found"
+            exit 1
+          fi
+          (cd release-artifacts && sha256sum * > SHA256SUMS.txt)
           ls -la release-artifacts/
           echo "artifact_name=regelsuche-${{ needs.preflight.outputs.release_version }}-artifacts" >> "$GITHUB_OUTPUT"
 
@@ -158,7 +205,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -168,15 +215,34 @@ jobs:
           name: ${{ needs.build.outputs.artifact_name }}
           path: release-artifacts
 
+      - name: Create release metadata commit (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.preflight.outputs.release_version }}"
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          python3 .github/scripts/update-release-metadata.py "${VERSION}" --release
+          git add CITATION.cff .zenodo.json codemeta.json release.properties
+          git commit -m "Release version ${VERSION}"
+
       - name: Create git tag (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           TAG="${{ needs.preflight.outputs.tag_name }}"
-          git config user.name  'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
           git tag -a "${TAG}" -m "Release ${{ needs.preflight.outputs.release_version }}"
           git push origin "${TAG}"
+
+      - name: Create maintenance branch (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          BRANCH="${{ needs.preflight.outputs.maintenance_branch }}"
+          if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
+            echo "Maintenance branch ${BRANCH} already exists; skipping"
+          else
+            git push origin "HEAD:refs/heads/${BRANCH}"
+          fi
 
       - name: Create GitHub Release
         run: |
@@ -187,6 +253,34 @@ jobs:
             --title  "Regelsuche ${VERSION}" \
             --generate-notes \
             release-artifacts/*
+
+      - name: Prepare next development metadata
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          python3 .github/scripts/update-release-metadata.py "${{ needs.preflight.outputs.next_development_version }}"
+
+      - name: Open next development metadata PR
+        if: github.event_name == 'workflow_dispatch'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: release/prepare-next-${{ needs.preflight.outputs.next_development_version }}
+          delete-branch: false
+          commit-message: Prepare next development version ${{ needs.preflight.outputs.next_development_version }}
+          title: Prepare next development version ${{ needs.preflight.outputs.next_development_version }}
+          body: |
+            Automated follow-up after release ${{ needs.preflight.outputs.release_version }}.
+
+            Changes:
+            - update release.properties
+            - update CITATION.cff
+            - update .zenodo.json
+            - update codemeta.json
+            - remove release-only date metadata from the development snapshot
+          add-paths: |
+            CITATION.cff
+            .zenodo.json
+            codemeta.json
+            release.properties
 
   dry-run-summary:
     name: Dry-run summary
@@ -201,5 +295,6 @@ jobs:
             echo "";
             echo "Would have created tag **${{ needs.preflight.outputs.tag_name }}** and a GitHub Release";
             echo "with artifacts uploaded from job *Build & Verify* (artifact name:";
-            echo "\`${{ needs.build.outputs.artifact_name }}\`).";
+            echo "`${{ needs.build.outputs.artifact_name }}`).";
+            echo "Would have opened a follow-up PR for **${{ needs.preflight.outputs.next_development_version }}**.";
           } >> "$GITHUB_STEP_SUMMARY"
