@@ -1,0 +1,48 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "Regelsuche",
+  "description": "Experimental mathematics and symbolic discovery platform for rewrite search, equality saturation, hypothesis mining, counterexample search, proof workflows, and reproducible mathematical exploration.",
+  "codeRepository": "https://github.com/carstenartur/Regelsuche",
+  "issueTracker": "https://github.com/carstenartur/Regelsuche/issues",
+  "license": "https://spdx.org/licenses/MIT",
+  "version": "0.1.0-SNAPSHOT",
+  "programmingLanguage": [
+    "Java",
+    "JavaScript",
+    "HTML",
+    "CSS"
+  ],
+  "runtimePlatform": "Java 21, Gradle, Docker",
+  "applicationCategory": "Symbolic Mathematics, Rewrite Search, Mathematical Discovery",
+  "keywords": [
+    "symbolic discovery",
+    "rewrite search",
+    "equality saturation",
+    "mathematical exploration",
+    "proof workflows",
+    "hypothesis mining",
+    "counterexample search",
+    "reproducible research"
+  ],
+  "author": {
+    "@type": "Person",
+    "@id": "https://orcid.org/0009-0005-1047-6381",
+    "givenName": "Carsten",
+    "familyName": "Hammer",
+    "url": "https://github.com/carstenartur"
+  },
+  "maintainer": {
+    "@type": "Person",
+    "@id": "https://orcid.org/0009-0005-1047-6381",
+    "givenName": "Carsten",
+    "familyName": "Hammer",
+    "url": "https://github.com/carstenartur"
+  },
+  "developmentStatus": "active",
+  "softwareRequirements": [
+    "Java 21+",
+    "Gradle wrapper",
+    "Optional Docker runtime for containerized demos and proof workbench experiments"
+  ]
+}
