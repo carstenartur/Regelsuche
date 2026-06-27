@@ -1,0 +1,58 @@
+[
+  {
+    "id": "no-infrastructure-in-core",
+    "label": "Mathematical core has no infrastructure dependencies",
+    "description": "regelsuche-core must not reference Neo4j, Spring, Hibernate, JPA, Testcontainers, Docker or GraalVM.",
+    "modules": ["regelsuche-core"],
+    "category": "architecture"
+  },
+  {
+    "id": "search-kernel-clean",
+    "label": "Search kernel is infrastructure-free",
+    "description": "regelsuche-search must not reference Neo4j, Hibernate, JPA, Testcontainers or GraalVM.",
+    "modules": ["regelsuche-search"],
+    "category": "architecture"
+  },
+  {
+    "id": "validation-kernel-clean",
+    "label": "Validation kernel is infrastructure-free",
+    "description": "regelsuche-validation must not reference Neo4j, Hibernate, JPA, Testcontainers or GraalVM.",
+    "modules": ["regelsuche-validation"],
+    "category": "architecture"
+  },
+  {
+    "id": "persistence-port-clean",
+    "label": "Persistence port has no database driver dependencies",
+    "description": "regelsuche-persistence must not reference Neo4j, Hibernate or JPA drivers directly.",
+    "modules": ["regelsuche-persistence"],
+    "category": "architecture"
+  },
+  {
+    "id": "acyclic-module-graph",
+    "label": "Gradle module dependency graph is acyclic",
+    "description": "The dependency graph across all regelsuche-* Gradle modules must be a directed acyclic graph with no cycles.",
+    "modules": ["regelsuche-core", "regelsuche-egraph", "regelsuche-search", "regelsuche-validation", "regelsuche-math-algorithms", "regelsuche-math-jas", "regelsuche-persistence", "regelsuche-persistence-hibernate", "regelsuche-learning", "regelsuche-experiments", "regelsuche-cli", "regelsuche-discovery"],
+    "category": "architecture"
+  },
+  {
+    "id": "port-interfaces-first",
+    "label": "Cross-module communication is port-driven (Teil-0 interfaces first)",
+    "description": "All public cross-module APIs must be declared as Java interfaces (RuleIndex, SearchTraceStore, HypothesisRepository, DiscoveryExperimentRunner, …).",
+    "modules": ["regelsuche-core", "regelsuche-search", "regelsuche-validation", "regelsuche-learning"],
+    "category": "architecture"
+  },
+  {
+    "id": "deterministic-discovery",
+    "label": "Discovery runs are reproducible",
+    "description": "Experiment and discovery runs must produce deterministic, reproducible outputs captured in replay artefacts.",
+    "modules": ["regelsuche-experiments", "regelsuche-discovery"],
+    "category": "quality"
+  },
+  {
+    "id": "hibernate-isolated",
+    "label": "Hibernate and JPA are isolated to the persistence-hibernate adapter",
+    "description": "Only regelsuche-persistence-hibernate is permitted to reference Hibernate or JPA; no other module may do so.",
+    "modules": ["regelsuche-persistence-hibernate"],
+    "category": "architecture"
+  }
+]

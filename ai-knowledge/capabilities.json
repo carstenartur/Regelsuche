@@ -1,0 +1,58 @@
+[
+  {
+    "id": "rewrite-search",
+    "label": "Rewrite-based term search",
+    "description": "Searches for rewrite-rule sequences that transform a source expression into a target expression using configurable search strategies (BFS, DFS, A*, beam search).",
+    "modules": ["regelsuche-search", "regelsuche-core", "regelsuche-egraph"],
+    "tags": ["search", "rewriting", "term-rewriting"]
+  },
+  {
+    "id": "equality-saturation",
+    "label": "Equality saturation",
+    "description": "Builds and saturates an e-graph from a set of rewrite rules to explore all equivalent forms of a mathematical expression simultaneously.",
+    "modules": ["regelsuche-egraph", "regelsuche-core"],
+    "tags": ["egraph", "equality-saturation", "symbolic"]
+  },
+  {
+    "id": "hypothesis-mining",
+    "label": "Hypothesis and rule-candidate mining",
+    "description": "Mines candidate rewrite rules from successful transformation paths using anti-unification and pattern generalisation.",
+    "modules": ["regelsuche-learning", "regelsuche-core", "regelsuche-search"],
+    "tags": ["mining", "learning", "anti-unification"]
+  },
+  {
+    "id": "counterexample-search",
+    "label": "Counterexample and validation search",
+    "description": "Validates algebraic identities and candidate rules by searching for numerical or symbolic counterexamples.",
+    "modules": ["regelsuche-validation", "regelsuche-math-algorithms", "regelsuche-math-jas"],
+    "tags": ["validation", "counterexample", "equivalence"]
+  },
+  {
+    "id": "proof-workflows",
+    "label": "Proof workflow support",
+    "description": "Supports proof-oriented workflows including critical-pair completion (Knuth-Bendix), Gröbner basis reduction and PSLQ-style numerical relation search.",
+    "modules": ["regelsuche-math-algorithms", "regelsuche-validation"],
+    "tags": ["proof", "completion", "groebner", "pslq"]
+  },
+  {
+    "id": "discovery",
+    "label": "Discovery path tracking",
+    "description": "Records and replays discovered transformation paths with full reproducibility metadata for scientific benchmarking.",
+    "modules": ["regelsuche-discovery", "regelsuche-experiments"],
+    "tags": ["discovery", "reproducibility", "benchmarks"]
+  },
+  {
+    "id": "persistence",
+    "label": "Checkpointable search-job persistence",
+    "description": "Persists and restores running search jobs via a technology-neutral checkpoint port implemented by JSON in-memory and Hibernate/PostgreSQL adapters.",
+    "modules": ["regelsuche-persistence", "regelsuche-persistence-hibernate"],
+    "tags": ["persistence", "checkpoint", "hibernate", "postgresql"]
+  },
+  {
+    "id": "web-workbench",
+    "label": "Web workbench",
+    "description": "Browser-based workbench for interactive rule editing, search execution, proof review and experiment management exposed via a lightweight HTTP API.",
+    "modules": ["app"],
+    "tags": ["web", "ui", "rest", "workbench"]
+  }
+]
