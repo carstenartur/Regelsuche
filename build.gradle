@@ -1,7 +1,7 @@
 def aiKnowledgeExtractor = file('../ai-knowledge-extractor')
 
 if (aiKnowledgeExtractor.isDirectory()) {
-    apply plugin: 'io.github.carstenartur.ai-knowledge'
+    apply plugin: 'org.aiknowledge.extractor'
 
     aiKnowledge {
         outputDirectory = layout.buildDirectory.dir('ai-knowledge')
@@ -16,7 +16,7 @@ if (aiKnowledgeExtractor.isDirectory()) {
         group = 'documentation'
         description = 'Explains how to enable the local AI Knowledge Extractor composite build.'
         doLast {
-            throw new GradleException('Place ai-knowledge-extractor next to Regelsuche or use the published io.github.carstenartur.ai-knowledge plugin.')
+            throw new GradleException('Place ai-knowledge-extractor next to this repository or use the published org.aiknowledge.extractor plugin.')
         }
     }
 }
