@@ -1367,12 +1367,12 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1367">            return;</span>
         }
 <span class="fc bfc" id="L1369" title="All 2 branches covered.">        if (!&quot;tree&quot;.equals(suffix)) {</span>
-<span class="fc" id="L1370">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
-<span class="fc" id="L1371">            return;</span>
+<span class="nc" id="L1370">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
+<span class="nc" id="L1371">            return;</span>
         }
 <span class="fc bfc" id="L1373" title="All 2 branches covered.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L1374">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="nc" id="L1375">            return;</span>
+<span class="fc" id="L1374">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="fc" id="L1375">            return;</span>
         }
 <span class="fc" id="L1377">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc bfc" id="L1378" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
@@ -1398,8 +1398,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1398">        String matchId = stringValue(body, &quot;matchId&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1399">        int matchIndex = intValue(body, &quot;matchIndex&quot;, -1);</span>
 <span class="pc bpc" id="L1400" title="4 of 8 branches missed.">        if (expression.isBlank() || pathKey.isBlank() || (matchId.isBlank() &amp;&amp; matchIndex &lt; 0)) {</span>
-<span class="nc" id="L1401">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
-<span class="nc" id="L1402">            return;</span>
+<span class="fc" id="L1401">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
+<span class="fc" id="L1402">            return;</span>
         }
 
 <span class="fc" id="L1405">        de.regelsuche.ide.RuleInspectionService service = new de.regelsuche.ide.RuleInspectionService();</span>
@@ -1583,8 +1583,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1583">            level = de.regelsuche.didactic.DifficultyLevel.valueOf(</span>
 <span class="fc" id="L1584">                difficulty.toUpperCase(Locale.ROOT));</span>
 <span class="fc" id="L1585">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L1586">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
-<span class="fc" id="L1587">            return;</span>
+<span class="nc" id="L1586">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
+<span class="nc" id="L1587">            return;</span>
 <span class="fc" id="L1588">        }</span>
 <span class="fc" id="L1589">        de.regelsuche.didactic.StudentStepValidator.Result result =</span>
 <span class="fc" id="L1590">            didacticStepValidator.validate(currentExpression, studentStep, level);</span>
@@ -1616,8 +1616,8 @@ public class WebWorkbenchServer {
 
     private void handleDidacticHint(HttpExchange exchange, String pathId) throws IOException {
 <span class="fc bfc" id="L1618" title="All 2 branches covered.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L1619">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="nc" id="L1620">            return;</span>
+<span class="fc" id="L1619">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="fc" id="L1620">            return;</span>
         }
 <span class="pc bpc" id="L1622" title="1 of 2 branches missed.">        if (pathId.isBlank()) {</span>
 <span class="nc" id="L1623">            sendStatus(exchange, 400, &quot;expected /api/didactic/hint/{pathId}&quot;);</span>
@@ -2430,8 +2430,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2431">            return;</span>
         }
-<span class="nc" id="L2433">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="nc" id="L2434">    }</span>
+<span class="fc" id="L2433">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="fc" id="L2434">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2437">        var jobs = proofWorkbenchService.listJobs();</span>
@@ -2448,8 +2448,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L2448">        String left = stringValue(body, &quot;leftPattern&quot;, &quot;&quot;).trim();</span>
 <span class="fc" id="L2449">        String right = stringValue(body, &quot;rightPattern&quot;, &quot;&quot;).trim();</span>
 <span class="pc bpc" id="L2450" title="1 of 4 branches missed.">        if (left.isBlank() || right.isBlank()) {</span>
-<span class="nc" id="L2451">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
-<span class="nc" id="L2452">            return;</span>
+<span class="fc" id="L2451">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
+<span class="fc" id="L2452">            return;</span>
         }
 <span class="fc" id="L2454">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
 <span class="fc bfc" id="L2455" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
@@ -2458,8 +2458,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2459">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2460" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="nc" id="L2461">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="nc" id="L2462">            return;</span>
+<span class="fc" id="L2461">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="fc" id="L2462">            return;</span>
         }
 <span class="fc" id="L2464">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
 <span class="fc" id="L2465">        Object raw = body.get(&quot;assumptions&quot;);</span>
