@@ -367,8 +367,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L367">                ? profile.defaultGoal()</span>
 <span class="fc" id="L368">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L369">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L370">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="nc" id="L371">            return;</span>
+<span class="fc" id="L370">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="fc" id="L371">            return;</span>
 <span class="fc" id="L372">        }</span>
 <span class="fc" id="L373">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1376,8 +1376,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L1377">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc bfc" id="L1378" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="fc" id="L1379">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
-<span class="fc" id="L1380">            return;</span>
+<span class="nc" id="L1379">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
+<span class="nc" id="L1380">            return;</span>
         }
 <span class="fc" id="L1382">        String selectedPathKey = queryParam(exchange, &quot;selectedPathKey&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1383">        de.regelsuche.ide.RuleInspectionDto dto =</span>
@@ -1583,8 +1583,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1583">            level = de.regelsuche.didactic.DifficultyLevel.valueOf(</span>
 <span class="fc" id="L1584">                difficulty.toUpperCase(Locale.ROOT));</span>
 <span class="fc" id="L1585">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L1586">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
-<span class="fc" id="L1587">            return;</span>
+<span class="nc" id="L1586">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
+<span class="nc" id="L1587">            return;</span>
 <span class="fc" id="L1588">        }</span>
 <span class="fc" id="L1589">        de.regelsuche.didactic.StudentStepValidator.Result result =</span>
 <span class="fc" id="L1590">            didacticStepValidator.validate(currentExpression, studentStep, level);</span>
@@ -1777,8 +1777,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1777">            default          -&gt; null;</span>
         };
 <span class="fc bfc" id="L1779" title="All 2 branches covered.">        if (body == null) {</span>
-<span class="nc" id="L1780">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
-<span class="nc" id="L1781">            return;</span>
+<span class="fc" id="L1780">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
+<span class="fc" id="L1781">            return;</span>
         }
 <span class="fc" id="L1783">        send(exchange, 200, &quot;text/markdown; charset=utf-8&quot;, body);</span>
 <span class="fc" id="L1784">    }</span>
@@ -2430,8 +2430,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2431">            return;</span>
         }
-<span class="nc" id="L2433">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="nc" id="L2434">    }</span>
+<span class="fc" id="L2433">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="fc" id="L2434">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2437">        var jobs = proofWorkbenchService.listJobs();</span>
@@ -2448,13 +2448,13 @@ public class WebWorkbenchServer {
 <span class="fc" id="L2448">        String left = stringValue(body, &quot;leftPattern&quot;, &quot;&quot;).trim();</span>
 <span class="fc" id="L2449">        String right = stringValue(body, &quot;rightPattern&quot;, &quot;&quot;).trim();</span>
 <span class="pc bpc" id="L2450" title="1 of 4 branches missed.">        if (left.isBlank() || right.isBlank()) {</span>
-<span class="fc" id="L2451">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
-<span class="fc" id="L2452">            return;</span>
+<span class="nc" id="L2451">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
+<span class="nc" id="L2452">            return;</span>
         }
 <span class="fc" id="L2454">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
 <span class="fc bfc" id="L2455" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
-<span class="fc" id="L2456">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
-<span class="fc" id="L2457">            return;</span>
+<span class="nc" id="L2456">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
+<span class="nc" id="L2457">            return;</span>
         }
 <span class="fc" id="L2459">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2460" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
