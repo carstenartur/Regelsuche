@@ -224,22 +224,34 @@ public class CliRouter {
                         out.println("No plugins loaded.");
                     } else {
                         runtime.loadedPlugins().forEach(plugin -> {
+                            String capabilities = plugin.capabilities().isEmpty()
+                                ? "-"
+                                : String.join(", ", plugin.capabilities());
                             String dependencies = plugin.dependencies().isEmpty()
                                 ? "-"
                                 : plugin.dependencies().stream()
                                     .map(dependency -> dependency.pluginId() + " " + dependency.versionConstraint()
                                         + (dependency.optional() ? " (optional)" : ""))
                                     .collect(java.util.stream.Collectors.joining(", "));
+                            String compatibilityIssues = plugin.compatibilityIssues().isEmpty()
+                                ? "-"
+                                : String.join(", ", plugin.compatibilityIssues());
+                            String provenance = plugin.provenance().isBlank() ? "-" : plugin.provenance();
                             String trustWarnings = plugin.trustWarnings().isEmpty()
                                 ? "-"
                                 : String.join(", ", plugin.trustWarnings());
                             out.println(
                                 plugin.id() + " " + plugin.version()
                                     + " (" + plugin.source() + ", " + (plugin.enabled() ? "enabled" : "disabled") + ")"
+                                    + " name=\"" + plugin.name() + "\""
                                     + " api=" + plugin.apiVersion()
                                     + " minCore=" + plugin.minimumCoreVersion()
+                                    + " capabilities=[" + capabilities + "]"
                                     + " compatibility=" + plugin.compatibility()
+                                    + " compatibilityIssues=[" + compatibilityIssues + "]"
                                     + " dependencies=[" + dependencies + "]"
+                                    + " provenance=" + provenance
+                                    + " signed=" + plugin.signed()
                                     + " trusted=" + plugin.trustedSource()
                                     + " warnings=[" + trustWarnings + "]"
                             );

@@ -356,12 +356,13 @@ public final class PluginRuntime implements AutoCloseable {
         List<String> capabilities = plugin.capabilities() == null
             ? List.of()
             : plugin.capabilities().stream()
-                .filter(capability -> capability != null && !capability.isBlank())
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(capability -> !capability.isBlank())
                 .map(capability -> capability.toLowerCase(Locale.ROOT))
-                .collect(java.util.stream.Collectors.collectingAndThen(
-                    java.util.stream.Collectors.toCollection(LinkedHashSet::new),
-                    List::copyOf
-                ));
+                .distinct()
+                .sorted()
+                .toList();
         List<PluginDependency> dependencies = plugin.dependencies() == null
             ? List.of()
             : plugin.dependencies().stream()

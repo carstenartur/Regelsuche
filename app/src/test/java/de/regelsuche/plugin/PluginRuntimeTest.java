@@ -93,6 +93,19 @@ class PluginRuntimeTest {
                 .orElseThrow();
             assertEquals("compatible", binomial.compatibility());
             assertEquals("1", binomial.apiVersion());
+            assertEquals(List.of(
+                "cost-functions",
+                "examples",
+                "explanations",
+                "heuristics",
+                "macros",
+                "parser-extensions",
+                "renderers",
+                "rules",
+                "search-strategies",
+                "transformations",
+                "visitors"
+            ), binomial.capabilities());
             assertTrue(binomial.dependencies().stream()
                 .anyMatch(dependency -> dependency.pluginId().equals("algebra-core")));
             assertTrue(binomial.trustedSource());

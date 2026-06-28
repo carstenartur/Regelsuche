@@ -29,6 +29,11 @@ class PluginCliRouterTest {
 
         assertEquals(0, exit);
         assertTrue(output.toString().contains("binomial-formulas"), output::toString);
+        assertTrue(output.toString().contains("name=\"Binomial Formulas\""), output::toString);
+        assertTrue(output.toString().contains("capabilities=[cost-functions"), output::toString);
+        assertTrue(output.toString().contains("compatibilityIssues=[-]"), output::toString);
+        assertTrue(output.toString().contains("provenance=https://github.com/carstenartur/Regelsuche"), output::toString);
+        assertTrue(output.toString().contains("signed=true"), output::toString);
     }
 
     @Test

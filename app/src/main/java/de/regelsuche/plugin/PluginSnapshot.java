@@ -9,6 +9,8 @@ public record PluginSnapshot(
     String apiVersion,
     String minimumCoreVersion,
     String compatibility,
+    String provenance,
+    boolean signed,
     boolean trustedSource
 ) {
     static PluginSnapshot from(PluginRuntime.LoadedPlugin plugin) {
@@ -21,6 +23,8 @@ public record PluginSnapshot(
             plugin.apiVersion(),
             plugin.minimumCoreVersion(),
             plugin.compatibility(),
+            plugin.provenance(),
+            plugin.signed(),
             plugin.trustedSource()
         );
     }
