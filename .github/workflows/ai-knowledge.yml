@@ -56,8 +56,14 @@ jobs:
           gradle-home-cache-cleanup: true
 
       - name: Publish extractor plugin to local Maven
-        working-directory: ai-knowledge-extractor
-        run: ./gradlew --no-daemon :core:publishToMavenLocal :gradle-plugin:publishToMavenLocal -x test -x javadoc -x javadocJar
+        continue-on-error: true
+        run: |
+          mkdir -p Regelsuche/build/ai-knowledge
+          cd ai-knowledge-extractor
+          ./gradlew --no-daemon --stacktrace :core:publishToMavenLocal :gradle-plugin:publishToMavenLocal -x test -x javadoc -x javadocJar > ../Regelsuche/build/ai-knowledge/publish.out 2> ../Regelsuche/build/ai-knowledge/publish.err
+          echo $? > ../Regelsuche/build/ai-knowledge/publish.exit
+          cat ../Regelsuche/build/ai-knowledge/publish.out
+          cat ../Regelsuche/build/ai-knowledge/publish.err
 
       - name: Generate core AI knowledge index
         continue-on-error: true
