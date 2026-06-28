@@ -56,15 +56,19 @@ jobs:
           gradle-home-cache-cleanup: true
 
       - name: Generate core AI knowledge index
-        working-directory: Regelsuche
-        run: ./gradlew --no-daemon generateAiKnowledgeIndex
-
-      - name: Generate AI knowledge reports
+        continue-on-error: true
         working-directory: Regelsuche
         run: |
-          ./gradlew --no-daemon analyzeAiComplexity || true
-          ./gradlew --no-daemon optimizeAiKnowledge || true
-          ./gradlew --no-daemon benchmarkAiKnowledge || true
+          mkdir -p build/ai-knowledge
+          ./gradlew --no-daemon --stacktrace generateAiKnowledgeIndex | tee build/ai-knowledge/generate.log
+
+      - name: Generate AI knowledge reports
+        continue-on-error: true
+        working-directory: Regelsuche
+        run: |
+          ./gradlew --no-daemon analyzeAiComplexity
+          ./gradlew --no-daemon optimizeAiKnowledge
+          ./gradlew --no-daemon benchmarkAiKnowledge
 
       - name: Upload AI knowledge artifacts
         if: always()
