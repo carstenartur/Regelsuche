@@ -60,15 +60,21 @@ jobs:
         working-directory: Regelsuche
         run: |
           mkdir -p build/ai-knowledge
-          ./gradlew --no-daemon --stacktrace generateAiKnowledgeIndex | tee build/ai-knowledge/generate.log
+          ./gradlew --no-daemon --stacktrace generateAiKnowledgeIndex > build/ai-knowledge/generate.out 2> build/ai-knowledge/generate.err
+          echo $? > build/ai-knowledge/generate.exit
+          cat build/ai-knowledge/generate.out
+          cat build/ai-knowledge/generate.err
 
       - name: Generate AI knowledge reports
         continue-on-error: true
         working-directory: Regelsuche
         run: |
-          ./gradlew --no-daemon analyzeAiComplexity
-          ./gradlew --no-daemon optimizeAiKnowledge
-          ./gradlew --no-daemon benchmarkAiKnowledge
+          ./gradlew --no-daemon analyzeAiComplexity > build/ai-knowledge/analyze.out 2> build/ai-knowledge/analyze.err
+          echo $? > build/ai-knowledge/analyze.exit
+          ./gradlew --no-daemon optimizeAiKnowledge > build/ai-knowledge/optimize.out 2> build/ai-knowledge/optimize.err
+          echo $? > build/ai-knowledge/optimize.exit
+          ./gradlew --no-daemon benchmarkAiKnowledge > build/ai-knowledge/benchmark.out 2> build/ai-knowledge/benchmark.err
+          echo $? > build/ai-knowledge/benchmark.exit
 
       - name: Upload AI knowledge artifacts
         if: always()
