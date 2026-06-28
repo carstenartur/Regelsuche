@@ -57,7 +57,7 @@ jobs:
 
       - name: Publish extractor plugin to local Maven
         working-directory: ai-knowledge-extractor
-        run: ./gradlew --no-daemon publishToMavenLocal
+        run: ./gradlew --no-daemon :core:publishToMavenLocal :gradle-plugin:publishToMavenLocal -x test -x javadoc -x javadocJar
 
       - name: Generate core AI knowledge index
         continue-on-error: true
