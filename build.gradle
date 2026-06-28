@@ -1,18 +1,21 @@
 def aiKnowledgeEnabled = System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
 
+def aiKnowledgeExtractorRoot = file('../ai-knowledge-extractor')
+
 buildscript {
-    repositories {
-        mavenLocal()
-        mavenCentral()
-    }
     dependencies {
         if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
-            classpath 'org.aiknowledge:ai-knowledge-gradle-plugin:0.1.0-SNAPSHOT'
+            classpath files('../ai-knowledge-extractor/core/build/libs/core-0.1.0-SNAPSHOT.jar')
+            classpath files('../ai-knowledge-extractor/gradle-plugin/build/libs/gradle-plugin-0.1.0-SNAPSHOT.jar')
         }
     }
 }
 
 if (aiKnowledgeEnabled) {
+    if (!aiKnowledgeExtractorRoot.isDirectory()) {
+        throw new GradleException('AI_KNOWLEDGE_EXTRACTOR_ENABLED=true requires ../ai-knowledge-extractor next to this repository.')
+    }
+
     apply plugin: 'org.aiknowledge.extractor'
 
     aiKnowledge {
@@ -28,7 +31,7 @@ if (aiKnowledgeEnabled) {
         group = 'documentation'
         description = 'Explains how to enable the AI Knowledge Extractor plugin.'
         doLast {
-            throw new GradleException('Enable the AI Knowledge Extractor with -PenableAiKnowledgeExtractor=true after publishing org.aiknowledge:ai-knowledge-gradle-plugin to mavenLocal, or set AI_KNOWLEDGE_EXTRACTOR_ENABLED=true in CI.')
+            throw new GradleException('Enable the AI Knowledge Extractor with -PenableAiKnowledgeExtractor=true after building ../ai-knowledge-extractor, or set AI_KNOWLEDGE_EXTRACTOR_ENABLED=true in CI.')
         }
     }
 }
