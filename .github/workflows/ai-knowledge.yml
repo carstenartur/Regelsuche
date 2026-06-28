@@ -60,7 +60,7 @@ jobs:
         run: |
           mkdir -p Regelsuche/build/ai-knowledge
           cd ai-knowledge-extractor
-          ./gradlew --no-daemon --stacktrace :core:publishToMavenLocal :gradle-plugin:publishToMavenLocal -x test -x javadoc -x javadocJar > ../Regelsuche/build/ai-knowledge/publish.out 2> ../Regelsuche/build/ai-knowledge/publish.err
+          ./gradlew --no-daemon --stacktrace :core:publishToMavenLocal :gradle-plugin:publishToMavenLocal -x test > ../Regelsuche/build/ai-knowledge/publish.out 2> ../Regelsuche/build/ai-knowledge/publish.err
           echo $? > ../Regelsuche/build/ai-knowledge/publish.exit
           cat ../Regelsuche/build/ai-knowledge/publish.out
           cat ../Regelsuche/build/ai-knowledge/publish.err
