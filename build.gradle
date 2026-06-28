@@ -13,7 +13,7 @@ buildscript {
 
 if (aiKnowledgeEnabled) {
     if (!aiKnowledgeExtractorRoot.isDirectory()) {
-        throw new GradleException('AI_KNOWLEDGE_EXTRACTOR_ENABLED=true requires ../ai-knowledge-extractor next to this repository.')
+        throw new GradleException('AI knowledge extractor repository is missing next to this checkout.')
     }
 
     apply plugin: 'org.aiknowledge.extractor'
@@ -24,14 +24,14 @@ if (aiKnowledgeEnabled) {
         seedDirectory = layout.projectDirectory.dir('ai-knowledge')
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
-        maxCognitiveDebt = 100.0
+        maxCognitiveDebt = 100.0d
     }
 } else {
     tasks.register('generateAiKnowledgeIndex') {
         group = 'documentation'
         description = 'Explains how to enable the AI Knowledge Extractor plugin.'
         doLast {
-            throw new GradleException('Enable the AI Knowledge Extractor with -PenableAiKnowledgeExtractor=true after building ../ai-knowledge-extractor, or set AI_KNOWLEDGE_EXTRACTOR_ENABLED=true in CI.')
+            throw new GradleException('AI knowledge extractor is disabled for this build.')
         }
     }
 }
