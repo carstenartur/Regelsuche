@@ -285,6 +285,15 @@ tasks.register('runDiscoveryCampaign6', JavaExec) {
     args rootProject.projectDir.absolutePath
 }
 
+tasks.register('runDiscoveryCampaign7', JavaExec) {
+    description = 'Runs Discovery Campaign 7 and writes reports under app/build/reports/discovery-campaign-7.'
+    group = 'documentation'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.docs.DiscoveryCampaignSevenRunner'
+    args rootProject.projectDir.absolutePath
+}
+
 tasks.register('runDiscoveryPromotionPipeline', JavaExec) {
     description = 'Runs the discovery promotion pipeline and writes reports under app/build/reports/discovery-promotion.'
     group = 'documentation'
