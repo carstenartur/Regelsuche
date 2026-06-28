@@ -59,35 +59,27 @@ jobs:
         run: |
           mkdir -p Regelsuche/build/ai-knowledge
           cd ai-knowledge-extractor
+          set +e
           ./gradlew --no-daemon --stacktrace :core:jar :gradle-plugin:jar -x test > ../Regelsuche/build/ai-knowledge/plugin-build.out 2> ../Regelsuche/build/ai-knowledge/plugin-build.err
-          echo $? > ../Regelsuche/build/ai-knowledge/plugin-build.exit
+          status=$?
+          echo "$status" > ../Regelsuche/build/ai-knowledge/plugin-build.exit
           cat ../Regelsuche/build/ai-knowledge/plugin-build.out
           cat ../Regelsuche/build/ai-knowledge/plugin-build.err
+          test "$status" = "0"
 
-      - name: Generate core AI knowledge index
-        continue-on-error: true
+      - name: Generate AI knowledge artifacts
         working-directory: Regelsuche
         env:
           AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
         run: |
           mkdir -p build/ai-knowledge
-          ./gradlew --no-daemon --stacktrace generateAiKnowledgeIndex > build/ai-knowledge/generate.out 2> build/ai-knowledge/generate.err
-          echo $? > build/ai-knowledge/generate.exit
-          cat build/ai-knowledge/generate.out
-          cat build/ai-knowledge/generate.err
-
-      - name: Generate AI knowledge reports
-        continue-on-error: true
-        working-directory: Regelsuche
-        env:
-          AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
-        run: |
-          ./gradlew --no-daemon analyzeAiComplexity > build/ai-knowledge/analyze.out 2> build/ai-knowledge/analyze.err
-          echo $? > build/ai-knowledge/analyze.exit
-          ./gradlew --no-daemon optimizeAiKnowledge > build/ai-knowledge/optimize.out 2> build/ai-knowledge/optimize.err
-          echo $? > build/ai-knowledge/optimize.exit
-          ./gradlew --no-daemon benchmarkAiKnowledge > build/ai-knowledge/benchmark.out 2> build/ai-knowledge/benchmark.err
-          echo $? > build/ai-knowledge/benchmark.exit
+          set +e
+          ./gradlew --no-daemon --no-configuration-cache --stacktrace generateAiKnowledgeIndex analyzeAiComplexity optimizeAiKnowledge benchmarkAiKnowledge > build/ai-knowledge/extractor.out 2> build/ai-knowledge/extractor.err
+          status=$?
+          echo "$status" > build/ai-knowledge/extractor.exit
+          cat build/ai-knowledge/extractor.out
+          cat build/ai-knowledge/extractor.err
+          test "$status" = "0"
 
       - name: Upload AI knowledge artifacts
         if: always()
