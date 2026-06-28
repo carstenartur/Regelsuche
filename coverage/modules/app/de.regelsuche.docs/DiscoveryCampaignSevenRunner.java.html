@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryCampaignSevenRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryCampaignSevenRunner.java</span></div><h1>DiscoveryCampaignSevenRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.sympyqa.SymPyQaHarness;
+import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
+import de.regelsuche.transform.RepeatedSubexpressionFactorizationHypothesisOperator;
+import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
+
+/**
+ * Runs Discovery Campaign 7 with extended family cases:
+ * repeated-subexpression factorization, extended telescoping / partial-fraction, and
+ * rational normalization with subtraction. Produces candidate-mining reports and
+ * cross-campaign progress comparison (campaigns 3, 5 and 7).
+ */
+<span class="fc" id="L26">public final class DiscoveryCampaignSevenRunner {</span>
+<span class="fc" id="L27">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L28">        .findAndRegisterModules()</span>
+<span class="fc" id="L29">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+<span class="fc" id="L31">    private final DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();</span>
+<span class="fc" id="L32">    private final DiscoveryCandidateReportWriter candidateReportWriter = new DiscoveryCandidateReportWriter();</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L36">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L37">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L38">        new DiscoveryCampaignSevenRunner().writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-campaign-7&quot;));</span>
+<span class="nc" id="L39">    }</span>
+
+    public CampaignReport run() {
+<span class="fc" id="L42">        List&lt;CaseResult&gt; results = cases().stream()</span>
+<span class="fc" id="L43">            .map(this::evaluate)</span>
+<span class="fc" id="L44">            .sorted(Comparator.comparing(CaseResult::id))</span>
+<span class="fc" id="L45">            .toList();</span>
+<span class="fc" id="L46">        List&lt;String&gt; blockers = results.stream()</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            .filter(result -&gt; !result.success())</span>
+<span class="fc" id="L48">            .map(result -&gt; result.id() + &quot;: &quot;</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">                + (result.failureReason().isBlank() ? result.notes() : result.failureReason()))</span>
+<span class="fc" id="L50">            .toList();</span>
+<span class="fc" id="L51">        SymPyQaHarness.QaSummary qaSummary = qaSummary(results, null);</span>
+<span class="fc" id="L52">        return new CampaignReport(</span>
+            &quot;discovery-campaign-7&quot;,
+            results,
+            blockers,
+<span class="fc" id="L56">            progressSummaries(results),</span>
+            qaSummary
+        );
+    }
+
+    public CampaignReport writeReport(Path outputDirectory) {
+<span class="fc" id="L62">        return writeReport(outputDirectory, run());</span>
+    }
+
+    CampaignReport writeReport(Path outputDirectory, CampaignReport report) {
+        try {
+<span class="fc" id="L67">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L68">            List&lt;PromotionRecord&gt; promotionRecords = report.results().stream()</span>
+<span class="fc" id="L69">                .map(result -&gt; new PromotionDecider()</span>
+<span class="fc" id="L70">                    .decide(PromotionObservation.fromCampaignSeven(result, report.id())))</span>
+<span class="fc" id="L71">                .toList();</span>
+<span class="fc" id="L72">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L73">                outputDirectory.resolve(&quot;discovery-campaign-7.json&quot;),</span>
+<span class="fc" id="L74">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+            );
+<span class="fc" id="L76">            Files.writeString(</span>
+<span class="fc" id="L77">                outputDirectory.resolve(&quot;campaign-progress.md&quot;),</span>
+<span class="fc" id="L78">                renderProgress(report),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L81">            candidateReportWriter.write(</span>
+                outputDirectory,
+<span class="fc" id="L83">                report.id(),</span>
+                promotionRecords
+            );
+<span class="fc" id="L86">            Path qaDirectory = outputDirectory.resolve(&quot;sympy-qa&quot;);</span>
+<span class="fc" id="L87">            Files.createDirectories(qaDirectory);</span>
+<span class="fc" id="L88">            qaSummary(report.results(), qaDirectory);</span>
+<span class="fc" id="L89">            return report;</span>
+<span class="nc" id="L90">        } catch (IOException exception) {</span>
+<span class="nc" id="L91">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private List&lt;ProgressSummary&gt; progressSummaries(List&lt;CaseResult&gt; currentResults) {
+<span class="fc" id="L96">        DiscoveryCampaignThreeRunner.CampaignReport campaignThree = new DiscoveryCampaignThreeRunner().run();</span>
+<span class="fc" id="L97">        DiscoveryCampaignFiveRunner.CampaignReport campaignFive = new DiscoveryCampaignFiveRunner().run();</span>
+<span class="fc" id="L98">        return List.of(</span>
+<span class="fc" id="L99">            summary(&quot;discovery-campaign-3&quot;, campaignThree.results().stream()</span>
+<span class="fc" id="L100">                .map(result -&gt; new SummaryInput(</span>
+<span class="fc" id="L101">                    result.success(),</span>
+<span class="fc" id="L102">                    result.oracleStatus(),</span>
+<span class="fc" id="L103">                    result.ablationStatus()))</span>
+<span class="fc" id="L104">                .toList()),</span>
+<span class="fc" id="L105">            summary(&quot;discovery-campaign-5&quot;, campaignFive.results().stream()</span>
+<span class="fc" id="L106">                .map(result -&gt; new SummaryInput(</span>
+<span class="fc" id="L107">                    result.success(),</span>
+<span class="fc" id="L108">                    result.oracleStatus(),</span>
+<span class="fc" id="L109">                    result.ablationStatus()))</span>
+<span class="fc" id="L110">                .toList()),</span>
+<span class="fc" id="L111">            summary(&quot;discovery-campaign-7&quot;, currentResults.stream()</span>
+<span class="fc" id="L112">                .map(result -&gt; new SummaryInput(</span>
+<span class="fc" id="L113">                    result.success(),</span>
+<span class="fc" id="L114">                    result.oracleStatus(),</span>
+<span class="fc" id="L115">                    result.ablationStatus()))</span>
+<span class="fc" id="L116">                .toList())</span>
+        );
+    }
+
+    private ProgressSummary summary(String campaignId, List&lt;SummaryInput&gt; results) {
+<span class="fc" id="L121">        long successCount = results.stream().filter(SummaryInput::success).count();</span>
+<span class="fc" id="L122">        long validatedCount = results.stream()</span>
+<span class="fc" id="L123">            .filter(SummaryInput::success)</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            .filter(result -&gt; !&quot;DISAGREE&quot;.equals(result.oracleStatus()))</span>
+<span class="fc" id="L125">            .filter(result -&gt; &quot;DEGRADED&quot;.equals(result.ablationStatus()))</span>
+<span class="fc" id="L126">            .count();</span>
+<span class="fc" id="L127">        return new ProgressSummary(campaignId, results.size(), successCount, results.size() - successCount, validatedCount);</span>
+    }
+
+    private SymPyQaHarness.QaSummary qaSummary(List&lt;CaseResult&gt; results, Path outputDirectory) {
+<span class="fc" id="L131">        Path targetDirectory = outputDirectory;</span>
+        try {
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (targetDirectory == null) {</span>
+<span class="fc" id="L134">                targetDirectory = Files.createTempDirectory(&quot;discovery-campaign-7-qa-&quot;);</span>
+            }
+<span class="fc" id="L136">            return new SymPyQaHarness().run(</span>
+<span class="fc" id="L137">                results.stream().map(CaseResult::inputExpression).toList(),</span>
+                targetDirectory
+            );
+<span class="nc" id="L140">        } catch (IOException exception) {</span>
+<span class="nc" id="L141">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private CaseResult evaluate(CampaignCase campaignCase) {
+<span class="fc" id="L146">        DiscoveryBenchmarkScenario scenario = campaignCase.scenario();</span>
+<span class="fc" id="L147">        DiscoveryBenchmarkEvidence enabled = new DiscoveryBenchmarkExecutor(loader).execute(scenario);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        AblationResult ablation = campaignCase.primaryOperatorId().isBlank()</span>
+<span class="nc" id="L149">            ? AblationResult.notApplicable()</span>
+<span class="fc" id="L150">            : runAblation(campaignCase, enabled);</span>
+<span class="fc" id="L151">        DiscoveryBenchmarkEvidence.EvidenceEdge shortcut = shortcutEdge(enabled, campaignCase).orElse(null);</span>
+<span class="fc" id="L152">        return new CaseResult(</span>
+<span class="fc" id="L153">            campaignCase.id(),</span>
+<span class="fc" id="L154">            campaignCase.family(),</span>
+<span class="fc" id="L155">            scenario.inputExpression(),</span>
+<span class="fc" id="L156">            scenario.targetExpression(),</span>
+<span class="fc" id="L157">            enabled.success(),</span>
+<span class="fc" id="L158">            enabled.failureReason(),</span>
+<span class="fc" id="L159">            enabled.oracleStatus(),</span>
+<span class="fc" id="L160">            enabled.oracleEvidence(),</span>
+<span class="fc" id="L161">            ablation.status(),</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            shortcut == null ? &quot;&quot; : shortcut.source(),</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            shortcut == null ? &quot;&quot; : shortcut.packId(),</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            shortcut == null ? &quot;&quot; : shortcut.operatorId(),</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            shortcut == null ? List.of() : shortcut.assumptions(),</span>
+<span class="fc" id="L166">            enabled.withoutMacroRun().appliedRuleIds(),</span>
+<span class="fc" id="L167">            campaignCase.notes(),</span>
+<span class="fc" id="L168">            enabled.smallGraphMessage()</span>
+        );
+    }
+
+    private AblationResult runAblation(CampaignCase campaignCase, DiscoveryBenchmarkEvidence enabled) {
+<span class="fc" id="L173">        DiscoveryOperatorRegistry registry = new DiscoveryOperatorRegistry()</span>
+<span class="fc" id="L174">            .register(new DefaultDiscoveryOperatorProvider());</span>
+<span class="fc" id="L175">        registry.disable(campaignCase.primaryOperatorId());</span>
+<span class="fc" id="L176">        DiscoveryBenchmarkEvidence disabled = new DiscoveryBenchmarkExecutor(loader, registry)</span>
+<span class="fc" id="L177">            .execute(campaignCase.scenario());</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        boolean worsePath = disabled.withoutMacroRun().path().size() &gt; enabled.withoutMacroRun().path().size();</span>
+<span class="pc bpc" id="L179" title="2 of 6 branches missed.">        boolean degraded = !disabled.success() || worsePath || shortcutEdge(disabled, campaignCase).isEmpty();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        String notes = disabled.success()</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            ? disabled.failureReason().isBlank()</span>
+<span class="fc" id="L182">                ? &quot;disabled path length &quot; + disabled.withoutMacroRun().path().size()</span>
+<span class="nc" id="L183">                : disabled.failureReason()</span>
+<span class="fc" id="L184">            : disabled.failureReason();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        return new AblationResult(degraded ? &quot;DEGRADED&quot; : &quot;UNCHANGED&quot;, notes);</span>
+    }
+
+    private Optional&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; shortcutEdge(
+        DiscoveryBenchmarkEvidence evidence,
+        CampaignCase campaignCase
+    ) {
+<span class="fc" id="L192">        List&lt;DiscoveryBenchmarkEvidence.EvidenceEdge&gt; selected = evidence.edges().stream()</span>
+<span class="fc" id="L193">            .filter(edge -&gt; edge.tags().contains(&quot;selected-path&quot;))</span>
+<span class="fc" id="L194">            .toList();</span>
+<span class="fc" id="L195">        return selected.stream()</span>
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">            .filter(edge -&gt; !campaignCase.expectedRuleId().isBlank() &amp;&amp; edge.ruleId().equals(campaignCase.expectedRuleId()))</span>
+<span class="fc" id="L197">            .findFirst()</span>
+<span class="fc" id="L198">            .or(() -&gt; selected.stream()</span>
+<span class="fc" id="L199">                .filter(edge -&gt; campaignCase.operatorIds().contains(edge.operatorId()))</span>
+<span class="fc" id="L200">                .findFirst())</span>
+<span class="fc" id="L201">            .or(() -&gt; selected.stream()</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                .filter(edge -&gt; !edge.assumptions().isEmpty())</span>
+<span class="fc" id="L203">                .findFirst())</span>
+<span class="fc" id="L204">            .or(() -&gt; selected.stream().reduce((left, right) -&gt; right));</span>
+    }
+
+    private String renderProgress(CampaignReport report) {
+<span class="fc" id="L208">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L209">        out.append(&quot;# Discovery campaign progress (campaigns 3, 5, 7)\n\n&quot;);</span>
+<span class="fc" id="L210">        out.append(&quot;| Campaign | Total | Success | Blocked | Validated |\n&quot;);</span>
+<span class="fc" id="L211">        out.append(&quot;| --- | ---: | ---: | ---: | ---: |\n&quot;);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (ProgressSummary summary : report.progress()) {</span>
+<span class="fc" id="L213">            out.append(&quot;| &quot;).append(escape(summary.campaignId()))</span>
+<span class="fc" id="L214">                .append(&quot; | &quot;).append(summary.totalCases())</span>
+<span class="fc" id="L215">                .append(&quot; | &quot;).append(summary.successCount())</span>
+<span class="fc" id="L216">                .append(&quot; | &quot;).append(summary.blockedCount())</span>
+<span class="fc" id="L217">                .append(&quot; | &quot;).append(summary.validatedCount())</span>
+<span class="fc" id="L218">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L219">        }</span>
+<span class="fc" id="L220">        return out.toString();</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    private List&lt;CampaignCase&gt; cases() {
+<span class="fc" id="L228">        return Stream.of(</span>
+<span class="fc" id="L229">            repeatedSubexpressionCases().stream(),</span>
+<span class="fc" id="L230">            extendedTelescopingCases().stream(),</span>
+<span class="fc" id="L231">            rationalNormalizationCases().stream())</span>
+<span class="fc" id="L232">            .flatMap(stream -&gt; stream)</span>
+<span class="fc" id="L233">            .toList();</span>
+    }
+
+    private List&lt;CampaignCase&gt; repeatedSubexpressionCases() {
+<span class="fc" id="L237">        return List.of(</span>
+            new CampaignCase(
+                &quot;rsf-x2-plus-x&quot;,
+                &quot;factorization&quot;,
+                &quot;x^2 + x&quot;,
+                &quot;x*(x + 1)&quot;,
+<span class="fc" id="L243">                List.of(&quot;repeated_subexpression_factorization&quot;),</span>
+                RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID,
+<span class="fc" id="L245">                List.of(&quot;sympy-polynomial-basic&quot;),</span>
+                &quot;repeated-subexpression: monomial squared plus monomial&quot;
+            ),
+            new CampaignCase(
+                &quot;rsf-x3-plus-x2&quot;,
+                &quot;factorization&quot;,
+                &quot;x^3 + x^2&quot;,
+                &quot;x^2*(x + 1)&quot;,
+<span class="fc" id="L253">                List.of(&quot;repeated_subexpression_factorization&quot;),</span>
+                RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID,
+<span class="fc" id="L255">                List.of(&quot;sympy-polynomial-basic&quot;),</span>
+                &quot;repeated-subexpression: cubic plus square factoring&quot;
+            ),
+            new CampaignCase(
+                &quot;rsf-sym-ab&quot;,
+                &quot;factorization&quot;,
+                &quot;a^2 + a*b&quot;,
+                &quot;a*(a + b)&quot;,
+<span class="fc" id="L263">                List.of(&quot;repeated_subexpression_factorization&quot;),</span>
+                RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID,
+<span class="fc" id="L265">                List.of(&quot;sympy-polynomial-basic&quot;),</span>
+                &quot;repeated-subexpression: symbolic two-variable factoring&quot;
+            )
+        );
+    }
+
+    private List&lt;CampaignCase&gt; extendedTelescopingCases() {
+<span class="fc" id="L272">        return List.of(</span>
+            new CampaignCase(
+                &quot;pf-tel-p34&quot;,
+                &quot;telescoping&quot;,
+                &quot;1 / ((p + 3) * (p + 4))&quot;,
+                &quot;1 / (p + 3) - 1 / (p + 4)&quot;,
+<span class="fc" id="L278">                List.of(&quot;telescoping_fraction&quot;),</span>
+                TelescopingFractionHypothesisOperator.RULE_ID,
+<span class="fc" id="L280">                List.of(&quot;sympy-rational-basic&quot;),</span>
+                &quot;extended telescoping: shifted by 3 with variable p&quot;
+            ),
+            new CampaignCase(
+                &quot;pf-tel-m45&quot;,
+                &quot;telescoping&quot;,
+                &quot;1 / ((m + 4) * (m + 5))&quot;,
+                &quot;1 / (m + 4) - 1 / (m + 5)&quot;,
+<span class="fc" id="L288">                List.of(&quot;telescoping_fraction&quot;),</span>
+                TelescopingFractionHypothesisOperator.RULE_ID,
+<span class="fc" id="L290">                List.of(&quot;sympy-rational-basic&quot;),</span>
+                &quot;extended telescoping: shifted by 4 with variable m&quot;
+            )
+        );
+    }
+
+    private List&lt;CampaignCase&gt; rationalNormalizationCases() {
+<span class="fc" id="L297">        return List.of(</span>
+            new CampaignCase(
+                &quot;rn-sub-pqr&quot;,
+                &quot;rational&quot;,
+                &quot;p / r - q / r&quot;,
+                &quot;(p - q) / r&quot;,
+<span class="fc" id="L303">                List.of(&quot;rational_normalization&quot;),</span>
+                RationalNormalizationHypothesisOperator.RULE_ID,
+<span class="fc" id="L305">                List.of(&quot;rational-basic&quot;),</span>
+                &quot;rational normalization: symbolic subtraction with shared denominator&quot;
+            ),
+            new CampaignCase(
+                &quot;rn-affine-denom-3&quot;,
+                &quot;rational&quot;,
+                &quot;u / (v + 3) + w / (v + 3)&quot;,
+                &quot;(u + w) / (v + 3)&quot;,
+<span class="fc" id="L313">                List.of(&quot;rational_normalization&quot;),</span>
+                RationalNormalizationHypothesisOperator.RULE_ID,
+<span class="fc" id="L315">                List.of(&quot;rational-basic&quot;),</span>
+                &quot;rational normalization: addition with affine denominator shifted by 3&quot;
+            )
+        );
+    }
+
+    public record CampaignReport(
+        String id,
+        List&lt;CaseResult&gt; results,
+        List&lt;String&gt; blockers,
+        List&lt;ProgressSummary&gt; progress,
+        SymPyQaHarness.QaSummary qaSummary
+    ) {
+<span class="fc" id="L328">        public CampaignReport {</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">            results = results == null ? List.of() : List.copyOf(results);</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            blockers = blockers == null ? List.of() : List.copyOf(blockers);</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            progress = progress == null ? List.of() : List.copyOf(progress);</span>
+<span class="fc" id="L332">        }</span>
+    }
+
+    public record CaseResult(
+        String id,
+        String family,
+        String inputExpression,
+        String targetExpression,
+        boolean success,
+        String failureReason,
+        String oracleStatus,
+        String oracleEvidence,
+        String ablationStatus,
+        String shortcutSource,
+        String shortcutPackId,
+        String shortcutOperatorId,
+        List&lt;String&gt; shortcutAssumptions,
+        List&lt;String&gt; rulePath,
+        String notes,
+        String smallGraphMessage
+    ) {
+<span class="fc" id="L353">        public CaseResult {</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;&quot; : failureReason;</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">            ablationStatus = ablationStatus == null ? &quot;N/A&quot; : ablationStatus;</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            shortcutSource = shortcutSource == null ? &quot;&quot; : shortcutSource;</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            shortcutPackId = shortcutPackId == null ? &quot;&quot; : shortcutPackId;</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">            shortcutOperatorId = shortcutOperatorId == null ? &quot;&quot; : shortcutOperatorId;</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">            shortcutAssumptions = shortcutAssumptions == null ? List.of() : List.copyOf(shortcutAssumptions);</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">            notes = notes == null ? &quot;&quot; : notes;</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            smallGraphMessage = smallGraphMessage == null ? &quot;&quot; : smallGraphMessage;</span>
+<span class="fc" id="L365">        }</span>
+    }
+
+<span class="fc" id="L368">    public record ProgressSummary(</span>
+        String campaignId,
+        long totalCases,
+        long successCount,
+        long blockedCount,
+        long validatedCount
+    ) {
+    }
+
+    private record SummaryInput(boolean success, String oracleStatus, String ablationStatus) {
+<span class="fc" id="L378">        private SummaryInput {</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">            ablationStatus = ablationStatus == null ? &quot;N/A&quot; : ablationStatus;</span>
+<span class="fc" id="L381">        }</span>
+    }
+
+<span class="fc" id="L384">    private record CampaignCase(</span>
+        String id,
+        String family,
+        String inputExpression,
+        String targetExpression,
+        List&lt;String&gt; operatorIds,
+        String expectedRuleId,
+        List&lt;String&gt; enabledRulePacks,
+        String notes
+    ) {
+        private String primaryOperatorId() {
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">            return operatorIds().isEmpty() ? &quot;&quot; : operatorIds().getFirst();</span>
+        }
+
+        private DiscoveryBenchmarkScenario scenario() {
+<span class="fc" id="L399">            return new DiscoveryBenchmarkScenario(</span>
+                id,
+                id,
+                inputExpression,
+                targetExpression,
+<span class="fc" id="L404">                List.of(),</span>
+                operatorIds,
+                enabledRulePacks,
+<span class="fc" id="L407">                List.of(),</span>
+<span class="fc" id="L408">                List.of(),</span>
+<span class="fc" id="L409">                List.of(expectedRuleId),</span>
+                new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
+                new DiscoveryBenchmarkScenario.Budgets(8, 240, 5000),
+                new DiscoveryBenchmarkScenario.Gallery(false, 1, 2)
+            );
+        }
+    }
+
+<span class="fc" id="L417">    private record AblationResult(String status, String notes) {</span>
+        private static AblationResult notApplicable() {
+<span class="nc" id="L419">            return new AblationResult(&quot;N/A&quot;, &quot;&quot;);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
