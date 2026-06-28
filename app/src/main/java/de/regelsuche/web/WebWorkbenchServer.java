@@ -996,6 +996,22 @@ public class WebWorkbenchServer {
             inner.property("version", plugin.version());
             inner.property("source", plugin.source());
             inner.property("enabled", plugin.enabled());
+            inner.property("apiVersion", plugin.apiVersion());
+            inner.property("minimumCoreVersion", plugin.minimumCoreVersion());
+            inner.property("compatibility", plugin.compatibility());
+            inner.stringArray("compatibilityIssues", plugin.compatibilityIssues());
+            inner.stringArray("capabilities", plugin.capabilities());
+            inner.array("dependencies", dependencies -> plugin.dependencies().forEach(dependency ->
+                dependencies.objectValue(value -> {
+                    value.property("pluginId", dependency.pluginId());
+                    value.property("versionConstraint", dependency.versionConstraint());
+                    value.property("optional", dependency.optional());
+                })
+            ));
+            inner.property("provenance", plugin.provenance());
+            inner.property("signed", plugin.signed());
+            inner.property("trustedSource", plugin.trustedSource());
+            inner.stringArray("trustWarnings", plugin.trustWarnings());
         })));
         writer.array("rules", array -> writePluginRules(runtime, array));
         writer.array("profiles", array -> writePluginProfiles(runtime, array));

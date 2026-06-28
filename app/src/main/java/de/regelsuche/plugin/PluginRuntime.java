@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -324,17 +325,17 @@ public final class PluginRuntime implements AutoCloseable {
             for (RegelsuchePlugin plugin : loader) {
                 boolean enabled = !config.disabledPluginIds().contains(plugin.id());
                 if (!enabled) {
-                    discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, false));
+                    discoveredPlugins.add(buildLoadedPlugin(plugin, source, false, "not-checked", List.of()));
                     discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(), "Plugin disabled by configuration"));
                     continue;
                 }
                 List<PluginRuntime.RuntimeDiagnostic> compatibilityIssues = PluginCompatibilityChecker.check(plugin);
                 if (!compatibilityIssues.isEmpty()) {
                     discoveredDiagnostics.addAll(compatibilityIssues);
-                    discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, false));
+                    discoveredPlugins.add(buildLoadedPlugin(plugin, source, false, "incompatible", compatibilityIssues));
                     continue;
                 }
-                discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, true));
+                discoveredPlugins.add(buildLoadedPlugin(plugin, source, true, "compatible", List.of()));
                 registerPlugin(plugin, source, discoveredDiagnostics);
             }
         } catch (ServiceConfigurationError error) {
@@ -343,6 +344,72 @@ public final class PluginRuntime implements AutoCloseable {
                 "Failed to instantiate plugin from " + source + ": " + error.getMessage()
             ));
         }
+    }
+
+    private LoadedPlugin buildLoadedPlugin(
+        RegelsuchePlugin plugin,
+        String source,
+        boolean enabled,
+        String compatibility,
+        List<RuntimeDiagnostic> compatibilityIssues
+    ) {
+        List<String> capabilities = plugin.capabilities() == null
+            ? List.of()
+            : plugin.capabilities().stream()
+                .filter(capability -> capability != null && !capability.isBlank())
+                .map(capability -> capability.toLowerCase(Locale.ROOT))
+                .collect(java.util.stream.Collectors.collectingAndThen(
+                    java.util.stream.Collectors.toCollection(LinkedHashSet::new),
+                    List::copyOf
+                ));
+        List<PluginDependency> dependencies = plugin.dependencies() == null
+            ? List.of()
+            : plugin.dependencies().stream()
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        String provenance = plugin.provenance() == null ? "" : plugin.provenance().trim();
+        boolean signed = plugin.signature() != null && !plugin.signature().isBlank();
+        boolean trustedSource = isTrustedSource(source, signed, provenance);
+        List<String> trustWarnings = buildTrustWarnings(source, signed, provenance, trustedSource);
+        List<String> compatibilityMessages = compatibilityIssues.stream().map(RuntimeDiagnostic::message).toList();
+        return new LoadedPlugin(
+            plugin.id(),
+            plugin.name(),
+            plugin.version(),
+            source,
+            enabled,
+            plugin.apiVersion(),
+            plugin.minimumCoreVersion(),
+            capabilities,
+            dependencies,
+            compatibility,
+            compatibilityMessages,
+            provenance,
+            signed,
+            trustedSource,
+            trustWarnings
+        );
+    }
+
+    private boolean isTrustedSource(String source, boolean signed, String provenance) {
+        if ("classpath".equals(source)) {
+            return true;
+        }
+        return signed && !provenance.isBlank();
+    }
+
+    private List<String> buildTrustWarnings(String source, boolean signed, String provenance, boolean trustedSource) {
+        List<String> warnings = new ArrayList<>();
+        if (!"classpath".equals(source) && !signed) {
+            warnings.add("UNSIGNED_PLUGIN_ARTIFACT");
+        }
+        if (!"classpath".equals(source) && provenance.isBlank()) {
+            warnings.add("MISSING_PROVENANCE");
+        }
+        if (!"classpath".equals(source) && !trustedSource) {
+            warnings.add("UNKNOWN_SOURCE");
+        }
+        return List.copyOf(warnings);
     }
 
     private void registerPlugin(RegelsuchePlugin plugin, String source, List<RuntimeDiagnostic> discoveredDiagnostics) {
@@ -633,7 +700,29 @@ public final class PluginRuntime implements AutoCloseable {
         }
     }
 
-    public record LoadedPlugin(String id, String name, String version, String source, boolean enabled) {
+    public record LoadedPlugin(
+        String id,
+        String name,
+        String version,
+        String source,
+        boolean enabled,
+        String apiVersion,
+        String minimumCoreVersion,
+        List<String> capabilities,
+        List<PluginDependency> dependencies,
+        String compatibility,
+        List<String> compatibilityIssues,
+        String provenance,
+        boolean signed,
+        boolean trustedSource,
+        List<String> trustWarnings
+    ) {
+        public LoadedPlugin {
+            capabilities = List.copyOf(capabilities);
+            dependencies = List.copyOf(dependencies);
+            compatibilityIssues = List.copyOf(compatibilityIssues);
+            trustWarnings = List.copyOf(trustWarnings);
+        }
     }
 
     public record RuntimeDiagnostic(String source, String message) {

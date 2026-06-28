@@ -223,10 +223,27 @@ public class CliRouter {
                     if (runtime.loadedPlugins().isEmpty()) {
                         out.println("No plugins loaded.");
                     } else {
-                        runtime.loadedPlugins().forEach(plugin -> out.println(
-                            plugin.id() + " " + plugin.version() + " (" + plugin.source() + ", "
-                                + (plugin.enabled() ? "enabled" : "disabled") + ")"
-                        ));
+                        runtime.loadedPlugins().forEach(plugin -> {
+                            String dependencies = plugin.dependencies().isEmpty()
+                                ? "-"
+                                : plugin.dependencies().stream()
+                                    .map(dependency -> dependency.pluginId() + " " + dependency.versionConstraint()
+                                        + (dependency.optional() ? " (optional)" : ""))
+                                    .collect(java.util.stream.Collectors.joining(", "));
+                            String trustWarnings = plugin.trustWarnings().isEmpty()
+                                ? "-"
+                                : String.join(", ", plugin.trustWarnings());
+                            out.println(
+                                plugin.id() + " " + plugin.version()
+                                    + " (" + plugin.source() + ", " + (plugin.enabled() ? "enabled" : "disabled") + ")"
+                                    + " api=" + plugin.apiVersion()
+                                    + " minCore=" + plugin.minimumCoreVersion()
+                                    + " compatibility=" + plugin.compatibility()
+                                    + " dependencies=[" + dependencies + "]"
+                                    + " trusted=" + plugin.trustedSource()
+                                    + " warnings=[" + trustWarnings + "]"
+                            );
+                        });
                     }
                     runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
                     return 0;
