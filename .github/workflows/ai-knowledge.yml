@@ -55,9 +55,15 @@ jobs:
         with:
           gradle-home-cache-cleanup: true
 
+      - name: Publish extractor plugin to local Maven
+        working-directory: ai-knowledge-extractor
+        run: ./gradlew --no-daemon publishToMavenLocal
+
       - name: Generate core AI knowledge index
         continue-on-error: true
         working-directory: Regelsuche
+        env:
+          AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
         run: |
           mkdir -p build/ai-knowledge
           ./gradlew --no-daemon --stacktrace generateAiKnowledgeIndex > build/ai-knowledge/generate.out 2> build/ai-knowledge/generate.err
@@ -68,6 +74,8 @@ jobs:
       - name: Generate AI knowledge reports
         continue-on-error: true
         working-directory: Regelsuche
+        env:
+          AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
         run: |
           ./gradlew --no-daemon analyzeAiComplexity > build/ai-knowledge/analyze.out 2> build/ai-knowledge/analyze.err
           echo $? > build/ai-knowledge/analyze.exit
