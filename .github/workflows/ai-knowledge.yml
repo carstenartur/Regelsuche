@@ -25,6 +25,9 @@ on:
       - '.github/workflows/ai-knowledge.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   extract:
     name: Generate AI knowledge index
