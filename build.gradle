@@ -1,6 +1,21 @@
-def aiKnowledgeExtractor = file('../ai-knowledge-extractor')
+def aiKnowledgeEnabled = System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
 
-if (aiKnowledgeExtractor.isDirectory()) {
+def aiKnowledgeExtractorRoot = file('../ai-knowledge-extractor')
+
+buildscript {
+    dependencies {
+        if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
+            classpath files('../ai-knowledge-extractor/core/build/libs/core-0.1.0-SNAPSHOT.jar')
+            classpath files('../ai-knowledge-extractor/gradle-plugin/build/libs/gradle-plugin-0.1.0-SNAPSHOT.jar')
+        }
+    }
+}
+
+if (aiKnowledgeEnabled) {
+    if (!aiKnowledgeExtractorRoot.isDirectory()) {
+        throw new GradleException('AI knowledge extractor repository is missing next to this checkout.')
+    }
+
     apply plugin: 'org.aiknowledge.extractor'
 
     aiKnowledge {
@@ -9,14 +24,14 @@ if (aiKnowledgeExtractor.isDirectory()) {
         seedDirectory = layout.projectDirectory.dir('ai-knowledge')
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
-        maxCognitiveDebt = 100.0
+        maxCognitiveDebt = 100.0d
     }
 } else {
     tasks.register('generateAiKnowledgeIndex') {
         group = 'documentation'
-        description = 'Explains how to enable the local AI Knowledge Extractor composite build.'
+        description = 'Explains how to enable the AI Knowledge Extractor plugin.'
         doLast {
-            throw new GradleException('Place ai-knowledge-extractor next to this repository or use the published org.aiknowledge.extractor plugin.')
+            throw new GradleException('AI knowledge extractor is disabled for this build.')
         }
     }
 }
