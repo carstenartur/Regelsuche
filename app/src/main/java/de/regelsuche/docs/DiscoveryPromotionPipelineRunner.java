@@ -36,6 +36,7 @@ public final class DiscoveryPromotionPipelineRunner {
     private final PromotionRegistry registry = new PromotionRegistry();
     private final DiscoveryCampaignFiveRunner campaignFiveRunner = new DiscoveryCampaignFiveRunner();
     private final DiscoveryCampaignFourRunner campaignFourRunner = new DiscoveryCampaignFourRunner();
+    private final DiscoveryCampaignSevenRunner campaignSevenRunner = new DiscoveryCampaignSevenRunner();
     private final DiscoveryExplanationFactory explanationFactory = new DiscoveryExplanationFactory();
     private final MarkdownExplanationRenderer markdownExplanationRenderer = new MarkdownExplanationRenderer();
 
@@ -54,6 +55,8 @@ public final class DiscoveryPromotionPipelineRunner {
         // Order decision: Campaign 5 runs before Campaign 4 so newly promoted hidden-structure cases can be
         // considered by Campaign 4's macro-reuse validation in the same pipeline run.
         DiscoveryCampaignFiveRunner.CampaignReport campaignFive = campaignFiveRunner.run();
+        // Campaign 7 runs after Campaign 5 so its new families can benefit from the same promotion context.
+        DiscoveryCampaignSevenRunner.CampaignReport campaignSeven = campaignSevenRunner.run();
 
         List<PromotionRecord> promotionRecords = Stream.of(
                 campaignOne.results().stream()
@@ -63,7 +66,9 @@ public final class DiscoveryPromotionPipelineRunner {
                 campaignThree.results().stream()
                     .map(result -> decider.decide(PromotionObservation.fromCampaignThree(result, campaignThree.id()))),
                 campaignFive.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignFive(result, campaignFive.id()))))
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignFive(result, campaignFive.id()))),
+                campaignSeven.results().stream()
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignSeven(result, campaignSeven.id()))))
             .flatMap(Function.identity())
             .sorted(Comparator.comparing(PromotionRecord::candidateId))
             .toList();
@@ -81,7 +86,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 : record)
             .toList();
         PromotionRegistry.Registry promotionRegistry = registry.build(updatedRecords);
-        return new PipelineReport(updatedRecords, promotionRegistry, campaignFive, campaignFour, campaignMetrics(updatedRecords));
+        return new PipelineReport(updatedRecords, promotionRegistry, campaignFive, campaignFour, campaignSeven, campaignMetrics(updatedRecords));
     }
 
     PipelineReport writeReport(Path outputDirectory) {
@@ -145,6 +150,7 @@ public final class DiscoveryPromotionPipelineRunner {
             );
             campaignFiveRunner.writeReport(outputDirectory.resolve("discovery-campaign-5"), report.campaignFive());
             campaignFourRunner.writeReport(outputDirectory.resolve("discovery-campaign-4"), report.promotionRecords());
+            campaignSevenRunner.writeReport(outputDirectory.resolve("discovery-campaign-7"), report.campaignSeven());
             return report;
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
@@ -874,6 +880,7 @@ public final class DiscoveryPromotionPipelineRunner {
         PromotionRegistry.Registry registry,
         DiscoveryCampaignFiveRunner.CampaignReport campaignFive,
         DiscoveryCampaignFourRunner.CampaignReport campaignFour,
+        DiscoveryCampaignSevenRunner.CampaignReport campaignSeven,
         List<CampaignMetric> campaignMetrics
     ) {
         PipelineReport {
