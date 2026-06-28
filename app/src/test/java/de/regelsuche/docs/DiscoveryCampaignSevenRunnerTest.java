@@ -3,11 +3,14 @@ package de.regelsuche.docs;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -81,9 +84,10 @@ class DiscoveryCampaignSevenRunnerTest {
         assertTrue(pipelineReport.campaignSeven() != null,
             "pipeline report must include campaign 7 report");
 
-        String metrics = Files.readString(
-            tempDir.resolve("pipeline").resolve("campaign-metrics.json"), StandardCharsets.UTF_8);
-        assertTrue(metrics.contains("\"campaign\" : \"discovery-campaign-7\""),
+        Path metricsPath = tempDir.resolve("pipeline").resolve("campaign-metrics.json");
+        List<Map<String, Object>> metrics = new ObjectMapper()
+            .readValue(metricsPath.toFile(), new TypeReference<>() {});
+        assertTrue(metrics.stream().anyMatch(m -> "discovery-campaign-7".equals(m.get("campaign"))),
             "campaign-metrics.json must include campaign 7");
 
         assertTrue(Files.exists(
