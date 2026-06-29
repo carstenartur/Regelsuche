@@ -10,6 +10,8 @@ import re
 ROOT = Path.cwd()
 ZENODO_RELEASE_DATE_KEY = 'publication' + '_date'
 CODEMETA_RELEASE_DATE_KEY = 'date' + 'Published'
+ORCID_ID = '0009-0005-1047-6381'
+ORCID_URL = 'https://orcid.org/' + ORCID_ID
 
 
 def set_cff_key(text, key, value):
@@ -86,6 +88,32 @@ def update_release_properties(version):
     path.write_text('\n'.join(updated) + '\n', encoding='utf-8')
 
 
+def update_citation_md(version, release_day):
+    path = ROOT / 'CITATION.md'
+    text = path.read_text(encoding='utf-8')
+    text = re.sub(
+        r'(Carsten Hammer\. \*\*Regelsuche\*\*\. Version )[0-9A-Za-z.-]+(\. 2026\.)',
+        rf'\g<1>{version}\2',
+        text,
+    )
+    text = re.sub(r'(  version\s+= \{)[^}]+(\},)', rf'\g<1>{version}\2', text)
+    if release_day:
+        if re.search(r'^  date\s+= \{[^}]+\},$', text, flags=re.MULTILINE):
+            text = re.sub(r'^  date\s+= \{[^}]+\},$', f'  date         = {{{release_day}}},', text, flags=re.MULTILINE)
+        else:
+            text = re.sub(r'^(  version\s+= \{[^}]+\},)$', rf'\1\n  date         = {{{release_day}}},', text, flags=re.MULTILINE)
+    else:
+        text = re.sub(r'^  date\s+= \{[^}]+\},\n', '', text, flags=re.MULTILINE)
+    if 'ORCID' not in text:
+        text = text.replace(
+            '## What to cite\n',
+            f"## Author identifier\n\nCarsten Hammer's ORCID iD is [{ORCID_URL}]({ORCID_URL}).\n\n## What to cite\n",
+        )
+    if '  orcid' not in text:
+        text = re.sub(r'(  author\s+= \{Hammer, Carsten\},)', rf'\1\n  orcid        = {{{ORCID_URL}}},', text, flags=re.MULTILINE)
+    path.write_text(text, encoding='utf-8')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('version', help='Version to write to release metadata files')
@@ -97,6 +125,7 @@ def main():
     update_zenodo(args.version, release_day)
     update_codemeta(args.version, release_day)
     update_release_properties(args.version)
+    update_citation_md(args.version, release_day)
 
 
 if __name__ == '__main__':
