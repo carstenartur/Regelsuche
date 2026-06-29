@@ -1,8 +1,8 @@
 name: Release
 
 # Gradle-native release workflow for Regelsuche.
-# It keeps CITATION.cff, .zenodo.json and codemeta.json aligned with the
-# released version and opens a follow-up PR for the next development version.
+# It keeps CITATION.cff, CITATION.md, .zenodo.json and codemeta.json aligned
+# with the released version and opens a follow-up PR for the next development version.
 
 on:
   workflow_dispatch:
@@ -116,6 +116,8 @@ jobs:
             exit 1
           fi
           grep -q "version: \"${CURRENT}\"" CITATION.cff
+          grep -q "Version ${CURRENT}." CITATION.md
+          grep -q "version      = {${CURRENT}}," CITATION.md
           grep -q "\"version\": \"${CURRENT}\"" .zenodo.json
           grep -q "\"version\": \"${CURRENT}\"" codemeta.json
 
@@ -223,7 +225,7 @@ jobs:
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           python3 .github/scripts/update-release-metadata.py "${VERSION}" --release
-          git add CITATION.cff .zenodo.json codemeta.json release.properties
+          git add CITATION.cff CITATION.md .zenodo.json codemeta.json release.properties
           git commit -m "Release version ${VERSION}"
 
       - name: Create git tag (workflow_dispatch only)
@@ -273,11 +275,13 @@ jobs:
             Changes:
             - update release.properties
             - update CITATION.cff
+            - update CITATION.md
             - update .zenodo.json
             - update codemeta.json
             - remove release-only date metadata from the development snapshot
           add-paths: |
             CITATION.cff
+            CITATION.md
             .zenodo.json
             codemeta.json
             release.properties
