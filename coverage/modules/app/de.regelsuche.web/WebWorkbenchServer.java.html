@@ -367,8 +367,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L367">                ? profile.defaultGoal()</span>
 <span class="fc" id="L368">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L369">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L370">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="nc" id="L371">            return;</span>
+<span class="fc" id="L370">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="fc" id="L371">            return;</span>
 <span class="fc" id="L372">        }</span>
 <span class="fc" id="L373">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1367,8 +1367,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1367">            return;</span>
         }
 <span class="fc bfc" id="L1369" title="All 2 branches covered.">        if (!&quot;tree&quot;.equals(suffix)) {</span>
-<span class="fc" id="L1370">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
-<span class="fc" id="L1371">            return;</span>
+<span class="nc" id="L1370">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
+<span class="nc" id="L1371">            return;</span>
         }
 <span class="fc bfc" id="L1373" title="All 2 branches covered.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
 <span class="fc" id="L1374">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
@@ -1376,8 +1376,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L1377">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc bfc" id="L1378" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="nc" id="L1379">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
-<span class="nc" id="L1380">            return;</span>
+<span class="fc" id="L1379">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
+<span class="fc" id="L1380">            return;</span>
         }
 <span class="fc" id="L1382">        String selectedPathKey = queryParam(exchange, &quot;selectedPathKey&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1383">        de.regelsuche.ide.RuleInspectionDto dto =</span>
@@ -1398,8 +1398,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1398">        String matchId = stringValue(body, &quot;matchId&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1399">        int matchIndex = intValue(body, &quot;matchIndex&quot;, -1);</span>
 <span class="pc bpc" id="L1400" title="4 of 8 branches missed.">        if (expression.isBlank() || pathKey.isBlank() || (matchId.isBlank() &amp;&amp; matchIndex &lt; 0)) {</span>
-<span class="nc" id="L1401">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
-<span class="nc" id="L1402">            return;</span>
+<span class="fc" id="L1401">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
+<span class="fc" id="L1402">            return;</span>
         }
 
 <span class="fc" id="L1405">        de.regelsuche.ide.RuleInspectionService service = new de.regelsuche.ide.RuleInspectionService();</span>
@@ -1627,8 +1627,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1627">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1628">            .findFirst();</span>
 <span class="fc bfc" id="L1629" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="nc" id="L1630">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="nc" id="L1631">            return;</span>
+<span class="fc" id="L1630">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="fc" id="L1631">            return;</span>
         }
 <span class="fc" id="L1633">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
 <span class="fc" id="L1634">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>
@@ -2453,13 +2453,13 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2454">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
 <span class="fc bfc" id="L2455" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
-<span class="nc" id="L2456">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
-<span class="nc" id="L2457">            return;</span>
+<span class="fc" id="L2456">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
+<span class="fc" id="L2457">            return;</span>
         }
 <span class="fc" id="L2459">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2460" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="nc" id="L2461">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="nc" id="L2462">            return;</span>
+<span class="fc" id="L2461">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="fc" id="L2462">            return;</span>
         }
 <span class="fc" id="L2464">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
 <span class="fc" id="L2465">        Object raw = body.get(&quot;assumptions&quot;);</span>
