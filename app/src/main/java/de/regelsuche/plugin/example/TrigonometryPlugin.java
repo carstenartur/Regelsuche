@@ -49,11 +49,6 @@ public final class TrigonometryPlugin implements RegelsuchePlugin {
     }
 
     @Override
-    public String signature() {
-        return "demo-classpath-signature";
-    }
-
-    @Override
     public void registerRules(RuleRegistry registry) {
         registry.register(new PatternRewriteRule(
             "trig_pythagorean_identity",

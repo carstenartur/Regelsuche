@@ -87,11 +87,6 @@ public final class BinomialFormulaPlugin implements RegelsuchePlugin {
     }
 
     @Override
-    public String signature() {
-        return "demo-classpath-signature";
-    }
-
-    @Override
     public void registerRules(RuleRegistry registry) {
         registry.register(new PatternRewriteRule(
             "binomial_difference_of_squares",

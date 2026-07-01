@@ -53,11 +53,6 @@ public final class RationalFunctionsPlugin implements RegelsuchePlugin {
     }
 
     @Override
-    public String signature() {
-        return "demo-classpath-signature";
-    }
-
-    @Override
     public void registerRules(RuleRegistry registry) {
         registry.register(new PatternRewriteRule(
             "rational_fraction_addition",

@@ -24,6 +24,7 @@ import de.regelsuche.mining.RuleDiscoveryService;
 import de.regelsuche.notify.ConsoleNotifier;
 import de.regelsuche.plugin.PluginRuntime;
 import de.regelsuche.plugin.PluginRuntimeConfig;
+import de.regelsuche.plugin.PluginCatalogEntry;
 import de.regelsuche.plugin.PluginDirectoryWatcher;
 import de.regelsuche.plugin.PluginExtensionRegistry;
 import de.regelsuche.plugin.PluginReloadResult;
@@ -224,35 +225,38 @@ public class CliRouter {
                         out.println("No plugins loaded.");
                     } else {
                         runtime.loadedPlugins().forEach(plugin -> {
+                            PluginCatalogEntry entry = PluginCatalogEntry.from(plugin);
                             String capabilities = plugin.capabilities().isEmpty()
                                 ? "-"
                                 : String.join(", ", plugin.capabilities());
-                            String dependencies = plugin.dependencies().isEmpty()
+                            String dependencies = entry.dependencies().isEmpty()
                                 ? "-"
-                                : plugin.dependencies().stream()
+                                : entry.dependencies().stream()
                                     .map(dependency -> dependency.pluginId() + " " + dependency.versionConstraint()
-                                        + (dependency.optional() ? " (optional)" : ""))
+                                        + (dependency.optional() ? " (optional)" : "")
+                                        + " [" + dependency.status() + "]")
                                     .collect(java.util.stream.Collectors.joining(", "));
-                            String compatibilityIssues = plugin.compatibilityIssues().isEmpty()
+                            String compatibilityIssues = entry.compatibilityIssues().isEmpty()
                                 ? "-"
-                                : String.join(", ", plugin.compatibilityIssues());
-                            String provenance = plugin.provenance().isBlank() ? "-" : plugin.provenance();
-                            String trustWarnings = plugin.trustWarnings().isEmpty()
+                                : String.join(", ", entry.compatibilityIssues());
+                            String provenance = entry.provenance().isBlank() ? "-" : entry.provenance();
+                            String trustWarnings = entry.trustWarnings().isEmpty()
                                 ? "-"
-                                : String.join(", ", plugin.trustWarnings());
+                                : String.join(", ", entry.trustWarnings());
                             out.println(
-                                plugin.id() + " " + plugin.version()
-                                    + " (" + plugin.source() + ", " + (plugin.enabled() ? "enabled" : "disabled") + ")"
-                                    + " name=\"" + plugin.name() + "\""
-                                    + " api=" + plugin.apiVersion()
-                                    + " minCore=" + plugin.minimumCoreVersion()
+                                entry.id() + " " + entry.version()
+                                    + " (" + entry.source() + ", " + (entry.enabled() ? "enabled" : "disabled") + ")"
+                                    + " name=\"" + entry.name() + "\""
+                                    + " api=" + entry.apiVersion()
+                                    + " minCore=" + entry.minimumCoreVersion()
                                     + " capabilities=[" + capabilities + "]"
-                                    + " compatibility=" + plugin.compatibility()
+                                    + " compatibility=" + entry.compatibility()
                                     + " compatibilityIssues=[" + compatibilityIssues + "]"
                                     + " dependencies=[" + dependencies + "]"
                                     + " provenance=" + provenance
-                                    + " signed=" + plugin.signed()
-                                    + " trusted=" + plugin.trustedSource()
+                                    + " signaturePresent=" + entry.signaturePresent()
+                                    + " signatureVerified=" + entry.signatureVerified()
+                                    + " trustedSource=" + entry.trustedSource()
                                     + " warnings=[" + trustWarnings + "]"
                             );
                         });

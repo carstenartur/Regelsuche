@@ -51,11 +51,6 @@ public final class FactorizationPlugin implements RegelsuchePlugin {
     }
 
     @Override
-    public String signature() {
-        return "demo-classpath-signature";
-    }
-
-    @Override
     public void registerTransformations(TransformationRegistry registry) {
         registry.register(new PatternBasedTransformation(
             "factorization_common_factor",

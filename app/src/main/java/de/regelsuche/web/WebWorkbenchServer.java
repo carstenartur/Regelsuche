@@ -33,6 +33,7 @@ import de.regelsuche.mining.RuleCandidateMiner;
 import de.regelsuche.mining.RuleDiscoveryService;
 import de.regelsuche.notify.NoOpNotifier;
 import de.regelsuche.notify.SimplificationNotifier;
+import de.regelsuche.plugin.PluginCatalogEntry;
 import de.regelsuche.plugin.PluginRuntime;
 import de.regelsuche.plugin.PluginRuntimeConfig;
 import de.regelsuche.scoring.ExpressionScorer;
@@ -990,29 +991,34 @@ public class WebWorkbenchServer {
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("activeProfile", runtime.activeProfile() == null ? "" : runtime.activeProfile());
-        writer.array("plugins", array -> runtime.loadedPlugins().forEach(plugin -> array.objectValue(inner -> {
-            inner.property("id", plugin.id());
-            inner.property("name", plugin.name());
-            inner.property("version", plugin.version());
-            inner.property("source", plugin.source());
-            inner.property("enabled", plugin.enabled());
-            inner.property("apiVersion", plugin.apiVersion());
-            inner.property("minimumCoreVersion", plugin.minimumCoreVersion());
-            inner.property("compatibility", plugin.compatibility());
-            inner.stringArray("compatibilityIssues", plugin.compatibilityIssues());
-            inner.stringArray("capabilities", plugin.capabilities());
-            inner.array("dependencies", dependencies -> plugin.dependencies().forEach(dependency ->
+        writer.array("plugins", array -> runtime.loadedPlugins().forEach(plugin -> {
+            PluginCatalogEntry entry = PluginCatalogEntry.from(plugin);
+            array.objectValue(inner -> {
+                inner.property("id", entry.id());
+                inner.property("name", entry.name());
+                inner.property("version", entry.version());
+                inner.property("source", entry.source());
+                inner.property("enabled", entry.enabled());
+                inner.property("apiVersion", entry.apiVersion());
+                inner.property("minimumCoreVersion", entry.minimumCoreVersion());
+                inner.property("compatibility", entry.compatibility());
+                inner.stringArray("compatibilityIssues", entry.compatibilityIssues());
+                inner.stringArray("capabilities", entry.capabilities());
+                inner.array("dependencies", dependencies -> entry.dependencies().forEach(dependency ->
                 dependencies.objectValue(value -> {
                     value.property("pluginId", dependency.pluginId());
                     value.property("versionConstraint", dependency.versionConstraint());
                     value.property("optional", dependency.optional());
+                    value.property("status", dependency.status());
                 })
-            ));
-            inner.property("provenance", plugin.provenance());
-            inner.property("signed", plugin.signed());
-            inner.property("trustedSource", plugin.trustedSource());
-            inner.stringArray("trustWarnings", plugin.trustWarnings());
-        })));
+                ));
+                inner.property("provenance", entry.provenance());
+                inner.property("signaturePresent", entry.signaturePresent());
+                inner.property("signatureVerified", entry.signatureVerified());
+                inner.property("trustedSource", entry.trustedSource());
+                inner.stringArray("trustWarnings", entry.trustWarnings());
+            });
+        }));
         writer.array("rules", array -> writePluginRules(runtime, array));
         writer.array("profiles", array -> writePluginProfiles(runtime, array));
         writer.array("diagnostics", array -> runtime.diagnostics().forEach(diagnostic -> array.objectValue(inner -> {

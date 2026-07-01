@@ -45,11 +45,6 @@ public final class AlgebraPlugin implements RegelsuchePlugin {
     }
 
     @Override
-    public String signature() {
-        return "demo-classpath-signature";
-    }
-
-    @Override
     public void registerRules(RuleRegistry registry) {
         registry.register(new PatternRewriteRule(
             "algebra_additive_identity",

@@ -31,9 +31,13 @@ class PluginCliRouterTest {
         assertTrue(output.toString().contains("binomial-formulas"), output::toString);
         assertTrue(output.toString().contains("name=\"Binomial Formulas\""), output::toString);
         assertTrue(output.toString().contains("capabilities=[cost-functions"), output::toString);
-        assertTrue(output.toString().contains("compatibilityIssues=[-]"), output::toString);
+        assertTrue(output.toString().contains("compatibility=not-checked"), output::toString);
+        assertTrue(output.toString().contains("compatibilityIssues=[Dependency version not checked: algebra-core"), output::toString);
+        assertTrue(output.toString().contains("dependencies=[algebra-core >=1.0.0 [version-not-checked]]"), output::toString);
         assertTrue(output.toString().contains("provenance=https://github.com/carstenartur/Regelsuche"), output::toString);
-        assertTrue(output.toString().contains("signed=true"), output::toString);
+        assertTrue(output.toString().contains("signaturePresent=false"), output::toString);
+        assertTrue(output.toString().contains("signatureVerified=false"), output::toString);
+        assertTrue(output.toString().contains("trustedSource=true"), output::toString);
     }
 
     @Test

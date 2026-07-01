@@ -59,8 +59,8 @@ Beispielimplementierungen liegen unter `app/src/main/java/de/regelsuche/plugin/e
 - Der Plugin-Katalog (`plugins list` und `GET /api/plugins`) zeigt pro Plugin:
   - Metadaten (`id`, `name`, `version`, `apiVersion`, `minimumCoreVersion`, `capabilities`)
   - Kompatibilitätsstatus (`compatible`, `incompatible`, `not-checked`) inkl. `compatibilityIssues`
-  - Abhängigkeiten (`dependencies` mit Version-Constraints und optional/required)
-  - Vertrauensinformationen (`provenance`, `signed`, `trustedSource`, `trustWarnings`)
+  - Abhängigkeiten (`dependencies` mit Version-Constraints, optional/required und Status wie `present`, `missing-required`, `missing-optional`, `version-not-checked`)
+  - Vertrauensinformationen (`provenance`, `signaturePresent`, `signatureVerified`, `trustedSource`, `trustWarnings`)
 - `plugins reload` liefert Diff, Diagnosen und Konflikte eines Reloads
 - `plugins status` zeigt Verzeichnis-, Plugin-, Regel- und Konfliktstatus
 - `plugins watch` überwacht `plugins/` und `rules/` mit debounce-basiertem Hot-Reload
@@ -81,8 +81,10 @@ Beispielimplementierungen liegen unter `app/src/main/java/de/regelsuche/plugin/e
 ## Vertrauensmodell
 
 - Classpath-Plugins gelten als bekannte Quelle.
-- Für externe Quellen werden Signatur- und Provenance-Metadaten ausgewertet (`signature()`, `provenance()`).
-- Bei unbekannter Herkunft oder fehlender Signatur erscheinen Warnungen (`UNKNOWN_SOURCE`, `UNSIGNED_PLUGIN_ARTIFACT`, `MISSING_PROVENANCE`) im Katalog.
+- Für externe Quellen werden Signatur- und Provenance-Metadaten ausgewertet (`signature()`, `provenance()`), aber nicht kryptografisch verifiziert.
+- `signaturePresent` signalisiert nur vorhandene Signatur-Metadaten; `signatureVerified` bleibt ohne Verifizierer `false`.
+- Externe Plugins bleiben ohne Verifizierer/Allowlist untrusted (`trustedSource=false`).
+- Bei unbekannter oder untrusted externer Herkunft und fehlenden Metadaten erscheinen Warnungen (`MISSING_PROVENANCE`, `MISSING_SIGNATURE_METADATA`, `SIGNATURE_NOT_VERIFIED`, `UNKNOWN_SOURCE`, `UNTRUSTED_EXTERNAL_SOURCE`) im Katalog.
 
 ## Community und Autoren-Onboarding
 

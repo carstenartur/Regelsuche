@@ -130,9 +130,12 @@ class WebWorkbenchServerTest {
         assertTrue(body.contains("\"id\":\"binomial-formulas\""), body);
         assertTrue(body.contains("\"apiVersion\":\"1\""), body);
         assertTrue(body.contains("\"minimumCoreVersion\":\"1.0.0\""), body);
-        assertTrue(body.contains("\"compatibility\":\"compatible\""), body);
+        assertTrue(body.contains("\"compatibility\":\"not-checked\""), body);
         assertTrue(body.contains("\"dependencies\""), body);
+        assertTrue(body.contains("\"status\":\"version-not-checked\""), body);
         assertTrue(body.contains("\"provenance\":\"https://github.com/carstenartur/Regelsuche"), body);
+        assertTrue(body.contains("\"signaturePresent\":false"), body);
+        assertTrue(body.contains("\"signatureVerified\":false"), body);
         assertTrue(body.contains("\"trustedSource\":true"), body);
         assertTrue(body.contains("\"trustWarnings\":[]"), body);
     }

@@ -91,7 +91,7 @@ class PluginRuntimeTest {
                 .filter(plugin -> plugin.id().equals("binomial-formulas"))
                 .findFirst()
                 .orElseThrow();
-            assertEquals("compatible", binomial.compatibility());
+            assertEquals("not-checked", binomial.compatibility());
             assertEquals("1", binomial.apiVersion());
             assertEquals(List.of(
                 "cost-functions",
@@ -108,8 +108,60 @@ class PluginRuntimeTest {
             ), binomial.capabilities());
             assertTrue(binomial.dependencies().stream()
                 .anyMatch(dependency -> dependency.pluginId().equals("algebra-core")));
+            assertTrue(binomial.dependencies().stream()
+                .anyMatch(dependency -> dependency.pluginId().equals("algebra-core")
+                    && dependency.status().equals("version-not-checked")));
+            assertTrue(binomial.compatibilityIssues().stream()
+                .anyMatch(issue -> issue.contains("Dependency version not checked: algebra-core")));
+            assertFalse(binomial.signaturePresent());
+            assertFalse(binomial.signatureVerified());
             assertTrue(binomial.trustedSource());
             assertTrue(binomial.trustWarnings().isEmpty());
+        }
+    }
+
+    @Test
+    void requiredDependenciesAreClassifiedAsMissingWhenDependencyPluginDisabled(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of("algebra-core"),
+            Set.of()
+        ))) {
+            PluginRuntime.LoadedPlugin binomial = runtime.loadedPlugins().stream()
+                .filter(plugin -> plugin.id().equals("binomial-formulas"))
+                .findFirst()
+                .orElseThrow();
+
+            assertEquals("incompatible", binomial.compatibility());
+            assertTrue(binomial.dependencies().stream()
+                .anyMatch(dependency -> dependency.pluginId().equals("algebra-core")
+                    && dependency.status().equals("missing-required")));
+            assertTrue(binomial.compatibilityIssues().stream()
+                .anyMatch(issue -> issue.contains("Missing required dependency: algebra-core")));
+        }
+    }
+
+    @Test
+    void optionalDependenciesAreClassifiedWithoutChangingCompatibility(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of("factorization-pack"),
+            Set.of()
+        ))) {
+            PluginRuntime.LoadedPlugin rational = runtime.loadedPlugins().stream()
+                .filter(plugin -> plugin.id().equals("rational-functions-pack"))
+                .findFirst()
+                .orElseThrow();
+
+            assertTrue(rational.dependencies().stream()
+                .anyMatch(dependency -> dependency.pluginId().equals("factorization-pack")
+                    && dependency.status().equals("missing-optional")));
+            assertFalse(rational.compatibilityIssues().stream()
+                .anyMatch(issue -> issue.contains("factorization-pack")));
         }
     }
 

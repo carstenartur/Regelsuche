@@ -48,11 +48,6 @@ public final class DiscoveryOperatorsPlugin implements RegelsuchePlugin {
     }
 
     @Override
-    public String signature() {
-        return "demo-classpath-signature";
-    }
-
-    @Override
     public void registerSearchStrategies(SearchStrategyRegistry registry) {
         registry.register(new SearchStrategy() {
             @Override

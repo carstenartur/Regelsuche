@@ -87,8 +87,10 @@ und UI/CLI-Komponenten nur aktive Erweiterungen verwenden können.
 
 - `dependencies()` beschreibt Plugin-Abhängigkeiten inkl. Version-Constraint und optional/required.
 - `provenance()` beschreibt Herkunft (z. B. Release-URL, Registry-Referenz, Commit).
-- `signature()` erlaubt das Hinterlegen einer Signaturkennung.
-- `signed` bedeutet aktuell nur, dass `signature()` einen nicht-leeren Wert liefert; eine kryptografische Verifikation findet derzeit nicht statt.
+- `signature()` erlaubt das Hinterlegen von Signatur-Metadaten (z. B. Referenz/Identifier).
+- `signaturePresent` bedeutet nur, dass `signature()` einen nicht-leeren Wert liefert.
+- `signatureVerified` bleibt aktuell `false`; eine kryptografische Verifikation externer Plugin-Artefakte ist derzeit nicht implementiert.
+- `trustedSource` ist aktuell nur für Classpath-/Built-in-Plugins `true`; externe Quellen bleiben ohne Verifizierer/Allowlist untrusted.
 - `plugins list` sowie `GET /api/plugins` zeigen diese Felder als Plugin-Katalog inklusive Vertrauenswarnungen.
 
 Damit sind Import/Export-Workflows (`rules import`/`rules export`) und Drittanbieter-Pakete transparent dokumentiert und prüfbar.
