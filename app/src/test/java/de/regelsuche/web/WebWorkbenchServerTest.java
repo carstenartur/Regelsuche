@@ -122,6 +122,25 @@ class WebWorkbenchServerTest {
     }
 
     @Test
+    void pluginsApiExposesPluginCatalogMetadata() throws IOException {
+        HttpURLConnection connection = open("/api/plugins");
+        assertEquals(200, connection.getResponseCode());
+        String body = new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+        assertTrue(body.contains("\"id\":\"binomial-formulas\""), body);
+        assertTrue(body.contains("\"apiVersion\":\"1\""), body);
+        assertTrue(body.contains("\"minimumCoreVersion\":\"1.0.0\""), body);
+        assertTrue(body.contains("\"compatibility\":\"not-checked\""), body);
+        assertTrue(body.contains("\"dependencies\""), body);
+        assertTrue(body.contains("\"status\":\"version-not-checked\""), body);
+        assertTrue(body.contains("\"provenance\":\"https://github.com/carstenartur/Regelsuche"), body);
+        assertTrue(body.contains("\"signaturePresent\":false"), body);
+        assertTrue(body.contains("\"signatureVerified\":false"), body);
+        assertTrue(body.contains("\"trustedSource\":true"), body);
+        assertTrue(body.contains("\"trustWarnings\":[]"), body);
+    }
+
+    @Test
     void mermaidExportReturnsText() throws IOException {
         HttpURLConnection connection = open("/api/exports/mermaid");
         assertEquals(200, connection.getResponseCode());

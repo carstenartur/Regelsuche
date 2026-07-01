@@ -16,6 +16,7 @@ import de.regelsuche.plugin.ExplanationRegistry;
 import de.regelsuche.plugin.Heuristic;
 import de.regelsuche.plugin.HeuristicRegistry;
 import de.regelsuche.plugin.MacroRegistry;
+import de.regelsuche.plugin.PluginDependency;
 import de.regelsuche.plugin.ParserExtension;
 import de.regelsuche.plugin.ParserExtensionRegistry;
 import de.regelsuche.plugin.PatternBasedTransformation;
@@ -32,6 +33,7 @@ import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import java.util.List;
+import java.util.Set;
 
 public final class BinomialFormulaPlugin implements RegelsuchePlugin {
     private static final PatternExpr A = PatternExpr.var("A");
@@ -50,6 +52,38 @@ public final class BinomialFormulaPlugin implements RegelsuchePlugin {
     @Override
     public String version() {
         return "1.0.0";
+    }
+
+    @Override
+    public String minimumCoreVersion() {
+        return "1.0.0";
+    }
+
+    @Override
+    public Set<String> capabilities() {
+        return Set.of(
+            "rules",
+            "transformations",
+            "visitors",
+            "macros",
+            "search-strategies",
+            "heuristics",
+            "cost-functions",
+            "renderers",
+            "explanations",
+            "parser-extensions",
+            "examples"
+        );
+    }
+
+    @Override
+    public List<PluginDependency> dependencies() {
+        return List.of(new PluginDependency("algebra-core", ">=1.0.0", false));
+    }
+
+    @Override
+    public String provenance() {
+        return "https://github.com/carstenartur/Regelsuche/tree/main/app/src/main/java/de/regelsuche/plugin/example";
     }
 
     @Override

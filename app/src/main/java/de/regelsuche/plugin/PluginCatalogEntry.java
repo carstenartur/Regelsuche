@@ -1,6 +1,8 @@
 package de.regelsuche.plugin;
 
-public record PluginSnapshot(
+import java.util.List;
+
+public record PluginCatalogEntry(
     String id,
     String name,
     String version,
@@ -8,18 +10,25 @@ public record PluginSnapshot(
     boolean enabled,
     String apiVersion,
     String minimumCoreVersion,
-    java.util.List<String> capabilities,
-    java.util.List<PluginCatalogDependency> dependencies,
+    List<String> capabilities,
+    List<PluginCatalogDependency> dependencies,
     String compatibility,
-    java.util.List<String> compatibilityIssues,
+    List<String> compatibilityIssues,
     String provenance,
     boolean signaturePresent,
     boolean signatureVerified,
     boolean trustedSource,
-    java.util.List<String> trustWarnings
+    List<String> trustWarnings
 ) {
-    static PluginSnapshot from(PluginRuntime.LoadedPlugin plugin) {
-        return new PluginSnapshot(
+    public PluginCatalogEntry {
+        capabilities = List.copyOf(capabilities);
+        dependencies = List.copyOf(dependencies);
+        compatibilityIssues = List.copyOf(compatibilityIssues);
+        trustWarnings = List.copyOf(trustWarnings);
+    }
+
+    public static PluginCatalogEntry from(PluginRuntime.LoadedPlugin plugin) {
+        return new PluginCatalogEntry(
             plugin.id(),
             plugin.name(),
             plugin.version(),

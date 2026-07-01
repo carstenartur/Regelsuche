@@ -19,6 +19,18 @@ public interface RegelsuchePlugin {
         return java.util.Set.of();
     }
 
+    default java.util.List<PluginDependency> dependencies() {
+        return java.util.List.of();
+    }
+
+    default String provenance() {
+        return "";
+    }
+
+    default String signature() {
+        return "";
+    }
+
     default void registerRules(RuleRegistry registry) {
     }
 

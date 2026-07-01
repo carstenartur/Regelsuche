@@ -36,14 +36,31 @@ class PluginRuntimeTest {
             Set.of()
         ))) {
             assertTrue(runtime.loadedPlugins().stream().anyMatch(plugin -> plugin.id().equals("binomial-formulas")));
+            assertTrue(runtime.loadedPlugins().stream().anyMatch(plugin -> plugin.id().equals("algebra-core")));
+            assertTrue(runtime.loadedPlugins().stream().anyMatch(plugin -> plugin.id().equals("factorization-pack")));
+            assertTrue(runtime.loadedPlugins().stream().anyMatch(plugin -> plugin.id().equals("trigonometry-pack")));
+            assertTrue(runtime.loadedPlugins().stream().anyMatch(plugin -> plugin.id().equals("rational-functions-pack")));
+            assertTrue(runtime.loadedPlugins().stream().anyMatch(plugin -> plugin.id().equals("discovery-operators-pack")));
             assertTrue(runtime.ruleRegistry().registrations().stream()
                 .anyMatch(rule -> rule.id().equals("binomial_difference_of_squares")));
+            assertTrue(runtime.ruleRegistry().registrations().stream()
+                .anyMatch(rule -> rule.id().equals("algebra_additive_identity")));
+            assertTrue(runtime.transformationRegistry().registrations().stream()
+                .anyMatch(rule -> rule.id().equals("factorization_common_factor")));
+            assertTrue(runtime.ruleRegistry().registrations().stream()
+                .anyMatch(rule -> rule.id().equals("trig_pythagorean_identity")));
+            assertTrue(runtime.ruleRegistry().registrations().stream()
+                .anyMatch(rule -> rule.id().equals("rational_fraction_addition")));
             assertTrue(runtime.transformationRegistry().registrations().stream()
                 .anyMatch(rule -> rule.id().equals("binomial_square_forward")));
             assertTrue(runtime.astVisitorRegistry().registrations().stream()
                 .anyMatch(visitor -> visitor.id().equals("binomial-pattern-visitor")));
             assertTrue(runtime.searchStrategyRegistry().registrations().stream()
+                .anyMatch(strategy -> strategy.id().equals("discovery-operator-bias")));
+            assertTrue(runtime.searchStrategyRegistry().registrations().stream()
                 .anyMatch(strategy -> strategy.id().equals("binomial-guided-search")));
+            assertTrue(runtime.heuristicRegistry().registrations().stream()
+                .anyMatch(heuristic -> heuristic.id().equals("discovery-operator-heuristic")));
             assertTrue(runtime.heuristicRegistry().registrations().stream()
                 .anyMatch(heuristic -> heuristic.id().equals("binomial-pattern-heuristic")));
             assertTrue(runtime.costFunctionRegistry().registrations().stream()
@@ -56,6 +73,95 @@ class PluginRuntimeTest {
                 .anyMatch(parserExtension -> parserExtension.id().equals("unicode-square-parser")));
             assertTrue(runtime.exampleRegistry().registrations().stream()
                 .anyMatch(examples -> examples.id().equals("binomial-examples")));
+            assertTrue(runtime.exampleRegistry().registrations().stream()
+                .anyMatch(examples -> examples.id().equals("discovery-operators-examples")));
+        }
+    }
+
+    @Test
+    void loadedPluginMetadataContainsCompatibilityDependenciesAndTrust(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of(),
+            Set.of()
+        ))) {
+            PluginRuntime.LoadedPlugin binomial = runtime.loadedPlugins().stream()
+                .filter(plugin -> plugin.id().equals("binomial-formulas"))
+                .findFirst()
+                .orElseThrow();
+            assertEquals("not-checked", binomial.compatibility());
+            assertEquals("1", binomial.apiVersion());
+            assertEquals(List.of(
+                "cost-functions",
+                "examples",
+                "explanations",
+                "heuristics",
+                "macros",
+                "parser-extensions",
+                "renderers",
+                "rules",
+                "search-strategies",
+                "transformations",
+                "visitors"
+            ), binomial.capabilities());
+            assertTrue(binomial.dependencies().stream()
+                .anyMatch(dependency -> dependency.pluginId().equals("algebra-core")));
+            assertTrue(binomial.dependencies().stream()
+                .anyMatch(dependency -> dependency.pluginId().equals("algebra-core")
+                    && dependency.status().equals("version-not-checked")));
+            assertTrue(binomial.compatibilityIssues().stream()
+                .anyMatch(issue -> issue.contains("Dependency version not checked: algebra-core")));
+            assertFalse(binomial.signaturePresent());
+            assertFalse(binomial.signatureVerified());
+            assertTrue(binomial.trustedSource());
+            assertTrue(binomial.trustWarnings().isEmpty());
+        }
+    }
+
+    @Test
+    void requiredDependenciesAreClassifiedAsMissingWhenDependencyPluginDisabled(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of("algebra-core"),
+            Set.of()
+        ))) {
+            PluginRuntime.LoadedPlugin binomial = runtime.loadedPlugins().stream()
+                .filter(plugin -> plugin.id().equals("binomial-formulas"))
+                .findFirst()
+                .orElseThrow();
+
+            assertEquals("incompatible", binomial.compatibility());
+            assertTrue(binomial.dependencies().stream()
+                .anyMatch(dependency -> dependency.pluginId().equals("algebra-core")
+                    && dependency.status().equals("missing-required")));
+            assertTrue(binomial.compatibilityIssues().stream()
+                .anyMatch(issue -> issue.contains("Missing required dependency: algebra-core")));
+        }
+    }
+
+    @Test
+    void optionalDependenciesAreClassifiedWithoutChangingCompatibility(@TempDir Path tempDir) {
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            tempDir.resolve("rules"),
+            true,
+            Set.of("factorization-pack"),
+            Set.of()
+        ))) {
+            PluginRuntime.LoadedPlugin rational = runtime.loadedPlugins().stream()
+                .filter(plugin -> plugin.id().equals("rational-functions-pack"))
+                .findFirst()
+                .orElseThrow();
+
+            assertTrue(rational.dependencies().stream()
+                .anyMatch(dependency -> dependency.pluginId().equals("factorization-pack")
+                    && dependency.status().equals("missing-optional")));
+            assertFalse(rational.compatibilityIssues().stream()
+                .anyMatch(issue -> issue.contains("factorization-pack")));
         }
     }
 

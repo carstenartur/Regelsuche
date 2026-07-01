@@ -23,7 +23,14 @@ Ein Plugin implementiert `de.regelsuche.plugin.RegelsuchePlugin` und kann mehrer
 - `ParserExtensionRegistry`
 - `ExampleRegistry`
 
-Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/example/BinomialFormulaPlugin.java`.
+Beispielimplementierungen liegen unter `app/src/main/java/de/regelsuche/plugin/example/`:
+
+- `AlgebraPlugin`
+- `BinomialFormulaPlugin`
+- `FactorizationPlugin`
+- `TrigonometryPlugin`
+- `RationalFunctionsPlugin`
+- `DiscoveryOperatorsPlugin`
 
 ## Umsetzungsstand zu Issue 74
 
@@ -49,6 +56,11 @@ Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/exa
 ## Sichtbarkeit und Debugging
 
 - `plugins list` zeigt geladene Plugins
+- Der Plugin-Katalog (`plugins list` und `GET /api/plugins`) zeigt pro Plugin:
+  - Metadaten (`id`, `name`, `version`, `apiVersion`, `minimumCoreVersion`, `capabilities`)
+  - Kompatibilitätsstatus (`compatible`, `incompatible`, `not-checked`) inkl. `compatibilityIssues`
+  - Abhängigkeiten (`dependencies` mit Version-Constraints, optional/required und Status wie `present`, `missing-required`, `missing-optional`, `version-not-checked`)
+  - Vertrauensinformationen (`provenance`, `signaturePresent`, `signatureVerified`, `trustedSource`, `trustWarnings`)
 - `plugins reload` liefert Diff, Diagnosen und Konflikte eines Reloads
 - `plugins status` zeigt Verzeichnis-, Plugin-, Regel- und Konfliktstatus
 - `plugins watch` überwacht `plugins/` und `rules/` mit debounce-basiertem Hot-Reload
@@ -59,6 +71,26 @@ Die Beispielimplementierung liegt in `app/src/main/java/de/regelsuche/plugin/exa
 - `rules debug <ausdruck>` zeigt Regelversuche, Rejektionsgründe und Diagnosen eines Transformationslaufs, inklusive deaktivierter Regeln, Bedingungen und Zyklusrisiken
 - `rules import` kopiert `.regelsuche`/`.rules`-Pakete in das Zielverzeichnis
 - `rules export` schreibt aktive Regeln als `.regelsuche`-Paket heraus
+
+## Paketierung und Distribution
+
+- Externe Plugins werden als JAR-Artefakte über `META-INF/services/de.regelsuche.plugin.RegelsuchePlugin` veröffentlicht.
+- Regelpakete werden als `.regelsuche`/`.rules`-Artefakte veröffentlicht und können mit `rules import`/`rules export` ausgetauscht werden.
+- Versionierung erfolgt pro Plugin über `version()`, `apiVersion()` und `minimumCoreVersion()`.
+
+## Vertrauensmodell
+
+- Classpath-Plugins gelten als bekannte Quelle.
+- Für externe Quellen werden Signatur- und Provenance-Metadaten ausgewertet (`signature()`, `provenance()`), aber nicht kryptografisch verifiziert.
+- `signaturePresent` signalisiert nur vorhandene Signatur-Metadaten; `signatureVerified` bleibt ohne Verifizierer `false`.
+- Externe Plugins bleiben ohne Verifizierer/Allowlist untrusted (`trustedSource=false`).
+- Bei unbekannter oder untrusted externer Herkunft und fehlenden Metadaten erscheinen Warnungen (`MISSING_PROVENANCE`, `MISSING_SIGNATURE_METADATA`, `SIGNATURE_NOT_VERIFIED`, `UNKNOWN_SOURCE`, `UNTRUSTED_EXTERNAL_SOURCE`) im Katalog.
+
+## Community und Autoren-Onboarding
+
+- Der Katalog in `plugins list` und `GET /api/plugins` dient als lokaler Plugin-Index.
+- `docs/plugin-api.md` enthält den Autorenleitfaden inklusive Metadaten, Abhängigkeiten und Service-Registrierung.
+- Die Beispielplugins unter `de.regelsuche.plugin.example` dienen als Templates/Referenzprojekte für Community-Erweiterungen.
 
 ## Aktivierungsprofile
 

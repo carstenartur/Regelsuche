@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -110,7 +111,7 @@ public final class PluginRuntime implements AutoCloseable {
             }
         }
         appendConditionDebugMetadata(discoveredDebugMetadata);
-        loadedPlugins = List.copyOf(discoveredPlugins);
+        loadedPlugins = List.copyOf(enrichCatalogMetadata(discoveredPlugins));
         loadedRuleFiles = List.copyOf(discoveredRuleFiles);
         debugMetadata = List.copyOf(discoveredDebugMetadata);
         diagnostics = List.copyOf(discoveredDiagnostics);
@@ -324,17 +325,17 @@ public final class PluginRuntime implements AutoCloseable {
             for (RegelsuchePlugin plugin : loader) {
                 boolean enabled = !config.disabledPluginIds().contains(plugin.id());
                 if (!enabled) {
-                    discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, false));
+                    discoveredPlugins.add(buildLoadedPlugin(plugin, source, false, "not-checked", List.of()));
                     discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(), "Plugin disabled by configuration"));
                     continue;
                 }
                 List<PluginRuntime.RuntimeDiagnostic> compatibilityIssues = PluginCompatibilityChecker.check(plugin);
                 if (!compatibilityIssues.isEmpty()) {
                     discoveredDiagnostics.addAll(compatibilityIssues);
-                    discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, false));
+                    discoveredPlugins.add(buildLoadedPlugin(plugin, source, false, "incompatible", compatibilityIssues));
                     continue;
                 }
-                discoveredPlugins.add(new LoadedPlugin(plugin.id(), plugin.name(), plugin.version(), source, true));
+                discoveredPlugins.add(buildLoadedPlugin(plugin, source, true, "compatible", List.of()));
                 registerPlugin(plugin, source, discoveredDiagnostics);
             }
         } catch (ServiceConfigurationError error) {
@@ -343,6 +344,175 @@ public final class PluginRuntime implements AutoCloseable {
                 "Failed to instantiate plugin from " + source + ": " + error.getMessage()
             ));
         }
+    }
+
+    private LoadedPlugin buildLoadedPlugin(
+        RegelsuchePlugin plugin,
+        String source,
+        boolean enabled,
+        String compatibility,
+        List<RuntimeDiagnostic> compatibilityIssues
+    ) {
+        List<String> capabilities = plugin.capabilities() == null
+            ? List.of()
+            : plugin.capabilities().stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(capability -> !capability.isBlank())
+                .map(capability -> capability.toLowerCase(Locale.ROOT))
+                .distinct()
+                .sorted()
+                .toList();
+        List<PluginCatalogDependency> dependencies = plugin.dependencies() == null
+            ? List.of()
+            : plugin.dependencies().stream()
+                .filter(java.util.Objects::nonNull)
+                .map(dependency -> new PluginCatalogDependency(
+                    dependency.pluginId(),
+                    dependency.versionConstraint(),
+                    dependency.optional(),
+                    "unknown"
+                ))
+                .sorted(Comparator
+                    .comparing(PluginCatalogDependency::pluginId)
+                    .thenComparing(PluginCatalogDependency::versionConstraint)
+                    .thenComparing(PluginCatalogDependency::optional))
+                .toList();
+        String provenance = plugin.provenance() == null ? "" : plugin.provenance().trim();
+        boolean signaturePresent = plugin.signature() != null && !plugin.signature().isBlank();
+        boolean signatureVerified = false;
+        boolean trustedSource = isTrustedSource(source, signatureVerified);
+        List<String> trustWarnings = buildTrustWarnings(
+            source,
+            signaturePresent,
+            signatureVerified,
+            provenance,
+            trustedSource
+        );
+        List<String> compatibilityMessages = compatibilityIssues.stream()
+            .map(RuntimeDiagnostic::message)
+            .sorted()
+            .toList();
+        return new LoadedPlugin(
+            plugin.id(),
+            plugin.name(),
+            plugin.version(),
+            source,
+            enabled,
+            plugin.apiVersion(),
+            plugin.minimumCoreVersion(),
+            capabilities,
+            dependencies,
+            compatibility,
+            compatibilityMessages,
+            provenance,
+            signaturePresent,
+            signatureVerified,
+            trustedSource,
+            trustWarnings
+        );
+    }
+
+    private List<LoadedPlugin> enrichCatalogMetadata(List<LoadedPlugin> plugins) {
+        Map<String, LoadedPlugin> pluginsById = new LinkedHashMap<>();
+        for (LoadedPlugin plugin : plugins) {
+            pluginsById.put(plugin.id(), plugin);
+        }
+        List<LoadedPlugin> enriched = new ArrayList<>();
+        for (LoadedPlugin plugin : plugins) {
+            List<PluginCatalogDependency> classifiedDependencies = new ArrayList<>();
+            List<String> compatibilityIssues = new ArrayList<>(plugin.compatibilityIssues());
+            String compatibility = plugin.compatibility();
+            for (PluginCatalogDependency dependency : plugin.dependencies()) {
+                LoadedPlugin dependencyPlugin = pluginsById.get(dependency.pluginId());
+                boolean dependencyPresent = dependencyPlugin != null && dependencyPlugin.enabled();
+                String status;
+                if (!dependencyPresent) {
+                    status = dependency.optional() ? "missing-optional" : "missing-required";
+                    if (!dependency.optional()) {
+                        compatibilityIssues.add("Missing required dependency: " + dependency.pluginId()
+                            + " (" + dependency.versionConstraint() + ")");
+                        compatibility = "incompatible";
+                    }
+                } else if (!"any".equals(dependency.versionConstraint())) {
+                    status = "version-not-checked";
+                    if ("compatible".equals(compatibility)) {
+                        compatibility = "not-checked";
+                    }
+                    compatibilityIssues.add("Dependency version not checked: " + dependency.pluginId()
+                        + " (" + dependency.versionConstraint() + ")");
+                } else {
+                    status = "present";
+                }
+                classifiedDependencies.add(new PluginCatalogDependency(
+                    dependency.pluginId(),
+                    dependency.versionConstraint(),
+                    dependency.optional(),
+                    status
+                ));
+            }
+            classifiedDependencies.sort(Comparator
+                .comparing(PluginCatalogDependency::pluginId)
+                .thenComparing(PluginCatalogDependency::versionConstraint)
+                .thenComparing(PluginCatalogDependency::optional));
+            List<String> normalizedCompatibilityIssues = compatibilityIssues.stream()
+                .distinct()
+                .sorted()
+                .toList();
+            List<String> normalizedTrustWarnings = plugin.trustWarnings().stream()
+                .distinct()
+                .sorted()
+                .toList();
+            enriched.add(new LoadedPlugin(
+                plugin.id(),
+                plugin.name(),
+                plugin.version(),
+                plugin.source(),
+                plugin.enabled(),
+                plugin.apiVersion(),
+                plugin.minimumCoreVersion(),
+                plugin.capabilities(),
+                classifiedDependencies,
+                compatibility,
+                normalizedCompatibilityIssues,
+                plugin.provenance(),
+                plugin.signaturePresent(),
+                plugin.signatureVerified(),
+                plugin.trustedSource(),
+                normalizedTrustWarnings
+            ));
+        }
+        return List.copyOf(enriched);
+    }
+
+    private boolean isTrustedSource(String source, boolean signatureVerified) {
+        return "classpath".equals(source) || signatureVerified;
+    }
+
+    private List<String> buildTrustWarnings(
+        String source,
+        boolean signaturePresent,
+        boolean signatureVerified,
+        String provenance,
+        boolean trustedSource
+    ) {
+        if ("classpath".equals(source)) {
+            return List.of();
+        }
+        List<String> warnings = new ArrayList<>();
+        if (provenance.isBlank()) {
+            warnings.add("MISSING_PROVENANCE");
+        }
+        if (!signaturePresent) {
+            warnings.add("MISSING_SIGNATURE_METADATA");
+        } else if (!signatureVerified) {
+            warnings.add("SIGNATURE_NOT_VERIFIED");
+        }
+        warnings.add("UNKNOWN_SOURCE");
+        if (!trustedSource) {
+            warnings.add("UNTRUSTED_EXTERNAL_SOURCE");
+        }
+        return warnings.stream().distinct().sorted().toList();
     }
 
     private void registerPlugin(RegelsuchePlugin plugin, String source, List<RuntimeDiagnostic> discoveredDiagnostics) {
@@ -633,7 +803,30 @@ public final class PluginRuntime implements AutoCloseable {
         }
     }
 
-    public record LoadedPlugin(String id, String name, String version, String source, boolean enabled) {
+    public record LoadedPlugin(
+        String id,
+        String name,
+        String version,
+        String source,
+        boolean enabled,
+        String apiVersion,
+        String minimumCoreVersion,
+        List<String> capabilities,
+        List<PluginCatalogDependency> dependencies,
+        String compatibility,
+        List<String> compatibilityIssues,
+        String provenance,
+        boolean signaturePresent,
+        boolean signatureVerified,
+        boolean trustedSource,
+        List<String> trustWarnings
+    ) {
+        public LoadedPlugin {
+            capabilities = List.copyOf(capabilities);
+            dependencies = List.copyOf(dependencies);
+            compatibilityIssues = List.copyOf(compatibilityIssues);
+            trustWarnings = List.copyOf(trustWarnings);
+        }
     }
 
     public record RuntimeDiagnostic(String source, String message) {
