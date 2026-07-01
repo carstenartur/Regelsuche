@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RationalFunctionsPlugin.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin.example</a> &gt; <span class="el_source">RationalFunctionsPlugin.java</span></div><h1>RationalFunctionsPlugin.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin.example;
+
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.plugin.PluginDependency;
+import de.regelsuche.plugin.RegelsuchePlugin;
+import de.regelsuche.plugin.RuleRegistry;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteKind;
+import java.util.List;
+import java.util.Set;
+
+<span class="fc" id="L13">public final class RationalFunctionsPlugin implements RegelsuchePlugin {</span>
+<span class="fc" id="L14">    private static final PatternExpr A = PatternExpr.var(&quot;A&quot;);</span>
+<span class="fc" id="L15">    private static final PatternExpr B = PatternExpr.var(&quot;B&quot;);</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L19">        return &quot;rational-functions-pack&quot;;</span>
+    }
+
+    @Override
+    public String name() {
+<span class="fc" id="L24">        return &quot;Rational Functions Pack&quot;;</span>
+    }
+
+    @Override
+    public String version() {
+<span class="fc" id="L29">        return &quot;1.0.0&quot;;</span>
+    }
+
+    @Override
+    public String minimumCoreVersion() {
+<span class="fc" id="L34">        return &quot;1.0.0&quot;;</span>
+    }
+
+    @Override
+    public Set&lt;String&gt; capabilities() {
+<span class="fc" id="L39">        return Set.of(&quot;rules&quot;);</span>
+    }
+
+    @Override
+    public List&lt;PluginDependency&gt; dependencies() {
+<span class="fc" id="L44">        return List.of(</span>
+            new PluginDependency(&quot;algebra-core&quot;, &quot;&gt;=1.0.0&quot;, false),
+            new PluginDependency(&quot;factorization-pack&quot;, &quot;&gt;=1.0.0&quot;, true)
+        );
+    }
+
+    @Override
+    public String provenance() {
+<span class="fc" id="L52">        return &quot;https://github.com/carstenartur/Regelsuche/tree/main/app/src/main/java/de/regelsuche/plugin/example&quot;;</span>
+    }
+
+    @Override
+    public void registerRules(RuleRegistry registry) {
+<span class="fc" id="L57">        registry.register(new PatternRewriteRule(</span>
+            &quot;rational_fraction_addition&quot;,
+<span class="fc" id="L59">            PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L60">                PatternExpr.op(BinaryOperator.DIV, A, B),</span>
+<span class="fc" id="L61">                PatternExpr.op(BinaryOperator.DIV, PatternExpr.var(&quot;C&quot;), B)),</span>
+<span class="fc" id="L62">            PatternExpr.op(BinaryOperator.DIV,</span>
+<span class="fc" id="L63">                PatternExpr.op(BinaryOperator.ADD, A, PatternExpr.var(&quot;C&quot;)),</span>
+                B),
+            RewriteKind.NORMALIZE,
+            false,
+            -3,
+            true
+<span class="fc" id="L69">        ), id(), &quot;Bringt Brüche mit gleichem Nenner zusammen.&quot;, List.of(&quot;rational-functions&quot;, &quot;normalize&quot;));</span>
+<span class="fc" id="L70">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

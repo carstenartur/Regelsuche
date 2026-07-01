@@ -16,6 +16,7 @@ import de.regelsuche.plugin.ExplanationRegistry;
 import de.regelsuche.plugin.Heuristic;
 import de.regelsuche.plugin.HeuristicRegistry;
 import de.regelsuche.plugin.MacroRegistry;
+import de.regelsuche.plugin.PluginDependency;
 import de.regelsuche.plugin.ParserExtension;
 import de.regelsuche.plugin.ParserExtensionRegistry;
 import de.regelsuche.plugin.PatternBasedTransformation;
@@ -32,306 +33,339 @@ import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import java.util.List;
+import java.util.Set;
 
-<span class="fc" id="L36">public final class BinomialFormulaPlugin implements RegelsuchePlugin {</span>
-<span class="fc" id="L37">    private static final PatternExpr A = PatternExpr.var(&quot;A&quot;);</span>
-<span class="fc" id="L38">    private static final PatternExpr B = PatternExpr.var(&quot;B&quot;);</span>
+<span class="fc" id="L38">public final class BinomialFormulaPlugin implements RegelsuchePlugin {</span>
+<span class="fc" id="L39">    private static final PatternExpr A = PatternExpr.var(&quot;A&quot;);</span>
+<span class="fc" id="L40">    private static final PatternExpr B = PatternExpr.var(&quot;B&quot;);</span>
 
     @Override
     public String id() {
-<span class="fc" id="L42">        return &quot;binomial-formulas&quot;;</span>
+<span class="fc" id="L44">        return &quot;binomial-formulas&quot;;</span>
     }
 
     @Override
     public String name() {
-<span class="fc" id="L47">        return &quot;Binomial Formulas&quot;;</span>
+<span class="fc" id="L49">        return &quot;Binomial Formulas&quot;;</span>
     }
 
     @Override
     public String version() {
-<span class="fc" id="L52">        return &quot;1.0.0&quot;;</span>
+<span class="fc" id="L54">        return &quot;1.0.0&quot;;</span>
+    }
+
+    @Override
+    public String minimumCoreVersion() {
+<span class="fc" id="L59">        return &quot;1.0.0&quot;;</span>
+    }
+
+    @Override
+    public Set&lt;String&gt; capabilities() {
+<span class="fc" id="L64">        return Set.of(</span>
+            &quot;rules&quot;,
+            &quot;transformations&quot;,
+            &quot;visitors&quot;,
+            &quot;macros&quot;,
+            &quot;search-strategies&quot;,
+            &quot;heuristics&quot;,
+            &quot;cost-functions&quot;,
+            &quot;renderers&quot;,
+            &quot;explanations&quot;,
+            &quot;parser-extensions&quot;,
+            &quot;examples&quot;
+        );
+    }
+
+    @Override
+    public List&lt;PluginDependency&gt; dependencies() {
+<span class="fc" id="L81">        return List.of(new PluginDependency(&quot;algebra-core&quot;, &quot;&gt;=1.0.0&quot;, false));</span>
+    }
+
+    @Override
+    public String provenance() {
+<span class="fc" id="L86">        return &quot;https://github.com/carstenartur/Regelsuche/tree/main/app/src/main/java/de/regelsuche/plugin/example&quot;;</span>
     }
 
     @Override
     public void registerRules(RuleRegistry registry) {
-<span class="fc" id="L57">        registry.register(new PatternRewriteRule(</span>
+<span class="fc" id="L91">        registry.register(new PatternRewriteRule(</span>
             &quot;binomial_difference_of_squares&quot;,
-<span class="fc" id="L59">            PatternExpr.op(BinaryOperator.SUB, PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
-<span class="fc" id="L60">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
-<span class="fc" id="L61">            PatternExpr.op(BinaryOperator.MUL,</span>
-<span class="fc" id="L62">                PatternExpr.op(BinaryOperator.SUB, A, B),</span>
-<span class="fc" id="L63">                PatternExpr.op(BinaryOperator.ADD, A, B)),</span>
+<span class="fc" id="L93">            PatternExpr.op(BinaryOperator.SUB, PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
+<span class="fc" id="L94">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
+<span class="fc" id="L95">            PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L96">                PatternExpr.op(BinaryOperator.SUB, A, B),</span>
+<span class="fc" id="L97">                PatternExpr.op(BinaryOperator.ADD, A, B)),</span>
             RewriteKind.FACTOR,
             false,
             -4,
             true
-<span class="fc" id="L68">        ), id(), &quot;Erkennt die Differenz zweier Quadrate.&quot;, List.of(&quot;binomial&quot;, &quot;factorization&quot;));</span>
-<span class="fc" id="L69">    }</span>
+<span class="fc" id="L102">        ), id(), &quot;Erkennt die Differenz zweier Quadrate.&quot;, List.of(&quot;binomial&quot;, &quot;factorization&quot;));</span>
+<span class="fc" id="L103">    }</span>
 
     @Override
     public void registerTransformations(TransformationRegistry registry) {
-<span class="fc" id="L73">        registry.register(new PatternBasedTransformation(</span>
+<span class="fc" id="L107">        registry.register(new PatternBasedTransformation(</span>
             &quot;binomial_square_forward&quot;,
-<span class="fc" id="L75">            PatternExpr.op(BinaryOperator.POW,</span>
-<span class="fc" id="L76">                PatternExpr.op(BinaryOperator.ADD, A, B),</span>
-<span class="fc" id="L77">                PatternExpr.num(2)),</span>
-<span class="fc" id="L78">            PatternExpr.op(BinaryOperator.ADD,</span>
-<span class="fc" id="L79">                PatternExpr.op(BinaryOperator.ADD,</span>
-<span class="fc" id="L80">                    PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
-<span class="fc" id="L81">                    PatternExpr.op(BinaryOperator.MUL,</span>
-<span class="fc" id="L82">                        PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), A),</span>
+<span class="fc" id="L109">            PatternExpr.op(BinaryOperator.POW,</span>
+<span class="fc" id="L110">                PatternExpr.op(BinaryOperator.ADD, A, B),</span>
+<span class="fc" id="L111">                PatternExpr.num(2)),</span>
+<span class="fc" id="L112">            PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L113">                PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L114">                    PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
+<span class="fc" id="L115">                    PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L116">                        PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), A),</span>
                         B)),
-<span class="fc" id="L84">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
+<span class="fc" id="L118">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
             RewriteKind.EXPAND,
             true,
             4,
             true,
             &quot;Erweitert die erste binomische Formel.&quot;
-<span class="fc" id="L90">        ), id(), &quot;Erweitert (A + B)^2.&quot;, List.of(&quot;binomial&quot;, &quot;expansion&quot;));</span>
-<span class="fc" id="L91">        registry.register(new PatternBasedTransformation(</span>
+<span class="fc" id="L124">        ), id(), &quot;Erweitert (A + B)^2.&quot;, List.of(&quot;binomial&quot;, &quot;expansion&quot;));</span>
+<span class="fc" id="L125">        registry.register(new PatternBasedTransformation(</span>
             &quot;binomial_square_backward&quot;,
-<span class="fc" id="L93">            PatternExpr.op(BinaryOperator.ADD,</span>
-<span class="fc" id="L94">                PatternExpr.op(BinaryOperator.ADD,</span>
-<span class="fc" id="L95">                    PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
-<span class="fc" id="L96">                    PatternExpr.op(BinaryOperator.MUL,</span>
-<span class="fc" id="L97">                        PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), A),</span>
+<span class="fc" id="L127">            PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L128">                PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L129">                    PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
+<span class="fc" id="L130">                    PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L131">                        PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), A),</span>
                         B)),
-<span class="fc" id="L99">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
-<span class="fc" id="L100">            PatternExpr.op(BinaryOperator.POW,</span>
-<span class="fc" id="L101">                PatternExpr.op(BinaryOperator.ADD, A, B),</span>
-<span class="fc" id="L102">                PatternExpr.num(2)),</span>
+<span class="fc" id="L133">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
+<span class="fc" id="L134">            PatternExpr.op(BinaryOperator.POW,</span>
+<span class="fc" id="L135">                PatternExpr.op(BinaryOperator.ADD, A, B),</span>
+<span class="fc" id="L136">                PatternExpr.num(2)),</span>
             RewriteKind.FACTOR,
             false,
             -4,
             true,
             &quot;Faktorisiert die erste binomische Formel.&quot;
-<span class="fc" id="L108">        ), id(), &quot;Faktorisiert A^2 + 2AB + B^2.&quot;, List.of(&quot;binomial&quot;, &quot;factorization&quot;));</span>
-<span class="fc" id="L109">        registry.register(new PatternBasedTransformation(</span>
+<span class="fc" id="L142">        ), id(), &quot;Faktorisiert A^2 + 2AB + B^2.&quot;, List.of(&quot;binomial&quot;, &quot;factorization&quot;));</span>
+<span class="fc" id="L143">        registry.register(new PatternBasedTransformation(</span>
             &quot;binomial_square_minus_forward&quot;,
-<span class="fc" id="L111">            PatternExpr.op(BinaryOperator.POW,</span>
-<span class="fc" id="L112">                PatternExpr.op(BinaryOperator.SUB, A, B),</span>
-<span class="fc" id="L113">                PatternExpr.num(2)),</span>
-<span class="fc" id="L114">            PatternExpr.op(BinaryOperator.ADD,</span>
-<span class="fc" id="L115">                PatternExpr.op(BinaryOperator.SUB,</span>
-<span class="fc" id="L116">                    PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
-<span class="fc" id="L117">                    PatternExpr.op(BinaryOperator.MUL,</span>
-<span class="fc" id="L118">                        PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), A),</span>
+<span class="fc" id="L145">            PatternExpr.op(BinaryOperator.POW,</span>
+<span class="fc" id="L146">                PatternExpr.op(BinaryOperator.SUB, A, B),</span>
+<span class="fc" id="L147">                PatternExpr.num(2)),</span>
+<span class="fc" id="L148">            PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L149">                PatternExpr.op(BinaryOperator.SUB,</span>
+<span class="fc" id="L150">                    PatternExpr.op(BinaryOperator.POW, A, PatternExpr.num(2)),</span>
+<span class="fc" id="L151">                    PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L152">                        PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), A),</span>
                         B)),
-<span class="fc" id="L120">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
+<span class="fc" id="L154">                PatternExpr.op(BinaryOperator.POW, B, PatternExpr.num(2))),</span>
             RewriteKind.EXPAND,
             true,
             4,
             true,
             &quot;Erweitert die zweite binomische Formel.&quot;
-<span class="fc" id="L126">        ), id(), &quot;Erweitert (A - B)^2.&quot;, List.of(&quot;binomial&quot;, &quot;expansion&quot;));</span>
-<span class="fc" id="L127">    }</span>
+<span class="fc" id="L160">        ), id(), &quot;Erweitert (A - B)^2.&quot;, List.of(&quot;binomial&quot;, &quot;expansion&quot;));</span>
+<span class="fc" id="L161">    }</span>
 
     @Override
     public void registerVisitors(AstVisitorRegistry registry) {
-<span class="fc" id="L131">        registry.register(new BinomialPatternVisitor(), id());</span>
-<span class="fc" id="L132">    }</span>
+<span class="fc" id="L165">        registry.register(new BinomialPatternVisitor(), id());</span>
+<span class="fc" id="L166">    }</span>
 
     @Override
     public void registerMacros(MacroRegistry registry) {
-<span class="fc" id="L136">        registry.register(new RuleMacro(</span>
+<span class="fc" id="L170">        registry.register(new RuleMacro(</span>
             &quot;expand_square&quot;,
             &quot;(A + B)^2&quot;,
             &quot;A^2 + 2*A*B + B^2&quot;,
             &quot;Makro für die erste binomische Formel.&quot;,
-<span class="fc" id="L141">            List.of(&quot;binomial&quot;, &quot;macro&quot;)</span>
-<span class="fc" id="L142">        ), id());</span>
-<span class="fc" id="L143">    }</span>
+<span class="fc" id="L175">            List.of(&quot;binomial&quot;, &quot;macro&quot;)</span>
+<span class="fc" id="L176">        ), id());</span>
+<span class="fc" id="L177">    }</span>
 
     @Override
     public void registerSearchStrategies(SearchStrategyRegistry registry) {
-<span class="fc" id="L147">        registry.register(new SearchStrategy() {</span>
+<span class="fc" id="L181">        registry.register(new SearchStrategy() {</span>
             @Override
             public String id() {
-<span class="fc" id="L150">                return &quot;binomial-guided-search&quot;;</span>
+<span class="fc" id="L184">                return &quot;binomial-guided-search&quot;;</span>
             }
 
             @Override
             public String name() {
-<span class="nc" id="L155">                return &quot;Binomial guided search&quot;;</span>
+<span class="nc" id="L189">                return &quot;Binomial guided search&quot;;</span>
             }
 
             @Override
             public String description() {
-<span class="nc" id="L160">                return &quot;Prioritises binomial expansion and factorisation examples.&quot;;</span>
+<span class="nc" id="L194">                return &quot;Prioritises binomial expansion and factorisation examples.&quot;;</span>
             }
 
             @Override
             public List&lt;String&gt; tags() {
-<span class="fc" id="L165">                return List.of(&quot;binomial&quot;, &quot;search&quot;);</span>
+<span class="fc" id="L199">                return List.of(&quot;binomial&quot;, &quot;search&quot;);</span>
             }
-<span class="fc" id="L167">        }, id());</span>
-<span class="fc" id="L168">    }</span>
+<span class="fc" id="L201">        }, id());</span>
+<span class="fc" id="L202">    }</span>
 
     @Override
     public void registerHeuristics(HeuristicRegistry registry) {
-<span class="fc" id="L172">        registry.register(new Heuristic() {</span>
+<span class="fc" id="L206">        registry.register(new Heuristic() {</span>
             @Override
             public String id() {
-<span class="fc" id="L175">                return &quot;binomial-pattern-heuristic&quot;;</span>
+<span class="fc" id="L209">                return &quot;binomial-pattern-heuristic&quot;;</span>
             }
 
             @Override
             public int score(String expression) {
-<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                return expression.contains(&quot;^2&quot;) ? 10 : 0;</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                return expression.contains(&quot;^2&quot;) ? 10 : 0;</span>
             }
 
             @Override
             public List&lt;String&gt; tags() {
-<span class="fc" id="L185">                return List.of(&quot;binomial&quot;, &quot;heuristic&quot;);</span>
+<span class="fc" id="L219">                return List.of(&quot;binomial&quot;, &quot;heuristic&quot;);</span>
             }
-<span class="fc" id="L187">        }, id());</span>
-<span class="fc" id="L188">    }</span>
+<span class="fc" id="L221">        }, id());</span>
+<span class="fc" id="L222">    }</span>
 
     @Override
     public void registerCostFunctions(CostFunctionRegistry registry) {
-<span class="fc" id="L192">        registry.register(new CostFunction() {</span>
+<span class="fc" id="L226">        registry.register(new CostFunction() {</span>
             @Override
             public String id() {
-<span class="fc" id="L195">                return &quot;binomial-cost-delta&quot;;</span>
+<span class="fc" id="L229">                return &quot;binomial-cost-delta&quot;;</span>
             }
 
             @Override
             public int cost(Transformation transformation) {
-<span class="nc" id="L200">                return transformation.estimatedCostDelta();</span>
+<span class="nc" id="L234">                return transformation.estimatedCostDelta();</span>
             }
 
             @Override
             public List&lt;String&gt; tags() {
-<span class="fc" id="L205">                return List.of(&quot;binomial&quot;, &quot;cost&quot;);</span>
+<span class="fc" id="L239">                return List.of(&quot;binomial&quot;, &quot;cost&quot;);</span>
             }
-<span class="fc" id="L207">        }, id());</span>
-<span class="fc" id="L208">    }</span>
+<span class="fc" id="L241">        }, id());</span>
+<span class="fc" id="L242">    }</span>
 
     @Override
     public void registerRenderers(RendererRegistry registry) {
-<span class="fc" id="L212">        registry.register(new Renderer() {</span>
+<span class="fc" id="L246">        registry.register(new Renderer() {</span>
             @Override
             public String id() {
-<span class="fc" id="L215">                return &quot;binomial-text-renderer&quot;;</span>
+<span class="fc" id="L249">                return &quot;binomial-text-renderer&quot;;</span>
             }
 
             @Override
             public boolean supports(String format) {
-<span class="nc" id="L220">                return &quot;text&quot;.equalsIgnoreCase(format);</span>
+<span class="nc" id="L254">                return &quot;text&quot;.equalsIgnoreCase(format);</span>
             }
 
             @Override
             public String render(String expression) {
-<span class="nc" id="L225">                return expression;</span>
+<span class="nc" id="L259">                return expression;</span>
             }
 
             @Override
             public List&lt;String&gt; tags() {
-<span class="fc" id="L230">                return List.of(&quot;binomial&quot;, &quot;renderer&quot;);</span>
+<span class="fc" id="L264">                return List.of(&quot;binomial&quot;, &quot;renderer&quot;);</span>
             }
-<span class="fc" id="L232">        }, id());</span>
-<span class="fc" id="L233">    }</span>
+<span class="fc" id="L266">        }, id());</span>
+<span class="fc" id="L267">    }</span>
 
     @Override
     public void registerExplanations(ExplanationRegistry registry) {
-<span class="fc" id="L237">        registry.register(new ExplanationProvider() {</span>
+<span class="fc" id="L271">        registry.register(new ExplanationProvider() {</span>
             @Override
             public String id() {
-<span class="fc" id="L240">                return &quot;binomial-explanations&quot;;</span>
+<span class="fc" id="L274">                return &quot;binomial-explanations&quot;;</span>
             }
 
             @Override
             public boolean supportsRule(String ruleId) {
-<span class="pc bpc" id="L245" title="3 of 4 branches missed.">                return ruleId.startsWith(&quot;binomial_&quot;) || ruleId.startsWith(&quot;macro.expand_square&quot;);</span>
+<span class="pc bpc" id="L279" title="3 of 4 branches missed.">                return ruleId.startsWith(&quot;binomial_&quot;) || ruleId.startsWith(&quot;macro.expand_square&quot;);</span>
             }
 
             @Override
             public String explain(String ruleId, String expression) {
-<span class="nc" id="L250">                return &quot;Binomial rule '&quot; + ruleId + &quot;' applies to &quot; + expression + &quot;.&quot;;</span>
+<span class="nc" id="L284">                return &quot;Binomial rule '&quot; + ruleId + &quot;' applies to &quot; + expression + &quot;.&quot;;</span>
             }
 
             @Override
             public List&lt;String&gt; tags() {
-<span class="fc" id="L255">                return List.of(&quot;binomial&quot;, &quot;explanation&quot;);</span>
+<span class="fc" id="L289">                return List.of(&quot;binomial&quot;, &quot;explanation&quot;);</span>
             }
-<span class="fc" id="L257">        }, id());</span>
-<span class="fc" id="L258">    }</span>
+<span class="fc" id="L291">        }, id());</span>
+<span class="fc" id="L292">    }</span>
 
     @Override
     public void registerParserExtensions(ParserExtensionRegistry registry) {
-<span class="fc" id="L262">        registry.register(new ParserExtension() {</span>
+<span class="fc" id="L296">        registry.register(new ParserExtension() {</span>
             @Override
             public String id() {
-<span class="fc" id="L265">                return &quot;unicode-square-parser&quot;;</span>
+<span class="fc" id="L299">                return &quot;unicode-square-parser&quot;;</span>
             }
 
             @Override
             public boolean supports(String input) {
-<span class="nc" id="L270">                return input.contains(&quot;²&quot;);</span>
+<span class="nc" id="L304">                return input.contains(&quot;²&quot;);</span>
             }
 
             @Override
             public String normalize(String input) {
-<span class="fc" id="L275">                return input.replace(&quot;²&quot;, &quot;^2&quot;);</span>
+<span class="fc" id="L309">                return input.replace(&quot;²&quot;, &quot;^2&quot;);</span>
             }
 
             @Override
             public List&lt;String&gt; tags() {
-<span class="fc" id="L280">                return List.of(&quot;binomial&quot;, &quot;parser&quot;);</span>
+<span class="fc" id="L314">                return List.of(&quot;binomial&quot;, &quot;parser&quot;);</span>
             }
-<span class="fc" id="L282">        }, id());</span>
-<span class="fc" id="L283">    }</span>
+<span class="fc" id="L316">        }, id());</span>
+<span class="fc" id="L317">    }</span>
 
     @Override
     public void registerExamples(ExampleRegistry registry) {
-<span class="fc" id="L287">        registry.register(new ExamplePackage(</span>
+<span class="fc" id="L321">        registry.register(new ExamplePackage(</span>
             &quot;binomial-examples&quot;,
             &quot;Binomial formula examples&quot;,
-<span class="fc" id="L290">            List.of(</span>
+<span class="fc" id="L324">            List.of(</span>
                 new ExamplePackage.ExampleEntry(&quot;(a+b)^2 expansion&quot;, &quot;(a + b)^2&quot;, &quot;a^2 + 2*a*b + b^2&quot;),
                 new ExamplePackage.ExampleEntry(&quot;difference of squares&quot;, &quot;a^2 - b^2&quot;, &quot;(a - b)*(a + b)&quot;)
             ),
-<span class="fc" id="L294">            List.of(&quot;binomial&quot;, &quot;examples&quot;)</span>
-<span class="fc" id="L295">        ), id());</span>
-<span class="fc" id="L296">    }</span>
+<span class="fc" id="L328">            List.of(&quot;binomial&quot;, &quot;examples&quot;)</span>
+<span class="fc" id="L329">        ), id());</span>
+<span class="fc" id="L330">    }</span>
 
     private static final class BinomialPatternVisitor implements AstVisitorPlugin {
         @Override
         public String id() {
-<span class="fc" id="L301">            return &quot;binomial-pattern-visitor&quot;;</span>
+<span class="fc" id="L335">            return &quot;binomial-pattern-visitor&quot;;</span>
         }
 
         @Override
         public AstVisitorPhase phase() {
-<span class="fc" id="L306">            return AstVisitorPhase.BEFORE_SEARCH;</span>
+<span class="fc" id="L340">            return AstVisitorPhase.BEFORE_SEARCH;</span>
         }
 
         @Override
         public void visit(Expr root, AstVisitorContext context) {
-<span class="fc" id="L311">            inspect(root, context);</span>
-<span class="fc" id="L312">        }</span>
+<span class="fc" id="L345">            inspect(root, context);</span>
+<span class="fc" id="L346">        }</span>
 
         private void inspect(Expr node, AstVisitorContext context) {
-<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (isBinomialSquare(node)) {</span>
-<span class="fc" id="L316">                context.mark(&quot;binomial-square&quot;);</span>
-<span class="fc" id="L317">                context.putMetadata(node, &quot;binomial&quot;, true);</span>
-<span class="fc" id="L318">                context.report(id(), &quot;Detected a binomial square candidate.&quot;);</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            if (isBinomialSquare(node)) {</span>
+<span class="fc" id="L350">                context.mark(&quot;binomial-square&quot;);</span>
+<span class="fc" id="L351">                context.putMetadata(node, &quot;binomial&quot;, true);</span>
+<span class="fc" id="L352">                context.report(id(), &quot;Detected a binomial square candidate.&quot;);</span>
             }
-<span class="fc bfc" id="L320" title="All 2 branches covered.">            if (node instanceof BinaryExpr binaryExpr) {</span>
-<span class="fc" id="L321">                inspect(binaryExpr.left(), context);</span>
-<span class="fc" id="L322">                inspect(binaryExpr.right(), context);</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            if (node instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc" id="L355">                inspect(binaryExpr.left(), context);</span>
+<span class="fc" id="L356">                inspect(binaryExpr.right(), context);</span>
             }
-<span class="fc" id="L324">        }</span>
+<span class="fc" id="L358">        }</span>
 
         private boolean isBinomialSquare(Expr node) {
-<span class="fc bfc" id="L327" title="All 4 branches covered.">            if (!(node instanceof BinaryExpr outer) || outer.operator() != BinaryOperator.POW) {</span>
-<span class="fc" id="L328">                return false;</span>
+<span class="fc bfc" id="L361" title="All 4 branches covered.">            if (!(node instanceof BinaryExpr outer) || outer.operator() != BinaryOperator.POW) {</span>
+<span class="fc" id="L362">                return false;</span>
             }
-<span class="pc bpc" id="L330" title="2 of 4 branches missed.">            if (!(outer.right() instanceof de.regelsuche.ast.NumberExpr exponent) || exponent.value() != 2) {</span>
-<span class="nc" id="L331">                return false;</span>
+<span class="pc bpc" id="L364" title="2 of 4 branches missed.">            if (!(outer.right() instanceof de.regelsuche.ast.NumberExpr exponent) || exponent.value() != 2) {</span>
+<span class="nc" id="L365">                return false;</span>
             }
-<span class="fc bfc" id="L333" title="All 2 branches covered.">            return outer.left() instanceof BinaryExpr inner</span>
-<span class="pc bpc" id="L334" title="3 of 4 branches missed.">                &amp;&amp; (inner.operator() == BinaryOperator.ADD || inner.operator() == BinaryOperator.SUB);</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">            return outer.left() instanceof BinaryExpr inner</span>
+<span class="pc bpc" id="L368" title="3 of 4 branches missed.">                &amp;&amp; (inner.operator() == BinaryOperator.ADD || inner.operator() == BinaryOperator.SUB);</span>
         }
     }
 }

@@ -16,7 +16,7 @@ public record PluginRuntimeConfig(
 <span class="pc bpc" id="L16" title="1 of 2 branches missed.">        rulesDirectory = rulesDirectory == null ? Path.of(&quot;rules&quot;) : rulesDirectory;</span>
 <span class="pc bpc" id="L17" title="1 of 2 branches missed.">        disabledPluginIds = Set.copyOf(disabledPluginIds == null ? Set.of() : disabledPluginIds);</span>
 <span class="pc bpc" id="L18" title="1 of 2 branches missed.">        disabledRuleIds = Set.copyOf(disabledRuleIds == null ? Set.of() : disabledRuleIds);</span>
-<span class="pc bpc" id="L19" title="1 of 4 branches missed.">        activeProfile = activeProfile == null || activeProfile.isBlank() ? null : activeProfile;</span>
+<span class="fc bfc" id="L19" title="All 4 branches covered.">        activeProfile = activeProfile == null || activeProfile.isBlank() ? null : activeProfile;</span>
 <span class="fc" id="L20">    }</span>
 
     public PluginRuntimeConfig(

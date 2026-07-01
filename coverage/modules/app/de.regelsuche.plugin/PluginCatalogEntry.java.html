@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginCatalogEntry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginCatalogEntry.java</span></div><h1>PluginCatalogEntry.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import java.util.List;
+
+public record PluginCatalogEntry(
+    String id,
+    String name,
+    String version,
+    String source,
+    boolean enabled,
+    String apiVersion,
+    String minimumCoreVersion,
+    List&lt;String&gt; capabilities,
+    List&lt;PluginCatalogDependency&gt; dependencies,
+    String compatibility,
+    List&lt;String&gt; compatibilityIssues,
+    String provenance,
+    boolean signaturePresent,
+    boolean signatureVerified,
+    boolean trustedSource,
+    List&lt;String&gt; trustWarnings
+) {
+<span class="fc" id="L23">    public PluginCatalogEntry {</span>
+<span class="fc" id="L24">        capabilities = List.copyOf(capabilities);</span>
+<span class="fc" id="L25">        dependencies = List.copyOf(dependencies);</span>
+<span class="fc" id="L26">        compatibilityIssues = List.copyOf(compatibilityIssues);</span>
+<span class="fc" id="L27">        trustWarnings = List.copyOf(trustWarnings);</span>
+<span class="fc" id="L28">    }</span>
+
+    public static PluginCatalogEntry from(PluginRuntime.LoadedPlugin plugin) {
+<span class="fc" id="L31">        return new PluginCatalogEntry(</span>
+<span class="fc" id="L32">            plugin.id(),</span>
+<span class="fc" id="L33">            plugin.name(),</span>
+<span class="fc" id="L34">            plugin.version(),</span>
+<span class="fc" id="L35">            plugin.source(),</span>
+<span class="fc" id="L36">            plugin.enabled(),</span>
+<span class="fc" id="L37">            plugin.apiVersion(),</span>
+<span class="fc" id="L38">            plugin.minimumCoreVersion(),</span>
+<span class="fc" id="L39">            plugin.capabilities(),</span>
+<span class="fc" id="L40">            plugin.dependencies(),</span>
+<span class="fc" id="L41">            plugin.compatibility(),</span>
+<span class="fc" id="L42">            plugin.compatibilityIssues(),</span>
+<span class="fc" id="L43">            plugin.provenance(),</span>
+<span class="fc" id="L44">            plugin.signaturePresent(),</span>
+<span class="fc" id="L45">            plugin.signatureVerified(),</span>
+<span class="fc" id="L46">            plugin.trustedSource(),</span>
+<span class="fc" id="L47">            plugin.trustWarnings()</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
