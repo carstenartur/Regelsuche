@@ -1,40 +1,266 @@
 - id: rewrite-search
   label: "Rewrite-based term search"
   description: "Searches for rewrite-rule sequences that transform a source expression into a target expression using configurable search strategies (BFS, DFS, A*, beam search)."
-  modules: [regelsuche-search, regelsuche-core, regelsuche-egraph]
+  modules: [regelsuche-search, regelsuche-core, regelsuche-egraph, app]
+  ownerModules: [regelsuche-search]
+  packages:
+    - de.regelsuche.search
+    - de.regelsuche.search.convergence
+    - de.regelsuche.search.estimate
+    - de.regelsuche.search.index
+    - de.regelsuche.search.memory
+    - de.regelsuche.search.strategy
+    - de.regelsuche.scoring
+    - de.regelsuche.scoring.cost
+    - de.regelsuche.moves
+    - de.regelsuche.moves.apply
+    - de.regelsuche.moves.enumerate
+    - de.regelsuche.moves.search
+  typePatterns:
+    - '*Search*'
+    - '*Rewrite*'
+    - '*Strategy*'
+    - '*Move*'
+    - '*Scorer*'
+    - '*RuleIndex*'
+  testPatterns:
+    - '*Search*Test'
+    - '*Strategy*Test'
+    - '*Move*Test'
+    - '*RuleIndex*Test'
+  docPatterns:
+    - docs/search-strategies.md
+    - docs/search-intelligence.md
+    - docs/search-intelligence-roadmap.md
+    - docs/search-space-analytics.md
+    - docs/rewrite-rules.md
+  evidenceTypes:
+    - discovery-evidence
+  jmhPatterns:
+    - app/src/jmh/**/*Benchmark*
+    - app/src/jmh/**/CoreBenchmarks*
   tags: [search, rewriting, term-rewriting]
+
 - id: equality-saturation
   label: "Equality saturation"
   description: "Builds and saturates an e-graph from a set of rewrite rules to explore all equivalent forms of a mathematical expression simultaneously."
   modules: [regelsuche-egraph, regelsuche-core]
+  ownerModules: [regelsuche-egraph]
+  packages:
+    - de.regelsuche.egraph
+  typePatterns:
+    - '*EGraph*'
+    - '*EClass*'
+    - '*Saturation*'
+    - '*ENode*'
+    - '*EGraphPattern*'
+  testPatterns:
+    - '*EGraph*Test'
+    - '*Saturation*Test'
+  docPatterns:
+    - docs/equality-saturation.md
+  evidenceTypes:
+    - discovery-evidence
+  jmhPatterns:
+    - app/src/jmh/**/CoreBenchmarks*
   tags: [egraph, equality-saturation, symbolic]
+
 - id: hypothesis-mining
   label: "Hypothesis and rule-candidate mining"
   description: "Mines candidate rewrite rules from successful transformation paths using anti-unification and pattern generalisation."
-  modules: [regelsuche-learning, regelsuche-core, regelsuche-search]
+  modules: [regelsuche-learning, regelsuche-core, regelsuche-search, app]
+  ownerModules: [regelsuche-learning]
+  packages:
+    - de.regelsuche.mining
+    - de.regelsuche.moves.hypothesis
+  typePatterns:
+    - '*Hypothesis*'
+    - '*Mining*'
+    - '*AntiUnification*'
+    - '*Pattern*'
+    - '*Generaliz*'
+    - '*Generalis*'
+    - '*ParameterIntelligence*'
+  testPatterns:
+    - '*Hypothesis*Test'
+    - '*Mining*Test'
+    - '*Pattern*Test'
+    - '*AntiUnification*Test'
+    - '*ParameterIntelligence*Test'
+  docPatterns:
+    - docs/hypothesis-mining.md
+  evidenceTypes:
+    - hypothesis-evidence
+    - discovery-evidence
   tags: [mining, learning, anti-unification]
+
 - id: counterexample-search
   label: "Counterexample and validation search"
   description: "Validates algebraic identities and candidate rules by searching for numerical or symbolic counterexamples."
   modules: [regelsuche-validation, regelsuche-math-algorithms, regelsuche-math-jas]
+  ownerModules: [regelsuche-validation]
+  packages:
+    - de.regelsuche.validation
+    - de.regelsuche.equivalence
+    - de.regelsuche.math.algorithms.equivalence
+    - de.regelsuche.math.algorithms.numeric
+    - de.regelsuche.math.jas
+  typePatterns:
+    - '*Counterexample*'
+    - '*Validation*'
+    - '*Equivalence*'
+    - '*Oracle*'
+    - '*QualityDashboard*'
+  testPatterns:
+    - '*Counterexample*Test'
+    - '*Validation*Test'
+    - '*Equivalence*Test'
+    - '*Oracle*Test'
+    - '*QualityDashboard*Test'
+  docPatterns:
+    - docs/rule-validation.md
+  evidenceTypes:
+    - validation-evidence
   tags: [validation, counterexample, equivalence]
+
 - id: proof-workflows
   label: "Proof workflow support"
   description: "Supports proof-oriented workflows including critical-pair completion (Knuth-Bendix), Groebner basis reduction and PSLQ-style numerical relation search."
-  modules: [regelsuche-math-algorithms, regelsuche-validation]
+  modules: [regelsuche-math-algorithms, regelsuche-validation, app]
+  ownerModules: [regelsuche-math-algorithms]
+  packages:
+    - de.regelsuche.math.algorithms
+    - de.regelsuche.math.algorithms.completion
+    - de.regelsuche.math.algorithms.cas
+    - de.regelsuche.math.algorithms.registry
+    - de.regelsuche.proof
+  typePatterns:
+    - '*Proof*'
+    - '*KnuthBendix*'
+    - '*Groebner*'
+    - '*Pslq*'
+    - '*Completion*'
+    - '*ProofBridge*'
+    - '*ProofJob*'
+    - '*ProofWorker*'
+  testPatterns:
+    - '*Proof*Test'
+    - '*KnuthBendix*Test'
+    - '*Groebner*Test'
+    - '*Pslq*Test'
+    - '*Completion*Test'
+    - '*ProofBridge*Test'
+  docPatterns:
+    - docs/proof-bridge.md
+    - docs/proof-workbench.md
+    - docs/prover-execution.md
+    - docs/mathematical-algorithms.md
+  evidenceTypes:
+    - proof-evidence
+    - discovery-evidence
   tags: [proof, completion, groebner, pslq]
+
 - id: discovery
   label: "Discovery path tracking"
   description: "Records and replays discovered transformation paths with full reproducibility metadata for scientific benchmarking."
-  modules: [regelsuche-discovery, regelsuche-experiments]
+  modules: [regelsuche-discovery, regelsuche-experiments, regelsuche-benchmarks, app]
+  ownerModules: [regelsuche-discovery]
+  packages:
+    - de.regelsuche.discovery
+    - de.regelsuche.benchmark
+    - de.regelsuche.benchmarks
+    - de.regelsuche.example
+    - de.regelsuche.docs
+  typePatterns:
+    - '*Discovery*'
+    - '*Campaign*'
+    - '*Experiment*'
+    - '*BenchmarkSuite*'
+    - '*BenchmarkCase*'
+    - '*Gallery*'
+    - '*Scenario*'
+  testPatterns:
+    - '*Discovery*Test'
+    - '*Campaign*Test'
+    - '*Benchmark*Test'
+    - '*Gallery*Test'
+    - '*Scenario*Test'
+  docPatterns:
+    - docs/rule-discovery.md
+    - docs/discovery-engine.md
+    - docs/discovery-benchmarks.md
+    - docs/experiment-runner.md
+    - docs/scientific-reproducibility.md
+    - docs/generated/discovery/**
+    - docs/demo-gallery.md
+  evidenceTypes:
+    - discovery-evidence
+  jmhPatterns:
+    - regelsuche-benchmarks/src/**/*Benchmark*
   tags: [discovery, reproducibility, benchmarks]
+
 - id: persistence
   label: "Checkpointable search-job persistence"
   description: "Persists and restores running search jobs via a technology-neutral checkpoint port implemented by JSON in-memory and Hibernate/PostgreSQL adapters."
-  modules: [regelsuche-persistence, regelsuche-persistence-hibernate]
+  modules: [regelsuche-persistence, regelsuche-persistence-hibernate, app]
+  ownerModules: [regelsuche-persistence]
+  packages:
+    - de.regelsuche.persistence
+    - de.regelsuche.checkpoint
+    - de.regelsuche.checkpoints
+  typePatterns:
+    - '*Checkpoint*'
+    - '*Persistence*'
+    - '*Repository*'
+    - '*Store*'
+    - '*Cache*'
+  testPatterns:
+    - '*Persistence*Test'
+    - '*Checkpoint*Test'
+    - '*Repository*Test'
+    - '*Cache*Test'
+  docPatterns:
+    - docs/checkpointing.md
+    - docs/storage-architecture.md
+    - docs/persistence.md
+  evidenceTypes:
+    - persistence-evidence
   tags: [persistence, checkpoint, hibernate, postgresql]
+
 - id: web-workbench
   label: "Web workbench"
   description: "Browser-based workbench for interactive rule editing, search execution, proof review and experiment management exposed via a lightweight HTTP API."
   modules: [app]
+  ownerModules: [app]
+  packages:
+    - de.regelsuche.web
+    - de.regelsuche.cli
+    - de.regelsuche.api
+    - de.regelsuche.api.searchgraph
+    - de.regelsuche.api.searchgraph.semantic
+    - de.regelsuche.plugin
+    - de.regelsuche.plugin.example
+  typePatterns:
+    - '*Workbench*'
+    - '*WebServer*'
+    - '*Api*'
+    - '*Router*'
+    - '*Endpoint*'
+    - '*Resource*'
+    - '*Plugin*'
+  testPatterns:
+    - '*WebWorkbench*Test'
+    - '*Api*Test'
+    - '*E2E*Test'
+    - '*Browser*Test'
+    - '*Security*Test'
+  docPatterns:
+    - docs/web-workbench.md
+    - docs/web-ui-user-guide.md
+    - docs/web-workbench-security.md
+    - docs/job-control.md
+    - docs/plugin-api.md
+    - docs/plugins.md
+  evidenceTypes:
+    - ui-evidence
   tags: [web, ui, rest, workbench]
