@@ -48,7 +48,7 @@ Term rewrite search over algebraic expressions using configurable strategies (BF
 - **Core packages**: `de.regelsuche.search`, `de.regelsuche.scoring`, `de.regelsuche.moves`, `de.regelsuche.moves.search`
 - **Evidence**: `discovery-evidence`
 - **JMH benchmarks**: `app/src/jmh` (`CoreBenchmarks` — rule index and transformation engine hot paths)
-- **Docs**: `docs/search-strategies.md`, `docs/search-intelligence.md`, `docs/rewrite-rules.md`
+- **Docs**: `docs/search-strategies.md`, `docs/search-intelligence.md`, `docs/search-intelligence-roadmap.md`, `docs/search-space-analytics.md`, `docs/rewrite-rules.md`
 
 ### equality-saturation
 
@@ -85,7 +85,7 @@ Proof-oriented workflows: Knuth-Bendix critical-pair completion, Groebner basis 
 - **Owner module**: `regelsuche-math-algorithms`
 - **Core packages**: `de.regelsuche.math.algorithms`, `de.regelsuche.math.algorithms.completion`, `de.regelsuche.proof`
 - **Evidence**: `proof-evidence`, `discovery-evidence`
-- **Docs**: `docs/proof-bridge.md`, `docs/proof-workbench.md`, `docs/mathematical-algorithms.md`
+- **Docs**: `docs/proof-bridge.md`, `docs/proof-workbench.md`, `docs/prover-execution.md`, `docs/mathematical-algorithms.md`
 
 ### discovery
 
@@ -96,7 +96,7 @@ Recording and replay of discovered transformation paths with full reproducibilit
 - **Evidence**: `discovery-evidence`
 - **JMH benchmarks**: `regelsuche-benchmarks/src` (discovery benchmark suite)
 - **Generated evidence**: `docs/generated/discovery/**`, `docs/demo-gallery.md`
-- **Docs**: `docs/rule-discovery.md`, `docs/discovery-engine.md`, `docs/experiment-runner.md`, `docs/scientific-reproducibility.md`
+- **Docs**: `docs/rule-discovery.md`, `docs/discovery-engine.md`, `docs/discovery-benchmarks.md`, `docs/experiment-runner.md`, `docs/scientific-reproducibility.md`
 
 ### persistence
 
@@ -114,7 +114,7 @@ Browser-based workbench for interactive rule editing, search execution, proof re
 - **Owner module**: `app`
 - **Core packages**: `de.regelsuche.web`, `de.regelsuche.cli`, `de.regelsuche.api`, `de.regelsuche.plugin`
 - **Evidence**: `ui-evidence`
-- **Docs**: `docs/web-workbench.md`, `docs/web-ui-user-guide.md`, `docs/job-control.md`, `docs/plugin-api.md`
+- **Docs**: `docs/web-workbench.md`, `docs/web-ui-user-guide.md`, `docs/web-workbench-security.md`, `docs/job-control.md`, `docs/plugin-api.md`, `docs/plugins.md`
 
 ## Evidence type reference
 
