@@ -60,7 +60,7 @@ The extractor is deterministic and does not require external LLM or SaaS calls.
 
 ## CI workflow
 
-The `.github/workflows/ai-knowledge.yml` workflow runs on every change to source files and seed files.
+The `.github/workflows/ai-knowledge.yml` workflow is triggered on changes to Java sources (`**/src/main/java/**`, `**/src/test/java/**`, `**/src/jmh/java/**`), seed files (`ai-knowledge/**`), generated discovery docs (`docs/generated/discovery/**`), build scripts (`**/build.gradle`, `settings.gradle`), and the workflow file itself.
 
 It performs the following checks in order:
 
