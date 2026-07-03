@@ -368,8 +368,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L368">                ? profile.defaultGoal()</span>
 <span class="fc" id="L369">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L370">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="nc" id="L372">            return;</span>
+<span class="fc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="fc" id="L372">            return;</span>
 <span class="fc" id="L373">        }</span>
 <span class="fc" id="L374">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1799,8 +1799,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1799">            default          -&gt; null;</span>
         };
 <span class="fc bfc" id="L1801" title="All 2 branches covered.">        if (body == null) {</span>
-<span class="nc" id="L1802">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
-<span class="nc" id="L1803">            return;</span>
+<span class="fc" id="L1802">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
+<span class="fc" id="L1803">            return;</span>
         }
 <span class="fc" id="L1805">        send(exchange, 200, &quot;text/markdown; charset=utf-8&quot;, body);</span>
 <span class="fc" id="L1806">    }</span>
@@ -2480,8 +2480,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2481">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2482" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="nc" id="L2483">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="nc" id="L2484">            return;</span>
+<span class="fc" id="L2483">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="fc" id="L2484">            return;</span>
         }
 <span class="fc" id="L2486">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
 <span class="fc" id="L2487">        Object raw = body.get(&quot;assumptions&quot;);</span>
