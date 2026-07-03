@@ -49,6 +49,8 @@ claims.json
 ./gradlew publishAiKnowledgeIndex
 ```
 
+`checkAiKnowledgeIndex` evaluates rule-bearing claim seeds from `ai-knowledge/claims.seed.yaml`. Claims marked with `severity: error` fail the build; `warning` claims remain advisory.
+
 `publishAiKnowledgeIndex` copies the generated snapshot to `docs/ai-knowledge/` when a committed documentation snapshot is desired.
 
 The extractor is deterministic and does not require external LLM or SaaS calls.

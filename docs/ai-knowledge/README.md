@@ -19,6 +19,37 @@ Seed files live in `ai-knowledge/` and use the documented plugin seed format:
 
 The extractor also scans project evidence from Regelsuche itself, including generated discovery evidence, Java/JMH sources, Markdown docs, build metadata, dependencies and GitHub workflow metadata when supported by the plugin version.
 
+## Claim seed structure
+
+Regelsuche now uses rule-bearing claim seeds so `checkAiKnowledgeIndex` can evaluate them once the extractor is enabled.
+
+| Field | Purpose |
+|---|---|
+| `scopeModules` | Limits a claim to specific Gradle modules |
+| `forbiddenReferences` | Rejects forbidden import/package references inside scoped modules |
+| `forbiddenDependencies` | Rejects forbidden external dependencies in scoped modules |
+| `allowedTargetModules` | Restricts project-module dependencies to an explicit allow-list |
+| `verifiedBy` | Names existing tests that act as architecture evidence |
+| `requiredTests` | Requires deterministic or boundary test classes to stay present |
+| `requiredEvidenceTypes` | Requires extractor evidence such as `discovery-evidence` |
+| `requiredDocs` | Requires normative documentation paths/globs to exist |
+| `severity` | Marks the claim as `error`, `warning`, or `info` for CI gating |
+
+## Normative Regelsuche claims
+
+The following claims in `ai-knowledge/claims.seed.yaml` are project rules rather than descriptive hints:
+
+| Claim | Severity | Rule style | Notes |
+|---|---|---|---|
+| `no-infrastructure-in-core` | `error` | `scopeModules` + forbidden refs/deps + `verifiedBy` | Core stays free of framework and infrastructure leakage |
+| `search-kernel-clean` | `error` | forbidden refs/deps + `allowedTargetModules` + `verifiedBy` | Search kernel may depend only on core/e-graph |
+| `validation-kernel-clean` | `error` | forbidden refs/deps + `allowedTargetModules` + `verifiedBy` | Validation kernel stays on the core side of the boundary |
+| `persistence-port-clean` | `error` | forbidden refs/deps + `allowedTargetModules` + `verifiedBy` | Persistence port remains driver-free |
+| `hibernate-isolated` | `error` | scoped forbidden refs/deps + `verifiedBy` | Hibernate/JPA stay out of non-adapter library modules |
+| `acyclic-module-graph` | `error` | `verifiedBy` + required docs | Teil-0 module directions remain documented and test-backed |
+| `deterministic-discovery` | `error` | required tests/evidence/docs + `verifiedBy` | Discovery reproducibility must keep evidence and regression tests |
+| `port-interfaces-first` | `warning` | `verifiedBy` + required docs | Advisory design rule until the extractor grows richer API-shape checks |
+
 ## Capability seed structure
 
 Each capability entry in `ai-knowledge/capabilities.seed.yaml` uses the following fields:
