@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class AiKnowledgeClaimsSeedTest {
@@ -24,10 +25,12 @@ class AiKnowledgeClaimsSeedTest {
 
     @Test
     void architectureClaimsUseMachineCheckableRuleFields() throws Exception {
-        Map<String, Map<String, Object>> claimsById = claimsById(readClaims(REPO_ROOT.resolve("ai-knowledge/claims.seed.yaml"), YAML));
+        List<Map<String, Object>> claims = readClaims(REPO_ROOT.resolve("ai-knowledge/claims.seed.yaml"), YAML);
+        Map<String, Map<String, Object>> claimsById = claimsById(claims);
+        List<String> claimIds = claims.stream().map(claim -> String.valueOf(claim.get("id"))).toList();
 
         assertEquals(
-            List.of(
+            Set.of(
                 "no-infrastructure-in-core",
                 "search-kernel-clean",
                 "validation-kernel-clean",
@@ -37,8 +40,9 @@ class AiKnowledgeClaimsSeedTest {
                 "deterministic-discovery",
                 "hibernate-isolated"
             ),
-            List.copyOf(claimsById.keySet())
+            Set.copyOf(claimIds)
         );
+        assertEquals(claimIds.size(), claimsById.size());
 
         claimsById.values().forEach(this::assertHasStructuralRule);
 
@@ -79,6 +83,8 @@ class AiKnowledgeClaimsSeedTest {
         );
         assertTrue(asStringList(claimsById.get("deterministic-discovery").get("requiredTests"))
             .contains("de.regelsuche.docs.DiscoveryCampaignSevenRunnerTest"));
+        assertTrue(asStringList(claimsById.get("deterministic-discovery").get("scopeModules"))
+            .contains("app"));
 
         assertEquals("error", claimsById.get("hibernate-isolated").get("severity"));
         assertFalse(asStringList(claimsById.get("hibernate-isolated").get("scopeModules"))
