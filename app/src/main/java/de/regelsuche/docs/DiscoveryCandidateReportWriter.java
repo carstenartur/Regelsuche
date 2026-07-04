@@ -8,6 +8,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -22,11 +23,19 @@ final class DiscoveryCandidateReportWriter {
     CandidateBundle write(Path outputDirectory, String campaignId, List<PromotionRecord> promotionRecords) {
         try {
             Files.createDirectories(outputDirectory);
+            List<PromotionRecord> records = promotionRecords == null ? List.of() : List.copyOf(promotionRecords);
+            List<NoveltyChecker.NoveltyResult> noveltyResults = new NoveltyChecker().classifyAll(
+                records.stream()
+                    .map(this::toNoveltyCandidate)
+                    .toList()
+            );
+            List<CandidateView> candidates = new ArrayList<>();
+            for (int index = 0; index < records.size(); index++) {
+                candidates.add(new CandidateView(records.get(index), noveltyResults.get(index)));
+            }
             CandidateBundle bundle = new CandidateBundle(
                 campaignId,
-                promotionRecords.stream()
-                    .map(CandidateView::new)
-                    .toList()
+                candidates
             );
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("discovery-candidates.json"),
@@ -53,14 +62,26 @@ final class DiscoveryCandidateReportWriter {
         }
     }
 
+    private NoveltyChecker.Candidate toNoveltyCandidate(PromotionRecord record) {
+        return new NoveltyChecker.Candidate(
+            record.candidateId(),
+            record.family(),
+            record.originalExpression(),
+            record.discoveredStructure(),
+            record.sourceOperator(),
+            record.rulePath()
+        );
+    }
+
     private String renderCandidates(CandidateBundle bundle) {
         StringBuilder out = new StringBuilder("# Discovery candidates\n\n");
-        out.append("| Candidate | Family | Stage | Success | Oracle | Ablation | Source | Pack | Operator |\n");
-        out.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+        out.append("| Candidate | Family | Stage | Novelty | Success | Oracle | Ablation | Source | Pack | Operator |\n");
+        out.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
         for (CandidateView candidate : bundle.candidates()) {
             out.append("| ").append(escape(candidate.id()))
                 .append(" | ").append(escape(candidate.family()))
                 .append(" | ").append(escape(candidate.stage()))
+                .append(" | ").append(escape(candidate.noveltyStatus().toLowerCase(Locale.ROOT)))
                 .append(" | ").append(candidate.success() ? "yes" : "no")
                 .append(" | ").append(escape(candidate.oracleStatus().toLowerCase(Locale.ROOT)))
                 .append(" | ").append(escape(candidate.ablationStatus().toLowerCase(Locale.ROOT)))
@@ -87,6 +108,7 @@ final class DiscoveryCandidateReportWriter {
                 out.append("- ").append(escape(candidate.id()))
                     .append(": investigate operator support for recorded path ")
                     .append(escape(candidate.rulePath().isEmpty() ? "—" : String.join(" -> ", candidate.rulePath())))
+                    .append(" (novelty=").append(escape(candidate.noveltyStatus().toLowerCase(Locale.ROOT))).append(")")
                     .append('\n');
             }
             out.append('\n');
@@ -109,7 +131,9 @@ final class DiscoveryCandidateReportWriter {
             out.append("- ").append(escape(candidate.id()))
                 .append(": ")
                 .append(escape(String.join(" -> ", candidate.rulePath())))
-                .append(" (stage=").append(escape(candidate.stage())).append(")\n");
+                .append(" (stage=").append(escape(candidate.stage()))
+                .append(", novelty=").append(escape(candidate.noveltyStatus().toLowerCase(Locale.ROOT)))
+                .append(")\n");
         }
         return out.toString();
     }
@@ -137,9 +161,12 @@ final class DiscoveryCandidateReportWriter {
         String packId,
         String operatorId,
         List<String> rulePath,
-        String stage
+        String stage,
+        String noveltyStatus,
+        String noveltyMatchedCandidateId,
+        String noveltyReason
     ) {
-        CandidateView(PromotionRecord record) {
+        CandidateView(PromotionRecord record, NoveltyChecker.NoveltyResult novelty) {
             this(
                 record.candidateId(),
                 record.family(),
@@ -149,13 +176,21 @@ final class DiscoveryCandidateReportWriter {
                 record.sourcePack(),
                 record.sourceOperator(),
                 record.rulePath(),
-                record.stage().name().toLowerCase(Locale.ROOT)
+                record.stage().name().toLowerCase(Locale.ROOT),
+                novelty.status().name(),
+                novelty.matchedCandidateId(),
+                novelty.reason()
             );
         }
 
         CandidateView {
             rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
             stage = stage == null ? "observed" : stage;
+            noveltyStatus = noveltyStatus == null || noveltyStatus.isBlank()
+                ? NoveltyStatus.UNKNOWN.name()
+                : noveltyStatus;
+            noveltyMatchedCandidateId = noveltyMatchedCandidateId == null ? "" : noveltyMatchedCandidateId;
+            noveltyReason = noveltyReason == null ? "" : noveltyReason;
         }
 
         boolean success() {
