@@ -2,152 +2,74 @@
 
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
-import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.ast.VariableExpr;
 import java.util.List;
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Value;
 
-/** Optional SymPy-backed discovery oracle adapter with explicit tri-state status. */
-<span class="fc" id="L14">public final class SymPyDiscoveryOracleAdapter {</span>
-<span class="fc" id="L15">    private final ExpressionParser parser = new ExpressionParser();</span>
+/** Infrastructure-free discovery oracle adapter with explicit tri-state status. */
+<span class="fc" id="L8">public final class SymPyDiscoveryOracleAdapter {</span>
+    private static final String CAS_UNAVAILABLE = &quot;python/sympy runtime unavailable&quot;;
+
+<span class="fc" id="L11">    private final ExpressionParser parser = new ExpressionParser();</span>
 
     public OracleResult equivalence(String leftExpression, String rightExpression) {
-<span class="fc" id="L18">        String left = parseForSymPy(leftExpression);</span>
-<span class="fc" id="L19">        String right = parseForSymPy(rightExpression);</span>
-<span class="pc bpc" id="L20" title="2 of 4 branches missed.">        if (left == null || right == null) {</span>
-<span class="nc" id="L21">            return OracleResult.unavailable(&quot;oracle input could not be parsed&quot;);</span>
+<span class="pc bpc" id="L14" title="2 of 4 branches missed.">        if (!canParse(leftExpression) || !canParse(rightExpression)) {</span>
+<span class="nc" id="L15">            return OracleResult.unavailable(&quot;oracle input could not be parsed&quot;);</span>
         }
-<span class="fc" id="L23">        String script = &quot;import sympy as sp\n&quot;</span>
-            + &quot;from sympy.parsing.sympy_parser import parse_expr\n&quot;
-<span class="fc" id="L25">            + &quot;lhs = parse_expr('&quot; + escape(left) + &quot;', evaluate=False)\n&quot;</span>
-<span class="fc" id="L26">            + &quot;rhs = parse_expr('&quot; + escape(right) + &quot;', evaluate=False)\n&quot;</span>
-            + &quot;sp.simplify(lhs-rhs) == 0&quot;;
-<span class="fc" id="L28">        return evaluate(script, &quot;SymPy simplify(lhs-rhs)&quot;);</span>
+<span class="fc" id="L17">        return OracleResult.unavailable(CAS_UNAVAILABLE);</span>
     }
 
     public OracleResult factorCandidate(String expression, String candidateExpression) {
-<span class="fc" id="L32">        String input = parseForSymPy(expression);</span>
-<span class="fc" id="L33">        String candidate = parseForSymPy(candidateExpression);</span>
-<span class="pc bpc" id="L34" title="3 of 4 branches missed.">        if (input == null || candidate == null) {</span>
-<span class="fc" id="L35">            return OracleResult.unavailable(&quot;factor candidate input could not be parsed&quot;);</span>
+<span class="pc bpc" id="L21" title="3 of 4 branches missed.">        if (!canParse(expression) || !canParse(candidateExpression)) {</span>
+<span class="fc" id="L22">            return OracleResult.unavailable(&quot;factor candidate input could not be parsed&quot;);</span>
         }
-<span class="nc" id="L37">        String script = &quot;import sympy as sp\n&quot;</span>
-            + &quot;from sympy.parsing.sympy_parser import parse_expr\n&quot;
-<span class="nc" id="L39">            + &quot;expr = parse_expr('&quot; + escape(input) + &quot;', evaluate=False)\n&quot;</span>
-<span class="nc" id="L40">            + &quot;candidate = parse_expr('&quot; + escape(candidate) + &quot;', evaluate=False)\n&quot;</span>
-            + &quot;sp.simplify(sp.expand(expr) - sp.expand(candidate)) == 0&quot;;
-<span class="nc" id="L42">        return evaluate(script, &quot;SymPy expand equivalence&quot;);</span>
+<span class="nc" id="L24">        return OracleResult.unavailable(CAS_UNAVAILABLE);</span>
     }
 
     public OracleResult groebnerEquivalence(List&lt;String&gt; generators, String polynomialExpression) {
-<span class="pc bpc" id="L46" title="2 of 4 branches missed.">        if (generators == null || generators.isEmpty()) {</span>
-<span class="fc" id="L47">            return OracleResult.unavailable(&quot;no generators provided&quot;);</span>
+<span class="pc bpc" id="L28" title="2 of 4 branches missed.">        if (generators == null || generators.isEmpty()) {</span>
+<span class="fc" id="L29">            return OracleResult.unavailable(&quot;no generators provided&quot;);</span>
         }
-<span class="nc" id="L49">        String polynomial = parseForSymPy(polynomialExpression);</span>
-<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (polynomial == null) {</span>
-<span class="nc" id="L51">            return OracleResult.unavailable(&quot;polynomial input could not be parsed&quot;);</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        if (!canParse(polynomialExpression)) {</span>
+<span class="nc" id="L32">            return OracleResult.unavailable(&quot;polynomial input could not be parsed&quot;);</span>
         }
-<span class="nc" id="L53">        java.util.LinkedHashSet&lt;String&gt; symbols = new java.util.LinkedHashSet&lt;&gt;();</span>
-<span class="nc" id="L54">        StringBuilder generatorList = new StringBuilder();</span>
-<span class="nc bnc" id="L55" title="All 2 branches missed.">        for (int index = 0; index &lt; generators.size(); index++) {</span>
-<span class="nc" id="L56">            String parsed = parseForSymPy(generators.get(index));</span>
-<span class="nc bnc" id="L57" title="All 2 branches missed.">            if (parsed == null) {</span>
-<span class="nc" id="L58">                return OracleResult.unavailable(&quot;generator input could not be parsed&quot;);</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        for (String generator : generators) {</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">            if (!canParse(generator)) {</span>
+<span class="nc" id="L36">                return OracleResult.unavailable(&quot;generator input could not be parsed&quot;);</span>
             }
-<span class="nc bnc" id="L60" title="All 2 branches missed.">            if (index &gt; 0) {</span>
-<span class="nc" id="L61">                generatorList.append(&quot;, &quot;);</span>
-            }
-<span class="nc" id="L63">            generatorList.append(&quot;parse_expr('&quot;).append(escape(parsed)).append(&quot;', evaluate=False)&quot;);</span>
-<span class="nc" id="L64">            symbols.addAll(variablesOf(generators.get(index)));</span>
-        }
-<span class="nc" id="L66">        symbols.addAll(variablesOf(polynomialExpression));</span>
-<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (symbols.isEmpty()) {</span>
-<span class="nc" id="L68">            return OracleResult.unavailable(&quot;no symbols for groebner basis&quot;);</span>
-        }
-<span class="nc" id="L70">        String symbolList = symbols.stream().map(this::escape).collect(java.util.stream.Collectors.joining(&quot; &quot;));</span>
-<span class="nc" id="L71">        String script = &quot;import sympy as sp\n&quot;</span>
-            + &quot;from sympy.parsing.sympy_parser import parse_expr\n&quot;
-            + &quot;gens = sp.symbols('&quot; + symbolList + &quot;')\n&quot;
-            + &quot;if not isinstance(gens, tuple):\n&quot;
-            + &quot;    gens = (gens,)\n&quot;
-            + &quot;G = sp.groebner([&quot; + generatorList + &quot;], *gens)\n&quot;
-<span class="nc" id="L77">            + &quot;poly = parse_expr('&quot; + escape(polynomial) + &quot;', evaluate=False)\n&quot;</span>
-            + &quot;G.reduce(poly)[1] == 0&quot;;
-<span class="nc" id="L79">        return evaluate(script, &quot;SymPy groebner remainder&quot;);</span>
+<span class="nc" id="L38">        }</span>
+<span class="nc" id="L39">        return OracleResult.unavailable(CAS_UNAVAILABLE);</span>
     }
 
-    private OracleResult evaluate(String script, String evidenceLabel) {
-<span class="nc" id="L83">        try (Context context = Context.newBuilder(&quot;python&quot;).build()) {</span>
-<span class="nc" id="L84">            Value value = context.eval(&quot;python&quot;, script);</span>
-<span class="nc" id="L85">            boolean agree = value.asBoolean();</span>
-<span class="nc bnc" id="L86" title="All 2 branches missed.">            return agree</span>
-<span class="nc" id="L87">                ? OracleResult.agree(evidenceLabel + &quot; == 0&quot;)</span>
-<span class="nc" id="L88">                : OracleResult.disagree(evidenceLabel + &quot; != 0&quot;);</span>
-<span class="fc" id="L89">        } catch (RuntimeException | LinkageError ignored) {</span>
-<span class="fc" id="L90">            return OracleResult.unavailable(&quot;python/sympy runtime unavailable&quot;);</span>
-        }
-    }
-
-    private String parseForSymPy(String expression) {
+    private boolean canParse(String expression) {
         try {
-<span class="fc" id="L96">            return ExpressionFormatter.format(parser.parseTerm(expression)).replace(&quot;^&quot;, &quot;**&quot;);</span>
-<span class="fc" id="L97">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L98">            return null;</span>
+<span class="fc" id="L44">            ExpressionFormatter.format(parser.parseTerm(expression));</span>
+<span class="fc" id="L45">            return true;</span>
+<span class="fc" id="L46">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L47">            return false;</span>
         }
     }
 
-    private String escape(String expression) {
-<span class="fc" id="L103">        return expression.replace(&quot;\\&quot;, &quot;\\\\&quot;).replace(&quot;'&quot;, &quot;\\'&quot;);</span>
-    }
-
-    private List&lt;String&gt; variablesOf(String expression) {
-        try {
-<span class="nc" id="L108">            java.util.LinkedHashSet&lt;String&gt; variables = new java.util.LinkedHashSet&lt;&gt;();</span>
-<span class="nc" id="L109">            collectVariables(parser.parseTerm(expression), variables);</span>
-<span class="nc" id="L110">            return List.copyOf(variables);</span>
-<span class="nc" id="L111">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L112">            return List.of();</span>
-        }
-    }
-
-    private void collectVariables(Expr expression, java.util.Set&lt;String&gt; variables) {
-<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (expression instanceof VariableExpr variableExpr) {</span>
-<span class="nc" id="L118">            variables.add(variableExpr.name());</span>
-<span class="nc bnc" id="L119" title="All 2 branches missed.">        } else if (expression instanceof BinaryExpr binaryExpr) {</span>
-<span class="nc" id="L120">            collectVariables(binaryExpr.left(), variables);</span>
-<span class="nc" id="L121">            collectVariables(binaryExpr.right(), variables);</span>
-<span class="nc bnc" id="L122" title="All 2 branches missed.">        } else if (expression instanceof FunctionExpr functionExpr) {</span>
-<span class="nc bnc" id="L123" title="All 2 branches missed.">            for (Expr argument : functionExpr.arguments()) {</span>
-<span class="nc" id="L124">                collectVariables(argument, variables);</span>
-<span class="nc" id="L125">            }</span>
-        }
-<span class="nc" id="L127">    }</span>
-
-<span class="fc" id="L129">    public enum Status {</span>
-<span class="fc" id="L130">        AGREE,</span>
-<span class="fc" id="L131">        DISAGREE,</span>
-<span class="fc" id="L132">        UNAVAILABLE</span>
+<span class="fc" id="L51">    public enum Status {</span>
+<span class="fc" id="L52">        AGREE,</span>
+<span class="fc" id="L53">        DISAGREE,</span>
+<span class="fc" id="L54">        UNAVAILABLE</span>
     }
 
     public record OracleResult(Status status, String evidence) {
-<span class="fc" id="L136">        public OracleResult {</span>
-<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            status = status == null ? Status.UNAVAILABLE : status;</span>
-<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            evidence = evidence == null ? &quot;&quot; : evidence;</span>
-<span class="fc" id="L139">        }</span>
+<span class="fc" id="L58">        public OracleResult {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            status = status == null ? Status.UNAVAILABLE : status;</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            evidence = evidence == null ? &quot;&quot; : evidence;</span>
+<span class="fc" id="L61">        }</span>
 
         public static OracleResult agree(String evidence) {
-<span class="nc" id="L142">            return new OracleResult(Status.AGREE, evidence);</span>
+<span class="nc" id="L64">            return new OracleResult(Status.AGREE, evidence);</span>
         }
 
         public static OracleResult disagree(String evidence) {
-<span class="nc" id="L146">            return new OracleResult(Status.DISAGREE, evidence);</span>
+<span class="nc" id="L68">            return new OracleResult(Status.DISAGREE, evidence);</span>
         }
 
         public static OracleResult unavailable(String evidence) {
-<span class="fc" id="L150">            return new OracleResult(Status.UNAVAILABLE, evidence);</span>
+<span class="fc" id="L72">            return new OracleResult(Status.UNAVAILABLE, evidence);</span>
         }
     }
 }
