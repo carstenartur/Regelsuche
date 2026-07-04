@@ -46,16 +46,16 @@ class AiKnowledgeClaimsSeedTest {
 
         claimsById.values().forEach(this::assertHasStructuralRule);
 
-        assertEquals("warning", claimsById.get("no-infrastructure-in-core").get("severity"));
+        assertEquals("error", claimsById.get("no-infrastructure-in-core").get("severity"));
         assertEquals(List.of(), claimsById.get("no-infrastructure-in-core").get("allowedTargetModules"));
 
-        assertEquals("warning", claimsById.get("search-kernel-clean").get("severity"));
+        assertEquals("error", claimsById.get("search-kernel-clean").get("severity"));
         assertEquals(
             List.of("regelsuche-core", "regelsuche-egraph"),
             claimsById.get("search-kernel-clean").get("allowedTargetModules")
         );
 
-        assertEquals("warning", claimsById.get("validation-kernel-clean").get("severity"));
+        assertEquals("error", claimsById.get("validation-kernel-clean").get("severity"));
         assertEquals(
             List.of("regelsuche-core"),
             claimsById.get("validation-kernel-clean").get("allowedTargetModules")
