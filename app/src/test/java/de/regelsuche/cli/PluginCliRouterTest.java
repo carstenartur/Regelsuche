@@ -1,6 +1,7 @@
 package de.regelsuche.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.export.DefaultTransformationExportService;
@@ -191,6 +192,27 @@ class PluginCliRouterTest {
         assertEquals(0, exit);
         assertTrue(output.toString().contains("Imported"), output::toString);
         assertTrue(Files.exists(targetDir.resolve("trig.rules")));
+    }
+
+    @Test
+    void rulesImportSingleFileRejectsUnsupportedExtension(@TempDir Path tempDir) throws Exception {
+        Path sourceFile = tempDir.resolve("notes.txt");
+        Files.writeString(sourceFile, "not a rule package");
+        Path targetDir = tempDir.resolve("rules");
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        CliRouter router = new CliRouter(
+            new PrintStream(output),
+            new InMemoryExpressionGraphStore(),
+            new InMemoryRuleInventoryRepository(),
+            new DefaultTransformationExportService(),
+            true
+        );
+
+        int exit = router.run(new String[]{"rules", "import", sourceFile.toString(), "--into", targetDir.toString()});
+
+        assertEquals(1, exit);
+        assertTrue(output.toString().contains("Unsupported rule file"), output::toString);
+        assertFalse(Files.exists(targetDir.resolve("notes.txt")));
     }
 
     @Test

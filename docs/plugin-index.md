@@ -8,11 +8,11 @@ Regelpakete. Er dient als Ausgangspunkt für Community-Erweiterungen.
 | ID | Name | Version | Fähigkeiten |
 |----|------|---------|-------------|
 | `algebra-core` | Algebra Core | 1.0.0 | rules, transformations |
-| `factorization-pack` | Factorization | 1.0.0 | rules, transformations |
-| `trigonometry-pack` | Trigonometry | 1.0.0 | rules |
-| `rational-functions-pack` | Rational Functions | 1.0.0 | rules |
-| `discovery-operators-pack` | Discovery Operators | 1.0.0 | rules, transformations, search-strategies, heuristics, examples |
-| `binomial-formulas` | Binomial Formulas | 1.0.0 | rules, transformations, ast-visitors, macros, search-strategies, heuristics, cost-functions, renderers, explanations, parser-extensions, examples |
+| `factorization-pack` | Factorization Pack | 1.0.0 | transformations |
+| `trigonometry-pack` | Trigonometry Pack | 1.0.0 | rules |
+| `rational-functions-pack` | Rational Functions Pack | 1.0.0 | rules |
+| `discovery-operators-pack` | Discovery Operators Pack | 1.0.0 | search-strategies, heuristics, examples |
+| `binomial-formulas` | Binomial Formulas | 1.0.0 | rules, transformations, visitors, macros, search-strategies, heuristics, cost-functions, renderers, explanations, parser-extensions, examples |
 
 Den aktuellen Katalog liefern:
 
@@ -27,7 +27,6 @@ Die folgenden `.regelsuche`-Dateien liegen im Verzeichnis `examples/`:
 
 | Datei | Inhalt |
 |-------|--------|
-| `algebra/basic-algebra.regelsuche` | Grundlegende Algebra-Regeln |
 | `binomial-formulas.regelsuche` | Binomische Formeln |
 | `factorization.regelsuche` | Faktorisierungsregeln |
 | `power-laws.regelsuche` | Potenzgesetze |
