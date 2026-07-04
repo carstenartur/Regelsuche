@@ -114,16 +114,14 @@ final class NoveltyChecker {
     }
 
     private static String exactPairKey(Candidate candidate) {
-        return candidate.family() + "|" + candidate.operatorId() + "|"
-            + normalizeExpression(candidate.inputExpression())
+        return normalizeExpression(candidate.inputExpression())
             + "->"
             + normalizeExpression(candidate.targetExpression());
     }
 
     private static String alphaPairKey(Candidate candidate) {
         Map<String, String> variableMap = new LinkedHashMap<>();
-        return candidate.family() + "|" + candidate.operatorId() + "|"
-            + alphaNormalize(candidate.inputExpression(), variableMap)
+        return alphaNormalize(candidate.inputExpression(), variableMap)
             + "->"
             + alphaNormalize(candidate.targetExpression(), variableMap);
     }
