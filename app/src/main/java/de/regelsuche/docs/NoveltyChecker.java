@@ -1,5 +1,14 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -12,15 +21,18 @@ import java.util.regex.Pattern;
 
 /**
  * Classifies discovery candidates against already seen input/target pairs, alpha-equivalent
- * variants and explicitly known rules. The checker is deliberately syntax-based: it is a
- * conservative gate for reports, not a mathematical oracle.
+ * variants and explicitly known rules. The primary comparison path is AST-based: expressions
+ * are parsed, canonicalized and serialized into structural keys. A lexical fallback exists only
+ * for non-parseable expressions so reporting remains robust.
  */
 final class NoveltyChecker {
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final Set<String> BUILTIN_FUNCTIONS = Set.of(
-        "sin", "cos", "tan", "sec", "csc", "cot", "sqrt", "log", "exp", "abs"
+        "sin", "cos", "tan", "sec", "csc", "cot", "sqrt", "log", "ln", "exp", "abs"
     );
 
+    private final ExpressionParser parser = new ExpressionParser();
+    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final Set<String> knownRuleIds;
     private final List<Candidate> knownCandidates;
 
@@ -63,7 +75,7 @@ final class NoveltyChecker {
                 return new NoveltyResult(
                     NoveltyStatus.DUPLICATE,
                     previousCandidate.id(),
-                    "same normalized input/target pair"
+                    "same AST-normalized input/target pair"
                 );
             }
         }
@@ -75,7 +87,7 @@ final class NoveltyChecker {
                 return new NoveltyResult(
                     NoveltyStatus.ALPHA_EQUIVALENT,
                     previousCandidate.id(),
-                    "same alpha-equivalent input/target pattern"
+                    "same alpha-equivalent AST input/target pattern"
                 );
             }
         }
@@ -113,24 +125,84 @@ final class NoveltyChecker {
             && left.operatorId().equals(right.operatorId());
     }
 
-    private static String exactPairKey(Candidate candidate) {
-        return normalizeExpression(candidate.inputExpression())
+    private String exactPairKey(Candidate candidate) {
+        return exactExpressionKey(candidate.inputExpression())
             + "->"
-            + normalizeExpression(candidate.targetExpression());
+            + exactExpressionKey(candidate.targetExpression());
     }
 
-    private static String alphaPairKey(Candidate candidate) {
+    private String alphaPairKey(Candidate candidate) {
         Map<String, String> variableMap = new LinkedHashMap<>();
-        return alphaNormalize(candidate.inputExpression(), variableMap)
+        return alphaExpressionKey(candidate.inputExpression(), variableMap)
             + "->"
-            + alphaNormalize(candidate.targetExpression(), variableMap);
+            + alphaExpressionKey(candidate.targetExpression(), variableMap);
+    }
+
+    private String exactExpressionKey(String expression) {
+        Expr parsed = parseCanonical(expression);
+        if (parsed == null) {
+            return "raw:" + normalizeExpression(expression);
+        }
+        return astKey(parsed, null);
+    }
+
+    private String alphaExpressionKey(String expression, Map<String, String> variableMap) {
+        Expr parsed = parseCanonical(expression);
+        if (parsed == null) {
+            return "raw:" + alphaNormalizeLexically(expression, variableMap);
+        }
+        return astKey(parsed, variableMap);
+    }
+
+    private Expr parseCanonical(String expression) {
+        try {
+            String canonical = canonicalizer.canonicalize(expression);
+            return parser.parse(new InputRequest(InputType.TERM, canonical)).terms().getFirst();
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private String astKey(Expr expression, Map<String, String> variableMap) {
+        if (expression instanceof BinaryExpr binaryExpr) {
+            return "bin(" + binaryExpr.operator().name()
+                + "," + astKey(binaryExpr.left(), variableMap)
+                + "," + astKey(binaryExpr.right(), variableMap)
+                + ")";
+        }
+        if (expression instanceof FunctionExpr functionExpr) {
+            List<String> argumentKeys = functionExpr.arguments().stream()
+                .map(argument -> astKey(argument, variableMap))
+                .toList();
+            return "fn(" + functionExpr.name().toLowerCase(Locale.ROOT)
+                + "," + String.join(",", argumentKeys)
+                + ")";
+        }
+        if (expression instanceof VariableExpr variableExpr) {
+            String variable = variableExpr.name();
+            if (variableMap != null) {
+                variable = variableMap.computeIfAbsent(variable, ignored -> "v" + variableMap.size());
+            }
+            return "var(" + variable + ")";
+        }
+        if (expression instanceof NumberExpr numberExpr) {
+            return "num(" + formatNumber(numberExpr.value()) + ")";
+        }
+        return "unknown(" + expression + ")";
+    }
+
+    private static String formatNumber(double value) {
+        if (Double.isFinite(value) && Math.rint(value) == value) {
+            return Long.toString((long) value);
+        }
+        return Double.toString(value);
     }
 
     private static String normalizeExpression(String expression) {
         return expression == null ? "" : expression.replaceAll("\\s+", "");
     }
 
-    private static String alphaNormalize(String expression, Map<String, String> variableMap) {
+    private static String alphaNormalizeLexically(String expression, Map<String, String> variableMap) {
         String normalized = normalizeExpression(expression);
         Matcher matcher = IDENTIFIER.matcher(normalized);
         StringBuilder out = new StringBuilder();
