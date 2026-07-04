@@ -70,6 +70,8 @@ class DiscoveryCampaignEightRunnerTest {
         assertTrue(progressMarkdown.contains("discovery-campaign-5"));
         assertTrue(progressMarkdown.contains("discovery-campaign-7"));
         assertTrue(progressMarkdown.contains("discovery-campaign-8"));
+        assertTrue(progressMarkdown.contains("Promotion-ready"), "progress table must use 'Promotion-ready' column header");
+        assertTrue(progressMarkdown.contains("Promotion-ready** means"), "progress table must include definition note");
     }
 
     @Test

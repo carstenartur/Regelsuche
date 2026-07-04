@@ -118,12 +118,12 @@ public final class DiscoveryCampaignEightRunner {
 
     private ProgressSummary summary(String campaignId, List<SummaryInput> results) {
         long successCount = results.stream().filter(SummaryInput::success).count();
-        long validatedCount = results.stream()
+        long promotionReadyCount = results.stream()
             .filter(SummaryInput::success)
             .filter(result -> !"DISAGREE".equals(result.oracleStatus()))
             .filter(result -> "DEGRADED".equals(result.ablationStatus()))
             .count();
-        return new ProgressSummary(campaignId, results.size(), successCount, results.size() - successCount, validatedCount);
+        return new ProgressSummary(campaignId, results.size(), successCount, results.size() - successCount, promotionReadyCount);
     }
 
     private SymPyQaHarness.QaSummary qaSummary(List<CaseResult> results, Path outputDirectory) {
@@ -206,16 +206,17 @@ public final class DiscoveryCampaignEightRunner {
     private String renderProgress(CampaignReport report) {
         StringBuilder out = new StringBuilder();
         out.append("# Discovery campaign progress (campaigns 5, 7, 8)\n\n");
-        out.append("| Campaign | Total | Success | Blocked | Validated |\n");
+        out.append("| Campaign | Total | Success | Blocked | Promotion-ready |\n");
         out.append("| --- | ---: | ---: | ---: | ---: |\n");
         for (ProgressSummary summary : report.progress()) {
             out.append("| ").append(escape(summary.campaignId()))
                 .append(" | ").append(summary.totalCases())
                 .append(" | ").append(summary.successCount())
                 .append(" | ").append(summary.blockedCount())
-                .append(" | ").append(summary.validatedCount())
+                .append(" | ").append(summary.promotionReadyCount())
                 .append(" |\n");
         }
+        out.append("\n> **Promotion-ready** means: success=true, oracleStatus is not DISAGREE, and ablationStatus=DEGRADED.\n");
         return out.toString();
     }
 
@@ -343,7 +344,7 @@ public final class DiscoveryCampaignEightRunner {
         long totalCases,
         long successCount,
         long blockedCount,
-        long validatedCount
+        long promotionReadyCount
     ) {
     }
 
