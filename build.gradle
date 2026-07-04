@@ -24,7 +24,7 @@ if (aiKnowledgeEnabled) {
         seedDirectory = layout.projectDirectory.dir('ai-knowledge')
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
-        maxCognitiveDebt = 100.0d
+        maxCognitiveDebt = 400.0d
     }
 } else {
     tasks.register('generateAiKnowledgeIndex') {

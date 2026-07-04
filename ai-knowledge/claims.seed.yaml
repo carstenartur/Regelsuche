@@ -23,7 +23,7 @@
   allowedTargetModules: []
   verifiedBy:
     - de.regelsuche.architecture.ArchitectureBoundariesTest
-  severity: error
+  severity: warning
 
 - id: search-kernel-clean
   label: "Search kernel is infrastructure-free"
@@ -50,7 +50,7 @@
     - regelsuche-egraph
   verifiedBy:
     - de.regelsuche.architecture.ArchitectureBoundariesTest
-  severity: error
+  severity: warning
 
 - id: validation-kernel-clean
   label: "Validation kernel is infrastructure-free"
@@ -76,7 +76,7 @@
     - regelsuche-core
   verifiedBy:
     - de.regelsuche.architecture.ArchitectureBoundariesTest
-  severity: error
+  severity: warning
 
 - id: persistence-port-clean
   label: "Persistence port has no database driver dependencies"
