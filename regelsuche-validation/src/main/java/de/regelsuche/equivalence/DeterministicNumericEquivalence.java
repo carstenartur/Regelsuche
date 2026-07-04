@@ -61,7 +61,9 @@ final class DeterministicNumericEquivalence {
         if (expression instanceof VariableExpr variableExpr) {
             return variables.getOrDefault(variableExpr.name(), 0.0);
         }
-        BinaryExpr binaryExpr = (BinaryExpr) expression;
+        if (!(expression instanceof BinaryExpr binaryExpr)) {
+            return Double.NaN;
+        }
         double left = evaluate(binaryExpr.left(), variables);
         double right = evaluate(binaryExpr.right(), variables);
         BinaryOperator operator = binaryExpr.operator();
