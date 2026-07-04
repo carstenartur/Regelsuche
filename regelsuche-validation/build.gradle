@@ -15,7 +15,6 @@ java {
 
 dependencies {
     api project(':regelsuche-core')
-    implementation 'org.graalvm.polyglot:polyglot:24.2.1'
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
