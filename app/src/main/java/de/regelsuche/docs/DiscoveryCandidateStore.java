@@ -337,7 +337,7 @@ final class DiscoveryCandidateStore {
         private String targetPattern = "";
         private final List<ConcreteExample> examples = new ArrayList<>();
         private final Set<String> sourceCampaigns = new LinkedHashSet<>();
-        private final Set<String> rulePath = new LinkedHashSet<>();
+        private List<String> rulePath = List.of();
         private String operatorId = "";
         private String packId = "";
         private final Set<String> assumptions = new LinkedHashSet<>();
@@ -360,7 +360,10 @@ final class DiscoveryCandidateStore {
             if (operatorId.isBlank()) operatorId = record.sourceOperator();
             if (packId.isBlank()) packId = record.sourcePack();
             sourceCampaigns.add(record.sourceCampaign());
-            rulePath.addAll(record.rulePath());
+            List<String> recordRulePath = record.rulePath();
+            if (recordRulePath != null && recordRulePath.size() > rulePath.size()) {
+                rulePath = List.copyOf(recordRulePath);
+            }
             assumptions.addAll(record.assumptions());
             oracleStatuses.add(record.oracleStatus());
             ablationStatuses.add(record.ablationStatus());
@@ -399,7 +402,7 @@ final class DiscoveryCandidateStore {
                 targetPattern,
                 examples,
                 List.copyOf(sourceCampaigns),
-                List.copyOf(rulePath),
+                rulePath,
                 operatorId,
                 packId,
                 List.copyOf(assumptions),
@@ -415,11 +418,8 @@ final class DiscoveryCandidateStore {
         }
 
         private CandidateLifecycleStatus mergeLifecycle(CandidateLifecycleStatus left, CandidateLifecycleStatus right) {
-            if (left == CandidateLifecycleStatus.REJECTED) {
-                return right == CandidateLifecycleStatus.REJECTED ? CandidateLifecycleStatus.REJECTED : right;
-            }
-            if (right == CandidateLifecycleStatus.REJECTED) {
-                return left;
+            if (left == CandidateLifecycleStatus.REJECTED || right == CandidateLifecycleStatus.REJECTED) {
+                return CandidateLifecycleStatus.REJECTED;
             }
             return left.ordinal() >= right.ordinal() ? left : right;
         }

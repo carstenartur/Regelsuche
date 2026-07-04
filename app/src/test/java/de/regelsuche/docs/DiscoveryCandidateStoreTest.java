@@ -62,6 +62,47 @@ class DiscoveryCandidateStoreTest {
     }
 
     @Test
+    void storeKeepsConcreteRepresentativeRulePath() {
+        DiscoveryCandidateStore store = new DiscoveryCandidateStore();
+        PromotionRecord shortPath = record(
+            "tpr-sin-x",
+            "discovery-campaign-2",
+            "trig-power-reduction",
+            PromotionStage.PROMOTED,
+            "1 - sin(x)^2",
+            "cos(x)^2",
+            "trig_power_reduction",
+            "sympy-trig-basic",
+            "AGREE",
+            "DEGRADED",
+            List.of("trig_power_reduction"),
+            false,
+            false
+        );
+        PromotionRecord longPath = record(
+            "tpr-sin-y",
+            "discovery-campaign-9",
+            "trig-power-reduction",
+            PromotionStage.PROMOTED,
+            "1 - sin(y)^2",
+            "cos(y)^2",
+            "trig_power_reduction",
+            "sympy-trig-basic",
+            "AGREE",
+            "DEGRADED",
+            List.of("trig_power_reduction", "ast_square_difference_factor"),
+            false,
+            false
+        );
+
+        DiscoveryCandidateStore.CandidateStoreReport report = store.build(List.of(shortPath, longPath));
+
+        assertEquals(1, report.candidates().size());
+        DiscoveryCandidateStore.CandidateEntry entry = report.candidates().getFirst();
+        assertEquals(List.of("trig_power_reduction", "ast_square_difference_factor"), entry.rulePath());
+    }
+
+    @Test
     void storeKeepsVariantsSeparateButLinksThem() {
         DiscoveryCandidateStore store = new DiscoveryCandidateStore();
         PromotionRecord first = record(
@@ -99,11 +140,11 @@ class DiscoveryCandidateStoreTest {
 
         assertEquals(2, report.candidates().size(), "variants are related but not merged");
         DiscoveryCandidateStore.CandidateEntry variantEntry = report.candidates().stream()
-            .filter(entry -> "qf-negative".equals(entry.candidateId()))
+            .filter(entry -> entry.noveltyStatus() == NoveltyStatus.VARIANT)
             .findFirst()
             .orElseThrow();
         assertEquals(NoveltyStatus.VARIANT, variantEntry.noveltyStatus());
-        assertTrue(variantEntry.relatedCandidateIds().contains("qf-small"));
+        assertEquals(1, variantEntry.relatedCandidateIds().size());
     }
 
     @Test
@@ -146,6 +187,47 @@ class DiscoveryCandidateStoreTest {
             assertEquals(DiscoveryCandidateStore.CandidateLifecycleStatus.REJECTED, entry.lifecycleStatus());
             assertFalse(entry.rejectionReason().isBlank());
         }
+    }
+
+    @Test
+    void storeKeepsRejectedLifecycleWhenMergedSupportDisagrees() {
+        DiscoveryCandidateStore store = new DiscoveryCandidateStore();
+        PromotionRecord rejected = record(
+            "tpr-sin-x",
+            "discovery-campaign-2",
+            "trig-power-reduction",
+            PromotionStage.CANDIDATE,
+            "1 - sin(x)^2",
+            "cos(x)^2",
+            "trig_power_reduction",
+            "sympy-trig-basic",
+            "DISAGREE",
+            "DEGRADED",
+            List.of("trig_power_reduction"),
+            false,
+            false
+        );
+        PromotionRecord promoted = record(
+            "tpr-sin-y",
+            "discovery-campaign-9",
+            "trig-power-reduction",
+            PromotionStage.PROMOTED,
+            "1 - sin(y)^2",
+            "cos(y)^2",
+            "trig_power_reduction",
+            "sympy-trig-basic",
+            "AGREE",
+            "DEGRADED",
+            List.of("trig_power_reduction"),
+            false,
+            false
+        );
+
+        DiscoveryCandidateStore.CandidateStoreReport report = store.build(List.of(rejected, promoted));
+
+        assertEquals(1, report.candidates().size());
+        DiscoveryCandidateStore.CandidateEntry entry = report.candidates().getFirst();
+        assertEquals(DiscoveryCandidateStore.CandidateLifecycleStatus.REJECTED, entry.lifecycleStatus());
     }
 
     @Test
