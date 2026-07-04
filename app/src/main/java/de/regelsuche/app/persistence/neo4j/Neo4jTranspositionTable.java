@@ -1,5 +1,7 @@
-package de.regelsuche.search.memory;
+package de.regelsuche.app.persistence.neo4j;
 
+import de.regelsuche.search.memory.TranspositionEntry;
+import de.regelsuche.search.memory.TranspositionTable;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,11 +20,6 @@ import org.neo4j.driver.Value;
 /**
  * Neo4j-backed {@link TranspositionTable} used by the optional Full Mode
  * ({@link de.regelsuche.persistence.GraphPersistenceMode#REMOTE_NEO4J}).
- *
- * <p>Mirrors the {@link de.regelsuche.graph.Neo4jExpressionGraphStore}
- * Driver/Session pattern: opens a single {@link Driver} for the lifetime of
- * the table and uses a short-lived {@link Session} per query. Nodes are
- * labelled {@code TranspositionEntry} and keyed by {@code canonicalHash}.</p>
  */
 public final class Neo4jTranspositionTable implements TranspositionTable, AutoCloseable {
 

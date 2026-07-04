@@ -1,5 +1,6 @@
 package de.regelsuche.persistence;
 
+import de.regelsuche.app.persistence.neo4j.Neo4jTranspositionTable;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.graph.Neo4jExpressionGraphStore;
@@ -10,7 +11,6 @@ import de.regelsuche.persistence.relational.PersistenceAdapterFactory;
 import de.regelsuche.persistence.relational.RelationalPersistenceAdapters;
 import de.regelsuche.search.memory.InMemoryTranspositionTable;
 import de.regelsuche.search.memory.JsonFileTranspositionTable;
-import de.regelsuche.search.memory.Neo4jTranspositionTable;
 import de.regelsuche.search.memory.TranspositionTable;
 import java.io.PrintStream;
 import java.util.Optional;

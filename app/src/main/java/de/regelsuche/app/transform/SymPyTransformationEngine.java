@@ -1,8 +1,11 @@
-package de.regelsuche.transform;
+package de.regelsuche.app.transform;
 
 import de.regelsuche.ast.Expr;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,10 +34,10 @@ public class SymPyTransformationEngine implements TransformationEngine {
             return List.of();
         }
         String escaped = toSymPyPowerSyntax(normalizedInput).replace("\\", "\\\\").replace("'", "\\'");
-        String script = "import sympy as sp\\n"
-            + "from sympy.parsing.sympy_parser import parse_expr\\n"
-            + "expr = parse_expr('" + escaped + "', evaluate=False)\\n"
-            + "results = [str(sp.simplify(expr)), str(sp.expand(expr)), str(sp.factor(expr))]\\n"
+        String script = "import sympy as sp\n"
+            + "from sympy.parsing.sympy_parser import parse_expr\n"
+            + "expr = parse_expr('" + escaped + "', evaluate=False)\n"
+            + "results = [str(sp.simplify(expr)), str(sp.expand(expr)), str(sp.factor(expr))]\n"
             + "results";
 
         try (Context context = Context.newBuilder("python").build()) {

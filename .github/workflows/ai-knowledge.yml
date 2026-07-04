@@ -81,6 +81,113 @@ jobs:
           cat build/ai-knowledge/extractor.err
           test "$status" = "0"
 
+      - name: Check AI knowledge index
+        working-directory: Regelsuche
+        env:
+          AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
+        run: |
+          mkdir -p build/ai-knowledge
+          set +e
+          ./gradlew --no-daemon --no-configuration-cache --stacktrace checkAiKnowledgeIndex > build/ai-knowledge/check.out 2> build/ai-knowledge/check.err
+          status=$?
+          echo "$status" > build/ai-knowledge/check.exit
+          cat build/ai-knowledge/check.out
+          cat build/ai-knowledge/check.err
+          test "$status" = "0"
+
+      - name: Validate artifact file presence
+        working-directory: Regelsuche
+        run: |
+          python3 - <<'PY'
+          import sys
+          from pathlib import Path
+
+          ai_dir = Path('build/ai-knowledge')
+          required = [
+              'index.json',
+              'modules.json',
+              'classes.json',
+              'tests.json',
+              'docs.json',
+              'dependencies.json',
+              'capabilities.json',
+              'claims.json',
+              'evidence.json',
+              'review-context.md',
+              'context-packs/index.json',
+          ]
+          missing = [f for f in required if not (ai_dir / f).exists()]
+          if missing:
+              print('Missing required ai-knowledge-index artifacts:')
+              for f in missing:
+                  print(f'  - {f}')
+              sys.exit(1)
+          print('All required ai-knowledge-index artifacts are present.')
+          PY
+
+      - name: Validate artifact quality
+        working-directory: Regelsuche
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          ai_dir = Path('build/ai-knowledge')
+          warnings = []
+          errors = []
+
+          # Check evidence.json contains useful entries
+          evidence_path = ai_dir / 'evidence.json'
+          try:
+              raw = json.loads(evidence_path.read_text(encoding='utf-8'))
+              evidence_list = raw if isinstance(raw, list) else raw.get('evidence', [])
+              if not evidence_list:
+                  errors.append('evidence.json is empty — no discovery evidence generated')
+              else:
+                  types = {str(e.get('type', '')) for e in evidence_list if isinstance(e, dict)}
+                  sources = ' '.join(str(e.get('source', '')) for e in evidence_list if isinstance(e, dict)).lower()
+                  if 'discovery-evidence' not in types:
+                      warnings.append('evidence.json does not contain discovery-evidence entries')
+                  if not any(kw in sources for kw in ('jmh', 'benchmark', 'bench')):
+                      warnings.append('evidence.json may lack JMH benchmark source evidence')
+                  if not any(kw in sources for kw in ('workflow', '.github', 'ci')):
+                      warnings.append('evidence.json may lack GitHub workflow evidence')
+          except Exception as exc:
+              errors.append(f'Failed to parse evidence.json: {exc}')
+
+          # Check review-context.md is readable (non-trivial content)
+          review_context_path = ai_dir / 'review-context.md'
+          try:
+              content = review_context_path.read_text(encoding='utf-8').strip()
+              if len(content) < 200:
+                  warnings.append(
+                      f'review-context.md is very short ({len(content)} chars) — may not be useful without raw JSON'
+                  )
+          except Exception as exc:
+              errors.append(f'Failed to read review-context.md: {exc}')
+
+          # Check context-packs exist for major Regelsuche capabilities
+          packs_index_path = ai_dir / 'context-packs' / 'index.json'
+          try:
+              packs_index = json.loads(packs_index_path.read_text(encoding='utf-8'))
+              pack_ids = [str(p.get('id', '')) for p in packs_index] if isinstance(packs_index, list) else []
+              major_caps = ['rewrite-search', 'discovery', 'web-workbench']
+              for cap in major_caps:
+                  if not any(cap in pid for pid in pack_ids):
+                      warnings.append(f'No context pack found for major capability: {cap}')
+          except Exception as exc:
+              errors.append(f'Failed to parse context-packs/index.json: {exc}')
+
+          for w in warnings:
+              print(f'WARNING: {w}')
+          if errors:
+              for e in errors:
+                  print(f'ERROR: {e}')
+              sys.exit(1)
+          print('AI knowledge artifact quality check passed.')
+          PY
+
       - name: Upload AI knowledge artifacts
         if: always()
         uses: actions/upload-artifact@v7
@@ -88,11 +195,26 @@ jobs:
           name: ai-knowledge-index
           path: Regelsuche/build/ai-knowledge/**
 
+      - name: Upload AI knowledge review reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ai-knowledge-review-reports
+          path: |
+            Regelsuche/build/ai-knowledge/review-context.md
+            Regelsuche/build/ai-knowledge/context-packs/**
+            Regelsuche/build/ai-knowledge/check.out
+            Regelsuche/build/ai-knowledge/check.err
+
       - name: Summary
         if: always()
         run: |
           echo '### AI knowledge artifacts' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo 'Generated artifacts are uploaded as the `ai-knowledge-index` workflow artifact.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Review reports (review-context.md, context-packs, check logs) are uploaded as `ai-knowledge-review-reports`.' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           find Regelsuche/build/ai-knowledge -maxdepth 1 -type f -printf '- `%f`\n' | sort >> "$GITHUB_STEP_SUMMARY" || true
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          check_exit="$(cat Regelsuche/build/ai-knowledge/check.exit 2>/dev/null || echo 'n/a')"
+          echo "**checkAiKnowledgeIndex exit code**: \`${check_exit}\`" >> "$GITHUB_STEP_SUMMARY"

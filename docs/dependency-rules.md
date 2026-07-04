@@ -64,14 +64,16 @@ Der mathematische Kern (`:regelsuche-core`) bleibt frei von Infrastruktur-Detail
 - keine Neo4j-spezifischen Klassen,
 - keine GraalVM/SymPy-Adapter.
 
-`SymPyTransformationEngine` bleibt deshalb als Adapter in `:app`, während die
-reinen `TransformationEngine`-/Rewrite-Typen in `:regelsuche-core` liegen.
+`SymPyTransformationEngine` bleibt deshalb als App-Adapter unter
+`de.regelsuche.app.transform`, während die reinen `TransformationEngine`-/Rewrite-Typen
+in `:regelsuche-core` liegen.
 
 ## Search-Regel
 
 `:regelsuche-search` enthält Strategien, Profile, CostModels und die
 `TranspositionTable`-Abstraktion. Technische Speicheradapter (`JsonFileTranspositionTable`,
-`Neo4jTranspositionTable`) bleiben in `:app` bzw. später in `:regelsuche-persistence`.
+`Neo4jTranspositionTable`) bleiben in `:app` bzw. später in `:regelsuche-persistence`;
+der Neo4j-Adapter liegt aktuell unter `de.regelsuche.app.persistence.neo4j`.
 
 ## Persistence-Regel
 

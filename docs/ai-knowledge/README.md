@@ -8,7 +8,11 @@ The canonical generated artifacts are produced under `build/ai-knowledge/` by:
 ./gradlew generateAiKnowledgeIndex analyzeAiComplexity optimizeAiKnowledge benchmarkAiKnowledge
 ```
 
-In CI, `.github/workflows/ai-knowledge.yml` checks out `carstenartur/ai-knowledge-extractor` next to this repository, runs the extractor via the existing composite-build configuration, and uploads `build/ai-knowledge/**` as the `ai-knowledge-index` workflow artifact.
+In CI, `.github/workflows/ai-knowledge.yml` checks out `carstenartur/ai-knowledge-extractor` next to this repository and runs the extractor via the existing composite-build configuration.
+It then runs `checkAiKnowledgeIndex`, failing the build for any claim with `severity: error`.
+After the check, it validates that all required artifact files are present and uploads `build/ai-knowledge/**` as the `ai-knowledge-index` workflow artifact.
+A separate `ai-knowledge-review-reports` artifact contains `review-context.md`, the context packs, and check logs for human review.
+See `docs/ai-knowledge.md` for the full CI workflow description.
 
 `publishAiKnowledgeIndex` can additionally copy generated files into this directory for manual review. Bulk JSON snapshots are ignored by default to avoid noisy diffs; promote selected snapshots deliberately when they are meant to become documentation.
 
