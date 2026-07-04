@@ -8,11 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -31,10 +31,20 @@ class DiscoveryCampaignEightRunnerTest {
             assertTrue(ids.add(result.id()), "duplicate campaign 8 id: " + result.id());
         }
 
-        Set<String> existingPairs = existingInputTargetPairs();
-        for (DiscoveryCampaignEightRunner.CaseResult result : report.results()) {
-            String pair = pair(result.inputExpression(), result.targetExpression());
-            assertFalse(existingPairs.contains(pair), "duplicate pair from prior campaigns: " + pair);
+        List<NoveltyChecker.Candidate> priorCandidates = priorCampaignCandidates();
+        List<NoveltyChecker.Candidate> allCandidates = new ArrayList<>(priorCandidates);
+        report.results().stream().map(this::candidate).forEach(allCandidates::add);
+        List<NoveltyChecker.NoveltyResult> noveltyResults = new NoveltyChecker().classifyAll(allCandidates);
+
+        for (NoveltyChecker.NoveltyResult result : noveltyResults.subList(priorCandidates.size(), noveltyResults.size())) {
+            assertFalse(result.status() == NoveltyStatus.DUPLICATE,
+                "campaign 8 must not repeat a prior normalized input/target pair: " + result);
+            assertFalse(result.status() == NoveltyStatus.ALPHA_EQUIVALENT,
+                "campaign 8 must not add alpha-equivalent duplicates: " + result);
+            assertFalse(result.status() == NoveltyStatus.KNOWN_RULE,
+                "campaign 8 must not be classified as a known-rule-only candidate: " + result);
+            assertFalse(result.status() == NoveltyStatus.UNKNOWN,
+                "campaign 8 candidates must have enough novelty input data: " + result);
         }
     }
 
@@ -112,6 +122,7 @@ class DiscoveryCampaignEightRunnerTest {
         assertTrue(candidatesMarkdown.contains("| Candidate |"), "must have Candidate column");
         assertTrue(candidatesMarkdown.contains("| Family |"), "must have Family column");
         assertTrue(candidatesMarkdown.contains("| Stage |"), "must have Stage column");
+        assertTrue(candidatesMarkdown.contains("| Novelty |"), "must have Novelty column");
         assertTrue(candidatesMarkdown.contains("| Oracle |"), "must have Oracle column");
         assertTrue(candidatesMarkdown.contains("| Ablation |"), "must have Ablation column");
         assertTrue(candidatesMarkdown.contains("| Source |"), "must have Source column");
@@ -131,30 +142,48 @@ class DiscoveryCampaignEightRunnerTest {
         assertTrue(families.size() >= 2, "campaign 8 must cover at least 2 distinct families, found: " + families);
     }
 
-    private Set<String> existingInputTargetPairs() {
-        Set<String> pairs = new HashSet<>();
-        collectPairs(pairs, new DiscoveryCampaignOneRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        collectPairs(pairs, new DiscoveryCampaignTwoRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        collectPairs(pairs, new DiscoveryCampaignThreeRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        collectPairs(pairs, new DiscoveryCampaignFiveRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        collectPairs(pairs, new DiscoveryCampaignSevenRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        return pairs;
+    private List<NoveltyChecker.Candidate> priorCampaignCandidates() {
+        List<NoveltyChecker.Candidate> candidates = new ArrayList<>();
+        new DiscoveryCampaignOneRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
+        new DiscoveryCampaignTwoRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
+        new DiscoveryCampaignThreeRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
+        new DiscoveryCampaignFiveRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
+        new DiscoveryCampaignSevenRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
+        return candidates;
     }
 
-    private void collectPairs(Set<String> pairs, Stream<String> values) {
-        values.forEach(pairs::add);
+    private NoveltyChecker.Candidate candidate(DiscoveryCampaignOneRunner.CaseResult result) {
+        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
     }
 
-    private String pair(String left, String right) {
-        return normalizeWhitespace(left) + " -> " + normalizeWhitespace(right);
+    private NoveltyChecker.Candidate candidate(DiscoveryCampaignTwoRunner.CaseResult result) {
+        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
     }
 
-    private String normalizeWhitespace(String expression) {
-        return expression == null ? "" : expression.replaceAll("\\s+", "");
+    private NoveltyChecker.Candidate candidate(DiscoveryCampaignThreeRunner.CaseResult result) {
+        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
+    }
+
+    private NoveltyChecker.Candidate candidate(DiscoveryCampaignFiveRunner.CaseResult result) {
+        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
+    }
+
+    private NoveltyChecker.Candidate candidate(DiscoveryCampaignSevenRunner.CaseResult result) {
+        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
+    }
+
+    private NoveltyChecker.Candidate candidate(DiscoveryCampaignEightRunner.CaseResult result) {
+        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
+    }
+
+    private NoveltyChecker.Candidate candidate(
+        String id,
+        String family,
+        String input,
+        String target,
+        String operator,
+        List<String> rulePath
+    ) {
+        return new NoveltyChecker.Candidate(id, family, input, target, operator, rulePath);
     }
 }
