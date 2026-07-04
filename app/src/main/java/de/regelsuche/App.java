@@ -1,5 +1,6 @@
 package de.regelsuche;
 
+import de.regelsuche.app.transform.SymPyTransformationEngine;
 import de.regelsuche.cli.CliRouter;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.GraphSnapshot;
@@ -11,7 +12,6 @@ import de.regelsuche.notify.ConsoleNotifier;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.SimplificationSuccess;
 import de.regelsuche.search.TransformationSearchService;
-import de.regelsuche.transform.SymPyTransformationEngine;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
