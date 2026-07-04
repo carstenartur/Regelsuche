@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NoveltyChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">NoveltyChecker.java</span></div><h1>NoveltyChecker.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Classifies discovery candidates against already seen input/target pairs, alpha-equivalent
+ * variants and explicitly known rules. The primary comparison path is AST-based: expressions
+ * are parsed, canonicalized and serialized into structural keys. A lexical fallback exists only
+ * for non-parseable expressions so reporting remains robust.
+ */
+final class NoveltyChecker {
+<span class="fc" id="L29">    private static final Pattern IDENTIFIER = Pattern.compile(&quot;[A-Za-z_][A-Za-z0-9_]*&quot;);</span>
+
+<span class="fc" id="L31">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L32">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+    private final Set&lt;String&gt; knownRuleIds;
+    private final List&lt;Candidate&gt; knownCandidates;
+
+    NoveltyChecker() {
+<span class="fc" id="L37">        this(Set.of(), List.of());</span>
+<span class="fc" id="L38">    }</span>
+
+<span class="fc" id="L40">    NoveltyChecker(Set&lt;String&gt; knownRuleIds, List&lt;Candidate&gt; knownCandidates) {</span>
+<span class="fc" id="L41">        this.knownRuleIds = normalizeSet(knownRuleIds);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        this.knownCandidates = knownCandidates == null ? List.of() : List.copyOf(knownCandidates);</span>
+<span class="fc" id="L43">    }</span>
+
+    List&lt;NoveltyResult&gt; classifyAll(List&lt;Candidate&gt; candidates) {
+<span class="fc" id="L46">        List&lt;Candidate&gt; seen = new ArrayList&lt;&gt;(knownCandidates);</span>
+<span class="fc" id="L47">        List&lt;NoveltyResult&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        for (Candidate candidate : candidates == null ? List.&lt;Candidate&gt;of() : candidates) {</span>
+<span class="fc" id="L49">            NoveltyResult result = classify(candidate, seen);</span>
+<span class="fc" id="L50">            results.add(result);</span>
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">            if (candidate != null &amp;&amp; result.status() != NoveltyStatus.UNKNOWN) {</span>
+<span class="fc" id="L52">                seen.add(candidate);</span>
+            }
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">        return List.copyOf(results);</span>
+    }
+
+    NoveltyResult classify(Candidate candidate, List&lt;Candidate&gt; previousCandidates) {
+<span class="pc bpc" id="L59" title="3 of 6 branches missed.">        if (candidate == null || candidate.inputExpression().isBlank() || candidate.targetExpression().isBlank()) {</span>
+<span class="nc" id="L60">            return new NoveltyResult(NoveltyStatus.UNKNOWN, &quot;&quot;, &quot;missing input or target expression&quot;);</span>
+        }
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (usesKnownRule(candidate)) {</span>
+<span class="fc" id="L63">            return new NoveltyResult(NoveltyStatus.KNOWN_RULE, &quot;&quot;, &quot;candidate path already uses a known rule id&quot;);</span>
+        }
+
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        List&lt;Candidate&gt; previous = previousCandidates == null ? List.of() : previousCandidates;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (Candidate previousCandidate : previous) {</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (previousCandidate == null) {</span>
+<span class="nc" id="L69">                continue;</span>
+            }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (exactPairKey(candidate).equals(exactPairKey(previousCandidate))) {</span>
+<span class="fc" id="L72">                return new NoveltyResult(</span>
+                    NoveltyStatus.DUPLICATE,
+<span class="fc" id="L74">                    previousCandidate.id(),</span>
+                    &quot;same AST-normalized input/target pair&quot;
+                );
+            }
+<span class="fc" id="L78">        }</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (Candidate previousCandidate : previous) {</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            if (previousCandidate == null) {</span>
+<span class="nc" id="L81">                continue;</span>
+            }
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (alphaPairKey(candidate).equals(alphaPairKey(previousCandidate))) {</span>
+<span class="fc" id="L84">                return new NoveltyResult(</span>
+                    NoveltyStatus.ALPHA_EQUIVALENT,
+<span class="fc" id="L86">                    previousCandidate.id(),</span>
+                    &quot;same alpha-equivalent AST input/target pattern&quot;
+                );
+            }
+<span class="fc" id="L90">        }</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (Candidate previousCandidate : previous) {</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (previousCandidate == null) {</span>
+<span class="nc" id="L93">                continue;</span>
+            }
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (sameFamilyAndOperator(candidate, previousCandidate)) {</span>
+<span class="fc" id="L96">                return new NoveltyResult(</span>
+                    NoveltyStatus.VARIANT,
+<span class="fc" id="L98">                    previousCandidate.id(),</span>
+                    &quot;same family/operator with a different structural pattern&quot;
+                );
+            }
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        return new NoveltyResult(NoveltyStatus.NEW, &quot;&quot;, &quot;new family/operator pattern&quot;);</span>
+    }
+
+    private boolean usesKnownRule(Candidate candidate) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (knownRuleIds.isEmpty()) {</span>
+<span class="fc" id="L108">            return false;</span>
+        }
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        for (String ruleId : candidate.rulePath()) {</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (knownRuleIds.contains(normalizeToken(ruleId))) {</span>
+<span class="fc" id="L112">                return true;</span>
+            }
+<span class="nc" id="L114">        }</span>
+<span class="nc" id="L115">        return false;</span>
+    }
+
+    private boolean sameFamilyAndOperator(Candidate left, Candidate right) {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        return !left.family().isBlank()</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            &amp;&amp; left.family().equals(right.family())</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            &amp;&amp; !left.operatorId().isBlank()</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            &amp;&amp; left.operatorId().equals(right.operatorId());</span>
+    }
+
+    private String exactPairKey(Candidate candidate) {
+<span class="fc" id="L126">        return exactExpressionKey(candidate.inputExpression())</span>
+            + &quot;-&gt;&quot;
+<span class="fc" id="L128">            + exactExpressionKey(candidate.targetExpression());</span>
+    }
+
+    private String alphaPairKey(Candidate candidate) {
+<span class="fc" id="L132">        Map&lt;String, String&gt; variableMap = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L133">        return alphaExpressionKey(candidate.inputExpression(), variableMap)</span>
+            + &quot;-&gt;&quot;
+<span class="fc" id="L135">            + alphaExpressionKey(candidate.targetExpression(), variableMap);</span>
+    }
+
+    private String exactExpressionKey(String expression) {
+<span class="fc" id="L139">        Expr parsed = parseCanonical(expression);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (parsed == null) {</span>
+<span class="nc" id="L141">            return &quot;raw:&quot; + normalizeExpression(expression);</span>
+        }
+<span class="fc" id="L143">        return astKey(parsed, null);</span>
+    }
+
+    private String alphaExpressionKey(String expression, Map&lt;String, String&gt; variableMap) {
+<span class="fc" id="L147">        Expr parsed = parseCanonical(expression);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (parsed == null) {</span>
+<span class="nc" id="L149">            return &quot;raw:&quot; + alphaNormalizeLexically(expression, variableMap);</span>
+        }
+<span class="fc" id="L151">        return astKey(parsed, variableMap);</span>
+    }
+
+    private Expr parseCanonical(String expression) {
+        try {
+<span class="fc" id="L156">            String canonical = canonicalizer.canonicalize(expression);</span>
+<span class="fc" id="L157">            return parser.parse(new InputRequest(InputType.TERM, canonical)).terms().getFirst();</span>
+<span class="nc" id="L158">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L159">            return null;</span>
+        }
+    }
+
+    private String astKey(Expr expression, Map&lt;String, String&gt; variableMap) {
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc" id="L165">            return &quot;bin(&quot; + binaryExpr.operator().name()</span>
+<span class="fc" id="L166">                + &quot;,&quot; + astKey(binaryExpr.left(), variableMap)</span>
+<span class="fc" id="L167">                + &quot;,&quot; + astKey(binaryExpr.right(), variableMap)</span>
+                + &quot;)&quot;;
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="fc" id="L171">            List&lt;String&gt; argumentKeys = functionExpr.arguments().stream()</span>
+<span class="fc" id="L172">                .map(argument -&gt; astKey(argument, variableMap))</span>
+<span class="fc" id="L173">                .toList();</span>
+<span class="fc" id="L174">            return &quot;fn(&quot; + functionExpr.name().toLowerCase(Locale.ROOT)</span>
+<span class="fc" id="L175">                + &quot;,&quot; + String.join(&quot;,&quot;, argumentKeys)</span>
+                + &quot;)&quot;;
+        }
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
+<span class="fc" id="L179">            String variable = variableExpr.name();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (variableMap != null) {</span>
+<span class="fc" id="L181">                variable = variableMap.computeIfAbsent(variable, ignored -&gt; &quot;v&quot; + variableMap.size());</span>
+            }
+<span class="fc" id="L183">            return &quot;var(&quot; + variable + &quot;)&quot;;</span>
+        }
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr numberExpr) {</span>
+<span class="fc" id="L186">            return &quot;num(&quot; + formatNumber(numberExpr.value()) + &quot;)&quot;;</span>
+        }
+<span class="nc" id="L188">        return &quot;unknown(&quot; + expression + &quot;)&quot;;</span>
+    }
+
+    private static String formatNumber(double value) {
+<span class="pc bpc" id="L192" title="2 of 4 branches missed.">        if (Double.isFinite(value) &amp;&amp; Math.rint(value) == value) {</span>
+<span class="fc" id="L193">            return Long.toString((long) value);</span>
+        }
+<span class="nc" id="L195">        return Double.toString(value);</span>
+    }
+
+    private static String normalizeExpression(String expression) {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+    }
+
+    private static String alphaNormalizeLexically(String expression, Map&lt;String, String&gt; variableMap) {
+<span class="nc" id="L203">        String normalized = normalizeExpression(expression);</span>
+<span class="nc" id="L204">        Matcher matcher = IDENTIFIER.matcher(normalized);</span>
+<span class="nc" id="L205">        StringBuilder out = new StringBuilder();</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L207">            String identifier = matcher.group();</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            String replacement = isFunctionCall(normalized, matcher.end())</span>
+<span class="nc" id="L209">                ? identifier.toLowerCase(Locale.ROOT)</span>
+<span class="nc" id="L210">                : variableMap.computeIfAbsent(identifier, ignored -&gt; &quot;v&quot; + variableMap.size());</span>
+<span class="nc" id="L211">            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));</span>
+<span class="nc" id="L212">        }</span>
+<span class="nc" id="L213">        matcher.appendTail(out);</span>
+<span class="nc" id="L214">        return out.toString();</span>
+    }
+
+    private static boolean isFunctionCall(String expression, int endIndex) {
+<span class="nc bnc" id="L218" title="All 4 branches missed.">        return endIndex &lt; expression.length() &amp;&amp; expression.charAt(endIndex) == '(';</span>
+    }
+
+    private static Set&lt;String&gt; normalizeSet(Set&lt;String&gt; values) {
+<span class="fc" id="L222">        LinkedHashSet&lt;String&gt; normalized = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L223" title="1 of 4 branches missed.">        for (String value : values == null ? Set.&lt;String&gt;of() : values) {</span>
+<span class="fc" id="L224">            String token = normalizeToken(value);</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (!token.isBlank()) {</span>
+<span class="fc" id="L226">                normalized.add(token);</span>
+            }
+<span class="fc" id="L228">        }</span>
+<span class="fc" id="L229">        return Set.copyOf(normalized);</span>
+    }
+
+    private static String normalizeToken(String value) {
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim().toLowerCase(Locale.ROOT);</span>
+    }
+
+    record Candidate(
+        String id,
+        String family,
+        String inputExpression,
+        String targetExpression,
+        String operatorId,
+        List&lt;String&gt; rulePath
+    ) {
+<span class="fc" id="L244">        Candidate {</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            id = id == null ? &quot;&quot; : id;</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            family = family == null ? &quot;&quot; : family;</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="fc" id="L251">        }</span>
+    }
+
+    record NoveltyResult(NoveltyStatus status, String matchedCandidateId, String reason) {
+<span class="fc" id="L255">        NoveltyResult {</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            status = status == null ? NoveltyStatus.UNKNOWN : status;</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            matchedCandidateId = matchedCandidateId == null ? &quot;&quot; : matchedCandidateId;</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
+<span class="fc" id="L259">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
