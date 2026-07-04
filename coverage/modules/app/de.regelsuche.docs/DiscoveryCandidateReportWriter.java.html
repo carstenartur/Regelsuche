@@ -101,9 +101,9 @@ import java.util.stream.Collectors;
 <span class="fc bfc" id="L101" title="All 2 branches covered.">            .filter(candidate -&gt; candidate.rulePath().size() &gt;= 2</span>
 <span class="fc bfc" id="L102" title="All 2 branches covered.">                || &quot;substitution&quot;.equals(candidate.family()))</span>
 <span class="fc" id="L103">            .toList();</span>
-<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (macroCandidates.isEmpty()) {</span>
-<span class="nc" id="L105">            out.append(&quot;- none\n&quot;);</span>
-<span class="nc" id="L106">            return out.toString();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (macroCandidates.isEmpty()) {</span>
+<span class="fc" id="L105">            out.append(&quot;- none\n&quot;);</span>
+<span class="fc" id="L106">            return out.toString();</span>
         }
 <span class="fc bfc" id="L108" title="All 2 branches covered.">        for (CandidateView candidate : macroCandidates) {</span>
 <span class="fc" id="L109">            out.append(&quot;- &quot;).append(escape(candidate.id()))</span>

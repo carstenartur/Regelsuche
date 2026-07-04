@@ -368,8 +368,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L368">                ? profile.defaultGoal()</span>
 <span class="fc" id="L369">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L370">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="nc" id="L372">            return;</span>
+<span class="fc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="fc" id="L372">            return;</span>
 <span class="fc" id="L373">        }</span>
 <span class="fc" id="L374">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1398,8 +1398,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L1399">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc bfc" id="L1400" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="fc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
-<span class="fc" id="L1402">            return;</span>
+<span class="nc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
+<span class="nc" id="L1402">            return;</span>
         }
 <span class="fc" id="L1404">        String selectedPathKey = queryParam(exchange, &quot;selectedPathKey&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1405">        de.regelsuche.ide.RuleInspectionDto dto =</span>
@@ -1738,8 +1738,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1738">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1739">            .findFirst();</span>
 <span class="fc bfc" id="L1740" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="nc" id="L1741">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="nc" id="L1742">            return;</span>
+<span class="fc" id="L1741">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="fc" id="L1742">            return;</span>
         }
 <span class="fc" id="L1744">        var derivation = match.get();</span>
 <span class="fc" id="L1745">        JsonWriter writer = new JsonWriter();</span>
@@ -2452,8 +2452,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2453">            return;</span>
         }
-<span class="nc" id="L2455">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="nc" id="L2456">    }</span>
+<span class="fc" id="L2455">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="fc" id="L2456">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2459">        var jobs = proofWorkbenchService.listJobs();</span>
