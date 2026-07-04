@@ -27,9 +27,6 @@ import java.util.regex.Pattern;
  */
 final class NoveltyChecker {
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    private static final Set<String> BUILTIN_FUNCTIONS = Set.of(
-        "sin", "cos", "tan", "sec", "csc", "cot", "sqrt", "log", "ln", "exp", "abs"
-    );
 
     private final ExpressionParser parser = new ExpressionParser();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
@@ -208,7 +205,7 @@ final class NoveltyChecker {
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
             String identifier = matcher.group();
-            String replacement = isBuiltinFunction(normalized, matcher.end(), identifier)
+            String replacement = isFunctionCall(normalized, matcher.end())
                 ? identifier.toLowerCase(Locale.ROOT)
                 : variableMap.computeIfAbsent(identifier, ignored -> "v" + variableMap.size());
             matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
@@ -217,10 +214,7 @@ final class NoveltyChecker {
         return out.toString();
     }
 
-    private static boolean isBuiltinFunction(String expression, int endIndex, String identifier) {
-        if (!BUILTIN_FUNCTIONS.contains(identifier.toLowerCase(Locale.ROOT))) {
-            return false;
-        }
+    private static boolean isFunctionCall(String expression, int endIndex) {
         return endIndex < expression.length() && expression.charAt(endIndex) == '(';
     }
 

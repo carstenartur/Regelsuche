@@ -111,6 +111,30 @@ class NoveltyCheckerTest {
         assertEquals(NoveltyStatus.KNOWN_RULE, result.status());
     }
 
+    @Test
+    void differentFunctionSymbolsAreNotAlphaEquivalent() {
+        NoveltyChecker.Candidate lnCandidate = candidate(
+            "ln-x",
+            "log-rule",
+            "ln(x)",
+            "log(x)",
+            "log_identity",
+            List.of()
+        );
+        NoveltyChecker.Candidate fooCandidate = candidate(
+            "foo-y",
+            "log-rule",
+            "foo(y)",
+            "bar(y)",
+            "log_identity",
+            List.of()
+        );
+
+        NoveltyChecker.NoveltyResult result = checker.classify(fooCandidate, List.of(lnCandidate));
+
+        assertEquals(NoveltyStatus.VARIANT, result.status());
+    }
+
     private NoveltyChecker.Candidate candidate(
         String id,
         String family,
