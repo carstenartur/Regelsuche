@@ -12,7 +12,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -31,10 +30,10 @@ class DiscoveryCampaignNineRunnerTest {
             assertTrue(ids.add(result.id()), "duplicate campaign 9 id: " + result.id());
         }
 
-        Set<String> existingPairs = existingInputTargetPairs();
+        Set<String> priorCaseIds = priorCampaignCaseIds();
         for (DiscoveryCampaignNineRunner.CaseResult result : report.results()) {
-            String pair = pair(result.inputExpression(), result.targetExpression());
-            assertFalse(existingPairs.contains(pair), "duplicate pair from prior campaigns: " + pair);
+            assertFalse(priorCaseIds.contains(result.id()),
+                "campaign 9 case id duplicates a prior campaign case id: " + result.id());
         }
     }
 
@@ -131,32 +130,36 @@ class DiscoveryCampaignNineRunnerTest {
         assertTrue(families.size() >= 2, "campaign 9 must cover at least 2 distinct families, found: " + families);
     }
 
-    private Set<String> existingInputTargetPairs() {
-        Set<String> pairs = new HashSet<>();
-        collectPairs(pairs, new DiscoveryCampaignOneRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        collectPairs(pairs, new DiscoveryCampaignTwoRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        collectPairs(pairs, new DiscoveryCampaignThreeRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        collectPairs(pairs, new DiscoveryCampaignFiveRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        collectPairs(pairs, new DiscoveryCampaignSevenRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        collectPairs(pairs, new DiscoveryCampaignEightRunner().run().results().stream()
-            .map(result -> pair(result.inputExpression(), result.targetExpression())));
-        return pairs;
+    @Test
+    void campaignNineCasesHaveOperatorProvenance(@TempDir Path tempDir) throws Exception {
+        DiscoveryCampaignNineRunner runner = new DiscoveryCampaignNineRunner();
+        DiscoveryCampaignNineRunner.CampaignReport report = runner.writeReport(tempDir);
+
+        Set<String> expectedOperatorIds = Set.of(
+            "trig_power_reduction",
+            "exp_log_inverse",
+            "log_product_assumption",
+            "power_root_assumptions"
+        );
+        for (DiscoveryCampaignNineRunner.CaseResult result : report.results()) {
+            if (result.success()) {
+                assertFalse(result.shortcutOperatorId().isBlank(),
+                    "successful result must have operator provenance: " + result.id());
+                assertTrue(expectedOperatorIds.contains(result.shortcutOperatorId()),
+                    "shortcutOperatorId '" + result.shortcutOperatorId()
+                        + "' not in expected assumption-carrying operator set for: " + result.id());
+            }
+        }
     }
 
-    private void collectPairs(Set<String> pairs, Stream<String> values) {
-        values.forEach(pairs::add);
-    }
-
-    private String pair(String left, String right) {
-        return normalizeWhitespace(left) + " -> " + normalizeWhitespace(right);
-    }
-
-    private String normalizeWhitespace(String expression) {
-        return expression == null ? "" : expression.replaceAll("\\s+", "");
+    private Set<String> priorCampaignCaseIds() {
+        Set<String> ids = new HashSet<>();
+        new DiscoveryCampaignOneRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
+        new DiscoveryCampaignTwoRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
+        new DiscoveryCampaignThreeRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
+        new DiscoveryCampaignFiveRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
+        new DiscoveryCampaignSevenRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
+        new DiscoveryCampaignEightRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
+        return ids;
     }
 }

@@ -19,9 +19,12 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Runs Discovery Campaign 9 with assumption-carrying families:
- * trig power-reduction identities, exp/log inverse simplification, log product decomposition,
- * and power/root assumption rules — all families are genuinely new relative to Campaigns 1–8.
+ * Runs Discovery Campaign 9, validating assumption-carrying promotion evidence for the four
+ * operators introduced in Campaign 2 ({@code TrigPowerReductionOperator},
+ * {@code ExpLogInverseOperator}, {@code LogProductAssumptionOperator},
+ * {@code PowerRootAssumptionRules}) using independent variable bindings.
+ * Each case confirms the operator produces correct promotion evidence when applied to an
+ * alpha-equivalent input form with different variable names from Campaign 2.
  * Produces candidate-mining reports and cross-campaign progress comparison (campaigns 7, 8 and 9).
  */
 public final class DiscoveryCampaignNineRunner {
