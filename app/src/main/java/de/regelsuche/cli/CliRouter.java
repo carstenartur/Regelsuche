@@ -596,10 +596,7 @@ public class CliRouter {
                 try (var stream = Files.list(source)) {
                     List<Path> files = stream
                         .filter(Files::isRegularFile)
-                        .filter(path -> {
-                            String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
-                            return name.endsWith(".regelsuche") || name.endsWith(".rules");
-                        })
+                        .filter(this::isImportableRuleFile)
                         .toList();
                     if (files.isEmpty()) {
                         out.println("No rule files found in: " + source);
@@ -612,6 +609,11 @@ public class CliRouter {
                     }
                 }
             } else if (Files.isRegularFile(source)) {
+                if (!isImportableRuleFile(source)) {
+                    out.println("Unsupported rule file: " + source.getFileName()
+                        + " (expected .regelsuche or .rules)");
+                    return 1;
+                }
                 Path target = targetDir.resolve(source.getFileName());
                 Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
                 out.println("Imported " + source.getFileName() + " -> " + target);
@@ -624,6 +626,11 @@ public class CliRouter {
             out.println("Import failed: " + ex.getMessage());
             return 2;
         }
+    }
+
+    private boolean isImportableRuleFile(Path path) {
+        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".regelsuche") || name.endsWith(".rules");
     }
 
     private int runRulesExport(Path rulesDir, Path outputDir, String profile) {
