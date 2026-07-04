@@ -194,7 +194,7 @@ public final class DiscoveryCampaignNineRunner {
             .filter(edge -> edge.tags().contains("selected-path"))
             .toList();
         return selected.stream()
-            .filter(edge -> !campaignCase.expectedRuleId().isBlank() && edge.ruleId().equals(campaignCase.expectedRuleId()))
+            .filter(edge -> !campaignCase.expectedRuleId().isBlank() && campaignCase.expectedRuleId().equals(edge.ruleId()))
             .findFirst()
             .or(() -> selected.stream()
                 .filter(edge -> campaignCase.operatorIds().contains(edge.operatorId()))
@@ -230,7 +230,7 @@ public final class DiscoveryCampaignNineRunner {
         return Stream.of(
             trigPowerReductionCases().stream(),
             expLogInverseCases().stream(),
-            powerRootAssumptionCases().stream())
+            powerRootAndLogProductCases().stream())
             .flatMap(stream -> stream)
             .toList();
     }
@@ -285,7 +285,7 @@ public final class DiscoveryCampaignNineRunner {
         );
     }
 
-    private List<CampaignCase> powerRootAssumptionCases() {
+    private List<CampaignCase> powerRootAndLogProductCases() {
         return List.of(
             new CampaignCase(
                 "pra-sqrt-y2",

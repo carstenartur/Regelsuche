@@ -61,7 +61,7 @@ public final class DiscoveryPromotionPipelineRunner {
         DiscoveryCampaignSevenRunner.CampaignReport campaignSeven = campaignSevenRunner.run();
         // Campaign 8 runs after Campaign 7 so trig/log-exp families extend the promotion context.
         DiscoveryCampaignEightRunner.CampaignReport campaignEight = campaignEightRunner.run();
-        // Campaign 9 runs after Campaign 8 so assumption-carrying families (trig, log-exp, power-root) extend the promotion context.
+        // Campaign 9 runs after Campaign 8 so assumption-carrying families (trig, log-exp, power-root, log-product) extend the promotion context.
         DiscoveryCampaignNineRunner.CampaignReport campaignNine = campaignNineRunner.run();
 
         List<PromotionRecord> promotionRecords = Stream.of(
