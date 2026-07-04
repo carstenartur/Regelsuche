@@ -3,10 +3,8 @@ package de.regelsuche.docs;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.sympyqa.SymPyQaHarness;
-import de.regelsuche.transform.ExpLogInverseOperator;
-import de.regelsuche.transform.LogProductAssumptionOperator;
-import de.regelsuche.transform.TrigPowerReductionOperator;
-import de.regelsuche.transform.TrigPythagoreanIdentityOperator;
+import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
+import de.regelsuche.transform.QuadraticFactorizationHypothesisOperator;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -19,8 +17,9 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Runs Discovery Campaign 8 with trigonometry and log/exp/power families:
- * Pythagorean identity, power-reduction, and assumption-aware log/exp simplifications.
+ * Runs Discovery Campaign 8 with quadratic-factorization and complete-square families:
+ * monic quadratic factorization (hypothesis operator) and conservative complete-square
+ * preparation — both families are genuinely new relative to Campaigns 1–7.
  * Produces candidate-mining reports and cross-campaign progress comparison (campaigns 5, 7 and 8).
  */
 public final class DiscoveryCampaignEightRunner {
@@ -226,68 +225,68 @@ public final class DiscoveryCampaignEightRunner {
 
     private List<CampaignCase> cases() {
         return Stream.of(
-            trigCases().stream(),
-            logExpCases().stream())
+            quadraticFactorizationCases().stream(),
+            completeSquareCases().stream())
             .flatMap(stream -> stream)
             .toList();
     }
 
-    private List<CampaignCase> trigCases() {
+    private List<CampaignCase> quadraticFactorizationCases() {
         return List.of(
             new CampaignCase(
-                "trig-pyth-xy",
-                "trigonometry",
-                "sin(x) ^ 2 + cos(x) ^ 2",
-                "1",
-                List.of("trig_pythagorean_identity"),
-                TrigPythagoreanIdentityOperator.RULE_ID,
-                List.of("sympy-trig-basic"),
-                "Pythagorean identity: sin²(x) + cos²(x) = 1"
+                "qf-x2-6x-5",
+                "quadratic-factorization",
+                "x^2 + 6*x + 5",
+                "(x + 1) * (x + 5)",
+                List.of(QuadraticFactorizationHypothesisOperator.RULE_ID),
+                QuadraticFactorizationHypothesisOperator.RULE_ID,
+                List.of("sympy-polynomial-basic"),
+                "quadratic factorization: x²+6x+5 = (x+1)(x+5)"
             ),
             new CampaignCase(
-                "trig-power-sin-x",
-                "trigonometry",
-                "1 - sin(x) ^ 2",
-                "cos(x) ^ 2",
-                List.of("trig_power_reduction"),
-                TrigPowerReductionOperator.RULE_ID,
-                List.of("sympy-trig-basic"),
-                "trig power reduction: 1 - sin²(x) = cos²(x)"
+                "qf-x2-3x-2",
+                "quadratic-factorization",
+                "x^2 + 3*x + 2",
+                "(x + 1) * (x + 2)",
+                List.of(QuadraticFactorizationHypothesisOperator.RULE_ID),
+                QuadraticFactorizationHypothesisOperator.RULE_ID,
+                List.of("sympy-polynomial-basic"),
+                "quadratic factorization: x²+3x+2 = (x+1)(x+2)"
             ),
             new CampaignCase(
-                "trig-tan-sec",
-                "trigonometry",
-                "tan(x) ^ 2 + 1",
-                "sec(x) ^ 2",
-                List.of("trig_pythagorean_identity"),
-                TrigPythagoreanIdentityOperator.RULE_ID,
-                List.of("sympy-trig-basic"),
-                "Pythagorean identity: tan²(x) + 1 = sec²(x)"
+                "qf-y2-y-6",
+                "quadratic-factorization",
+                "y^2 - y - 6",
+                "(y - 3) * (y + 2)",
+                List.of(QuadraticFactorizationHypothesisOperator.RULE_ID),
+                QuadraticFactorizationHypothesisOperator.RULE_ID,
+                List.of("sympy-polynomial-basic"),
+                "quadratic factorization: y²-y-6 = (y-3)(y+2)"
             )
         );
     }
 
-    private List<CampaignCase> logExpCases() {
+    private List<CampaignCase> completeSquareCases() {
         return List.of(
             new CampaignCase(
-                "log-product-pq",
-                "log-exp",
-                "log(p * q)",
-                "log(p) + log(q)",
-                List.of("log_product_assumption"),
-                LogProductAssumptionOperator.RULE_ID,
-                List.of("sympy-log-basic"),
-                "log product assumption: log(p*q) = log(p) + log(q) for p,q > 0"
+                "cs-x2-4x-4",
+                "complete-square",
+                "x^2 + 4*x + 4",
+                "(x + 2)^2",
+                List.of(ConservativeCompleteSquareHypothesisOperator.RULE_ID),
+                ConservativeCompleteSquareHypothesisOperator.RULE_ID,
+                List.of("sympy-polynomial-basic"),
+                "complete the square: x²+4x+4 = (x+2)²"
             ),
             new CampaignCase(
-                "exp-log-inverse-t",
-                "log-exp",
-                "exp(log(t))",
-                "t",
-                List.of("exp_log_inverse"),
-                ExpLogInverseOperator.RULE_ID,
-                List.of("sympy-log-basic"),
-                "exp/log inverse: exp(log(t)) = t for t > 0"
+                "cs-x2-2xy-y2",
+                "complete-square",
+                "x^2 + 2*x*y + y^2",
+                "(x + y)^2",
+                List.of(ConservativeCompleteSquareHypothesisOperator.RULE_ID),
+                ConservativeCompleteSquareHypothesisOperator.RULE_ID,
+                List.of("sympy-polynomial-basic"),
+                "bivariate perfect square: x²+2xy+y² = (x+y)²"
             )
         );
     }

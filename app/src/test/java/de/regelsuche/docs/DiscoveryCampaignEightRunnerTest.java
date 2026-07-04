@@ -149,6 +149,10 @@ class DiscoveryCampaignEightRunnerTest {
     }
 
     private String pair(String left, String right) {
-        return left + " -> " + right;
+        return normalizeWhitespace(left) + " -> " + normalizeWhitespace(right);
+    }
+
+    private String normalizeWhitespace(String expression) {
+        return expression == null ? "" : expression.replaceAll("\\s+", "");
     }
 }
