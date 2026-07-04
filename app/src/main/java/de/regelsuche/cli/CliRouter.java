@@ -34,7 +34,7 @@ import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.TransformationSearchService;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.SymPyTransformationEngine;
+import de.regelsuche.app.transform.SymPyTransformationEngine;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.io.IOException;

@@ -3,6 +3,7 @@ package de.regelsuche.transform;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.app.transform.SymPyTransformationEngine;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;

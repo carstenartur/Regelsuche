@@ -40,7 +40,7 @@ import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchProfile;
 import de.regelsuche.search.TransformationSearchService;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.SymPyTransformationEngine;
+import de.regelsuche.app.transform.SymPyTransformationEngine;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
