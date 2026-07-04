@@ -143,6 +143,89 @@ class PluginCliRouterTest {
     }
 
     @Test
+    void rulesImportCopiesRuleFileToTargetDir(@TempDir Path tempDir) throws Exception {
+        Path sourceDir = tempDir.resolve("source");
+        Files.createDirectories(sourceDir);
+        Files.writeString(sourceDir.resolve("algebra.regelsuche"), """
+            rule additive_identity:
+              pattern: A + 0
+              replace: A
+            """);
+        Path targetDir = tempDir.resolve("rules");
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        CliRouter router = new CliRouter(
+            new PrintStream(output),
+            new InMemoryExpressionGraphStore(),
+            new InMemoryRuleInventoryRepository(),
+            new DefaultTransformationExportService(),
+            true
+        );
+
+        int exit = router.run(new String[]{"rules", "import", sourceDir.toString(), "--into", targetDir.toString()});
+
+        assertEquals(0, exit);
+        assertTrue(output.toString().contains("Imported"), output::toString);
+        assertTrue(Files.exists(targetDir.resolve("algebra.regelsuche")));
+    }
+
+    @Test
+    void rulesImportSingleFileToTargetDir(@TempDir Path tempDir) throws Exception {
+        Path sourceFile = tempDir.resolve("trig.rules");
+        Files.writeString(sourceFile, """
+            rule sin_zero:
+              pattern: sin(0)
+              replace: 0
+            """);
+        Path targetDir = tempDir.resolve("rules");
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        CliRouter router = new CliRouter(
+            new PrintStream(output),
+            new InMemoryExpressionGraphStore(),
+            new InMemoryRuleInventoryRepository(),
+            new DefaultTransformationExportService(),
+            true
+        );
+
+        int exit = router.run(new String[]{"rules", "import", sourceFile.toString(), "--into", targetDir.toString()});
+
+        assertEquals(0, exit);
+        assertTrue(output.toString().contains("Imported"), output::toString);
+        assertTrue(Files.exists(targetDir.resolve("trig.rules")));
+    }
+
+    @Test
+    void rulesExportWritesActiveRulesToFile(@TempDir Path tempDir) throws Exception {
+        Path rulesDir = tempDir.resolve("rules");
+        Files.createDirectories(rulesDir);
+        Files.writeString(rulesDir.resolve("custom.regelsuche"), """
+            rule multiply_by_one:
+              pattern: A * 1
+              replace: A
+              tags:
+                - algebra
+            """);
+        Path outputDir = tempDir.resolve("exports");
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        CliRouter router = new CliRouter(
+            new PrintStream(output),
+            new InMemoryExpressionGraphStore(),
+            new InMemoryRuleInventoryRepository(),
+            new DefaultTransformationExportService(),
+            true
+        );
+
+        int exit = router.run(new String[]{"rules", "export",
+            "--dir", rulesDir.toString(),
+            "--out", outputDir.toString()});
+
+        assertEquals(0, exit);
+        assertTrue(output.toString().contains("Exported"), output::toString);
+        assertTrue(Files.exists(outputDir.resolve("exported-rules.regelsuche")));
+        String exported = Files.readString(outputDir.resolve("exported-rules.regelsuche"));
+        assertTrue(exported.contains("multiply_by_one"), () -> "exported content: " + exported);
+    }
+
+    @Test
     void rulesProfilesMarksActiveProfileAndShowsLists(@TempDir Path tempDir) throws Exception {
         Path rulesDir = tempDir.resolve("rules");
         Files.createDirectories(rulesDir);
