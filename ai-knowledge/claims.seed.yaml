@@ -4,26 +4,11 @@
   modules: [regelsuche-core]
   scopeModules: [regelsuche-core]
   category: architecture
-  forbiddenReferences:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-    - org.springframework
-    - org.neo4j
-    - org.graalvm
-    - org.testcontainers
-  forbiddenDependencies:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-    - org.springframework
-    - org.neo4j
-    - org.graalvm
-    - org.testcontainers
+  forbiddenReferences: [org.hibernate, jakarta.persistence, javax.persistence, org.springframework, org.neo4j, org.graalvm, org.testcontainers]
+  forbiddenDependencies: [org.hibernate, jakarta.persistence, javax.persistence, org.springframework, org.neo4j, org.graalvm, org.testcontainers]
   allowedTargetModules: []
-  verifiedBy:
-    - de.regelsuche.architecture.ArchitectureBoundariesTest
-  severity: warning
+  verifiedBy: [de.regelsuche.architecture.ArchitectureBoundariesTest]
+  severity: error
 
 - id: search-kernel-clean
   label: "Search kernel is infrastructure-free"
@@ -31,26 +16,11 @@
   modules: [regelsuche-search]
   scopeModules: [regelsuche-search]
   category: architecture
-  forbiddenReferences:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-    - org.neo4j
-    - org.graalvm
-    - org.testcontainers
-  forbiddenDependencies:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-    - org.neo4j
-    - org.graalvm
-    - org.testcontainers
-  allowedTargetModules:
-    - regelsuche-core
-    - regelsuche-egraph
-  verifiedBy:
-    - de.regelsuche.architecture.ArchitectureBoundariesTest
-  severity: warning
+  forbiddenReferences: [org.hibernate, jakarta.persistence, javax.persistence, org.neo4j, org.graalvm, org.testcontainers]
+  forbiddenDependencies: [org.hibernate, jakarta.persistence, javax.persistence, org.neo4j, org.graalvm, org.testcontainers]
+  allowedTargetModules: [regelsuche-core, regelsuche-egraph]
+  verifiedBy: [de.regelsuche.architecture.ArchitectureBoundariesTest]
+  severity: error
 
 - id: validation-kernel-clean
   label: "Validation kernel is infrastructure-free"
@@ -58,25 +28,11 @@
   modules: [regelsuche-validation]
   scopeModules: [regelsuche-validation]
   category: architecture
-  forbiddenReferences:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-    - org.neo4j
-    - org.graalvm
-    - org.testcontainers
-  forbiddenDependencies:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-    - org.neo4j
-    - org.graalvm
-    - org.testcontainers
-  allowedTargetModules:
-    - regelsuche-core
-  verifiedBy:
-    - de.regelsuche.architecture.ArchitectureBoundariesTest
-  severity: warning
+  forbiddenReferences: [org.hibernate, jakarta.persistence, javax.persistence, org.neo4j, org.graalvm, org.testcontainers]
+  forbiddenDependencies: [org.hibernate, jakarta.persistence, javax.persistence, org.neo4j, org.graalvm, org.testcontainers]
+  allowedTargetModules: [regelsuche-core]
+  verifiedBy: [de.regelsuche.architecture.ArchitectureBoundariesTest]
+  severity: error
 
 - id: persistence-port-clean
   label: "Persistence port has no database driver dependencies"
@@ -84,145 +40,51 @@
   modules: [regelsuche-persistence]
   scopeModules: [regelsuche-persistence]
   category: architecture
-  forbiddenReferences:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-    - org.neo4j
-    - org.postgresql
-    - org.graalvm
-    - org.testcontainers
-  forbiddenDependencies:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-    - org.neo4j
-    - org.postgresql
-    - org.graalvm
-    - org.testcontainers
-  allowedTargetModules:
-    - regelsuche-core
-  verifiedBy:
-    - de.regelsuche.architecture.ArchitectureBoundariesTest
+  forbiddenReferences: [org.hibernate, jakarta.persistence, javax.persistence, org.neo4j, org.postgresql, org.graalvm, org.testcontainers]
+  forbiddenDependencies: [org.hibernate, jakarta.persistence, javax.persistence, org.neo4j, org.postgresql, org.graalvm, org.testcontainers]
+  allowedTargetModules: [regelsuche-core]
+  verifiedBy: [de.regelsuche.architecture.ArchitectureBoundariesTest]
   severity: error
 
 - id: acyclic-module-graph
   label: "Gradle module dependency graph is acyclic"
   description: "The documented Teil-0 module dependency graph must stay acyclic and continue to be guarded by the architecture boundary test."
-  modules:
-    - regelsuche-core
-    - regelsuche-egraph
-    - regelsuche-search
-    - regelsuche-validation
-    - regelsuche-math-algorithms
-    - regelsuche-math-jas
-    - regelsuche-persistence
-    - regelsuche-persistence-hibernate
-    - regelsuche-learning
-    - regelsuche-experiments
-    - regelsuche-cli
-    - regelsuche-discovery
-    - regelsuche-benchmarks
-  scopeModules:
-    - regelsuche-core
-    - regelsuche-egraph
-    - regelsuche-search
-    - regelsuche-validation
-    - regelsuche-math-algorithms
-    - regelsuche-math-jas
-    - regelsuche-persistence
-    - regelsuche-persistence-hibernate
-    - regelsuche-learning
-    - regelsuche-experiments
-    - regelsuche-cli
-    - regelsuche-discovery
-    - regelsuche-benchmarks
+  modules: [regelsuche-core, regelsuche-egraph, regelsuche-search, regelsuche-validation, regelsuche-math-algorithms, regelsuche-math-jas, regelsuche-persistence, regelsuche-persistence-hibernate, regelsuche-learning, regelsuche-experiments, regelsuche-cli, regelsuche-discovery, regelsuche-benchmarks]
+  scopeModules: [regelsuche-core, regelsuche-egraph, regelsuche-search, regelsuche-validation, regelsuche-math-algorithms, regelsuche-math-jas, regelsuche-persistence, regelsuche-persistence-hibernate, regelsuche-learning, regelsuche-experiments, regelsuche-cli, regelsuche-discovery, regelsuche-benchmarks]
   category: architecture
-  verifiedBy:
-    - de.regelsuche.architecture.ArchitectureBoundariesTest
-  requiredDocs:
-    - docs/dependency-rules.md
-    - docs/module-structure.md
+  verifiedBy: [de.regelsuche.architecture.ArchitectureBoundariesTest]
+  requiredDocs: [docs/dependency-rules.md, docs/module-structure.md]
   severity: error
 
 - id: port-interfaces-first
   label: "Cross-module communication is port-driven (Teil-0 interfaces first)"
   description: "Cross-module APIs should be introduced as stable interfaces/ports before concrete adapters are added."
-  modules:
-    - regelsuche-core
-    - regelsuche-search
-    - regelsuche-validation
-    - regelsuche-learning
-    - regelsuche-experiments
-  scopeModules:
-    - regelsuche-core
-    - regelsuche-search
-    - regelsuche-validation
-    - regelsuche-learning
-    - regelsuche-experiments
+  modules: [regelsuche-core, regelsuche-search, regelsuche-validation, regelsuche-learning, regelsuche-experiments]
+  scopeModules: [regelsuche-core, regelsuche-search, regelsuche-validation, regelsuche-learning, regelsuche-experiments]
   category: architecture
-  verifiedBy:
-    - de.regelsuche.architecture.ArchitectureBoundariesTest
-  requiredDocs:
-    - docs/dependency-rules.md
-    - docs/adr/0001-logical-module-boundaries.md
+  verifiedBy: [de.regelsuche.architecture.ArchitectureBoundariesTest]
+  requiredDocs: [docs/dependency-rules.md, docs/adr/0001-logical-module-boundaries.md]
   severity: warning
 
 - id: deterministic-discovery
   label: "Discovery runs are reproducible"
   description: "Discovery runs must keep deterministic replay tests, committed evidence and reproducibility documentation in place."
-  modules:
-    - regelsuche-experiments
-    - regelsuche-discovery
-    - regelsuche-benchmarks
-    - app
-  scopeModules:
-    - regelsuche-experiments
-    - regelsuche-discovery
-    - regelsuche-benchmarks
-    - app
+  modules: [regelsuche-experiments, regelsuche-discovery, regelsuche-benchmarks, app]
+  scopeModules: [regelsuche-experiments, regelsuche-discovery, regelsuche-benchmarks, app]
   category: quality
-  verifiedBy:
-    - de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunnerTest
-    - de.regelsuche.benchmark.DiscoveryReplayArtifactWriterTest
-  requiredTests:
-    - de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunnerTest
-    - de.regelsuche.benchmark.DiscoveryReplayArtifactWriterTest
-    - de.regelsuche.docs.DiscoveryCampaignSevenRunnerTest
-  requiredEvidenceTypes:
-    - discovery-evidence
-  requiredDocs:
-    - docs/experiment-runner.md
-    - docs/scientific-reproducibility.md
-    - docs/generated/discovery/**
+  verifiedBy: [de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunnerTest, de.regelsuche.benchmark.DiscoveryReplayArtifactWriterTest]
+  requiredTests: [de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunnerTest, de.regelsuche.benchmark.DiscoveryReplayArtifactWriterTest, de.regelsuche.docs.DiscoveryCampaignSevenRunnerTest]
+  requiredEvidenceTypes: [discovery-evidence]
+  requiredDocs: [docs/experiment-runner.md, docs/scientific-reproducibility.md, docs/generated/discovery/**]
   severity: error
 
 - id: hibernate-isolated
   label: "Hibernate and JPA are isolated to the persistence-hibernate adapter"
   description: "Library modules outside regelsuche-persistence-hibernate must not reference Hibernate or JPA APIs directly."
   modules: [regelsuche-persistence-hibernate]
-  scopeModules:
-    - regelsuche-core
-    - regelsuche-egraph
-    - regelsuche-search
-    - regelsuche-validation
-    - regelsuche-math-algorithms
-    - regelsuche-math-jas
-    - regelsuche-persistence
-    - regelsuche-learning
-    - regelsuche-experiments
-    - regelsuche-cli
-    - regelsuche-discovery
-    - regelsuche-benchmarks
+  scopeModules: [regelsuche-core, regelsuche-egraph, regelsuche-search, regelsuche-validation, regelsuche-math-algorithms, regelsuche-math-jas, regelsuche-persistence, regelsuche-learning, regelsuche-experiments, regelsuche-cli, regelsuche-discovery, regelsuche-benchmarks]
   category: architecture
-  forbiddenReferences:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-  forbiddenDependencies:
-    - org.hibernate
-    - jakarta.persistence
-    - javax.persistence
-  verifiedBy:
-    - de.regelsuche.architecture.ArchitectureBoundariesTest
+  forbiddenReferences: [org.hibernate, jakarta.persistence, javax.persistence]
+  forbiddenDependencies: [org.hibernate, jakarta.persistence, javax.persistence]
+  verifiedBy: [de.regelsuche.architecture.ArchitectureBoundariesTest]
   severity: error
