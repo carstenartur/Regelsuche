@@ -1,36 +1,27 @@
 package de.regelsuche.validation;
 
-import de.regelsuche.equivalence.EquivalenceService;
-import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
 
 /** Infrastructure-free discovery oracle adapter with explicit tri-state status. */
 public final class SymPyDiscoveryOracleAdapter {
+    private static final String CAS_UNAVAILABLE = "python/sympy runtime unavailable";
+
     private final ExpressionParser parser = new ExpressionParser();
-    private final EquivalenceService equivalenceService;
-
-    public SymPyDiscoveryOracleAdapter() {
-        this(new SymPyEquivalenceService());
-    }
-
-    public SymPyDiscoveryOracleAdapter(EquivalenceService equivalenceService) {
-        this.equivalenceService = equivalenceService == null ? new SymPyEquivalenceService() : equivalenceService;
-    }
 
     public OracleResult equivalence(String leftExpression, String rightExpression) {
         if (!canParse(leftExpression) || !canParse(rightExpression)) {
             return OracleResult.unavailable("oracle input could not be parsed");
         }
-        return toResult(leftExpression, rightExpression, "deterministic equivalence check");
+        return OracleResult.unavailable(CAS_UNAVAILABLE);
     }
 
     public OracleResult factorCandidate(String expression, String candidateExpression) {
         if (!canParse(expression) || !canParse(candidateExpression)) {
             return OracleResult.unavailable("factor candidate input could not be parsed");
         }
-        return toResult(expression, candidateExpression, "factor candidate equivalence check");
+        return OracleResult.unavailable(CAS_UNAVAILABLE);
     }
 
     public OracleResult groebnerEquivalence(List<String> generators, String polynomialExpression) {
@@ -45,13 +36,7 @@ public final class SymPyDiscoveryOracleAdapter {
                 return OracleResult.unavailable("generator input could not be parsed");
             }
         }
-        return OracleResult.unavailable("groebner oracle requires an optional CAS adapter");
-    }
-
-    private OracleResult toResult(String leftExpression, String rightExpression, String evidenceLabel) {
-        boolean equivalent = equivalenceService.areEquivalent(leftExpression, rightExpression);
-        String evidence = evidenceLabel + ": " + equivalenceService.evidence(leftExpression, rightExpression);
-        return equivalent ? OracleResult.agree(evidence) : OracleResult.disagree(evidence);
+        return OracleResult.unavailable(CAS_UNAVAILABLE);
     }
 
     private boolean canParse(String expression) {
