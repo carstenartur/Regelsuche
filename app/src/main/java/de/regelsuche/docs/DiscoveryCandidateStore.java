@@ -364,14 +364,14 @@ final class DiscoveryCandidateStore {
             assumptions.addAll(record.assumptions());
             oracleStatuses.add(record.oracleStatus());
             ablationStatuses.add(record.ablationStatus());
-            if (noveltyStatus == NoveltyStatus.UNKNOWN || noveltyStatus == NoveltyStatus.NEW) {
+            if (examples.isEmpty() || noveltyStatus == NoveltyStatus.UNKNOWN) {
                 noveltyStatus = noveltyResult.status();
             }
             if (!noveltyResult.matchedCandidateId().isBlank()) {
                 relatedCandidateIds.add(noveltyResult.matchedCandidateId());
             }
             CandidateLifecycleStatus exampleLifecycle = lifecycleFor(record);
-            lifecycleStatus = mergeLifecycle(lifecycleStatus, exampleLifecycle);
+            lifecycleStatus = examples.isEmpty() ? exampleLifecycle : mergeLifecycle(lifecycleStatus, exampleLifecycle);
             promotionStatus = higherPromotionStage(promotionStatus, record.stage());
             String rejectionReason = rejectionReason(record);
             if (!rejectionReason.isBlank()) {
