@@ -33,6 +33,42 @@ class PublicEvidenceGateTest {
     }
 
     @Test
+    void rejectsStatusOnlyAblationEvenWhenStatusSaysDegraded() {
+        PromotionRecord statusOnly = new PromotionRecord(
+            "status-only",
+            "campaign",
+            "2026-01-01",
+            "family",
+            PromotionStage.PROMOTED,
+            "x^2 + 6*x + 5",
+            "(x + 1) * (x + 5)",
+            "AGREE",
+            "oracle evidence",
+            "DEGRADED",
+            "op",
+            "pack",
+            List.of(),
+            "rationale",
+            List.of("rule"),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            true,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+
+        PublicEvidenceGate.GateDecision decision = gate.evaluate(statusOnly, NoveltyStatus.NEW);
+
+        assertFalse(decision.accepted());
+        assertTrue(decision.rejectionReasons().contains("ablation=missing-structured"));
+    }
+
+    @Test
     void rejectsMissingSearchEvidence() {
         PromotionRecord record = record("missing", PromotionStage.PROMOTED, "AGREE", "DEGRADED", false, false, false, "", "", List.of());
 
@@ -92,6 +128,9 @@ class PublicEvidenceGateTest {
         String pack,
         List<String> path
     ) {
+        AblationEvidence ablationEvidence = "UNCHANGED".equals(ablation)
+            ? AblationEvidence.compare(true, 3, 30, true, 3, 30, "test ablation")
+            : AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation");
         return new PromotionRecord(
             id,
             "campaign",
@@ -117,7 +156,8 @@ class PublicEvidenceGateTest {
             "",
             List.of(),
             false,
-            ""
+            "",
+            ablationEvidence
         );
     }
 }
