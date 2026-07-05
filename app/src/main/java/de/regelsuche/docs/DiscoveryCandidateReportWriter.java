@@ -75,8 +75,8 @@ final class DiscoveryCandidateReportWriter {
 
     private String renderCandidates(CandidateBundle bundle) {
         StringBuilder out = new StringBuilder("# Discovery candidates\n\n");
-        out.append("| Candidate | Family | Stage | Novelty | Success | Oracle | Ablation | Source | Pack | Operator |\n");
-        out.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+        out.append("| Candidate | Family | Stage | Novelty | Success | Oracle | Ablation | Ablation evidence | Source | Pack | Operator |\n");
+        out.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
         for (CandidateView candidate : bundle.candidates()) {
             out.append("| ").append(escape(candidate.id()))
                 .append(" | ").append(escape(candidate.family()))
@@ -85,6 +85,7 @@ final class DiscoveryCandidateReportWriter {
                 .append(" | ").append(candidate.success() ? "yes" : "no")
                 .append(" | ").append(escape(candidate.oracleStatus().toLowerCase(Locale.ROOT)))
                 .append(" | ").append(escape(candidate.ablationStatus().toLowerCase(Locale.ROOT)))
+                .append(" | ").append(escape(candidate.ablationEvidenceSummary()))
                 .append(" | ").append(escape(orDash(candidate.source())))
                 .append(" | ").append(escape(orDash(candidate.packId())))
                 .append(" | ").append(escape(orDash(candidate.operatorId())))
@@ -108,7 +109,9 @@ final class DiscoveryCandidateReportWriter {
                 out.append("- ").append(escape(candidate.id()))
                     .append(": investigate operator support for recorded path ")
                     .append(escape(candidate.rulePath().isEmpty() ? "—" : String.join(" -> ", candidate.rulePath())))
-                    .append(" (novelty=").append(escape(candidate.noveltyStatus().toLowerCase(Locale.ROOT))).append(")")
+                    .append(" (novelty=").append(escape(candidate.noveltyStatus().toLowerCase(Locale.ROOT)))
+                    .append(", ablation=").append(escape(candidate.ablationEvidenceSummary()))
+                    .append(")")
                     .append('\n');
             }
             out.append('\n');
@@ -133,6 +136,7 @@ final class DiscoveryCandidateReportWriter {
                 .append(escape(String.join(" -> ", candidate.rulePath())))
                 .append(" (stage=").append(escape(candidate.stage()))
                 .append(", novelty=").append(escape(candidate.noveltyStatus().toLowerCase(Locale.ROOT)))
+                .append(", ablation=").append(escape(candidate.ablationEvidenceSummary()))
                 .append(")\n");
         }
         return out.toString();
@@ -157,6 +161,11 @@ final class DiscoveryCandidateReportWriter {
         String family,
         String oracleStatus,
         String ablationStatus,
+        AblationEvidence.RunEvidence ablationWithCandidate,
+        AblationEvidence.RunEvidence ablationWithoutCandidate,
+        double ablationImprovementRatio,
+        String ablationEvidenceSummary,
+        String ablationExplanation,
         String source,
         String packId,
         String operatorId,
@@ -172,6 +181,11 @@ final class DiscoveryCandidateReportWriter {
                 record.family(),
                 record.oracleStatus(),
                 record.ablationStatus(),
+                record.ablationEvidence().withCandidate(),
+                record.ablationEvidence().withoutCandidate(),
+                record.ablationEvidence().improvementRatio(),
+                record.ablationEvidence().compactSummary(),
+                record.ablationEvidence().explanation(),
                 record.sourcePack().isBlank() && record.sourceOperator().isBlank() ? "" : "promotion-record",
                 record.sourcePack(),
                 record.sourceOperator(),
@@ -184,6 +198,14 @@ final class DiscoveryCandidateReportWriter {
         }
 
         CandidateView {
+            ablationWithCandidate = ablationWithCandidate == null
+                ? AblationEvidence.RunEvidence.unknown()
+                : ablationWithCandidate;
+            ablationWithoutCandidate = ablationWithoutCandidate == null
+                ? AblationEvidence.RunEvidence.unknown()
+                : ablationWithoutCandidate;
+            ablationEvidenceSummary = ablationEvidenceSummary == null ? "" : ablationEvidenceSummary;
+            ablationExplanation = ablationExplanation == null ? "" : ablationExplanation;
             rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
             stage = stage == null ? "observed" : stage;
             noveltyStatus = noveltyStatus == null || noveltyStatus.isBlank()
