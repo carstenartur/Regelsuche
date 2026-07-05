@@ -113,8 +113,7 @@ record PromotionRecord(
     }
 
     boolean galleryEligible() {
-        return !fallbackUsed && !curatedPathPresent
-            && (promotionEligible || stage.atLeast(PromotionStage.REUSED));
+        return new PublicEvidenceGate().evaluate(this, NoveltyStatus.NEW).accepted();
     }
 
     PromotionRecord withReuse(DiscoveryCampaignFourRunner.CaseResult reuse) {
