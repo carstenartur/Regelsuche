@@ -202,19 +202,19 @@ import java.util.stream.Collectors;
     }
 
     private static CandidateLifecycleStatus lifecycleFor(PromotionRecord record) {
-<span class="pc bpc" id="L205" title="1 of 6 branches missed.">        if (&quot;DISAGREE&quot;.equalsIgnoreCase(record.oracleStatus()) || record.curatedPathPresent() || record.fallbackUsed()) {</span>
+<span class="fc bfc" id="L205" title="All 6 branches covered.">        if (&quot;DISAGREE&quot;.equalsIgnoreCase(record.oracleStatus()) || record.curatedPathPresent() || record.fallbackUsed()) {</span>
 <span class="fc" id="L206">            return CandidateLifecycleStatus.REJECTED;</span>
         }
 <span class="fc bfc" id="L208" title="All 2 branches covered.">        if (record.stage().atLeast(PromotionStage.PROMOTED)) {</span>
 <span class="fc" id="L209">            return CandidateLifecycleStatus.PROMOTED;</span>
         }
-<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (record.stage().atLeast(PromotionStage.VALIDATED)) {</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (record.stage().atLeast(PromotionStage.VALIDATED)) {</span>
 <span class="fc" id="L212">            return CandidateLifecycleStatus.VALIDATED;</span>
         }
-<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (record.stage().atLeast(PromotionStage.CANDIDATE)) {</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (record.stage().atLeast(PromotionStage.CANDIDATE)) {</span>
 <span class="nc" id="L215">            return CandidateLifecycleStatus.CANDIDATE;</span>
         }
-<span class="nc" id="L217">        return CandidateLifecycleStatus.OBSERVED;</span>
+<span class="fc" id="L217">        return CandidateLifecycleStatus.OBSERVED;</span>
     }
 
     private static String rejectionReason(PromotionRecord record) {
@@ -222,8 +222,8 @@ import java.util.stream.Collectors;
 <span class="fc bfc" id="L222" title="All 2 branches covered.">        if (&quot;DISAGREE&quot;.equalsIgnoreCase(record.oracleStatus())) {</span>
 <span class="fc" id="L223">            reasons.add(&quot;oracle=DISAGREE&quot;);</span>
         }
-<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (record.curatedPathPresent()) {</span>
-<span class="nc" id="L226">            reasons.add(&quot;curated-path=true&quot;);</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (record.curatedPathPresent()) {</span>
+<span class="fc" id="L226">            reasons.add(&quot;curated-path=true&quot;);</span>
         }
 <span class="fc bfc" id="L228" title="All 2 branches covered.">        if (record.fallbackUsed()) {</span>
 <span class="fc" id="L229">            reasons.add(&quot;fallback=true&quot;);</span>
@@ -417,10 +417,10 @@ import java.util.stream.Collectors;
         }
 
         private CandidateLifecycleStatus mergeLifecycle(CandidateLifecycleStatus left, CandidateLifecycleStatus right) {
-<span class="pc bpc" id="L420" title="1 of 4 branches missed.">            if (left == CandidateLifecycleStatus.REJECTED || right == CandidateLifecycleStatus.REJECTED) {</span>
+<span class="fc bfc" id="L420" title="All 4 branches covered.">            if (left == CandidateLifecycleStatus.REJECTED || right == CandidateLifecycleStatus.REJECTED) {</span>
 <span class="fc" id="L421">                return CandidateLifecycleStatus.REJECTED;</span>
             }
-<span class="pc bpc" id="L423" title="1 of 2 branches missed.">            return left.ordinal() &gt;= right.ordinal() ? left : right;</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            return left.ordinal() &gt;= right.ordinal() ? left : right;</span>
         }
 
         private PromotionStage higherPromotionStage(PromotionStage left, PromotionStage right) {

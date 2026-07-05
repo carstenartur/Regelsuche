@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PublicEvidenceGate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">PublicEvidenceGate.java</span></div><h1>PublicEvidenceGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/** Strict gate for candidates that may be shown as public discovery evidence. */
+<span class="fc" id="L20">final class PublicEvidenceGate {</span>
+<span class="fc" id="L21">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L22">        .findAndRegisterModules()</span>
+<span class="fc" id="L23">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+    GateReport evaluate(List&lt;PromotionRecord&gt; records) {
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        List&lt;PromotionRecord&gt; safeRecords = records == null ? List.of() : List.copyOf(records);</span>
+<span class="fc" id="L27">        return evaluate(safeRecords, noveltyByCandidateId(safeRecords));</span>
+    }
+
+    GateReport evaluate(List&lt;PromotionRecord&gt; records, Map&lt;String, NoveltyStatus&gt; noveltyByCandidate) {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        List&lt;PromotionRecord&gt; safeRecords = records == null ? List.of() : List.copyOf(records);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        Map&lt;String, NoveltyStatus&gt; safeNovelty = noveltyByCandidate == null ? Map.of() : Map.copyOf(noveltyByCandidate);</span>
+<span class="fc" id="L33">        List&lt;GateDecision&gt; decisions = safeRecords.stream()</span>
+<span class="fc" id="L34">            .map(record -&gt; evaluate(record, safeNovelty.getOrDefault(record.candidateId(), NoveltyStatus.UNKNOWN)))</span>
+<span class="fc" id="L35">            .sorted(Comparator.comparing(GateDecision::candidateId))</span>
+<span class="fc" id="L36">            .toList();</span>
+<span class="fc" id="L37">        return new GateReport(</span>
+            decisions,
+<span class="fc" id="L39">            decisions.stream().filter(GateDecision::accepted).count(),</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            decisions.stream().filter(decision -&gt; !decision.accepted()).count()</span>
+        );
+    }
+
+    GateReport write(Path outputDirectory, List&lt;PromotionRecord&gt; records) {
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        List&lt;PromotionRecord&gt; safeRecords = records == null ? List.of() : List.copyOf(records);</span>
+<span class="fc" id="L46">        return write(outputDirectory, safeRecords, noveltyByCandidateId(safeRecords));</span>
+    }
+
+    GateReport write(Path outputDirectory, List&lt;PromotionRecord&gt; records, Map&lt;String, NoveltyStatus&gt; noveltyByCandidate) {
+        try {
+<span class="fc" id="L51">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L52">            GateReport report = evaluate(records, noveltyByCandidate);</span>
+<span class="fc" id="L53">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L54">                outputDirectory.resolve(&quot;public-evidence-gate.json&quot;),</span>
+<span class="fc" id="L55">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+            );
+<span class="fc" id="L57">            Files.writeString(</span>
+<span class="fc" id="L58">                outputDirectory.resolve(&quot;public-evidence-rejections.md&quot;),</span>
+<span class="fc" id="L59">                renderRejections(report),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L62">            return report;</span>
+<span class="nc" id="L63">        } catch (IOException exception) {</span>
+<span class="nc" id="L64">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    GateDecision evaluate(PromotionRecord record, NoveltyStatus noveltyStatus) {
+<span class="fc" id="L69">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        NoveltyStatus effectiveNovelty = noveltyStatus == null ? NoveltyStatus.UNKNOWN : noveltyStatus;</span>
+<span class="fc" id="L71">        boolean success = record.stage().atLeast(PromotionStage.PROMOTED);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (!success) {</span>
+<span class="fc" id="L73">            reasons.add(&quot;success=false&quot;);</span>
+        }
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        if (!record.evidenceExists() || record.rulePath().isEmpty()) {</span>
+<span class="fc" id="L76">            reasons.add(&quot;pathSource!=REGELSUCHE_SEARCH&quot;);</span>
+        }
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (record.curatedPathPresent()) {</span>
+<span class="fc" id="L79">            reasons.add(&quot;curated-path=true&quot;);</span>
+        }
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (record.fallbackUsed()) {</span>
+<span class="fc" id="L82">            reasons.add(&quot;fallback=true&quot;);</span>
+        }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (&quot;DISAGREE&quot;.equalsIgnoreCase(record.oracleStatus())) {</span>
+<span class="fc" id="L85">            reasons.add(&quot;oracle=DISAGREE&quot;);</span>
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (!record.ablationEvidence().promotionReady()) {</span>
+<span class="fc" id="L88">            reasons.add(&quot;ablation=&quot; + record.ablationEvidence().ablationStatus());</span>
+        }
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (record.sourceOperator().isBlank()) {</span>
+<span class="fc" id="L91">            reasons.add(&quot;operator=missing&quot;);</span>
+        }
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (record.sourcePack().isBlank()) {</span>
+<span class="fc" id="L94">            reasons.add(&quot;pack=missing&quot;);</span>
+        }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!hasVisibleGraphEvidence(record)) {</span>
+<span class="fc" id="L97">            reasons.add(&quot;visible-graph=insufficient&quot;);</span>
+        }
+<span class="fc bfc" id="L99" title="All 4 branches covered.">        if (!(effectiveNovelty == NoveltyStatus.NEW || effectiveNovelty == NoveltyStatus.VARIANT)) {</span>
+<span class="fc" id="L100">            reasons.add(&quot;novelty=&quot; + effectiveNovelty.name());</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        String pathSource = reasons.stream().anyMatch(reason -&gt; reason.equals(&quot;pathSource!=REGELSUCHE_SEARCH&quot;))</span>
+<span class="fc" id="L103">            ? &quot;UNKNOWN&quot;</span>
+<span class="fc" id="L104">            : &quot;REGELSUCHE_SEARCH&quot;;</span>
+<span class="fc" id="L105">        return new GateDecision(</span>
+<span class="fc" id="L106">            record.candidateId(),</span>
+<span class="fc" id="L107">            record.sourceCampaign(),</span>
+            effectiveNovelty,
+<span class="fc" id="L109">            reasons.isEmpty(),</span>
+            pathSource,
+<span class="fc" id="L111">            record.stage(),</span>
+<span class="fc" id="L112">            record.oracleStatus(),</span>
+<span class="fc" id="L113">            record.ablationEvidence().ablationStatus(),</span>
+<span class="fc" id="L114">            record.sourceOperator(),</span>
+<span class="fc" id="L115">            record.sourcePack(),</span>
+            reasons
+        );
+    }
+
+    String renderRejections(GateReport report) {
+<span class="fc" id="L121">        StringBuilder out = new StringBuilder(&quot;# Public evidence gate rejections\n\n&quot;);</span>
+<span class="fc" id="L122">        out.append(&quot;| Candidate | Campaign | Stage | Novelty | Rejection reasons |\n&quot;);</span>
+<span class="fc" id="L123">        out.append(&quot;| --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc" id="L124">        List&lt;GateDecision&gt; rejected = report.decisions().stream()</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            .filter(decision -&gt; !decision.accepted())</span>
+<span class="fc" id="L126">            .toList();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (rejected.isEmpty()) {</span>
+<span class="nc" id="L128">            out.append(&quot;| — | — | — | — | none |\n&quot;);</span>
+<span class="nc" id="L129">            return out.toString();</span>
+        }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (GateDecision decision : rejected) {</span>
+<span class="fc" id="L132">            out.append(&quot;| &quot;).append(escape(decision.candidateId()))</span>
+<span class="fc" id="L133">                .append(&quot; | &quot;).append(escape(decision.sourceCampaign()))</span>
+<span class="fc" id="L134">                .append(&quot; | &quot;).append(decision.stage().name().toLowerCase(Locale.ROOT))</span>
+<span class="fc" id="L135">                .append(&quot; | &quot;).append(decision.noveltyStatus().name().toLowerCase(Locale.ROOT))</span>
+<span class="fc" id="L136">                .append(&quot; | &quot;).append(escape(String.join(&quot;, &quot;, decision.rejectionReasons())))</span>
+<span class="fc" id="L137">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        return out.toString();</span>
+    }
+
+    private boolean hasVisibleGraphEvidence(PromotionRecord record) {
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">        return record.evidenceExists() &amp;&amp; !record.rulePath().isEmpty();</span>
+    }
+
+    private Map&lt;String, NoveltyStatus&gt; noveltyByCandidateId(List&lt;PromotionRecord&gt; records) {
+<span class="fc" id="L147">        DiscoveryCandidateStore.CandidateStoreReport storeReport = new DiscoveryCandidateStore().build(records);</span>
+<span class="fc" id="L148">        Map&lt;String, NoveltyStatus&gt; novelty = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (DiscoveryCandidateStore.CandidateEntry entry : storeReport.candidates()) {</span>
+<span class="fc" id="L150">            novelty.put(entry.candidateId(), entry.noveltyStatus());</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            for (DiscoveryCandidateStore.ConcreteExample example : entry.concreteExamples()) {</span>
+<span class="fc" id="L152">                novelty.put(example.exampleId(), example.noveltyStatus());</span>
+<span class="fc" id="L153">            }</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">        return novelty;</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    record GateReport(List&lt;GateDecision&gt; decisions, long acceptedCount, long rejectedCount) {
+<span class="fc" id="L163">        GateReport {</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            decisions = decisions == null ? List.of() : List.copyOf(decisions);</span>
+<span class="fc" id="L165">        }</span>
+
+        List&lt;GateDecision&gt; accepted() {
+<span class="fc" id="L168">            return decisions.stream().filter(GateDecision::accepted).toList();</span>
+        }
+
+        List&lt;GateDecision&gt; rejected() {
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            return decisions.stream().filter(decision -&gt; !decision.accepted()).toList();</span>
+        }
+
+        Map&lt;String, Long&gt; rejectionReasonCounts() {
+<span class="nc" id="L176">            return decisions.stream()</span>
+<span class="nc" id="L177">                .flatMap(decision -&gt; decision.rejectionReasons().stream())</span>
+<span class="nc" id="L178">                .collect(Collectors.groupingBy(reason -&gt; reason, LinkedHashMap::new, Collectors.counting()));</span>
+        }
+    }
+
+    record GateDecision(
+        String candidateId,
+        String sourceCampaign,
+        NoveltyStatus noveltyStatus,
+        boolean accepted,
+        String pathSource,
+        PromotionStage stage,
+        String oracleStatus,
+        String ablationStatus,
+        String operatorId,
+        String packId,
+        List&lt;String&gt; rejectionReasons
+    ) {
+<span class="fc" id="L195">        GateDecision {</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            candidateId = candidateId == null ? &quot;&quot; : candidateId;</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            sourceCampaign = sourceCampaign == null ? &quot;&quot; : sourceCampaign;</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            noveltyStatus = noveltyStatus == null ? NoveltyStatus.UNKNOWN : noveltyStatus;</span>
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">            pathSource = pathSource == null || pathSource.isBlank() ? &quot;UNKNOWN&quot; : pathSource;</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            stage = stage == null ? PromotionStage.OBSERVED : stage;</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            ablationStatus = ablationStatus == null ? &quot;N/A&quot; : ablationStatus;</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            packId = packId == null ? &quot;&quot; : packId;</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            rejectionReasons = rejectionReasons == null ? List.of() : List.copyOf(rejectionReasons);</span>
+<span class="fc" id="L206">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

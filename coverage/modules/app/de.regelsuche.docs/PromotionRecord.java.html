@@ -112,27 +112,26 @@ record PromotionRecord(
 <span class="fc bfc" id="L112" title="All 2 branches covered.">        return !stage.atLeast(PromotionStage.PROMOTED);</span>
     }
 
-    boolean galleryEligible() {
-<span class="pc bpc" id="L116" title="1 of 6 branches missed.">        return !fallbackUsed &amp;&amp; !curatedPathPresent</span>
-<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            &amp;&amp; (promotionEligible || stage.atLeast(PromotionStage.REUSED));</span>
+    boolean galleryEligible(NoveltyStatus noveltyStatus) {
+<span class="fc" id="L116">        return new PublicEvidenceGate().evaluate(this, noveltyStatus).accepted();</span>
     }
 
     PromotionRecord withReuse(DiscoveryCampaignFourRunner.CaseResult reuse) {
-<span class="fc" id="L121">        LinkedHashSet&lt;String&gt; reused = new LinkedHashSet&lt;&gt;(reusedMacroIds);</span>
-<span class="fc" id="L122">        reused.addAll(reuse.reusedMacroIds());</span>
-<span class="pc bpc" id="L123" title="2 of 4 branches missed.">        PromotionStage nextStage = reuse.measuredImprovement() &amp;&amp; !reuse.reusedMacroIds().isEmpty()</span>
-<span class="fc" id="L124">            ? PromotionStage.REUSED</span>
-<span class="pc" id="L125">            : stage;</span>
-<span class="fc" id="L126">        AblationEvidence reuseEvidence = AblationEvidence.compare(</span>
-<span class="fc" id="L127">            reuse.macroEnabled().success(),</span>
-<span class="fc" id="L128">            reuse.macroEnabled().pathLength(),</span>
-<span class="fc" id="L129">            reuse.macroEnabled().statesExplored(),</span>
-<span class="fc" id="L130">            reuse.macroDisabled().success(),</span>
-<span class="fc" id="L131">            reuse.macroDisabled().pathLength(),</span>
-<span class="fc" id="L132">            reuse.macroDisabled().statesExplored(),</span>
-<span class="fc" id="L133">            &quot;macro reuse validation from &quot; + reuse.campaignId()</span>
+<span class="fc" id="L120">        LinkedHashSet&lt;String&gt; reused = new LinkedHashSet&lt;&gt;(reusedMacroIds);</span>
+<span class="fc" id="L121">        reused.addAll(reuse.reusedMacroIds());</span>
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">        PromotionStage nextStage = reuse.measuredImprovement() &amp;&amp; !reuse.reusedMacroIds().isEmpty()</span>
+<span class="fc" id="L123">            ? PromotionStage.REUSED</span>
+<span class="pc" id="L124">            : stage;</span>
+<span class="fc" id="L125">        AblationEvidence reuseEvidence = AblationEvidence.compare(</span>
+<span class="fc" id="L126">            reuse.macroEnabled().success(),</span>
+<span class="fc" id="L127">            reuse.macroEnabled().pathLength(),</span>
+<span class="fc" id="L128">            reuse.macroEnabled().statesExplored(),</span>
+<span class="fc" id="L129">            reuse.macroDisabled().success(),</span>
+<span class="fc" id="L130">            reuse.macroDisabled().pathLength(),</span>
+<span class="fc" id="L131">            reuse.macroDisabled().statesExplored(),</span>
+<span class="fc" id="L132">            &quot;macro reuse validation from &quot; + reuse.campaignId()</span>
         );
-<span class="fc" id="L135">        return new PromotionRecord(</span>
+<span class="fc" id="L134">        return new PromotionRecord(</span>
             candidateId,
             sourceCampaign,
             discoveryDate,
@@ -142,7 +141,7 @@ record PromotionRecord(
             discoveredStructure,
             oracleStatus,
             oracleEvidence,
-<span class="fc" id="L145">            reuseEvidence.ablationStatus(),</span>
+<span class="fc" id="L144">            reuseEvidence.ablationStatus(),</span>
             sourceOperator,
             sourcePack,
             assumptions,
@@ -154,10 +153,10 @@ record PromotionRecord(
             curatedPathPresent,
             fallbackUsed,
             macroOpportunity,
-<span class="fc" id="L157">            reuse.generatedMacroId(),</span>
-<span class="fc" id="L158">            List.copyOf(reused),</span>
-<span class="fc" id="L159">            reuse.measuredImprovement(),</span>
-<span class="fc" id="L160">            reuse.campaignId(),</span>
+<span class="fc" id="L156">            reuse.generatedMacroId(),</span>
+<span class="fc" id="L157">            List.copyOf(reused),</span>
+<span class="fc" id="L158">            reuse.measuredImprovement(),</span>
+<span class="fc" id="L159">            reuse.campaignId(),</span>
             reuseEvidence
         );
     }
