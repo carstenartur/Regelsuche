@@ -1,5 +1,13 @@
 package de.regelsuche.docs;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -10,6 +18,9 @@ import java.util.stream.Collectors;
 
 /** Strict gate for candidates that may be shown as public discovery evidence. */
 final class PublicEvidenceGate {
+    private static final ObjectMapper JSON = new ObjectMapper()
+        .findAndRegisterModules()
+        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
     GateReport evaluate(List<PromotionRecord> records) {
         List<PromotionRecord> safeRecords = records == null ? List.of() : List.copyOf(records);
@@ -23,6 +34,25 @@ final class PublicEvidenceGate {
             decisions.stream().filter(GateDecision::accepted).count(),
             decisions.stream().filter(decision -> !decision.accepted()).count()
         );
+    }
+
+    GateReport write(Path outputDirectory, List<PromotionRecord> records) {
+        try {
+            Files.createDirectories(outputDirectory);
+            GateReport report = evaluate(records);
+            AtomicJsonFile.writeUtf8(
+                outputDirectory.resolve("public-evidence-gate.json"),
+                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)
+            );
+            Files.writeString(
+                outputDirectory.resolve("public-evidence-rejections.md"),
+                renderRejections(report),
+                StandardCharsets.UTF_8
+            );
+            return report;
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
+        }
     }
 
     GateDecision evaluate(PromotionRecord record, NoveltyStatus noveltyStatus) {
