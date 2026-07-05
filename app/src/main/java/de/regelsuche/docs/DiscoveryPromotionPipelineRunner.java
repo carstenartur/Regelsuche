@@ -643,10 +643,13 @@ public final class DiscoveryPromotionPipelineRunner {
     String renderGallery(List<PromotionRecord> records) {
         StringBuilder out = new StringBuilder("# Gallery 2.0\n\n");
         out.append("## Selection policy\n\n")
-            .append("- Candidate is selected only if `fallbackUsed=false` and `curatedPathPresent=false`.\n")
-            .append("- Additionally, candidate must be `promotionEligible=true` or have stage `reused` (or higher).\n\n");
+            .append("- Candidates are selected by the public evidence gate: evidence, novelty, oracle, ablation, and provenance requirements must all be met.\n")
+            .append("- See `public-evidence-gate.json` for per-candidate gate decisions and rejection reasons.\n\n");
+        Set<String> acceptedIds = new PublicEvidenceGate().evaluate(records).accepted().stream()
+            .map(PublicEvidenceGate.GateDecision::candidateId)
+            .collect(Collectors.toSet());
         List<PromotionRecord> selected = records.stream()
-            .filter(PromotionRecord::galleryEligible)
+            .filter(r -> acceptedIds.contains(r.candidateId()))
             .sorted(Comparator.comparing(PromotionRecord::candidateId))
             .toList();
         if (selected.isEmpty()) {
