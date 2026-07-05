@@ -5,9 +5,10 @@ import java.util.List;
 
 final class PromotionDecider {
     PromotionRecord decide(PromotionObservation observation) {
-        List<String> blockers = promotionBlockers(observation);
+        AblationEvidence ablationEvidence = observation.ablationEvidence();
+        List<String> blockers = promotionBlockers(observation, ablationEvidence);
         boolean promotionEligible = blockers.isEmpty();
-        PromotionStage stage = stageFor(observation, promotionEligible);
+        PromotionStage stage = stageFor(observation, ablationEvidence, promotionEligible);
         return new PromotionRecord(
             observation.candidateId(),
             observation.sourceCampaign(),
@@ -18,7 +19,7 @@ final class PromotionDecider {
             observation.discoveredStructure(),
             observation.oracleStatus(),
             observation.oracleEvidence(),
-            observation.ablationStatus(),
+            ablationEvidence.ablationStatus(),
             observation.sourceOperator(),
             observation.sourcePack(),
             observation.assumptions(),
@@ -33,11 +34,12 @@ final class PromotionDecider {
             "",
             List.of(),
             false,
-            ""
+            "",
+            ablationEvidence
         );
     }
 
-    private List<String> promotionBlockers(PromotionObservation observation) {
+    private List<String> promotionBlockers(PromotionObservation observation, AblationEvidence ablationEvidence) {
         List<String> blockers = new ArrayList<>();
         if (!observation.success()) {
             blockers.add("success=false");
@@ -45,8 +47,8 @@ final class PromotionDecider {
         if ("DISAGREE".equals(observation.oracleStatus())) {
             blockers.add("oracle=DISAGREE");
         }
-        if (!"DEGRADED".equals(observation.ablationStatus())) {
-            blockers.add("ablation=" + observation.ablationStatus());
+        if (!ablationEvidence.promotionReady()) {
+            blockers.add("ablation=" + ablationEvidence.ablationStatus());
         }
         if (!observation.evidenceExists()) {
             blockers.add("evidence=missing");
@@ -60,14 +62,18 @@ final class PromotionDecider {
         return List.copyOf(blockers);
     }
 
-    private PromotionStage stageFor(PromotionObservation observation, boolean promotionEligible) {
+    private PromotionStage stageFor(
+        PromotionObservation observation,
+        AblationEvidence ablationEvidence,
+        boolean promotionEligible
+    ) {
         if (!observation.success()) {
             return PromotionStage.OBSERVED;
         }
         if ("DISAGREE".equals(observation.oracleStatus()) || !observation.evidenceExists()) {
             return PromotionStage.CANDIDATE;
         }
-        if (!"DEGRADED".equals(observation.ablationStatus())
+        if (!ablationEvidence.promotionReady()
             || observation.curatedPathPresent()
             || observation.fallbackUsed()) {
             return PromotionStage.VALIDATED;

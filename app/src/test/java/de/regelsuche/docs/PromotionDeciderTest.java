@@ -58,9 +58,13 @@ class PromotionDeciderTest {
         assertEquals(PromotionStage.PROMOTED, promoted.stage());
         assertTrue(promoted.promotionEligible());
         assertTrue(promoted.promotionBlockers().isEmpty());
+        assertEquals("DEGRADED", promoted.ablationEvidence().ablationStatus());
+        assertTrue(promoted.ablationEvidence().promotionReady());
 
         assertEquals(PromotionStage.VALIDATED, blocked.stage());
         assertFalse(blocked.promotionEligible());
         assertTrue(blocked.promotionBlockers().contains("ablation=UNCHANGED"));
+        assertEquals("UNCHANGED", blocked.ablationEvidence().ablationStatus());
+        assertFalse(blocked.ablationEvidence().promotionReady());
     }
 }

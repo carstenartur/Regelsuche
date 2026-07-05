@@ -28,8 +28,66 @@ record PromotionRecord(
     String generatedMacroId,
     List<String> reusedMacroIds,
     boolean measuredImprovement,
-    String reuseCampaign
+    String reuseCampaign,
+    AblationEvidence ablationEvidence
 ) {
+    PromotionRecord(
+        String candidateId,
+        String sourceCampaign,
+        String discoveryDate,
+        String family,
+        PromotionStage stage,
+        String originalExpression,
+        String discoveredStructure,
+        String oracleStatus,
+        String oracleEvidence,
+        String ablationStatus,
+        String sourceOperator,
+        String sourcePack,
+        List<String> assumptions,
+        String rationale,
+        List<String> rulePath,
+        boolean promotionEligible,
+        List<String> promotionBlockers,
+        boolean evidenceExists,
+        boolean curatedPathPresent,
+        boolean fallbackUsed,
+        boolean macroOpportunity,
+        String generatedMacroId,
+        List<String> reusedMacroIds,
+        boolean measuredImprovement,
+        String reuseCampaign
+    ) {
+        this(
+            candidateId,
+            sourceCampaign,
+            discoveryDate,
+            family,
+            stage,
+            originalExpression,
+            discoveredStructure,
+            oracleStatus,
+            oracleEvidence,
+            ablationStatus,
+            sourceOperator,
+            sourcePack,
+            assumptions,
+            rationale,
+            rulePath,
+            promotionEligible,
+            promotionBlockers,
+            evidenceExists,
+            curatedPathPresent,
+            fallbackUsed,
+            macroOpportunity,
+            generatedMacroId,
+            reusedMacroIds,
+            measuredImprovement,
+            reuseCampaign,
+            AblationEvidence.statusOnly(ablationStatus)
+        );
+    }
+
     PromotionRecord {
         family = family == null ? "" : family;
         stage = stage == null ? PromotionStage.OBSERVED : stage;
@@ -37,7 +95,8 @@ record PromotionRecord(
         discoveredStructure = discoveredStructure == null ? "" : discoveredStructure;
         oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? "UNAVAILABLE" : oracleStatus;
         oracleEvidence = oracleEvidence == null ? "" : oracleEvidence;
-        ablationStatus = ablationStatus == null || ablationStatus.isBlank() ? "N/A" : ablationStatus;
+        ablationEvidence = ablationEvidence == null ? AblationEvidence.statusOnly(ablationStatus) : ablationEvidence;
+        ablationStatus = ablationEvidence.ablationStatus();
         sourceOperator = sourceOperator == null ? "" : sourceOperator;
         sourcePack = sourcePack == null ? "" : sourcePack;
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
@@ -64,6 +123,15 @@ record PromotionRecord(
         PromotionStage nextStage = reuse.measuredImprovement() && !reuse.reusedMacroIds().isEmpty()
             ? PromotionStage.REUSED
             : stage;
+        AblationEvidence reuseEvidence = AblationEvidence.compare(
+            reuse.macroEnabled().success(),
+            reuse.macroEnabled().pathLength(),
+            reuse.macroEnabled().statesExplored(),
+            reuse.macroDisabled().success(),
+            reuse.macroDisabled().pathLength(),
+            reuse.macroDisabled().statesExplored(),
+            "macro reuse validation from " + reuse.campaignId()
+        );
         return new PromotionRecord(
             candidateId,
             sourceCampaign,
@@ -74,7 +142,7 @@ record PromotionRecord(
             discoveredStructure,
             oracleStatus,
             oracleEvidence,
-            ablationStatus,
+            reuseEvidence.ablationStatus(),
             sourceOperator,
             sourcePack,
             assumptions,
@@ -89,7 +157,8 @@ record PromotionRecord(
             reuse.generatedMacroId(),
             List.copyOf(reused),
             reuse.measuredImprovement(),
-            reuse.campaignId()
+            reuse.campaignId(),
+            reuseEvidence
         );
     }
 }

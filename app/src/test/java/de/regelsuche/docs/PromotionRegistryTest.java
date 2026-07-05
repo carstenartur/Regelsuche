@@ -81,5 +81,82 @@ class PromotionRegistryTest {
         assertEquals(List.of("macro-left", "macro-right"), record.reusedMacroIds());
         assertTrue(record.measuredImprovement());
         assertEquals("discovery-campaign-4", record.reuseCampaign());
+        assertEquals(record.ablationEvidence().ablationStatus(), record.ablationStatus());
+    }
+
+    @Test
+    void mergePrefersStructuredAblationEvidenceAndKeepsStatusConsistent() {
+        PromotionRegistry registry = new PromotionRegistry();
+        PromotionRecord higherStageStatusOnly = new PromotionRecord(
+            "candidate-2",
+            "campaign-higher",
+            "2026-01-02",
+            "family",
+            PromotionStage.REUSED,
+            "",
+            "",
+            "AGREE",
+            "",
+            "DEGRADED",
+            "",
+            "",
+            List.of(),
+            "",
+            List.of(),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            false,
+            "",
+            List.of(),
+            false,
+            ""
+        );
+        AblationEvidence structured = AblationEvidence.compare(
+            true,
+            4,
+            100,
+            true,
+            4,
+            100,
+            "same search cost"
+        );
+        PromotionRecord lowerStageStructured = new PromotionRecord(
+            "candidate-2",
+            "campaign-lower",
+            "2026-01-01",
+            "family",
+            PromotionStage.CANDIDATE,
+            "x + y",
+            "(x + y)",
+            "AGREE",
+            "",
+            "DEGRADED",
+            "",
+            "",
+            List.of(),
+            "",
+            List.of(),
+            false,
+            List.of(),
+            true,
+            false,
+            false,
+            false,
+            "",
+            List.of(),
+            false,
+            "",
+            structured
+        );
+
+        PromotionRegistry.Registry merged = registry.build(List.of(higherStageStatusOnly, lowerStageStructured));
+        PromotionRecord record = merged.records().getFirst();
+
+        assertTrue(record.ablationEvidence().hasStructuredMetrics());
+        assertEquals(structured.ablationStatus(), record.ablationEvidence().ablationStatus());
+        assertEquals(record.ablationEvidence().ablationStatus(), record.ablationStatus());
     }
 }

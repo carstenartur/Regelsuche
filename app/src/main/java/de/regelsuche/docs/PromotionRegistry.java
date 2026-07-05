@@ -76,6 +76,7 @@ final class PromotionRegistry {
         reusedMacroIds.addAll(right.reusedMacroIds());
         List<String> uniqueReusedMacroIds = reusedMacroIds.stream().distinct().sorted().toList();
         String generatedMacroId = !left.generatedMacroId().isBlank() ? left.generatedMacroId() : right.generatedMacroId();
+        AblationEvidence mergedAblationEvidence = preferStructuredAblationEvidence(left, right, higherStage);
         return new PromotionRecord(
             higherStage.candidateId(),
             higherStage.sourceCampaign(),
@@ -101,8 +102,25 @@ final class PromotionRegistry {
             generatedMacroId,
             uniqueReusedMacroIds,
             left.measuredImprovement() || right.measuredImprovement(),
-            choose(left.reuseCampaign(), right.reuseCampaign())
+            choose(left.reuseCampaign(), right.reuseCampaign()),
+            mergedAblationEvidence
         );
+    }
+
+    private AblationEvidence preferStructuredAblationEvidence(
+        PromotionRecord left,
+        PromotionRecord right,
+        PromotionRecord higherStage
+    ) {
+        boolean leftStructured = left.ablationEvidence().hasStructuredMetrics();
+        boolean rightStructured = right.ablationEvidence().hasStructuredMetrics();
+        if (leftStructured && !rightStructured) {
+            return left.ablationEvidence();
+        }
+        if (rightStructured && !leftStructured) {
+            return right.ablationEvidence();
+        }
+        return higherStage.ablationEvidence();
     }
 
     private String choose(String left, String right) {
