@@ -19,6 +19,9 @@ public final class DiscoveryCandidateStoreRunner {
 
     DiscoveryCandidateStore.CandidateStoreReport writeReport(Path outputDirectory) {
         DiscoveryPromotionPipelineRunner.PipelineReport pipeline = new DiscoveryPromotionPipelineRunner().run();
-        return new DiscoveryCandidateStore().write(outputDirectory, pipeline.promotionRecords());
+        DiscoveryCandidateStore.CandidateStoreReport storeReport =
+            new DiscoveryCandidateStore().write(outputDirectory, pipeline.promotionRecords());
+        new PatternHypothesisMiner().write(outputDirectory, storeReport);
+        return storeReport;
     }
 }
