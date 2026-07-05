@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AblationEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">AblationEvidence.java</span></div><h1>AblationEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import java.util.Locale;
+
+/** Structured ablation signal used for promotion and candidate reports. */
+record AblationEvidence(
+    RunEvidence withCandidate,
+    RunEvidence withoutCandidate,
+    double improvementRatio,
+    String ablationStatus,
+    String explanation
+) {
+<span class="fc" id="L13">    AblationEvidence {</span>
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">        withCandidate = withCandidate == null ? RunEvidence.unknown() : withCandidate;</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        withoutCandidate = withoutCandidate == null ? RunEvidence.unknown() : withoutCandidate;</span>
+<span class="fc" id="L16">        ablationStatus = normalizeStatus(ablationStatus);</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L18">    }</span>
+
+    static AblationEvidence statusOnly(String ablationStatus) {
+<span class="fc" id="L21">        return statusOnly(ablationStatus, &quot;structured ablation metrics unavailable&quot;);</span>
+    }
+
+    static AblationEvidence statusOnly(String ablationStatus, String explanation) {
+<span class="fc" id="L25">        return new AblationEvidence(</span>
+<span class="fc" id="L26">            RunEvidence.unknown(),</span>
+<span class="fc" id="L27">            RunEvidence.unknown(),</span>
+            0.0d,
+            ablationStatus,
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">            explanation == null || explanation.isBlank()</span>
+<span class="nc" id="L31">                ? &quot;structured ablation metrics unavailable&quot;</span>
+<span class="fc" id="L32">                : explanation</span>
+        );
+    }
+
+    static AblationEvidence compare(
+        boolean withSuccess,
+        int withPathLength,
+        long withStatesExplored,
+        boolean withoutSuccess,
+        int withoutPathLength,
+        long withoutStatesExplored,
+        String explanation
+    ) {
+<span class="fc" id="L45">        RunEvidence with = new RunEvidence(withSuccess, withPathLength, withStatesExplored);</span>
+<span class="fc" id="L46">        RunEvidence without = new RunEvidence(withoutSuccess, withoutPathLength, withoutStatesExplored);</span>
+<span class="fc" id="L47">        String status = statusFor(with, without);</span>
+<span class="fc" id="L48">        return new AblationEvidence(</span>
+            with,
+            without,
+<span class="fc" id="L51">            improvementRatio(with, without),</span>
+            status,
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">            explanation == null || explanation.isBlank() ? defaultExplanation(with, without, status) : explanation</span>
+        );
+    }
+
+    boolean promotionReady() {
+<span class="fc" id="L58">        return &quot;DEGRADED&quot;.equals(ablationStatus);</span>
+    }
+
+    boolean hasStructuredMetrics() {
+<span class="pc bpc" id="L62" title="1 of 4 branches missed.">        return withCandidate.known() || withoutCandidate.known();</span>
+    }
+
+    String compactSummary() {
+<span class="fc" id="L66">        return &quot;with=&quot; + withCandidate.compact()</span>
+<span class="fc" id="L67">            + &quot;; without=&quot; + withoutCandidate.compact()</span>
+<span class="fc" id="L68">            + &quot;; ratio=&quot; + String.format(Locale.ROOT, &quot;%.3f&quot;, improvementRatio)</span>
+            + &quot;; status=&quot; + ablationStatus;
+    }
+
+    private static String statusFor(RunEvidence with, RunEvidence without) {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (with.failed()) {</span>
+<span class="fc" id="L74">            return &quot;BLOCKED&quot;;</span>
+        }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (without.failed()) {</span>
+<span class="fc" id="L77">            return &quot;DEGRADED&quot;;</span>
+        }
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if (isKnownNonNegative(with.pathLength()) &amp;&amp; isKnownNonNegative(without.pathLength())</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            &amp;&amp; with.pathLength() &lt; without.pathLength()) {</span>
+<span class="fc" id="L81">            return &quot;DEGRADED&quot;;</span>
+        }
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">        if (isKnownNonNegative(with.statesExplored()) &amp;&amp; isKnownNonNegative(without.statesExplored())</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            &amp;&amp; with.statesExplored() &lt; without.statesExplored()) {</span>
+<span class="nc" id="L85">            return &quot;DEGRADED&quot;;</span>
+        }
+<span class="fc" id="L87">        return &quot;UNCHANGED&quot;;</span>
+    }
+
+    private static double improvementRatio(RunEvidence with, RunEvidence without) {
+<span class="fc bfc" id="L91" title="All 4 branches covered.">        if (!with.successful() || !without.successful()) {</span>
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">            return with.successful() &amp;&amp; without.failed() ? 1.0d : 0.0d;</span>
+        }
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">        if (isKnownPositive(without.statesExplored()) &amp;&amp; isKnownNonNegative(with.statesExplored())) {</span>
+<span class="fc" id="L95">            return Math.max(0.0d, (without.statesExplored() - with.statesExplored()) / (double) without.statesExplored());</span>
+        }
+<span class="nc bnc" id="L97" title="All 4 branches missed.">        if (isKnownPositive(without.pathLength()) &amp;&amp; isKnownNonNegative(with.pathLength())) {</span>
+<span class="nc" id="L98">            return Math.max(0.0d, (without.pathLength() - with.pathLength()) / (double) without.pathLength());</span>
+        }
+<span class="nc" id="L100">        return 0.0d;</span>
+    }
+
+    private static String defaultExplanation(RunEvidence with, RunEvidence without, String status) {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (&quot;BLOCKED&quot;.equals(status)) {</span>
+<span class="nc" id="L105">            return &quot;candidate-enabled run did not succeed&quot;;</span>
+        }
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        if (&quot;DEGRADED&quot;.equals(status) &amp;&amp; without.failed()) {</span>
+<span class="nc" id="L108">            return &quot;candidate-enabled run succeeds while disabled run does not&quot;;</span>
+        }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (&quot;DEGRADED&quot;.equals(status)) {</span>
+<span class="nc" id="L111">            return &quot;candidate-enabled run improves path length or explored states&quot;;</span>
+        }
+<span class="nc" id="L113">        return &quot;candidate-enabled run did not improve path length or explored states&quot;;</span>
+    }
+
+    private static String normalizeStatus(String status) {
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">        return status == null || status.isBlank() ? &quot;N/A&quot; : status.trim().toUpperCase(Locale.ROOT);</span>
+    }
+
+    private static boolean isKnownPositive(long value) {
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        return value &gt; 0L;</span>
+    }
+
+    private static boolean isKnownPositive(int value) {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        return value &gt; 0;</span>
+    }
+
+    private static boolean isKnownNonNegative(long value) {
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        return value &gt;= 0L;</span>
+    }
+
+    private static boolean isKnownNonNegative(int value) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        return value &gt;= 0;</span>
+    }
+
+<span class="fc" id="L136">    record RunEvidence(Boolean success, int pathLength, long statesExplored) {</span>
+        static RunEvidence unknown() {
+<span class="fc" id="L138">            return new RunEvidence(null, -1, -1L);</span>
+        }
+
+        boolean known() {
+<span class="pc bpc" id="L142" title="2 of 6 branches missed.">            return success != null || pathLength &gt;= 0 || statesExplored &gt;= 0;</span>
+        }
+
+        boolean successful() {
+<span class="fc" id="L146">            return Boolean.TRUE.equals(success);</span>
+        }
+
+        boolean failed() {
+<span class="fc" id="L150">            return Boolean.FALSE.equals(success);</span>
+        }
+
+        String compact() {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            return &quot;success=&quot; + (success == null ? &quot;unknown&quot; : success)</span>
+<span class="fc" id="L155">                + &quot;, pathLength=&quot; + render(pathLength)</span>
+<span class="fc" id="L156">                + &quot;, statesExplored=&quot; + render(statesExplored);</span>
+        }
+
+        private String render(long value) {
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            return value &lt; 0 ? &quot;unknown&quot; : Long.toString(value);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
