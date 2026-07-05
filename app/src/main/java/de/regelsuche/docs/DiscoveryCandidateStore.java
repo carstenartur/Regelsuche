@@ -32,10 +32,9 @@ final class DiscoveryCandidateStore {
         .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
     CandidateStoreReport build(List<PromotionRecord> promotionRecords) {
-        List<PromotionRecord> records = (promotionRecords == null ? List.<PromotionRecord>of() : promotionRecords).stream()
-            .sorted(Comparator.comparing(PromotionRecord::sourceCampaign)
-                .thenComparing(PromotionRecord::candidateId))
-            .toList();
+        List<PromotionRecord> records = promotionRecords == null
+            ? List.of()
+            : List.copyOf(promotionRecords);
         List<NoveltyChecker.Candidate> noveltyCandidates = records.stream()
             .map(this::toNoveltyCandidate)
             .toList();
