@@ -30,6 +30,7 @@ public final class DocsDiscoveryGalleryGenerator {
     private final DiscoveryBenchmarkScenarioLoader scenarioLoader = new DiscoveryBenchmarkScenarioLoader();
     private final DiscoveryBenchmarkExecutor executor = new DiscoveryBenchmarkExecutor();
     private final SearchSpaceGallerySvgWriter svgWriter = new SearchSpaceGallerySvgWriter();
+    private final PublicBenchmarkEvidenceGate publicGate = new PublicBenchmarkEvidenceGate();
 
     public static void main(String[] args) {
         Path repoRoot = args.length == 0 ? Path.of(".").toAbsolutePath().normalize() : Path.of(args[0]).toAbsolutePath().normalize();
@@ -43,20 +44,22 @@ public final class DocsDiscoveryGalleryGenerator {
             Files.createDirectories(generatedRoot);
 
             List<PublicScenarioArtifact> artifacts = new ArrayList<>();
+            List<PublicBenchmarkEvidenceGate.GateDecision> gateDecisions = new ArrayList<>();
             for (DiscoveryBenchmarkScenario scenario : scenarioLoader.loadAll("discovery-scenarios")) {
                 if (!PUBLIC_SCENARIO_IDS.contains(scenario.id())) {
                     continue;
                 }
                 DiscoveryBenchmarkEvidence evidence = executor.execute(scenario);
-                if (!evidence.success()) {
-                    throw new IllegalStateException("Public discovery scenario is not successful: "
-                            + scenario.id() + " - " + evidence.failureReason());
+                PublicBenchmarkEvidenceGate.GateDecision gateDecision = publicGate.evaluate(scenario, evidence);
+                gateDecisions.add(gateDecision);
+                if (gateDecision.accepted()) {
+                    artifacts.add(writeScenarioArtifacts(generatedRoot, scenario, evidence));
                 }
-                if (!evidence.promotionEligible()) {
-                    throw new IllegalStateException("Public discovery scenario is not promotion eligible: "
-                            + scenario.id() + " - oracle=" + evidence.oracleStatus());
-                }
-                artifacts.add(writeScenarioArtifacts(generatedRoot, scenario, evidence));
+            }
+            PublicBenchmarkEvidenceGate.GateReport gateReport = publicGate.write(generatedRoot, gateDecisions);
+            if (gateReport.rejectedCount() > 0) {
+                throw new IllegalStateException("Public discovery scenario gate rejected "
+                    + gateReport.rejectedCount() + " scenario(s); see docs/generated/discovery/public-scenario-rejections.md");
             }
             ensureAllPublicScenariosGenerated(artifacts);
             writeIndex(generatedRoot.resolve("index.json"), artifacts);
@@ -132,6 +135,8 @@ public final class DocsDiscoveryGalleryGenerator {
                 # Regelsuche Discovery Gallery
 
                 This gallery contains generated evidence only.
+
+                Public entries are admitted only after `PublicBenchmarkEvidenceGate` accepts their generated search evidence. Rejections are written to `generated/discovery/public-scenario-rejections.md`.
 
                 ## Complete-square factorization
 
