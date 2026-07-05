@@ -147,7 +147,8 @@ class DiscoveryPromotionPipelineRunnerTest {
             "macro.id",
             List.of("macro.id"),
             true,
-            "discovery-campaign-4"
+            "discovery-campaign-4",
+            AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation")
         );
         PromotionRecord blocked = new PromotionRecord(
             "blocked",
@@ -463,7 +464,8 @@ class DiscoveryPromotionPipelineRunnerTest {
             "macro",
             List.of("m1"),
             true,
-            "campaign-4"
+            "campaign-4",
+            AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation")
         );
 
         String gallery = runner.renderGallery(List.of(record));
@@ -547,7 +549,8 @@ class DiscoveryPromotionPipelineRunnerTest {
             "macro.id",
             List.of("macro.id"),
             true,
-            "discovery-campaign-4"
+            "discovery-campaign-4",
+            AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation")
         );
 
         String gallery = runner.renderGallery(List.of(record));
@@ -600,7 +603,8 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             false,
-            ""
+            "",
+            AblationEvidence.compare(true, 2, 9, true, 4, 25, "test ablation")
         );
 
         String gallery = runner.renderGallery(List.of(record));
