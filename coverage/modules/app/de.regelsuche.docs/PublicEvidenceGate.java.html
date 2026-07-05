@@ -169,7 +169,7 @@ import java.util.stream.Collectors;
         }
 
         List&lt;GateDecision&gt; rejected() {
-<span class="nc bnc" id="L172" title="All 2 branches missed.">            return decisions.stream().filter(decision -&gt; !decision.accepted()).toList();</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            return decisions.stream().filter(decision -&gt; !decision.accepted()).toList();</span>
         }
 
         Map&lt;String, Long&gt; rejectionReasonCounts() {

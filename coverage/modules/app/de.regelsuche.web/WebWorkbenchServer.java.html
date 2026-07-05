@@ -2525,8 +2525,8 @@ public class WebWorkbenchServer {
     private void handleProofJobGet(HttpExchange exchange, String jobId) throws IOException {
 <span class="fc" id="L2526">        var job = proofWorkbenchService.getJob(jobId);</span>
 <span class="fc bfc" id="L2527" title="All 2 branches covered.">        if (job.isEmpty()) {</span>
-<span class="nc" id="L2528">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
-<span class="nc" id="L2529">            return;</span>
+<span class="fc" id="L2528">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
+<span class="fc" id="L2529">            return;</span>
         }
 <span class="fc" id="L2531">        JsonWriter writer = new JsonWriter();</span>
 <span class="fc" id="L2532">        writer.beginObject();</span>

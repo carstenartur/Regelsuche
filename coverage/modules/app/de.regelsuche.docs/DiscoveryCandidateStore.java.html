@@ -116,8 +116,8 @@ import java.util.stream.Collectors;
 <span class="fc" id="L116">                    .append(&quot; [&quot;).append(example.lifecycleStatus().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
 <span class="fc" id="L117">                    .append(&quot; campaign=&quot;).append(escape(example.sourceCampaign()))</span>
 <span class="fc" id="L118">                    .append(&quot; novelty=&quot;).append(example.noveltyStatus().name().toLowerCase(Locale.ROOT));</span>
-<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                if (!example.matchedCandidateId().isBlank()) {</span>
-<span class="nc" id="L120">                    out.append(&quot; matched=&quot;).append(escape(example.matchedCandidateId()));</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (!example.matchedCandidateId().isBlank()) {</span>
+<span class="fc" id="L120">                    out.append(&quot; matched=&quot;).append(escape(example.matchedCandidateId()));</span>
                 }
 <span class="fc" id="L122">                out.append(&quot; input=`&quot;).append(escapeInlineCode(example.inputExpression()))</span>
 <span class="fc" id="L123">                    .append(&quot;` target=`&quot;).append(escapeInlineCode(example.targetExpression()))</span>
@@ -211,8 +211,8 @@ import java.util.stream.Collectors;
 <span class="fc bfc" id="L211" title="All 2 branches covered.">        if (record.stage().atLeast(PromotionStage.VALIDATED)) {</span>
 <span class="fc" id="L212">            return CandidateLifecycleStatus.VALIDATED;</span>
         }
-<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (record.stage().atLeast(PromotionStage.CANDIDATE)) {</span>
-<span class="nc" id="L215">            return CandidateLifecycleStatus.CANDIDATE;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (record.stage().atLeast(PromotionStage.CANDIDATE)) {</span>
+<span class="fc" id="L215">            return CandidateLifecycleStatus.CANDIDATE;</span>
         }
 <span class="fc" id="L217">        return CandidateLifecycleStatus.OBSERVED;</span>
     }

@@ -135,14 +135,14 @@ import java.util.stream.Collectors;
 <span class="fc" id="L135">                    .append(&quot;)\n&quot;);</span>
 <span class="fc" id="L136">            }</span>
         }
-<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (!report.rejectedClusters().isEmpty()) {</span>
-<span class="nc" id="L139">            out.append(&quot;\n## Rejected clusters\n\n&quot;);</span>
-<span class="nc bnc" id="L140" title="All 2 branches missed.">            for (RejectedCluster rejected : report.rejectedClusters()) {</span>
-<span class="nc" id="L141">                out.append(&quot;- &quot;).append(escape(rejected.clusterKey()))</span>
-<span class="nc" id="L142">                    .append(&quot;: &quot;).append(escape(rejected.reason()))</span>
-<span class="nc" id="L143">                    .append(&quot; (support=&quot;).append(rejected.supportCount())</span>
-<span class="nc" id="L144">                    .append(&quot;)\n&quot;);</span>
-<span class="nc" id="L145">            }</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (!report.rejectedClusters().isEmpty()) {</span>
+<span class="fc" id="L139">            out.append(&quot;\n## Rejected clusters\n\n&quot;);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            for (RejectedCluster rejected : report.rejectedClusters()) {</span>
+<span class="fc" id="L141">                out.append(&quot;- &quot;).append(escape(rejected.clusterKey()))</span>
+<span class="fc" id="L142">                    .append(&quot;: &quot;).append(escape(rejected.reason()))</span>
+<span class="fc" id="L143">                    .append(&quot; (support=&quot;).append(rejected.supportCount())</span>
+<span class="fc" id="L144">                    .append(&quot;)\n&quot;);</span>
+<span class="fc" id="L145">            }</span>
         }
 <span class="fc" id="L147">        return out.toString();</span>
     }

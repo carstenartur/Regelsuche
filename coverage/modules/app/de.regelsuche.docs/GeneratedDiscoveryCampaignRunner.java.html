@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeneratedDiscoveryCampaignRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">GeneratedDiscoveryCampaignRunner.java</span></div><h1>GeneratedDiscoveryCampaignRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Runs a deterministic generator-driven discovery campaign from systematic families. */
+<span class="fc" id="L17">public final class GeneratedDiscoveryCampaignRunner {</span>
+    private static final String CAMPAIGN_ID = &quot;discovery-campaign-generated-1&quot;;
+<span class="fc" id="L19">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L20">        .findAndRegisterModules()</span>
+<span class="fc" id="L21">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L24" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L25">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L26">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L27">        new GeneratedDiscoveryCampaignRunner()</span>
+<span class="nc" id="L28">            .writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-generated-campaign&quot;));</span>
+<span class="nc" id="L29">    }</span>
+
+    CampaignReport run() {
+<span class="fc" id="L32">        List&lt;GeneratedCase&gt; cases = generatedCases();</span>
+<span class="fc" id="L33">        List&lt;PromotionRecord&gt; records = cases.stream()</span>
+<span class="fc" id="L34">            .map(this::toPromotionRecord)</span>
+<span class="fc" id="L35">            .toList();</span>
+<span class="fc" id="L36">        return new CampaignReport(</span>
+            CAMPAIGN_ID,
+            cases,
+            records,
+<span class="fc" id="L40">            familySummaries(cases)</span>
+        );
+    }
+
+    CampaignReport writeReport(Path outputDirectory) {
+        try {
+<span class="fc" id="L46">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L47">            CampaignReport report = run();</span>
+<span class="fc" id="L48">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L49">                outputDirectory.resolve(&quot;generated-discovery-campaign.json&quot;),</span>
+<span class="fc" id="L50">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+            );
+<span class="fc" id="L52">            Files.writeString(</span>
+<span class="fc" id="L53">                outputDirectory.resolve(&quot;generated-discovery-campaign.md&quot;),</span>
+<span class="fc" id="L54">                renderCampaign(report),</span>
+                StandardCharsets.UTF_8
+            );
+
+<span class="fc" id="L58">            new DiscoveryCandidateReportWriter().write(outputDirectory, report.campaignId(), report.promotionRecords());</span>
+<span class="fc" id="L59">            DiscoveryCandidateStore.CandidateStoreReport store =</span>
+<span class="fc" id="L60">                new DiscoveryCandidateStore().write(outputDirectory, report.promotionRecords());</span>
+<span class="fc" id="L61">            new PatternHypothesisMiner().write(outputDirectory, store);</span>
+<span class="fc" id="L62">            new PublicEvidenceGate().write(outputDirectory, report.promotionRecords());</span>
+<span class="fc" id="L63">            return report;</span>
+<span class="nc" id="L64">        } catch (IOException exception) {</span>
+<span class="nc" id="L65">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    List&lt;GeneratedCase&gt; generatedCases() {
+<span class="fc" id="L70">        List&lt;GeneratedCase&gt; cases = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L71">        cases.addAll(perfectSquareExpansionFamily());</span>
+<span class="fc" id="L72">        cases.addAll(rationalCommonDenominatorFamily());</span>
+<span class="fc" id="L73">        return List.copyOf(cases);</span>
+    }
+
+    private List&lt;GeneratedCase&gt; perfectSquareExpansionFamily() {
+<span class="fc" id="L77">        List&lt;GeneratedCase&gt; cases = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int k : List.of(1, 2, 3)) {</span>
+<span class="fc" id="L79">            Map&lt;String, String&gt; seed = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L80">            seed.put(&quot;variable&quot;, &quot;x&quot;);</span>
+<span class="fc" id="L81">            seed.put(&quot;offset&quot;, Integer.toString(k));</span>
+<span class="fc" id="L82">            cases.add(new GeneratedCase(</span>
+                &quot;generated-perfect-square-&quot; + k,
+                &quot;perfect-square-expansion&quot;,
+                &quot;(x + &quot; + k + &quot;)^2&quot;,
+                &quot;x^2 + &quot; + (2 * k) + &quot;*x + &quot; + (k * k),
+                &quot;generated_perfect_square_expansion&quot;,
+                &quot;generated-family:perfect-square-expansion&quot;,
+                seed,
+<span class="fc" id="L90">                List.of(),</span>
+<span class="fc" id="L91">                List.of(&quot;generated_family_seed&quot;, &quot;generated_perfect_square_expansion&quot;),</span>
+                &quot;generated from parameterized family (x+k)^2 -&gt; x^2+2kx+k^2&quot;
+            ));
+<span class="fc" id="L94">        }</span>
+<span class="fc" id="L95">        return cases;</span>
+    }
+
+    private List&lt;GeneratedCase&gt; rationalCommonDenominatorFamily() {
+<span class="fc" id="L99">        List&lt;GeneratedCase&gt; cases = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L100">        List&lt;RationalSeed&gt; seeds = List.of(</span>
+            new RationalSeed(&quot;x&quot;, &quot;z&quot;, &quot;y&quot;),
+            new RationalSeed(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;),
+            new RationalSeed(&quot;m&quot;, &quot;n&quot;, &quot;q&quot;)
+        );
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (RationalSeed seed : seeds) {</span>
+<span class="fc" id="L106">            Map&lt;String, String&gt; seedParameters = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L107">            seedParameters.put(&quot;leftNumerator&quot;, seed.leftNumerator());</span>
+<span class="fc" id="L108">            seedParameters.put(&quot;rightNumerator&quot;, seed.rightNumerator());</span>
+<span class="fc" id="L109">            seedParameters.put(&quot;denominator&quot;, seed.denominator());</span>
+<span class="fc" id="L110">            cases.add(new GeneratedCase(</span>
+<span class="fc" id="L111">                &quot;generated-rational-common-denominator-&quot; + seed.denominator(),</span>
+                &quot;rational-common-denominator&quot;,
+<span class="fc" id="L113">                seed.leftNumerator() + &quot; / &quot; + seed.denominator() + &quot; + &quot;</span>
+<span class="fc" id="L114">                    + seed.rightNumerator() + &quot; / &quot; + seed.denominator(),</span>
+<span class="fc" id="L115">                &quot;(&quot; + seed.leftNumerator() + &quot; + &quot; + seed.rightNumerator() + &quot;) / &quot; + seed.denominator(),</span>
+                &quot;generated_rational_common_denominator&quot;,
+                &quot;generated-family:rational-common-denominator&quot;,
+                seedParameters,
+<span class="fc" id="L119">                List.of(&quot;nonZero(&quot; + seed.denominator() + &quot;)&quot;),</span>
+<span class="fc" id="L120">                List.of(&quot;generated_family_seed&quot;, &quot;generated_rational_common_denominator&quot;),</span>
+                &quot;generated from parameterized family a/d + b/d -&gt; (a+b)/d under d != 0&quot;
+            ));
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        return cases;</span>
+    }
+
+    private PromotionRecord toPromotionRecord(GeneratedCase generatedCase) {
+<span class="fc" id="L128">        return new PromotionRecord(</span>
+<span class="fc" id="L129">            generatedCase.id(),</span>
+            CAMPAIGN_ID,
+            &quot;2026-10-01&quot;,
+<span class="fc" id="L132">            generatedCase.family(),</span>
+            PromotionStage.CANDIDATE,
+<span class="fc" id="L134">            generatedCase.inputExpression(),</span>
+<span class="fc" id="L135">            generatedCase.targetExpression(),</span>
+            &quot;UNAVAILABLE&quot;,
+            &quot;generated family case; no oracle check has been performed&quot;,
+            &quot;N/A&quot;,
+<span class="fc" id="L139">            generatedCase.operatorId(),</span>
+<span class="fc" id="L140">            generatedCase.packId(),</span>
+<span class="fc" id="L141">            generatedCase.assumptions(),</span>
+<span class="fc" id="L142">            generatedCase.rationale(),</span>
+<span class="fc" id="L143">            generatedCase.rulePath(),</span>
+            false,
+<span class="fc" id="L145">            List.of(&quot;no-real-search-evidence&quot;),</span>
+            false,
+            false,
+            false,
+            false,
+            &quot;&quot;,
+<span class="fc" id="L151">            List.of(),</span>
+            false,
+            &quot;&quot;
+        );
+    }
+
+    private List&lt;FamilySummary&gt; familySummaries(List&lt;GeneratedCase&gt; cases) {
+<span class="fc" id="L158">        Map&lt;String, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (GeneratedCase generatedCase : cases) {</span>
+<span class="fc" id="L160">            counts.merge(generatedCase.family(), 1, Integer::sum);</span>
+<span class="fc" id="L161">        }</span>
+<span class="fc" id="L162">        return counts.entrySet().stream()</span>
+<span class="fc" id="L163">            .map(entry -&gt; new FamilySummary(entry.getKey(), entry.getValue()))</span>
+<span class="fc" id="L164">            .toList();</span>
+    }
+
+    private String renderCampaign(CampaignReport report) {
+<span class="fc" id="L168">        StringBuilder out = new StringBuilder(&quot;# Generated discovery campaign\n\n&quot;);</span>
+<span class="fc" id="L169">        out.append(&quot;Campaign: `&quot;).append(report.campaignId()).append(&quot;`\n\n&quot;);</span>
+<span class="fc" id="L170">        out.append(&quot;## Families\n\n&quot;);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (FamilySummary summary : report.familySummaries()) {</span>
+<span class="fc" id="L172">            out.append(&quot;- &quot;).append(summary.family()).append(&quot;: &quot;).append(summary.caseCount()).append(&quot; cases\n&quot;);</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        out.append(&quot;\n## Generated cases\n\n&quot;);</span>
+<span class="fc" id="L175">        out.append(&quot;| Case | Family | Input | Target | Operator | Assumptions | Seed parameters |\n&quot;);</span>
+<span class="fc" id="L176">        out.append(&quot;| --- | --- | --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (GeneratedCase generatedCase : report.cases()) {</span>
+<span class="fc" id="L178">            out.append(&quot;| &quot;).append(escape(generatedCase.id()))</span>
+<span class="fc" id="L179">                .append(&quot; | &quot;).append(escape(generatedCase.family()))</span>
+<span class="fc" id="L180">                .append(&quot; | `&quot;).append(escapeInlineCode(generatedCase.inputExpression())).append(&quot;`&quot;)</span>
+<span class="fc" id="L181">                .append(&quot; | `&quot;).append(escapeInlineCode(generatedCase.targetExpression())).append(&quot;`&quot;)</span>
+<span class="fc" id="L182">                .append(&quot; | &quot;).append(escape(generatedCase.operatorId()))</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                .append(&quot; | &quot;).append(escape(generatedCase.assumptions().isEmpty() ? &quot;—&quot; : String.join(&quot;, &quot;, generatedCase.assumptions())))</span>
+<span class="fc" id="L184">                .append(&quot; | &quot;).append(escape(generatedCase.sourceSeedParameters().toString()))</span>
+<span class="fc" id="L185">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L186">        }</span>
+<span class="fc" id="L187">        return out.toString();</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    private String escapeInlineCode(String value) {
+<span class="fc" id="L195">        return escape(value).replace(&quot;`&quot;, &quot;\\`&quot;);</span>
+    }
+
+    record CampaignReport(
+        String campaignId,
+        List&lt;GeneratedCase&gt; cases,
+        List&lt;PromotionRecord&gt; promotionRecords,
+        List&lt;FamilySummary&gt; familySummaries
+    ) {
+<span class="fc" id="L204">        CampaignReport {</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            cases = cases == null ? List.of() : List.copyOf(cases);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            promotionRecords = promotionRecords == null ? List.of() : List.copyOf(promotionRecords);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            familySummaries = familySummaries == null ? List.of() : List.copyOf(familySummaries);</span>
+<span class="fc" id="L208">        }</span>
+    }
+
+    record GeneratedCase(
+        String id,
+        String family,
+        String inputExpression,
+        String targetExpression,
+        String operatorId,
+        String packId,
+        Map&lt;String, String&gt; sourceSeedParameters,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; rulePath,
+        String rationale
+    ) {
+<span class="fc" id="L223">        GeneratedCase {</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            sourceSeedParameters = sourceSeedParameters == null ? Map.of() : Map.copyOf(sourceSeedParameters);</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            rationale = rationale == null ? &quot;&quot; : rationale;</span>
+<span class="fc" id="L228">        }</span>
+    }
+
+<span class="fc" id="L231">    record FamilySummary(String family, int caseCount) {</span>
+    }
+
+<span class="fc" id="L234">    private record RationalSeed(String leftNumerator, String rightNumerator, String denominator) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
