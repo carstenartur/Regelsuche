@@ -144,7 +144,7 @@ import java.util.stream.Collectors;
         NoveltyChecker.NoveltyResult noveltyResult,
         Map&lt;String, String&gt; representativeByCandidateId
     ) {
-<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if ((noveltyResult.status() == NoveltyStatus.DUPLICATE</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if ((noveltyResult.status() == NoveltyStatus.DUPLICATE</span>
 <span class="fc bfc" id="L148" title="All 2 branches covered.">            || noveltyResult.status() == NoveltyStatus.ALPHA_EQUIVALENT)</span>
 <span class="pc bpc" id="L149" title="1 of 2 branches missed.">            &amp;&amp; !noveltyResult.matchedCandidateId().isBlank()) {</span>
 <span class="fc" id="L150">            return representativeByCandidateId.getOrDefault(</span>

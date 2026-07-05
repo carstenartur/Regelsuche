@@ -19,7 +19,10 @@ import java.nio.file.Path;
 
     DiscoveryCandidateStore.CandidateStoreReport writeReport(Path outputDirectory) {
 <span class="nc" id="L21">        DiscoveryPromotionPipelineRunner.PipelineReport pipeline = new DiscoveryPromotionPipelineRunner().run();</span>
-<span class="nc" id="L22">        return new DiscoveryCandidateStore().write(outputDirectory, pipeline.promotionRecords());</span>
+<span class="nc" id="L22">        DiscoveryCandidateStore.CandidateStoreReport storeReport =</span>
+<span class="nc" id="L23">            new DiscoveryCandidateStore().write(outputDirectory, pipeline.promotionRecords());</span>
+<span class="nc" id="L24">        new PatternHypothesisMiner().write(outputDirectory, storeReport);</span>
+<span class="nc" id="L25">        return storeReport;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
