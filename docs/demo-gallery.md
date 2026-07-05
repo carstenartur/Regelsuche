@@ -2,6 +2,8 @@
 
 This gallery contains generated evidence only.
 
+Public entries are admitted only after `PublicBenchmarkEvidenceGate` accepts their generated search evidence. Rejections are written to `generated/discovery/public-scenario-rejections.md`.
+
 ## Complete-square factorization
 
 - Input: `x ^ 2 + 6 * x + 5`
