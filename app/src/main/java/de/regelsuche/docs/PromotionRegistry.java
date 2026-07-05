@@ -101,7 +101,8 @@ final class PromotionRegistry {
             generatedMacroId,
             uniqueReusedMacroIds,
             left.measuredImprovement() || right.measuredImprovement(),
-            choose(left.reuseCampaign(), right.reuseCampaign())
+            choose(left.reuseCampaign(), right.reuseCampaign()),
+            higherStage.ablationEvidence()
         );
     }
 
