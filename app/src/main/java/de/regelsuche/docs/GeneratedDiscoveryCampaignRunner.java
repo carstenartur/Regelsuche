@@ -125,42 +125,32 @@ public final class GeneratedDiscoveryCampaignRunner {
     }
 
     private PromotionRecord toPromotionRecord(GeneratedCase generatedCase) {
-        AblationEvidence ablation = AblationEvidence.compare(
-            true,
-            1,
-            8,
-            true,
-            3,
-            40,
-            "generated family operator shortens the search path for " + generatedCase.id()
-        );
         return new PromotionRecord(
             generatedCase.id(),
             CAMPAIGN_ID,
             "2026-10-01",
             generatedCase.family(),
-            PromotionStage.PROMOTED,
+            PromotionStage.CANDIDATE,
             generatedCase.inputExpression(),
             generatedCase.targetExpression(),
-            "AGREE",
-            "generated family target is symbolically equivalent by construction; external oracle can re-check",
-            ablation.ablationStatus(),
+            "UNAVAILABLE",
+            "generated family case; no oracle check has been performed",
+            "N/A",
             generatedCase.operatorId(),
             generatedCase.packId(),
             generatedCase.assumptions(),
             generatedCase.rationale(),
             generatedCase.rulePath(),
-            true,
-            List.of(),
-            true,
+            false,
+            List.of("no-real-search-evidence"),
             false,
             false,
-            true,
+            false,
+            false,
             "",
             List.of(),
             false,
-            "",
-            ablation
+            ""
         );
     }
 
