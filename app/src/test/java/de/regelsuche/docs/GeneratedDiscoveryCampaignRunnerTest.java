@@ -72,7 +72,9 @@ class GeneratedDiscoveryCampaignRunnerTest {
 
         assertFalse(store.candidates().isEmpty());
         assertFalse(hypotheses.hypotheses().isEmpty(), "generated families should produce at least one generalized hypothesis");
-        assertEquals(report.promotionRecords().size(), gateReport.acceptedCount());
-        assertEquals(0, gateReport.rejectedCount());
+        assertTrue(gateReport.acceptedCount() > 0, "some generated variants should pass the public evidence gate");
+        assertTrue(gateReport.rejectedCount() > 0, "alpha-equivalent support cases should remain rejected for public evidence");
+        assertTrue(gateReport.rejected().stream()
+            .anyMatch(decision -> decision.rejectionReasons().stream().anyMatch(reason -> reason.startsWith("novelty="))));
     }
 }
