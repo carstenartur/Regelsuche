@@ -22,6 +22,7 @@ public final class DiscoveryCandidateStoreRunner {
         DiscoveryCandidateStore.CandidateStoreReport storeReport =
             new DiscoveryCandidateStore().write(outputDirectory, pipeline.promotionRecords());
         new PatternHypothesisMiner().write(outputDirectory, storeReport);
+        new PublicEvidenceGate().write(outputDirectory, pipeline.promotionRecords());
         return storeReport;
     }
 }
