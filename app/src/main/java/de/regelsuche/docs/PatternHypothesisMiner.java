@@ -44,32 +44,42 @@ final class PatternHypothesisMiner {
         List<GeneralizedHypothesis> hypotheses = new ArrayList<>();
         List<RejectedCluster> rejected = new ArrayList<>();
         for (Map.Entry<String, List<SupportExample>> entry : byFamilyAndOperator.entrySet()) {
-            List<SupportExample> examples = entry.getValue().stream()
+            List<SupportExample> deduplicatedExamples = entry.getValue().stream()
                 .sorted(Comparator.comparing(SupportExample::exampleId))
+                .collect(Collectors.toMap(
+                    SupportExample::exampleId,
+                    example -> example,
+                    (first, ignored) -> first,
+                    LinkedHashMap::new
+                ))
+                .values()
+                .stream()
                 .toList();
-            if (examples.size() < 2) {
-                rejected.add(reject(entry.getKey(), examples, "support-count<2"));
+            if (deduplicatedExamples.size() < 2) {
+                rejected.add(reject(entry.getKey(), deduplicatedExamples, "support-count<2"));
                 continue;
             }
-            List<SuccessfulTransformationPath> paths = examples.stream()
+            List<SuccessfulTransformationPath> paths = deduplicatedExamples.stream()
                 .map(this::toPath)
                 .toList();
             Optional<GeneralizedPattern> generalized = generalizer.generalize(paths);
             if (generalized.isEmpty()) {
-                rejected.add(reject(entry.getKey(), examples, "generalizer returned no compatible pattern"));
+                rejected.add(reject(entry.getKey(), deduplicatedExamples, "generalizer returned no compatible pattern"));
                 continue;
             }
             GeneralizedPattern pattern = generalized.orElseThrow();
-            SupportExample first = examples.getFirst();
+            SupportExample first = deduplicatedExamples.getFirst();
+            List<String> supportingExampleIds = deduplicatedExamples.stream().map(SupportExample::exampleId).toList();
+            List<String> supportingCandidateIds = deduplicatedExamples.stream().map(SupportExample::candidateId).distinct().toList();
             hypotheses.add(new GeneralizedHypothesis(
                 hypothesisId(first.family(), first.operatorId(), pattern.leftPattern(), pattern.rightPattern()),
                 first.family(),
                 first.operatorId(),
                 pattern.leftPattern(),
                 pattern.rightPattern(),
-                examples.size(),
-                examples.stream().map(SupportExample::exampleId).distinct().toList(),
-                examples.stream().map(SupportExample::candidateId).distinct().toList(),
+                supportingExampleIds.size(),
+                supportingExampleIds,
+                supportingCandidateIds,
                 pattern.parameterRelations(),
                 pattern.expressionPlaceholderValues(),
                 "GENERALIZED_FROM_SUPPORT"
@@ -139,8 +149,8 @@ final class PatternHypothesisMiner {
 
     String renderPatternHypotheses(PatternHypothesisReport report) {
         StringBuilder out = new StringBuilder("# Pattern hypotheses\n\n");
-        out.append("| Hypothesis | Family | Operator | Support | Left pattern | Right pattern | Examples |\n");
-        out.append("| --- | --- | --- | ---: | --- | --- | --- |\n");
+        out.append("| Hypothesis | Family | Operator | Support | Left pattern | Right pattern | Examples | Candidates |\n");
+        out.append("| --- | --- | --- | ---: | --- | --- | --- | --- |\n");
         for (GeneralizedHypothesis hypothesis : report.hypotheses()) {
             out.append("| ").append(escape(hypothesis.hypothesisId()))
                 .append(" | ").append(escape(hypothesis.family()))
@@ -149,6 +159,7 @@ final class PatternHypothesisMiner {
                 .append(" | `").append(escapeInlineCode(hypothesis.leftPattern())).append("`")
                 .append(" | `").append(escapeInlineCode(hypothesis.rightPattern())).append("`")
                 .append(" | ").append(escape(String.join(", ", hypothesis.supportingExampleIds())))
+                .append(" | ").append(escape(String.join(", ", hypothesis.supportingCandidateIds())))
                 .append(" |\n");
         }
         out.append("\n## Parameter relations\n\n");
@@ -160,6 +171,22 @@ final class PatternHypothesisMiner {
                 for (String relation : hypothesis.parameterRelations()) {
                     out.append("- ").append(escape(relation)).append('\n');
                 }
+            }
+            out.append('\n');
+        }
+        out.append("## Expression placeholder values\n\n");
+        for (GeneralizedHypothesis hypothesis : report.hypotheses()) {
+            out.append("### ").append(escape(hypothesis.hypothesisId())).append("\n\n");
+            if (hypothesis.expressionPlaceholderValues().isEmpty()) {
+                out.append("- none\n");
+            } else {
+                hypothesis.expressionPlaceholderValues().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> out.append("- ")
+                        .append(escape(entry.getKey()))
+                        .append(": ")
+                        .append(escape(String.join(", ", entry.getValue())))
+                        .append('\n'));
             }
             out.append('\n');
         }

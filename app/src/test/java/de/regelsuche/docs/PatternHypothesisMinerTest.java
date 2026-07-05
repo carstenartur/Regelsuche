@@ -70,6 +70,23 @@ class PatternHypothesisMinerTest {
         assertTrue(suggestions.contains("square-1"));
         assertTrue(suggestions.contains("square-2"));
         assertTrue(suggestions.contains("square-3"));
+        String hypotheses = Files.readString(tempDir.resolve("pattern-hypotheses.md"), StandardCharsets.UTF_8);
+        assertTrue(hypotheses.contains("| Hypothesis | Family | Operator | Support | Left pattern | Right pattern | Examples | Candidates |"));
+        assertTrue(hypotheses.contains("## Expression placeholder values"));
+    }
+
+    @Test
+    void rejectsClusterWhenOnlyDuplicateExampleIdsContributeSupport() {
+        DiscoveryCandidateStore.CandidateStoreReport store = store(
+            record("square-1", "(x + 1)^2", "x^2 + 2*x + 1"),
+            record("square-1", "(x + 2)^2", "x^2 + 4*x + 4")
+        );
+
+        PatternHypothesisMiner.PatternHypothesisReport report = new PatternHypothesisMiner().mine(store);
+
+        assertTrue(report.hypotheses().isEmpty());
+        assertTrue(report.rejectedClusters().stream()
+            .anyMatch(cluster -> cluster.reason().contains("support-count<2")));
     }
 
     private DiscoveryCandidateStore.CandidateStoreReport store(PromotionRecord... records) {
