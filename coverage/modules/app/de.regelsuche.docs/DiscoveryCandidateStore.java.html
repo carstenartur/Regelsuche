@@ -32,111 +32,110 @@ import java.util.stream.Collectors;
 <span class="fc" id="L32">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
 
     CandidateStoreReport build(List&lt;PromotionRecord&gt; promotionRecords) {
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        List&lt;PromotionRecord&gt; records = (promotionRecords == null ? List.&lt;PromotionRecord&gt;of() : promotionRecords).stream()</span>
-<span class="fc" id="L36">            .sorted(Comparator.comparing(PromotionRecord::sourceCampaign)</span>
-<span class="fc" id="L37">                .thenComparing(PromotionRecord::candidateId))</span>
-<span class="fc" id="L38">            .toList();</span>
-<span class="fc" id="L39">        List&lt;NoveltyChecker.Candidate&gt; noveltyCandidates = records.stream()</span>
-<span class="fc" id="L40">            .map(this::toNoveltyCandidate)</span>
-<span class="fc" id="L41">            .toList();</span>
-<span class="fc" id="L42">        List&lt;NoveltyChecker.NoveltyResult&gt; novelty = new NoveltyChecker().classifyAll(noveltyCandidates);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        List&lt;PromotionRecord&gt; records = promotionRecords == null</span>
+<span class="nc" id="L36">            ? List.of()</span>
+<span class="fc" id="L37">            : List.copyOf(promotionRecords);</span>
+<span class="fc" id="L38">        List&lt;NoveltyChecker.Candidate&gt; noveltyCandidates = records.stream()</span>
+<span class="fc" id="L39">            .map(this::toNoveltyCandidate)</span>
+<span class="fc" id="L40">            .toList();</span>
+<span class="fc" id="L41">        List&lt;NoveltyChecker.NoveltyResult&gt; novelty = new NoveltyChecker().classifyAll(noveltyCandidates);</span>
 
-<span class="fc" id="L44">        Map&lt;String, String&gt; representativeByCandidateId = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L45">        Map&lt;String, EntryBuilder&gt; builders = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (int index = 0; index &lt; records.size(); index++) {</span>
-<span class="fc" id="L47">            PromotionRecord record = records.get(index);</span>
-<span class="fc" id="L48">            NoveltyChecker.NoveltyResult noveltyResult = novelty.get(index);</span>
-<span class="fc" id="L49">            String representativeId = representativeId(record, noveltyResult, representativeByCandidateId);</span>
-<span class="fc" id="L50">            representativeByCandidateId.put(record.candidateId(), representativeId);</span>
-<span class="fc" id="L51">            builders.computeIfAbsent(representativeId, id -&gt; new EntryBuilder(id)).add(record, noveltyResult);</span>
+<span class="fc" id="L43">        Map&lt;String, String&gt; representativeByCandidateId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L44">        Map&lt;String, EntryBuilder&gt; builders = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int index = 0; index &lt; records.size(); index++) {</span>
+<span class="fc" id="L46">            PromotionRecord record = records.get(index);</span>
+<span class="fc" id="L47">            NoveltyChecker.NoveltyResult noveltyResult = novelty.get(index);</span>
+<span class="fc" id="L48">            String representativeId = representativeId(record, noveltyResult, representativeByCandidateId);</span>
+<span class="fc" id="L49">            representativeByCandidateId.put(record.candidateId(), representativeId);</span>
+<span class="fc" id="L50">            builders.computeIfAbsent(representativeId, id -&gt; new EntryBuilder(id)).add(record, noveltyResult);</span>
         }
 
-<span class="fc" id="L54">        List&lt;CandidateEntry&gt; entries = builders.values().stream()</span>
-<span class="fc" id="L55">            .map(EntryBuilder::build)</span>
-<span class="fc" id="L56">            .sorted(Comparator.comparing(CandidateEntry::candidateId))</span>
-<span class="fc" id="L57">            .toList();</span>
-<span class="fc" id="L58">        return new CandidateStoreReport(</span>
+<span class="fc" id="L53">        List&lt;CandidateEntry&gt; entries = builders.values().stream()</span>
+<span class="fc" id="L54">            .map(EntryBuilder::build)</span>
+<span class="fc" id="L55">            .sorted(Comparator.comparing(CandidateEntry::candidateId))</span>
+<span class="fc" id="L56">            .toList();</span>
+<span class="fc" id="L57">        return new CandidateStoreReport(</span>
             entries,
             new CandidateStoreMetrics(
-<span class="fc" id="L61">                records.size(),</span>
-<span class="fc" id="L62">                entries.size(),</span>
-<span class="fc" id="L63">                countMergedSupport(entries),</span>
-<span class="fc" id="L64">                countByLifecycle(entries),</span>
-<span class="fc" id="L65">                countByNovelty(entries)</span>
+<span class="fc" id="L60">                records.size(),</span>
+<span class="fc" id="L61">                entries.size(),</span>
+<span class="fc" id="L62">                countMergedSupport(entries),</span>
+<span class="fc" id="L63">                countByLifecycle(entries),</span>
+<span class="fc" id="L64">                countByNovelty(entries)</span>
             )
         );
     }
 
     CandidateStoreReport write(Path outputDirectory, List&lt;PromotionRecord&gt; promotionRecords) {
         try {
-<span class="fc" id="L72">            Files.createDirectories(outputDirectory);</span>
-<span class="fc" id="L73">            CandidateStoreReport report = build(promotionRecords);</span>
-<span class="fc" id="L74">            AtomicJsonFile.writeUtf8(</span>
-<span class="fc" id="L75">                outputDirectory.resolve(&quot;discovery-candidate-store.json&quot;),</span>
-<span class="fc" id="L76">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+<span class="fc" id="L71">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L72">            CandidateStoreReport report = build(promotionRecords);</span>
+<span class="fc" id="L73">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L74">                outputDirectory.resolve(&quot;discovery-candidate-store.json&quot;),</span>
+<span class="fc" id="L75">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
             );
-<span class="fc" id="L78">            Files.writeString(</span>
-<span class="fc" id="L79">                outputDirectory.resolve(&quot;discovery-candidate-store.md&quot;),</span>
-<span class="fc" id="L80">                renderMarkdown(report),</span>
+<span class="fc" id="L77">            Files.writeString(</span>
+<span class="fc" id="L78">                outputDirectory.resolve(&quot;discovery-candidate-store.md&quot;),</span>
+<span class="fc" id="L79">                renderMarkdown(report),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L83">            return report;</span>
-<span class="nc" id="L84">        } catch (IOException exception) {</span>
-<span class="nc" id="L85">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L82">            return report;</span>
+<span class="nc" id="L83">        } catch (IOException exception) {</span>
+<span class="nc" id="L84">            throw new UncheckedIOException(exception);</span>
         }
     }
 
     String renderMarkdown(CandidateStoreReport report) {
-<span class="fc" id="L90">        StringBuilder out = new StringBuilder(&quot;# Discovery candidate store\n\n&quot;);</span>
-<span class="fc" id="L91">        out.append(&quot;| Candidate | Lifecycle | Promotion | Novelty | Support | Campaigns | Family | Operator | Pack | Rejection |\n&quot;);</span>
-<span class="fc" id="L92">        out.append(&quot;| --- | --- | --- | --- | ---: | --- | --- | --- | --- | --- |\n&quot;);</span>
-<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (CandidateEntry entry : report.candidates()) {</span>
-<span class="fc" id="L94">            out.append(&quot;| &quot;).append(escape(entry.candidateId()))</span>
-<span class="fc" id="L95">                .append(&quot; | &quot;).append(entry.lifecycleStatus().name().toLowerCase(Locale.ROOT))</span>
-<span class="fc" id="L96">                .append(&quot; | &quot;).append(entry.promotionStatus().name().toLowerCase(Locale.ROOT))</span>
-<span class="fc" id="L97">                .append(&quot; | &quot;).append(entry.noveltyStatus().name().toLowerCase(Locale.ROOT))</span>
-<span class="fc" id="L98">                .append(&quot; | &quot;).append(entry.supportCount())</span>
-<span class="fc" id="L99">                .append(&quot; | &quot;).append(escape(String.join(&quot;, &quot;, entry.sourceCampaigns())))</span>
-<span class="fc" id="L100">                .append(&quot; | &quot;).append(escape(entry.family()))</span>
-<span class="fc" id="L101">                .append(&quot; | &quot;).append(escape(orDash(entry.operatorId())))</span>
-<span class="fc" id="L102">                .append(&quot; | &quot;).append(escape(orDash(entry.packId())))</span>
-<span class="fc" id="L103">                .append(&quot; | &quot;).append(escape(orDash(entry.rejectionReason())))</span>
-<span class="fc" id="L104">                .append(&quot; |\n&quot;);</span>
-<span class="fc" id="L105">        }</span>
-<span class="fc" id="L106">        out.append(&quot;\n## Metrics\n\n&quot;);</span>
-<span class="fc" id="L107">        out.append(&quot;- totalRecords: &quot;).append(report.metrics().totalRecords()).append('\n');</span>
-<span class="fc" id="L108">        out.append(&quot;- candidateCount: &quot;).append(report.metrics().candidateCount()).append('\n');</span>
-<span class="fc" id="L109">        out.append(&quot;- mergedSupportRecords: &quot;).append(report.metrics().mergedSupportRecords()).append('\n');</span>
-<span class="fc" id="L110">        out.append(&quot;- lifecycleCounts: &quot;).append(renderMap(report.metrics().lifecycleCounts())).append('\n');</span>
-<span class="fc" id="L111">        out.append(&quot;- noveltyCounts: &quot;).append(renderMap(report.metrics().noveltyCounts())).append('\n');</span>
-<span class="fc" id="L112">        out.append(&quot;\n## Support examples\n\n&quot;);</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (CandidateEntry entry : report.candidates()) {</span>
-<span class="fc" id="L114">            out.append(&quot;### &quot;).append(escape(entry.candidateId())).append(&quot;\n\n&quot;);</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            for (ConcreteExample example : entry.concreteExamples()) {</span>
-<span class="fc" id="L116">                out.append(&quot;- &quot;).append(escape(example.exampleId()))</span>
-<span class="fc" id="L117">                    .append(&quot; [&quot;).append(example.lifecycleStatus().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
-<span class="fc" id="L118">                    .append(&quot; campaign=&quot;).append(escape(example.sourceCampaign()))</span>
-<span class="fc" id="L119">                    .append(&quot; novelty=&quot;).append(example.noveltyStatus().name().toLowerCase(Locale.ROOT));</span>
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                if (!example.matchedCandidateId().isBlank()) {</span>
-<span class="nc" id="L121">                    out.append(&quot; matched=&quot;).append(escape(example.matchedCandidateId()));</span>
+<span class="fc" id="L89">        StringBuilder out = new StringBuilder(&quot;# Discovery candidate store\n\n&quot;);</span>
+<span class="fc" id="L90">        out.append(&quot;| Candidate | Lifecycle | Promotion | Novelty | Support | Campaigns | Family | Operator | Pack | Rejection |\n&quot;);</span>
+<span class="fc" id="L91">        out.append(&quot;| --- | --- | --- | --- | ---: | --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (CandidateEntry entry : report.candidates()) {</span>
+<span class="fc" id="L93">            out.append(&quot;| &quot;).append(escape(entry.candidateId()))</span>
+<span class="fc" id="L94">                .append(&quot; | &quot;).append(entry.lifecycleStatus().name().toLowerCase(Locale.ROOT))</span>
+<span class="fc" id="L95">                .append(&quot; | &quot;).append(entry.promotionStatus().name().toLowerCase(Locale.ROOT))</span>
+<span class="fc" id="L96">                .append(&quot; | &quot;).append(entry.noveltyStatus().name().toLowerCase(Locale.ROOT))</span>
+<span class="fc" id="L97">                .append(&quot; | &quot;).append(entry.supportCount())</span>
+<span class="fc" id="L98">                .append(&quot; | &quot;).append(escape(String.join(&quot;, &quot;, entry.sourceCampaigns())))</span>
+<span class="fc" id="L99">                .append(&quot; | &quot;).append(escape(entry.family()))</span>
+<span class="fc" id="L100">                .append(&quot; | &quot;).append(escape(orDash(entry.operatorId())))</span>
+<span class="fc" id="L101">                .append(&quot; | &quot;).append(escape(orDash(entry.packId())))</span>
+<span class="fc" id="L102">                .append(&quot; | &quot;).append(escape(orDash(entry.rejectionReason())))</span>
+<span class="fc" id="L103">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">        out.append(&quot;\n## Metrics\n\n&quot;);</span>
+<span class="fc" id="L106">        out.append(&quot;- totalRecords: &quot;).append(report.metrics().totalRecords()).append('\n');</span>
+<span class="fc" id="L107">        out.append(&quot;- candidateCount: &quot;).append(report.metrics().candidateCount()).append('\n');</span>
+<span class="fc" id="L108">        out.append(&quot;- mergedSupportRecords: &quot;).append(report.metrics().mergedSupportRecords()).append('\n');</span>
+<span class="fc" id="L109">        out.append(&quot;- lifecycleCounts: &quot;).append(renderMap(report.metrics().lifecycleCounts())).append('\n');</span>
+<span class="fc" id="L110">        out.append(&quot;- noveltyCounts: &quot;).append(renderMap(report.metrics().noveltyCounts())).append('\n');</span>
+<span class="fc" id="L111">        out.append(&quot;\n## Support examples\n\n&quot;);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (CandidateEntry entry : report.candidates()) {</span>
+<span class="fc" id="L113">            out.append(&quot;### &quot;).append(escape(entry.candidateId())).append(&quot;\n\n&quot;);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            for (ConcreteExample example : entry.concreteExamples()) {</span>
+<span class="fc" id="L115">                out.append(&quot;- &quot;).append(escape(example.exampleId()))</span>
+<span class="fc" id="L116">                    .append(&quot; [&quot;).append(example.lifecycleStatus().name().toLowerCase(Locale.ROOT)).append(&quot;]&quot;)</span>
+<span class="fc" id="L117">                    .append(&quot; campaign=&quot;).append(escape(example.sourceCampaign()))</span>
+<span class="fc" id="L118">                    .append(&quot; novelty=&quot;).append(example.noveltyStatus().name().toLowerCase(Locale.ROOT));</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                if (!example.matchedCandidateId().isBlank()) {</span>
+<span class="nc" id="L120">                    out.append(&quot; matched=&quot;).append(escape(example.matchedCandidateId()));</span>
                 }
-<span class="fc" id="L123">                out.append(&quot; input=`&quot;).append(escapeInlineCode(example.inputExpression()))</span>
-<span class="fc" id="L124">                    .append(&quot;` target=`&quot;).append(escapeInlineCode(example.targetExpression()))</span>
-<span class="fc" id="L125">                    .append(&quot;`\n&quot;);</span>
-<span class="fc" id="L126">            }</span>
-<span class="fc" id="L127">            out.append('\n');</span>
-<span class="fc" id="L128">        }</span>
-<span class="fc" id="L129">        return out.toString();</span>
+<span class="fc" id="L122">                out.append(&quot; input=`&quot;).append(escapeInlineCode(example.inputExpression()))</span>
+<span class="fc" id="L123">                    .append(&quot;` target=`&quot;).append(escapeInlineCode(example.targetExpression()))</span>
+<span class="fc" id="L124">                    .append(&quot;`\n&quot;);</span>
+<span class="fc" id="L125">            }</span>
+<span class="fc" id="L126">            out.append('\n');</span>
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        return out.toString();</span>
     }
 
     private NoveltyChecker.Candidate toNoveltyCandidate(PromotionRecord record) {
-<span class="fc" id="L133">        return new NoveltyChecker.Candidate(</span>
-<span class="fc" id="L134">            record.candidateId(),</span>
-<span class="fc" id="L135">            record.family(),</span>
-<span class="fc" id="L136">            record.originalExpression(),</span>
-<span class="fc" id="L137">            record.discoveredStructure(),</span>
-<span class="fc" id="L138">            record.sourceOperator(),</span>
-<span class="fc" id="L139">            record.rulePath()</span>
+<span class="fc" id="L132">        return new NoveltyChecker.Candidate(</span>
+<span class="fc" id="L133">            record.candidateId(),</span>
+<span class="fc" id="L134">            record.family(),</span>
+<span class="fc" id="L135">            record.originalExpression(),</span>
+<span class="fc" id="L136">            record.discoveredStructure(),</span>
+<span class="fc" id="L137">            record.sourceOperator(),</span>
+<span class="fc" id="L138">            record.rulePath()</span>
         );
     }
 
@@ -145,106 +144,106 @@ import java.util.stream.Collectors;
         NoveltyChecker.NoveltyResult noveltyResult,
         Map&lt;String, String&gt; representativeByCandidateId
     ) {
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if ((noveltyResult.status() == NoveltyStatus.DUPLICATE</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">            || noveltyResult.status() == NoveltyStatus.ALPHA_EQUIVALENT)</span>
-<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            &amp;&amp; !noveltyResult.matchedCandidateId().isBlank()) {</span>
-<span class="fc" id="L151">            return representativeByCandidateId.getOrDefault(</span>
-<span class="fc" id="L152">                noveltyResult.matchedCandidateId(),</span>
-<span class="fc" id="L153">                noveltyResult.matchedCandidateId()</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if ((noveltyResult.status() == NoveltyStatus.DUPLICATE</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            || noveltyResult.status() == NoveltyStatus.ALPHA_EQUIVALENT)</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            &amp;&amp; !noveltyResult.matchedCandidateId().isBlank()) {</span>
+<span class="fc" id="L150">            return representativeByCandidateId.getOrDefault(</span>
+<span class="fc" id="L151">                noveltyResult.matchedCandidateId(),</span>
+<span class="fc" id="L152">                noveltyResult.matchedCandidateId()</span>
             );
         }
-<span class="fc" id="L156">        return record.candidateId();</span>
+<span class="fc" id="L155">        return record.candidateId();</span>
     }
 
     private long countMergedSupport(List&lt;CandidateEntry&gt; entries) {
-<span class="fc" id="L160">        return entries.stream()</span>
-<span class="fc" id="L161">            .mapToLong(entry -&gt; Math.max(0, entry.supportCount() - 1))</span>
-<span class="fc" id="L162">            .sum();</span>
+<span class="fc" id="L159">        return entries.stream()</span>
+<span class="fc" id="L160">            .mapToLong(entry -&gt; Math.max(0, entry.supportCount() - 1))</span>
+<span class="fc" id="L161">            .sum();</span>
     }
 
     private Map&lt;String, Long&gt; countByLifecycle(List&lt;CandidateEntry&gt; entries) {
-<span class="fc" id="L166">        return entries.stream()</span>
-<span class="fc" id="L167">            .collect(Collectors.groupingBy(</span>
-<span class="fc" id="L168">                entry -&gt; entry.lifecycleStatus().name().toLowerCase(Locale.ROOT),</span>
+<span class="fc" id="L165">        return entries.stream()</span>
+<span class="fc" id="L166">            .collect(Collectors.groupingBy(</span>
+<span class="fc" id="L167">                entry -&gt; entry.lifecycleStatus().name().toLowerCase(Locale.ROOT),</span>
                 LinkedHashMap::new,
-<span class="fc" id="L170">                Collectors.counting()</span>
+<span class="fc" id="L169">                Collectors.counting()</span>
             ));
     }
 
     private Map&lt;String, Long&gt; countByNovelty(List&lt;CandidateEntry&gt; entries) {
-<span class="fc" id="L175">        return entries.stream()</span>
-<span class="fc" id="L176">            .collect(Collectors.groupingBy(</span>
-<span class="fc" id="L177">                entry -&gt; entry.noveltyStatus().name().toLowerCase(Locale.ROOT),</span>
+<span class="fc" id="L174">        return entries.stream()</span>
+<span class="fc" id="L175">            .collect(Collectors.groupingBy(</span>
+<span class="fc" id="L176">                entry -&gt; entry.noveltyStatus().name().toLowerCase(Locale.ROOT),</span>
                 LinkedHashMap::new,
-<span class="fc" id="L179">                Collectors.counting()</span>
+<span class="fc" id="L178">                Collectors.counting()</span>
             ));
     }
 
     private String renderMap(Map&lt;String, Long&gt; values) {
-<span class="pc bpc" id="L184" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
-<span class="nc" id="L185">            return &quot;{}&quot;;</span>
+<span class="pc bpc" id="L183" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L184">            return &quot;{}&quot;;</span>
         }
-<span class="fc" id="L187">        return values.entrySet().stream()</span>
-<span class="fc" id="L188">            .sorted(Map.Entry.comparingByKey())</span>
-<span class="fc" id="L189">            .map(entry -&gt; entry.getKey() + &quot;=&quot; + entry.getValue())</span>
-<span class="fc" id="L190">            .collect(Collectors.joining(&quot;, &quot;, &quot;{&quot;, &quot;}&quot;));</span>
+<span class="fc" id="L186">        return values.entrySet().stream()</span>
+<span class="fc" id="L187">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L188">            .map(entry -&gt; entry.getKey() + &quot;=&quot; + entry.getValue())</span>
+<span class="fc" id="L189">            .collect(Collectors.joining(&quot;, &quot;, &quot;{&quot;, &quot;}&quot;));</span>
     }
 
     private String orDash(String value) {
-<span class="pc bpc" id="L194" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
+<span class="pc bpc" id="L193" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
     }
 
     private String escape(String value) {
-<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
     }
 
     private String escapeInlineCode(String value) {
-<span class="fc" id="L202">        return escape(value).replace(&quot;`&quot;, &quot;\\`&quot;);</span>
+<span class="fc" id="L201">        return escape(value).replace(&quot;`&quot;, &quot;\\`&quot;);</span>
     }
 
     private static CandidateLifecycleStatus lifecycleFor(PromotionRecord record) {
-<span class="pc bpc" id="L206" title="1 of 6 branches missed.">        if (&quot;DISAGREE&quot;.equalsIgnoreCase(record.oracleStatus()) || record.curatedPathPresent() || record.fallbackUsed()) {</span>
-<span class="fc" id="L207">            return CandidateLifecycleStatus.REJECTED;</span>
+<span class="pc bpc" id="L205" title="1 of 6 branches missed.">        if (&quot;DISAGREE&quot;.equalsIgnoreCase(record.oracleStatus()) || record.curatedPathPresent() || record.fallbackUsed()) {</span>
+<span class="fc" id="L206">            return CandidateLifecycleStatus.REJECTED;</span>
         }
-<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (record.stage().atLeast(PromotionStage.PROMOTED)) {</span>
-<span class="fc" id="L210">            return CandidateLifecycleStatus.PROMOTED;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (record.stage().atLeast(PromotionStage.PROMOTED)) {</span>
+<span class="fc" id="L209">            return CandidateLifecycleStatus.PROMOTED;</span>
         }
-<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (record.stage().atLeast(PromotionStage.VALIDATED)) {</span>
-<span class="fc" id="L213">            return CandidateLifecycleStatus.VALIDATED;</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (record.stage().atLeast(PromotionStage.VALIDATED)) {</span>
+<span class="fc" id="L212">            return CandidateLifecycleStatus.VALIDATED;</span>
         }
-<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (record.stage().atLeast(PromotionStage.CANDIDATE)) {</span>
-<span class="nc" id="L216">            return CandidateLifecycleStatus.CANDIDATE;</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (record.stage().atLeast(PromotionStage.CANDIDATE)) {</span>
+<span class="nc" id="L215">            return CandidateLifecycleStatus.CANDIDATE;</span>
         }
-<span class="nc" id="L218">        return CandidateLifecycleStatus.OBSERVED;</span>
+<span class="nc" id="L217">        return CandidateLifecycleStatus.OBSERVED;</span>
     }
 
     private static String rejectionReason(PromotionRecord record) {
-<span class="fc" id="L222">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (&quot;DISAGREE&quot;.equalsIgnoreCase(record.oracleStatus())) {</span>
-<span class="fc" id="L224">            reasons.add(&quot;oracle=DISAGREE&quot;);</span>
+<span class="fc" id="L221">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (&quot;DISAGREE&quot;.equalsIgnoreCase(record.oracleStatus())) {</span>
+<span class="fc" id="L223">            reasons.add(&quot;oracle=DISAGREE&quot;);</span>
         }
-<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (record.curatedPathPresent()) {</span>
-<span class="nc" id="L227">            reasons.add(&quot;curated-path=true&quot;);</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (record.curatedPathPresent()) {</span>
+<span class="nc" id="L226">            reasons.add(&quot;curated-path=true&quot;);</span>
         }
-<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (record.fallbackUsed()) {</span>
-<span class="fc" id="L230">            reasons.add(&quot;fallback=true&quot;);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (record.fallbackUsed()) {</span>
+<span class="fc" id="L229">            reasons.add(&quot;fallback=true&quot;);</span>
         }
-<span class="fc" id="L232">        return String.join(&quot;, &quot;, reasons);</span>
+<span class="fc" id="L231">        return String.join(&quot;, &quot;, reasons);</span>
     }
 
-<span class="fc" id="L235">    enum CandidateLifecycleStatus {</span>
-<span class="fc" id="L236">        OBSERVED,</span>
-<span class="fc" id="L237">        CANDIDATE,</span>
-<span class="fc" id="L238">        VALIDATED,</span>
-<span class="fc" id="L239">        PROMOTED,</span>
-<span class="fc" id="L240">        REJECTED</span>
+<span class="fc" id="L234">    enum CandidateLifecycleStatus {</span>
+<span class="fc" id="L235">        OBSERVED,</span>
+<span class="fc" id="L236">        CANDIDATE,</span>
+<span class="fc" id="L237">        VALIDATED,</span>
+<span class="fc" id="L238">        PROMOTED,</span>
+<span class="fc" id="L239">        REJECTED</span>
     }
 
     record CandidateStoreReport(List&lt;CandidateEntry&gt; candidates, CandidateStoreMetrics metrics) {
-<span class="fc" id="L244">        CandidateStoreReport {</span>
-<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            candidates = candidates == null ? List.of() : List.copyOf(candidates);</span>
-<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            metrics = metrics == null ? CandidateStoreMetrics.empty() : metrics;</span>
-<span class="fc" id="L247">        }</span>
+<span class="fc" id="L243">        CandidateStoreReport {</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            candidates = candidates == null ? List.of() : List.copyOf(candidates);</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            metrics = metrics == null ? CandidateStoreMetrics.empty() : metrics;</span>
+<span class="fc" id="L246">        }</span>
     }
 
     record CandidateStoreMetrics(
@@ -254,13 +253,13 @@ import java.util.stream.Collectors;
         Map&lt;String, Long&gt; lifecycleCounts,
         Map&lt;String, Long&gt; noveltyCounts
     ) {
-<span class="fc" id="L257">        CandidateStoreMetrics {</span>
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            lifecycleCounts = lifecycleCounts == null ? Map.of() : Map.copyOf(lifecycleCounts);</span>
-<span class="pc bpc" id="L259" title="1 of 2 branches missed.">            noveltyCounts = noveltyCounts == null ? Map.of() : Map.copyOf(noveltyCounts);</span>
-<span class="fc" id="L260">        }</span>
+<span class="fc" id="L256">        CandidateStoreMetrics {</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            lifecycleCounts = lifecycleCounts == null ? Map.of() : Map.copyOf(lifecycleCounts);</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            noveltyCounts = noveltyCounts == null ? Map.of() : Map.copyOf(noveltyCounts);</span>
+<span class="fc" id="L259">        }</span>
 
         static CandidateStoreMetrics empty() {
-<span class="nc" id="L263">            return new CandidateStoreMetrics(0, 0, 0, Map.of(), Map.of());</span>
+<span class="nc" id="L262">            return new CandidateStoreMetrics(0, 0, 0, Map.of(), Map.of());</span>
         }
     }
 
@@ -284,24 +283,24 @@ import java.util.stream.Collectors;
         int supportCount,
         List&lt;String&gt; relatedCandidateIds
     ) {
-<span class="fc" id="L287">        CandidateEntry {</span>
-<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            family = family == null ? &quot;&quot; : family;</span>
-<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            inputPattern = inputPattern == null ? &quot;&quot; : inputPattern;</span>
-<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            targetPattern = targetPattern == null ? &quot;&quot; : targetPattern;</span>
-<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            concreteExamples = concreteExamples == null ? List.of() : List.copyOf(concreteExamples);</span>
-<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            sourceCampaigns = sourceCampaigns == null ? List.of() : List.copyOf(sourceCampaigns);</span>
-<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
-<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
-<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            packId = packId == null ? &quot;&quot; : packId;</span>
-<span class="pc bpc" id="L296" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
-<span class="pc bpc" id="L297" title="1 of 2 branches missed.">            oracleStatuses = oracleStatuses == null ? List.of() : List.copyOf(oracleStatuses);</span>
-<span class="pc bpc" id="L298" title="1 of 2 branches missed.">            ablationStatuses = ablationStatuses == null ? List.of() : List.copyOf(ablationStatuses);</span>
-<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            noveltyStatus = noveltyStatus == null ? NoveltyStatus.UNKNOWN : noveltyStatus;</span>
-<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            lifecycleStatus = lifecycleStatus == null ? CandidateLifecycleStatus.OBSERVED : lifecycleStatus;</span>
-<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            promotionStatus = promotionStatus == null ? PromotionStage.OBSERVED : promotionStatus;</span>
-<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            rejectionReason = rejectionReason == null ? &quot;&quot; : rejectionReason;</span>
-<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            relatedCandidateIds = relatedCandidateIds == null ? List.of() : List.copyOf(relatedCandidateIds);</span>
-<span class="fc" id="L304">        }</span>
+<span class="fc" id="L286">        CandidateEntry {</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">            family = family == null ? &quot;&quot; : family;</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            inputPattern = inputPattern == null ? &quot;&quot; : inputPattern;</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            targetPattern = targetPattern == null ? &quot;&quot; : targetPattern;</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            concreteExamples = concreteExamples == null ? List.of() : List.copyOf(concreteExamples);</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            sourceCampaigns = sourceCampaigns == null ? List.of() : List.copyOf(sourceCampaigns);</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            packId = packId == null ? &quot;&quot; : packId;</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">            oracleStatuses = oracleStatuses == null ? List.of() : List.copyOf(oracleStatuses);</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">            ablationStatuses = ablationStatuses == null ? List.of() : List.copyOf(ablationStatuses);</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">            noveltyStatus = noveltyStatus == null ? NoveltyStatus.UNKNOWN : noveltyStatus;</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            lifecycleStatus = lifecycleStatus == null ? CandidateLifecycleStatus.OBSERVED : lifecycleStatus;</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            promotionStatus = promotionStatus == null ? PromotionStage.OBSERVED : promotionStatus;</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            rejectionReason = rejectionReason == null ? &quot;&quot; : rejectionReason;</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            relatedCandidateIds = relatedCandidateIds == null ? List.of() : List.copyOf(relatedCandidateIds);</span>
+<span class="fc" id="L303">        }</span>
     }
 
     record ConcreteExample(
@@ -316,116 +315,116 @@ import java.util.stream.Collectors;
         String oracleStatus,
         String ablationStatus
     ) {
-<span class="fc" id="L319">        ConcreteExample {</span>
-<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            exampleId = exampleId == null ? &quot;&quot; : exampleId;</span>
-<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            sourceCampaign = sourceCampaign == null ? &quot;&quot; : sourceCampaign;</span>
-<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
-<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
-<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            lifecycleStatus = lifecycleStatus == null ? CandidateLifecycleStatus.OBSERVED : lifecycleStatus;</span>
-<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            promotionStatus = promotionStatus == null ? PromotionStage.OBSERVED : promotionStatus;</span>
-<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            noveltyStatus = noveltyStatus == null ? NoveltyStatus.UNKNOWN : noveltyStatus;</span>
-<span class="pc bpc" id="L327" title="1 of 2 branches missed.">            matchedCandidateId = matchedCandidateId == null ? &quot;&quot; : matchedCandidateId;</span>
-<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
-<span class="pc bpc" id="L329" title="1 of 2 branches missed.">            ablationStatus = ablationStatus == null ? &quot;N/A&quot; : ablationStatus;</span>
-<span class="fc" id="L330">        }</span>
+<span class="fc" id="L318">        ConcreteExample {</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            exampleId = exampleId == null ? &quot;&quot; : exampleId;</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            sourceCampaign = sourceCampaign == null ? &quot;&quot; : sourceCampaign;</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            lifecycleStatus = lifecycleStatus == null ? CandidateLifecycleStatus.OBSERVED : lifecycleStatus;</span>
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            promotionStatus = promotionStatus == null ? PromotionStage.OBSERVED : promotionStatus;</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            noveltyStatus = noveltyStatus == null ? NoveltyStatus.UNKNOWN : noveltyStatus;</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            matchedCandidateId = matchedCandidateId == null ? &quot;&quot; : matchedCandidateId;</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            ablationStatus = ablationStatus == null ? &quot;N/A&quot; : ablationStatus;</span>
+<span class="fc" id="L329">        }</span>
     }
 
     private static final class EntryBuilder {
         private final String candidateId;
-<span class="fc" id="L335">        private String family = &quot;&quot;;</span>
-<span class="fc" id="L336">        private String inputPattern = &quot;&quot;;</span>
-<span class="fc" id="L337">        private String targetPattern = &quot;&quot;;</span>
-<span class="fc" id="L338">        private final List&lt;ConcreteExample&gt; examples = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L339">        private final Set&lt;String&gt; sourceCampaigns = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L340">        private List&lt;String&gt; rulePath = List.of();</span>
-<span class="fc" id="L341">        private String operatorId = &quot;&quot;;</span>
-<span class="fc" id="L342">        private String packId = &quot;&quot;;</span>
-<span class="fc" id="L343">        private final Set&lt;String&gt; assumptions = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L344">        private final Set&lt;String&gt; oracleStatuses = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L345">        private final Set&lt;String&gt; ablationStatuses = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L346">        private NoveltyStatus noveltyStatus = NoveltyStatus.UNKNOWN;</span>
-<span class="fc" id="L347">        private CandidateLifecycleStatus lifecycleStatus = CandidateLifecycleStatus.OBSERVED;</span>
-<span class="fc" id="L348">        private PromotionStage promotionStatus = PromotionStage.OBSERVED;</span>
-<span class="fc" id="L349">        private final Set&lt;String&gt; rejectionReasons = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L350">        private final Set&lt;String&gt; relatedCandidateIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L334">        private String family = &quot;&quot;;</span>
+<span class="fc" id="L335">        private String inputPattern = &quot;&quot;;</span>
+<span class="fc" id="L336">        private String targetPattern = &quot;&quot;;</span>
+<span class="fc" id="L337">        private final List&lt;ConcreteExample&gt; examples = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L338">        private final Set&lt;String&gt; sourceCampaigns = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L339">        private List&lt;String&gt; rulePath = List.of();</span>
+<span class="fc" id="L340">        private String operatorId = &quot;&quot;;</span>
+<span class="fc" id="L341">        private String packId = &quot;&quot;;</span>
+<span class="fc" id="L342">        private final Set&lt;String&gt; assumptions = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L343">        private final Set&lt;String&gt; oracleStatuses = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L344">        private final Set&lt;String&gt; ablationStatuses = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L345">        private NoveltyStatus noveltyStatus = NoveltyStatus.UNKNOWN;</span>
+<span class="fc" id="L346">        private CandidateLifecycleStatus lifecycleStatus = CandidateLifecycleStatus.OBSERVED;</span>
+<span class="fc" id="L347">        private PromotionStage promotionStatus = PromotionStage.OBSERVED;</span>
+<span class="fc" id="L348">        private final Set&lt;String&gt; rejectionReasons = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L349">        private final Set&lt;String&gt; relatedCandidateIds = new LinkedHashSet&lt;&gt;();</span>
 
-<span class="fc" id="L352">        private EntryBuilder(String candidateId) {</span>
-<span class="fc" id="L353">            this.candidateId = candidateId;</span>
-<span class="fc" id="L354">        }</span>
+<span class="fc" id="L351">        private EntryBuilder(String candidateId) {</span>
+<span class="fc" id="L352">            this.candidateId = candidateId;</span>
+<span class="fc" id="L353">        }</span>
 
         private void add(PromotionRecord record, NoveltyChecker.NoveltyResult noveltyResult) {
-<span class="fc bfc" id="L357" title="All 2 branches covered.">            if (family.isBlank()) family = record.family();</span>
-<span class="fc bfc" id="L358" title="All 2 branches covered.">            if (inputPattern.isBlank()) inputPattern = record.originalExpression();</span>
-<span class="fc bfc" id="L359" title="All 2 branches covered.">            if (targetPattern.isBlank()) targetPattern = record.discoveredStructure();</span>
-<span class="fc bfc" id="L360" title="All 2 branches covered.">            if (operatorId.isBlank()) operatorId = record.sourceOperator();</span>
-<span class="fc bfc" id="L361" title="All 2 branches covered.">            if (packId.isBlank()) packId = record.sourcePack();</span>
-<span class="fc" id="L362">            sourceCampaigns.add(record.sourceCampaign());</span>
-<span class="fc" id="L363">            List&lt;String&gt; recordRulePath = record.rulePath();</span>
-<span class="pc bpc" id="L364" title="1 of 4 branches missed.">            if (recordRulePath != null &amp;&amp; recordRulePath.size() &gt; rulePath.size()) {</span>
-<span class="fc" id="L365">                rulePath = List.copyOf(recordRulePath);</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">            if (family.isBlank()) family = record.family();</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            if (inputPattern.isBlank()) inputPattern = record.originalExpression();</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">            if (targetPattern.isBlank()) targetPattern = record.discoveredStructure();</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">            if (operatorId.isBlank()) operatorId = record.sourceOperator();</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">            if (packId.isBlank()) packId = record.sourcePack();</span>
+<span class="fc" id="L361">            sourceCampaigns.add(record.sourceCampaign());</span>
+<span class="fc" id="L362">            List&lt;String&gt; recordRulePath = record.rulePath();</span>
+<span class="pc bpc" id="L363" title="1 of 4 branches missed.">            if (recordRulePath != null &amp;&amp; recordRulePath.size() &gt; rulePath.size()) {</span>
+<span class="fc" id="L364">                rulePath = List.copyOf(recordRulePath);</span>
             }
-<span class="fc" id="L367">            assumptions.addAll(record.assumptions());</span>
-<span class="fc" id="L368">            oracleStatuses.add(record.oracleStatus());</span>
-<span class="fc" id="L369">            ablationStatuses.add(record.ablationStatus());</span>
-<span class="pc bpc" id="L370" title="1 of 4 branches missed.">            if (examples.isEmpty() || noveltyStatus == NoveltyStatus.UNKNOWN) {</span>
-<span class="fc" id="L371">                noveltyStatus = noveltyResult.status();</span>
+<span class="fc" id="L366">            assumptions.addAll(record.assumptions());</span>
+<span class="fc" id="L367">            oracleStatuses.add(record.oracleStatus());</span>
+<span class="fc" id="L368">            ablationStatuses.add(record.ablationStatus());</span>
+<span class="pc bpc" id="L369" title="1 of 4 branches missed.">            if (examples.isEmpty() || noveltyStatus == NoveltyStatus.UNKNOWN) {</span>
+<span class="fc" id="L370">                noveltyStatus = noveltyResult.status();</span>
             }
-<span class="fc bfc" id="L373" title="All 2 branches covered.">            if (!noveltyResult.matchedCandidateId().isBlank()) {</span>
-<span class="fc" id="L374">                relatedCandidateIds.add(noveltyResult.matchedCandidateId());</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            if (!noveltyResult.matchedCandidateId().isBlank()) {</span>
+<span class="fc" id="L373">                relatedCandidateIds.add(noveltyResult.matchedCandidateId());</span>
             }
-<span class="fc" id="L376">            CandidateLifecycleStatus exampleLifecycle = lifecycleFor(record);</span>
-<span class="fc bfc" id="L377" title="All 2 branches covered.">            lifecycleStatus = examples.isEmpty() ? exampleLifecycle : mergeLifecycle(lifecycleStatus, exampleLifecycle);</span>
-<span class="fc" id="L378">            promotionStatus = higherPromotionStage(promotionStatus, record.stage());</span>
-<span class="fc" id="L379">            String rejectionReason = rejectionReason(record);</span>
-<span class="fc bfc" id="L380" title="All 2 branches covered.">            if (!rejectionReason.isBlank()) {</span>
-<span class="fc" id="L381">                rejectionReasons.add(rejectionReason);</span>
+<span class="fc" id="L375">            CandidateLifecycleStatus exampleLifecycle = lifecycleFor(record);</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            lifecycleStatus = examples.isEmpty() ? exampleLifecycle : mergeLifecycle(lifecycleStatus, exampleLifecycle);</span>
+<span class="fc" id="L377">            promotionStatus = higherPromotionStage(promotionStatus, record.stage());</span>
+<span class="fc" id="L378">            String rejectionReason = rejectionReason(record);</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (!rejectionReason.isBlank()) {</span>
+<span class="fc" id="L380">                rejectionReasons.add(rejectionReason);</span>
             }
-<span class="fc" id="L383">            examples.add(new ConcreteExample(</span>
-<span class="fc" id="L384">                record.candidateId(),</span>
-<span class="fc" id="L385">                record.sourceCampaign(),</span>
-<span class="fc" id="L386">                record.originalExpression(),</span>
-<span class="fc" id="L387">                record.discoveredStructure(),</span>
+<span class="fc" id="L382">            examples.add(new ConcreteExample(</span>
+<span class="fc" id="L383">                record.candidateId(),</span>
+<span class="fc" id="L384">                record.sourceCampaign(),</span>
+<span class="fc" id="L385">                record.originalExpression(),</span>
+<span class="fc" id="L386">                record.discoveredStructure(),</span>
                 exampleLifecycle,
-<span class="fc" id="L389">                record.stage(),</span>
-<span class="fc" id="L390">                noveltyResult.status(),</span>
-<span class="fc" id="L391">                noveltyResult.matchedCandidateId(),</span>
-<span class="fc" id="L392">                record.oracleStatus(),</span>
-<span class="fc" id="L393">                record.ablationStatus()</span>
+<span class="fc" id="L388">                record.stage(),</span>
+<span class="fc" id="L389">                noveltyResult.status(),</span>
+<span class="fc" id="L390">                noveltyResult.matchedCandidateId(),</span>
+<span class="fc" id="L391">                record.oracleStatus(),</span>
+<span class="fc" id="L392">                record.ablationStatus()</span>
             ));
-<span class="fc" id="L395">        }</span>
+<span class="fc" id="L394">        }</span>
 
         private CandidateEntry build() {
-<span class="fc" id="L398">            return new CandidateEntry(</span>
+<span class="fc" id="L397">            return new CandidateEntry(</span>
                 candidateId,
                 family,
                 inputPattern,
                 targetPattern,
                 examples,
-<span class="fc" id="L404">                List.copyOf(sourceCampaigns),</span>
+<span class="fc" id="L403">                List.copyOf(sourceCampaigns),</span>
                 rulePath,
                 operatorId,
                 packId,
-<span class="fc" id="L408">                List.copyOf(assumptions),</span>
-<span class="fc" id="L409">                List.copyOf(oracleStatuses),</span>
-<span class="fc" id="L410">                List.copyOf(ablationStatuses),</span>
+<span class="fc" id="L407">                List.copyOf(assumptions),</span>
+<span class="fc" id="L408">                List.copyOf(oracleStatuses),</span>
+<span class="fc" id="L409">                List.copyOf(ablationStatuses),</span>
                 noveltyStatus,
                 lifecycleStatus,
                 promotionStatus,
-<span class="fc" id="L414">                String.join(&quot;, &quot;, rejectionReasons),</span>
-<span class="fc" id="L415">                examples.size(),</span>
-<span class="fc" id="L416">                List.copyOf(relatedCandidateIds)</span>
+<span class="fc" id="L413">                String.join(&quot;, &quot;, rejectionReasons),</span>
+<span class="fc" id="L414">                examples.size(),</span>
+<span class="fc" id="L415">                List.copyOf(relatedCandidateIds)</span>
             );
         }
 
         private CandidateLifecycleStatus mergeLifecycle(CandidateLifecycleStatus left, CandidateLifecycleStatus right) {
-<span class="pc bpc" id="L421" title="1 of 4 branches missed.">            if (left == CandidateLifecycleStatus.REJECTED || right == CandidateLifecycleStatus.REJECTED) {</span>
-<span class="fc" id="L422">                return CandidateLifecycleStatus.REJECTED;</span>
+<span class="pc bpc" id="L420" title="1 of 4 branches missed.">            if (left == CandidateLifecycleStatus.REJECTED || right == CandidateLifecycleStatus.REJECTED) {</span>
+<span class="fc" id="L421">                return CandidateLifecycleStatus.REJECTED;</span>
             }
-<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            return left.ordinal() &gt;= right.ordinal() ? left : right;</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">            return left.ordinal() &gt;= right.ordinal() ? left : right;</span>
         }
 
         private PromotionStage higherPromotionStage(PromotionStage left, PromotionStage right) {
-<span class="fc bfc" id="L428" title="All 2 branches covered.">            return left.ordinal() &gt;= right.ordinal() ? left : right;</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">            return left.ordinal() &gt;= right.ordinal() ? left : right;</span>
         }
     }
 }

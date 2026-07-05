@@ -368,8 +368,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L368">                ? profile.defaultGoal()</span>
 <span class="fc" id="L369">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L370">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="fc" id="L372">            return;</span>
+<span class="nc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="nc" id="L372">            return;</span>
 <span class="fc" id="L373">        }</span>
 <span class="fc" id="L374">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1389,8 +1389,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1389">            return;</span>
         }
 <span class="fc bfc" id="L1391" title="All 2 branches covered.">        if (!&quot;tree&quot;.equals(suffix)) {</span>
-<span class="fc" id="L1392">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
-<span class="fc" id="L1393">            return;</span>
+<span class="nc" id="L1392">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
+<span class="nc" id="L1393">            return;</span>
         }
 <span class="fc bfc" id="L1395" title="All 2 branches covered.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
 <span class="fc" id="L1396">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
@@ -2475,13 +2475,13 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2476">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
 <span class="fc bfc" id="L2477" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
-<span class="fc" id="L2478">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
-<span class="fc" id="L2479">            return;</span>
+<span class="nc" id="L2478">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
+<span class="nc" id="L2479">            return;</span>
         }
 <span class="fc" id="L2481">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2482" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="fc" id="L2483">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="fc" id="L2484">            return;</span>
+<span class="nc" id="L2483">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="nc" id="L2484">            return;</span>
         }
 <span class="fc" id="L2486">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
 <span class="fc" id="L2487">        Object raw = body.get(&quot;assumptions&quot;);</span>
