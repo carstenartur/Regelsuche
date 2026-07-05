@@ -84,6 +84,7 @@ class AblationEvidenceTest {
         assertEquals("DEGRADED", evidence.ablationStatus());
         assertTrue(evidence.promotionReady());
         assertFalse(evidence.hasStructuredMetrics());
+        assertTrue(evidence.compactSummary().contains("success=unknown"));
         assertTrue(evidence.compactSummary().contains("pathLength=unknown"));
     }
 

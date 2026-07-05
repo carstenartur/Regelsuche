@@ -70,10 +70,10 @@ record AblationEvidence(
     }
 
     private static String statusFor(RunEvidence with, RunEvidence without) {
-        if (!with.success()) {
+        if (with.failed()) {
             return "BLOCKED";
         }
-        if (!without.success()) {
+        if (without.failed()) {
             return "DEGRADED";
         }
         if (isKnownNonNegative(with.pathLength()) && isKnownNonNegative(without.pathLength())
@@ -88,8 +88,8 @@ record AblationEvidence(
     }
 
     private static double improvementRatio(RunEvidence with, RunEvidence without) {
-        if (!with.success() || !without.success()) {
-            return with.success() && !without.success() ? 1.0d : 0.0d;
+        if (!with.successful() || !without.successful()) {
+            return with.successful() && without.failed() ? 1.0d : 0.0d;
         }
         if (isKnownPositive(without.statesExplored()) && isKnownNonNegative(with.statesExplored())) {
             return Math.max(0.0d, (without.statesExplored() - with.statesExplored()) / (double) without.statesExplored());
@@ -104,7 +104,7 @@ record AblationEvidence(
         if ("BLOCKED".equals(status)) {
             return "candidate-enabled run did not succeed";
         }
-        if ("DEGRADED".equals(status) && !without.success()) {
+        if ("DEGRADED".equals(status) && without.failed()) {
             return "candidate-enabled run succeeds while disabled run does not";
         }
         if ("DEGRADED".equals(status)) {
@@ -133,17 +133,25 @@ record AblationEvidence(
         return value >= 0;
     }
 
-    record RunEvidence(boolean success, int pathLength, long statesExplored) {
+    record RunEvidence(Boolean success, int pathLength, long statesExplored) {
         static RunEvidence unknown() {
-            return new RunEvidence(false, -1, -1L);
+            return new RunEvidence(null, -1, -1L);
         }
 
         boolean known() {
-            return pathLength >= 0 || statesExplored >= 0;
+            return success != null || pathLength >= 0 || statesExplored >= 0;
+        }
+
+        boolean successful() {
+            return Boolean.TRUE.equals(success);
+        }
+
+        boolean failed() {
+            return Boolean.FALSE.equals(success);
         }
 
         String compact() {
-            return "success=" + success
+            return "success=" + (success == null ? "unknown" : success)
                 + ", pathLength=" + render(pathLength)
                 + ", statesExplored=" + render(statesExplored);
         }

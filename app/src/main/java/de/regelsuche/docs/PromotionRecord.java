@@ -95,8 +95,8 @@ record PromotionRecord(
         discoveredStructure = discoveredStructure == null ? "" : discoveredStructure;
         oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? "UNAVAILABLE" : oracleStatus;
         oracleEvidence = oracleEvidence == null ? "" : oracleEvidence;
-        ablationStatus = ablationStatus == null || ablationStatus.isBlank() ? "N/A" : ablationStatus;
         ablationEvidence = ablationEvidence == null ? AblationEvidence.statusOnly(ablationStatus) : ablationEvidence;
+        ablationStatus = ablationEvidence.ablationStatus();
         sourceOperator = sourceOperator == null ? "" : sourceOperator;
         sourcePack = sourcePack == null ? "" : sourcePack;
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
