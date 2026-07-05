@@ -20,7 +20,8 @@ class PublicEvidenceGateTest {
 
         assertTrue(gate.evaluate(record, NoveltyStatus.NEW).accepted());
         assertTrue(gate.evaluate(record, NoveltyStatus.VARIANT).accepted());
-        assertTrue(record.galleryEligible());
+        assertTrue(record.galleryEligible(NoveltyStatus.NEW));
+        assertTrue(record.galleryEligible(NoveltyStatus.VARIANT));
     }
 
     @Test
@@ -42,6 +43,19 @@ class PublicEvidenceGateTest {
         assertTrue(decision.rejectionReasons().contains("visible-graph=insufficient"));
         assertTrue(decision.rejectionReasons().contains("operator=missing"));
         assertTrue(decision.rejectionReasons().contains("pack=missing"));
+    }
+
+    @Test
+    void missingProvenanceAloneDoesNotTriggerVisibleGraphInsufficient() {
+        PromotionRecord record = record("prov-only", PromotionStage.PROMOTED, "AGREE", "DEGRADED", false, false, true, "", "", List.of("rule"));
+
+        PublicEvidenceGate.GateDecision decision = gate.evaluate(record, NoveltyStatus.NEW);
+
+        assertFalse(decision.accepted());
+        assertTrue(decision.rejectionReasons().contains("operator=missing"));
+        assertTrue(decision.rejectionReasons().contains("pack=missing"));
+        assertFalse(decision.rejectionReasons().contains("visible-graph=insufficient"),
+            decision.rejectionReasons().toString());
     }
 
     @Test

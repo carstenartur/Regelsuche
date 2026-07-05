@@ -112,8 +112,8 @@ record PromotionRecord(
         return !stage.atLeast(PromotionStage.PROMOTED);
     }
 
-    boolean galleryEligible() {
-        return new PublicEvidenceGate().evaluate(this, NoveltyStatus.NEW).accepted();
+    boolean galleryEligible(NoveltyStatus noveltyStatus) {
+        return new PublicEvidenceGate().evaluate(this, noveltyStatus).accepted();
     }
 
     PromotionRecord withReuse(DiscoveryCampaignFourRunner.CaseResult reuse) {

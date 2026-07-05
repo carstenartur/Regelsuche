@@ -24,9 +24,14 @@ final class PublicEvidenceGate {
 
     GateReport evaluate(List<PromotionRecord> records) {
         List<PromotionRecord> safeRecords = records == null ? List.of() : List.copyOf(records);
-        Map<String, NoveltyStatus> noveltyByCandidate = noveltyByCandidateId(safeRecords);
+        return evaluate(safeRecords, noveltyByCandidateId(safeRecords));
+    }
+
+    GateReport evaluate(List<PromotionRecord> records, Map<String, NoveltyStatus> noveltyByCandidate) {
+        List<PromotionRecord> safeRecords = records == null ? List.of() : List.copyOf(records);
+        Map<String, NoveltyStatus> safeNovelty = noveltyByCandidate == null ? Map.of() : Map.copyOf(noveltyByCandidate);
         List<GateDecision> decisions = safeRecords.stream()
-            .map(record -> evaluate(record, noveltyByCandidate.getOrDefault(record.candidateId(), NoveltyStatus.UNKNOWN)))
+            .map(record -> evaluate(record, safeNovelty.getOrDefault(record.candidateId(), NoveltyStatus.UNKNOWN)))
             .sorted(Comparator.comparing(GateDecision::candidateId))
             .toList();
         return new GateReport(
@@ -37,9 +42,14 @@ final class PublicEvidenceGate {
     }
 
     GateReport write(Path outputDirectory, List<PromotionRecord> records) {
+        List<PromotionRecord> safeRecords = records == null ? List.of() : List.copyOf(records);
+        return write(outputDirectory, safeRecords, noveltyByCandidateId(safeRecords));
+    }
+
+    GateReport write(Path outputDirectory, List<PromotionRecord> records, Map<String, NoveltyStatus> noveltyByCandidate) {
         try {
             Files.createDirectories(outputDirectory);
-            GateReport report = evaluate(records);
+            GateReport report = evaluate(records, noveltyByCandidate);
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("public-evidence-gate.json"),
                 JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)
@@ -130,10 +140,7 @@ final class PublicEvidenceGate {
     }
 
     private boolean hasVisibleGraphEvidence(PromotionRecord record) {
-        return record.evidenceExists()
-            && !record.rulePath().isEmpty()
-            && !record.sourceOperator().isBlank()
-            && !record.sourcePack().isBlank();
+        return record.evidenceExists() && !record.rulePath().isEmpty();
     }
 
     private Map<String, NoveltyStatus> noveltyByCandidateId(List<PromotionRecord> records) {

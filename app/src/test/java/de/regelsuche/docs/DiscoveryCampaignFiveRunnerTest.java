@@ -75,10 +75,11 @@ class DiscoveryCampaignFiveRunnerTest {
             .filter(line -> line.startsWith("| ") && !line.contains("Candidate | Stage") && !line.contains("---"))
             .map(line -> line.split("\\|")[1].trim())
             .toList();
+        Set<String> acceptedIds = new PublicEvidenceGate().evaluate(pipelineReport.promotionRecords()).accepted().stream()
+            .map(PublicEvidenceGate.GateDecision::candidateId)
+            .collect(Collectors.toSet());
         for (String candidateId : galleryCandidates) {
-            assertTrue(pipelineReport.promotionRecords().stream()
-                .filter(record -> record.candidateId().equals(candidateId))
-                .anyMatch(PromotionRecord::galleryEligible), candidateId);
+            assertTrue(acceptedIds.contains(candidateId), candidateId);
         }
     }
 

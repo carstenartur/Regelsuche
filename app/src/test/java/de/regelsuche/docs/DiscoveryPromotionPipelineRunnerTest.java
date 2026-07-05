@@ -68,10 +68,11 @@ class DiscoveryPromotionPipelineRunnerTest {
             .filter(line -> !line.contains("---"))
             .map(line -> line.split("\\|")[1].trim())
             .toList();
+        Set<String> acceptedIds = new PublicEvidenceGate().evaluate(report.promotionRecords()).accepted().stream()
+            .map(PublicEvidenceGate.GateDecision::candidateId)
+            .collect(Collectors.toSet());
         for (String candidateId : galleryCandidates) {
-            assertTrue(report.promotionRecords().stream()
-                .filter(entry -> entry.candidateId().equals(candidateId))
-                .anyMatch(PromotionRecord::galleryEligible), candidateId);
+            assertTrue(acceptedIds.contains(candidateId), candidateId);
         }
 
         Map<String, Object> dashboardJson = JSON.readValue(
@@ -179,7 +180,7 @@ class DiscoveryPromotionPipelineRunnerTest {
         String gallery = runner.renderGallery(List.of(eligible, blocked));
 
         assertTrue(gallery.contains("## Selection policy"));
-        assertTrue(gallery.contains("fallbackUsed=false"));
+        assertTrue(gallery.contains("public evidence gate"));
         assertTrue(gallery.contains("| eligible |"));
         assertFalse(gallery.contains("| blocked |"));
     }
