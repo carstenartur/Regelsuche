@@ -39,6 +39,10 @@ record PromotionObservation(
         rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
     }
 
+    AblationEvidence ablationEvidence() {
+        return AblationEvidence.statusOnly(ablationStatus, rationale);
+    }
+
     static PromotionObservation fromCampaignOne(DiscoveryCampaignOneRunner.CaseResult result, String campaignId) {
         return new PromotionObservation(
             result.id(),
