@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PublicBenchmarkEvidenceGate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">PublicBenchmarkEvidenceGate.java</span></div><h1>PublicBenchmarkEvidenceGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/** Gate for generated benchmark evidence that feeds docs/demo-gallery.md. */
+<span class="fc" id="L16">final class PublicBenchmarkEvidenceGate {</span>
+<span class="fc" id="L17">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L18">        .findAndRegisterModules()</span>
+<span class="fc" id="L19">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+    GateDecision evaluate(DiscoveryBenchmarkScenario scenario, DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L22">        List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        if (!evidence.success()) {</span>
+<span class="nc" id="L24">            reasons.add(&quot;success=false&quot;);</span>
+        }
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (!evidence.promotionEligible()) {</span>
+<span class="nc" id="L27">            reasons.add(&quot;promotionEligible=false&quot;);</span>
+        }
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (&quot;DISAGREE&quot;.equalsIgnoreCase(evidence.oracleStatus())) {</span>
+<span class="nc" id="L30">            reasons.add(&quot;oracle=DISAGREE&quot;);</span>
+        }
+<span class="pc bpc" id="L32" title="2 of 4 branches missed.">        if (evidence.foundPaths().isEmpty() || evidence.edges().isEmpty()) {</span>
+<span class="nc" id="L33">            reasons.add(&quot;pathSource!=REGELSUCHE_SEARCH&quot;);</span>
+        }
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (hasCuratedOrFallbackEdge(evidence)) {</span>
+<span class="fc" id="L36">            reasons.add(&quot;curated-or-fallback-path=true&quot;);</span>
+        }
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">        if (evidence.edges().stream().noneMatch(edge -&gt; !edge.operatorId().isBlank())) {</span>
+<span class="nc" id="L39">            reasons.add(&quot;operator=missing&quot;);</span>
+        }
+<span class="pc bpc" id="L41" title="3 of 6 branches missed.">        if (evidence.edges().stream().noneMatch(edge -&gt; edge.packId() != null &amp;&amp; !edge.packId().isBlank())) {</span>
+<span class="nc" id="L42">            reasons.add(&quot;pack=missing&quot;);</span>
+        }
+<span class="fc" id="L44">        int minVisibleNodes = Math.max(1, scenario.gallery().minVisibleNodes());</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">        if (evidence.nodeCount() &lt; minVisibleNodes || evidence.edgeCount() == 0) {</span>
+<span class="nc" id="L46">            reasons.add(&quot;visible-graph=insufficient&quot;);</span>
+        }
+<span class="fc" id="L48">        AblationEvidence ablation = ablationEvidence(evidence);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (!ablation.hasStructuredMetrics()) {</span>
+<span class="fc" id="L50">            reasons.add(&quot;ablation=missing-structured&quot;);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        } else if (!ablation.promotionReady()) {</span>
+<span class="nc" id="L52">            reasons.add(&quot;ablation=&quot; + ablation.ablationStatus());</span>
+        }
+<span class="fc" id="L54">        return new GateDecision(</span>
+<span class="fc" id="L55">            scenario.id(),</span>
+<span class="fc" id="L56">            scenario.displayName(),</span>
+<span class="fc" id="L57">            reasons.isEmpty(),</span>
+<span class="fc" id="L58">            evidence.success(),</span>
+<span class="fc" id="L59">            evidence.promotionEligible(),</span>
+<span class="fc" id="L60">            evidence.oracleStatus(),</span>
+<span class="fc" id="L61">            ablation.ablationStatus(),</span>
+<span class="fc" id="L62">            ablation.hasStructuredMetrics(),</span>
+<span class="fc" id="L63">            evidence.nodeCount(),</span>
+<span class="fc" id="L64">            evidence.edgeCount(),</span>
+            reasons
+        );
+    }
+
+    GateReport write(Path outputDirectory, List&lt;GateDecision&gt; decisions) {
+        try {
+<span class="fc" id="L71">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L72">            GateReport report = new GateReport(</span>
+                decisions,
+<span class="fc" id="L74">                decisions.stream().filter(GateDecision::accepted).count(),</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                decisions.stream().filter(decision -&gt; !decision.accepted()).count()</span>
+            );
+<span class="fc" id="L77">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L78">                outputDirectory.resolve(&quot;public-scenario-gate.json&quot;),</span>
+<span class="fc" id="L79">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+            );
+<span class="fc" id="L81">            Files.writeString(</span>
+<span class="fc" id="L82">                outputDirectory.resolve(&quot;public-scenario-rejections.md&quot;),</span>
+<span class="fc" id="L83">                renderRejections(report),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L86">            return report;</span>
+<span class="nc" id="L87">        } catch (IOException exception) {</span>
+<span class="nc" id="L88">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    String renderRejections(GateReport report) {
+<span class="fc" id="L93">        StringBuilder out = new StringBuilder(&quot;# Public scenario gate rejections\n\n&quot;);</span>
+<span class="fc" id="L94">        out.append(&quot;| Scenario | Accepted | Success | Promotion eligible | Oracle | Ablation | Nodes | Edges | Rejection reasons |\n&quot;);</span>
+<span class="fc" id="L95">        out.append(&quot;| --- | --- | --- | --- | --- | --- | ---: | ---: | --- |\n&quot;);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (report.decisions().isEmpty()) {</span>
+<span class="nc" id="L97">            out.append(&quot;| — | — | — | — | — | — | 0 | 0 | none |\n&quot;);</span>
+<span class="nc" id="L98">            return out.toString();</span>
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (GateDecision decision : report.decisions()) {</span>
+<span class="fc" id="L101">            out.append(&quot;| &quot;).append(escape(decision.scenarioId()))</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                .append(&quot; | &quot;).append(decision.accepted() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(decision.success() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(decision.promotionEligible() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc" id="L105">                .append(&quot; | &quot;).append(escape(decision.oracleStatus().toLowerCase(Locale.ROOT)))</span>
+<span class="fc" id="L106">                .append(&quot; | &quot;).append(escape(decision.ablationStatus().toLowerCase(Locale.ROOT)))</span>
+<span class="fc" id="L107">                .append(&quot; | &quot;).append(decision.nodeCount())</span>
+<span class="fc" id="L108">                .append(&quot; | &quot;).append(decision.edgeCount())</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                .append(&quot; | &quot;).append(decision.rejectionReasons().isEmpty() ? &quot;—&quot; : escape(String.join(&quot;, &quot;, decision.rejectionReasons())))</span>
+<span class="fc" id="L110">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L111">        }</span>
+<span class="fc" id="L112">        return out.toString();</span>
+    }
+
+    private AblationEvidence ablationEvidence(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L116">        DiscoveryBenchmarkEvidence.SearchRunEvidence withMacro = evidence.withMacroRun();</span>
+<span class="fc" id="L117">        DiscoveryBenchmarkEvidence.SearchRunEvidence withoutMacro = evidence.withoutMacroRun();</span>
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        if (withMacro == null || withoutMacro == null) {</span>
+<span class="fc" id="L119">            return AblationEvidence.statusOnly(&quot;N/A&quot;, &quot;benchmark evidence does not contain both runs&quot;);</span>
+        }
+<span class="fc" id="L121">        return AblationEvidence.compare(</span>
+<span class="fc" id="L122">            withMacro.success(),</span>
+<span class="fc" id="L123">            pathLength(withMacro),</span>
+<span class="fc" id="L124">            statesExplored(withMacro),</span>
+<span class="fc" id="L125">            withoutMacro.success(),</span>
+<span class="fc" id="L126">            pathLength(withoutMacro),</span>
+<span class="fc" id="L127">            statesExplored(withoutMacro),</span>
+            &quot;public benchmark macro reuse ablation&quot;
+        );
+    }
+
+    private int pathLength(DiscoveryBenchmarkEvidence.SearchRunEvidence run) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        return run.path().isEmpty() ? -1 : Math.max(0, run.path().size() - 1);</span>
+    }
+
+    private long statesExplored(DiscoveryBenchmarkEvidence.SearchRunEvidence run) {
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        return run.analytics() == null ? -1L : run.analytics().statesExplored();</span>
+    }
+
+    private boolean hasCuratedOrFallbackEdge(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L141">        return evidence.edges().stream().anyMatch(edge -&gt; {</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            String source = edge.source() == null ? &quot;&quot; : edge.source().toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            String rule = edge.ruleId() == null ? &quot;&quot; : edge.ruleId().toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            return source.contains(&quot;scenario&quot;)</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                || source.contains(&quot;curated&quot;)</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                || source.contains(&quot;hardcoded&quot;)</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                || source.contains(&quot;fallback&quot;)</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                || rule.contains(&quot;fallback&quot;);</span>
+        });
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    record GateReport(List&lt;GateDecision&gt; decisions, long acceptedCount, long rejectedCount) {
+<span class="fc" id="L157">        GateReport {</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            decisions = decisions == null ? List.of() : List.copyOf(decisions);</span>
+<span class="fc" id="L159">        }</span>
+    }
+
+    record GateDecision(
+        String scenarioId,
+        String displayName,
+        boolean accepted,
+        boolean success,
+        boolean promotionEligible,
+        String oracleStatus,
+        String ablationStatus,
+        boolean structuredAblation,
+        int nodeCount,
+        int edgeCount,
+        List&lt;String&gt; rejectionReasons
+    ) {
+<span class="fc" id="L175">        GateDecision {</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            scenarioId = scenarioId == null ? &quot;&quot; : scenarioId;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            displayName = displayName == null ? &quot;&quot; : displayName;</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            ablationStatus = ablationStatus == null ? &quot;N/A&quot; : ablationStatus;</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            rejectionReasons = rejectionReasons == null ? List.of() : List.copyOf(rejectionReasons);</span>
+<span class="fc" id="L181">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
