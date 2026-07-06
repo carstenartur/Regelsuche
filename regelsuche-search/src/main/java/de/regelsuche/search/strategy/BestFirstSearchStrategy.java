@@ -1,6 +1,9 @@
 package de.regelsuche.search.strategy;
 
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.search.telemetry.SearchEvent;
+import de.regelsuche.search.telemetry.SearchEventType;
+import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
@@ -46,19 +49,34 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         Set<String> visited = new HashSet<>();
         frontier.add(rootState);
 
+        SearchObserver observer = problem.observer();
+        long[] sequence = {0L};
+        emit(observer, sequence, SearchEventType.SEARCH_STARTED, rootState, problem,
+            frontier.size(), visited.size(), 0, "");
+
         while (!frontier.isEmpty() && explored.size() < problem.heuristic().maxVisitedExpressions()) {
             SearchState current = frontier.remove();
+            emit(observer, sequence, SearchEventType.STATE_DEQUEUED, current, problem,
+                frontier.size(), visited.size(), 0, "");
             if (!visited.add(stateKey(current))) {
+                emit(observer, sequence, SearchEventType.STATE_PRUNED_DUPLICATE, current, problem,
+                    frontier.size(), visited.size(), 0, "visited-state-key");
                 continue;
             }
             if (current.depth() > 0
                 && TranspositionGate.evaluate(problem.memory(), current,
                     current.canonicalHash() + "#" + current.depth())
                 == TranspositionGate.Verdict.PRUNE) {
+                emit(observer, sequence, SearchEventType.STATE_PRUNED_TRANSPOSITION, current, problem,
+                    frontier.size(), visited.size(), 0, "transposition-gate");
                 continue;
             }
             explored.add(current);
+            emit(observer, sequence, SearchEventType.STATE_VISITED, current, problem,
+                frontier.size(), visited.size(), 0, "");
             if (current.depth() >= problem.heuristic().maxDepth()) {
+                emit(observer, sequence, SearchEventType.STATE_PRUNED_DEPTH, current, problem,
+                    frontier.size(), visited.size(), 0, "max-depth");
                 continue;
             }
 
@@ -68,20 +86,32 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 .comparing(Transformation::rule)
                 .thenComparing(Transformation::transformedExpression)
                 .thenComparing(Transformation::applicationKey));
+            emit(observer, sequence, SearchEventType.STATE_EXPANDED, current, problem,
+                frontier.size(), visited.size(), transformations.size(), "");
             for (Transformation transformation : transformations) {
+                emitTransformation(observer, sequence, current, transformation, problem,
+                    frontier.size(), visited.size(), generated, "");
                 if (generated >= problem.heuristic().maxCandidatesPerState()) {
+                    emitTransformation(observer, sequence, current, transformation, problem,
+                        frontier.size(), visited.size(), generated, "max-candidates-per-state");
                     break;
                 }
                 if (current.appliedRuleApplications().contains(transformation.applicationKey())) {
+                    emitTransformation(observer, sequence, current, transformation, problem,
+                        frontier.size(), visited.size(), generated, "repeated-rule-application");
                     continue;
                 }
                 int expandedSteps = current.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);
                 if (expandedSteps > problem.heuristic().maxExpandingSteps()) {
+                    emitTransformation(observer, sequence, current, transformation, problem,
+                        frontier.size(), visited.size(), generated, "max-expanding-steps");
                     continue;
                 }
                 String nextExpression = transformation.transformedExpression();
                 String hash = problem.canonicalizer().stableHash(nextExpression);
                 if (nextExpression.equals(current.expression())) {
+                    emitTransformation(observer, sequence, current, transformation, problem,
+                        frontier.size(), visited.size(), generated, "same-expression");
                     continue;
                 }
                 ExpressionScore nextScore = problem.scorer().score(nextExpression);
@@ -119,12 +149,18 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                     assumptions
                 );
                 if (visited.contains(stateKey(nextState))) {
+                    emit(observer, sequence, SearchEventType.STATE_PRUNED_DUPLICATE, nextState, problem,
+                        frontier.size(), visited.size(), generated, "visited-state-key");
                     continue;
                 }
                 frontier.add(nextState);
                 generated++;
+                emit(observer, sequence, SearchEventType.STATE_ENQUEUED, nextState, problem,
+                    frontier.size(), visited.size(), generated, "");
             }
         }
+        emit(observer, sequence, SearchEventType.SEARCH_FINISHED, rootState, problem,
+            frontier.size(), visited.size(), explored.size(), "");
         return explored;
     }
 
@@ -155,6 +191,64 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             return Integer.MAX_VALUE / 2;
         }
         return modelCost + depthPenalty + expansionPenalty + noImprovementPenalty;
+    }
+
+    private void emit(
+        SearchObserver observer,
+        long[] sequence,
+        SearchEventType type,
+        SearchState state,
+        SearchProblem problem,
+        int frontierSize,
+        int visitedCount,
+        int generatedCount,
+        String pruningReason
+    ) {
+        observer.onEvent(new SearchEvent(
+            sequence[0]++,
+            type,
+            state.expression(),
+            state.canonicalHash(),
+            state.depth(),
+            state.score().weightedTotal(),
+            state.parentExpression() == null ? "" : problem.canonicalizer().stableHash(state.parentExpression()),
+            state.appliedRuleId(),
+            state.appliedRuleKind(),
+            state.assumptions(),
+            frontierSize,
+            visitedCount,
+            generatedCount,
+            pruningReason
+        ));
+    }
+
+    private void emitTransformation(
+        SearchObserver observer,
+        long[] sequence,
+        SearchState state,
+        Transformation transformation,
+        SearchProblem problem,
+        int frontierSize,
+        int visitedCount,
+        int generatedCount,
+        String pruningReason
+    ) {
+        observer.onEvent(new SearchEvent(
+            sequence[0]++,
+            pruningReason.isBlank() ? SearchEventType.TRANSFORMATION_GENERATED : SearchEventType.STATE_PRUNED_BUDGET,
+            transformation.transformedExpression(),
+            problem.canonicalizer().stableHash(transformation.transformedExpression()),
+            state.depth() + 1,
+            problem.scorer().score(transformation.transformedExpression()).weightedTotal(),
+            state.canonicalHash(),
+            transformation.rule(),
+            transformation.kind(),
+            transformation.assumptions(),
+            frontierSize,
+            visitedCount,
+            generatedCount,
+            pruningReason
+        ));
     }
 
     private String stateKey(SearchState state) {
