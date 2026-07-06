@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchSpacePowerRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">SearchSpacePowerRunner.java</span></div><h1>SearchSpacePowerRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Runner that generates {@code SearchSpacePowerReport} artifacts for selected discovery scenarios.
+ *
+ * &lt;p&gt;Scenarios are chosen from the existing public scenario set.  For each scenario the runner:&lt;/p&gt;
+ * &lt;ol&gt;
+ *   &lt;li&gt;Executes the {@link DiscoveryBenchmarkExecutor} to collect full search evidence.&lt;/li&gt;
+ *   &lt;li&gt;Writes per-scenario artifacts: {@code search-space-power.json}, {@code search-space-power.md},
+ *       {@code search-space-power.svg}.&lt;/li&gt;
+ *   &lt;li&gt;Writes an aggregate index and combined Markdown summary.&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;Run via the Gradle task {@code runSearchSpacePowerReport} or {@code main()}.&lt;/p&gt;
+ */
+<span class="nc" id="L28">public final class SearchSpacePowerRunner {</span>
+
+<span class="nc" id="L30">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="nc" id="L31">            .findAndRegisterModules()</span>
+<span class="nc" id="L32">            .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+<span class="nc" id="L34">    private static final List&lt;String&gt; SCENARIO_IDS =</span>
+<span class="nc" id="L35">            List.of(&quot;complete-square-factorization&quot;, &quot;sophie-germain&quot;);</span>
+
+<span class="nc" id="L37">    private final DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();</span>
+<span class="nc" id="L38">    private final DiscoveryBenchmarkExecutor executor = new DiscoveryBenchmarkExecutor();</span>
+<span class="nc" id="L39">    private final SearchSpacePowerReportWriter writer = new SearchSpacePowerReportWriter();</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L43">                ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L44">                : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L45">        new SearchSpacePowerRunner()</span>
+<span class="nc" id="L46">                .writeReport(repoRoot.resolve(&quot;app/build/reports/search-space-power&quot;));</span>
+<span class="nc" id="L47">    }</span>
+
+    /** Runs the power report for all configured scenarios and returns the aggregate report. */
+    public PowerReport run() {
+<span class="nc" id="L51">        List&lt;ScenarioResult&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        for (DiscoveryBenchmarkScenario scenario : loader.loadAll(&quot;discovery-scenarios&quot;)) {</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            if (!SCENARIO_IDS.contains(scenario.id())) {</span>
+<span class="nc" id="L54">                continue;</span>
+            }
+<span class="nc" id="L56">            DiscoveryBenchmarkEvidence evidence = executor.execute(scenario);</span>
+<span class="nc" id="L57">            SearchSpacePowerReport report = SearchSpacePowerReport.compute(evidence);</span>
+<span class="nc" id="L58">            results.add(new ScenarioResult(scenario.id(), report));</span>
+<span class="nc" id="L59">        }</span>
+<span class="nc" id="L60">        results.sort((a, b) -&gt; Integer.compare(</span>
+<span class="nc" id="L61">                SCENARIO_IDS.indexOf(a.scenarioId()),</span>
+<span class="nc" id="L62">                SCENARIO_IDS.indexOf(b.scenarioId())));</span>
+<span class="nc" id="L63">        return new PowerReport(&quot;search-space-power&quot;, results);</span>
+    }
+
+    /** Runs and writes all artifacts to the given output directory. */
+    public PowerReport writeReport(Path outputDirectory) {
+        try {
+<span class="nc" id="L69">            Files.createDirectories(outputDirectory);</span>
+<span class="nc" id="L70">            PowerReport aggregate = run();</span>
+
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            for (ScenarioResult result : aggregate.results()) {</span>
+<span class="nc" id="L73">                Path scenarioDir = outputDirectory.resolve(slugFor(result.scenarioId()));</span>
+<span class="nc" id="L74">                Files.createDirectories(scenarioDir);</span>
+<span class="nc" id="L75">                writer.write(scenarioDir, result.report());</span>
+<span class="nc" id="L76">            }</span>
+
+<span class="nc" id="L78">            AtomicJsonFile.writeUtf8(</span>
+<span class="nc" id="L79">                    outputDirectory.resolve(&quot;search-space-power-index.json&quot;),</span>
+<span class="nc" id="L80">                    JSON.writerWithDefaultPrettyPrinter().writeValueAsString(aggregate));</span>
+<span class="nc" id="L81">            Files.writeString(</span>
+<span class="nc" id="L82">                    outputDirectory.resolve(&quot;search-space-power.md&quot;),</span>
+<span class="nc" id="L83">                    renderAggregateSummary(aggregate),</span>
+                    StandardCharsets.UTF_8);
+<span class="nc" id="L85">            return aggregate;</span>
+<span class="nc" id="L86">        } catch (IOException exception) {</span>
+<span class="nc" id="L87">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private String renderAggregateSummary(PowerReport aggregate) {
+<span class="nc" id="L92">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L93">        out.append(&quot;# Search-space power: aggregate summary\n\n&quot;);</span>
+<span class="nc" id="L94">        out.append(&quot;&gt; Generated by `SearchSpacePowerRunner`.\n\n&quot;);</span>
+<span class="nc" id="L95">        out.append(&quot;| Scenario | Path length | Max depth | Nodes | Edges | States explored | Canonical states | Pruning | Dead ends |\n&quot;);</span>
+<span class="nc" id="L96">        out.append(&quot;| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |\n&quot;);</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        for (ScenarioResult result : aggregate.results()) {</span>
+<span class="nc" id="L98">            SearchSpacePowerReport r = result.report();</span>
+<span class="nc" id="L99">            out.append(&quot;| `&quot;).append(escape(r.scenarioId())).append(&quot;` | &quot;)</span>
+<span class="nc" id="L100">                    .append(r.selectedPathLength()).append(&quot; | &quot;)</span>
+<span class="nc" id="L101">                    .append(r.maxExploredDepth()).append(&quot; | &quot;)</span>
+<span class="nc" id="L102">                    .append(r.nodeCount()).append(&quot; | &quot;)</span>
+<span class="nc" id="L103">                    .append(r.edgeCount()).append(&quot; | &quot;)</span>
+<span class="nc" id="L104">                    .append(r.statesExplored()).append(&quot; | &quot;)</span>
+<span class="nc" id="L105">                    .append(r.uniqueCanonicalStates()).append(&quot; | &quot;)</span>
+<span class="nc" id="L106">                    .append(String.format(Locale.ROOT, &quot;%.1f%%&quot;, r.pruningRatio() * 100)).append(&quot; | &quot;)</span>
+<span class="nc" id="L107">                    .append(r.deadEndCount()).append(&quot; |\n&quot;);</span>
+<span class="nc" id="L108">        }</span>
+<span class="nc" id="L109">        out.append(&quot;\n&quot;);</span>
+
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        for (ScenarioResult result : aggregate.results()) {</span>
+<span class="nc" id="L112">            out.append(&quot;## &quot;).append(escape(result.scenarioId())).append(&quot;\n\n&quot;);</span>
+<span class="nc" id="L113">            out.append(&quot;See [search-space-power.md](&quot;).append(slugFor(result.scenarioId()))</span>
+<span class="nc" id="L114">                    .append(&quot;/search-space-power.md) and &quot;)</span>
+<span class="nc" id="L115">                    .append(&quot;[search-space-power.svg](&quot;).append(slugFor(result.scenarioId()))</span>
+<span class="nc" id="L116">                    .append(&quot;/search-space-power.svg).\n\n&quot;);</span>
+<span class="nc" id="L117">        }</span>
+<span class="nc" id="L118">        return out.toString();</span>
+    }
+
+    private String escape(String value) {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;);</span>
+    }
+
+    private String slugFor(String scenarioId) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        return scenarioId == null ? &quot;unknown&quot;</span>
+<span class="nc" id="L127">                : scenarioId.toLowerCase(Locale.ROOT).replaceAll(&quot;[^a-z0-9-]&quot;, &quot;-&quot;);</span>
+    }
+
+    public record PowerReport(String id, List&lt;ScenarioResult&gt; results) {
+<span class="nc" id="L131">        public PowerReport {</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            results = results == null ? List.of() : List.copyOf(results);</span>
+<span class="nc" id="L133">        }</span>
+    }
+
+<span class="nc" id="L136">    public record ScenarioResult(String scenarioId, SearchSpacePowerReport report) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
