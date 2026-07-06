@@ -321,6 +321,15 @@ tasks.register('runDiscoveryPromotionPipeline', JavaExec) {
     args rootProject.projectDir.absolutePath
 }
 
+tasks.register('runSearchSpacePowerReport', JavaExec) {
+    description = 'Generates search-space power reports (search-space-power.json/.md/.svg) for selected discovery scenarios under app/build/reports/search-space-power.'
+    group = 'documentation'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.docs.SearchSpacePowerRunner'
+    args rootProject.projectDir.absolutePath
+}
+
 tasks.register('e2eTest', Test) {
     description = 'Browser-driven end-to-end demo flows (Playwright). Use ' +
         '-Pregelsuche.recordDocs=true to refresh docs/assets/{screenshots,videos}.'
