@@ -1,6 +1,7 @@
 package de.regelsuche.docs;
 
 import de.regelsuche.search.SearchSpaceAnalytics;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,10 +36,16 @@ public record SearchSpacePowerReport(
         Map<String, Long> topRuleIds) {
 
     public SearchSpacePowerReport {
-        depthHistogram = depthHistogram == null ? Map.of() : Map.copyOf(depthHistogram);
-        edgeSourceBreakdown = edgeSourceBreakdown == null ? Map.of() : Map.copyOf(edgeSourceBreakdown);
-        edgeKindBreakdown = edgeKindBreakdown == null ? Map.of() : Map.copyOf(edgeKindBreakdown);
-        topRuleIds = topRuleIds == null ? Map.of() : Map.copyOf(topRuleIds);
+        depthHistogram = immutableLinkedMap(depthHistogram);
+        edgeSourceBreakdown = immutableLinkedMap(edgeSourceBreakdown);
+        edgeKindBreakdown = immutableLinkedMap(edgeKindBreakdown);
+        topRuleIds = immutableLinkedMap(topRuleIds);
+    }
+
+    private static <K, V> Map<K, V> immutableLinkedMap(Map<K, V> source) {
+        return source == null || source.isEmpty()
+                ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(source));
     }
 
     /** Computes a {@code SearchSpacePowerReport} from a fully-populated evidence object. */

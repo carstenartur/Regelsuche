@@ -249,18 +249,6 @@ class SearchSpacePowerReportWriterTest {
                 new DiscoveryBenchmarkEvidence.EvidenceNode("n5", "target", "target", 3,
                         List.of("target")));
 
-        List<DiscoveryBenchmarkEvidence.EvidenceEdge> edges = List.of(
-                new DiscoveryBenchmarkEvidence.EvidenceEdge(
-                        "n0", "n2", "rule.alpha", "rule", "core", "core", List.of()),
-                new DiscoveryBenchmarkEvidence.EvidenceEdge(
-                        "n0", "n1", "rule.beta", "rule", "operator", "core", List.of()),
-                new DiscoveryBenchmarkEvidence.EvidenceEdge(
-                        "n1", "n3", "rule.gamma", "bridge", "operator", "core", List.of()),
-                new DiscoveryBenchmarkEvidence.EvidenceEdge(
-                        "n2", "n4", "rule.alpha", "rule", "core", "core", List.of()),
-                new DiscoveryBenchmarkEvidence.EvidenceEdge(
-                        "n4", "n5", "rule.delta", "bridge", "core", "core", List.of()));
-
         // Tag edges
         List<DiscoveryBenchmarkEvidence.EvidenceEdge> taggedEdges = List.of(
                 new DiscoveryBenchmarkEvidence.EvidenceEdge(

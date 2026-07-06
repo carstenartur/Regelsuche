@@ -72,13 +72,7 @@ public final class SearchSpacePowerRunner {
             for (ScenarioResult result : aggregate.results()) {
                 Path scenarioDir = outputDirectory.resolve(slugFor(result.scenarioId()));
                 Files.createDirectories(scenarioDir);
-                DiscoveryBenchmarkEvidence evidence = executor.execute(
-                        loader.loadAll("discovery-scenarios").stream()
-                                .filter(s -> s.id().equals(result.scenarioId()))
-                                .findFirst()
-                                .orElseThrow(() -> new IllegalStateException(
-                                        "Missing scenario: " + result.scenarioId())));
-                writer.write(scenarioDir, evidence);
+                writer.write(scenarioDir, result.report());
             }
 
             AtomicJsonFile.writeUtf8(

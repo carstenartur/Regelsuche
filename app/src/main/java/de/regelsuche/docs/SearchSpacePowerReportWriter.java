@@ -33,6 +33,14 @@ public final class SearchSpacePowerReportWriter {
             DiscoveryBenchmarkEvidence evidence) throws IOException {
         Files.createDirectories(outputDirectory);
         SearchSpacePowerReport report = SearchSpacePowerReport.compute(evidence);
+        return write(outputDirectory, report);
+    }
+
+    /** Writes all three artifacts for an already computed report. */
+    public SearchSpacePowerReport write(
+            Path outputDirectory,
+            SearchSpacePowerReport report) throws IOException {
+        Files.createDirectories(outputDirectory);
         AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("search-space-power.json"),
                 JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report));
@@ -234,7 +242,7 @@ public final class SearchSpacePowerReportWriter {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private String escape(String value) {
-        return value == null ? "" : value.replace("|", "\\|");
+        return value == null ? "" : value.replace("\n", " ").replace("\r", " ").replace("|", "\\|");
     }
 
     private String escapeXml(String text) {
