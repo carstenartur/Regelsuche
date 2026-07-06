@@ -84,7 +84,9 @@ final class PublicEvidenceGate {
         if ("DISAGREE".equalsIgnoreCase(record.oracleStatus())) {
             reasons.add("oracle=DISAGREE");
         }
-        if (!record.ablationEvidence().promotionReady()) {
+        if (!record.ablationEvidence().hasStructuredMetrics()) {
+            reasons.add("ablation=missing-structured");
+        } else if (!record.ablationEvidence().promotionReady()) {
             reasons.add("ablation=" + record.ablationEvidence().ablationStatus());
         }
         if (record.sourceOperator().isBlank()) {
