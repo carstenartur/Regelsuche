@@ -24,8 +24,8 @@ if (aiKnowledgeEnabled) {
         seedDirectory = layout.projectDirectory.dir('ai-knowledge')
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
-        // Keep the CI gate just above the measured baseline so future debt increases fail fast.
-        maxCognitiveDebt = 351.0d
+        // Keep the CI gate just above the measured baseline (~340) so future debt increases fail fast.
+        maxCognitiveDebt = 350.0d
     }
 } else {
     tasks.register('generateAiKnowledgeIndex') {
