@@ -1,6 +1,7 @@
 package de.regelsuche.search.strategy;
 
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.search.telemetry.NoOpSearchObserver;
 import de.regelsuche.search.telemetry.SearchEvent;
 import de.regelsuche.search.telemetry.SearchEventType;
 import de.regelsuche.search.telemetry.SearchObserver;
@@ -89,13 +90,13 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             emit(observer, sequence, SearchEventType.STATE_EXPANDED, current, problem,
                 frontier.size(), visited.size(), transformations.size(), "");
             for (Transformation transformation : transformations) {
-                emitTransformation(observer, sequence, current, transformation, problem,
-                    frontier.size(), visited.size(), generated, "");
                 if (generated >= problem.heuristic().maxCandidatesPerState()) {
-                    emitTransformation(observer, sequence, current, transformation, problem,
+                    emit(observer, sequence, SearchEventType.STATE_PRUNED_BUDGET, current, problem,
                         frontier.size(), visited.size(), generated, "max-candidates-per-state");
                     break;
                 }
+                emitTransformation(observer, sequence, current, transformation, problem,
+                    frontier.size(), visited.size(), generated, "");
                 if (current.appliedRuleApplications().contains(transformation.applicationKey())) {
                     emitTransformation(observer, sequence, current, transformation, problem,
                         frontier.size(), visited.size(), generated, "repeated-rule-application");
@@ -204,6 +205,9 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         int generatedCount,
         String pruningReason
     ) {
+        if (observer == NoOpSearchObserver.INSTANCE) {
+            return;
+        }
         observer.onEvent(new SearchEvent(
             sequence[0]++,
             type,
@@ -233,9 +237,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         int generatedCount,
         String pruningReason
     ) {
+        if (observer == NoOpSearchObserver.INSTANCE) {
+            return;
+        }
         observer.onEvent(new SearchEvent(
             sequence[0]++,
-            pruningReason.isBlank() ? SearchEventType.TRANSFORMATION_GENERATED : SearchEventType.STATE_PRUNED_BUDGET,
+            SearchEventType.TRANSFORMATION_GENERATED,
             transformation.transformedExpression(),
             problem.canonicalizer().stableHash(transformation.transformedExpression()),
             state.depth() + 1,

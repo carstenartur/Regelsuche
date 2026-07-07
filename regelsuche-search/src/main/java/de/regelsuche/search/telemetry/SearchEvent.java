@@ -28,7 +28,6 @@ public record SearchEvent(
         canonicalHash = canonicalHash == null ? "" : canonicalHash;
         parentCanonicalHash = parentCanonicalHash == null ? "" : parentCanonicalHash;
         ruleId = ruleId == null ? "" : ruleId;
-        rewriteKind = rewriteKind == null ? RewriteKind.NORMALIZE : rewriteKind;
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         pruningReason = pruningReason == null ? "" : pruningReason;
     }

@@ -40,6 +40,12 @@ class BestFirstSearchTelemetryTest {
         assertTrue(observer.events().stream().anyMatch(event -> event.type() == SearchEventType.STATE_ENQUEUED));
         assertTrue(observer.events().stream().anyMatch(event -> event.type() == SearchEventType.STATE_PRUNED_DEPTH));
         assertTrue(observer.events().stream().anyMatch(event -> event.type() == SearchEventType.STATE_PRUNED_BUDGET));
+        SearchEvent budgetEvent = observer.events().stream()
+            .filter(event -> event.type() == SearchEventType.STATE_PRUNED_BUDGET)
+            .findFirst()
+            .orElseThrow();
+        assertEquals("x", budgetEvent.expression());
+        assertEquals("max-candidates-per-state", budgetEvent.pruningReason());
     }
 
     @Test
