@@ -27,23 +27,19 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   extract:
     name: Generate AI knowledge index
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout Regelsuche
         uses: actions/checkout@v7
         with:
           path: Regelsuche
-
-      - name: Checkout AI knowledge extractor
-        uses: actions/checkout@v7
-        with:
-          repository: carstenartur/ai-knowledge-extractor
-          ref: v0.1.4
-          path: ai-knowledge-extractor
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -55,18 +51,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.1.0
         with:
           gradle-home-cache-cleanup: true
-
-      - name: Build extractor plugin jars
-        run: |
-          mkdir -p Regelsuche/build/ai-knowledge
-          cd ai-knowledge-extractor
-          set +e
-          ./gradlew --no-daemon --stacktrace :core:jar :gradle-plugin:jar -x test > ../Regelsuche/build/ai-knowledge/plugin-build.out 2> ../Regelsuche/build/ai-knowledge/plugin-build.err
-          status=$?
-          echo "$status" > ../Regelsuche/build/ai-knowledge/plugin-build.exit
-          cat ../Regelsuche/build/ai-knowledge/plugin-build.out
-          cat ../Regelsuche/build/ai-knowledge/plugin-build.err
-          test "$status" = "0"
 
       - name: Generate AI knowledge artifacts
         working-directory: Regelsuche
