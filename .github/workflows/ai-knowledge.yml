@@ -27,22 +27,19 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   extract:
     name: Generate AI knowledge index
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout Regelsuche
         uses: actions/checkout@v7
         with:
           path: Regelsuche
-
-      - name: Checkout AI knowledge extractor
-        uses: actions/checkout@v7
-        with:
-          repository: carstenartur/ai-knowledge-extractor
-          path: ai-knowledge-extractor
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -54,18 +51,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.1.0
         with:
           gradle-home-cache-cleanup: true
-
-      - name: Build extractor plugin jars
-        run: |
-          mkdir -p Regelsuche/build/ai-knowledge
-          cd ai-knowledge-extractor
-          set +e
-          ./gradlew --no-daemon --stacktrace :core:jar :gradle-plugin:jar -x test > ../Regelsuche/build/ai-knowledge/plugin-build.out 2> ../Regelsuche/build/ai-knowledge/plugin-build.err
-          status=$?
-          echo "$status" > ../Regelsuche/build/ai-knowledge/plugin-build.exit
-          cat ../Regelsuche/build/ai-knowledge/plugin-build.out
-          cat ../Regelsuche/build/ai-knowledge/plugin-build.err
-          test "$status" = "0"
 
       - name: Generate AI knowledge artifacts
         working-directory: Regelsuche
@@ -113,6 +98,7 @@ jobs:
               'capabilities.json',
               'claims.json',
               'evidence.json',
+              'complexity.json',
               'review-context.md',
               'context-packs/index.json',
           ]
@@ -137,55 +123,44 @@ jobs:
           warnings = []
           errors = []
 
-          # Check evidence.json contains useful entries
+          # Check evidence.json contains useful entries (handles both list and object root)
           evidence_path = ai_dir / 'evidence.json'
           try:
               raw = json.loads(evidence_path.read_text(encoding='utf-8'))
-              evidence_list = raw if isinstance(raw, list) else raw.get('evidence', [])
-              if not evidence_list:
-                  errors.append('evidence.json is empty — no discovery evidence generated')
-              else:
-                  types = {str(e.get('type', '')) for e in evidence_list if isinstance(e, dict)}
-                  sources = ' '.join(str(e.get('source', '')) for e in evidence_list if isinstance(e, dict)).lower()
-                  if 'discovery-evidence' not in types:
-                      warnings.append('evidence.json does not contain discovery-evidence entries')
-                  if not any(kw in sources for kw in ('jmh', 'benchmark', 'bench')):
-                      warnings.append('evidence.json may lack JMH benchmark source evidence')
-                  if not any(kw in sources for kw in ('workflow', '.github', 'ci')):
-                      warnings.append('evidence.json may lack GitHub workflow evidence')
+              evidence = raw if isinstance(raw, list) else raw.get('evidence', [])
           except Exception as exc:
-              errors.append(f'Failed to parse evidence.json: {exc}')
+              errors.append(f'Could not parse evidence.json: {exc}')
+              evidence = []
+          if not evidence:
+              errors.append('evidence.json is empty; expected repository evidence artifacts.')
 
-          # Check review-context.md is readable (non-trivial content)
-          review_context_path = ai_dir / 'review-context.md'
+          # Check class/test facts are linked to method facts
           try:
-              content = review_context_path.read_text(encoding='utf-8').strip()
-              if len(content) < 200:
-                  warnings.append(
-                      f'review-context.md is very short ({len(content)} chars) — may not be useful without raw JSON'
-                  )
+              classes = json.loads((ai_dir / 'classes.json').read_text(encoding='utf-8')).get('classes', [])
+              if not any(c.get('methodFacts') for c in classes):
+                  warnings.append('classes.json contains no methodFacts; Java extraction may be too shallow.')
           except Exception as exc:
-              errors.append(f'Failed to read review-context.md: {exc}')
+              errors.append(f'Could not parse classes.json: {exc}')
 
-          # Check context-packs exist for major Regelsuche capabilities
-          packs_index_path = ai_dir / 'context-packs' / 'index.json'
+          # Check complexity report contains method-level and AI-cost metrics from ai-knowledge-extractor 0.1.4
           try:
-              packs_index = json.loads(packs_index_path.read_text(encoding='utf-8'))
-              pack_ids = [str(p.get('id', '')) for p in packs_index] if isinstance(packs_index, list) else []
-              major_caps = ['rewrite-search', 'discovery', 'web-workbench']
-              for cap in major_caps:
-                  if not any(cap in pid for pid in pack_ids):
-                      warnings.append(f'No context pack found for major capability: {cap}')
+              complexity = json.loads((ai_dir / 'complexity.json').read_text(encoding='utf-8'))
+              code_complexity = complexity.get('codeComplexity', {})
+              cost_drivers = complexity.get('aiCostDrivers', {})
+              if 'maxMethodCognitiveComplexity' not in code_complexity:
+                  errors.append('complexity.json lacks codeComplexity.maxMethodCognitiveComplexity.')
+              if 'tokenCostDrivers' not in cost_drivers:
+                  errors.append('complexity.json lacks aiCostDrivers.tokenCostDrivers.')
           except Exception as exc:
-              errors.append(f'Failed to parse context-packs/index.json: {exc}')
+              errors.append(f'Could not parse complexity.json: {exc}')
 
-          for w in warnings:
-              print(f'WARNING: {w}')
+          for warning in warnings:
+              print(f'WARNING: {warning}')
+          for error in errors:
+              print(f'ERROR: {error}', file=sys.stderr)
           if errors:
-              for e in errors:
-                  print(f'ERROR: {e}')
               sys.exit(1)
-          print('AI knowledge artifact quality check passed.')
+          print('AI knowledge artifacts passed basic quality checks.')
           PY
 
       - name: Upload AI knowledge artifacts
