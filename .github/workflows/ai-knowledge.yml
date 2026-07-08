@@ -114,6 +114,7 @@ jobs:
               'capabilities.json',
               'claims.json',
               'evidence.json',
+              'complexity.json',
               'review-context.md',
               'context-packs/index.json',
           ]
@@ -138,10 +139,11 @@ jobs:
           warnings = []
           errors = []
 
-          # Check evidence.json contains useful entries
+          # Check evidence.json contains useful entries (handles both list and object root)
           evidence_path = ai_dir / 'evidence.json'
           try:
-              evidence = json.loads(evidence_path.read_text(encoding='utf-8')).get('evidence', [])
+              raw = json.loads(evidence_path.read_text(encoding='utf-8'))
+              evidence = raw if isinstance(raw, list) else raw.get('evidence', [])
           except Exception as exc:
               errors.append(f'Could not parse evidence.json: {exc}')
               evidence = []
@@ -149,18 +151,24 @@ jobs:
               errors.append('evidence.json is empty; expected repository evidence artifacts.')
 
           # Check class/test facts are linked to method facts
-          classes = json.loads((ai_dir / 'classes.json').read_text(encoding='utf-8')).get('classes', [])
-          if not any(c.get('methodFacts') for c in classes):
-              warnings.append('classes.json contains no methodFacts; Java extraction may be too shallow.')
+          try:
+              classes = json.loads((ai_dir / 'classes.json').read_text(encoding='utf-8')).get('classes', [])
+              if not any(c.get('methodFacts') for c in classes):
+                  warnings.append('classes.json contains no methodFacts; Java extraction may be too shallow.')
+          except Exception as exc:
+              errors.append(f'Could not parse classes.json: {exc}')
 
           # Check complexity report contains method-level and AI-cost metrics from ai-knowledge-extractor 0.1.4
-          complexity = json.loads((ai_dir / 'complexity.json').read_text(encoding='utf-8'))
-          code_complexity = complexity.get('codeComplexity', {})
-          cost_drivers = complexity.get('aiCostDrivers', {})
-          if 'maxMethodCognitiveComplexity' not in code_complexity:
-              errors.append('complexity.json lacks codeComplexity.maxMethodCognitiveComplexity.')
-          if 'tokenCostDrivers' not in cost_drivers:
-              errors.append('complexity.json lacks aiCostDrivers.tokenCostDrivers.')
+          try:
+              complexity = json.loads((ai_dir / 'complexity.json').read_text(encoding='utf-8'))
+              code_complexity = complexity.get('codeComplexity', {})
+              cost_drivers = complexity.get('aiCostDrivers', {})
+              if 'maxMethodCognitiveComplexity' not in code_complexity:
+                  errors.append('complexity.json lacks codeComplexity.maxMethodCognitiveComplexity.')
+              if 'tokenCostDrivers' not in cost_drivers:
+                  errors.append('complexity.json lacks aiCostDrivers.tokenCostDrivers.')
+          except Exception as exc:
+              errors.append(f'Could not parse complexity.json: {exc}')
 
           for warning in warnings:
               print(f'WARNING: {warning}')
@@ -170,3 +178,34 @@ jobs:
               sys.exit(1)
           print('AI knowledge artifacts passed basic quality checks.')
           PY
+
+      - name: Upload AI knowledge artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ai-knowledge-index
+          path: Regelsuche/build/ai-knowledge/**
+
+      - name: Upload AI knowledge review reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ai-knowledge-review-reports
+          path: |
+            Regelsuche/build/ai-knowledge/review-context.md
+            Regelsuche/build/ai-knowledge/context-packs/**
+            Regelsuche/build/ai-knowledge/check.out
+            Regelsuche/build/ai-knowledge/check.err
+
+      - name: Summary
+        if: always()
+        run: |
+          echo '### AI knowledge artifacts' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Generated artifacts are uploaded as the `ai-knowledge-index` workflow artifact.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Review reports (review-context.md, context-packs, check logs) are uploaded as `ai-knowledge-review-reports`.' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          find Regelsuche/build/ai-knowledge -maxdepth 1 -type f -printf '- `%f`\n' | sort >> "$GITHUB_STEP_SUMMARY" || true
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          check_exit="$(cat Regelsuche/build/ai-knowledge/check.exit 2>/dev/null || echo 'n/a')"
+          echo "**checkAiKnowledgeIndex exit code**: \`${check_exit}\`" >> "$GITHUB_STEP_SUMMARY"
