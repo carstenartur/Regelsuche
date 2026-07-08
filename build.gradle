@@ -3,10 +3,19 @@ def aiKnowledgeEnabled = System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'tru
 def aiKnowledgeExtractorRoot = file('../ai-knowledge-extractor')
 
 buildscript {
+    repositories {
+        if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
+            mavenCentral()
+        }
+    }
+
     dependencies {
         if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
             classpath fileTree(dir: '../ai-knowledge-extractor/core/build/libs', include: ['*.jar'])
             classpath fileTree(dir: '../ai-knowledge-extractor/gradle-plugin/build/libs', include: ['*.jar'])
+            // The local extractor jars are not fat jars. Add the JDT dependency transitively so
+            // ai-knowledge-extractor 0.1.4 can run its AST-based method complexity analyzer.
+            classpath 'org.eclipse.jdt:org.eclipse.jdt.core:3.41.0'
         }
     }
 }
