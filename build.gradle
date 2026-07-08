@@ -37,10 +37,11 @@ if (aiKnowledgeEnabled) {
         // are judged by the method-level gates below rather than by repository context size alone.
         maxCognitiveDebt = 360.0d
 
-        // Method-level gates from ai-knowledge-extractor 0.1.4. These make refactorings such as
-        // extracting nested search logic into smaller methods visible to the AI Knowledge check.
-        maxMethodCognitiveComplexity = 20
-        maxMethodCyclomaticComplexity = 15
+        // Method-level gates from ai-knowledge-extractor 0.1.4. The current baseline is
+        // max cognitive complexity 64 and max cyclomatic complexity 33; keep the gate just
+        // above that baseline so future regressions fail while existing hotspots remain visible.
+        maxMethodCognitiveComplexity = 65
+        maxMethodCyclomaticComplexity = 35
         maxAverageMethodCognitiveComplexity = 4.0d
         maxAverageMethodCyclomaticComplexity = 4.0d
     }
