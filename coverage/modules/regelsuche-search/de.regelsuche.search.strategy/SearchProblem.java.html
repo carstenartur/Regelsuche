@@ -6,17 +6,24 @@ import de.regelsuche.scoring.cost.CostModel;
 import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.memory.SearchMemory;
+import de.regelsuche.search.telemetry.NoOpSearchObserver;
+import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.transform.TransformationEngine;
 
-<span class="fc" id="L11">public record SearchProblem(</span>
+public record SearchProblem(
     String rootExpression,
     TransformationEngine engine,
     ExpressionScorer scorer,
     ExpressionCanonicalizer canonicalizer,
     SearchHeuristic heuristic,
     SearchMemory memory,
-    CostModel costModel
+    CostModel costModel,
+    SearchObserver observer
 ) {
+<span class="fc" id="L23">    public SearchProblem {</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        observer = observer == null ? NoOpSearchObserver.INSTANCE : observer;</span>
+<span class="fc" id="L25">    }</span>
+
     /**
      * Backwards-compatible constructor without a search memory – the strategy
      * falls back to plain canonical-hash deduplication, no
@@ -29,8 +36,8 @@ import de.regelsuche.transform.TransformationEngine;
         ExpressionCanonicalizer canonicalizer,
         SearchHeuristic heuristic
     ) {
-<span class="fc" id="L32">        this(rootExpression, engine, scorer, canonicalizer, heuristic, null, null);</span>
-<span class="fc" id="L33">    }</span>
+<span class="fc" id="L39">        this(rootExpression, engine, scorer, canonicalizer, heuristic, null, null, NoOpSearchObserver.INSTANCE);</span>
+<span class="fc" id="L40">    }</span>
 
     /**
      * Backwards-compatible constructor that preserves the pre-PR-3 API
@@ -46,12 +53,25 @@ import de.regelsuche.transform.TransformationEngine;
         SearchHeuristic heuristic,
         SearchMemory memory
     ) {
-<span class="nc" id="L49">        this(rootExpression, engine, scorer, canonicalizer, heuristic, memory, null);</span>
-<span class="nc" id="L50">    }</span>
+<span class="nc" id="L56">        this(rootExpression, engine, scorer, canonicalizer, heuristic, memory, null, NoOpSearchObserver.INSTANCE);</span>
+<span class="nc" id="L57">    }</span>
+
+    /** Backwards-compatible constructor without runtime search telemetry. */
+    public SearchProblem(
+        String rootExpression,
+        TransformationEngine engine,
+        ExpressionScorer scorer,
+        ExpressionCanonicalizer canonicalizer,
+        SearchHeuristic heuristic,
+        SearchMemory memory,
+        CostModel costModel
+    ) {
+<span class="nc" id="L69">        this(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel, NoOpSearchObserver.INSTANCE);</span>
+<span class="nc" id="L70">    }</span>
 
     /** Returns this problem with {@code memory} attached. */
     public SearchProblem withMemory(SearchMemory memory) {
-<span class="nc" id="L54">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel);</span>
+<span class="fc" id="L74">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel, observer);</span>
     }
 
     /**
@@ -60,12 +80,17 @@ import de.regelsuche.transform.TransformationEngine;
      * {@link de.regelsuche.scoring.ExpressionScore#weightedTotal()}.
      */
     public SearchProblem withCostModel(CostModel costModel) {
-<span class="fc" id="L63">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel);</span>
+<span class="fc" id="L83">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel, observer);</span>
+    }
+
+    /** Returns this problem with a runtime telemetry observer attached. */
+    public SearchProblem withObserver(SearchObserver observer) {
+<span class="fc" id="L88">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel, observer);</span>
     }
 
     /** Convenience: derive the cost model from the goal. */
     public SearchProblem withGoal(TransformationGoal goal) {
-<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        return withCostModel(goal == null ? null : goal.defaultCostModel());</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        return withCostModel(goal == null ? null : goal.defaultCostModel());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
