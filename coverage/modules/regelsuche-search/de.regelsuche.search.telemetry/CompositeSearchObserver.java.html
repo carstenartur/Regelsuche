@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompositeSearchObserver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.telemetry</a> &gt; <span class="el_source">CompositeSearchObserver.java</span></div><h1>CompositeSearchObserver.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.telemetry;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+/** Fan-out observer that forwards each event to all configured observers in declaration order. */
+public final class CompositeSearchObserver implements SearchObserver {
+    private final List&lt;SearchObserver&gt; observers;
+
+<span class="fc" id="L11">    public CompositeSearchObserver(List&lt;SearchObserver&gt; observers) {</span>
+<span class="pc bpc" id="L12" title="2 of 4 branches missed.">        if (observers == null || observers.isEmpty()) {</span>
+<span class="nc" id="L13">            this.observers = List.of();</span>
+<span class="nc" id="L14">            return;</span>
+        }
+<span class="fc" id="L16">        this.observers = observers.stream()</span>
+<span class="fc" id="L17">            .map(observer -&gt; Objects.requireNonNull(observer, &quot;observer&quot;))</span>
+<span class="fc" id="L18">            .toList();</span>
+<span class="fc" id="L19">    }</span>
+
+    public static CompositeSearchObserver of(SearchObserver... observers) {
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        return new CompositeSearchObserver(observers == null ? List.of() : Arrays.asList(observers));</span>
+    }
+
+    @Override
+    public void onEvent(SearchEvent event) {
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (SearchObserver observer : observers) {</span>
+<span class="fc" id="L28">            observer.onEvent(event);</span>
+<span class="fc" id="L29">        }</span>
+<span class="fc" id="L30">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchTimelineDataCollector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.telemetry</a> &gt; <span class="el_source">SearchTimelineDataCollector.java</span></div><h1>SearchTimelineDataCollector.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.telemetry;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Lightweight observer that records one {@link TimelinePoint} per {@link SearchEventType#STATE_VISITED}
+ * event for SVG timeline generation.
+ *
+ * &lt;p&gt;Only the fields needed for visualization (sequence, frontierSize, visitedCount) are captured,
+ * keeping memory overhead small even for moderately large searches.&lt;/p&gt;
+ */
+<span class="nc" id="L14">public final class SearchTimelineDataCollector implements SearchObserver {</span>
+
+<span class="nc" id="L16">    private final List&lt;TimelinePoint&gt; points = new ArrayList&lt;&gt;();</span>
+
+    @Override
+    public synchronized void onEvent(SearchEvent event) {
+<span class="nc bnc" id="L20" title="All 2 branches missed.">        if (event.type() == SearchEventType.STATE_VISITED) {</span>
+<span class="nc" id="L21">            points.add(new TimelinePoint(event.sequence(), event.frontierSize(), event.visitedCount()));</span>
+        }
+<span class="nc" id="L23">    }</span>
+
+    /** Returns an unmodifiable snapshot of the collected timeline points in emission order. */
+    public synchronized List&lt;TimelinePoint&gt; points() {
+<span class="nc" id="L27">        return Collections.unmodifiableList(new ArrayList&lt;&gt;(points));</span>
+    }
+
+    /**
+     * A single data point in the search timeline.
+     *
+     * @param sequence     sequence number of the triggering {@code STATE_VISITED} event.
+     * @param frontierSize frontier (open list) size at that moment.
+     * @param visitedCount number of canonical states visited so far.
+     */
+<span class="nc" id="L37">    public record TimelinePoint(long sequence, int frontierSize, int visitedCount) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

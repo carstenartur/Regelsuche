@@ -134,69 +134,79 @@ import java.util.Map;
 <span class="fc" id="L134">        }</span>
 <span class="fc" id="L135">        out.append(&quot;\n&quot;);</span>
 
-<span class="fc" id="L137">        return out.toString();</span>
+<span class="fc" id="L137">        String telemetrySlug = slugFor(report.scenarioId());</span>
+<span class="fc" id="L138">        out.append(&quot;## See also\n\n&quot;);</span>
+<span class="fc" id="L139">        out.append(&quot;- [Runtime telemetry summary](../../search-telemetry/&quot;).append(telemetrySlug)</span>
+<span class="fc" id="L140">                .append(&quot;/search-telemetry-summary.md) — per-event counters and rule usage recorded during the search.\n&quot;);</span>
+<span class="fc" id="L141">        out.append(&quot;- [Timeline SVG](../../search-telemetry/&quot;).append(telemetrySlug)</span>
+<span class="fc" id="L142">                .append(&quot;/search-telemetry-timeline.svg) — frontier and visited-count chart over search events.\n&quot;);</span>
+<span class="fc" id="L143">        out.append(&quot;- [Replay](../../search-telemetry/&quot;).append(telemetrySlug)</span>
+<span class="fc" id="L144">                .append(&quot;/search-telemetry-replay.html) — step through individual events interactively.\n&quot;);</span>
+<span class="fc" id="L145">        out.append('\n');</span>
+
+<span class="fc" id="L147">        return out.toString();</span>
     }
 
     // ── SVG depth-histogram ───────────────────────────────────────────────────
 
     String renderSvg(SearchSpacePowerReport report) {
-<span class="fc" id="L143">        Map&lt;Integer, Long&gt; histogram = report.depthHistogram();</span>
-<span class="fc" id="L144">        List&lt;Map.Entry&lt;Integer, Long&gt;&gt; entries = histogram.entrySet().stream()</span>
-<span class="fc" id="L145">                .sorted(Comparator.comparingInt(Map.Entry::getKey))</span>
-<span class="fc" id="L146">                .toList();</span>
+<span class="fc" id="L153">        Map&lt;Integer, Long&gt; histogram = report.depthHistogram();</span>
+<span class="fc" id="L154">        List&lt;Map.Entry&lt;Integer, Long&gt;&gt; entries = histogram.entrySet().stream()</span>
+<span class="fc" id="L155">                .sorted(Comparator.comparingInt(Map.Entry::getKey))</span>
+<span class="fc" id="L156">                .toList();</span>
 
-<span class="fc" id="L148">        long maxCount = entries.stream().mapToLong(Map.Entry::getValue).max().orElse(1);</span>
+<span class="fc" id="L158">        long maxCount = entries.stream().mapToLong(Map.Entry::getValue).max().orElse(1);</span>
 
-<span class="fc" id="L150">        int svgWidth = 900;</span>
-<span class="fc" id="L151">        int svgHeight = 460;</span>
-<span class="fc" id="L152">        int chartLeft = 60;</span>
-<span class="fc" id="L153">        int chartRight = svgWidth - 40;</span>
-<span class="fc" id="L154">        int chartTop = 60;</span>
-<span class="fc" id="L155">        int chartBottom = svgHeight - 100;</span>
-<span class="fc" id="L156">        int chartWidth = chartRight - chartLeft;</span>
-<span class="fc" id="L157">        int chartHeight = chartBottom - chartTop;</span>
+<span class="fc" id="L160">        int svgWidth = 900;</span>
+<span class="fc" id="L161">        int svgHeight = 460;</span>
+<span class="fc" id="L162">        int chartLeft = 60;</span>
+<span class="fc" id="L163">        int chartRight = svgWidth - 40;</span>
+<span class="fc" id="L164">        int chartTop = 60;</span>
+<span class="fc" id="L165">        int chartBottom = svgHeight - 100;</span>
+<span class="fc" id="L166">        int chartWidth = chartRight - chartLeft;</span>
+<span class="fc" id="L167">        int chartHeight = chartBottom - chartTop;</span>
 
-<span class="fc" id="L159">        int barCount = Math.max(1, entries.size());</span>
-<span class="fc" id="L160">        int barWidth = Math.max(6, chartWidth / barCount - 4);</span>
+<span class="fc" id="L169">        int barCount = Math.max(1, entries.size());</span>
+<span class="fc" id="L170">        int barWidth = Math.max(6, chartWidth / barCount - 4);</span>
 
-<span class="fc" id="L162">        StringBuilder bars = new StringBuilder();</span>
-<span class="fc" id="L163">        StringBuilder labels = new StringBuilder();</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (int i = 0; i &lt; entries.size(); i++) {</span>
-<span class="fc" id="L165">            Map.Entry&lt;Integer, Long&gt; entry = entries.get(i);</span>
-<span class="fc" id="L166">            int depth = entry.getKey();</span>
-<span class="fc" id="L167">            long count = entry.getValue();</span>
-<span class="fc" id="L168">            int barH = (int) Math.round((double) count / maxCount * chartHeight);</span>
-<span class="fc" id="L169">            int x = chartLeft + i * (chartWidth / barCount) + 2;</span>
-<span class="fc" id="L170">            int y = chartBottom - barH;</span>
+<span class="fc" id="L172">        StringBuilder bars = new StringBuilder();</span>
+<span class="fc" id="L173">        StringBuilder labels = new StringBuilder();</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (int i = 0; i &lt; entries.size(); i++) {</span>
+<span class="fc" id="L175">            Map.Entry&lt;Integer, Long&gt; entry = entries.get(i);</span>
+<span class="fc" id="L176">            int depth = entry.getKey();</span>
+<span class="fc" id="L177">            long count = entry.getValue();</span>
+<span class="fc" id="L178">            int barH = (int) Math.round((double) count / maxCount * chartHeight);</span>
+<span class="fc" id="L179">            int x = chartLeft + i * (chartWidth / barCount) + 2;</span>
+<span class="fc" id="L180">            int y = chartBottom - barH;</span>
 
-<span class="fc" id="L172">            bars.append(&quot;&lt;rect x=\&quot;&quot;).append(x)</span>
-<span class="fc" id="L173">                    .append(&quot;\&quot; y=\&quot;&quot;).append(y)</span>
-<span class="fc" id="L174">                    .append(&quot;\&quot; width=\&quot;&quot;).append(barWidth)</span>
-<span class="fc" id="L175">                    .append(&quot;\&quot; height=\&quot;&quot;).append(barH)</span>
-<span class="fc" id="L176">                    .append(&quot;\&quot; fill=\&quot;#6366f1\&quot; fill-opacity=\&quot;0.8\&quot; rx=\&quot;2\&quot;&gt;&lt;title&gt;depth &quot;)</span>
-<span class="fc" id="L177">                    .append(depth).append(&quot;: &quot;).append(count).append(&quot; node(s)&lt;/title&gt;&lt;/rect&gt;\n&quot;);</span>
+<span class="fc" id="L182">            bars.append(&quot;&lt;rect x=\&quot;&quot;).append(x)</span>
+<span class="fc" id="L183">                    .append(&quot;\&quot; y=\&quot;&quot;).append(y)</span>
+<span class="fc" id="L184">                    .append(&quot;\&quot; width=\&quot;&quot;).append(barWidth)</span>
+<span class="fc" id="L185">                    .append(&quot;\&quot; height=\&quot;&quot;).append(barH)</span>
+<span class="fc" id="L186">                    .append(&quot;\&quot; fill=\&quot;#6366f1\&quot; fill-opacity=\&quot;0.8\&quot; rx=\&quot;2\&quot;&gt;&lt;title&gt;depth &quot;)</span>
+<span class="fc" id="L187">                    .append(depth).append(&quot;: &quot;).append(count).append(&quot; node(s)&lt;/title&gt;&lt;/rect&gt;\n&quot;);</span>
 
-<span class="fc" id="L179">            labels.append(&quot;&lt;text x=\&quot;&quot;).append(x + barWidth / 2)</span>
-<span class="fc" id="L180">                    .append(&quot;\&quot; y=\&quot;&quot;).append(chartBottom + 16)</span>
-<span class="fc" id="L181">                    .append(&quot;\&quot; font-size=\&quot;10\&quot; text-anchor=\&quot;middle\&quot; fill=\&quot;#334155\&quot;&gt;&quot;)</span>
-<span class="fc" id="L182">                    .append(depth).append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="fc" id="L189">            labels.append(&quot;&lt;text x=\&quot;&quot;).append(x + barWidth / 2)</span>
+<span class="fc" id="L190">                    .append(&quot;\&quot; y=\&quot;&quot;).append(chartBottom + 16)</span>
+<span class="fc" id="L191">                    .append(&quot;\&quot; font-size=\&quot;10\&quot; text-anchor=\&quot;middle\&quot; fill=\&quot;#334155\&quot;&gt;&quot;)</span>
+<span class="fc" id="L192">                    .append(depth).append(&quot;&lt;/text&gt;\n&quot;);</span>
 
-<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (barH &gt; 14) {</span>
-<span class="fc" id="L185">                labels.append(&quot;&lt;text x=\&quot;&quot;).append(x + barWidth / 2)</span>
-<span class="fc" id="L186">                        .append(&quot;\&quot; y=\&quot;&quot;).append(y - 3)</span>
-<span class="fc" id="L187">                        .append(&quot;\&quot; font-size=\&quot;9\&quot; text-anchor=\&quot;middle\&quot; fill=\&quot;#334155\&quot;&gt;&quot;)</span>
-<span class="fc" id="L188">                        .append(count).append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (barH &gt; 14) {</span>
+<span class="fc" id="L195">                labels.append(&quot;&lt;text x=\&quot;&quot;).append(x + barWidth / 2)</span>
+<span class="fc" id="L196">                        .append(&quot;\&quot; y=\&quot;&quot;).append(y - 3)</span>
+<span class="fc" id="L197">                        .append(&quot;\&quot; font-size=\&quot;9\&quot; text-anchor=\&quot;middle\&quot; fill=\&quot;#334155\&quot;&gt;&quot;)</span>
+<span class="fc" id="L198">                        .append(count).append(&quot;&lt;/text&gt;\n&quot;);</span>
             }
         }
 
-<span class="fc" id="L192">        String pruningLabel = String.format(Locale.ROOT, &quot;%.1f%%&quot;, report.pruningRatio() * 100);</span>
-<span class="fc" id="L193">        int midY = (chartTop + chartBottom) / 2;</span>
-<span class="fc" id="L194">        int xAxisLabelY = chartBottom + 34;</span>
-<span class="fc" id="L195">        int maxCountY = chartTop - 8;</span>
-<span class="fc" id="L196">        int zeroY = chartBottom - 4;</span>
-<span class="fc" id="L197">        int legendY = svgHeight - 20;</span>
+<span class="fc" id="L202">        String pruningLabel = String.format(Locale.ROOT, &quot;%.1f%%&quot;, report.pruningRatio() * 100);</span>
+<span class="fc" id="L203">        int midY = (chartTop + chartBottom) / 2;</span>
+<span class="fc" id="L204">        int xAxisLabelY = chartBottom + 34;</span>
+<span class="fc" id="L205">        int maxCountY = chartTop - 8;</span>
+<span class="fc" id="L206">        int zeroY = chartBottom - 4;</span>
+<span class="fc" id="L207">        int legendY = svgHeight - 20;</span>
 
-<span class="fc" id="L199">        return &quot;&quot;&quot;</span>
+<span class="fc" id="L209">        return &quot;&quot;&quot;</span>
                 &lt;svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;${w}&quot; height=&quot;${h}&quot; viewBox=&quot;0 0 ${w} ${h}&quot; data-generated-by=&quot;SearchSpacePowerReportWriter&quot; data-scenario-id=&quot;${scenarioId}&quot;&gt;
                   &lt;rect width=&quot;100%&quot; height=&quot;100%&quot; fill=&quot;#f8fafc&quot;/&gt;
                   &lt;text x=&quot;40&quot; y=&quot;36&quot; font-size=&quot;15&quot; font-weight=&quot;700&quot; fill=&quot;#1e293b&quot;&gt;Search-space depth histogram: ${scenarioId}&lt;/text&gt;
@@ -213,44 +223,49 @@ import java.util.Map;
                   &lt;/text&gt;
                 &lt;/svg&gt;
                 &quot;&quot;&quot;
-<span class="fc" id="L216">                .replace(&quot;${w}&quot;, Integer.toString(svgWidth))</span>
-<span class="fc" id="L217">                .replace(&quot;${h}&quot;, Integer.toString(svgHeight))</span>
-<span class="fc" id="L218">                .replace(&quot;${scenarioId}&quot;, escapeXml(report.scenarioId()))</span>
-<span class="fc" id="L219">                .replace(&quot;${pathLen}&quot;, Integer.toString(report.selectedPathLength()))</span>
-<span class="fc" id="L220">                .replace(&quot;${nodes}&quot;, Integer.toString(report.nodeCount()))</span>
-<span class="fc" id="L221">                .replace(&quot;${states}&quot;, Integer.toString(report.statesExplored()))</span>
-<span class="fc" id="L222">                .replace(&quot;${canonical}&quot;, Integer.toString(report.uniqueCanonicalStates()))</span>
-<span class="fc" id="L223">                .replace(&quot;${pruning}&quot;, escapeXml(pruningLabel))</span>
-<span class="fc" id="L224">                .replace(&quot;${chartLeft}&quot;, Integer.toString(chartLeft))</span>
-<span class="fc" id="L225">                .replace(&quot;${chartRight}&quot;, Integer.toString(chartRight))</span>
-<span class="fc" id="L226">                .replace(&quot;${chartTop}&quot;, Integer.toString(chartTop))</span>
-<span class="fc" id="L227">                .replace(&quot;${chartBottom}&quot;, Integer.toString(chartBottom))</span>
-<span class="fc" id="L228">                .replace(&quot;${midY}&quot;, Integer.toString(midY))</span>
-<span class="fc" id="L229">                .replace(&quot;${maxCount}&quot;, Long.toString(maxCount))</span>
-<span class="fc" id="L230">                .replace(&quot;${bars}&quot;, bars.toString())</span>
-<span class="fc" id="L231">                .replace(&quot;${labels}&quot;, labels.toString())</span>
-<span class="fc" id="L232">                .replace(&quot;${legendY}&quot;, Integer.toString(legendY))</span>
-<span class="fc" id="L233">                .replace(&quot;${xAxisLabelY}&quot;, Integer.toString(xAxisLabelY))</span>
-<span class="fc" id="L234">                .replace(&quot;${maxCountY}&quot;, Integer.toString(maxCountY))</span>
-<span class="fc" id="L235">                .replace(&quot;${zeroY}&quot;, Integer.toString(zeroY))</span>
-<span class="fc" id="L236">                .replace(&quot;${pathNodes}&quot;, Integer.toString(report.selectedPathNodeCount()))</span>
-<span class="fc" id="L237">                .replace(&quot;${pathEdges}&quot;, Integer.toString(report.selectedPathEdgeCount()))</span>
-<span class="fc" id="L238">                .replace(&quot;${deadEnds}&quot;, Integer.toString(report.deadEndCount()))</span>
-<span class="fc" id="L239">                .replace(&quot;${altNodes}&quot;, Integer.toString(report.alternativeBranchNodeCount()));</span>
+<span class="fc" id="L226">                .replace(&quot;${w}&quot;, Integer.toString(svgWidth))</span>
+<span class="fc" id="L227">                .replace(&quot;${h}&quot;, Integer.toString(svgHeight))</span>
+<span class="fc" id="L228">                .replace(&quot;${scenarioId}&quot;, escapeXml(report.scenarioId()))</span>
+<span class="fc" id="L229">                .replace(&quot;${pathLen}&quot;, Integer.toString(report.selectedPathLength()))</span>
+<span class="fc" id="L230">                .replace(&quot;${nodes}&quot;, Integer.toString(report.nodeCount()))</span>
+<span class="fc" id="L231">                .replace(&quot;${states}&quot;, Integer.toString(report.statesExplored()))</span>
+<span class="fc" id="L232">                .replace(&quot;${canonical}&quot;, Integer.toString(report.uniqueCanonicalStates()))</span>
+<span class="fc" id="L233">                .replace(&quot;${pruning}&quot;, escapeXml(pruningLabel))</span>
+<span class="fc" id="L234">                .replace(&quot;${chartLeft}&quot;, Integer.toString(chartLeft))</span>
+<span class="fc" id="L235">                .replace(&quot;${chartRight}&quot;, Integer.toString(chartRight))</span>
+<span class="fc" id="L236">                .replace(&quot;${chartTop}&quot;, Integer.toString(chartTop))</span>
+<span class="fc" id="L237">                .replace(&quot;${chartBottom}&quot;, Integer.toString(chartBottom))</span>
+<span class="fc" id="L238">                .replace(&quot;${midY}&quot;, Integer.toString(midY))</span>
+<span class="fc" id="L239">                .replace(&quot;${maxCount}&quot;, Long.toString(maxCount))</span>
+<span class="fc" id="L240">                .replace(&quot;${bars}&quot;, bars.toString())</span>
+<span class="fc" id="L241">                .replace(&quot;${labels}&quot;, labels.toString())</span>
+<span class="fc" id="L242">                .replace(&quot;${legendY}&quot;, Integer.toString(legendY))</span>
+<span class="fc" id="L243">                .replace(&quot;${xAxisLabelY}&quot;, Integer.toString(xAxisLabelY))</span>
+<span class="fc" id="L244">                .replace(&quot;${maxCountY}&quot;, Integer.toString(maxCountY))</span>
+<span class="fc" id="L245">                .replace(&quot;${zeroY}&quot;, Integer.toString(zeroY))</span>
+<span class="fc" id="L246">                .replace(&quot;${pathNodes}&quot;, Integer.toString(report.selectedPathNodeCount()))</span>
+<span class="fc" id="L247">                .replace(&quot;${pathEdges}&quot;, Integer.toString(report.selectedPathEdgeCount()))</span>
+<span class="fc" id="L248">                .replace(&quot;${deadEnds}&quot;, Integer.toString(report.deadEndCount()))</span>
+<span class="fc" id="L249">                .replace(&quot;${altNodes}&quot;, Integer.toString(report.alternativeBranchNodeCount()));</span>
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private String escape(String value) {
-<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;\n&quot;, &quot; &quot;).replace(&quot;\r&quot;, &quot; &quot;).replace(&quot;|&quot;, &quot;\\|&quot;);</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;\n&quot;, &quot; &quot;).replace(&quot;\r&quot;, &quot; &quot;).replace(&quot;|&quot;, &quot;\\|&quot;);</span>
     }
 
     private String escapeXml(String text) {
-<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        return text == null ? &quot;&quot; : text</span>
-<span class="fc" id="L250">                .replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
-<span class="fc" id="L251">                .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
-<span class="fc" id="L252">                .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
-<span class="fc" id="L253">                .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        return text == null ? &quot;&quot; : text</span>
+<span class="fc" id="L260">                .replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
+<span class="fc" id="L261">                .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="fc" id="L262">                .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
+<span class="fc" id="L263">                .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+    }
+
+    private String slugFor(String scenarioId) {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        return scenarioId == null ? &quot;unknown&quot;</span>
+<span class="fc" id="L268">                : scenarioId.toLowerCase(java.util.Locale.ROOT).replaceAll(&quot;[^a-z0-9-]&quot;, &quot;-&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

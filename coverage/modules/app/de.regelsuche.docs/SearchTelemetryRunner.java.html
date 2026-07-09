@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchTelemetryRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">SearchTelemetryRunner.java</span></div><h1>SearchTelemetryRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.search.telemetry.CompositeSearchObserver;
+import de.regelsuche.search.telemetry.NdjsonSearchObserver;
+import de.regelsuche.search.telemetry.SearchTimelineDataCollector;
+import de.regelsuche.search.telemetry.SearchTelemetrySummary;
+import de.regelsuche.search.telemetry.SearchTelemetrySummaryObserver;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+
+/** Records runtime search telemetry artifacts for selected discovery scenarios. */
+<span class="fc" id="L23">public final class SearchTelemetryRunner {</span>
+<span class="fc" id="L24">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L25">        .findAndRegisterModules()</span>
+<span class="fc" id="L26">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+<span class="fc" id="L28">    private static final List&lt;String&gt; SCENARIO_IDS = List.of(&quot;complete-square-factorization&quot;);</span>
+
+<span class="fc" id="L30">    private final DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();</span>
+<span class="fc" id="L31">    private final DiscoveryBenchmarkExecutor executor = new DiscoveryBenchmarkExecutor();</span>
+<span class="fc" id="L32">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L33">    private final TelemetryTimelineSvgWriter svgWriter = new TelemetryTimelineSvgWriter();</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L36" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L37">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L38">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L39">        new SearchTelemetryRunner().writeReport(repoRoot.resolve(&quot;app/build/reports/search-telemetry&quot;));</span>
+<span class="nc" id="L40">    }</span>
+
+    public TelemetryReport writeReport(Path outputDirectory) {
+        try {
+<span class="fc" id="L44">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L45">            List&lt;ScenarioTelemetryResult&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            for (DiscoveryBenchmarkScenario scenario : sortedScenarios()) {</span>
+<span class="fc" id="L47">                Path scenarioDirectory = outputDirectory.resolve(slugFor(scenario.id()));</span>
+<span class="fc" id="L48">                Files.createDirectories(scenarioDirectory);</span>
+<span class="fc" id="L49">                ScenarioTelemetryResult result = recordScenario(scenario, scenarioDirectory);</span>
+<span class="fc" id="L50">                results.add(result);</span>
+<span class="fc" id="L51">            }</span>
+<span class="fc" id="L52">            TelemetryReport report = new TelemetryReport(&quot;search-telemetry&quot;, results);</span>
+<span class="fc" id="L53">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L54">                outputDirectory.resolve(&quot;search-telemetry-index.json&quot;),</span>
+<span class="fc" id="L55">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+            );
+<span class="fc" id="L57">            Files.writeString(</span>
+<span class="fc" id="L58">                outputDirectory.resolve(&quot;search-telemetry-summary.md&quot;),</span>
+<span class="fc" id="L59">                renderAggregateSummary(report),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L62">            return report;</span>
+<span class="nc" id="L63">        } catch (IOException exception) {</span>
+<span class="nc" id="L64">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private List&lt;DiscoveryBenchmarkScenario&gt; sortedScenarios() {
+<span class="fc" id="L69">        return loader.loadAll(&quot;discovery-scenarios&quot;).stream()</span>
+<span class="fc" id="L70">            .filter(scenario -&gt; SCENARIO_IDS.contains(scenario.id()))</span>
+<span class="pc" id="L71">            .sorted(Comparator.comparingInt(scenario -&gt; SCENARIO_IDS.indexOf(scenario.id())))</span>
+<span class="fc" id="L72">            .toList();</span>
+    }
+
+    private ScenarioTelemetryResult recordScenario(DiscoveryBenchmarkScenario scenario, Path scenarioDirectory) throws IOException {
+<span class="fc" id="L76">        String targetCanonicalHash = canonicalizer.stableHash(normalizeExpression(scenario.targetExpression()));</span>
+<span class="fc" id="L77">        SearchTelemetrySummaryObserver summaryObserver = new SearchTelemetrySummaryObserver(targetCanonicalHash);</span>
+<span class="fc" id="L78">        SearchTimelineDataCollector timelineCollector = new SearchTimelineDataCollector();</span>
+        DiscoveryBenchmarkEvidence evidence;
+<span class="fc" id="L80">        try (NdjsonSearchObserver ndjson = new NdjsonSearchObserver(scenarioDirectory.resolve(&quot;search-events.ndjson&quot;))) {</span>
+<span class="fc" id="L81">            evidence = executor.execute(scenario,</span>
+<span class="fc" id="L82">                CompositeSearchObserver.of(summaryObserver, ndjson, timelineCollector));</span>
+        }
+<span class="fc" id="L84">        SearchTelemetrySummary summary = summaryObserver.summary();</span>
+<span class="fc" id="L85">        ScenarioTelemetryResult result = new ScenarioTelemetryResult(</span>
+<span class="fc" id="L86">            scenario.id(),</span>
+<span class="fc" id="L87">            scenario.inputExpression(),</span>
+<span class="fc" id="L88">            scenario.targetExpression(),</span>
+<span class="fc" id="L89">            evidence.success(),</span>
+<span class="fc" id="L90">            evidence.failureReason(),</span>
+            summary,
+<span class="fc" id="L92">            evidence.withoutMacroRun().path(),</span>
+<span class="fc" id="L93">            evidence.withoutMacroRun().appliedRuleIds()</span>
+        );
+<span class="fc" id="L95">        AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L96">            scenarioDirectory.resolve(&quot;search-telemetry-summary.json&quot;),</span>
+<span class="fc" id="L97">            JSON.writerWithDefaultPrettyPrinter().writeValueAsString(result)</span>
+        );
+<span class="fc" id="L99">        Files.writeString(</span>
+<span class="fc" id="L100">            scenarioDirectory.resolve(&quot;search-telemetry-summary.md&quot;),</span>
+<span class="fc" id="L101">            renderScenarioSummary(result),</span>
+            StandardCharsets.UTF_8
+        );
+<span class="fc" id="L104">        Files.writeString(</span>
+<span class="fc" id="L105">            scenarioDirectory.resolve(&quot;search-telemetry-replay.html&quot;),</span>
+<span class="fc" id="L106">            renderReplayHtml(result),</span>
+            StandardCharsets.UTF_8
+        );
+<span class="fc" id="L109">        Files.writeString(</span>
+<span class="fc" id="L110">            scenarioDirectory.resolve(&quot;search-telemetry-timeline.svg&quot;),</span>
+<span class="fc" id="L111">            svgWriter.render(scenario.id(), timelineCollector.points()),</span>
+            StandardCharsets.UTF_8
+        );
+<span class="fc" id="L114">        return result;</span>
+    }
+
+    private String renderAggregateSummary(TelemetryReport report) {
+<span class="fc" id="L118">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L119">        out.append(&quot;# Search telemetry summary\n\n&quot;);</span>
+<span class="fc" id="L120">        out.append(&quot;| Scenario | Success | Events | Visited | Generated | Enqueued | Max depth | Max frontier |\n&quot;);</span>
+<span class="fc" id="L121">        out.append(&quot;| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |\n&quot;);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (ScenarioTelemetryResult result : report.results()) {</span>
+<span class="fc" id="L123">            SearchTelemetrySummary summary = result.summary();</span>
+<span class="fc" id="L124">            out.append(&quot;| `&quot;).append(escapeMd(result.scenarioId())).append(&quot;` | &quot;)</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                .append(result.success() ? &quot;yes&quot; : &quot;no&quot;).append(&quot; | &quot;)</span>
+<span class="fc" id="L126">                .append(summary.totalEvents()).append(&quot; | &quot;)</span>
+<span class="fc" id="L127">                .append(summary.visitedStates()).append(&quot; | &quot;)</span>
+<span class="fc" id="L128">                .append(summary.generatedTransformations()).append(&quot; | &quot;)</span>
+<span class="fc" id="L129">                .append(summary.enqueuedStates()).append(&quot; | &quot;)</span>
+<span class="fc" id="L130">                .append(summary.maxDepthReached()).append(&quot; | &quot;)</span>
+<span class="fc" id="L131">                .append(summary.maxFrontierSize()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L132">        }</span>
+<span class="fc" id="L133">        out.append('\n');</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (ScenarioTelemetryResult result : report.results()) {</span>
+<span class="fc" id="L135">            String slug = slugFor(result.scenarioId());</span>
+<span class="fc" id="L136">            out.append(&quot;## &quot;).append(escapeMd(result.scenarioId())).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L137">            out.append(&quot;- [search-events.ndjson](&quot;).append(slug).append(&quot;/search-events.ndjson)\n&quot;);</span>
+<span class="fc" id="L138">            out.append(&quot;- [search-telemetry-summary.json](&quot;).append(slug).append(&quot;/search-telemetry-summary.json)\n&quot;);</span>
+<span class="fc" id="L139">            out.append(&quot;- [search-telemetry-summary.md](&quot;).append(slug).append(&quot;/search-telemetry-summary.md)\n&quot;);</span>
+<span class="fc" id="L140">            out.append(&quot;- [search-telemetry-replay.html](&quot;).append(slug).append(&quot;/search-telemetry-replay.html)\n&quot;);</span>
+<span class="fc" id="L141">            out.append(&quot;- [search-telemetry-timeline.svg](&quot;).append(slug).append(&quot;/search-telemetry-timeline.svg)\n\n&quot;);</span>
+<span class="fc" id="L142">        }</span>
+<span class="fc" id="L143">        return out.toString();</span>
+    }
+
+    private String renderScenarioSummary(ScenarioTelemetryResult result) {
+<span class="fc" id="L147">        SearchTelemetrySummary summary = result.summary();</span>
+<span class="fc" id="L148">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L149">        out.append(&quot;# Runtime search telemetry\n\n&quot;);</span>
+<span class="fc" id="L150">        out.append(&quot;- Scenario: `&quot;).append(escapeMd(result.scenarioId())).append(&quot;`\n&quot;);</span>
+<span class="fc" id="L151">        out.append(&quot;- Input: `&quot;).append(escapeMd(result.inputExpression())).append(&quot;`\n&quot;);</span>
+<span class="fc" id="L152">        out.append(&quot;- Target: `&quot;).append(escapeMd(result.targetExpression())).append(&quot;`\n&quot;);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        out.append(&quot;- Success: &quot;).append(result.success() ? &quot;yes&quot; : &quot;no&quot;).append('\n');</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (!result.failureReason().isBlank()) {</span>
+<span class="nc" id="L155">            out.append(&quot;- Failure reason: &quot;).append(escapeMd(result.failureReason())).append('\n');</span>
+        }
+<span class="fc" id="L157">        out.append('\n');</span>
+<span class="fc" id="L158">        out.append(&quot;## Counters\n\n&quot;);</span>
+<span class="fc" id="L159">        out.append(&quot;| Metric | Value |\n&quot;);</span>
+<span class="fc" id="L160">        out.append(&quot;| --- | ---: |\n&quot;);</span>
+<span class="fc" id="L161">        out.append(&quot;| Total events | &quot;).append(summary.totalEvents()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L162">        out.append(&quot;| Visited states | &quot;).append(summary.visitedStates()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L163">        out.append(&quot;| Generated transformations | &quot;).append(summary.generatedTransformations()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L164">        out.append(&quot;| Enqueued states | &quot;).append(summary.enqueuedStates()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L165">        out.append(&quot;| Pruned duplicates | &quot;).append(summary.prunedDuplicates()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L166">        out.append(&quot;| Pruned transpositions | &quot;).append(summary.prunedTranspositions()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L167">        out.append(&quot;| Pruned by depth | &quot;).append(summary.prunedByDepth()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L168">        out.append(&quot;| Pruned by budget | &quot;).append(summary.prunedByBudget()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L169">        out.append(&quot;| Max depth reached | &quot;).append(summary.maxDepthReached()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L170">        out.append(&quot;| Max frontier size | &quot;).append(summary.maxFrontierSize()).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L171">        out.append(&quot;| Target-near states | &quot;).append(summary.targetNearStates()).append(&quot; |\n&quot;);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        out.append(&quot;| Target reached | &quot;).append(summary.targetReached() ? &quot;yes&quot; : &quot;no&quot;).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L173">        out.append('\n');</span>
+
+<span class="fc" id="L175">        out.append(&quot;## Depth histogram\n\n&quot;);</span>
+<span class="fc" id="L176">        out.append(&quot;| Depth | Count |\n&quot;);</span>
+<span class="fc" id="L177">        out.append(&quot;| ---: | ---: |\n&quot;);</span>
+<span class="fc" id="L178">        summary.depthHistogram().entrySet().stream()</span>
+<span class="fc" id="L179">            .sorted(java.util.Map.Entry.comparingByKey())</span>
+<span class="fc" id="L180">            .forEach(entry -&gt; out.append(&quot;| &quot;).append(entry.getKey()).append(&quot; | &quot;).append(entry.getValue()).append(&quot; |\n&quot;));</span>
+<span class="fc" id="L181">        out.append('\n');</span>
+
+<span class="fc" id="L183">        out.append(&quot;## Rule usage during search\n\n&quot;);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (summary.ruleUsage().isEmpty()) {</span>
+<span class="nc" id="L185">            out.append(&quot;_No rule usage recorded._\n\n&quot;);</span>
+        } else {
+<span class="fc" id="L187">            out.append(&quot;| Rule | Count |\n&quot;);</span>
+<span class="fc" id="L188">            out.append(&quot;| --- | ---: |\n&quot;);</span>
+<span class="fc" id="L189">            summary.ruleUsage().entrySet().stream()</span>
+<span class="fc" id="L190">                .sorted(java.util.Map.Entry.comparingByKey())</span>
+<span class="fc" id="L191">                .forEach(entry -&gt; out.append(&quot;| `&quot;).append(escapeMd(entry.getKey())).append(&quot;` | &quot;)</span>
+<span class="fc" id="L192">                    .append(entry.getValue()).append(&quot; |\n&quot;));</span>
+<span class="fc" id="L193">            out.append('\n');</span>
+        }
+
+<span class="fc" id="L196">        out.append(&quot;## Selected path (if found)\n\n&quot;);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (!result.selectedPath().isEmpty()) {</span>
+<span class="fc" id="L198">            out.append(&quot;- Expressions: &quot;).append(result.selectedPath().size()).append('\n');</span>
+<span class="fc" id="L199">            out.append(&quot;- Applied rules: &quot;).append(result.appliedRuleIds().size()).append('\n');</span>
+        } else {
+<span class="nc" id="L201">            out.append(&quot;_No selected target-reaching path found._\n&quot;);</span>
+        }
+<span class="fc" id="L203">        out.append('\n');</span>
+<span class="fc" id="L204">        out.append(&quot;Replay in [search-telemetry-replay.html](search-telemetry-replay.html).&quot; +</span>
+            &quot; Timeline SVG: [search-telemetry-timeline.svg](search-telemetry-timeline.svg).\n&quot;);
+<span class="fc" id="L206">        out.append('\n');</span>
+<span class="fc" id="L207">        String powerSlug = slugFor(result.scenarioId());</span>
+<span class="fc" id="L208">        out.append(&quot;## See also\n\n&quot;);</span>
+<span class="fc" id="L209">        out.append(&quot;- [Search-space power report](../../search-space-power/&quot;).append(powerSlug)</span>
+<span class="fc" id="L210">            .append(&quot;/search-space-power.md) — structural metrics derived from the evidence graph.\n&quot;);</span>
+<span class="fc" id="L211">        return out.toString();</span>
+    }
+
+    private String renderReplayHtml(ScenarioTelemetryResult result) {
+<span class="fc" id="L215">        return &quot;&quot;&quot;</span>
+            &lt;!doctype html&gt;
+            &lt;html lang=&quot;en&quot;&gt;
+            &lt;head&gt;
+              &lt;meta charset=&quot;utf-8&quot;&gt;
+              &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;
+              &lt;title&gt;Search telemetry replay - %s&lt;/title&gt;
+              &lt;style&gt;
+                body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+                button { margin-right: .5rem; }
+                pre { background: #111; color: #f5f5f5; padding: .75rem; overflow-x: auto; border-radius: 6px; }
+              &lt;/style&gt;
+            &lt;/head&gt;
+            &lt;body&gt;
+              &lt;h1&gt;Search telemetry replay&lt;/h1&gt;
+              &lt;p&gt;&lt;strong&gt;Scenario:&lt;/strong&gt; %s&lt;/p&gt;
+              &lt;p&gt;&lt;strong&gt;Input:&lt;/strong&gt; &lt;code&gt;%s&lt;/code&gt;&lt;/p&gt;
+              &lt;p&gt;&lt;strong&gt;Target:&lt;/strong&gt; &lt;code&gt;%s&lt;/code&gt;&lt;/p&gt;
+              &lt;div&gt;
+                &lt;button id=&quot;play&quot;&gt;Play&lt;/button&gt;
+                &lt;button id=&quot;pause&quot;&gt;Pause&lt;/button&gt;
+                &lt;button id=&quot;step&quot;&gt;Step&lt;/button&gt;
+                &lt;label&gt;Speed
+                  &lt;select id=&quot;speed&quot;&gt;
+                    &lt;option value=&quot;1000&quot;&gt;1x&lt;/option&gt;
+                    &lt;option value=&quot;500&quot;&gt;2x&lt;/option&gt;
+                    &lt;option value=&quot;250&quot;&gt;4x&lt;/option&gt;
+                    &lt;option value=&quot;100&quot;&gt;10x&lt;/option&gt;
+                  &lt;/select&gt;
+                &lt;/label&gt;
+              &lt;/div&gt;
+              &lt;p id=&quot;status&quot;&gt;Loading events…&lt;/p&gt;
+              &lt;pre id=&quot;event&quot;&gt;&lt;/pre&gt;
+              &lt;script&gt;
+                const status = document.getElementById('status');
+                const eventView = document.getElementById('event');
+                const speed = document.getElementById('speed');
+                let events = [];
+                let index = -1;
+                let timer = null;
+
+                function render() {
+                  if (index &lt; 0 || index &gt;= events.length) {
+                    eventView.textContent = '';
+                    return;
+                  }
+                  const e = events[index];
+                  status.textContent = `Event ${index + 1}/${events.length}: ${e.type} | frontier=${e.frontierSize} | visited=${e.visitedCount}`;
+                  eventView.textContent = JSON.stringify(e, null, 2);
+                }
+
+                function step() {
+                  if (index &lt; events.length - 1) {
+                    index += 1;
+                    render();
+                  }
+                }
+
+                function play() {
+                  if (timer !== null) return;
+                  timer = setInterval(() =&gt; {
+                    if (index &gt;= events.length - 1) {
+                      pause();
+                      return;
+                    }
+                    step();
+                  }, Number(speed.value));
+                }
+
+                function pause() {
+                  if (timer !== null) {
+                    clearInterval(timer);
+                    timer = null;
+                  }
+                }
+
+                document.getElementById('play').addEventListener('click', play);
+                document.getElementById('pause').addEventListener('click', pause);
+                document.getElementById('step').addEventListener('click', step);
+                speed.addEventListener('change', () =&gt; {
+                  if (timer !== null) {
+                    pause();
+                    play();
+                  }
+                });
+
+                fetch('search-events.ndjson')
+                  .then(response =&gt; response.text())
+                  .then(text =&gt; {
+                    events = text.trim().split('\\n').filter(Boolean).map(line =&gt; JSON.parse(line));
+                    status.textContent = `Loaded ${events.length} events`;
+                    index = -1;
+                    render();
+                  })
+                  .catch(error =&gt; {
+                    status.textContent = `Failed to load NDJSON: ${error}. If opening from disk (file://), serve via a local web server instead, e.g. python3 -m http.server 8080`;
+                  });
+              &lt;/script&gt;
+            &lt;/body&gt;
+            &lt;/html&gt;
+<span class="fc" id="L315">            &quot;&quot;&quot;.formatted(</span>
+<span class="fc" id="L316">            escapeHtml(result.scenarioId()),</span>
+<span class="fc" id="L317">            escapeHtml(result.scenarioId()),</span>
+<span class="fc" id="L318">            escapeHtml(result.inputExpression()),</span>
+<span class="fc" id="L319">            escapeHtml(result.targetExpression())</span>
+        );
+    }
+
+    private String normalizeExpression(String expression) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private String escapeMd(String value) {
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;);</span>
+    }
+
+    private String escapeHtml(String value) {
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L333">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L335">        return value</span>
+<span class="fc" id="L336">            .replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
+<span class="fc" id="L337">            .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="fc" id="L338">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
+<span class="fc" id="L339">            .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+    }
+
+    private String slugFor(String scenarioId) {
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        return scenarioId == null ? &quot;unknown&quot;</span>
+<span class="fc" id="L344">            : scenarioId.toLowerCase(Locale.ROOT).replaceAll(&quot;[^a-z0-9-]&quot;, &quot;-&quot;);</span>
+    }
+
+    public record TelemetryReport(String id, List&lt;ScenarioTelemetryResult&gt; results) {
+<span class="fc" id="L348">        public TelemetryReport {</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            results = results == null ? List.of() : List.copyOf(results);</span>
+<span class="fc" id="L350">        }</span>
+    }
+
+    public record ScenarioTelemetryResult(
+        String scenarioId,
+        String inputExpression,
+        String targetExpression,
+        boolean success,
+        String failureReason,
+        SearchTelemetrySummary summary,
+        List&lt;String&gt; selectedPath,
+        List&lt;String&gt; appliedRuleIds
+    ) {
+<span class="fc" id="L363">        public ScenarioTelemetryResult {</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;&quot; : failureReason;</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            selectedPath = selectedPath == null ? List.of() : List.copyOf(selectedPath);</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);</span>
+<span class="fc" id="L367">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
