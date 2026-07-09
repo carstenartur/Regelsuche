@@ -330,6 +330,15 @@ tasks.register('runSearchSpacePowerReport', JavaExec) {
     args rootProject.projectDir.absolutePath
 }
 
+tasks.register('runSearchTelemetryReport', JavaExec) {
+    description = 'Generates runtime search telemetry reports (search-events.ndjson + telemetry summaries) under app/build/reports/search-telemetry.'
+    group = 'documentation'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.docs.SearchTelemetryRunner'
+    args rootProject.projectDir.absolutePath
+}
+
 tasks.register('e2eTest', Test) {
     description = 'Browser-driven end-to-end demo flows (Playwright). Use ' +
         '-Pregelsuche.recordDocs=true to refresh docs/assets/{screenshots,videos}.'
