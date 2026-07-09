@@ -167,7 +167,7 @@ public final class DiscoveryCampaignSevenRunner {
             shortcut == null ? "" : shortcut.operatorId(),
             shortcut == null ? List.of() : shortcut.assumptions(),
             enabled.withoutMacroRun().appliedRuleIds(),
-            campaignCase.notes(),
+            ablationExplanation,
             enabled.smallGraphMessage(),
             ablation.toStructuredEvidence(ablationExplanation)
         );
@@ -451,10 +451,17 @@ public final class DiscoveryCampaignSevenRunner {
             if ("N/A".equals(status) || withPathLength < 0) {
                 return AblationEvidence.statusOnly(status, explanation);
             }
-            return AblationEvidence.compare(
+            AblationEvidence compared = AblationEvidence.compare(
                 withSuccess, withPathLength, withStatesExplored,
                 withoutSuccess, withoutPathLength, withoutStatesExplored,
                 explanation
+            );
+            return new AblationEvidence(
+                compared.withCandidate(),
+                compared.withoutCandidate(),
+                compared.improvementRatio(),
+                status,
+                compared.explanation()
             );
         }
     }
