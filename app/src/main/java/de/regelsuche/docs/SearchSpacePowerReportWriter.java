@@ -134,6 +134,16 @@ public final class SearchSpacePowerReportWriter {
         }
         out.append("\n");
 
+        String telemetrySlug = slugFor(report.scenarioId());
+        out.append("## See also\n\n");
+        out.append("- [Runtime telemetry summary](../../search-telemetry/").append(telemetrySlug)
+                .append("/search-telemetry-summary.md) — per-event counters and rule usage recorded during the search.\n");
+        out.append("- [Timeline SVG](../../search-telemetry/").append(telemetrySlug)
+                .append("/search-telemetry-timeline.svg) — frontier and visited-count chart over search events.\n");
+        out.append("- [Replay](../../search-telemetry/").append(telemetrySlug)
+                .append("/search-telemetry-replay.html) — step through individual events interactively.\n");
+        out.append('\n');
+
         return out.toString();
     }
 
@@ -251,5 +261,10 @@ public final class SearchSpacePowerReportWriter {
                 .replace("<", "&lt;")
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;");
+    }
+
+    private String slugFor(String scenarioId) {
+        return scenarioId == null ? "unknown"
+                : scenarioId.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9-]", "-");
     }
 }

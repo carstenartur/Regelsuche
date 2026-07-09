@@ -25,7 +25,7 @@ class SearchTelemetryReplayTest {
     private static final Pattern SEQUENCE_PATTERN = Pattern.compile("\"sequence\":(\\d+)");
 
     @Test
-    void ndjsonAndSummaryStayReplayableAndDeterministic(@TempDir Path tempDir) throws Exception {
+    void ndjsonAndSummaryAreInternallyConsistent(@TempDir Path tempDir) throws Exception {
         Path ndjson = tempDir.resolve("search-events.ndjson");
         SearchTelemetrySummaryObserver summaryObserver = new SearchTelemetrySummaryObserver();
         try (NdjsonSearchObserver ndjsonObserver = new NdjsonSearchObserver(ndjson)) {
@@ -49,6 +49,32 @@ class SearchTelemetryReplayTest {
         for (int i = 0; i < lines.size(); i++) {
             assertEquals(i, parseSequence(lines.get(i)));
         }
+    }
+
+    @Test
+    void ndjsonOutputIsDeterministicAcrossTwoRuns(@TempDir Path tempDir) throws Exception {
+        List<String> run1 = runAndCollectNdjson(tempDir.resolve("run1.ndjson"));
+        List<String> run2 = runAndCollectNdjson(tempDir.resolve("run2.ndjson"));
+
+        assertEquals(run1.size(), run2.size(), "event count must be identical across runs");
+        for (int i = 0; i < run1.size(); i++) {
+            assertEquals(run1.get(i), run2.get(i),
+                "event at index " + i + " must be byte-identical across runs");
+        }
+    }
+
+    private List<String> runAndCollectNdjson(Path ndjson) throws Exception {
+        try (NdjsonSearchObserver ndjsonObserver = new NdjsonSearchObserver(ndjson)) {
+            SearchProblem problem = new SearchProblem(
+                "x",
+                new DeterministicTransformationEngine(),
+                new ExpressionScorer(),
+                new ExpressionCanonicalizer(),
+                new SearchHeuristic(2, 20, 2, 4, 80, 12)
+            ).withObserver(ndjsonObserver);
+            new BestFirstSearchStrategy().search(problem);
+        }
+        return Files.readAllLines(ndjson, StandardCharsets.UTF_8);
     }
 
     private int parseSequence(String line) {

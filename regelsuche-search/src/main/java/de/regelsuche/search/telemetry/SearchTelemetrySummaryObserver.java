@@ -40,7 +40,6 @@ public final class SearchTelemetrySummaryObserver implements SearchObserver {
         totalEvents++;
         maxDepthReached = Math.max(maxDepthReached, event.depth());
         maxFrontierSize = Math.max(maxFrontierSize, event.frontierSize());
-        depthHistogram.merge(event.depth(), 1L, Long::sum);
         if (!targetCanonicalHash.isBlank() && targetCanonicalHash.equals(event.canonicalHash())) {
             targetNearStates++;
             if (event.type() == SearchEventType.STATE_VISITED || event.type() == SearchEventType.STATE_ENQUEUED) {
@@ -49,7 +48,10 @@ public final class SearchTelemetrySummaryObserver implements SearchObserver {
         }
 
         switch (event.type()) {
-            case STATE_VISITED -> visitedStates++;
+            case STATE_VISITED -> {
+                visitedStates++;
+                depthHistogram.merge(event.depth(), 1L, Long::sum);
+            }
             case TRANSFORMATION_GENERATED -> {
                 generatedTransformations++;
                 if (!event.ruleId().isBlank()) {

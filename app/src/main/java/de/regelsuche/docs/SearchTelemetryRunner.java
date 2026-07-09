@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.search.telemetry.CompositeSearchObserver;
 import de.regelsuche.search.telemetry.NdjsonSearchObserver;
+import de.regelsuche.search.telemetry.SearchTimelineDataCollector;
 import de.regelsuche.search.telemetry.SearchTelemetrySummary;
 import de.regelsuche.search.telemetry.SearchTelemetrySummaryObserver;
 import de.regelsuche.util.AtomicJsonFile;
@@ -29,6 +30,7 @@ public final class SearchTelemetryRunner {
     private final DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();
     private final DiscoveryBenchmarkExecutor executor = new DiscoveryBenchmarkExecutor();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+    private final TelemetryTimelineSvgWriter svgWriter = new TelemetryTimelineSvgWriter();
 
     public static void main(String[] args) {
         Path repoRoot = args.length == 0
@@ -73,9 +75,11 @@ public final class SearchTelemetryRunner {
     private ScenarioTelemetryResult recordScenario(DiscoveryBenchmarkScenario scenario, Path scenarioDirectory) throws IOException {
         String targetCanonicalHash = canonicalizer.stableHash(normalizeExpression(scenario.targetExpression()));
         SearchTelemetrySummaryObserver summaryObserver = new SearchTelemetrySummaryObserver(targetCanonicalHash);
+        SearchTimelineDataCollector timelineCollector = new SearchTimelineDataCollector();
         DiscoveryBenchmarkEvidence evidence;
         try (NdjsonSearchObserver ndjson = new NdjsonSearchObserver(scenarioDirectory.resolve("search-events.ndjson"))) {
-            evidence = executor.execute(scenario, CompositeSearchObserver.of(summaryObserver, ndjson));
+            evidence = executor.execute(scenario,
+                CompositeSearchObserver.of(summaryObserver, ndjson, timelineCollector));
         }
         SearchTelemetrySummary summary = summaryObserver.summary();
         ScenarioTelemetryResult result = new ScenarioTelemetryResult(
@@ -100,6 +104,11 @@ public final class SearchTelemetryRunner {
         Files.writeString(
             scenarioDirectory.resolve("search-telemetry-replay.html"),
             renderReplayHtml(result),
+            StandardCharsets.UTF_8
+        );
+        Files.writeString(
+            scenarioDirectory.resolve("search-telemetry-timeline.svg"),
+            svgWriter.render(scenario.id(), timelineCollector.points()),
             StandardCharsets.UTF_8
         );
         return result;
@@ -128,7 +137,8 @@ public final class SearchTelemetryRunner {
             out.append("- [search-events.ndjson](").append(slug).append("/search-events.ndjson)\n");
             out.append("- [search-telemetry-summary.json](").append(slug).append("/search-telemetry-summary.json)\n");
             out.append("- [search-telemetry-summary.md](").append(slug).append("/search-telemetry-summary.md)\n");
-            out.append("- [search-telemetry-replay.html](").append(slug).append("/search-telemetry-replay.html)\n\n");
+            out.append("- [search-telemetry-replay.html](").append(slug).append("/search-telemetry-replay.html)\n");
+            out.append("- [search-telemetry-timeline.svg](").append(slug).append("/search-telemetry-timeline.svg)\n\n");
         }
         return out.toString();
     }
@@ -191,7 +201,13 @@ public final class SearchTelemetryRunner {
             out.append("_No selected target-reaching path found._\n");
         }
         out.append('\n');
-        out.append("Replay in [search-telemetry-replay.html](search-telemetry-replay.html).\n");
+        out.append("Replay in [search-telemetry-replay.html](search-telemetry-replay.html)." +
+            " Timeline SVG: [search-telemetry-timeline.svg](search-telemetry-timeline.svg).\n");
+        out.append('\n');
+        String powerSlug = slugFor(result.scenarioId());
+        out.append("## See also\n\n");
+        out.append("- [Search-space power report](../../search-space-power/").append(powerSlug)
+            .append("/search-space-power.md) — structural metrics derived from the evidence graph.\n");
         return out.toString();
     }
 
@@ -291,7 +307,7 @@ public final class SearchTelemetryRunner {
                     render();
                   })
                   .catch(error => {
-                    status.textContent = `Failed to load NDJSON: ${error}`;
+                    status.textContent = `Failed to load NDJSON: ${error}. If opening from disk (file://), serve via a local web server instead, e.g. python3 -m http.server 8080`;
                   });
               </script>
             </body>

@@ -23,7 +23,7 @@ final class SearchEventJson {
         appendNumberField(json, "frontierSize", event.frontierSize());
         appendNumberField(json, "visitedCount", event.visitedCount());
         appendNumberField(json, "generatedCount", event.generatedCount());
-        appendStringField(json, "pruningReason", event.pruningReason());
+        appendLastStringField(json, "pruningReason", event.pruningReason());
         json.append('}');
         return json.toString();
     }
@@ -31,6 +31,12 @@ final class SearchEventJson {
     private static void appendNumberField(StringBuilder json, String name, long value) {
         appendFieldName(json, name);
         json.append(value).append(',');
+    }
+
+    private static void appendLastStringField(StringBuilder json, String name, String value) {
+        appendFieldName(json, name);
+        appendQuoted(json, value);
+        // no trailing comma — this is the last field
     }
 
     private static void appendStringField(StringBuilder json, String name, String value) {
