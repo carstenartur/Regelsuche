@@ -1,21 +1,28 @@
 def aiKnowledgeEnabled = System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
 
-def aiKnowledgeExtractorRoot = file('../ai-knowledge-extractor')
-
 buildscript {
+    repositories {
+        if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
+            mavenCentral()
+            maven {
+                name = 'GitHubPackages'
+                url = uri('https://maven.pkg.github.com/carstenartur/ai-knowledge-extractor')
+                credentials {
+                    username = System.getenv('GITHUB_ACTOR') ?: ''
+                    password = System.getenv('GITHUB_TOKEN') ?: ''
+                }
+            }
+        }
+    }
+
     dependencies {
         if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
-            classpath fileTree(dir: '../ai-knowledge-extractor/core/build/libs', include: ['*.jar'])
-            classpath fileTree(dir: '../ai-knowledge-extractor/gradle-plugin/build/libs', include: ['*.jar'])
+            classpath 'org.aiknowledge:ai-knowledge-gradle-plugin:0.1.4'
         }
     }
 }
 
 if (aiKnowledgeEnabled) {
-    if (!aiKnowledgeExtractorRoot.isDirectory()) {
-        throw new GradleException('AI knowledge extractor repository is missing next to this checkout.')
-    }
-
     apply plugin: 'org.aiknowledge.extractor'
 
     aiKnowledge {
@@ -24,8 +31,19 @@ if (aiKnowledgeEnabled) {
         seedDirectory = layout.projectDirectory.dir('ai-knowledge')
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
-        // Keep the CI gate just above the measured baseline (~340) so future debt increases fail fast.
-        maxCognitiveDebt = 350.0d
+
+        // Context-size gate: this measures AI context footprint, not local method complexity.
+        // Keep it slightly above the observed 0.1.4 baseline so normal code-structure improvements
+        // are judged by the method-level gates below rather than by repository context size alone.
+        maxCognitiveDebt = 360.0d
+
+        // Method-level gates from ai-knowledge-extractor 0.1.4. The current baseline is
+        // max cognitive complexity 64 and max cyclomatic complexity 33; keep the gate just
+        // above that baseline so future regressions fail while existing hotspots remain visible.
+        maxMethodCognitiveComplexity = 65
+        maxMethodCyclomaticComplexity = 35
+        maxAverageMethodCognitiveComplexity = 4.0d
+        maxAverageMethodCyclomaticComplexity = 4.0d
     }
 } else {
     tasks.register('generateAiKnowledgeIndex') {
