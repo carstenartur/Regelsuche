@@ -17,6 +17,8 @@ import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.ProofStep;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.SearchSpaceAnalytics;
+import de.regelsuche.search.telemetry.NoOpSearchObserver;
+import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
@@ -70,6 +72,11 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     public DiscoveryBenchmarkEvidence execute(DiscoveryBenchmarkScenario scenario) {
+        return execute(scenario, NoOpSearchObserver.INSTANCE);
+    }
+
+    public DiscoveryBenchmarkEvidence execute(DiscoveryBenchmarkScenario scenario, SearchObserver observer) {
+        SearchObserver activeObserver = observer == null ? NoOpSearchObserver.INSTANCE : observer;
         SubstitutionRewriteState.clear();
         List<ScenarioRulePack> packs = loader.loadRulePacks(scenario);
         Map<String, ScenarioRule> rulesById = packs.stream()
@@ -78,7 +85,7 @@ public final class DiscoveryBenchmarkExecutor {
         Map<String, String> ruleIdToPackId = buildRuleIdToPackId(packs);
         Set<String> enabledOperators = Set.copyOf(scenario.enabledOperators());
         TransformationEngine baseEngine = engineFor(scenario, packs);
-        SearchRun withoutMacro = run(scenario, baseEngine);
+        SearchRun withoutMacro = run(scenario, baseEngine, activeObserver);
         MacroLearningRun macroLearningRun = scenario.macroLearning().enabled() && withoutMacro.success()
                 ? learnMacros(scenario, baseEngine, withoutMacro)
                 : new MacroLearningRun(List.of(), Map.of(), new InMemoryRuleInventoryRepository());
@@ -302,16 +309,30 @@ public final class DiscoveryBenchmarkExecutor {
     }
 
     private SearchRun run(DiscoveryBenchmarkScenario scenario, TransformationEngine engine) {
-        return run(scenario, engine, scenario.budgets().maxDepth(), scenario.budgets().maxStates());
+        return run(scenario, engine, scenario.budgets().maxDepth(), scenario.budgets().maxStates(), NoOpSearchObserver.INSTANCE);
+    }
+
+    private SearchRun run(DiscoveryBenchmarkScenario scenario, TransformationEngine engine, SearchObserver observer) {
+        return run(scenario, engine, scenario.budgets().maxDepth(), scenario.budgets().maxStates(), observer);
     }
 
     private SearchRun run(DiscoveryBenchmarkScenario scenario, TransformationEngine engine, int maxDepth, int maxStates) {
+        return run(scenario, engine, maxDepth, maxStates, NoOpSearchObserver.INSTANCE);
+    }
+
+    private SearchRun run(
+            DiscoveryBenchmarkScenario scenario,
+            TransformationEngine engine,
+            int maxDepth,
+            int maxStates,
+            SearchObserver observer) {
         SearchProblem problem = new SearchProblem(
                 scenario.inputExpression(),
                 engine,
                 new ExpressionScorer(),
                 new ExpressionCanonicalizer(),
-                new SearchHeuristic(maxDepth, maxStates, 1, 4, 80, 12));
+                new SearchHeuristic(maxDepth, maxStates, 1, 4, 80, 12))
+            .withObserver(observer);
         String normalizedTarget = normalizeExpression(scenario.targetExpression());
         List<SearchState> explored = new BestFirstSearchStrategy().search(problem.withGoal(TransformationGoal.FACTORIZE));
         return explored.stream()
