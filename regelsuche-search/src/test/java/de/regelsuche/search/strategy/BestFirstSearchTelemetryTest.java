@@ -8,14 +8,17 @@ import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.memory.SearchMemory;
+import de.regelsuche.search.memory.TranspositionEntry;
 import de.regelsuche.search.telemetry.SearchEvent;
 import de.regelsuche.search.telemetry.SearchEventType;
 import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class BestFirstSearchTelemetryTest {
@@ -67,20 +70,39 @@ class BestFirstSearchTelemetryTest {
     @Test
     void transpositionPrunedStatesAreNotReportedAsExploredResults() {
         RecordingObserver observer = new RecordingObserver();
+        ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+        ExpressionScorer scorer = new ExpressionScorer();
         SearchMemory memory = new SearchMemory();
+        rememberKnownAState(memory, canonicalizer, scorer);
         SearchProblem problem = new SearchProblem(
             "x",
-            new DuplicatePathTransformationEngine(),
-            new ExpressionScorer(),
-            new ExpressionCanonicalizer(),
-            new SearchHeuristic(1, 8, 4, 2, 1, 8)
+            new KnownStateTransformationEngine(),
+            scorer,
+            canonicalizer,
+            new SearchHeuristic(1, 8, 1, 2, 4, 8)
         ).withMemory(memory).withObserver(observer);
 
         List<SearchState> states = new BestFirstSearchStrategy().search(problem);
 
-        assertEquals(List.of("x", "a"), states.stream().map(SearchState::expression).toList());
+        assertEquals(List.of("x"), states.stream().map(SearchState::expression).toList());
         assertFalse(memory.decisions().isEmpty());
         assertTrue(observer.events().stream().anyMatch(event -> event.type() == SearchEventType.STATE_PRUNED_TRANSPOSITION));
+    }
+
+    private void rememberKnownAState(SearchMemory memory, ExpressionCanonicalizer canonicalizer, ExpressionScorer scorer) {
+        String expression = "a";
+        String hash = canonicalizer.stableHash(expression);
+        memory.table().record(new TranspositionEntry(
+            hash,
+            expression,
+            scorer.score(expression).weightedTotal(),
+            1,
+            "known#a",
+            Set.of("known_rule"),
+            1,
+            Instant.EPOCH,
+            Instant.EPOCH
+        ));
     }
 
     private SearchProblem baseProblem() {
@@ -119,15 +141,14 @@ class BestFirstSearchTelemetryTest {
         }
     }
 
-    private static final class DuplicatePathTransformationEngine implements TransformationEngine {
+    private static final class KnownStateTransformationEngine implements TransformationEngine {
         @Override
         public List<Transformation> transform(String expression) {
             if (!"x".equals(expression)) {
                 return List.of();
             }
             return List.of(
-                new Transformation("same_rule", "a", RewriteKind.NORMALIZE, false, 0, true, "same_rule:a:1"),
-                new Transformation("same_rule", "a", RewriteKind.NORMALIZE, false, 0, true, "same_rule:a:2")
+                new Transformation("known_rule", "a", RewriteKind.NORMALIZE, false, 0, true, "known_rule:a")
             );
         }
     }
