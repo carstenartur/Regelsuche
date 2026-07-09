@@ -223,28 +223,24 @@ final class GeneralizedHypothesisValidationRunner {
         return List.copyOf(assumptions);
     }
 
-    private List<String> holdoutCases(PatternHypothesisMiner.GeneralizedHypothesis hypothesis) {
+    private List<HoldoutCase> holdoutCases(PatternHypothesisMiner.GeneralizedHypothesis hypothesis) {
         String operator = hypothesis.operatorId();
         if (RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID.equals(operator)) {
             return List.of(
-                new HoldoutCase("holdout-rsf-explicit-uv", "u * v + u * w", "u * (v + w)", List.of("sympy-polynomial-basic")),
-                new HoldoutCase("holdout-rsf-explicit-mn", "m * n - m * p", "m * (n - p)", List.of("sympy-polynomial-basic"))
+                new HoldoutCase("holdout-rsf-explicit-uv", "u * v + u * w", "u * (v + w)", List.of()),
+                new HoldoutCase("holdout-rsf-explicit-mn", "m * n - m * p", "m * (n - p)", List.of())
             );
         }
         if (TelescopingFractionHypothesisOperator.RULE_ID.equals(operator)) {
             return List.of(
-                new HoldoutCase("holdout-tel-q56", "1 / ((q + 5) * (q + 6))", "1 / (q + 5) - 1 / (q + 6)",
-                    List.of("sympy-rational-basic")),
-                new HoldoutCase("holdout-tel-r78", "1 / ((r + 7) * (r + 8))", "1 / (r + 7) - 1 / (r + 8)",
-                    List.of("sympy-rational-basic"))
+                new HoldoutCase("holdout-tel-q56", "1 / ((q + 5) * (q + 6))", "1 / (q + 5) - 1 / (q + 6)", List.of()),
+                new HoldoutCase("holdout-tel-r78", "1 / ((r + 7) * (r + 8))", "1 / (r + 7) - 1 / (r + 8)", List.of())
             );
         }
         if (RationalNormalizationHypothesisOperator.RULE_ID.equals(operator)) {
             return List.of(
-                new HoldoutCase("holdout-rn-shared-denom-add", "alpha / gamma + beta / gamma", "(alpha + beta) / gamma",
-                    List.of("rational-basic")),
-                new HoldoutCase("holdout-rn-shared-denom-sub", "alpha / gamma - beta / gamma", "(alpha - beta) / gamma",
-                    List.of("rational-basic"))
+                new HoldoutCase("holdout-rn-shared-denom-add", "alpha / gamma + beta / gamma", "(alpha + beta) / gamma", List.of()),
+                new HoldoutCase("holdout-rn-shared-denom-sub", "alpha / gamma - beta / gamma", "(alpha - beta) / gamma", List.of())
             );
         }
         return List.of();
