@@ -74,7 +74,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 campaignFive.results().stream()
                     .map(result -> decider.decide(PromotionObservation.fromCampaignFive(result, campaignFive.id()))),
                 campaignSeven.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignSeven(result, campaignSeven.id()))),
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignSeven(result, campaignSeven.id()), result.structuredAblation())),
                 campaignEight.results().stream()
                     .map(result -> decider.decide(PromotionObservation.fromCampaignEight(result, campaignEight.id()))),
                 campaignNine.results().stream()

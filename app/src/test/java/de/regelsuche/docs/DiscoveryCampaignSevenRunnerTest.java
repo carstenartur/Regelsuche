@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -127,6 +128,53 @@ class DiscoveryCampaignSevenRunnerTest {
             families.add(result.family());
         }
         assertTrue(families.size() >= 2, "campaign 7 must cover at least 2 distinct families, found: " + families);
+    }
+
+    @Test
+    void campaignSevenSuccessfulCasesHaveStructuredAblationEvidence(@TempDir Path tempDir) throws Exception {
+        DiscoveryCampaignSevenRunner runner = new DiscoveryCampaignSevenRunner();
+        DiscoveryCampaignSevenRunner.CampaignReport report = runner.writeReport(tempDir);
+
+        for (DiscoveryCampaignSevenRunner.CaseResult result : report.results()) {
+            if (result.success() && "DEGRADED".equals(result.ablationStatus())) {
+                assertTrue(result.structuredAblation().hasStructuredMetrics(),
+                    result.id() + ": successful DEGRADED case must have structured ablation metrics");
+                assertTrue(result.structuredAblation().promotionReady(),
+                    result.id() + ": structured ablation for DEGRADED case must be promotion-ready");
+            }
+        }
+    }
+
+    @Test
+    void repeatedSubexpressionFactorizationCandidatePassesPublicEvidenceGate(@TempDir Path tempDir) throws Exception {
+        DiscoveryCampaignSevenRunner runner = new DiscoveryCampaignSevenRunner();
+        DiscoveryCampaignSevenRunner.CampaignReport report = runner.writeReport(tempDir);
+
+        DiscoveryCampaignSevenRunner.CaseResult rsfCase = report.results().stream()
+            .filter(result -> "rsf-x2-plus-x".equals(result.id()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("rsf-x2-plus-x case not found in campaign 7"));
+
+        assertTrue(rsfCase.success(), "rsf-x2-plus-x must succeed");
+        assertTrue(rsfCase.structuredAblation().hasStructuredMetrics(),
+            "rsf-x2-plus-x must have structured ablation metrics");
+        assertTrue(rsfCase.structuredAblation().promotionReady(),
+            "rsf-x2-plus-x structured ablation must be DEGRADED (promotion-ready)");
+
+        PromotionDecider decider = new PromotionDecider();
+        PromotionRecord record = decider.decide(
+            PromotionObservation.fromCampaignSeven(rsfCase, "discovery-campaign-7"),
+            rsfCase.structuredAblation());
+
+        assertTrue(record.ablationEvidence().hasStructuredMetrics(),
+            "promotion record must carry structured ablation evidence");
+        assertEquals(PromotionStage.PROMOTED, record.stage(),
+            "rsf-x2-plus-x must be at PROMOTED stage");
+        PublicEvidenceGate.GateDecision decision = new PublicEvidenceGate().evaluate(record, NoveltyStatus.NEW);
+        assertFalse(decision.rejectionReasons().contains("ablation=missing-structured"),
+            "rsf-x2-plus-x must not be rejected for missing structured ablation: " + decision.rejectionReasons());
+        assertTrue(decision.accepted(),
+            "rsf-x2-plus-x with NEW novelty must be accepted by the public evidence gate: " + decision.rejectionReasons());
     }
 
     private Set<String> existingInputTargetPairs() {

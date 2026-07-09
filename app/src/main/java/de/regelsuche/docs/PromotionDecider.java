@@ -5,7 +5,11 @@ import java.util.List;
 
 final class PromotionDecider {
     PromotionRecord decide(PromotionObservation observation) {
-        AblationEvidence ablationEvidence = observation.ablationEvidence();
+        return decide(observation, null);
+    }
+
+    PromotionRecord decide(PromotionObservation observation, AblationEvidence overrideAblation) {
+        AblationEvidence ablationEvidence = overrideAblation != null ? overrideAblation : observation.ablationEvidence();
         List<String> blockers = promotionBlockers(observation, ablationEvidence);
         boolean promotionEligible = blockers.isEmpty();
         PromotionStage stage = stageFor(observation, ablationEvidence, promotionEligible);
