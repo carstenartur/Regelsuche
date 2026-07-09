@@ -75,14 +75,17 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     private void processNextState(SearchProblem problem, SearchFrame frame) {
         SearchState current = frame.frontier().remove();
         frame.telemetry().stateDequeued(current, frame.frontier().size(), frame.visited().size());
-        if (markVisited(current, frame) && !pruneByTransposition(problem, current, frame) && !pruneByDepth(problem, current, frame)) {
+        if (!markVisited(current, frame) || pruneByTransposition(problem, current, frame)) {
+            return;
+        }
+        frame.explored().add(current);
+        if (!pruneByDepth(problem, current, frame)) {
             expandState(problem, current, frame);
         }
     }
 
     private boolean markVisited(SearchState current, SearchFrame frame) {
         if (frame.visited().add(stateKey(current))) {
-            frame.explored().add(current);
             frame.telemetry().stateVisited(current, frame.frontier().size(), frame.visited().size());
             return true;
         }
