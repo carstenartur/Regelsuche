@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.memory.SearchMemory;
 import de.regelsuche.search.telemetry.SearchEvent;
 import de.regelsuche.search.telemetry.SearchEventType;
 import de.regelsuche.search.telemetry.SearchObserver;
@@ -63,6 +64,25 @@ class BestFirstSearchTelemetryTest {
         assertFalse(observer.events().isEmpty());
     }
 
+    @Test
+    void transpositionPrunedStatesAreNotReportedAsExploredResults() {
+        RecordingObserver observer = new RecordingObserver();
+        SearchMemory memory = new SearchMemory();
+        SearchProblem problem = new SearchProblem(
+            "x",
+            new DuplicatePathTransformationEngine(),
+            new ExpressionScorer(),
+            new ExpressionCanonicalizer(),
+            new SearchHeuristic(1, 8, 4, 2, 1, 8)
+        ).withMemory(memory).withObserver(observer);
+
+        List<SearchState> states = new BestFirstSearchStrategy().search(problem);
+
+        assertEquals(List.of("x", "a"), states.stream().map(SearchState::expression).toList());
+        assertFalse(memory.decisions().isEmpty());
+        assertTrue(observer.events().stream().anyMatch(event -> event.type() == SearchEventType.STATE_PRUNED_TRANSPOSITION));
+    }
+
     private SearchProblem baseProblem() {
         return new SearchProblem(
             "x",
@@ -95,6 +115,19 @@ class BestFirstSearchTelemetryTest {
             return List.of(
                 new Transformation("rule_z", "z", RewriteKind.NORMALIZE, false, 0, true, "rule_z:z"),
                 new Transformation("rule_a", "a", RewriteKind.NORMALIZE, false, 0, true, "rule_a:a")
+            );
+        }
+    }
+
+    private static final class DuplicatePathTransformationEngine implements TransformationEngine {
+        @Override
+        public List<Transformation> transform(String expression) {
+            if (!"x".equals(expression)) {
+                return List.of();
+            }
+            return List.of(
+                new Transformation("same_rule", "a", RewriteKind.NORMALIZE, false, 0, true, "same_rule:a:1"),
+                new Transformation("same_rule", "a", RewriteKind.NORMALIZE, false, 0, true, "same_rule:a:2")
             );
         }
     }
