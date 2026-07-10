@@ -10,6 +10,11 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import de.regelsuche.mining.DynamicOperatorCompiler;
+import de.regelsuche.mining.DynamicPatternOperator;
+import de.regelsuche.mining.RulePatternInstantiator;
+import de.regelsuche.mining.RulePatternParser;
+import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
@@ -30,6 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -63,6 +69,9 @@ final class GeneralizedHypothesisValidationRunner {
     private final PublicEvidenceGate publicEvidenceGate = new PublicEvidenceGate();
     private final HoldoutLeakageChecker leakageChecker = new HoldoutLeakageChecker();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+    private final DynamicOperatorCompiler dynamicCompiler = new DynamicOperatorCompiler();
+    private final RulePatternParser rulePatternParser = new RulePatternParser();
+    private final RulePatternInstantiator rulePatternInstantiator = new RulePatternInstantiator();
 
     ValidationReport run(PatternHypothesisMiner.PatternHypothesisReport patternReport) {
         List<PatternHypothesisMiner.GeneralizedHypothesis> hypotheses = patternReport == null
@@ -158,26 +167,33 @@ final class GeneralizedHypothesisValidationRunner {
         PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
         HoldoutCase holdout
     ) {
+        // For dynamic operators, we need to register them in the operator registry so the benchmark
+        // executor can find them. We resolve the effective operator ID used in the scenario.
+        HypothesisOperator compiledOperator = operatorFor(hypothesis);
+        String effectiveOperatorId = (compiledOperator instanceof DynamicPatternOperator dynOp)
+            ? dynOp.ruleId()
+            : hypothesis.operatorId();
+
         DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(
             holdout.id(),
             holdout.id(),
             holdout.inputExpression(),
             holdout.targetExpression(),
             List.of(),
-            List.of(hypothesis.operatorId()),
+            List.of(effectiveOperatorId),
             holdout.enabledRulePacks(),
             List.of(),
             List.of(),
-            List.of(hypothesis.operatorId()),
+            List.of(effectiveOperatorId),
             new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
             new DiscoveryBenchmarkScenario.Budgets(8, 240, 5000),
             new DiscoveryBenchmarkScenario.Gallery(false, 1, 2)
         );
-        DiscoveryBenchmarkEvidence withCandidate = new DiscoveryBenchmarkExecutor(loader).execute(scenario);
-        DiscoveryOperatorRegistry disabledRegistry = new DiscoveryOperatorRegistry()
-            .register(new DefaultDiscoveryOperatorProvider());
-        disabledRegistry.disable(hypothesis.operatorId());
-        DiscoveryBenchmarkEvidence withoutCandidate = new DiscoveryBenchmarkExecutor(loader, disabledRegistry).execute(scenario);
+        DiscoveryOperatorRegistry withRegistry = buildRegistryWithDynamic(compiledOperator, effectiveOperatorId);
+        DiscoveryBenchmarkEvidence withCandidate = new DiscoveryBenchmarkExecutor(loader, withRegistry).execute(scenario);
+        DiscoveryOperatorRegistry withoutRegistry = buildRegistryWithDynamic(compiledOperator, effectiveOperatorId);
+        withoutRegistry.disable(effectiveOperatorId);
+        DiscoveryBenchmarkEvidence withoutCandidate = new DiscoveryBenchmarkExecutor(loader, withoutRegistry).execute(scenario);
         return new HoldoutResult(
             holdout.id(),
             holdout.inputExpression(),
@@ -201,13 +217,49 @@ final class GeneralizedHypothesisValidationRunner {
         );
     }
 
+    /**
+     * Builds an operator registry that includes both the default operators and, if the
+     * compiled operator is a {@link DynamicPatternOperator}, also registers it under its
+     * effective rule ID so the benchmark executor can find it.
+     */
+    private DiscoveryOperatorRegistry buildRegistryWithDynamic(
+        HypothesisOperator compiledOperator,
+        String effectiveOperatorId
+    ) {
+        DiscoveryOperatorRegistry registry = new DiscoveryOperatorRegistry()
+            .register(new DefaultDiscoveryOperatorProvider());
+        if (compiledOperator instanceof DynamicPatternOperator dynOp) {
+            HypothesisOperator capturedOp = dynOp; // effectively final for lambda
+            registry.register(new DiscoveryOperatorProvider() {
+                @Override
+                public String id() {
+                    return "dynamic-operator-provider:" + effectiveOperatorId;
+                }
+
+                @Override
+                public List<DiscoveryOperatorProvider.DiscoveryOperatorDefinition> operators() {
+                    return List.of(new DiscoveryOperatorProvider.DiscoveryOperatorDefinition(
+                        effectiveOperatorId,
+                        () -> capturedOp,
+                        List.of(effectiveOperatorId)
+                    ));
+                }
+            });
+        }
+        return registry;
+    }
+
     private NegativeHoldoutResult validateNegativeHoldout(
         PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
         HoldoutCase holdout
     ) {
-        HypothesisOperator operator = operatorFor(hypothesis.operatorId());
+        HypothesisOperator operator = operatorFor(hypothesis);
         List<Transformation> candidates = operator == null ? List.of() : operator.generateCandidates(holdout.inputExpression());
-        boolean operatorFired = candidates.stream().anyMatch(candidate -> hypothesis.operatorId().equals(candidate.rule()));
+        // For dynamic operators the rule ID is the dynamic rule ID, not the original operatorId.
+        // Check both the original operatorId and any dynamic rule that starts with the dynamic prefix.
+        boolean operatorFired = candidates.stream().anyMatch(candidate ->
+            hypothesis.operatorId().equals(candidate.rule())
+            || candidate.rule().startsWith(DynamicPatternOperator.RULE_ID_PREFIX));
         boolean rewroteToForbiddenTarget = candidates.stream().anyMatch(candidate ->
             comparableExpressionKey(candidate.transformedExpression()).equals(comparableExpressionKey(holdout.targetExpression())));
         return new NegativeHoldoutResult(
@@ -324,7 +376,7 @@ final class GeneralizedHypothesisValidationRunner {
     }
 
     private GeneratedHoldoutSuite holdoutCases(PatternHypothesisMiner.GeneralizedHypothesis hypothesis) {
-        HypothesisOperator operator = operatorFor(hypothesis.operatorId());
+        HypothesisOperator operator = operatorFor(hypothesis);
         if (operator == null) {
             return GeneratedHoldoutSuite.empty();
         }
@@ -332,7 +384,9 @@ final class GeneralizedHypothesisValidationRunner {
             case RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID -> repeatedSubexpressionHoldouts(operator);
             case TelescopingFractionHypothesisOperator.RULE_ID -> telescopingHoldouts(operator);
             case RationalNormalizationHypothesisOperator.RULE_ID -> rationalNormalizationHoldouts(operator);
-            default -> List.of();
+            default -> (operator instanceof DynamicPatternOperator dynOp)
+                ? dynamicHoldouts(hypothesis, dynOp)
+                : List.of();
         };
         if (generated.isEmpty()) {
             return GeneratedHoldoutSuite.empty();
@@ -354,6 +408,209 @@ final class GeneralizedHypothesisValidationRunner {
             coverage(filtered, leakage)
         );
     }
+
+    /**
+     * Generic holdout generator for dynamically compiled operators.
+     *
+     * <p>Instantiates the left-hand pattern with systematic variable combinations to build
+     * positive holdouts, and constructs negative holdouts from structurally non-matching
+     * expressions. The set is deterministic for reproducibility.</p>
+     */
+    private List<HoldoutCase> dynamicHoldouts(
+        PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
+        DynamicPatternOperator op
+    ) {
+        List<HoldoutCase> holdouts = new ArrayList<>();
+        // Variable pools for substituting placeholders (deterministic order)
+        String[] pool1 = {"u", "v", "w", "m", "n", "p", "q", "r", "s", "t"};
+        String[] pool2 = {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"};
+        String[] pool3 = {"x", "y", "z", "k", "l"};
+        addDynamicPositiveHoldouts(holdouts, op, pool1, pool2, pool3);
+        addDynamicNegativeHoldouts(holdouts, op, pool1, pool2);
+        return List.copyOf(holdouts);
+    }
+
+    private void addDynamicPositiveHoldouts(
+        List<HoldoutCase> holdouts,
+        DynamicPatternOperator op,
+        String[] pool1,
+        String[] pool2,
+        String[] pool3
+    ) {
+        List<String> placeholders = extractUppercasePlaceholders(op.leftPatternText());
+        if (placeholders.isEmpty()) {
+            return;
+        }
+        de.regelsuche.mining.RulePatternNode leftNode;
+        try {
+            leftNode = rulePatternParser.parse(op.leftPatternText());
+        } catch (IllegalArgumentException ignored) {
+            return;
+        }
+        int idx = 0;
+        // Simple variable bindings: each placeholder gets a fresh variable name
+        for (int i = 0; i < pool1.length && countExpectation(holdouts, HoldoutExpectation.POSITIVE) < 120; i++) {
+            for (int j = 0; j < pool2.length; j++) {
+                if (pool1[i].equals(pool2[j])) {
+                    continue;
+                }
+                Map<String, Expr> bindings = buildVariableBindings(placeholders, pool1, pool2, pool3, i, j, idx);
+                idx++;
+                String input = instantiateToString(leftNode, bindings);
+                if (input == null) {
+                    continue;
+                }
+                positiveHoldout(op, "dyn-pos-" + idx, input, "dynamic-positive", "dynamic-operator", "general", "none")
+                    .ifPresent(holdouts::add);
+            }
+        }
+        // Composite bindings: first placeholder gets (pool1[i] + offset) for diversity
+        for (int i = 0; i < pool1.length && countExpectation(holdouts, HoldoutExpectation.POSITIVE) < 120; i++) {
+            for (int offset = 1; offset <= 3; offset++) {
+                Map<String, Expr> bindings = buildCompositeBindings(placeholders, pool1, pool2, pool3, i, offset, idx);
+                idx++;
+                String input = instantiateToString(leftNode, bindings);
+                if (input == null) {
+                    continue;
+                }
+                positiveHoldout(op, "dyn-pos-comp-" + idx, input, "dynamic-positive-composite", "dynamic-operator", "general", "none")
+                    .ifPresent(holdouts::add);
+            }
+        }
+    }
+
+    private void addDynamicNegativeHoldouts(
+        List<HoldoutCase> holdouts,
+        DynamicPatternOperator op,
+        String[] pool1,
+        String[] pool2
+    ) {
+        // Negative holdouts: simple expressions that shouldn't match the dynamic pattern.
+        // These are deliberately simple so they structurally differ from the pattern.
+        String[] simpleNegatives = {
+            "u", "u + v", "u * v", "u^2", "u - v", "u / v",
+            "a + b + c", "a * b * c", "a + b - c", "a^2 + b^2",
+            "2 * u + 3 * v", "u * (v + 1)", "1 / (u + 1)",
+            "u + 1", "u - 1", "u * 2", "u / 2", "u^3",
+            "a + b + c + d", "a * b + c", "u^2 + v^2", "(u + v)^2",
+            "u * v + w", "u + v * w", "u - v + w", "u * v - w"
+        };
+        int idx = 5000;
+        for (String neg : simpleNegatives) {
+            if (countExpectation(holdouts, HoldoutExpectation.NEGATIVE) >= 120) {
+                break;
+            }
+            List<Transformation> candidates = op.generateCandidates(neg);
+            if (!candidates.isEmpty()) {
+                continue; // Operator fires – not a negative example for this pattern
+            }
+            holdouts.add(negativeHoldout(
+                "dyn-neg-" + (idx++), neg, neg + " (no-rewrite)",
+                "dynamic-negative", "dynamic-operator", "general", "none"
+            ));
+        }
+        // Also vary with different variables in both pools
+        for (int i = 0; i < pool1.length && countExpectation(holdouts, HoldoutExpectation.NEGATIVE) < 120; i++) {
+            for (int j = 0; j < pool2.length; j++) {
+                if (pool1[i].equals(pool2[j])) {
+                    continue;
+                }
+                // Pair of different-variable simple expressions that don't satisfy repeated-placeholder constraints
+                String neg1 = pool1[i] + " + " + pool2[j];
+                String neg2 = pool1[i] + " * " + pool2[j] + " + " + pool1[(i + 1) % pool1.length] + " * " + pool2[(j + 1) % pool2.length];
+                for (String neg : List.of(neg1, neg2)) {
+                    if (countExpectation(holdouts, HoldoutExpectation.NEGATIVE) >= 120) {
+                        break;
+                    }
+                    List<Transformation> candidates = op.generateCandidates(neg);
+                    if (!candidates.isEmpty()) {
+                        continue;
+                    }
+                    holdouts.add(negativeHoldout(
+                        "dyn-neg-v-" + (idx++), neg, neg + " (no-rewrite)",
+                        "dynamic-negative-vars", "dynamic-operator", "general", "none"
+                    ));
+                }
+            }
+        }
+    }
+
+    private Map<String, Expr> buildVariableBindings(
+        List<String> placeholders,
+        String[] pool1,
+        String[] pool2,
+        String[] pool3,
+        int i,
+        int j,
+        int idx
+    ) {
+        Map<String, Expr> bindings = new java.util.LinkedHashMap<>();
+        for (int k = 0; k < placeholders.size(); k++) {
+            String placeholder = placeholders.get(k);
+            if (k == 0) {
+                bindings.put(placeholder, new VariableExpr(pool1[i]));
+            } else if (k == 1) {
+                bindings.put(placeholder, new VariableExpr(pool2[j]));
+            } else {
+                bindings.put(placeholder, new VariableExpr(pool3[(i + j + k) % pool3.length]));
+            }
+        }
+        return bindings;
+    }
+
+    private Map<String, Expr> buildCompositeBindings(
+        List<String> placeholders,
+        String[] pool1,
+        String[] pool2,
+        String[] pool3,
+        int i,
+        int offset,
+        int idx
+    ) {
+        Map<String, Expr> bindings = new java.util.LinkedHashMap<>();
+        for (int k = 0; k < placeholders.size(); k++) {
+            String placeholder = placeholders.get(k);
+            if (k == 0) {
+                // First placeholder gets a composite expression (variable + offset)
+                bindings.put(placeholder, new BinaryExpr(
+                    new VariableExpr(pool1[i]),
+                    de.regelsuche.ast.BinaryOperator.ADD,
+                    new NumberExpr(offset)
+                ));
+            } else if (k == 1) {
+                bindings.put(placeholder, new VariableExpr(pool2[k % pool2.length]));
+            } else {
+                bindings.put(placeholder, new VariableExpr(pool3[(i + k) % pool3.length]));
+            }
+        }
+        return bindings;
+    }
+
+    private String instantiateToString(de.regelsuche.mining.RulePatternNode leftNode, Map<String, Expr> bindings) {
+        try {
+            Expr expr = rulePatternInstantiator.instantiate(leftNode, bindings);
+            return ExpressionFormatter.format(expr);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private long countExpectation(List<HoldoutCase> holdouts, HoldoutExpectation expectation) {
+        return holdouts.stream().filter(h -> h.expectation() == expectation).count();
+    }
+
+    private List<String> extractUppercasePlaceholders(String pattern) {
+        List<String> result = new ArrayList<>();
+        java.util.regex.Matcher m = Pattern.compile("\\b([A-Z])\\b").matcher(pattern);
+        while (m.find()) {
+            String name = m.group(1);
+            if (!result.contains(name)) {
+                result.add(name);
+            }
+        }
+        return result;
+    }
+
 
     private List<HoldoutCase> repeatedSubexpressionHoldouts(HypothesisOperator operator) {
         List<HoldoutCase> holdouts = new ArrayList<>();
@@ -925,6 +1182,29 @@ final class GeneralizedHypothesisValidationRunner {
             return new RationalNormalizationHypothesisOperator();
         }
         return null;
+    }
+
+    /**
+     * Returns the best available {@link HypothesisOperator} for the hypothesis.
+     *
+     * <p>For well-known operators (with hardcoded Java classes) the existing hand-written
+     * implementation is returned. For any other hypothesis, this method compiles a
+     * {@link DynamicPatternOperator} from the hypothesis's left/right patterns, allowing
+     * generalized hypotheses to become executable without a new Java class.</p>
+     */
+    private HypothesisOperator operatorFor(PatternHypothesisMiner.GeneralizedHypothesis hypothesis) {
+        HypothesisOperator known = operatorFor(hypothesis.operatorId());
+        if (known != null) {
+            return known;
+        }
+        // Fall back to dynamic compilation from the mined patterns
+        DynamicOperatorCompiler.CompilationResult result = dynamicCompiler.compile(
+            hypothesis.hypothesisId(),
+            "GENERALIZED_FROM_SUPPORT",
+            hypothesis.leftPattern(),
+            hypothesis.rightPattern()
+        );
+        return result.operator().orElse(null);
     }
 
     private static boolean fallbackUsed(List<String> rulePath) {
