@@ -74,7 +74,7 @@ import java.util.stream.Stream;
 <span class="fc" id="L74">                campaignFive.results().stream()</span>
 <span class="fc" id="L75">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignFive(result, campaignFive.id()))),</span>
 <span class="fc" id="L76">                campaignSeven.results().stream()</span>
-<span class="fc" id="L77">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignSeven(result, campaignSeven.id()))),</span>
+<span class="fc" id="L77">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignSeven(result, campaignSeven.id()), result.structuredAblation())),</span>
 <span class="fc" id="L78">                campaignEight.results().stream()</span>
 <span class="fc" id="L79">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignEight(result, campaignEight.id()))),</span>
 <span class="fc" id="L80">                campaignNine.results().stream()</span>
