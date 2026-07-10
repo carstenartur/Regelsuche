@@ -130,7 +130,7 @@ public final class DynamicPatternOperator implements HypothesisOperator {
         if (expression == null || expression.isBlank()) {
             return List.of();
         }
-        Optional<Map<String, Expr>> bindings = matcher.match(leftPatternText, expression);
+        Optional<Map<String, Expr>> bindings = matcher.match(leftPattern, expression);
         if (bindings.isEmpty()) {
             return List.of();
         }

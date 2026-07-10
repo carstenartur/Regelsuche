@@ -21,7 +21,9 @@ import java.util.regex.Pattern;
  *       single upper-case letter placeholder (A–Z), otherwise there is nothing
  *       to bind and every expression would trivially "match".</li>
  *   <li><b>Non-trivial</b> – left and right patterns must differ (checked via
- *       their canonical hash).</li>
+ *       whitespace-normalised string comparison; note that commutative rewrites
+ *       such as {@code A + B → B + A} are <em>not</em> considered trivial by
+ *       this check).</li>
  *   <li><b>Right-hand completeness</b> – every placeholder in the right pattern
  *       must also appear in the left pattern, so that instantiation always
  *       succeeds.</li>
@@ -84,7 +86,7 @@ public final class DynamicOperatorCompiler {
         int maxCandidates
     ) {
         if (hypothesisId == null || hypothesisId.isBlank()) {
-            return CompilationResult.rejected("hypothesis-id-blank", "Hypothesis ID must not be blank");
+            return CompilationResult.rejected(hypothesisId == null ? "" : hypothesisId, "Hypothesis ID must not be blank");
         }
         if (leftPattern == null || leftPattern.isBlank()) {
             return CompilationResult.rejected(hypothesisId, "left-pattern-blank");

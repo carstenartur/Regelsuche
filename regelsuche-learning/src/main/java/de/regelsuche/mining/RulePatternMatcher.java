@@ -30,6 +30,19 @@ public class RulePatternMatcher {
         }
     }
 
+    public Optional<Map<String, Expr>> match(RulePatternNode patternNode, String expression) {
+        try {
+            Expr expressionNode = expressionParser.parseTerm(expression);
+            Map<String, Expr> bindings = new HashMap<>();
+            if (!match(patternNode, expressionNode, bindings)) {
+                return Optional.empty();
+            }
+            return Optional.of(Map.copyOf(bindings));
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+    }
+
     private boolean match(RulePatternNode pattern, Expr expression, Map<String, Expr> bindings) {
         if (pattern instanceof PatternVariable variable) {
             Expr existing = bindings.get(variable.name());
