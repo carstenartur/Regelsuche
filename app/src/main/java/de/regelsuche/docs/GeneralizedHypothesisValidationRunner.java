@@ -146,7 +146,7 @@ final class GeneralizedHypothesisValidationRunner {
             statesExplored(withoutCandidate),
             withCandidate.oracleStatus(),
             withCandidate.oracleEvidence(),
-            aggregateRulePath(withCandidate, hypothesis.operatorId())
+            aggregateRulePath(withCandidate)
         );
     }
 
@@ -198,11 +198,11 @@ final class GeneralizedHypothesisValidationRunner {
             sourcePack(hypothesis.operatorId()),
             assumptions,
             "generalized from " + hypothesis.supportCount() + " support examples and validated on generated holdouts",
-            rulePath.isEmpty() ? List.of(hypothesis.operatorId()) : rulePath,
-            results.stream().allMatch(HoldoutResult::withSuccess),
+            rulePath,
+            !rulePath.isEmpty(),
             false,
-            false,
-            true
+            fallbackUsed(rulePath),
+            macroOpportunity(hypothesis.family(), rulePath)
         );
         return decider.decide(observation, ablation);
     }
@@ -246,6 +246,17 @@ final class GeneralizedHypothesisValidationRunner {
         return List.of();
     }
 
+    private static boolean fallbackUsed(List<String> rulePath) {
+        return rulePath != null && rulePath.stream()
+            .filter(ruleId -> ruleId != null)
+            .map(ruleId -> ruleId.toLowerCase(Locale.ROOT))
+            .anyMatch(ruleId -> ruleId.contains("fallback"));
+    }
+
+    private static boolean macroOpportunity(String family, List<String> rulePath) {
+        return "substitution".equals(family) || (rulePath != null && rulePath.size() >= 2);
+    }
+
     private String sourcePack(String operatorId) {
         if (RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID.equals(operatorId)) {
             return "sympy-polynomial-basic";
@@ -267,10 +278,10 @@ final class GeneralizedHypothesisValidationRunner {
         return evidence.withoutMacroRun().analytics().statesExplored();
     }
 
-    private List<String> aggregateRulePath(DiscoveryBenchmarkEvidence evidence, String fallbackOperatorId) {
+    private List<String> aggregateRulePath(DiscoveryBenchmarkEvidence evidence) {
         List<String> path = evidence.withoutMacroRun().appliedRuleIds();
         if (path == null || path.isEmpty()) {
-            return List.of(fallbackOperatorId);
+            return List.of();
         }
         return List.copyOf(path);
     }
