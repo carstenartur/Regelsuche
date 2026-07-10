@@ -473,9 +473,10 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 if (guard.relation() == Relation.NON_ZERO) {
                     return true;
                 }
-                if (guard.relation() == Relation.POSITIVE || guard.relation() == Relation.NON_NEGATIVE) {
-                    return true;
-                }
+            }
+            if (value != null && value.kind() == RuntimeValue.Kind.COMPLEX
+                    && (guard.relation() == Relation.POSITIVE || guard.relation() == Relation.NON_NEGATIVE)) {
+                return true;
             }
             if (value != null && value.kind() == RuntimeValue.Kind.SCALAR) {
                 double scalar = value.scalar();
@@ -574,7 +575,10 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
 
     private List<CounterexampleSearchService.ProofEncoding> proofEncodings(InferenceCandidate candidate) {
         List<CounterexampleSearchService.ProofEncoding> encodings = new ArrayList<>();
-        String leanRelation = candidate.normalizedPredicate().replace("!=", "≠");
+        String leanRelation = candidate.normalizedPredicate()
+                .replace(">=", "≥")
+                .replace("<=", "≤")
+                .replace("!=", "≠");
         encodings.add(new CounterexampleSearchService.ProofEncoding("lean", leanRelation));
         try {
             Expr subject = parser.parse(new InputRequest(InputType.TERM, candidate.subjectExpression())).terms().getFirst();

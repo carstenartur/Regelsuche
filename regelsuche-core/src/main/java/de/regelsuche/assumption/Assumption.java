@@ -147,7 +147,7 @@ public record Assumption(Kind kind, String expression, List<String> symbols) {
         return switch (required) {
             case NON_ZERO -> known == Kind.POSITIVE;
             case INTEGER -> known == Kind.NATURAL;
-            case RATIONAL -> known == Kind.INTEGER;
+            case RATIONAL -> known == Kind.INTEGER || known == Kind.NATURAL;
             case REAL -> known == Kind.INTEGER || known == Kind.NATURAL
                 || known == Kind.RATIONAL || known == Kind.POSITIVE || known == Kind.NON_NEGATIVE;
             default -> false;
