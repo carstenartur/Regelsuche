@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DynamicCandidateRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">DynamicCandidateRegistry.java</span></div><h1>DynamicCandidateRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Isolated, quarantined registry for dynamically compiled hypothesis operators.
+ *
+ * &lt;p&gt;Lifecycle of a registered operator:&lt;/p&gt;
+ * &lt;pre&gt;
+ *  CANDIDATE ──promote()──► VALIDATED
+ *      └──block()──► BLOCKED
+ *  VALIDATED ──block()──► BLOCKED
+ * &lt;/pre&gt;
+ *
+ * &lt;p&gt;Safety invariants:
+ * &lt;ul&gt;
+ *   &lt;li&gt;No operator can bypass normal rule preconditions: candidates remain
+ *       in CANDIDATE state until explicit promotion after holdout validation.&lt;/li&gt;
+ *   &lt;li&gt;Only VALIDATED operators may be retrieved via
+ *       {@link #validatedOperators()}; CANDIDATE and BLOCKED operators are
+ *       not globally active.&lt;/li&gt;
+ *   &lt;li&gt;Promotion requires that the hypothesis passed all positive-holdout and
+ *       negative-holdout checks (caller responsibility; the registry records the
+ *       decision but does not re-run validation).&lt;/li&gt;
+ *   &lt;li&gt;Blocking is permanent: a BLOCKED operator cannot be unblocked.&lt;/li&gt;
+ *   &lt;li&gt;Every state transition is recorded in an immutable history log.&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;Duplicate registrations (same rule ID) are rejected with an
+ * {@link IllegalStateException} to prevent accidental shadowing of existing
+ * operators.&lt;/p&gt;
+ */
+<span class="fc" id="L40">public final class DynamicCandidateRegistry {</span>
+
+    /** Lifecycle state of a registered operator. */
+<span class="fc" id="L43">    public enum CandidateStatus {</span>
+        /**
+         * Compiled and registered, but not yet validated on holdouts.
+         * Not eligible for global activation.
+         */
+<span class="fc" id="L48">        CANDIDATE,</span>
+        /**
+         * Passed positive-holdout and negative-holdout checks.
+         * Eligible for global activation via {@link #validatedOperators()}.
+         */
+<span class="fc" id="L53">        VALIDATED,</span>
+        /**
+         * Blocked due to a counterexample, failed assumption, or explicit block call.
+         * Permanently ineligible for activation.
+         */
+<span class="fc" id="L58">        BLOCKED</span>
+    }
+
+    /** An immutable snapshot of a registered operator and its current status. */
+    public record RegistryEntry(
+        DynamicPatternOperator operator,
+        CandidateStatus status,
+        String blockReason,
+        Instant registeredAt,
+        Instant lastTransitionAt
+    ) {
+<span class="fc" id="L69">        public RegistryEntry {</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (operator == null) {</span>
+<span class="nc" id="L71">                throw new IllegalArgumentException(&quot;operator must not be null&quot;);</span>
+            }
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (status == null) {</span>
+<span class="nc" id="L74">                throw new IllegalArgumentException(&quot;status must not be null&quot;);</span>
+            }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            registeredAt = registeredAt == null ? Instant.now() : registeredAt;</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            lastTransitionAt = lastTransitionAt == null ? registeredAt : lastTransitionAt;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            blockReason = blockReason == null ? &quot;&quot; : blockReason;</span>
+<span class="fc" id="L79">        }</span>
+    }
+
+    /** An entry in the immutable audit log of state transitions. */
+<span class="fc" id="L83">    public record TransitionRecord(</span>
+        String ruleId,
+        CandidateStatus fromStatus,
+        CandidateStatus toStatus,
+        String reason,
+        Instant timestamp
+    ) {}
+
+<span class="fc" id="L91">    private final Map&lt;String, RegistryEntry&gt; entries = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L92">    private final List&lt;TransitionRecord&gt; history = new ArrayList&lt;&gt;();</span>
+
+    /**
+     * Registers a compiled {@link DynamicPatternOperator} in CANDIDATE state.
+     *
+     * @param operator the compiled operator to register
+     * @throws IllegalStateException if an operator with the same rule ID is already registered
+     */
+    public synchronized void register(DynamicPatternOperator operator) {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (operator == null) {</span>
+<span class="nc" id="L102">            throw new IllegalArgumentException(&quot;operator must not be null&quot;);</span>
+        }
+<span class="fc" id="L104">        String ruleId = operator.ruleId();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (entries.containsKey(ruleId)) {</span>
+<span class="fc" id="L106">            throw new IllegalStateException(</span>
+                &quot;Operator with rule ID '&quot; + ruleId + &quot;' is already registered; &quot;
+                + &quot;duplicate registrations are not allowed to prevent shadowing&quot;);
+        }
+<span class="fc" id="L110">        Instant now = Instant.now();</span>
+<span class="fc" id="L111">        entries.put(ruleId, new RegistryEntry(operator, CandidateStatus.CANDIDATE, null, now, now));</span>
+<span class="fc" id="L112">        history.add(new TransitionRecord(ruleId, null, CandidateStatus.CANDIDATE, &quot;registered&quot;, now));</span>
+<span class="fc" id="L113">    }</span>
+
+    /**
+     * Promotes a CANDIDATE operator to VALIDATED state after successful holdout checks.
+     *
+     * @param ruleId the rule ID of the operator to promote
+     * @throws IllegalArgumentException if no operator with {@code ruleId} is registered
+     * @throws IllegalStateException    if the operator is not in CANDIDATE state
+     *                                  (i.e. already VALIDATED or BLOCKED)
+     */
+    public synchronized void promote(String ruleId) {
+<span class="fc" id="L124">        RegistryEntry entry = requireEntry(ruleId);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (entry.status() != CandidateStatus.CANDIDATE) {</span>
+<span class="fc" id="L126">            throw new IllegalStateException(</span>
+<span class="fc" id="L127">                &quot;Cannot promote operator '&quot; + ruleId + &quot;': current status is &quot; + entry.status());</span>
+        }
+<span class="fc" id="L129">        Instant now = Instant.now();</span>
+<span class="fc" id="L130">        entries.put(ruleId, new RegistryEntry(</span>
+<span class="fc" id="L131">            entry.operator(), CandidateStatus.VALIDATED, null, entry.registeredAt(), now));</span>
+<span class="fc" id="L132">        history.add(new TransitionRecord(ruleId, CandidateStatus.CANDIDATE, CandidateStatus.VALIDATED, &quot;holdout-validated&quot;, now));</span>
+<span class="fc" id="L133">    }</span>
+
+    /**
+     * Blocks a CANDIDATE or VALIDATED operator permanently due to a counterexample,
+     * failed assumption, or explicit rejection.
+     *
+     * @param ruleId the rule ID of the operator to block
+     * @param reason human-readable explanation for the block
+     * @throws IllegalArgumentException if no operator with {@code ruleId} is registered
+     * @throws IllegalStateException    if the operator is already BLOCKED
+     */
+    public synchronized void block(String ruleId, String reason) {
+<span class="fc" id="L145">        RegistryEntry entry = requireEntry(ruleId);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (entry.status() == CandidateStatus.BLOCKED) {</span>
+<span class="fc" id="L147">            throw new IllegalStateException(&quot;Operator '&quot; + ruleId + &quot;' is already BLOCKED&quot;);</span>
+        }
+<span class="fc" id="L149">        CandidateStatus previous = entry.status();</span>
+<span class="fc" id="L150">        Instant now = Instant.now();</span>
+<span class="fc" id="L151">        entries.put(ruleId, new RegistryEntry(</span>
+<span class="fc" id="L152">            entry.operator(), CandidateStatus.BLOCKED,</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            reason == null ? &quot;&quot; : reason,</span>
+<span class="fc" id="L154">            entry.registeredAt(), now));</span>
+<span class="fc" id="L155">        history.add(new TransitionRecord(ruleId, previous, CandidateStatus.BLOCKED,</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            reason == null ? &quot;&quot; : reason, now));</span>
+<span class="fc" id="L157">    }</span>
+
+    /**
+     * Returns the registry entry for the given rule ID, or empty if not registered.
+     */
+    public synchronized Optional&lt;RegistryEntry&gt; entry(String ruleId) {
+<span class="fc" id="L163">        return Optional.ofNullable(entries.get(ruleId));</span>
+    }
+
+    /**
+     * Returns the compiled operator for the given rule ID regardless of its status,
+     * or empty if not registered.
+     */
+    public synchronized Optional&lt;DynamicPatternOperator&gt; operator(String ruleId) {
+<span class="fc" id="L171">        return Optional.ofNullable(entries.get(ruleId)).map(RegistryEntry::operator);</span>
+    }
+
+    /**
+     * Returns all operators currently in CANDIDATE state (not yet validated).
+     * These operators are quarantined and not globally active.
+     */
+    public synchronized List&lt;DynamicPatternOperator&gt; candidateOperators() {
+<span class="fc" id="L179">        return entries.values().stream()</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            .filter(e -&gt; e.status() == CandidateStatus.CANDIDATE)</span>
+<span class="fc" id="L181">            .map(RegistryEntry::operator)</span>
+<span class="fc" id="L182">            .toList();</span>
+    }
+
+    /**
+     * Returns all operators that have been promoted to VALIDATED state.
+     * These are the only operators eligible for global activation.
+     */
+    public synchronized List&lt;DynamicPatternOperator&gt; validatedOperators() {
+<span class="fc" id="L190">        return entries.values().stream()</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            .filter(e -&gt; e.status() == CandidateStatus.VALIDATED)</span>
+<span class="fc" id="L192">            .map(RegistryEntry::operator)</span>
+<span class="fc" id="L193">            .toList();</span>
+    }
+
+    /**
+     * Returns all entries across all lifecycle states for audit and reporting.
+     */
+    public synchronized List&lt;RegistryEntry&gt; allEntries() {
+<span class="nc" id="L200">        return List.copyOf(entries.values());</span>
+    }
+
+    /**
+     * Returns an immutable snapshot of the state-transition history log.
+     */
+    public synchronized List&lt;TransitionRecord&gt; history() {
+<span class="fc" id="L207">        return Collections.unmodifiableList(new ArrayList&lt;&gt;(history));</span>
+    }
+
+    /**
+     * Returns {@code true} if an operator with this rule ID is registered in any state.
+     */
+    public synchronized boolean isRegistered(String ruleId) {
+<span class="fc" id="L214">        return entries.containsKey(ruleId);</span>
+    }
+
+    private RegistryEntry requireEntry(String ruleId) {
+<span class="fc" id="L218">        RegistryEntry entry = entries.get(ruleId);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (entry == null) {</span>
+<span class="nc" id="L220">            throw new IllegalArgumentException(&quot;No operator registered with rule ID '&quot; + ruleId + &quot;'&quot;);</span>
+        }
+<span class="fc" id="L222">        return entry;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

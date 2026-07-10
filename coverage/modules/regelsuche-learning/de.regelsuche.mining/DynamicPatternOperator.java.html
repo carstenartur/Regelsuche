@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DynamicPatternOperator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">DynamicPatternOperator.java</span></div><h1>DynamicPatternOperator.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.Transformation;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * A quarantined, dynamically compiled hypothesis operator that executes an
+ * AST rewrite rule specified entirely by a left-hand pattern and a right-hand
+ * template, without requiring a hand-written Java operator class.
+ *
+ * &lt;p&gt;Safety invariants enforced at execution time:
+ * &lt;ul&gt;
+ *   &lt;li&gt;Identity rewrites (output == input) are suppressed.&lt;/li&gt;
+ *   &lt;li&gt;Structural cycle guards prevent the operator from reproducing itself:
+ *       the rule ID is a hypothesis-specific prefix, not a global rule name.&lt;/li&gt;
+ *   &lt;li&gt;Operators in CANDIDATE state are not eligible for global activation; only
+ *       VALIDATED operators may be promoted by {@link DynamicCandidateRegistry}.&lt;/li&gt;
+ *   &lt;li&gt;Every emitted transformation carries the hypothesis revision in its
+ *       {@code applicationKey}, satisfying edge provenance requirements.&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;The operator is deterministic: given the same input expression it always
+ * produces the same candidate set.&lt;/p&gt;
+ */
+public final class DynamicPatternOperator implements HypothesisOperator {
+
+    /** Prefix used to distinguish dynamically compiled operator IDs from static ones. */
+    public static final String RULE_ID_PREFIX = &quot;dynamic_hypothesis_&quot;;
+
+    private final String ruleId;
+    private final String hypothesisId;
+    private final String hypothesisRevision;
+    private final String provenanceHash;
+    private final String leftPatternText;
+    private final String rightPatternText;
+    private final RulePatternNode leftPattern;
+    private final RulePatternNode rightPattern;
+    private final int maxCandidates;
+
+<span class="fc" id="L49">    private final RulePatternMatcher matcher = new RulePatternMatcher();</span>
+<span class="fc" id="L50">    private final RulePatternInstantiator instantiator = new RulePatternInstantiator();</span>
+<span class="fc" id="L51">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L52">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+
+    DynamicPatternOperator(
+        String ruleId,
+        String hypothesisId,
+        String hypothesisRevision,
+        String provenanceHash,
+        String leftPatternText,
+        String rightPatternText,
+        RulePatternNode leftPattern,
+        RulePatternNode rightPattern,
+        int maxCandidates
+<span class="fc" id="L64">    ) {</span>
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">        if (ruleId == null || ruleId.isBlank()) {</span>
+<span class="nc" id="L66">            throw new IllegalArgumentException(&quot;ruleId must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">        if (hypothesisId == null || hypothesisId.isBlank()) {</span>
+<span class="nc" id="L69">            throw new IllegalArgumentException(&quot;hypothesisId must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        if (leftPattern == null || rightPattern == null) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(&quot;patterns must not be null&quot;);</span>
+        }
+<span class="fc" id="L74">        this.ruleId = ruleId;</span>
+<span class="fc" id="L75">        this.hypothesisId = hypothesisId;</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        this.hypothesisRevision = hypothesisRevision == null ? &quot;&quot; : hypothesisRevision;</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        this.provenanceHash = provenanceHash == null ? &quot;&quot; : provenanceHash;</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        this.leftPatternText = leftPatternText == null ? &quot;&quot; : leftPatternText;</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        this.rightPatternText = rightPatternText == null ? &quot;&quot; : rightPatternText;</span>
+<span class="fc" id="L80">        this.leftPattern = leftPattern;</span>
+<span class="fc" id="L81">        this.rightPattern = rightPattern;</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        this.maxCandidates = maxCandidates &lt; 1 ? 1 : maxCandidates;</span>
+<span class="fc" id="L83">    }</span>
+
+    /** The unique rule ID for this dynamic operator (includes hypothesis ID). */
+    public String ruleId() {
+<span class="fc" id="L87">        return ruleId;</span>
+    }
+
+    /** The hypothesis ID this operator was compiled from. */
+    public String hypothesisId() {
+<span class="fc" id="L92">        return hypothesisId;</span>
+    }
+
+    /** The hypothesis revision tag attached to every emitted transformation. */
+    public String hypothesisRevision() {
+<span class="fc" id="L97">        return hypothesisRevision;</span>
+    }
+
+    /** A deterministic hash of the compiled patterns, for reproducibility checks. */
+    public String provenanceHash() {
+<span class="fc" id="L102">        return provenanceHash;</span>
+    }
+
+    /** The left (source) pattern as a string, for serialisation and audit. */
+    public String leftPatternText() {
+<span class="fc" id="L107">        return leftPatternText;</span>
+    }
+
+    /** The right (target) template as a string, for serialisation and audit. */
+    public String rightPatternText() {
+<span class="fc" id="L112">        return rightPatternText;</span>
+    }
+
+    /**
+     * Attempts to match the left pattern against {@code expression} and, on
+     * success, instantiates the right template from the captured bindings.
+     *
+     * &lt;p&gt;Returns an empty list when:
+     * &lt;ul&gt;
+     *   &lt;li&gt;the expression cannot be parsed,&lt;/li&gt;
+     *   &lt;li&gt;the left pattern does not match,&lt;/li&gt;
+     *   &lt;li&gt;template instantiation fails, or&lt;/li&gt;
+     *   &lt;li&gt;the resulting expression is identical to the input (identity rewrite).&lt;/li&gt;
+     * &lt;/ul&gt;
+     * &lt;/p&gt;
+     */
+    @Override
+    public List&lt;Transformation&gt; generateCandidates(String expression) {
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L131">            return List.of();</span>
+        }
+<span class="fc" id="L133">        Optional&lt;Map&lt;String, Expr&gt;&gt; bindings = matcher.match(leftPattern, expression);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (bindings.isEmpty()) {</span>
+<span class="fc" id="L135">            return List.of();</span>
+        }
+        Expr outputExpr;
+        try {
+<span class="fc" id="L139">            outputExpr = instantiator.instantiate(rightPattern, bindings.get());</span>
+<span class="nc" id="L140">        } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L141">            return List.of();</span>
+<span class="fc" id="L142">        }</span>
+<span class="fc" id="L143">        String formattedOutput = ExpressionFormatter.format(outputExpr);</span>
+<span class="fc" id="L144">        String formattedInput = normalizeWhitespace(expression);</span>
+        // Suppress identity rewrites
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (canonicalKey(formattedOutput).equals(canonicalKey(formattedInput))) {</span>
+<span class="fc" id="L147">            return List.of();</span>
+        }
+<span class="fc" id="L149">        String applicationKey = ruleId + &quot;:&quot; + hypothesisRevision + &quot;:&quot;</span>
+<span class="fc" id="L150">            + canonicalizer.stableHash(formattedInput) + &quot;-&gt;&quot; + canonicalizer.stableHash(formattedOutput);</span>
+<span class="fc" id="L151">        Transformation transformation = new Transformation(</span>
+            ruleId,
+            formattedOutput,
+            RewriteKind.NORMALIZE,
+            true,
+            -1,
+            true,
+            applicationKey
+        );
+<span class="fc" id="L160">        return List.of(transformation).stream()</span>
+<span class="fc" id="L161">            .limit(maxCandidates)</span>
+<span class="fc" id="L162">            .toList();</span>
+    }
+
+    private String canonicalKey(String expression) {
+        try {
+<span class="fc" id="L167">            return canonicalizer.stableHash(expression);</span>
+<span class="nc" id="L168">        } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L169">            return expression;</span>
+        }
+    }
+
+    private static String normalizeWhitespace(String expression) {
+<span class="fc" id="L174">        return expression.trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
