@@ -95,9 +95,11 @@ public class HypothesisRefinementLoop {
     public RefinementOutcome refine(HypothesisCandidate hypothesis) {
         List<HypothesisRevision> history = new ArrayList<>();
         Set<String> seenFingerprints = new LinkedHashSet<>();
+        CounterexampleSearchService.CounterexampleSearchResult lastSearchResult = null;
 
         HypothesisRevision current = HypothesisRevision.initial(hypothesis);
         history.add(current);
+        seenFingerprints.add(current.canonicalFingerprint());
 
         for (int attempt = 0; attempt < maxRevisions; attempt++) {
             // Mark as challenged
@@ -119,6 +121,7 @@ public class HypothesisRefinementLoop {
                     ),
                     CounterexampleSearchService.CounterexampleBudget.defaultBudget()
                 );
+            lastSearchResult = searchResult;
 
             if (searchResult.status() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND) {
                 // Accept: no counterexample found within budget
@@ -199,11 +202,15 @@ public class HypothesisRefinementLoop {
         // Should not normally reach here, but handle defensively
         current = current.withStatus(HypothesisRevisionStatus.REJECTED);
         history.set(history.size() - 1, current);
-        CounterexampleSearchService.CounterexampleSearchResult finalResult =
-            CounterexampleSearchService.CounterexampleSearchResult.inconclusive(
-                "revision budget exhausted after " + maxRevisions + " attempts"
-            );
-        return new RefinementOutcome(current, List.copyOf(history), finalResult);
+        return new RefinementOutcome(
+            current,
+            List.copyOf(history),
+            lastSearchResult == null
+                ? CounterexampleSearchService.CounterexampleSearchResult.inconclusive(
+                    "refinement loop terminated without a counterexample verdict"
+                )
+                : lastSearchResult
+        );
     }
 
     /** The five built-in refinement strategies in priority order. */

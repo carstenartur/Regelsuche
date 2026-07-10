@@ -117,6 +117,21 @@ public class HypothesisPromotionPipeline {
         HypothesisRankingStrategy rankingStrategy,
         OracleValidator oracleValidator
     ) {
+        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,
+            symbolicRegressionSources, rankingStrategy, oracleValidator, null);
+    }
+
+    HypothesisPromotionPipeline(
+        RuleCandidateMiner miner,
+        HypothesisRepository hypothesisRepository,
+        CounterexampleSearchService counterexampleService,
+        MacroRuleLearningService learningService,
+        boolean autoPromote,
+        List<SymbolicRegressionHypothesisSource> symbolicRegressionSources,
+        HypothesisRankingStrategy rankingStrategy,
+        OracleValidator oracleValidator,
+        HypothesisRefinementLoop refinementLoop
+    ) {
         this.miner = miner;
         this.hypothesisRepository = hypothesisRepository;
         this.counterexampleService = counterexampleService;
@@ -129,7 +144,9 @@ public class HypothesisPromotionPipeline {
         this.oracleValidator = oracleValidator == null
             ? (leftExpression, rightExpression) -> OracleValidator.OracleValidation.unavailable("no oracle configured")
             : oracleValidator;
-        this.refinementLoop = new HypothesisRefinementLoop(counterexampleService);
+        this.refinementLoop = refinementLoop == null
+            ? new HypothesisRefinementLoop(counterexampleService)
+            : refinementLoop;
     }
 
     /**
@@ -171,18 +188,7 @@ public class HypothesisPromotionPipeline {
             CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =
                 outcome.lastSearchResult();
 
-            // Update hypothesis from the terminal revision; merge inferred assumptions.
-            HypothesisRevision terminal = outcome.terminalRevision();
-            hypothesis = hypothesis.withCounterexampleResult(counterexampleResult);
-            // Build a merged assumption list: start from the terminal revision's assumptions
-            // (which may have been refined), then add any inferred assumptions from the search.
-            List<String> mergedAssumptions = new ArrayList<>(terminal.assumptions());
-            counterexampleResult.inferredAssumptions().stream()
-                .filter(a -> !mergedAssumptions.contains(a))
-                .forEach(mergedAssumptions::add);
-            if (!mergedAssumptions.equals(new ArrayList<>(hypothesis.assumptions()))) {
-                hypothesis = hypothesis.withAssumptions(mergedAssumptions);
-            }
+            hypothesis = applyTerminalRevision(hypothesis, outcome.terminalRevision(), counterexampleResult);
 
             if (outcome.isRejected()) {
                 hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);
@@ -230,11 +236,7 @@ public class HypothesisPromotionPipeline {
                 allRevisions.addAll(outcome.revisionHistory());
                 CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =
                     outcome.lastSearchResult();
-                hypothesis = hypothesis.withCounterexampleResult(counterexampleResult);
-                HypothesisRevision terminal = outcome.terminalRevision();
-                if (!terminal.assumptions().equals(hypothesis.assumptions())) {
-                    hypothesis = hypothesis.withAssumptions(terminal.assumptions());
-                }
+                hypothesis = applyTerminalRevision(hypothesis, outcome.terminalRevision(), counterexampleResult);
                 if (outcome.isRejected()) {
                     hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);
                 } else if (outcome.isInconclusive()) {
@@ -260,6 +262,26 @@ public class HypothesisPromotionPipeline {
         }
 
         return new PromotionResult(newHypotheses, promotedRules, List.copyOf(allRevisions));
+    }
+
+    private HypothesisCandidate applyTerminalRevision(
+        HypothesisCandidate hypothesis,
+        HypothesisRevision terminal,
+        CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+    ) {
+        HypothesisCandidate updated = hypothesis.withCounterexampleResult(counterexampleResult);
+        if (!terminal.leftPattern().equals(updated.leftPattern())
+            || !terminal.rightPattern().equals(updated.rightPattern())) {
+            updated = updated.withPatterns(terminal.leftPattern(), terminal.rightPattern());
+        }
+        List<String> mergedAssumptions = new ArrayList<>(terminal.assumptions());
+        counterexampleResult.inferredAssumptions().stream()
+            .filter(assumption -> !mergedAssumptions.contains(assumption))
+            .forEach(mergedAssumptions::add);
+        if (!mergedAssumptions.equals(updated.assumptions())) {
+            updated = updated.withAssumptions(mergedAssumptions);
+        }
+        return updated;
     }
 
     /**

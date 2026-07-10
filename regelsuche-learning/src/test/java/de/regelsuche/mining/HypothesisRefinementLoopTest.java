@@ -177,6 +177,36 @@ class HypothesisRefinementLoopTest {
     }
 
     @Test
+    void cycleDetectionRejectsImmediateRepeatOfInitialFingerprint() {
+        RefinementStrategy sameFingerprintStrategy = new RefinementStrategy() {
+            @Override
+            public String name() {
+                return "same-fingerprint";
+            }
+
+            @Override
+            public Optional<RefinementProposal> refine(
+                HypothesisRevision revision,
+                CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+            ) {
+                return Optional.of(new RefinementProposal(
+                    revision.leftPattern(), revision.rightPattern(), revision.assumptions()
+                ));
+            }
+        };
+
+        HypothesisRefinementLoop loop = new HypothesisRefinementLoop(
+            ALWAYS_COUNTEREXAMPLE, List.of(sameFingerprintStrategy), 10
+        );
+        HypothesisRefinementLoop.RefinementOutcome outcome =
+            loop.refine(hypothesis("hyp-immediate-cycle", "x", "x + 1"));
+
+        assertTrue(outcome.isRejected());
+        assertEquals(2, outcome.revisionHistory().size(),
+            "the first repeated fingerprint should be rejected immediately");
+    }
+
+    @Test
     void revisionIndexIncreasesMonotonically() {
         HypothesisRefinementLoop loop = new HypothesisRefinementLoop(DIVISION_BY_ZERO_SERVICE);
         HypothesisRefinementLoop.RefinementOutcome outcome =

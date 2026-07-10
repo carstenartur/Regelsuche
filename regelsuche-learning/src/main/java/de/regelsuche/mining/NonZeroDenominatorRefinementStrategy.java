@@ -2,9 +2,14 @@ package de.regelsuche.mining;
 
 import de.regelsuche.validation.CounterexampleSearchService;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Refinement strategy that adds a non-zero denominator constraint when a
@@ -15,6 +20,10 @@ import java.util.Optional;
  * strategy adds a {@code "var != 0"} assumption for each such variable.</p>
  */
 public class NonZeroDenominatorRefinementStrategy implements RefinementStrategy {
+    private static final Pattern PARENTHESIZED_DENOMINATOR =
+        Pattern.compile("/\\s*\\(\\s*([A-Za-z][A-Za-z0-9_]*)\\s*\\)");
+    private static final Pattern BARE_DENOMINATOR =
+        Pattern.compile("/\\s*([A-Za-z][A-Za-z0-9_]*)\\b");
 
     @Override
     public String name() {
@@ -31,16 +40,21 @@ public class NonZeroDenominatorRefinementStrategy implements RefinementStrategy 
             return Optional.empty();
         }
 
-        // Collect variables that are assigned 0 in the counterexample
+        Set<String> denominatorVars = new LinkedHashSet<>();
+        collectDenominatorVars(revision.leftPattern(), denominatorVars);
+        collectDenominatorVars(revision.rightPattern(), denominatorVars);
+        if (denominatorVars.isEmpty()) {
+            return Optional.empty();
+        }
+
         List<String> zeroVars = new ArrayList<>();
         if (counterexampleResult.counterexample().isPresent()) {
             CounterexampleSearchService.Counterexample cex = counterexampleResult.counterexample().get();
             for (String assignment : cex.assignments()) {
-                // assignments are of the form "x=0" or "x = 0"
                 String[] parts = assignment.split("=", 2);
-                if (parts.length == 2 && parts[1].strip().equals("0")) {
+                if (parts.length == 2 && isZeroValue(parts[1].strip())) {
                     String varName = parts[0].strip();
-                    if (!varName.isEmpty()) {
+                    if (!varName.isEmpty() && denominatorVars.contains(varName)) {
                         zeroVars.add(varName);
                     }
                 }
@@ -82,5 +96,39 @@ public class NonZeroDenominatorRefinementStrategy implements RefinementStrategy 
         return Optional.of(new RefinementProposal(
             revision.leftPattern(), revision.rightPattern(), newAssumptions
         ));
+    }
+
+    private static void collectDenominatorVars(String pattern, Set<String> denominatorVars) {
+        Matcher parenthesized = PARENTHESIZED_DENOMINATOR.matcher(pattern);
+        while (parenthesized.find()) {
+            denominatorVars.add(parenthesized.group(1));
+        }
+
+        Matcher bare = BARE_DENOMINATOR.matcher(pattern);
+        while (bare.find()) {
+            denominatorVars.add(bare.group(1));
+        }
+    }
+
+    private static boolean isZeroValue(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        String normalized = value.strip();
+        int slashIndex = normalized.indexOf('/');
+        if (slashIndex > 0 && slashIndex == normalized.lastIndexOf('/')) {
+            try {
+                BigDecimal numerator = new BigDecimal(normalized.substring(0, slashIndex).strip());
+                BigDecimal denominator = new BigDecimal(normalized.substring(slashIndex + 1).strip());
+                return denominator.compareTo(BigDecimal.ZERO) != 0 && numerator.compareTo(BigDecimal.ZERO) == 0;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
+        }
+        try {
+            return new BigDecimal(normalized).compareTo(BigDecimal.ZERO) == 0;
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
     }
 }

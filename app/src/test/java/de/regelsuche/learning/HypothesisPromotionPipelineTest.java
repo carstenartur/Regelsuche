@@ -8,14 +8,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.mining.HeuristicSymbolicRegressionHypothesisSource;
 import de.regelsuche.mining.HypothesisCandidate;
+import de.regelsuche.mining.HypothesisRefinementLoop;
 import de.regelsuche.mining.InMemoryHypothesisRepository;
+import de.regelsuche.mining.InterestingnessRankingStrategy;
 import de.regelsuche.mining.KnownRuleRepository;
+import de.regelsuche.mining.RefinementStrategy;
 import de.regelsuche.mining.RuleCandidateMiner;
 import de.regelsuche.mining.SuccessfulTransformationPath;
+import de.regelsuche.mining.SymbolicRegressionHypothesisSource;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.OracleValidator;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -308,6 +313,156 @@ class HypothesisPromotionPipelineTest {
             assertTrue(hasNonRejectedHypothesis || !result.revisionHistory().isEmpty(),
                 "at least one hypothesis should be non-rejected or revision history should be populated");
         }
+    }
+
+    @Test
+    void terminalRevisionPatternsArePersistedForMinedHypotheses() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        KnownRuleRepository knownRules = new KnownRuleRepository();
+        RuleCandidateMiner miner = new RuleCandidateMiner(knownRules);
+        InMemoryHypothesisRepository hypothesisRepo = new InMemoryHypothesisRepository();
+        MacroRuleLearningService learningService = new MacroRuleLearningService(
+            inventory, miner, knownRules, 3, 0.0
+        );
+        CounterexampleSearchService cex = (hypothesis, budget) -> {
+            if ("refined-left".equals(hypothesis.leftExpression())) {
+                return CounterexampleSearchService.CounterexampleSearchResult.noCounterexampleFound(
+                    List.of("search inferred"), List.of("numeric-random")
+                );
+            }
+            return CounterexampleSearchService.CounterexampleSearchResult.counterexampleFound(
+                new CounterexampleSearchService.Counterexample(
+                    List.of("x=1"), "bad", "worse"
+                ),
+                List.of(), List.of("numeric-random")
+            );
+        };
+        RefinementStrategy patternRefinement = new RefinementStrategy() {
+            @Override
+            public String name() {
+                return "pattern-refinement";
+            }
+
+            @Override
+            public Optional<RefinementProposal> refine(
+                de.regelsuche.mining.HypothesisRevision revision,
+                CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+            ) {
+                return Optional.of(new RefinementProposal(
+                    "refined-left", "refined-right", List.of("terminal assumption")
+                ));
+            }
+        };
+        HypothesisRefinementLoop refinementLoop = new HypothesisRefinementLoop(cex, List.of(patternRefinement), 2);
+        HypothesisPromotionPipeline pipe = new HypothesisPromotionPipeline(
+            miner, hypothesisRepo, cex, learningService, false, List.of(),
+            new InterestingnessRankingStrategy(),
+            (leftExpression, rightExpression) -> OracleValidator.OracleValidation.unavailable("no oracle configured"),
+            refinementLoop
+        );
+
+        HypothesisPromotionPipeline.PromotionResult result = pipe.run(List.of(
+            path("p1", "(x + 1) ^ 2", "1 + 2 * x + x ^ 2"),
+            path("p2", "(x + 2) ^ 2", "4 + 4 * x + x ^ 2"),
+            path("p3", "(x + 3) ^ 2", "9 + 6 * x + x ^ 2")
+        ));
+
+        assertFalse(result.newHypotheses().isEmpty());
+        assertTrue(result.newHypotheses().stream().allMatch(hypothesis ->
+            "refined-left".equals(hypothesis.leftPattern())
+                && "refined-right".equals(hypothesis.rightPattern())
+                && hypothesis.assumptions().contains("terminal assumption")
+                && hypothesis.assumptions().contains("search inferred")));
+    }
+
+    @Test
+    void symbolicRegressionHypothesesPersistTerminalPatternsAndInferredAssumptions() {
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        KnownRuleRepository knownRules = new KnownRuleRepository();
+        RuleCandidateMiner miner = new RuleCandidateMiner(knownRules);
+        InMemoryHypothesisRepository hypothesisRepo = new InMemoryHypothesisRepository();
+        MacroRuleLearningService learningService = new MacroRuleLearningService(
+            inventory, miner, knownRules, 3, 0.0
+        );
+        CounterexampleSearchService cex = (hypothesis, budget) -> {
+            if ("sym-refined-left".equals(hypothesis.leftExpression())) {
+                return CounterexampleSearchService.CounterexampleSearchResult.noCounterexampleFound(
+                    List.of("sym inferred"), List.of("numeric-random")
+                );
+            }
+            return CounterexampleSearchService.CounterexampleSearchResult.counterexampleFound(
+                new CounterexampleSearchService.Counterexample(
+                    List.of("x=1"), "bad", "worse"
+                ),
+                List.of(), List.of("numeric-random")
+            );
+        };
+        RefinementStrategy patternRefinement = new RefinementStrategy() {
+            @Override
+            public String name() {
+                return "sym-pattern-refinement";
+            }
+
+            @Override
+            public Optional<RefinementProposal> refine(
+                de.regelsuche.mining.HypothesisRevision revision,
+                CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+            ) {
+                return Optional.of(new RefinementProposal(
+                    "sym-refined-left", "sym-refined-right", List.of("sym terminal")
+                ));
+            }
+        };
+        HypothesisRefinementLoop refinementLoop = new HypothesisRefinementLoop(cex, List.of(patternRefinement), 2);
+        SymbolicRegressionHypothesisSource source = new SymbolicRegressionHypothesisSource() {
+            @Override
+            public boolean enabled() {
+                return true;
+            }
+
+            @Override
+            public List<HypothesisCandidate> propose(List<SuccessfulTransformationPath> paths) {
+                return List.of(new HypothesisCandidate(
+                    "symreg-test",
+                    "sym-original-left",
+                    "sym-original-right",
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    0.3,
+                    CandidateProofStatus.OBSERVED,
+                    null,
+                    null,
+                    List.of(),
+                    "",
+                    List.of(),
+                    Map.of(),
+                    Instant.now()
+                ));
+            }
+        };
+        HypothesisPromotionPipeline pipe = new HypothesisPromotionPipeline(
+            miner, hypothesisRepo, cex, learningService, false, List.of(source),
+            new InterestingnessRankingStrategy(),
+            (leftExpression, rightExpression) -> OracleValidator.OracleValidation.unavailable("no oracle configured"),
+            refinementLoop
+        );
+
+        HypothesisPromotionPipeline.PromotionResult result = pipe.run(List.of(
+            path("sym1", "f(1)", "2"),
+            path("sym2", "f(2)", "4")
+        ));
+
+        assertTrue(result.newHypotheses().stream().anyMatch(hypothesis ->
+            "symreg-test".equals(hypothesis.id())));
+        HypothesisCandidate symbolicHypothesis = result.newHypotheses().stream()
+            .filter(hypothesis -> "symreg-test".equals(hypothesis.id()))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("sym-refined-left", symbolicHypothesis.leftPattern());
+        assertEquals("sym-refined-right", symbolicHypothesis.rightPattern());
+        assertTrue(symbolicHypothesis.assumptions().contains("sym terminal"));
+        assertTrue(symbolicHypothesis.assumptions().contains("sym inferred"));
     }
 
 }

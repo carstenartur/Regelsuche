@@ -158,6 +158,15 @@ public record HypothesisCandidate(
             parameterRelations, expressionPlaceholders, createdAt);
     }
 
+    /** Returns a copy with updated left/right patterns. */
+    public HypothesisCandidate withPatterns(String newLeftPattern, String newRightPattern) {
+        return new HypothesisCandidate(id, newLeftPattern, newRightPattern,
+            supportingPaths, supportingExpressions, assumptions,
+            noveltyScore, proofStatus, counterexampleStatus, counterexampleSearchStatus,
+            counterexampleAttemptedSources, counterexampleExplanation,
+            parameterRelations, expressionPlaceholders, createdAt);
+    }
+
     /** Returns a copy with an updated ranking/novelty score. */
     public HypothesisCandidate withNoveltyScore(double newNoveltyScore) {
         return new HypothesisCandidate(id, leftPattern, rightPattern,

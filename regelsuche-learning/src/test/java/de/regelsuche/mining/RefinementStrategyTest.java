@@ -75,6 +75,47 @@ class RefinementStrategyTest {
         assertFalse(proposal.isPresent(), "should not add duplicate constraint");
     }
 
+    @Test
+    void nonZeroDenominator_onlyRestrictsVariablesUsedAsDenominators() {
+        NonZeroDenominatorRefinementStrategy strategy = new NonZeroDenominatorRefinementStrategy();
+        HypothesisRevision revision = new HypothesisRevision(
+            "rev-1", null, "hyp", 0, "a / b", "a",
+            List.of(), null, null, HypothesisRevisionStatus.COUNTEREXAMPLE_FOUND, null
+        );
+        CounterexampleSearchService.CounterexampleSearchResult result =
+            CounterexampleSearchService.CounterexampleSearchResult.counterexampleFound(
+                new CounterexampleSearchService.Counterexample(
+                    List.of("a=0", "b=2"), "0", "1"
+                ),
+                List.of(), List.of("numeric-random")
+            );
+
+        Optional<RefinementStrategy.RefinementProposal> proposal = strategy.refine(revision, result);
+
+        assertFalse(proposal.isPresent(), "should ignore zero assignments outside denominator positions");
+    }
+
+    @Test
+    void nonZeroDenominator_recognizesEquivalentZeroRepresentations() {
+        NonZeroDenominatorRefinementStrategy strategy = new NonZeroDenominatorRefinementStrategy();
+        HypothesisRevision revision = new HypothesisRevision(
+            "rev-1", null, "hyp", 0, "a / b", "a",
+            List.of(), null, null, HypothesisRevisionStatus.COUNTEREXAMPLE_FOUND, null
+        );
+        CounterexampleSearchService.CounterexampleSearchResult result =
+            CounterexampleSearchService.CounterexampleSearchResult.counterexampleFound(
+                new CounterexampleSearchService.Counterexample(
+                    List.of("b=-0.0"), "undefined", "1"
+                ),
+                List.of(), List.of("numeric-random")
+            );
+
+        Optional<RefinementStrategy.RefinementProposal> proposal = strategy.refine(revision, result);
+
+        assertTrue(proposal.isPresent(), "should treat -0.0 as a zero denominator assignment");
+        assertTrue(proposal.get().newAssumptions().contains("b != 0"));
+    }
+
     // ─── PositivityRefinementStrategy ─────────────────────────────────────────
 
     @Test
@@ -270,5 +311,26 @@ class RefinementStrategyTest {
         Optional<RefinementStrategy.RefinementProposal> proposal = strategy.refine(revision, result);
 
         assertFalse(proposal.isPresent(), "should not apply when assignment is already numeric");
+    }
+
+    @Test
+    void astSpecialization_treatsRationalAssignmentsAsNumeric() {
+        AstPlaceholderSpecializationRefinementStrategy strategy =
+            new AstPlaceholderSpecializationRefinementStrategy();
+        HypothesisRevision revision = new HypothesisRevision(
+            "rev-1", null, "hyp", 0, "x + 0", "x",
+            List.of(), null, null, HypothesisRevisionStatus.COUNTEREXAMPLE_FOUND, null
+        );
+        CounterexampleSearchService.CounterexampleSearchResult result =
+            CounterexampleSearchService.CounterexampleSearchResult.counterexampleFound(
+                new CounterexampleSearchService.Counterexample(
+                    List.of("x=1/3"), "1/3", "2/3"
+                ),
+                List.of(), List.of("rational-samples")
+            );
+
+        Optional<RefinementStrategy.RefinementProposal> proposal = strategy.refine(revision, result);
+
+        assertFalse(proposal.isPresent(), "should not add numeric constraints for rational assignments");
     }
 }

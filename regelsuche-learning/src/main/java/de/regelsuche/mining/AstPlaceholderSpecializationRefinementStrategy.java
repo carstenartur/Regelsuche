@@ -2,6 +2,7 @@ package de.regelsuche.mining;
 
 import de.regelsuche.validation.CounterexampleSearchService;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -97,8 +98,22 @@ public class AstPlaceholderSpecializationRefinementStrategy implements Refinemen
     }
 
     private static boolean isNumericValue(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        String normalized = value.strip();
+        int slashIndex = normalized.indexOf('/');
+        if (slashIndex > 0 && slashIndex == normalized.lastIndexOf('/')) {
+            try {
+                new BigDecimal(normalized.substring(0, slashIndex).strip());
+                BigDecimal denominator = new BigDecimal(normalized.substring(slashIndex + 1).strip());
+                return denominator.compareTo(BigDecimal.ZERO) != 0;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
         try {
-            Double.parseDouble(value);
+            new BigDecimal(normalized);
             return true;
         } catch (NumberFormatException e) {
             return false;
