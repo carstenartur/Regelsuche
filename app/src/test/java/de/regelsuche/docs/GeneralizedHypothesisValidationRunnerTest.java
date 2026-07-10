@@ -3,6 +3,7 @@ package de.regelsuche.docs;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.mining.DynamicPatternOperator;
 import de.regelsuche.transform.RepeatedSubexpressionFactorizationHypothesisOperator;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -86,7 +87,57 @@ class GeneralizedHypothesisValidationRunnerTest {
             "distinct targets must still compare differently");
     }
 
+    @Test
+    void unknownOperatorHypothesisIsCompiledDynamically(@TempDir Path tempDir) throws Exception {
+        // Support examples attributed to a novel operator that has no handwritten Java class
+        String novelOperatorId = "novel_test_factorization_operator";
+        List<PromotionRecord> support = List.of(
+            supportRecord("support-novel-1", "2 * a + 2 * b", "2 * (a + b)", novelOperatorId),
+            supportRecord("support-novel-2", "3 * x + 3 * y", "3 * (x + y)", novelOperatorId)
+        );
+        DiscoveryCandidateStore.CandidateStoreReport storeReport = new DiscoveryCandidateStore().build(support);
+        PatternHypothesisMiner.PatternHypothesisReport patternReport = new PatternHypothesisMiner().mine(storeReport);
+
+        GeneralizedHypothesisValidationRunner.ValidationReport validationReport =
+            new GeneralizedHypothesisValidationRunner().write(tempDir, patternReport);
+
+        assertFalse(patternReport.hypotheses().isEmpty(),
+            "support examples should produce a generalized hypothesis");
+
+        // The hypothesis for the novel (unknown) operatorId must be validated via dynamic compilation
+        GeneralizedHypothesisValidationRunner.ValidatedHypothesis validated =
+            validationReport.validatedHypotheses().stream()
+                .filter(h -> novelOperatorId.equals(h.operatorId()))
+                .findFirst()
+                .orElseThrow(() ->
+                    new AssertionError(
+                        "Hypothesis with unknown operatorId should be validated via DynamicPatternOperator; "
+                        + "validated hypotheses: " + validationReport.validatedHypotheses().stream()
+                            .map(GeneralizedHypothesisValidationRunner.ValidatedHypothesis::operatorId).toList()
+                        + "; rejected: " + validationReport.rejectedHypotheses().stream()
+                            .map(r -> r.operatorId() + ":" + r.reason()).toList()
+                    )
+                );
+
+        assertFalse(validated.holdoutResults().isEmpty(),
+            "dynamically compiled operator must produce holdout results");
+        assertTrue(validated.generatorCoverage().generatedPositiveCount() >= 100,
+            "dynamic holdout generator must produce at least 100 positive holdouts, got "
+            + validated.generatorCoverage().generatedPositiveCount());
+        assertTrue(validated.generatorCoverage().generatedNegativeCount() >= 100,
+            "dynamic holdout generator must produce at least 100 negative holdouts, got "
+            + validated.generatorCoverage().generatedNegativeCount());
+        assertTrue(
+            validated.negativeHoldoutResults().stream()
+                .allMatch(GeneralizedHypothesisValidationRunner.NegativeHoldoutResult::blocked),
+            "negative holdouts must not fire on the dynamically compiled operator");
+    }
+
     private PromotionRecord supportRecord(String id, String input, String target) {
+        return supportRecord(id, input, target, RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID);
+    }
+
+    private PromotionRecord supportRecord(String id, String input, String target, String sourceOperator) {
         AblationEvidence ablation = AblationEvidence.compare(
             true,
             1,
@@ -107,11 +158,11 @@ class GeneralizedHypothesisValidationRunnerTest {
             "AGREE",
             "support fixture oracle agreement",
             ablation.ablationStatus(),
-            RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID,
+            sourceOperator,
             "sympy-polynomial-basic",
             List.of(),
             "support fixture",
-            List.of(RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID),
+            List.of(sourceOperator),
             true,
             List.of(),
             true,
