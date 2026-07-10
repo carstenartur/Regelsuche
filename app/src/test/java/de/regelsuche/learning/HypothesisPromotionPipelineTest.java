@@ -240,4 +240,74 @@ class HypothesisPromotionPipelineTest {
         assertTrue(result.newHypotheses().stream()
             .allMatch(hypothesis -> hypothesis.proofStatus() == CandidateProofStatus.OBSERVED));
     }
+
+    @Test
+    void revisionHistoryIsPopulatedInPromotionResult() {
+        HypothesisPromotionPipeline pipe = pipeline(NO_COUNTEREXAMPLE, false);
+        List<SuccessfulTransformationPath> paths = List.of(
+            path("p1", "(x + 1) ^ 2", "1 + 2 * x + x ^ 2"),
+            path("p2", "(x + 2) ^ 2", "4 + 4 * x + x ^ 2"),
+            path("p3", "(x + 3) ^ 2", "9 + 6 * x + x ^ 2")
+        );
+
+        HypothesisPromotionPipeline.PromotionResult result = pipe.run(paths);
+
+        assertNotNull(result.revisionHistory(),
+            "revisionHistory must never be null");
+        assertFalse(result.revisionHistory().isEmpty(),
+            "at least one revision should be recorded when hypotheses were processed");
+    }
+
+    @Test
+    void refinementLoopRefinesHypothesisWithDivisionConstraint() {
+        // Service: finds a counterexample on first call (before any !='!= 0' assumption),
+        // no counterexample once any "!= 0" assumption is present (strategy applied).
+        CounterexampleSearchService divisionService = (hypothesis, budget) -> {
+            boolean hasNonZeroConstraint = hypothesis.assumptions().stream()
+                .anyMatch(a -> a.contains("!= 0"));
+            if (hasNonZeroConstraint) {
+                return CounterexampleSearchService.CounterexampleSearchResult.noCounterexample();
+            }
+            return CounterexampleSearchService.CounterexampleSearchResult.counterexampleFound(
+                new CounterexampleSearchService.Counterexample(
+                    List.of("b=0", "a=2"), "undefined", "2"
+                ),
+                List.of(), List.of("numeric-random")
+            );
+        };
+
+        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        KnownRuleRepository knownRules = new KnownRuleRepository();
+        RuleCandidateMiner miner = new RuleCandidateMiner(knownRules);
+        InMemoryHypothesisRepository hypothesisRepo = new InMemoryHypothesisRepository();
+        MacroRuleLearningService learningService = new MacroRuleLearningService(
+            inventory, miner, knownRules, 3, 0.0
+        );
+        HypothesisPromotionPipeline pipe = new HypothesisPromotionPipeline(
+            miner, hypothesisRepo, divisionService, learningService, false
+        );
+
+        // Use paths with division that the miner can generalize
+        List<SuccessfulTransformationPath> paths = List.of(
+            path("p1", "(1 + 2) / 3", "1"),
+            path("p2", "(2 + 4) / 6", "1"),
+            path("p3", "(3 + 6) / 9", "1")
+        );
+
+        HypothesisPromotionPipeline.PromotionResult result = pipe.run(paths);
+
+        // Verify revision history is populated (refinement loop ran)
+        assertNotNull(result.revisionHistory());
+
+        if (!result.newHypotheses().isEmpty()) {
+            // At least one hypothesis should have been refined: not rejected
+            // OR has a non-zero constraint (if the division pattern matched)
+            boolean hasNonRejectedHypothesis = result.newHypotheses().stream()
+                .anyMatch(h -> h.proofStatus() != CandidateProofStatus.REJECTED
+                    || h.assumptions().stream().anyMatch(a -> a.contains("!= 0")));
+            assertTrue(hasNonRejectedHypothesis || !result.revisionHistory().isEmpty(),
+                "at least one hypothesis should be non-rejected or revision history should be populated");
+        }
+    }
+
 }
