@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StructuralCompatibilityRefinementStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">StructuralCompatibilityRefinementStrategy.java</span></div><h1>StructuralCompatibilityRefinementStrategy.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.validation.CounterexampleSearchService;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Refinement strategy that rejects structurally incompatible substitutions.
+ *
+ * &lt;p&gt;When the counterexample assigns a complex expression (e.g. a list, a
+ * matrix, or a symbolic expression with multiple operators) to a placeholder
+ * that was intended to represent a simple scalar, this strategy adds an
+ * assumption that restricts the placeholder to scalar numeric values.&lt;/p&gt;
+ *
+ * &lt;p&gt;A substitution is considered structurally incompatible if a lowercase
+ * placeholder variable (convention: simple expression placeholder) is
+ * assigned a value containing nested structure indicators (brackets, commas)
+ * or matrix notation.&lt;/p&gt;
+ */
+<span class="fc" id="L21">public class StructuralCompatibilityRefinementStrategy implements RefinementStrategy {</span>
+
+    @Override
+    public String name() {
+<span class="nc" id="L25">        return &quot;structural-compatibility&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;RefinementProposal&gt; refine(
+        HypothesisRevision revision,
+        CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+    ) {
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (counterexampleResult.counterexample().isEmpty()) {</span>
+<span class="nc" id="L34">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L37">        CounterexampleSearchService.Counterexample cex = counterexampleResult.counterexample().get();</span>
+<span class="fc" id="L38">        List&lt;String&gt; newAssumptions = new java.util.ArrayList&lt;&gt;(revision.assumptions());</span>
+<span class="fc" id="L39">        boolean changed = false;</span>
+
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (String assignment : cex.assignments()) {</span>
+<span class="fc" id="L42">            String[] parts = assignment.split(&quot;=&quot;, 2);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            if (parts.length != 2) {</span>
+<span class="nc" id="L44">                continue;</span>
+            }
+<span class="fc" id="L46">            String varName = parts[0].strip();</span>
+<span class="fc" id="L47">            String value = parts[1].strip();</span>
+
+            // Only apply to single-letter lowercase variables (expression placeholders)
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">            if (varName.length() != 1 || !Character.isLowerCase(varName.charAt(0))) {</span>
+<span class="nc" id="L51">                continue;</span>
+            }
+
+            // Check if the assigned value has incompatible structure
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            if (isStructurallyComplex(value)) {</span>
+<span class="fc" id="L56">                String scalarConstraint = varName + &quot; is scalar&quot;;</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                if (!newAssumptions.contains(scalarConstraint)) {</span>
+<span class="fc" id="L58">                    newAssumptions.add(scalarConstraint);</span>
+<span class="fc" id="L59">                    changed = true;</span>
+                }
+            }
+<span class="fc" id="L62">        }</span>
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (!changed) {</span>
+<span class="fc" id="L65">            return Optional.empty();</span>
+        }
+<span class="fc" id="L67">        return Optional.of(new RefinementProposal(</span>
+<span class="fc" id="L68">            revision.leftPattern(), revision.rightPattern(), newAssumptions</span>
+        ));
+    }
+
+    private static boolean isStructurallyComplex(String value) {
+        // Matrix brackets or comma-separated list
+<span class="pc bpc" id="L74" title="2 of 6 branches missed.">        return value.contains(&quot;[&quot;) || value.contains(&quot;,&quot;) || value.contains(&quot;\\begin{&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RefinementStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">RefinementStrategy.java</span></div><h1>RefinementStrategy.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.validation.CounterexampleSearchService;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Strategy port for refining a disproved hypothesis revision.
+ *
+ * &lt;p&gt;Each strategy inspects the failing revision and the counterexample that
+ * disproved it, and optionally produces a {@link RefinementProposal} that
+ * tightens the hypothesis (e.g. by adding an assumption, narrowing a
+ * placeholder, or restricting a parameter domain).  Returning
+ * {@link Optional#empty()} means the strategy cannot help with this particular
+ * counterexample.&lt;/p&gt;
+ *
+ * &lt;p&gt;Strategies are applied in priority order by
+ * {@link HypothesisRefinementLoop}.  The first non-empty proposal wins for
+ * one loop iteration; all strategies are re-tried on the successor revision.&lt;/p&gt;
+ */
+public interface RefinementStrategy {
+
+    /** Short, stable identifier used in revision provenance records. */
+    String name();
+
+    /**
+     * Try to refine {@code revision} given the counterexample that disproved it.
+     *
+     * @param revision            the revision that was disproved
+     * @param counterexampleResult the full counterexample search result, including
+     *                            the concrete counterexample and inferred assumptions
+     * @return a proposal for the refined hypothesis, or {@link Optional#empty()}
+     *         if this strategy cannot apply
+     */
+    Optional&lt;RefinementProposal&gt; refine(
+        HypothesisRevision revision,
+        CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+    );
+
+    /**
+     * The refined hypothesis proposal returned by a {@link RefinementStrategy}.
+     *
+     * @param newLeftPattern   left-hand side of the refined hypothesis (may equal
+     *                         the original if only assumptions changed)
+     * @param newRightPattern  right-hand side of the refined hypothesis
+     * @param newAssumptions   updated/extended assumption list
+     */
+    record RefinementProposal(
+        String newLeftPattern,
+        String newRightPattern,
+        List&lt;String&gt; newAssumptions
+    ) {
+<span class="fc" id="L54">        public RefinementProposal {</span>
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">            if (newLeftPattern == null || newLeftPattern.isBlank()) {</span>
+<span class="nc" id="L56">                throw new IllegalArgumentException(&quot;newLeftPattern must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">            if (newRightPattern == null || newRightPattern.isBlank()) {</span>
+<span class="nc" id="L59">                throw new IllegalArgumentException(&quot;newRightPattern must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            newAssumptions = newAssumptions == null ? List.of() : List.copyOf(newAssumptions);</span>
+<span class="fc" id="L62">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

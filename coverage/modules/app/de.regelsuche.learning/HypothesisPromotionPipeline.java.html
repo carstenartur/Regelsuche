@@ -3,9 +3,12 @@
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.HypothesisCandidate;
 import de.regelsuche.mining.HypothesisRankingStrategy;
+import de.regelsuche.mining.HypothesisRefinementLoop;
+import de.regelsuche.mining.HypothesisRevision;
 import de.regelsuche.mining.InterestingnessScore;
 import de.regelsuche.mining.InterestingnessRankingStrategy;
 import de.regelsuche.mining.HypothesisRepository;
+import de.regelsuche.mining.RefinementStrategy;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleCandidateMiner;
 import de.regelsuche.mining.RuleStatus;
@@ -29,7 +32,7 @@ import java.util.stream.Collectors;
  * Path-Mining (RuleCandidateMiner)
  *   → Generalisation (PatternGeneralizer / anti-unification)
  *   → HypothesisCandidate (stored in HypothesisRepository)
- *   → Counterexample Search (CounterexampleSearchService)
+ *   → Counterexample Search + Refinement Loop (HypothesisRefinementLoop)
  *   → optional Proof (EquivalenceService via CandidateValidator)
  *   → Promotion → ReusableRule (MacroRuleLearningService / RuleInventoryRepository)
  * &lt;/pre&gt;
@@ -37,6 +40,13 @@ import java.util.stream.Collectors;
  * &lt;p&gt;Each step is optional: pass a no-op counterexample service if you don't
  * need that check, or set {@code autoPromote = false} to stop before inventory
  * insertion.&lt;/p&gt;
+ *
+ * &lt;p&gt;When a counterexample is found, the pipeline hands off to a
+ * {@link HypothesisRefinementLoop} which attempts to refine the hypothesis
+ * (e.g. by adding constraints) until it either survives a fresh challenge
+ * ({@code VALIDATED_WITHIN_BUDGET}), exhausts the revision budget
+ * ({@code REJECTED}), or ends inconclusively ({@code INCONCLUSIVE}).
+ * The full revision history is available in the {@link PromotionResult}.&lt;/p&gt;
  */
 public class HypothesisPromotionPipeline {
 
@@ -48,6 +58,7 @@ public class HypothesisPromotionPipeline {
     private final List&lt;SymbolicRegressionHypothesisSource&gt; symbolicRegressionSources;
     private final HypothesisRankingStrategy rankingStrategy;
     private final OracleValidator oracleValidator;
+    private final HypothesisRefinementLoop refinementLoop;
 
     /**
      * Full-featured constructor.
@@ -67,8 +78,8 @@ public class HypothesisPromotionPipeline {
         MacroRuleLearningService learningService,
         boolean autoPromote
     ) {
-<span class="fc" id="L70">        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote, List.of());</span>
-<span class="fc" id="L71">    }</span>
+<span class="fc" id="L81">        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote, List.of());</span>
+<span class="fc" id="L82">    }</span>
 
     public HypothesisPromotionPipeline(
         RuleCandidateMiner miner,
@@ -78,9 +89,9 @@ public class HypothesisPromotionPipeline {
         boolean autoPromote,
         List&lt;SymbolicRegressionHypothesisSource&gt; symbolicRegressionSources
     ) {
-<span class="fc" id="L81">        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,</span>
+<span class="fc" id="L92">        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,</span>
             symbolicRegressionSources, new InterestingnessRankingStrategy());
-<span class="fc" id="L83">    }</span>
+<span class="fc" id="L94">    }</span>
 
     public HypothesisPromotionPipeline(
         RuleCandidateMiner miner,
@@ -91,10 +102,10 @@ public class HypothesisPromotionPipeline {
         List&lt;SymbolicRegressionHypothesisSource&gt; symbolicRegressionSources,
         HypothesisRankingStrategy rankingStrategy
     ) {
-<span class="fc" id="L94">        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,</span>
+<span class="fc" id="L105">        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,</span>
             symbolicRegressionSources, rankingStrategy,
-<span class="fc" id="L96">            (leftExpression, rightExpression) -&gt; OracleValidator.OracleValidation.unavailable(&quot;no oracle configured&quot;));</span>
-<span class="fc" id="L97">    }</span>
+<span class="fc" id="L107">            (leftExpression, rightExpression) -&gt; OracleValidator.OracleValidation.unavailable(&quot;no oracle configured&quot;));</span>
+<span class="fc" id="L108">    }</span>
 
     public HypothesisPromotionPipeline(
         RuleCandidateMiner miner,
@@ -105,20 +116,38 @@ public class HypothesisPromotionPipeline {
         List&lt;SymbolicRegressionHypothesisSource&gt; symbolicRegressionSources,
         HypothesisRankingStrategy rankingStrategy,
         OracleValidator oracleValidator
-<span class="fc" id="L108">    ) {</span>
-<span class="fc" id="L109">        this.miner = miner;</span>
-<span class="fc" id="L110">        this.hypothesisRepository = hypothesisRepository;</span>
-<span class="fc" id="L111">        this.counterexampleService = counterexampleService;</span>
-<span class="fc" id="L112">        this.learningService = learningService;</span>
-<span class="fc" id="L113">        this.autoPromote = autoPromote;</span>
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        this.symbolicRegressionSources = symbolicRegressionSources == null</span>
-<span class="nc" id="L115">            ? List.of()</span>
-<span class="fc" id="L116">            : List.copyOf(symbolicRegressionSources);</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">        this.rankingStrategy = rankingStrategy == null ? new InterestingnessRankingStrategy() : rankingStrategy;</span>
-<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        this.oracleValidator = oracleValidator == null</span>
-<span class="nc" id="L119">            ? (leftExpression, rightExpression) -&gt; OracleValidator.OracleValidation.unavailable(&quot;no oracle configured&quot;)</span>
-<span class="fc" id="L120">            : oracleValidator;</span>
-<span class="fc" id="L121">    }</span>
+    ) {
+<span class="fc" id="L120">        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,</span>
+            symbolicRegressionSources, rankingStrategy, oracleValidator, null);
+<span class="fc" id="L122">    }</span>
+
+    HypothesisPromotionPipeline(
+        RuleCandidateMiner miner,
+        HypothesisRepository hypothesisRepository,
+        CounterexampleSearchService counterexampleService,
+        MacroRuleLearningService learningService,
+        boolean autoPromote,
+        List&lt;SymbolicRegressionHypothesisSource&gt; symbolicRegressionSources,
+        HypothesisRankingStrategy rankingStrategy,
+        OracleValidator oracleValidator,
+        HypothesisRefinementLoop refinementLoop
+<span class="fc" id="L134">    ) {</span>
+<span class="fc" id="L135">        this.miner = miner;</span>
+<span class="fc" id="L136">        this.hypothesisRepository = hypothesisRepository;</span>
+<span class="fc" id="L137">        this.counterexampleService = counterexampleService;</span>
+<span class="fc" id="L138">        this.learningService = learningService;</span>
+<span class="fc" id="L139">        this.autoPromote = autoPromote;</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        this.symbolicRegressionSources = symbolicRegressionSources == null</span>
+<span class="nc" id="L141">            ? List.of()</span>
+<span class="fc" id="L142">            : List.copyOf(symbolicRegressionSources);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        this.rankingStrategy = rankingStrategy == null ? new InterestingnessRankingStrategy() : rankingStrategy;</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        this.oracleValidator = oracleValidator == null</span>
+<span class="nc" id="L145">            ? (leftExpression, rightExpression) -&gt; OracleValidator.OracleValidation.unavailable(&quot;no oracle configured&quot;)</span>
+<span class="fc" id="L146">            : oracleValidator;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        this.refinementLoop = refinementLoop == null</span>
+<span class="fc" id="L148">            ? new HypothesisRefinementLoop(counterexampleService)</span>
+<span class="fc" id="L149">            : refinementLoop;</span>
+<span class="fc" id="L150">    }</span>
 
     /**
      * Run the pipeline for the given transformation paths.
@@ -127,131 +156,132 @@ public class HypothesisPromotionPipeline {
      *         promoted rules.
      */
     public PromotionResult run(List&lt;SuccessfulTransformationPath&gt; paths) {
-<span class="pc bpc" id="L130" title="1 of 4 branches missed.">        if (paths == null || paths.isEmpty()) {</span>
-<span class="fc" id="L131">            return new PromotionResult(List.of(), List.of());</span>
+<span class="pc bpc" id="L159" title="1 of 4 branches missed.">        if (paths == null || paths.isEmpty()) {</span>
+<span class="fc" id="L160">            return new PromotionResult(List.of(), List.of());</span>
         }
 
         // Step 1: Mine candidates via anti-unification.
-<span class="fc" id="L135">        List&lt;RuleCandidate&gt; candidates = miner.mine(paths);</span>
+<span class="fc" id="L164">        List&lt;RuleCandidate&gt; candidates = miner.mine(paths);</span>
 
-<span class="fc" id="L137">        List&lt;HypothesisCandidate&gt; newHypotheses = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L138">        List&lt;ReusableRule&gt; promotedRules = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L166">        List&lt;HypothesisCandidate&gt; newHypotheses = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L167">        List&lt;ReusableRule&gt; promotedRules = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L168">        List&lt;HypothesisRevision&gt; allRevisions = new ArrayList&lt;&gt;();</span>
         // Collect supporting paths of non-rejected candidates for the promotion step,
         // so rejected rules cannot be re-mined by learningService.learn().
         // Track assumptions per path-id so each path only receives the assumptions
         // inferred from the specific candidate(s) it supports — not assumptions from
         // unrelated candidates that the path never contributed to.
-<span class="fc" id="L144">        Map&lt;String, List&lt;String&gt;&gt; pathAssumptions = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L145">        boolean anyValidatedForPromotion = false;</span>
+<span class="fc" id="L174">        Map&lt;String, List&lt;String&gt;&gt; pathAssumptions = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L175">        boolean anyValidatedForPromotion = false;</span>
 
-<span class="fc" id="L147">        Map&lt;String, Set&lt;String&gt;&gt; domainsByPath = domainsByPath(paths);</span>
-<span class="fc" id="L148">        List&lt;ScoredCandidate&gt; prioritizedCandidates = score(candidates, paths, domainsByPath);</span>
+<span class="fc" id="L177">        Map&lt;String, Set&lt;String&gt;&gt; domainsByPath = domainsByPath(paths);</span>
+<span class="fc" id="L178">        List&lt;ScoredCandidate&gt; prioritizedCandidates = score(candidates, paths, domainsByPath);</span>
 
-<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (ScoredCandidate scoredCandidate : prioritizedCandidates) {</span>
-<span class="fc" id="L151">            RuleCandidate candidate = scoredCandidate.candidate();</span>
-<span class="fc" id="L152">            HypothesisCandidate hypothesis = scoredCandidate.hypothesis();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (ScoredCandidate scoredCandidate : prioritizedCandidates) {</span>
+<span class="fc" id="L181">            RuleCandidate candidate = scoredCandidate.candidate();</span>
+<span class="fc" id="L182">            HypothesisCandidate hypothesis = scoredCandidate.hypothesis();</span>
 
-            // Step 3: Counterexample search.
-<span class="fc" id="L155">            CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =</span>
-<span class="fc" id="L156">                counterexampleService.search(</span>
-                    new CounterexampleSearchService.HypothesisInput(
-<span class="fc" id="L158">                        hypothesis.id(),</span>
-<span class="fc" id="L159">                        candidate.leftPattern(),</span>
-<span class="fc" id="L160">                        candidate.rightPattern(),</span>
-<span class="fc" id="L161">                        hypothesis.assumptions()</span>
-                    ),
-<span class="fc" id="L163">                    CounterexampleSearchService.CounterexampleBudget.defaultBudget()</span>
-                );
+            // Step 3: Counterexample search with refinement loop.
+<span class="fc" id="L185">            HypothesisRefinementLoop.RefinementOutcome outcome = refinementLoop.refine(hypothesis);</span>
+<span class="fc" id="L186">            allRevisions.addAll(outcome.revisionHistory());</span>
 
-<span class="fc" id="L166">            hypothesis = hypothesis.withCounterexampleResult(counterexampleResult);</span>
-<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (!counterexampleResult.inferredAssumptions().isEmpty()) {</span>
-<span class="fc" id="L168">                List&lt;String&gt; mergedAssumptions = new ArrayList&lt;&gt;(hypothesis.assumptions());</span>
-<span class="fc" id="L169">                mergedAssumptions.addAll(counterexampleResult.inferredAssumptions());</span>
-<span class="fc" id="L170">                hypothesis = hypothesis.withAssumptions(mergedAssumptions);</span>
-            }
-<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (counterexampleResult.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {</span>
-<span class="fc" id="L173">                hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);</span>
+<span class="fc" id="L188">            CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =</span>
+<span class="fc" id="L189">                outcome.lastSearchResult();</span>
+
+<span class="fc" id="L191">            hypothesis = applyTerminalRevision(hypothesis, outcome.terminalRevision(), counterexampleResult);</span>
+
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (outcome.isRejected()) {</span>
+<span class="fc" id="L194">                hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);</span>
                 // Persist with REJECTED status so downstream readers see the correct state.
-<span class="fc" id="L175">                hypothesisRepository.save(hypothesis.id(), hypothesis);</span>
-<span class="fc" id="L176">                newHypotheses.add(hypothesis);</span>
-<span class="fc" id="L177">                continue;</span>
+<span class="fc" id="L196">                hypothesisRepository.save(hypothesis.id(), hypothesis);</span>
+<span class="fc" id="L197">                newHypotheses.add(hypothesis);</span>
+<span class="fc" id="L198">                continue;</span>
             }
-<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (counterexampleResult.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {</span>
-<span class="fc" id="L180">                hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (outcome.isInconclusive()) {</span>
+<span class="fc" id="L201">                hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);</span>
             }
-<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (hypothesis.proofStatus().atLeast(CandidateProofStatus.VALIDATED_BY_EXAMPLES)</span>
-<span class="fc bfc" id="L183" title="All 2 branches covered.">                &amp;&amp; oracleValidator.validateEquivalence(hypothesis.leftPattern(), hypothesis.rightPattern()).status()</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (hypothesis.proofStatus().atLeast(CandidateProofStatus.VALIDATED_BY_EXAMPLES)</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                &amp;&amp; oracleValidator.validateEquivalence(hypothesis.leftPattern(), hypothesis.rightPattern()).status()</span>
                 == OracleValidator.OracleValidationStatus.DISAGREE) {
-<span class="fc" id="L185">                hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);</span>
+<span class="fc" id="L206">                hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);</span>
             }
 
             // Store as a pending hypothesis.
-<span class="fc" id="L189">            hypothesisRepository.save(hypothesis.id(), hypothesis);</span>
-<span class="fc" id="L190">            newHypotheses.add(hypothesis);</span>
+<span class="fc" id="L210">            hypothesisRepository.save(hypothesis.id(), hypothesis);</span>
+<span class="fc" id="L211">            newHypotheses.add(hypothesis);</span>
 
             // Track which paths back this validated candidate for the promotion step.
-<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (autoPromote</span>
-<span class="fc bfc" id="L194" title="All 2 branches covered.">                &amp;&amp; counterexampleResult.status() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">                &amp;&amp; hypothesis.proofStatus().ordinal() &gt;= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {</span>
-<span class="fc" id="L196">                List&lt;String&gt; candidateAssumptions = hypothesis.assumptions();</span>
-<span class="fc bfc" id="L197" title="All 2 branches covered.">                for (String pathId : candidate.supportingTransformationIds()) {</span>
-<span class="fc" id="L198">                    pathAssumptions.computeIfAbsent(pathId, k -&gt; new ArrayList&lt;&gt;())</span>
-<span class="fc" id="L199">                        .addAll(candidateAssumptions);</span>
-<span class="fc" id="L200">                }</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (autoPromote</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                &amp;&amp; outcome.isAccepted()</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                &amp;&amp; hypothesis.proofStatus().ordinal() &gt;= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {</span>
+<span class="fc" id="L217">                List&lt;String&gt; candidateAssumptions = hypothesis.assumptions();</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                for (String pathId : candidate.supportingTransformationIds()) {</span>
+<span class="fc" id="L219">                    pathAssumptions.computeIfAbsent(pathId, k -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L220">                        .addAll(candidateAssumptions);</span>
+<span class="fc" id="L221">                }</span>
 
-<span class="fc" id="L202">                anyValidatedForPromotion = true;</span>
+<span class="fc" id="L223">                anyValidatedForPromotion = true;</span>
             }
-<span class="fc" id="L204">        }</span>
+<span class="fc" id="L225">        }</span>
 
-<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (SymbolicRegressionHypothesisSource source : symbolicRegressionSources) {</span>
-<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (!source.enabled()) {</span>
-<span class="nc" id="L208">                continue;</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (SymbolicRegressionHypothesisSource source : symbolicRegressionSources) {</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (!source.enabled()) {</span>
+<span class="nc" id="L229">                continue;</span>
             }
-<span class="fc bfc" id="L210" title="All 2 branches covered.">            for (HypothesisCandidate proposal : source.propose(paths)) {</span>
-<span class="fc" id="L211">                HypothesisCandidate hypothesis = proposal.withNoveltyScore(</span>
-<span class="fc" id="L212">                    normalized(InterestingnessScore.from(proposal, 0.0, domainsFor(proposal, domainsByPath)).total())</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            for (HypothesisCandidate proposal : source.propose(paths)) {</span>
+<span class="fc" id="L232">                HypothesisCandidate hypothesis = proposal.withNoveltyScore(</span>
+<span class="fc" id="L233">                    normalized(InterestingnessScore.from(proposal, 0.0, domainsFor(proposal, domainsByPath)).total())</span>
                 );
-<span class="fc" id="L214">                CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =</span>
-<span class="fc" id="L215">                    counterexampleService.search(</span>
-                        new CounterexampleSearchService.HypothesisInput(
-<span class="fc" id="L217">                            hypothesis.id(),</span>
-<span class="fc" id="L218">                            hypothesis.leftPattern(),</span>
-<span class="fc" id="L219">                            hypothesis.rightPattern(),</span>
-<span class="fc" id="L220">                            hypothesis.assumptions()</span>
-                        ),
-<span class="fc" id="L222">                        CounterexampleSearchService.CounterexampleBudget.defaultBudget()</span>
-                    );
-<span class="fc" id="L224">                hypothesis = hypothesis.withCounterexampleResult(counterexampleResult);</span>
-<span class="pc bpc" id="L225" title="1 of 2 branches missed.">                if (!counterexampleResult.inferredAssumptions().isEmpty()) {</span>
-<span class="nc" id="L226">                    List&lt;String&gt; mergedAssumptions = new ArrayList&lt;&gt;(hypothesis.assumptions());</span>
-<span class="nc" id="L227">                    mergedAssumptions.addAll(counterexampleResult.inferredAssumptions());</span>
-<span class="nc" id="L228">                    hypothesis = hypothesis.withAssumptions(mergedAssumptions);</span>
+<span class="fc" id="L235">                HypothesisRefinementLoop.RefinementOutcome outcome = refinementLoop.refine(hypothesis);</span>
+<span class="fc" id="L236">                allRevisions.addAll(outcome.revisionHistory());</span>
+<span class="fc" id="L237">                CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =</span>
+<span class="fc" id="L238">                    outcome.lastSearchResult();</span>
+<span class="fc" id="L239">                hypothesis = applyTerminalRevision(hypothesis, outcome.terminalRevision(), counterexampleResult);</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                if (outcome.isRejected()) {</span>
+<span class="nc" id="L241">                    hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">                } else if (outcome.isInconclusive()) {</span>
+<span class="nc" id="L243">                    hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);</span>
                 }
-<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                if (counterexampleResult.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {</span>
-<span class="nc" id="L231">                    hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);</span>
-<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                } else if (counterexampleResult.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {</span>
-<span class="nc" id="L233">                    hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);</span>
-                }
-<span class="fc" id="L235">                hypothesisRepository.save(hypothesis.id(), hypothesis);</span>
-<span class="fc" id="L236">                newHypotheses.add(hypothesis);</span>
-<span class="fc" id="L237">            }</span>
-<span class="fc" id="L238">        }</span>
+<span class="fc" id="L245">                hypothesisRepository.save(hypothesis.id(), hypothesis);</span>
+<span class="fc" id="L246">                newHypotheses.add(hypothesis);</span>
+<span class="fc" id="L247">            }</span>
+<span class="fc" id="L248">        }</span>
 
         // Step 4: Auto-promote validated hypotheses — called once, using only the
         // supporting paths of candidates that passed the counterexample check, so
         // rejected rules cannot be inadvertently re-mined and activated.
-<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (anyValidatedForPromotion) {</span>
-<span class="fc" id="L244">            List&lt;SuccessfulTransformationPath&gt; validatedPaths = paths.stream()</span>
-<span class="fc" id="L245">                .filter(p -&gt; pathAssumptions.containsKey(p.id()))</span>
-<span class="fc" id="L246">                .map(p -&gt; p.withAssumptions(pathAssumptions.get(p.id())))</span>
-<span class="fc" id="L247">                .toList();</span>
-<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            if (!validatedPaths.isEmpty()) {</span>
-<span class="fc" id="L249">                MacroLearningResult result = learningService.learn(validatedPaths);</span>
-<span class="fc" id="L250">                promotedRules.addAll(result.newlyActivated());</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        if (anyValidatedForPromotion) {</span>
+<span class="fc" id="L254">            List&lt;SuccessfulTransformationPath&gt; validatedPaths = paths.stream()</span>
+<span class="fc" id="L255">                .filter(p -&gt; pathAssumptions.containsKey(p.id()))</span>
+<span class="fc" id="L256">                .map(p -&gt; p.withAssumptions(pathAssumptions.get(p.id())))</span>
+<span class="fc" id="L257">                .toList();</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (!validatedPaths.isEmpty()) {</span>
+<span class="fc" id="L259">                MacroLearningResult result = learningService.learn(validatedPaths);</span>
+<span class="fc" id="L260">                promotedRules.addAll(result.newlyActivated());</span>
             }
         }
 
-<span class="fc" id="L254">        return new PromotionResult(newHypotheses, promotedRules);</span>
+<span class="fc" id="L264">        return new PromotionResult(newHypotheses, promotedRules, List.copyOf(allRevisions));</span>
+    }
+
+    private HypothesisCandidate applyTerminalRevision(
+        HypothesisCandidate hypothesis,
+        HypothesisRevision terminal,
+        CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+    ) {
+<span class="fc" id="L272">        HypothesisCandidate updated = hypothesis.withCounterexampleResult(counterexampleResult);</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (!terminal.leftPattern().equals(updated.leftPattern())</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">            || !terminal.rightPattern().equals(updated.rightPattern())) {</span>
+<span class="fc" id="L275">            updated = updated.withPatterns(terminal.leftPattern(), terminal.rightPattern());</span>
+        }
+<span class="fc" id="L277">        List&lt;String&gt; mergedAssumptions = new ArrayList&lt;&gt;(terminal.assumptions());</span>
+<span class="fc" id="L278">        counterexampleResult.inferredAssumptions().stream()</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">            .filter(assumption -&gt; !mergedAssumptions.contains(assumption))</span>
+<span class="fc" id="L280">            .forEach(mergedAssumptions::add);</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (!mergedAssumptions.equals(updated.assumptions())) {</span>
+<span class="fc" id="L282">            updated = updated.withAssumptions(mergedAssumptions);</span>
+        }
+<span class="fc" id="L284">        return updated;</span>
     }
 
     /**
@@ -259,15 +289,23 @@ public class HypothesisPromotionPipeline {
      *
      * @param newHypotheses  newly created {@link HypothesisCandidate} records
      * @param promotedRules  rules that were promoted to the inventory in this run
+     * @param revisionHistory all {@link HypothesisRevision} records created during
+     *                        the counterexample-guided refinement loop
      */
     public record PromotionResult(
         List&lt;HypothesisCandidate&gt; newHypotheses,
-        List&lt;ReusableRule&gt; promotedRules
+        List&lt;ReusableRule&gt; promotedRules,
+        List&lt;HypothesisRevision&gt; revisionHistory
     ) {
-<span class="fc" id="L267">        public PromotionResult {</span>
-<span class="fc" id="L268">            newHypotheses = List.copyOf(newHypotheses);</span>
-<span class="fc" id="L269">            promotedRules = List.copyOf(promotedRules);</span>
-<span class="fc" id="L270">        }</span>
+        public PromotionResult(List&lt;HypothesisCandidate&gt; newHypotheses, List&lt;ReusableRule&gt; promotedRules) {
+<span class="fc" id="L301">            this(newHypotheses, promotedRules, List.of());</span>
+<span class="fc" id="L302">        }</span>
+
+<span class="fc" id="L304">        public PromotionResult {</span>
+<span class="fc" id="L305">            newHypotheses = List.copyOf(newHypotheses);</span>
+<span class="fc" id="L306">            promotedRules = List.copyOf(promotedRules);</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            revisionHistory = revisionHistory == null ? List.of() : List.copyOf(revisionHistory);</span>
+<span class="fc" id="L308">        }</span>
     }
 
     private List&lt;ScoredCandidate&gt; score(
@@ -275,70 +313,70 @@ public class HypothesisPromotionPipeline {
         List&lt;SuccessfulTransformationPath&gt; paths,
         Map&lt;String, Set&lt;String&gt;&gt; domainsByPath
     ) {
-<span class="fc" id="L278">        Map&lt;String, RuleCandidate&gt; candidatesByHypothesisId = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L279">        Map&lt;String, Double&gt; similarities = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L280">        Map&lt;String, Set&lt;String&gt;&gt; domains = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L281">        List&lt;HypothesisCandidate&gt; hypotheses = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L282" title="All 2 branches covered.">        for (RuleCandidate candidate : candidates) {</span>
-<span class="fc" id="L283">            HypothesisCandidate base = HypothesisCandidate.from(candidate, 0.0, paths);</span>
-<span class="fc" id="L284">            candidatesByHypothesisId.put(base.id(), candidate);</span>
-<span class="fc bfc" id="L285" title="All 2 branches covered.">            similarities.put(base.id(), candidate.status() == RuleStatus.NEW ? 0.0 : 1.0);</span>
-<span class="fc" id="L286">            domains.put(base.id(), domainsFor(base, domainsByPath));</span>
-<span class="fc" id="L287">            hypotheses.add(base);</span>
-<span class="fc" id="L288">        }</span>
-<span class="fc" id="L289">        return rankingStrategy.rank(hypotheses, similarities, domains).stream()</span>
-<span class="fc" id="L290">            .map(ranked -&gt; new ScoredCandidate(</span>
-<span class="fc" id="L291">                candidatesByHypothesisId.get(ranked.hypothesis().id()),</span>
-<span class="fc" id="L292">                ranked.hypothesis().withNoveltyScore(normalized(ranked.score().total())),</span>
-<span class="fc" id="L293">                ranked.score()</span>
+<span class="fc" id="L316">        Map&lt;String, RuleCandidate&gt; candidatesByHypothesisId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L317">        Map&lt;String, Double&gt; similarities = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L318">        Map&lt;String, Set&lt;String&gt;&gt; domains = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L319">        List&lt;HypothesisCandidate&gt; hypotheses = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        for (RuleCandidate candidate : candidates) {</span>
+<span class="fc" id="L321">            HypothesisCandidate base = HypothesisCandidate.from(candidate, 0.0, paths);</span>
+<span class="fc" id="L322">            candidatesByHypothesisId.put(base.id(), candidate);</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            similarities.put(base.id(), candidate.status() == RuleStatus.NEW ? 0.0 : 1.0);</span>
+<span class="fc" id="L324">            domains.put(base.id(), domainsFor(base, domainsByPath));</span>
+<span class="fc" id="L325">            hypotheses.add(base);</span>
+<span class="fc" id="L326">        }</span>
+<span class="fc" id="L327">        return rankingStrategy.rank(hypotheses, similarities, domains).stream()</span>
+<span class="fc" id="L328">            .map(ranked -&gt; new ScoredCandidate(</span>
+<span class="fc" id="L329">                candidatesByHypothesisId.get(ranked.hypothesis().id()),</span>
+<span class="fc" id="L330">                ranked.hypothesis().withNoveltyScore(normalized(ranked.score().total())),</span>
+<span class="fc" id="L331">                ranked.score()</span>
             ))
-<span class="fc" id="L295">            .toList();</span>
+<span class="fc" id="L333">            .toList();</span>
     }
 
     private static double normalized(double score) {
-<span class="fc" id="L299">        return Math.max(0.0, Math.min(1.0, score / 10.0));</span>
+<span class="fc" id="L337">        return Math.max(0.0, Math.min(1.0, score / 10.0));</span>
     }
 
     private static Map&lt;String, Set&lt;String&gt;&gt; domainsByPath(List&lt;SuccessfulTransformationPath&gt; paths) {
-<span class="fc" id="L303">        return paths.stream().collect(Collectors.toMap(</span>
+<span class="fc" id="L341">        return paths.stream().collect(Collectors.toMap(</span>
             SuccessfulTransformationPath::id,
             HypothesisPromotionPipeline::domainsOf,
             (left, right) -&gt; {
-<span class="nc" id="L307">                java.util.LinkedHashSet&lt;String&gt; merged = new java.util.LinkedHashSet&lt;&gt;(left);</span>
-<span class="nc" id="L308">                merged.addAll(right);</span>
-<span class="nc" id="L309">                return Set.copyOf(merged);</span>
+<span class="nc" id="L345">                java.util.LinkedHashSet&lt;String&gt; merged = new java.util.LinkedHashSet&lt;&gt;(left);</span>
+<span class="nc" id="L346">                merged.addAll(right);</span>
+<span class="nc" id="L347">                return Set.copyOf(merged);</span>
             },
             LinkedHashMap::new
         ));
     }
 
     private static Set&lt;String&gt; domainsFor(HypothesisCandidate candidate, Map&lt;String, Set&lt;String&gt;&gt; domainsByPath) {
-<span class="fc" id="L316">        return candidate.supportingPaths().stream()</span>
-<span class="fc" id="L317">            .flatMap(path -&gt; domainsByPath.getOrDefault(path, Set.of()).stream())</span>
-<span class="fc" id="L318">            .collect(Collectors.toCollection(java.util.LinkedHashSet::new));</span>
+<span class="fc" id="L354">        return candidate.supportingPaths().stream()</span>
+<span class="fc" id="L355">            .flatMap(path -&gt; domainsByPath.getOrDefault(path, Set.of()).stream())</span>
+<span class="fc" id="L356">            .collect(Collectors.toCollection(java.util.LinkedHashSet::new));</span>
     }
 
     private static Set&lt;String&gt; domainsOf(SuccessfulTransformationPath path) {
-<span class="fc" id="L322">        java.util.LinkedHashSet&lt;String&gt; domains = new java.util.LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L323">        String domain = path.variableStructure().get(&quot;domain&quot;);</span>
-<span class="pc bpc" id="L324" title="3 of 4 branches missed.">        if (domain != null &amp;&amp; !domain.isBlank()) {</span>
-<span class="nc" id="L325">            domains.add(domain);</span>
+<span class="fc" id="L360">        java.util.LinkedHashSet&lt;String&gt; domains = new java.util.LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L361">        String domain = path.variableStructure().get(&quot;domain&quot;);</span>
+<span class="pc bpc" id="L362" title="3 of 4 branches missed.">        if (domain != null &amp;&amp; !domain.isBlank()) {</span>
+<span class="nc" id="L363">            domains.add(domain);</span>
         }
-<span class="fc" id="L327">        String category = path.variableStructure().get(&quot;category&quot;);</span>
-<span class="pc bpc" id="L328" title="3 of 4 branches missed.">        if (category != null &amp;&amp; !category.isBlank()) {</span>
-<span class="nc" id="L329">            domains.add(category);</span>
+<span class="fc" id="L365">        String category = path.variableStructure().get(&quot;category&quot;);</span>
+<span class="pc bpc" id="L366" title="3 of 4 branches missed.">        if (category != null &amp;&amp; !category.isBlank()) {</span>
+<span class="nc" id="L367">            domains.add(category);</span>
         }
-<span class="fc" id="L331">        return Set.copyOf(domains);</span>
+<span class="fc" id="L369">        return Set.copyOf(domains);</span>
     }
 
-<span class="fc" id="L334">    private record ScoredCandidate(</span>
+<span class="fc" id="L372">    private record ScoredCandidate(</span>
         RuleCandidate candidate,
         HypothesisCandidate hypothesis,
         InterestingnessScore score
     ) implements Comparable&lt;ScoredCandidate&gt; {
         @Override
         public int compareTo(ScoredCandidate other) {
-<span class="nc" id="L341">            return score.compareTo(other.score);</span>
+<span class="nc" id="L379">            return score.compareTo(other.score);</span>
         }
     }
 }

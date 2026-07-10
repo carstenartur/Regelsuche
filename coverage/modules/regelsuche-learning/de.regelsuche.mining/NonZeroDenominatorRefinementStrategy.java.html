@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NonZeroDenominatorRefinementStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">NonZeroDenominatorRefinementStrategy.java</span></div><h1>NonZeroDenominatorRefinementStrategy.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.validation.CounterexampleSearchService;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Refinement strategy that adds a non-zero denominator constraint when a
+ * counterexample reveals a division-by-zero case.
+ *
+ * &lt;p&gt;If the hypothesis contains a division operator ({@code /}) and the
+ * counterexample assigns a zero value to a denominator variable, this
+ * strategy adds a {@code &quot;var != 0&quot;} assumption for each such variable.&lt;/p&gt;
+ */
+<span class="fc" id="L22">public class NonZeroDenominatorRefinementStrategy implements RefinementStrategy {</span>
+<span class="fc" id="L23">    private static final Pattern PARENTHESIZED_DENOMINATOR =</span>
+<span class="fc" id="L24">        Pattern.compile(&quot;/\\s*\\(\\s*([A-Za-z][A-Za-z0-9_]*)\\s*\\)&quot;);</span>
+<span class="fc" id="L25">    private static final Pattern BARE_DENOMINATOR =</span>
+<span class="fc" id="L26">        Pattern.compile(&quot;/\\s*([A-Za-z][A-Za-z0-9_]*)\\b&quot;);</span>
+
+    @Override
+    public String name() {
+<span class="fc" id="L30">        return &quot;non-zero-denominator&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;RefinementProposal&gt; refine(
+        HypothesisRevision revision,
+        CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+    ) {
+        // Only apply if the pattern contains division
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">        if (!revision.leftPattern().contains(&quot;/&quot;) &amp;&amp; !revision.rightPattern().contains(&quot;/&quot;)) {</span>
+<span class="fc" id="L40">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L43">        Set&lt;String&gt; denominatorVars = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L44">        collectDenominatorVars(revision.leftPattern(), denominatorVars);</span>
+<span class="fc" id="L45">        collectDenominatorVars(revision.rightPattern(), denominatorVars);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (denominatorVars.isEmpty()) {</span>
+<span class="nc" id="L47">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L50">        List&lt;String&gt; zeroVars = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (counterexampleResult.counterexample().isPresent()) {</span>
+<span class="fc" id="L52">            CounterexampleSearchService.Counterexample cex = counterexampleResult.counterexample().get();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            for (String assignment : cex.assignments()) {</span>
+<span class="fc" id="L54">                String[] parts = assignment.split(&quot;=&quot;, 2);</span>
+<span class="pc bpc" id="L55" title="1 of 4 branches missed.">                if (parts.length == 2 &amp;&amp; isZeroValue(parts[1].strip())) {</span>
+<span class="fc" id="L56">                    String varName = parts[0].strip();</span>
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">                    if (!varName.isEmpty() &amp;&amp; denominatorVars.contains(varName)) {</span>
+<span class="fc" id="L58">                        zeroVars.add(varName);</span>
+                    }
+                }
+<span class="fc" id="L61">            }</span>
+        }
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (zeroVars.isEmpty()) {</span>
+            // No zero-assignments found; also check inferred assumptions for denominator hints
+<span class="fc" id="L66">            boolean hasNonZeroDenominatorHint = counterexampleResult.inferredAssumptions().stream()</span>
+<span class="pc bnc" id="L67" title="All 6 branches missed.">                .anyMatch(a -&gt; a.contains(&quot;!= 0&quot;) || a.contains(&quot;≠ 0&quot;) || a.contains(&quot;≠0&quot;));</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (!hasNonZeroDenominatorHint) {</span>
+<span class="fc" id="L69">                return Optional.empty();</span>
+            }
+            // Use inferred assumptions directly
+<span class="nc" id="L72">            List&lt;String&gt; newAssumptions = new ArrayList&lt;&gt;(revision.assumptions());</span>
+<span class="nc" id="L73">            counterexampleResult.inferredAssumptions().stream()</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                .filter(a -&gt; !newAssumptions.contains(a))</span>
+<span class="nc" id="L75">                .forEach(newAssumptions::add);</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            if (newAssumptions.equals(revision.assumptions())) {</span>
+<span class="nc" id="L77">                return Optional.empty();</span>
+            }
+<span class="nc" id="L79">            return Optional.of(new RefinementProposal(</span>
+<span class="nc" id="L80">                revision.leftPattern(), revision.rightPattern(), newAssumptions</span>
+            ));
+        }
+
+<span class="fc" id="L84">        List&lt;String&gt; newAssumptions = new ArrayList&lt;&gt;(revision.assumptions());</span>
+<span class="fc" id="L85">        boolean changed = false;</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (String var : zeroVars) {</span>
+<span class="fc" id="L87">            String constraint = var + &quot; != 0&quot;;</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (!newAssumptions.contains(constraint)) {</span>
+<span class="fc" id="L89">                newAssumptions.add(constraint);</span>
+<span class="fc" id="L90">                changed = true;</span>
+            }
+<span class="fc" id="L92">        }</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (!changed) {</span>
+<span class="fc" id="L94">            return Optional.empty();</span>
+        }
+<span class="fc" id="L96">        return Optional.of(new RefinementProposal(</span>
+<span class="fc" id="L97">            revision.leftPattern(), revision.rightPattern(), newAssumptions</span>
+        ));
+    }
+
+    private static void collectDenominatorVars(String pattern, Set&lt;String&gt; denominatorVars) {
+<span class="fc" id="L102">        Matcher parenthesized = PARENTHESIZED_DENOMINATOR.matcher(pattern);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        while (parenthesized.find()) {</span>
+<span class="nc" id="L104">            denominatorVars.add(parenthesized.group(1));</span>
+        }
+
+<span class="fc" id="L107">        Matcher bare = BARE_DENOMINATOR.matcher(pattern);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        while (bare.find()) {</span>
+<span class="fc" id="L109">            denominatorVars.add(bare.group(1));</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+    private static boolean isZeroValue(String value) {
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L115">            return false;</span>
+        }
+<span class="fc" id="L117">        String normalized = value.strip();</span>
+<span class="fc" id="L118">        int slashIndex = normalized.indexOf('/');</span>
+<span class="pc bpc" id="L119" title="3 of 4 branches missed.">        if (slashIndex &gt; 0 &amp;&amp; slashIndex == normalized.lastIndexOf('/')) {</span>
+            try {
+<span class="nc" id="L121">                BigDecimal numerator = new BigDecimal(normalized.substring(0, slashIndex).strip());</span>
+<span class="nc" id="L122">                BigDecimal denominator = new BigDecimal(normalized.substring(slashIndex + 1).strip());</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">                return denominator.compareTo(BigDecimal.ZERO) != 0 &amp;&amp; numerator.compareTo(BigDecimal.ZERO) == 0;</span>
+<span class="nc" id="L124">            } catch (NumberFormatException ignored) {</span>
+<span class="nc" id="L125">                return false;</span>
+            }
+        }
+        try {
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            return new BigDecimal(normalized).compareTo(BigDecimal.ZERO) == 0;</span>
+<span class="nc" id="L130">        } catch (NumberFormatException ignored) {</span>
+<span class="nc" id="L131">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

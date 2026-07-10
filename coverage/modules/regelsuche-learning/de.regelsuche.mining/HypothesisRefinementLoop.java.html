@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HypothesisRefinementLoop.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">HypothesisRefinementLoop.java</span></div><h1>HypothesisRefinementLoop.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.validation.CounterexampleSearchService;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Counterexample-guided hypothesis refinement loop.
+ *
+ * &lt;p&gt;Given a hypothesis candidate and a set of registered
+ * {@link RefinementStrategy refinement strategies}, the loop:
+ * &lt;ol&gt;
+ *   &lt;li&gt;Creates the initial {@link HypothesisRevision} in
+ *       {@link HypothesisRevisionStatus#PROPOSED} state.&lt;/li&gt;
+ *   &lt;li&gt;Submits the revision for a counterexample search
+ *       ({@link HypothesisRevisionStatus#CHALLENGED}).&lt;/li&gt;
+ *   &lt;li&gt;If no counterexample is found, marks the revision as
+ *       {@link HypothesisRevisionStatus#VALIDATED_WITHIN_BUDGET} (terminal).&lt;/li&gt;
+ *   &lt;li&gt;If a counterexample is found:
+ *     &lt;ul&gt;
+ *       &lt;li&gt;Marks the revision as
+ *           {@link HypothesisRevisionStatus#COUNTEREXAMPLE_FOUND}.&lt;/li&gt;
+ *       &lt;li&gt;Applies the first strategy that produces a
+ *           {@link RefinementStrategy.RefinementProposal}.&lt;/li&gt;
+ *       &lt;li&gt;If no strategy applies, or the revision budget is exhausted, or
+ *           a cycle is detected, marks the revision
+ *           {@link HypothesisRevisionStatus#REJECTED} (terminal).&lt;/li&gt;
+ *       &lt;li&gt;Otherwise, creates a successor revision in
+ *           {@link HypothesisRevisionStatus#CHALLENGED_AGAIN} and repeats.&lt;/li&gt;
+ *     &lt;/ul&gt;
+ *   &lt;/li&gt;
+ *   &lt;li&gt;If the search is {@link CounterexampleSearchService.Status#INCONCLUSIVE},
+ *       marks the revision {@link HypothesisRevisionStatus#INCONCLUSIVE}
+ *       (terminal).&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;The full revision history (every attempted revision) is captured in the
+ * returned {@link RefinementOutcome} so it can be serialized and shown in
+ * reports.&lt;/p&gt;
+ */
+public class HypothesisRefinementLoop {
+
+    /** Default maximum number of revision attempts before giving up. */
+    public static final int DEFAULT_MAX_REVISIONS = 5;
+
+    private final CounterexampleSearchService counterexampleService;
+    private final List&lt;RefinementStrategy&gt; strategies;
+    private final int maxRevisions;
+
+    /**
+     * Constructs a refinement loop with the default maximum revision count and
+     * the five built-in refinement strategies.
+     *
+     * @param counterexampleService the service to use for counterexample search
+     */
+    public HypothesisRefinementLoop(CounterexampleSearchService counterexampleService) {
+<span class="fc" id="L62">        this(counterexampleService, defaultStrategies(), DEFAULT_MAX_REVISIONS);</span>
+<span class="fc" id="L63">    }</span>
+
+    /**
+     * Constructs a refinement loop with explicit strategies and revision budget.
+     *
+     * @param counterexampleService the service to use for counterexample search
+     * @param strategies            refinement strategies to try in order
+     * @param maxRevisions          maximum number of revisions (must be &amp;ge;&amp;nbsp;1)
+     */
+    public HypothesisRefinementLoop(
+        CounterexampleSearchService counterexampleService,
+        List&lt;RefinementStrategy&gt; strategies,
+        int maxRevisions
+<span class="fc" id="L76">    ) {</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (counterexampleService == null) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(&quot;counterexampleService must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (maxRevisions &lt; 1) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;maxRevisions must be &gt;= 1&quot;);</span>
+        }
+<span class="fc" id="L83">        this.counterexampleService = counterexampleService;</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        this.strategies = strategies == null ? List.of() : List.copyOf(strategies);</span>
+<span class="fc" id="L85">        this.maxRevisions = maxRevisions;</span>
+<span class="fc" id="L86">    }</span>
+
+    /**
+     * Runs the refinement loop for the given hypothesis.
+     *
+     * @param hypothesis the hypothesis to challenge and (if needed) refine
+     * @return a {@link RefinementOutcome} with the terminal revision and full
+     *         revision history
+     */
+    public RefinementOutcome refine(HypothesisCandidate hypothesis) {
+<span class="fc" id="L96">        List&lt;HypothesisRevision&gt; history = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L97">        Set&lt;String&gt; seenFingerprints = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L98">        CounterexampleSearchService.CounterexampleSearchResult lastSearchResult = null;</span>
+
+<span class="fc" id="L100">        HypothesisRevision current = HypothesisRevision.initial(hypothesis);</span>
+<span class="fc" id="L101">        history.add(current);</span>
+<span class="fc" id="L102">        seenFingerprints.add(current.canonicalFingerprint());</span>
+
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        for (int attempt = 0; attempt &lt; maxRevisions; attempt++) {</span>
+            // Mark as challenged
+<span class="fc" id="L106">            current = current.withStatus(</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                attempt == 0</span>
+<span class="fc" id="L108">                    ? HypothesisRevisionStatus.CHALLENGED</span>
+<span class="fc" id="L109">                    : HypothesisRevisionStatus.CHALLENGED_AGAIN</span>
+            );
+<span class="fc" id="L111">            history.set(history.size() - 1, current);</span>
+
+            // Run counterexample search
+<span class="fc" id="L114">            CounterexampleSearchService.CounterexampleSearchResult searchResult =</span>
+<span class="fc" id="L115">                counterexampleService.search(</span>
+                    new CounterexampleSearchService.HypothesisInput(
+<span class="fc" id="L117">                        current.id(),</span>
+<span class="fc" id="L118">                        current.leftPattern(),</span>
+<span class="fc" id="L119">                        current.rightPattern(),</span>
+<span class="fc" id="L120">                        current.assumptions()</span>
+                    ),
+<span class="fc" id="L122">                    CounterexampleSearchService.CounterexampleBudget.defaultBudget()</span>
+                );
+<span class="fc" id="L124">            lastSearchResult = searchResult;</span>
+
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (searchResult.status() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND) {</span>
+                // Accept: no counterexample found within budget
+<span class="fc" id="L128">                current = current.withStatus(HypothesisRevisionStatus.VALIDATED_WITHIN_BUDGET);</span>
+<span class="fc" id="L129">                history.set(history.size() - 1, current);</span>
+<span class="fc" id="L130">                return new RefinementOutcome(current, List.copyOf(history), searchResult);</span>
+            }
+
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (searchResult.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {</span>
+<span class="fc" id="L134">                current = current.withStatus(HypothesisRevisionStatus.INCONCLUSIVE);</span>
+<span class="fc" id="L135">                history.set(history.size() - 1, current);</span>
+<span class="fc" id="L136">                return new RefinementOutcome(current, List.copyOf(history), searchResult);</span>
+            }
+
+            // Counterexample found — mark and try to refine
+<span class="fc" id="L140">            current = current.withStatus(HypothesisRevisionStatus.COUNTEREXAMPLE_FOUND);</span>
+<span class="fc" id="L141">            history.set(history.size() - 1, current);</span>
+
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            if (attempt &gt;= maxRevisions - 1) {</span>
+                // Budget exhausted
+<span class="nc" id="L145">                current = current.withStatus(HypothesisRevisionStatus.REJECTED);</span>
+<span class="nc" id="L146">                history.set(history.size() - 1, current);</span>
+<span class="nc" id="L147">                return new RefinementOutcome(current, List.copyOf(history), searchResult);</span>
+            }
+
+            // Try refinement strategies in order
+<span class="fc" id="L151">            Optional&lt;RefinementStrategy.RefinementProposal&gt; proposal = Optional.empty();</span>
+<span class="fc" id="L152">            String strategyUsed = null;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            for (RefinementStrategy strategy : strategies) {</span>
+<span class="fc" id="L154">                proposal = strategy.refine(current, searchResult);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                if (proposal.isPresent()) {</span>
+<span class="fc" id="L156">                    strategyUsed = strategy.name();</span>
+<span class="fc" id="L157">                    break;</span>
+                }
+<span class="nc" id="L159">            }</span>
+
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (proposal.isEmpty()) {</span>
+                // No strategy can help
+<span class="fc" id="L163">                current = current.withStatus(HypothesisRevisionStatus.REJECTED);</span>
+<span class="fc" id="L164">                history.set(history.size() - 1, current);</span>
+<span class="fc" id="L165">                return new RefinementOutcome(current, List.copyOf(history), searchResult);</span>
+            }
+
+            // Mark current as REFINED before creating the successor
+<span class="fc" id="L169">            current = current.withStatus(HypothesisRevisionStatus.REFINED);</span>
+<span class="fc" id="L170">            history.set(history.size() - 1, current);</span>
+
+            // Create successor revision
+<span class="fc" id="L173">            RefinementStrategy.RefinementProposal p = proposal.get();</span>
+<span class="fc" id="L174">            HypothesisRevision successor = new HypothesisRevision(</span>
+<span class="fc" id="L175">                current.originHypothesisId() + &quot;-r&quot; + (attempt + 1),</span>
+<span class="fc" id="L176">                current.id(),</span>
+<span class="fc" id="L177">                current.originHypothesisId(),</span>
+                attempt + 1,
+<span class="fc" id="L179">                p.newLeftPattern(),</span>
+<span class="fc" id="L180">                p.newRightPattern(),</span>
+<span class="fc" id="L181">                p.newAssumptions(),</span>
+<span class="fc" id="L182">                searchResult.counterexample().orElse(null),</span>
+                strategyUsed,
+                HypothesisRevisionStatus.PROPOSED,
+<span class="fc" id="L185">                Instant.now()</span>
+            );
+
+            // Cycle detection: check if this fingerprint was already seen
+<span class="fc" id="L189">            String fingerprint = successor.canonicalFingerprint();</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (seenFingerprints.contains(fingerprint)) {</span>
+                // Cycle detected — reject
+<span class="fc" id="L192">                HypothesisRevision cycleRevision = successor.withStatus(HypothesisRevisionStatus.REJECTED);</span>
+<span class="fc" id="L193">                history.add(cycleRevision);</span>
+<span class="fc" id="L194">                return new RefinementOutcome(cycleRevision, List.copyOf(history), searchResult);</span>
+            }
+<span class="fc" id="L196">            seenFingerprints.add(fingerprint);</span>
+
+<span class="fc" id="L198">            current = successor;</span>
+<span class="fc" id="L199">            history.add(current);</span>
+        }
+
+        // Should not normally reach here, but handle defensively
+<span class="nc" id="L203">        current = current.withStatus(HypothesisRevisionStatus.REJECTED);</span>
+<span class="nc" id="L204">        history.set(history.size() - 1, current);</span>
+<span class="nc" id="L205">        return new RefinementOutcome(</span>
+            current,
+<span class="nc" id="L207">            List.copyOf(history),</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            lastSearchResult == null</span>
+<span class="nc" id="L209">                ? CounterexampleSearchService.CounterexampleSearchResult.inconclusive(</span>
+                    &quot;refinement loop terminated without a counterexample verdict&quot;
+                )
+<span class="nc" id="L212">                : lastSearchResult</span>
+        );
+    }
+
+    /** The five built-in refinement strategies in priority order. */
+    public static List&lt;RefinementStrategy&gt; defaultStrategies() {
+<span class="fc" id="L218">        return List.of(</span>
+            new NonZeroDenominatorRefinementStrategy(),
+            new PositivityRefinementStrategy(),
+            new NumericRangeRefinementStrategy(),
+            new StructuralCompatibilityRefinementStrategy(),
+            new AstPlaceholderSpecializationRefinementStrategy()
+        );
+    }
+
+    /**
+     * The outcome of the refinement loop.
+     *
+     * @param terminalRevision   the last (terminal) revision in the chain
+     * @param revisionHistory    all revisions created during the loop (in order)
+     * @param lastSearchResult   the counterexample search result from the terminal round
+     */
+    public record RefinementOutcome(
+        HypothesisRevision terminalRevision,
+        List&lt;HypothesisRevision&gt; revisionHistory,
+        CounterexampleSearchService.CounterexampleSearchResult lastSearchResult
+    ) {
+<span class="fc" id="L239">        public RefinementOutcome {</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (terminalRevision == null) {</span>
+<span class="nc" id="L241">                throw new IllegalArgumentException(&quot;terminalRevision must not be null&quot;);</span>
+            }
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            revisionHistory = revisionHistory == null ? List.of() : List.copyOf(revisionHistory);</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            if (lastSearchResult == null) {</span>
+<span class="nc" id="L245">                lastSearchResult = CounterexampleSearchService.CounterexampleSearchResult.inconclusive();</span>
+            }
+<span class="fc" id="L247">        }</span>
+
+        /** @return {@code true} if the terminal revision was accepted. */
+        public boolean isAccepted() {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            return terminalRevision.status() == HypothesisRevisionStatus.VALIDATED_WITHIN_BUDGET;</span>
+        }
+
+        /** @return {@code true} if the terminal revision was rejected or inconclusive. */
+        public boolean isRejected() {
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            return terminalRevision.status() == HypothesisRevisionStatus.REJECTED;</span>
+        }
+
+        /** @return {@code true} if the result was inconclusive. */
+        public boolean isInconclusive() {
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            return terminalRevision.status() == HypothesisRevisionStatus.INCONCLUSIVE;</span>
+        }
+
+        /**
+         * @return the accepted terminal revision's patterns and assumptions,
+         *         usable to update the original hypothesis; present only when
+         *         {@link #isAccepted()} is {@code true}.
+         */
+        public Optional&lt;RefinementStrategy.RefinementProposal&gt; acceptedProposal() {
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            if (!isAccepted()) {</span>
+<span class="nc" id="L271">                return Optional.empty();</span>
+            }
+<span class="fc" id="L273">            return Optional.of(new RefinementStrategy.RefinementProposal(</span>
+<span class="fc" id="L274">                terminalRevision.leftPattern(),</span>
+<span class="fc" id="L275">                terminalRevision.rightPattern(),</span>
+<span class="fc" id="L276">                terminalRevision.assumptions()</span>
+            ));
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

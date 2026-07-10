@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PositivityRefinementStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">PositivityRefinementStrategy.java</span></div><h1>PositivityRefinementStrategy.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.validation.CounterexampleSearchService;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Refinement strategy that adds positivity or non-negativity constraints when
+ * a counterexample reveals a violation caused by a negative argument to a
+ * function that requires non-negative input (e.g. {@code sqrt}, {@code log}).
+ *
+ * &lt;p&gt;If the pattern contains {@code sqrt(x)} or {@code log(x)} and the
+ * counterexample assigns a negative value to {@code x}, this strategy adds
+ * an {@code &quot;x &gt;= 0&quot;} or {@code &quot;x &gt; 0&quot;} assumption for each such variable.&lt;/p&gt;
+ */
+<span class="fc" id="L22">public class PositivityRefinementStrategy implements RefinementStrategy {</span>
+
+    /** Functions that require strictly positive arguments. */
+<span class="fc" id="L25">    private static final Set&lt;String&gt; STRICTLY_POSITIVE_FUNCS = Set.of(&quot;log&quot;, &quot;ln&quot;);</span>
+
+    /** Functions that require non-negative (&gt;= 0) arguments. */
+<span class="fc" id="L28">    private static final Set&lt;String&gt; NON_NEGATIVE_FUNCS = Set.of(&quot;sqrt&quot;);</span>
+
+<span class="fc" id="L30">    private static final Pattern FUNC_ARG_PATTERN =</span>
+<span class="fc" id="L31">        Pattern.compile(&quot;\\b(sqrt|log|ln)\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)&quot;);</span>
+
+    @Override
+    public String name() {
+<span class="nc" id="L35">        return &quot;positivity-constraint&quot;;</span>
+    }
+
+    @Override
+    public Optional&lt;RefinementProposal&gt; refine(
+        HypothesisRevision revision,
+        CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+    ) {
+        // Find functions that impose positivity requirements in the pattern
+<span class="fc" id="L44">        Set&lt;String&gt; nonNegVars = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L45">        Set&lt;String&gt; strictlyPosVars = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L46">        extractPositivityVars(revision.leftPattern(), nonNegVars, strictlyPosVars);</span>
+<span class="fc" id="L47">        extractPositivityVars(revision.rightPattern(), nonNegVars, strictlyPosVars);</span>
+
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        if (nonNegVars.isEmpty() &amp;&amp; strictlyPosVars.isEmpty()) {</span>
+<span class="fc" id="L50">            return Optional.empty();</span>
+        }
+
+        // Only apply if the counterexample assigns a negative value to one of those vars
+<span class="fc" id="L54">        Set&lt;String&gt; negativeVars = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (counterexampleResult.counterexample().isPresent()) {</span>
+<span class="fc" id="L56">            CounterexampleSearchService.Counterexample cex = counterexampleResult.counterexample().get();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            for (String assignment : cex.assignments()) {</span>
+<span class="fc" id="L58">                String[] parts = assignment.split(&quot;=&quot;, 2);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                if (parts.length == 2) {</span>
+<span class="fc" id="L60">                    String varName = parts[0].strip();</span>
+<span class="fc" id="L61">                    String value = parts[1].strip();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                    if (isNegativeNumeric(value)) {</span>
+<span class="fc" id="L63">                        negativeVars.add(varName);</span>
+                    }
+                }
+<span class="fc" id="L66">            }</span>
+        }
+
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (negativeVars.isEmpty()) {</span>
+<span class="nc" id="L70">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L73">        List&lt;String&gt; newAssumptions = new ArrayList&lt;&gt;(revision.assumptions());</span>
+<span class="fc" id="L74">        boolean changed = false;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (String var : negativeVars) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (strictlyPosVars.contains(var)) {</span>
+<span class="fc" id="L77">                String constraint = var + &quot; &gt; 0&quot;;</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                if (!newAssumptions.contains(constraint)) {</span>
+<span class="fc" id="L79">                    newAssumptions.add(constraint);</span>
+<span class="fc" id="L80">                    changed = true;</span>
+                }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            } else if (nonNegVars.contains(var)) {</span>
+<span class="fc" id="L83">                String constraint = var + &quot; &gt;= 0&quot;;</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                if (!newAssumptions.contains(constraint)) {</span>
+<span class="fc" id="L85">                    newAssumptions.add(constraint);</span>
+<span class="fc" id="L86">                    changed = true;</span>
+                }
+            }
+<span class="fc" id="L89">        }</span>
+
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!changed) {</span>
+<span class="nc" id="L92">            return Optional.empty();</span>
+        }
+<span class="fc" id="L94">        return Optional.of(new RefinementProposal(</span>
+<span class="fc" id="L95">            revision.leftPattern(), revision.rightPattern(), newAssumptions</span>
+        ));
+    }
+
+    private static void extractPositivityVars(
+        String pattern,
+        Set&lt;String&gt; nonNegVars,
+        Set&lt;String&gt; strictlyPosVars
+    ) {
+<span class="fc" id="L104">        Matcher m = FUNC_ARG_PATTERN.matcher(pattern);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        while (m.find()) {</span>
+<span class="fc" id="L106">            String func = m.group(1);</span>
+<span class="fc" id="L107">            String arg = m.group(2);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (STRICTLY_POSITIVE_FUNCS.contains(func)) {</span>
+<span class="fc" id="L109">                strictlyPosVars.add(arg);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            } else if (NON_NEGATIVE_FUNCS.contains(func)) {</span>
+<span class="fc" id="L111">                nonNegVars.add(arg);</span>
+            }
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">    }</span>
+
+    private static boolean isNegativeNumeric(String value) {
+        try {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            return Double.parseDouble(value) &lt; 0;</span>
+<span class="nc" id="L119">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L120">            return value.startsWith(&quot;-&quot;);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
