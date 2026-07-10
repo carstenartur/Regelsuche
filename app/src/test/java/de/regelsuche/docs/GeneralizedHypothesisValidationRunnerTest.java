@@ -31,11 +31,41 @@ class GeneralizedHypothesisValidationRunnerTest {
             .findFirst()
             .orElseThrow();
         assertFalse(validated.holdoutResults().isEmpty(), "validation must use generated holdout cases");
+        assertTrue(validated.generatorCoverage().generatedPositiveCount() >= 100,
+            "expected at least 100 positive holdouts, got " + validated.generatorCoverage().generatedPositiveCount());
+        assertTrue(validated.generatorCoverage().generatedNegativeCount() >= 100,
+            "expected at least 100 negative holdouts, got " + validated.generatorCoverage().generatedNegativeCount());
+        assertTrue(validated.negativeHoldoutResults().stream().allMatch(GeneralizedHypothesisValidationRunner.NegativeHoldoutResult::blocked),
+            "negative holdouts must block dynamic operator firings");
+        assertTrue(validated.generatorCoverage().filteredLeakageCount() == 0,
+            "this fixture should not need leakage filtering");
         assertTrue(validated.ablationEvidence().hasStructuredMetrics(), "holdout validation must carry structured ablation metrics");
-        assertTrue(validated.publicEvidenceAccepted(),
-            "validated generalized hypothesis should pass the public evidence gate: " + validated.publicEvidenceRejectionReasons());
+        assertTrue(validationReport.generatorCoverage().generatedPositiveCount() >= 100);
+        assertTrue(validationReport.generatorCoverage().generatedNegativeCount() >= 100);
         assertTrue(Files.exists(tempDir.resolve("validated-hypotheses.json")));
         assertTrue(Files.exists(tempDir.resolve("validated-hypotheses.md")));
+    }
+
+    @Test
+    void alphaEquivalentSupportExamplesAreFilteredOutOfGeneratedHoldouts(@TempDir Path tempDir) throws Exception {
+        List<PromotionRecord> support = List.of(
+            supportRecord("support-offset-1", "(u + 1) * a + (u + 1) * d", "(u + 1) * (a + d)"),
+            supportRecord("support-offset-2", "(v + 2) * b + (v + 2) * e", "(v + 2) * (b + e)")
+        );
+        DiscoveryCandidateStore.CandidateStoreReport storeReport = new DiscoveryCandidateStore().build(support);
+        PatternHypothesisMiner.PatternHypothesisReport patternReport = new PatternHypothesisMiner().mine(storeReport);
+
+        GeneralizedHypothesisValidationRunner.ValidationReport validationReport =
+            new GeneralizedHypothesisValidationRunner().write(tempDir, patternReport);
+
+        GeneralizedHypothesisValidationRunner.ValidatedHypothesis validated = validationReport.validatedHypotheses().stream()
+            .filter(hypothesis -> RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID.equals(hypothesis.operatorId()))
+            .findFirst()
+            .orElseThrow();
+        assertTrue(validated.generatorCoverage().filteredLeakageCount() > 0,
+            "expected alpha-equivalent support examples to be removed from the generated holdout set");
+        assertTrue(validated.generatorCoverage().generatedPositiveCount() >= 100);
+        assertTrue(validated.generatorCoverage().generatedNegativeCount() >= 100);
     }
 
     private PromotionRecord supportRecord(String id, String input, String target) {

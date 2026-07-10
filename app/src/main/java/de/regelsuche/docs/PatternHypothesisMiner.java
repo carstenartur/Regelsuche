@@ -80,6 +80,13 @@ final class PatternHypothesisMiner {
                 supportingExampleIds.size(),
                 supportingExampleIds,
                 supportingCandidateIds,
+                deduplicatedExamples.stream()
+                    .map(example -> new SupportExampleRef(
+                        example.exampleId(),
+                        example.inputExpression(),
+                        example.targetExpression()
+                    ))
+                    .toList(),
                 pattern.parameterRelations(),
                 pattern.expressionPlaceholderValues(),
                 "GENERALIZED_FROM_SUPPORT"
@@ -285,6 +292,7 @@ final class PatternHypothesisMiner {
         int supportCount,
         List<String> supportingExampleIds,
         List<String> supportingCandidateIds,
+        List<SupportExampleRef> supportExamples,
         List<String> parameterRelations,
         Map<String, List<String>> expressionPlaceholderValues,
         String confidence
@@ -292,9 +300,18 @@ final class PatternHypothesisMiner {
         GeneralizedHypothesis {
             supportingExampleIds = supportingExampleIds == null ? List.of() : List.copyOf(supportingExampleIds);
             supportingCandidateIds = supportingCandidateIds == null ? List.of() : List.copyOf(supportingCandidateIds);
+            supportExamples = supportExamples == null ? List.of() : List.copyOf(supportExamples);
             parameterRelations = parameterRelations == null ? List.of() : List.copyOf(parameterRelations);
             expressionPlaceholderValues = expressionPlaceholderValues == null ? Map.of() : Map.copyOf(expressionPlaceholderValues);
             confidence = confidence == null ? "" : confidence;
+        }
+    }
+
+    record SupportExampleRef(String exampleId, String inputExpression, String targetExpression) {
+        SupportExampleRef {
+            exampleId = exampleId == null ? "" : exampleId;
+            inputExpression = inputExpression == null ? "" : inputExpression;
+            targetExpression = targetExpression == null ? "" : targetExpression;
         }
     }
 
