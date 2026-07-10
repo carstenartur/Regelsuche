@@ -62,6 +62,7 @@ final class GeneralizedHypothesisValidationRunner {
     private final PromotionDecider decider = new PromotionDecider();
     private final PublicEvidenceGate publicEvidenceGate = new PublicEvidenceGate();
     private final HoldoutLeakageChecker leakageChecker = new HoldoutLeakageChecker();
+    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
 
     ValidationReport run(PatternHypothesisMiner.PatternHypothesisReport patternReport) {
         List<PatternHypothesisMiner.GeneralizedHypothesis> hypotheses = patternReport == null
@@ -208,7 +209,7 @@ final class GeneralizedHypothesisValidationRunner {
         List<Transformation> candidates = operator == null ? List.of() : operator.generateCandidates(holdout.inputExpression());
         boolean operatorFired = candidates.stream().anyMatch(candidate -> hypothesis.operatorId().equals(candidate.rule()));
         boolean rewroteToForbiddenTarget = candidates.stream().anyMatch(candidate ->
-            normalize(candidate.transformedExpression()).equals(normalize(holdout.targetExpression())));
+            comparableExpressionKey(candidate.transformedExpression()).equals(comparableExpressionKey(holdout.targetExpression())));
         return new NegativeHoldoutResult(
             holdout.id(),
             holdout.inputExpression(),
@@ -849,6 +850,7 @@ final class GeneralizedHypothesisValidationRunner {
             holdouts.stream().filter(holdout -> holdout.expectation() == HoldoutExpectation.POSITIVE).count(),
             holdouts.stream().filter(holdout -> holdout.expectation() == HoldoutExpectation.NEGATIVE).count(),
             countBy(holdouts, HoldoutCase::templateId),
+            countBy(holdouts, HoldoutCase::structureClass),
             countBy(holdouts, HoldoutCase::domainClass),
             countBy(holdouts, HoldoutCase::assumptionClass),
             filteredLeakage.size(),
@@ -874,6 +876,7 @@ final class GeneralizedHypothesisValidationRunner {
             positives,
             negatives,
             mergeMaps(validatedHypotheses, coverage -> coverage.byTemplate()),
+            mergeMaps(validatedHypotheses, coverage -> coverage.byStructureClass()),
             mergeMaps(validatedHypotheses, coverage -> coverage.byDomain()),
             mergeMaps(validatedHypotheses, coverage -> coverage.byAssumptionClass()),
             filteredLeakage,
@@ -1013,6 +1016,7 @@ final class GeneralizedHypothesisValidationRunner {
         out.append("- negative holdouts: ").append(report.generatorCoverage().generatedNegativeCount()).append('\n');
         out.append("- filtered leakage cases: ").append(report.generatorCoverage().filteredLeakageCount()).append('\n');
         out.append("- template coverage: ").append(escape(report.generatorCoverage().byTemplate().toString())).append('\n');
+        out.append("- structure coverage: ").append(escape(report.generatorCoverage().byStructureClass().toString())).append('\n');
         out.append("- domain coverage: ").append(escape(report.generatorCoverage().byDomain().toString())).append('\n');
         out.append("- assumption coverage: ").append(escape(report.generatorCoverage().byAssumptionClass().toString())).append('\n');
         out.append("- leakage coverage: ").append(escape(report.generatorCoverage().filteredLeakageByKind().toString())).append('\n');
@@ -1033,6 +1037,14 @@ final class GeneralizedHypothesisValidationRunner {
 
     private String normalize(String value) {
         return value == null ? "" : value.replaceAll("\\s+", "");
+    }
+
+    private String comparableExpressionKey(String expression) {
+        try {
+            return canonicalizer.canonicalize(expression);
+        } catch (RuntimeException exception) {
+            return normalize(expression);
+        }
     }
 
     record ValidationReport(
@@ -1146,6 +1158,7 @@ final class GeneralizedHypothesisValidationRunner {
         long generatedPositiveCount,
         long generatedNegativeCount,
         Map<String, Long> byTemplate,
+        Map<String, Long> byStructureClass,
         Map<String, Long> byDomain,
         Map<String, Long> byAssumptionClass,
         long filteredLeakageCount,
@@ -1154,6 +1167,7 @@ final class GeneralizedHypothesisValidationRunner {
     ) {
         GeneratorCoverage {
             byTemplate = byTemplate == null ? Map.of() : Map.copyOf(byTemplate);
+            byStructureClass = byStructureClass == null ? Map.of() : Map.copyOf(byStructureClass);
             byDomain = byDomain == null ? Map.of() : Map.copyOf(byDomain);
             byAssumptionClass = byAssumptionClass == null ? Map.of() : Map.copyOf(byAssumptionClass);
             filteredLeakageByKind = filteredLeakageByKind == null ? Map.of() : Map.copyOf(filteredLeakageByKind);
@@ -1161,7 +1175,7 @@ final class GeneralizedHypothesisValidationRunner {
         }
 
         private static GeneratorCoverage empty() {
-            return new GeneratorCoverage(0, 0, Map.of(), Map.of(), Map.of(), 0, Map.of(), COVERAGE_NOTE);
+            return new GeneratorCoverage(0, 0, Map.of(), Map.of(), Map.of(), Map.of(), 0, Map.of(), COVERAGE_NOTE);
         }
     }
 

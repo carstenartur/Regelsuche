@@ -35,6 +35,8 @@ class GeneralizedHypothesisValidationRunnerTest {
             "expected at least 100 positive holdouts, got " + validated.generatorCoverage().generatedPositiveCount());
         assertTrue(validated.generatorCoverage().generatedNegativeCount() >= 100,
             "expected at least 100 negative holdouts, got " + validated.generatorCoverage().generatedNegativeCount());
+        assertFalse(validated.generatorCoverage().byStructureClass().isEmpty(),
+            "expected generator coverage to include structure-class counts");
         assertTrue(validated.negativeHoldoutResults().stream().allMatch(GeneralizedHypothesisValidationRunner.NegativeHoldoutResult::blocked),
             "negative holdouts must block dynamic operator firings");
         assertTrue(validated.generatorCoverage().filteredLeakageCount() == 0,
@@ -42,8 +44,11 @@ class GeneralizedHypothesisValidationRunnerTest {
         assertTrue(validated.ablationEvidence().hasStructuredMetrics(), "holdout validation must carry structured ablation metrics");
         assertTrue(validationReport.generatorCoverage().generatedPositiveCount() >= 100);
         assertTrue(validationReport.generatorCoverage().generatedNegativeCount() >= 100);
+        assertFalse(validationReport.generatorCoverage().byStructureClass().isEmpty());
         assertTrue(Files.exists(tempDir.resolve("validated-hypotheses.json")));
         assertTrue(Files.exists(tempDir.resolve("validated-hypotheses.md")));
+        assertTrue(Files.readString(tempDir.resolve("validated-hypotheses.md")).contains("structure coverage:"),
+            "markdown report should surface structure coverage");
     }
 
     @Test
@@ -66,6 +71,19 @@ class GeneralizedHypothesisValidationRunnerTest {
             "expected alpha-equivalent support examples to be removed from the generated holdout set");
         assertTrue(validated.generatorCoverage().generatedPositiveCount() >= 100);
         assertTrue(validated.generatorCoverage().generatedNegativeCount() >= 100);
+    }
+
+    @Test
+    void canonicalNegativeTargetComparisonTreatsEquivalentFormattingAsRewrite() throws Exception {
+        GeneralizedHypothesisValidationRunner runner = new GeneralizedHypothesisValidationRunner();
+        var comparison = GeneralizedHypothesisValidationRunner.class
+            .getDeclaredMethod("comparableExpressionKey", String.class);
+        comparison.setAccessible(true);
+
+        assertTrue(comparison.invoke(runner, "a * (b + c)").equals(comparison.invoke(runner, "(a) * ((b + c))")),
+            "canonical comparison should treat equivalent formatting and parentheses as the same target");
+        assertFalse(comparison.invoke(runner, "a * (b + c)").equals(comparison.invoke(runner, "a * (b - c)")),
+            "distinct targets must still compare differently");
     }
 
     private PromotionRecord supportRecord(String id, String input, String target) {
