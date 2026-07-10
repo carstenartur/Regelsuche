@@ -54,10 +54,11 @@ public class SmtProofBridge implements ProofBridge {
 
     private String toSmt(Assumption assumption) {
         return switch (assumption.kind()) {
-            case NON_ZERO -> "(distinct " + renderTerm(assumption) + " 0)";
+            case NON_ZERO, INVERTIBLE -> "(distinct " + renderTerm(assumption) + " 0)";
             case POSITIVE -> "(> " + renderTerm(assumption) + " 0)";
             case NON_NEGATIVE -> "(>= " + renderTerm(assumption) + " 0)";
-            case REAL, INTEGER, RATIONAL, UNKNOWN, DOMAIN, CUSTOM ->
+            case NATURAL -> "(>= " + renderTerm(assumption) + " 0)";
+            case REAL, INTEGER, RATIONAL, UNKNOWN, DOMAIN_MEMBERSHIP, DOMAIN, CUSTOM_PREDICATE, CUSTOM ->
                 "(! true :named " + sanitize(assumption.expression()) + ")";
         };
     }

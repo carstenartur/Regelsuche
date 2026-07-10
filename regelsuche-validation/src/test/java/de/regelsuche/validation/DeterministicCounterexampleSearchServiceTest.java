@@ -125,13 +125,34 @@ class DeterministicCounterexampleSearchServiceTest {
     }
 
     @Test
-    void domainAssumptionsAreOnlyInferredForDirectVariables() {
+    void logDomainInferenceTracksCompositePredicateAndProofEncodings() {
         CounterexampleSearchService.CounterexampleSearchResult result = service.search(
             new CounterexampleSearchService.HypothesisInput("h", "log(x^2 - 2)", "log(x^2 - 2)", List.of()),
             CounterexampleSearchService.CounterexampleBudget.defaultBudget()
         );
 
-        assertTrue(result.inferredAssumptions().isEmpty());
+        assertTrue(result.inferredAssumptions().contains("x ^ 2 - 2 > 0"));
+        assertTrue(result.typedAssumptions().stream().anyMatch(assumption ->
+            assumption.kind() == CounterexampleSearchService.AssumptionKind.POSITIVE
+                && assumption.normalizedPredicate().equals("x ^ 2 - 2 > 0")
+                && assumption.affectedVariables().contains("x")
+                && assumption.evidenceSources().contains("numeric-boundary-values")
+                && assumption.proofEncodings().stream().anyMatch(encoding -> encoding.dialect().equals("lean"))));
+    }
+
+    @Test
+    void fractionalPowerInferenceRequiresNonNegativeBase() {
+        CounterexampleSearchService.CounterexampleSearchResult result = service.search(
+            new CounterexampleSearchService.HypothesisInput("h", "x ^ 0.5", "sqrt(x)", List.of()),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+        );
+
+        assertFalse(result.counterexample().isPresent());
+        assertTrue(result.inferredAssumptions().contains("x >= 0"));
+        assertTrue(result.typedAssumptions().stream().anyMatch(assumption ->
+            assumption.kind() == CounterexampleSearchService.AssumptionKind.NON_NEGATIVE
+                && assumption.normalizedPredicate().equals("x >= 0")
+                && assumption.proofEncodings().stream().anyMatch(encoding -> encoding.dialect().equals("smtlib"))));
     }
 
     @Test

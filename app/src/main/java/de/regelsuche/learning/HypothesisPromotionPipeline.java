@@ -7,6 +7,7 @@ import de.regelsuche.mining.HypothesisRefinementLoop;
 import de.regelsuche.mining.HypothesisRevision;
 import de.regelsuche.mining.InterestingnessScore;
 import de.regelsuche.mining.InterestingnessRankingStrategy;
+import de.regelsuche.mining.AssumptionMinimizer;
 import de.regelsuche.mining.HypothesisRepository;
 import de.regelsuche.mining.RefinementStrategy;
 import de.regelsuche.mining.RuleCandidate;
@@ -281,7 +282,41 @@ public class HypothesisPromotionPipeline {
         if (!mergedAssumptions.equals(updated.assumptions())) {
             updated = updated.withAssumptions(mergedAssumptions);
         }
+        if (counterexampleResult.status() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND) {
+            List<String> minimizableAssumptions = updated.assumptions().stream()
+                .filter(HypothesisPromotionPipeline::isMinimizableAssumption)
+                .toList();
+            if (minimizableAssumptions.size() > 1) {
+                List<String> preservedAssumptions = updated.assumptions().stream()
+                    .filter(assumption -> !isMinimizableAssumption(assumption))
+                    .toList();
+                HypothesisCandidate minimized = AssumptionMinimizer.analyze(
+                    updated.withAssumptions(minimizableAssumptions),
+                    challengedCandidate -> counterexampleService.search(
+                new CounterexampleSearchService.HypothesisInput(
+                    challengedCandidate.id(),
+                    challengedCandidate.leftPattern(),
+                    challengedCandidate.rightPattern(),
+                    challengedCandidate.assumptions()
+                ),
+                CounterexampleSearchService.CounterexampleBudget.defaultBudget()
+                    )).minimizedCandidate();
+                List<String> finalAssumptions = new ArrayList<>(preservedAssumptions);
+                finalAssumptions.addAll(minimized.assumptions());
+                updated = updated.withAssumptions(finalAssumptions);
+            }
+        }
         return updated;
+    }
+
+    private static boolean isMinimizableAssumption(String assumption) {
+        if (assumption == null) {
+            return false;
+        }
+        return assumption.contains(" != 0")
+            || assumption.contains(" > 0")
+            || assumption.contains(" >= 0")
+            || assumption.contains(" ∈ ");
     }
 
     /**

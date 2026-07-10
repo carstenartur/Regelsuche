@@ -154,7 +154,8 @@ public interface CounterexampleSearchService {
         Optional<Counterexample> counterexample,
         List<String> inferredAssumptions,
         List<String> attemptedSources,
-        String explanation
+        String explanation,
+        List<TypedAssumption> typedAssumptions
     ) {
         public CounterexampleSearchResult(Optional<Counterexample> counterexample, List<String> inferredAssumptions, List<String> attemptedSources) {
             this(deriveStatus(counterexample, attemptedSources), counterexample, inferredAssumptions, attemptedSources,
@@ -171,6 +172,16 @@ public interface CounterexampleSearchService {
                 deriveExplanation(status == null ? deriveStatus(counterexample, attemptedSources) : status, attemptedSources));
         }
 
+        public CounterexampleSearchResult(
+            Status status,
+            Optional<Counterexample> counterexample,
+            List<String> inferredAssumptions,
+            List<String> attemptedSources,
+            String explanation
+        ) {
+            this(status, counterexample, inferredAssumptions, attemptedSources, explanation, typedAssumptionsFromExpressions(inferredAssumptions));
+        }
+
         public CounterexampleSearchResult {
             status = status == null ? deriveStatus(counterexample, attemptedSources) : status;
             counterexample = counterexample == null ? Optional.empty() : counterexample;
@@ -179,6 +190,9 @@ public interface CounterexampleSearchService {
             explanation = explanation == null || explanation.isBlank()
                 ? deriveExplanation(status, attemptedSources)
                 : explanation;
+            typedAssumptions = typedAssumptions == null || typedAssumptions.isEmpty()
+                ? typedAssumptionsFromExpressions(inferredAssumptions)
+                : List.copyOf(typedAssumptions);
         }
 
         public static CounterexampleSearchResult noCounterexample() {
@@ -207,6 +221,22 @@ public interface CounterexampleSearchService {
             );
         }
 
+        public static CounterexampleSearchResult counterexampleFound(
+            Counterexample counterexample,
+            List<String> inferredAssumptions,
+            List<String> attemptedSources,
+            List<TypedAssumption> typedAssumptions
+        ) {
+            return new CounterexampleSearchResult(
+                Status.COUNTEREXAMPLE_FOUND,
+                Optional.of(counterexample),
+                inferredAssumptions,
+                attemptedSources,
+                "refuting sample found",
+                typedAssumptions
+            );
+        }
+
         public static CounterexampleSearchResult noCounterexampleFound(
             List<String> inferredAssumptions,
             List<String> attemptedSources
@@ -217,6 +247,21 @@ public interface CounterexampleSearchService {
                 inferredAssumptions,
                 attemptedSources,
                 deriveExplanation(Status.NO_COUNTEREXAMPLE_FOUND, attemptedSources)
+            );
+        }
+
+        public static CounterexampleSearchResult noCounterexampleFound(
+            List<String> inferredAssumptions,
+            List<String> attemptedSources,
+            List<TypedAssumption> typedAssumptions
+        ) {
+            return new CounterexampleSearchResult(
+                Status.NO_COUNTEREXAMPLE_FOUND,
+                Optional.empty(),
+                inferredAssumptions,
+                attemptedSources,
+                deriveExplanation(Status.NO_COUNTEREXAMPLE_FOUND, attemptedSources),
+                typedAssumptions
             );
         }
 
@@ -238,6 +283,74 @@ public interface CounterexampleSearchService {
                     ? "no executable counterexample source was available"
                     : "counterexample search ended without a reliable verdict";
             };
+        }
+
+        private static List<TypedAssumption> typedAssumptionsFromExpressions(List<String> inferredAssumptions) {
+            if (inferredAssumptions == null || inferredAssumptions.isEmpty()) {
+                return List.of();
+            }
+            return inferredAssumptions.stream()
+                .map(predicate -> new TypedAssumption(
+                    AssumptionKind.CUSTOM_PREDICATE,
+                    predicate,
+                    predicate,
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    AssumptionClassification.UNKNOWN
+                ))
+                .toList();
+        }
+    }
+
+    enum AssumptionKind {
+        NON_ZERO,
+        POSITIVE,
+        NON_NEGATIVE,
+        INTEGER,
+        NATURAL,
+        INVERTIBLE,
+        DOMAIN_MEMBERSHIP,
+        CUSTOM_PREDICATE
+    }
+
+    enum AssumptionClassification {
+        REQUIRED,
+        REDUNDANT_WITHIN_TESTED_EVIDENCE,
+        UNSUPPORTED,
+        UNKNOWN
+    }
+
+    record ProofEncoding(String dialect, String expression) {
+        public ProofEncoding {
+            dialect = dialect == null ? "" : dialect;
+            expression = expression == null ? "" : expression;
+        }
+    }
+
+    record TypedAssumption(
+        AssumptionKind kind,
+        String normalizedPredicate,
+        String subjectExpression,
+        List<String> affectedVariables,
+        List<String> evidenceSources,
+        List<ProofEncoding> proofEncodings,
+        AssumptionClassification classification
+    ) {
+        public TypedAssumption {
+            if (kind == null) {
+                throw new IllegalArgumentException("kind must not be null");
+            }
+            if (normalizedPredicate == null || normalizedPredicate.isBlank()) {
+                throw new IllegalArgumentException("normalizedPredicate must not be blank");
+            }
+            subjectExpression = subjectExpression == null || subjectExpression.isBlank()
+                ? normalizedPredicate
+                : subjectExpression;
+            affectedVariables = affectedVariables == null ? List.of() : List.copyOf(affectedVariables);
+            evidenceSources = evidenceSources == null ? List.of() : List.copyOf(evidenceSources);
+            proofEncodings = proofEncodings == null ? List.of() : List.copyOf(proofEncodings);
+            classification = classification == null ? AssumptionClassification.UNKNOWN : classification;
         }
     }
 
