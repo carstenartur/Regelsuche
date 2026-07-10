@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.transform.RepeatedSubexpressionFactorizationHypothesisOperator;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -143,6 +146,56 @@ class DiscoveryCampaignSevenRunnerTest {
                     result.id() + ": structured ablation for DEGRADED case must be promotion-ready");
             }
         }
+    }
+
+    @Test
+    void campaignSevenStructuredAblationStatusMatchesReportedStatus(@TempDir Path tempDir) throws Exception {
+        DiscoveryCampaignSevenRunner runner = new DiscoveryCampaignSevenRunner();
+        DiscoveryCampaignSevenRunner.CampaignReport report = runner.writeReport(tempDir);
+
+        for (DiscoveryCampaignSevenRunner.CaseResult result : report.results()) {
+            assertEquals(result.ablationStatus(), result.structuredAblation().ablationStatus(),
+                result.id() + ": structured ablation status must match the campaign report status");
+        }
+    }
+
+    @Test
+    void campaignSevenFallsBackToAblationNotesWhenCaseNotesAreBlank() throws Exception {
+        DiscoveryCampaignSevenRunner runner = new DiscoveryCampaignSevenRunner();
+        Class<?> campaignCaseClass = Class.forName("de.regelsuche.docs.DiscoveryCampaignSevenRunner$CampaignCase");
+        Constructor<?> constructor = campaignCaseClass.getDeclaredConstructor(
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            List.class,
+            String.class,
+            List.class,
+            String.class
+        );
+        constructor.setAccessible(true);
+        Object campaignCase = constructor.newInstance(
+            "rsf-x2-plus-x-blank-notes",
+            "factorization",
+            "x^2 + x",
+            "x*(x + 1)",
+            List.of("repeated_subexpression_factorization"),
+            RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID,
+            List.of("sympy-polynomial-basic"),
+            ""
+        );
+        Method evaluate = DiscoveryCampaignSevenRunner.class.getDeclaredMethod("evaluate", campaignCaseClass);
+        evaluate.setAccessible(true);
+
+        DiscoveryCampaignSevenRunner.CaseResult result =
+            (DiscoveryCampaignSevenRunner.CaseResult) evaluate.invoke(runner, campaignCase);
+        PromotionObservation observation = PromotionObservation.fromCampaignSeven(result, "discovery-campaign-7");
+
+        assertFalse(result.notes().isBlank(), "blank case notes must fall back to ablation notes");
+        assertEquals(result.structuredAblation().explanation(), result.notes(),
+            "campaign result notes must preserve the fallback ablation explanation");
+        assertEquals(result.notes(), observation.rationale(),
+            "promotion observation rationale must carry the fallback ablation notes");
     }
 
     @Test

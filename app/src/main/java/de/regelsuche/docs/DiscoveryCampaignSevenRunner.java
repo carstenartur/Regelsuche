@@ -186,7 +186,8 @@ public final class DiscoveryCampaignSevenRunner {
         long withoutStatesExplored = disabled.withoutMacroRun().analytics().statesExplored();
         boolean degraded = !disabled.success()
             || withoutPathLength > withPathLength
-            || withoutStatesExplored > withStatesExplored;
+            || withoutStatesExplored > withStatesExplored
+            || shortcutEdge(disabled, campaignCase).isEmpty();
         String notes = disabled.success()
             ? disabled.failureReason().isBlank()
                 ? "disabled path length " + disabled.withoutMacroRun().path().size()
@@ -454,10 +455,17 @@ public final class DiscoveryCampaignSevenRunner {
             if ("N/A".equals(status) || withPathLength < 0) {
                 return AblationEvidence.statusOnly(status, explanation);
             }
-            return AblationEvidence.compare(
+            AblationEvidence compared = AblationEvidence.compare(
                 withSuccess, withPathLength, withStatesExplored,
                 withoutSuccess, withoutPathLength, withoutStatesExplored,
                 explanation
+            );
+            return new AblationEvidence(
+                compared.withCandidate(),
+                compared.withoutCandidate(),
+                compared.improvementRatio(),
+                status,
+                compared.explanation()
             );
         }
     }
