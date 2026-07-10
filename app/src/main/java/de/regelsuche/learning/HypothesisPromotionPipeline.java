@@ -3,9 +3,12 @@ package de.regelsuche.learning;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.HypothesisCandidate;
 import de.regelsuche.mining.HypothesisRankingStrategy;
+import de.regelsuche.mining.HypothesisRefinementLoop;
+import de.regelsuche.mining.HypothesisRevision;
 import de.regelsuche.mining.InterestingnessScore;
 import de.regelsuche.mining.InterestingnessRankingStrategy;
 import de.regelsuche.mining.HypothesisRepository;
+import de.regelsuche.mining.RefinementStrategy;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleCandidateMiner;
 import de.regelsuche.mining.RuleStatus;
@@ -29,7 +32,7 @@ import java.util.stream.Collectors;
  * Path-Mining (RuleCandidateMiner)
  *   → Generalisation (PatternGeneralizer / anti-unification)
  *   → HypothesisCandidate (stored in HypothesisRepository)
- *   → Counterexample Search (CounterexampleSearchService)
+ *   → Counterexample Search + Refinement Loop (HypothesisRefinementLoop)
  *   → optional Proof (EquivalenceService via CandidateValidator)
  *   → Promotion → ReusableRule (MacroRuleLearningService / RuleInventoryRepository)
  * </pre>
@@ -37,6 +40,13 @@ import java.util.stream.Collectors;
  * <p>Each step is optional: pass a no-op counterexample service if you don't
  * need that check, or set {@code autoPromote = false} to stop before inventory
  * insertion.</p>
+ *
+ * <p>When a counterexample is found, the pipeline hands off to a
+ * {@link HypothesisRefinementLoop} which attempts to refine the hypothesis
+ * (e.g. by adding constraints) until it either survives a fresh challenge
+ * ({@code VALIDATED_WITHIN_BUDGET}), exhausts the revision budget
+ * ({@code REJECTED}), or ends inconclusively ({@code INCONCLUSIVE}).
+ * The full revision history is available in the {@link PromotionResult}.</p>
  */
 public class HypothesisPromotionPipeline {
 
@@ -48,6 +58,7 @@ public class HypothesisPromotionPipeline {
     private final List<SymbolicRegressionHypothesisSource> symbolicRegressionSources;
     private final HypothesisRankingStrategy rankingStrategy;
     private final OracleValidator oracleValidator;
+    private final HypothesisRefinementLoop refinementLoop;
 
     /**
      * Full-featured constructor.
@@ -106,6 +117,21 @@ public class HypothesisPromotionPipeline {
         HypothesisRankingStrategy rankingStrategy,
         OracleValidator oracleValidator
     ) {
+        this(miner, hypothesisRepository, counterexampleService, learningService, autoPromote,
+            symbolicRegressionSources, rankingStrategy, oracleValidator, null);
+    }
+
+    HypothesisPromotionPipeline(
+        RuleCandidateMiner miner,
+        HypothesisRepository hypothesisRepository,
+        CounterexampleSearchService counterexampleService,
+        MacroRuleLearningService learningService,
+        boolean autoPromote,
+        List<SymbolicRegressionHypothesisSource> symbolicRegressionSources,
+        HypothesisRankingStrategy rankingStrategy,
+        OracleValidator oracleValidator,
+        HypothesisRefinementLoop refinementLoop
+    ) {
         this.miner = miner;
         this.hypothesisRepository = hypothesisRepository;
         this.counterexampleService = counterexampleService;
@@ -118,6 +144,9 @@ public class HypothesisPromotionPipeline {
         this.oracleValidator = oracleValidator == null
             ? (leftExpression, rightExpression) -> OracleValidator.OracleValidation.unavailable("no oracle configured")
             : oracleValidator;
+        this.refinementLoop = refinementLoop == null
+            ? new HypothesisRefinementLoop(counterexampleService)
+            : refinementLoop;
     }
 
     /**
@@ -136,6 +165,7 @@ public class HypothesisPromotionPipeline {
 
         List<HypothesisCandidate> newHypotheses = new ArrayList<>();
         List<ReusableRule> promotedRules = new ArrayList<>();
+        List<HypothesisRevision> allRevisions = new ArrayList<>();
         // Collect supporting paths of non-rejected candidates for the promotion step,
         // so rejected rules cannot be re-mined by learningService.learn().
         // Track assumptions per path-id so each path only receives the assumptions
@@ -151,32 +181,23 @@ public class HypothesisPromotionPipeline {
             RuleCandidate candidate = scoredCandidate.candidate();
             HypothesisCandidate hypothesis = scoredCandidate.hypothesis();
 
-            // Step 3: Counterexample search.
-            CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =
-                counterexampleService.search(
-                    new CounterexampleSearchService.HypothesisInput(
-                        hypothesis.id(),
-                        candidate.leftPattern(),
-                        candidate.rightPattern(),
-                        hypothesis.assumptions()
-                    ),
-                    CounterexampleSearchService.CounterexampleBudget.defaultBudget()
-                );
+            // Step 3: Counterexample search with refinement loop.
+            HypothesisRefinementLoop.RefinementOutcome outcome = refinementLoop.refine(hypothesis);
+            allRevisions.addAll(outcome.revisionHistory());
 
-            hypothesis = hypothesis.withCounterexampleResult(counterexampleResult);
-            if (!counterexampleResult.inferredAssumptions().isEmpty()) {
-                List<String> mergedAssumptions = new ArrayList<>(hypothesis.assumptions());
-                mergedAssumptions.addAll(counterexampleResult.inferredAssumptions());
-                hypothesis = hypothesis.withAssumptions(mergedAssumptions);
-            }
-            if (counterexampleResult.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {
+            CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =
+                outcome.lastSearchResult();
+
+            hypothesis = applyTerminalRevision(hypothesis, outcome.terminalRevision(), counterexampleResult);
+
+            if (outcome.isRejected()) {
                 hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);
                 // Persist with REJECTED status so downstream readers see the correct state.
                 hypothesisRepository.save(hypothesis.id(), hypothesis);
                 newHypotheses.add(hypothesis);
                 continue;
             }
-            if (counterexampleResult.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {
+            if (outcome.isInconclusive()) {
                 hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);
             }
             if (hypothesis.proofStatus().atLeast(CandidateProofStatus.VALIDATED_BY_EXAMPLES)
@@ -191,7 +212,7 @@ public class HypothesisPromotionPipeline {
 
             // Track which paths back this validated candidate for the promotion step.
             if (autoPromote
-                && counterexampleResult.status() == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND
+                && outcome.isAccepted()
                 && hypothesis.proofStatus().ordinal() >= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {
                 List<String> candidateAssumptions = hypothesis.assumptions();
                 for (String pathId : candidate.supportingTransformationIds()) {
@@ -211,25 +232,14 @@ public class HypothesisPromotionPipeline {
                 HypothesisCandidate hypothesis = proposal.withNoveltyScore(
                     normalized(InterestingnessScore.from(proposal, 0.0, domainsFor(proposal, domainsByPath)).total())
                 );
+                HypothesisRefinementLoop.RefinementOutcome outcome = refinementLoop.refine(hypothesis);
+                allRevisions.addAll(outcome.revisionHistory());
                 CounterexampleSearchService.CounterexampleSearchResult counterexampleResult =
-                    counterexampleService.search(
-                        new CounterexampleSearchService.HypothesisInput(
-                            hypothesis.id(),
-                            hypothesis.leftPattern(),
-                            hypothesis.rightPattern(),
-                            hypothesis.assumptions()
-                        ),
-                        CounterexampleSearchService.CounterexampleBudget.defaultBudget()
-                    );
-                hypothesis = hypothesis.withCounterexampleResult(counterexampleResult);
-                if (!counterexampleResult.inferredAssumptions().isEmpty()) {
-                    List<String> mergedAssumptions = new ArrayList<>(hypothesis.assumptions());
-                    mergedAssumptions.addAll(counterexampleResult.inferredAssumptions());
-                    hypothesis = hypothesis.withAssumptions(mergedAssumptions);
-                }
-                if (counterexampleResult.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {
+                    outcome.lastSearchResult();
+                hypothesis = applyTerminalRevision(hypothesis, outcome.terminalRevision(), counterexampleResult);
+                if (outcome.isRejected()) {
                     hypothesis = hypothesis.withProofStatus(CandidateProofStatus.REJECTED);
-                } else if (counterexampleResult.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {
+                } else if (outcome.isInconclusive()) {
                     hypothesis = hypothesis.withProofStatus(CandidateProofStatus.OBSERVED);
                 }
                 hypothesisRepository.save(hypothesis.id(), hypothesis);
@@ -251,7 +261,27 @@ public class HypothesisPromotionPipeline {
             }
         }
 
-        return new PromotionResult(newHypotheses, promotedRules);
+        return new PromotionResult(newHypotheses, promotedRules, List.copyOf(allRevisions));
+    }
+
+    private HypothesisCandidate applyTerminalRevision(
+        HypothesisCandidate hypothesis,
+        HypothesisRevision terminal,
+        CounterexampleSearchService.CounterexampleSearchResult counterexampleResult
+    ) {
+        HypothesisCandidate updated = hypothesis.withCounterexampleResult(counterexampleResult);
+        if (!terminal.leftPattern().equals(updated.leftPattern())
+            || !terminal.rightPattern().equals(updated.rightPattern())) {
+            updated = updated.withPatterns(terminal.leftPattern(), terminal.rightPattern());
+        }
+        List<String> mergedAssumptions = new ArrayList<>(terminal.assumptions());
+        counterexampleResult.inferredAssumptions().stream()
+            .filter(assumption -> !mergedAssumptions.contains(assumption))
+            .forEach(mergedAssumptions::add);
+        if (!mergedAssumptions.equals(updated.assumptions())) {
+            updated = updated.withAssumptions(mergedAssumptions);
+        }
+        return updated;
     }
 
     /**
@@ -259,14 +289,22 @@ public class HypothesisPromotionPipeline {
      *
      * @param newHypotheses  newly created {@link HypothesisCandidate} records
      * @param promotedRules  rules that were promoted to the inventory in this run
+     * @param revisionHistory all {@link HypothesisRevision} records created during
+     *                        the counterexample-guided refinement loop
      */
     public record PromotionResult(
         List<HypothesisCandidate> newHypotheses,
-        List<ReusableRule> promotedRules
+        List<ReusableRule> promotedRules,
+        List<HypothesisRevision> revisionHistory
     ) {
+        public PromotionResult(List<HypothesisCandidate> newHypotheses, List<ReusableRule> promotedRules) {
+            this(newHypotheses, promotedRules, List.of());
+        }
+
         public PromotionResult {
             newHypotheses = List.copyOf(newHypotheses);
             promotedRules = List.copyOf(promotedRules);
+            revisionHistory = revisionHistory == null ? List.of() : List.copyOf(revisionHistory);
         }
     }
 
