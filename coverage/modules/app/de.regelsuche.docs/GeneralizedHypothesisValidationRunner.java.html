@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeneralizedHypothesisValidationRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">GeneralizedHypothesisValidationRunner.java</span></div><h1>GeneralizedHypothesisValidationRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
+import de.regelsuche.transform.RepeatedSubexpressionFactorizationHypothesisOperator;
+import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
+/**
+ * Validates mined generalized pattern hypotheses on generated holdout cases.
+ *
+ * &lt;p&gt;This closes the first automated discovery loop after pattern mining: support examples are no longer
+ * enough for promotion. A generalized hypothesis must also succeed on generated holdout cases, survive
+ * oracle validation, show useful ablation, and pass the public evidence gate.&lt;/p&gt;
+ */
+<span class="fc" id="L29">final class GeneralizedHypothesisValidationRunner {</span>
+    static final String SOURCE_CAMPAIGN = &quot;pattern-hypothesis-validation&quot;;
+
+<span class="fc" id="L32">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L33">        .findAndRegisterModules()</span>
+<span class="fc" id="L34">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+<span class="fc" id="L36">    private final DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();</span>
+<span class="fc" id="L37">    private final PromotionDecider decider = new PromotionDecider();</span>
+<span class="fc" id="L38">    private final PublicEvidenceGate publicEvidenceGate = new PublicEvidenceGate();</span>
+
+    ValidationReport run(PatternHypothesisMiner.PatternHypothesisReport patternReport) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        List&lt;PatternHypothesisMiner.GeneralizedHypothesis&gt; hypotheses = patternReport == null</span>
+<span class="nc" id="L42">            ? List.of()</span>
+<span class="fc" id="L43">            : patternReport.hypotheses();</span>
+<span class="fc" id="L44">        List&lt;ValidatedHypothesis&gt; validated = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L45">        List&lt;RejectedHypothesis&gt; rejected = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L46">        List&lt;PromotionRecord&gt; promotionRecords = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (PatternHypothesisMiner.GeneralizedHypothesis hypothesis : hypotheses) {</span>
+<span class="fc" id="L49">            List&lt;HoldoutCase&gt; holdouts = holdoutCases(hypothesis);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (holdouts.isEmpty()) {</span>
+<span class="nc" id="L51">                rejected.add(new RejectedHypothesis(hypothesis.hypothesisId(), hypothesis.family(), hypothesis.operatorId(),</span>
+                    &quot;no-holdout-generator&quot;));
+<span class="nc" id="L53">                continue;</span>
+            }
+<span class="fc" id="L55">            ValidatedHypothesis result = validate(hypothesis, holdouts);</span>
+<span class="fc" id="L56">            validated.add(result);</span>
+<span class="fc" id="L57">            promotionRecords.add(result.promotionRecord());</span>
+<span class="fc" id="L58">        }</span>
+<span class="fc" id="L59">        long publicAccepted = validated.stream().filter(ValidatedHypothesis::publicEvidenceAccepted).count();</span>
+<span class="fc" id="L60">        return new ValidationReport(</span>
+<span class="fc" id="L61">            validated.stream().sorted(Comparator.comparing(ValidatedHypothesis::hypothesisId)).toList(),</span>
+<span class="fc" id="L62">            rejected.stream().sorted(Comparator.comparing(RejectedHypothesis::hypothesisId)).toList(),</span>
+<span class="fc" id="L63">            promotionRecords.stream().sorted(Comparator.comparing(PromotionRecord::candidateId)).toList(),</span>
+            publicAccepted
+        );
+    }
+
+    ValidationReport write(Path outputDirectory, PatternHypothesisMiner.PatternHypothesisReport patternReport) {
+        try {
+<span class="fc" id="L70">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L71">            ValidationReport report = run(patternReport);</span>
+<span class="fc" id="L72">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L73">                outputDirectory.resolve(&quot;validated-hypotheses.json&quot;),</span>
+<span class="fc" id="L74">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+            );
+<span class="fc" id="L76">            Files.writeString(</span>
+<span class="fc" id="L77">                outputDirectory.resolve(&quot;validated-hypotheses.md&quot;),</span>
+<span class="fc" id="L78">                renderMarkdown(report),</span>
+                StandardCharsets.UTF_8
+            );
+<span class="fc" id="L81">            return report;</span>
+<span class="nc" id="L82">        } catch (IOException exception) {</span>
+<span class="nc" id="L83">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private ValidatedHypothesis validate(
+        PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
+        List&lt;HoldoutCase&gt; holdouts
+    ) {
+<span class="fc" id="L91">        List&lt;HoldoutResult&gt; results = holdouts.stream()</span>
+<span class="fc" id="L92">            .map(holdout -&gt; validateHoldout(hypothesis, holdout))</span>
+<span class="fc" id="L93">            .toList();</span>
+<span class="fc" id="L94">        AblationEvidence ablation = aggregateAblation(hypothesis, results);</span>
+<span class="fc" id="L95">        PromotionRecord record = promotionRecord(hypothesis, results, ablation);</span>
+<span class="fc" id="L96">        PublicEvidenceGate.GateDecision gateDecision = publicEvidenceGate.evaluate(record, NoveltyStatus.NEW);</span>
+<span class="fc" id="L97">        return new ValidatedHypothesis(</span>
+<span class="fc" id="L98">            hypothesis.hypothesisId(),</span>
+<span class="fc" id="L99">            hypothesis.family(),</span>
+<span class="fc" id="L100">            hypothesis.operatorId(),</span>
+<span class="fc" id="L101">            hypothesis.leftPattern(),</span>
+<span class="fc" id="L102">            hypothesis.rightPattern(),</span>
+<span class="fc" id="L103">            hypothesis.supportCount(),</span>
+<span class="fc" id="L104">            hypothesis.supportingExampleIds(),</span>
+            results,
+            ablation,
+            record,
+<span class="fc" id="L108">            gateDecision.accepted(),</span>
+<span class="fc" id="L109">            gateDecision.rejectionReasons()</span>
+        );
+    }
+
+    private HoldoutResult validateHoldout(
+        PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
+        HoldoutCase holdout
+    ) {
+<span class="fc" id="L117">        DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(</span>
+<span class="fc" id="L118">            holdout.id(),</span>
+<span class="fc" id="L119">            holdout.id(),</span>
+<span class="fc" id="L120">            holdout.inputExpression(),</span>
+<span class="fc" id="L121">            holdout.targetExpression(),</span>
+<span class="fc" id="L122">            List.of(),</span>
+<span class="fc" id="L123">            List.of(hypothesis.operatorId()),</span>
+<span class="fc" id="L124">            holdout.enabledRulePacks(),</span>
+<span class="fc" id="L125">            List.of(),</span>
+<span class="fc" id="L126">            List.of(),</span>
+<span class="fc" id="L127">            List.of(hypothesis.operatorId()),</span>
+            new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
+            new DiscoveryBenchmarkScenario.Budgets(8, 240, 5000),
+            new DiscoveryBenchmarkScenario.Gallery(false, 1, 2)
+        );
+<span class="fc" id="L132">        DiscoveryBenchmarkEvidence withCandidate = new DiscoveryBenchmarkExecutor(loader).execute(scenario);</span>
+<span class="fc" id="L133">        DiscoveryOperatorRegistry disabledRegistry = new DiscoveryOperatorRegistry()</span>
+<span class="fc" id="L134">            .register(new DefaultDiscoveryOperatorProvider());</span>
+<span class="fc" id="L135">        disabledRegistry.disable(hypothesis.operatorId());</span>
+<span class="fc" id="L136">        DiscoveryBenchmarkEvidence withoutCandidate = new DiscoveryBenchmarkExecutor(loader, disabledRegistry).execute(scenario);</span>
+<span class="fc" id="L137">        return new HoldoutResult(</span>
+<span class="fc" id="L138">            holdout.id(),</span>
+<span class="fc" id="L139">            holdout.inputExpression(),</span>
+<span class="fc" id="L140">            holdout.targetExpression(),</span>
+<span class="fc" id="L141">            withCandidate.success(),</span>
+<span class="fc" id="L142">            pathLength(withCandidate),</span>
+<span class="fc" id="L143">            statesExplored(withCandidate),</span>
+<span class="fc" id="L144">            withoutCandidate.success(),</span>
+<span class="fc" id="L145">            pathLength(withoutCandidate),</span>
+<span class="fc" id="L146">            statesExplored(withoutCandidate),</span>
+<span class="fc" id="L147">            withCandidate.oracleStatus(),</span>
+<span class="fc" id="L148">            withCandidate.oracleEvidence(),</span>
+<span class="fc" id="L149">            aggregateRulePath(withCandidate)</span>
+        );
+    }
+
+    private AblationEvidence aggregateAblation(
+        PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
+        List&lt;HoldoutResult&gt; results
+    ) {
+<span class="fc" id="L157">        boolean withSuccess = results.stream().allMatch(HoldoutResult::withSuccess);</span>
+<span class="fc" id="L158">        boolean withoutSuccess = results.stream().allMatch(HoldoutResult::withoutSuccess);</span>
+<span class="fc" id="L159">        int withPathLength = results.stream().mapToInt(HoldoutResult::withPathLength).sum();</span>
+<span class="fc" id="L160">        int withoutPathLength = results.stream().mapToInt(HoldoutResult::withoutPathLength).sum();</span>
+<span class="fc" id="L161">        long withStatesExplored = results.stream().mapToLong(HoldoutResult::withStatesExplored).sum();</span>
+<span class="fc" id="L162">        long withoutStatesExplored = results.stream().mapToLong(HoldoutResult::withoutStatesExplored).sum();</span>
+<span class="fc" id="L163">        return AblationEvidence.compare(</span>
+            withSuccess,
+            withPathLength,
+            withStatesExplored,
+            withoutSuccess,
+            withoutPathLength,
+            withoutStatesExplored,
+<span class="fc" id="L170">            &quot;holdout validation for &quot; + hypothesis.hypothesisId() + &quot; on &quot; + results.size() + &quot; generated cases&quot;</span>
+        );
+    }
+
+    private PromotionRecord promotionRecord(
+        PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
+        List&lt;HoldoutResult&gt; results,
+        AblationEvidence ablation
+    ) {
+<span class="fc" id="L179">        HoldoutResult representative = results.getFirst();</span>
+<span class="fc" id="L180">        List&lt;String&gt; rulePath = results.stream()</span>
+<span class="fc" id="L181">            .flatMap(result -&gt; result.rulePath().stream())</span>
+<span class="pc bpc" id="L182" title="2 of 4 branches missed.">            .filter(rule -&gt; rule != null &amp;&amp; !rule.isBlank())</span>
+<span class="fc" id="L183">            .distinct()</span>
+<span class="fc" id="L184">            .toList();</span>
+<span class="fc" id="L185">        List&lt;String&gt; assumptions = assumptions(hypothesis, results);</span>
+<span class="fc" id="L186">        PromotionObservation observation = new PromotionObservation(</span>
+<span class="fc" id="L187">            hypothesis.hypothesisId() + &quot;-holdout&quot;,</span>
+            SOURCE_CAMPAIGN,
+<span class="fc" id="L189">            LocalDate.of(2026, 12, 1).toString(),</span>
+<span class="fc" id="L190">            hypothesis.family(),</span>
+<span class="fc" id="L191">            representative.inputExpression(),</span>
+<span class="fc" id="L192">            representative.targetExpression(),</span>
+<span class="fc" id="L193">            results.stream().allMatch(HoldoutResult::withSuccess),</span>
+<span class="fc" id="L194">            oracleStatus(results),</span>
+<span class="fc" id="L195">            oracleEvidence(results),</span>
+<span class="fc" id="L196">            ablation.ablationStatus(),</span>
+<span class="fc" id="L197">            hypothesis.operatorId(),</span>
+<span class="fc" id="L198">            sourcePack(hypothesis.operatorId()),</span>
+            assumptions,
+<span class="fc" id="L200">            &quot;generalized from &quot; + hypothesis.supportCount() + &quot; support examples and validated on generated holdouts&quot;,</span>
+            rulePath,
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            !rulePath.isEmpty(),</span>
+            false,
+<span class="fc" id="L204">            fallbackUsed(rulePath),</span>
+<span class="fc" id="L205">            macroOpportunity(hypothesis.family(), rulePath)</span>
+        );
+<span class="fc" id="L207">        return decider.decide(observation, ablation);</span>
+    }
+
+    private List&lt;String&gt; assumptions(PatternHypothesisMiner.GeneralizedHypothesis hypothesis, List&lt;HoldoutResult&gt; results) {
+<span class="fc" id="L211">        List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L212">        assumptions.add(&quot;generatedHypothesis.id=&quot; + hypothesis.hypothesisId());</span>
+<span class="fc" id="L213">        assumptions.add(&quot;generatedHypothesis.supportCount=&quot; + hypothesis.supportCount());</span>
+<span class="fc" id="L214">        assumptions.add(&quot;generatedHypothesis.leftPattern=&quot; + hypothesis.leftPattern());</span>
+<span class="fc" id="L215">        assumptions.add(&quot;generatedHypothesis.rightPattern=&quot; + hypothesis.rightPattern());</span>
+<span class="fc" id="L216">        assumptions.addAll(hypothesis.parameterRelations().stream()</span>
+<span class="fc" id="L217">            .map(relation -&gt; &quot;generatedHypothesis.parameterRelation=&quot; + relation)</span>
+<span class="fc" id="L218">            .toList());</span>
+<span class="fc" id="L219">        assumptions.addAll(results.stream()</span>
+<span class="fc" id="L220">            .map(result -&gt; &quot;generatedHoldout.&quot; + result.holdoutId() + &quot;=&quot;</span>
+<span class="fc" id="L221">                + result.inputExpression() + &quot; -&gt; &quot; + result.targetExpression())</span>
+<span class="fc" id="L222">            .toList());</span>
+<span class="fc" id="L223">        return List.copyOf(assumptions);</span>
+    }
+
+    private List&lt;HoldoutCase&gt; holdoutCases(PatternHypothesisMiner.GeneralizedHypothesis hypothesis) {
+<span class="fc" id="L227">        String operator = hypothesis.operatorId();</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID.equals(operator)) {</span>
+<span class="fc" id="L229">            return List.of(</span>
+<span class="fc" id="L230">                new HoldoutCase(&quot;holdout-rsf-explicit-uv&quot;, &quot;u * v + u * w&quot;, &quot;u * (v + w)&quot;, List.of()),</span>
+<span class="fc" id="L231">                new HoldoutCase(&quot;holdout-rsf-explicit-mn&quot;, &quot;m * n - m * p&quot;, &quot;m * (n - p)&quot;, List.of())</span>
+            );
+        }
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (TelescopingFractionHypothesisOperator.RULE_ID.equals(operator)) {</span>
+<span class="nc" id="L235">            return List.of(</span>
+<span class="nc" id="L236">                new HoldoutCase(&quot;holdout-tel-q56&quot;, &quot;1 / ((q + 5) * (q + 6))&quot;, &quot;1 / (q + 5) - 1 / (q + 6)&quot;, List.of()),</span>
+<span class="nc" id="L237">                new HoldoutCase(&quot;holdout-tel-r78&quot;, &quot;1 / ((r + 7) * (r + 8))&quot;, &quot;1 / (r + 7) - 1 / (r + 8)&quot;, List.of())</span>
+            );
+        }
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (RationalNormalizationHypothesisOperator.RULE_ID.equals(operator)) {</span>
+<span class="nc" id="L241">            return List.of(</span>
+<span class="nc" id="L242">                new HoldoutCase(&quot;holdout-rn-shared-denom-add&quot;, &quot;alpha / gamma + beta / gamma&quot;, &quot;(alpha + beta) / gamma&quot;, List.of()),</span>
+<span class="nc" id="L243">                new HoldoutCase(&quot;holdout-rn-shared-denom-sub&quot;, &quot;alpha / gamma - beta / gamma&quot;, &quot;(alpha - beta) / gamma&quot;, List.of())</span>
+            );
+        }
+<span class="nc" id="L246">        return List.of();</span>
+    }
+
+    private static boolean fallbackUsed(List&lt;String&gt; rulePath) {
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        return rulePath != null &amp;&amp; rulePath.stream()</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            .filter(ruleId -&gt; ruleId != null)</span>
+<span class="fc" id="L252">            .map(ruleId -&gt; ruleId.toLowerCase(Locale.ROOT))</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            .anyMatch(ruleId -&gt; ruleId.contains(&quot;fallback&quot;));</span>
+    }
+
+    private static boolean macroOpportunity(String family, List&lt;String&gt; rulePath) {
+<span class="pc bpc" id="L257" title="3 of 6 branches missed.">        return &quot;substitution&quot;.equals(family) || (rulePath != null &amp;&amp; rulePath.size() &gt;= 2);</span>
+    }
+
+    private String sourcePack(String operatorId) {
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
+<span class="fc" id="L262">            return &quot;sympy-polynomial-basic&quot;;</span>
+        }
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (TelescopingFractionHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
+<span class="nc" id="L265">            return &quot;sympy-rational-basic&quot;;</span>
+        }
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (RationalNormalizationHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
+<span class="nc" id="L268">            return &quot;rational-basic&quot;;</span>
+        }
+<span class="nc" id="L270">        return &quot;generated-holdout&quot;;</span>
+    }
+
+    private int pathLength(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L274">        return Math.max(0, evidence.withoutMacroRun().path().size() - 1);</span>
+    }
+
+    private long statesExplored(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L278">        return evidence.withoutMacroRun().analytics().statesExplored();</span>
+    }
+
+    private List&lt;String&gt; aggregateRulePath(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L282">        List&lt;String&gt; path = evidence.withoutMacroRun().appliedRuleIds();</span>
+<span class="pc bpc" id="L283" title="2 of 4 branches missed.">        if (path == null || path.isEmpty()) {</span>
+<span class="nc" id="L284">            return List.of();</span>
+        }
+<span class="fc" id="L286">        return List.copyOf(path);</span>
+    }
+
+    private String oracleStatus(List&lt;HoldoutResult&gt; results) {
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt; &quot;DISAGREE&quot;.equalsIgnoreCase(result.oracleStatus()))) {</span>
+<span class="nc" id="L291">            return &quot;DISAGREE&quot;;</span>
+        }
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt; &quot;AGREE&quot;.equalsIgnoreCase(result.oracleStatus()))) {</span>
+<span class="nc" id="L294">            return &quot;AGREE&quot;;</span>
+        }
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt; &quot;UNKNOWN&quot;.equalsIgnoreCase(result.oracleStatus()))) {</span>
+<span class="nc" id="L297">            return &quot;UNKNOWN&quot;;</span>
+        }
+<span class="fc" id="L299">        return &quot;UNAVAILABLE&quot;;</span>
+    }
+
+    private String oracleEvidence(List&lt;HoldoutResult&gt; results) {
+<span class="fc" id="L303">        Set&lt;String&gt; evidence = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (HoldoutResult result : results) {</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (!result.oracleEvidence().isBlank()) {</span>
+<span class="fc" id="L306">                evidence.add(result.holdoutId() + &quot;: &quot; + result.oracleEvidence());</span>
+            }
+<span class="fc" id="L308">        }</span>
+<span class="fc" id="L309">        return String.join(&quot;; &quot;, evidence);</span>
+    }
+
+    String renderMarkdown(ValidationReport report) {
+<span class="fc" id="L313">        StringBuilder out = new StringBuilder(&quot;# Validated generalized hypotheses\n\n&quot;);</span>
+<span class="fc" id="L314">        out.append(&quot;| Hypothesis | Family | Operator | Support | Holdouts | Ablation | Public evidence |\n&quot;);</span>
+<span class="fc" id="L315">        out.append(&quot;| --- | --- | --- | ---: | ---: | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        for (ValidatedHypothesis hypothesis : report.validatedHypotheses()) {</span>
+<span class="fc" id="L317">            out.append(&quot;| &quot;).append(escape(hypothesis.hypothesisId()))</span>
+<span class="fc" id="L318">                .append(&quot; | &quot;).append(escape(hypothesis.family()))</span>
+<span class="fc" id="L319">                .append(&quot; | &quot;).append(escape(hypothesis.operatorId()))</span>
+<span class="fc" id="L320">                .append(&quot; | &quot;).append(hypothesis.supportCount())</span>
+<span class="fc" id="L321">                .append(&quot; | &quot;).append(hypothesis.holdoutResults().size())</span>
+<span class="fc" id="L322">                .append(&quot; | &quot;).append(escape(hypothesis.ablationEvidence().ablationStatus()))</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(hypothesis.publicEvidenceAccepted() ? &quot;accepted&quot; : escape(String.join(&quot;, &quot;, hypothesis.publicEvidenceRejectionReasons())))</span>
+<span class="fc" id="L324">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L325">        }</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (!report.rejectedHypotheses().isEmpty()) {</span>
+<span class="nc" id="L327">            out.append(&quot;\n## Rejected hypotheses\n\n&quot;);</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            for (RejectedHypothesis rejected : report.rejectedHypotheses()) {</span>
+<span class="nc" id="L329">                out.append(&quot;- &quot;).append(escape(rejected.hypothesisId()))</span>
+<span class="nc" id="L330">                    .append(&quot;: &quot;).append(escape(rejected.reason()))</span>
+<span class="nc" id="L331">                    .append(&quot;\n&quot;);</span>
+<span class="nc" id="L332">            }</span>
+        }
+<span class="fc" id="L334">        return out.toString();</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    record ValidationReport(
+        List&lt;ValidatedHypothesis&gt; validatedHypotheses,
+        List&lt;RejectedHypothesis&gt; rejectedHypotheses,
+        List&lt;PromotionRecord&gt; promotionRecords,
+        long publicAcceptedCount
+    ) {
+<span class="fc" id="L347">        ValidationReport {</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">            validatedHypotheses = validatedHypotheses == null ? List.of() : List.copyOf(validatedHypotheses);</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            rejectedHypotheses = rejectedHypotheses == null ? List.of() : List.copyOf(rejectedHypotheses);</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">            promotionRecords = promotionRecords == null ? List.of() : List.copyOf(promotionRecords);</span>
+<span class="fc" id="L351">        }</span>
+    }
+
+    record ValidatedHypothesis(
+        String hypothesisId,
+        String family,
+        String operatorId,
+        String leftPattern,
+        String rightPattern,
+        int supportCount,
+        List&lt;String&gt; supportingExampleIds,
+        List&lt;HoldoutResult&gt; holdoutResults,
+        AblationEvidence ablationEvidence,
+        PromotionRecord promotionRecord,
+        boolean publicEvidenceAccepted,
+        List&lt;String&gt; publicEvidenceRejectionReasons
+    ) {
+<span class="fc" id="L368">        ValidatedHypothesis {</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            supportingExampleIds = supportingExampleIds == null ? List.of() : List.copyOf(supportingExampleIds);</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            holdoutResults = holdoutResults == null ? List.of() : List.copyOf(holdoutResults);</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            publicEvidenceRejectionReasons = publicEvidenceRejectionReasons == null ? List.of() : List.copyOf(publicEvidenceRejectionReasons);</span>
+<span class="fc" id="L372">        }</span>
+    }
+
+    record RejectedHypothesis(String hypothesisId, String family, String operatorId, String reason) {
+<span class="nc" id="L376">        RejectedHypothesis {</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
+<span class="nc" id="L378">        }</span>
+    }
+
+    record HoldoutResult(
+        String holdoutId,
+        String inputExpression,
+        String targetExpression,
+        boolean withSuccess,
+        int withPathLength,
+        long withStatesExplored,
+        boolean withoutSuccess,
+        int withoutPathLength,
+        long withoutStatesExplored,
+        String oracleStatus,
+        String oracleEvidence,
+        List&lt;String&gt; rulePath
+    ) {
+<span class="fc" id="L395">        HoldoutResult {</span>
+<span class="pc bpc" id="L396" title="2 of 4 branches missed.">            oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="fc" id="L399">        }</span>
+    }
+
+    private record HoldoutCase(String id, String inputExpression, String targetExpression, List&lt;String&gt; enabledRulePacks) {
+<span class="fc" id="L403">        private HoldoutCase {</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            enabledRulePacks = enabledRulePacks == null ? List.of() : List.copyOf(enabledRulePacks);</span>
+<span class="fc" id="L405">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -74,22 +74,36 @@ import java.util.Set;
         }
 <span class="fc" id="L75">        List&lt;HypothesisOperator&gt; operators = new ArrayList&lt;&gt;();</span>
 <span class="fc bfc" id="L76" title="All 2 branches covered.">        for (String operatorId : profile.enabledOperatorIds()) {</span>
-<span class="pc bpc" id="L77" title="2 of 6 branches missed.">            if (operatorId == null || operatorId.isBlank() || disabledOperatorIds.contains(operatorId)) {</span>
-<span class="fc" id="L78">                continue;</span>
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">            if (operatorId == null || operatorId.isBlank()) {</span>
+<span class="nc" id="L78">                continue;</span>
             }
 <span class="fc" id="L80">            DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition = operatorsById.get(operatorId);</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (definition == null) {</span>
-<span class="fc" id="L82">                continue;</span>
+<span class="fc" id="L81">            String resolvedId = operatorId;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (definition == null) {</span>
+                // Also accept rule IDs (e.g. &quot;hypothesis_*&quot;) in addition to definition IDs
+<span class="fc" id="L84">                String defId = operatorIdForRule(operatorId);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                if (!defId.isBlank()) {</span>
+<span class="fc" id="L86">                    definition = operatorsById.get(defId);</span>
+<span class="fc" id="L87">                    resolvedId = defId;</span>
+                }
             }
-<span class="fc" id="L84">            operators.add(definition.factory().get());</span>
-<span class="fc" id="L85">        }</span>
-<span class="fc" id="L86">        return List.copyOf(operators);</span>
+            // Check the disabled set after resolution so that disabling by definition ID
+            // also suppresses operators looked up via their rule ID, and vice versa.
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">            if (disabledOperatorIds.contains(operatorId) || disabledOperatorIds.contains(resolvedId)) {</span>
+<span class="nc" id="L93">                continue;</span>
+            }
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (definition == null) {</span>
+<span class="fc" id="L96">                continue;</span>
+            }
+<span class="fc" id="L98">            operators.add(definition.factory().get());</span>
+<span class="fc" id="L99">        }</span>
+<span class="fc" id="L100">        return List.copyOf(operators);</span>
     }
 
     public record OperatorProfile(List&lt;String&gt; enabledOperatorIds) {
-<span class="fc" id="L90">        public OperatorProfile {</span>
-<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            enabledOperatorIds = enabledOperatorIds == null ? List.of() : List.copyOf(enabledOperatorIds);</span>
-<span class="fc" id="L92">        }</span>
+<span class="fc" id="L104">        public OperatorProfile {</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            enabledOperatorIds = enabledOperatorIds == null ? List.of() : List.copyOf(enabledOperatorIds);</span>
+<span class="fc" id="L106">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

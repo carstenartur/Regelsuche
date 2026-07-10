@@ -291,7 +291,7 @@ final class SearchTraceCollector {
 <span class="nc" id="L291">            return false;</span>
         }
 <span class="fc" id="L293">        String operatorId = operatorRegistry.operatorIdForRule(ruleId);</span>
-<span class="pc bpc" id="L294" title="2 of 4 branches missed.">        return !operatorId.isEmpty() &amp;&amp; enabledOperators.contains(operatorId);</span>
+<span class="pc bpc" id="L294" title="1 of 4 branches missed.">        return !operatorId.isEmpty() &amp;&amp; enabledOperators.contains(operatorId);</span>
     }
 
     private List&lt;SearchEffect&gt; inferredEffects(String ruleId, Map&lt;String, ScenarioRule&gt; rulesById) {

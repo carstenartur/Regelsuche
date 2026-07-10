@@ -2,41 +2,51 @@
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /** Generates the cross-campaign discovery candidate store from the promotion pipeline records. */
-<span class="nc" id="L8">public final class DiscoveryCandidateStoreRunner {</span>
+<span class="nc" id="L10">public final class DiscoveryCandidateStoreRunner {</span>
     public static void main(String[] args) {
-<span class="nc bnc" id="L10" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
-<span class="nc" id="L11">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
-<span class="nc" id="L12">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
-<span class="nc" id="L13">        new DiscoveryCandidateStoreRunner()</span>
-<span class="nc" id="L14">            .writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-candidate-store&quot;));</span>
-<span class="nc" id="L15">    }</span>
+<span class="nc bnc" id="L12" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L13">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L14">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L15">        new DiscoveryCandidateStoreRunner()</span>
+<span class="nc" id="L16">            .writeReport(repoRoot.resolve(&quot;app/build/reports/discovery-candidate-store&quot;));</span>
+<span class="nc" id="L17">    }</span>
 
     DiscoveryCandidateStore.CandidateStoreReport run() {
-<span class="nc" id="L18">        DiscoveryPromotionPipelineRunner.PipelineReport pipeline = new DiscoveryPromotionPipelineRunner().run();</span>
-<span class="nc" id="L19">        return new DiscoveryCandidateStore().build(pipeline.promotionRecords());</span>
+<span class="nc" id="L20">        DiscoveryPromotionPipelineRunner.PipelineReport pipeline = new DiscoveryPromotionPipelineRunner().run();</span>
+<span class="nc" id="L21">        return new DiscoveryCandidateStore().build(pipeline.promotionRecords());</span>
     }
 
     DiscoveryCandidateStore.CandidateStoreReport writeReport(Path outputDirectory) {
-<span class="nc" id="L23">        DiscoveryPromotionPipelineRunner.PipelineReport pipeline = new DiscoveryPromotionPipelineRunner().run();</span>
-<span class="nc" id="L24">        DiscoveryCandidateStore.CandidateStoreReport storeReport =</span>
-<span class="nc" id="L25">            new DiscoveryCandidateStore().write(outputDirectory, pipeline.promotionRecords());</span>
-<span class="nc" id="L26">        new PatternHypothesisMiner().write(outputDirectory, storeReport);</span>
-<span class="nc" id="L27">        new PublicEvidenceGate().write(outputDirectory, pipeline.promotionRecords(), noveltyMapFrom(storeReport));</span>
-<span class="nc" id="L28">        return storeReport;</span>
+<span class="nc" id="L25">        DiscoveryPromotionPipelineRunner.PipelineReport pipeline = new DiscoveryPromotionPipelineRunner().run();</span>
+<span class="nc" id="L26">        DiscoveryCandidateStore.CandidateStoreReport storeReport =</span>
+<span class="nc" id="L27">            new DiscoveryCandidateStore().write(outputDirectory, pipeline.promotionRecords());</span>
+<span class="nc" id="L28">        PatternHypothesisMiner.PatternHypothesisReport patternReport = new PatternHypothesisMiner().write(outputDirectory, storeReport);</span>
+<span class="nc" id="L29">        GeneralizedHypothesisValidationRunner.ValidationReport validationReport =</span>
+<span class="nc" id="L30">            new GeneralizedHypothesisValidationRunner().write(outputDirectory, patternReport);</span>
+<span class="nc" id="L31">        List&lt;PromotionRecord&gt; publicEvidenceRecords = Stream.concat(</span>
+<span class="nc" id="L32">                pipeline.promotionRecords().stream(),</span>
+<span class="nc" id="L33">                validationReport.promotionRecords().stream())</span>
+<span class="nc" id="L34">            .toList();</span>
+<span class="nc" id="L35">        Map&lt;String, NoveltyStatus&gt; novelty = noveltyMapFrom(storeReport);</span>
+<span class="nc" id="L36">        validationReport.promotionRecords().forEach(record -&gt; novelty.put(record.candidateId(), NoveltyStatus.NEW));</span>
+<span class="nc" id="L37">        new PublicEvidenceGate().write(outputDirectory, publicEvidenceRecords, novelty);</span>
+<span class="nc" id="L38">        return storeReport;</span>
     }
 
     private static Map&lt;String, NoveltyStatus&gt; noveltyMapFrom(DiscoveryCandidateStore.CandidateStoreReport storeReport) {
-<span class="nc" id="L32">        Map&lt;String, NoveltyStatus&gt; novelty = new LinkedHashMap&lt;&gt;();</span>
-<span class="nc bnc" id="L33" title="All 2 branches missed.">        for (DiscoveryCandidateStore.CandidateEntry entry : storeReport.candidates()) {</span>
-<span class="nc" id="L34">            novelty.put(entry.candidateId(), entry.noveltyStatus());</span>
-<span class="nc bnc" id="L35" title="All 2 branches missed.">            for (DiscoveryCandidateStore.ConcreteExample example : entry.concreteExamples()) {</span>
-<span class="nc" id="L36">                novelty.put(example.exampleId(), example.noveltyStatus());</span>
-<span class="nc" id="L37">            }</span>
-<span class="nc" id="L38">        }</span>
-<span class="nc" id="L39">        return novelty;</span>
+<span class="nc" id="L42">        Map&lt;String, NoveltyStatus&gt; novelty = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        for (DiscoveryCandidateStore.CandidateEntry entry : storeReport.candidates()) {</span>
+<span class="nc" id="L44">            novelty.put(entry.candidateId(), entry.noveltyStatus());</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">            for (DiscoveryCandidateStore.ConcreteExample example : entry.concreteExamples()) {</span>
+<span class="nc" id="L46">                novelty.put(example.exampleId(), example.noveltyStatus());</span>
+<span class="nc" id="L47">            }</span>
+<span class="nc" id="L48">        }</span>
+<span class="nc" id="L49">        return novelty;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
