@@ -79,6 +79,13 @@ public final class DiscoveryOperatorRegistry {
             }
             DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition = operatorsById.get(operatorId);
             if (definition == null) {
+                // Also accept rule IDs (e.g. "hypothesis_*") in addition to definition IDs
+                String defId = operatorIdForRule(operatorId);
+                if (!defId.isBlank()) {
+                    definition = operatorsById.get(defId);
+                }
+            }
+            if (definition == null) {
                 continue;
             }
             operators.add(definition.factory().get());

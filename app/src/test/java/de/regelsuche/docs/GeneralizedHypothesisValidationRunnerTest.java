@@ -15,8 +15,8 @@ class GeneralizedHypothesisValidationRunnerTest {
     @Test
     void minedPatternHypothesesAreValidatedOnGeneratedHoldouts(@TempDir Path tempDir) throws Exception {
         List<PromotionRecord> support = List.of(
-            supportRecord("support-factor-x", "x * y + x * z", "x * (y + z)"),
-            supportRecord("support-factor-a", "a * b + a * c", "a * (b + c)")
+            supportRecord("support-factor-2", "2 * a + 2 * b", "2 * (a + b)"),
+            supportRecord("support-factor-3", "3 * x + 3 * y", "3 * (x + y)")
         );
         DiscoveryCandidateStore.CandidateStoreReport storeReport = new DiscoveryCandidateStore().build(support);
         PatternHypothesisMiner.PatternHypothesisReport patternReport = new PatternHypothesisMiner().mine(storeReport);
