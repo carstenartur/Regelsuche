@@ -2,7 +2,9 @@ package de.regelsuche.docs;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /** Generates the cross-campaign discovery candidate store from the promotion pipeline records. */
 public final class DiscoveryCandidateStoreRunner {
@@ -23,8 +25,16 @@ public final class DiscoveryCandidateStoreRunner {
         DiscoveryPromotionPipelineRunner.PipelineReport pipeline = new DiscoveryPromotionPipelineRunner().run();
         DiscoveryCandidateStore.CandidateStoreReport storeReport =
             new DiscoveryCandidateStore().write(outputDirectory, pipeline.promotionRecords());
-        new PatternHypothesisMiner().write(outputDirectory, storeReport);
-        new PublicEvidenceGate().write(outputDirectory, pipeline.promotionRecords(), noveltyMapFrom(storeReport));
+        PatternHypothesisMiner.PatternHypothesisReport patternReport = new PatternHypothesisMiner().write(outputDirectory, storeReport);
+        GeneralizedHypothesisValidationRunner.ValidationReport validationReport =
+            new GeneralizedHypothesisValidationRunner().write(outputDirectory, patternReport);
+        List<PromotionRecord> publicEvidenceRecords = Stream.concat(
+                pipeline.promotionRecords().stream(),
+                validationReport.promotionRecords().stream())
+            .toList();
+        Map<String, NoveltyStatus> novelty = noveltyMapFrom(storeReport);
+        validationReport.promotionRecords().forEach(record -> novelty.put(record.candidateId(), NoveltyStatus.NEW));
+        new PublicEvidenceGate().write(outputDirectory, publicEvidenceRecords, novelty);
         return storeReport;
     }
 

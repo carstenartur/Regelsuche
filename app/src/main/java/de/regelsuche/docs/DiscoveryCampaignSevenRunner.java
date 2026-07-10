@@ -152,6 +152,7 @@ public final class DiscoveryCampaignSevenRunner {
             : runAblation(campaignCase, enabled);
         DiscoveryBenchmarkEvidence.EvidenceEdge shortcut = shortcutEdge(enabled, campaignCase).orElse(null);
         String ablationExplanation = campaignCase.notes().isBlank() ? ablation.notes() : campaignCase.notes();
+        AblationEvidence structuredAblation = ablation.toStructuredEvidence(ablationExplanation);
         return new CaseResult(
             campaignCase.id(),
             campaignCase.family(),
@@ -161,7 +162,7 @@ public final class DiscoveryCampaignSevenRunner {
             enabled.failureReason(),
             enabled.oracleStatus(),
             enabled.oracleEvidence(),
-            ablation.status(),
+            structuredAblation.ablationStatus(),
             shortcut == null ? "" : shortcut.source(),
             shortcut == null ? "" : shortcut.packId(),
             shortcut == null ? "" : shortcut.operatorId(),
@@ -169,7 +170,7 @@ public final class DiscoveryCampaignSevenRunner {
             enabled.withoutMacroRun().appliedRuleIds(),
             ablationExplanation,
             enabled.smallGraphMessage(),
-            ablation.toStructuredEvidence(ablationExplanation)
+            structuredAblation
         );
     }
 
@@ -183,8 +184,10 @@ public final class DiscoveryCampaignSevenRunner {
         long withStatesExplored = enabled.withoutMacroRun().analytics().statesExplored();
         int withoutPathLength = Math.max(0, disabled.withoutMacroRun().path().size() - 1);
         long withoutStatesExplored = disabled.withoutMacroRun().analytics().statesExplored();
-        boolean worsePath = disabled.withoutMacroRun().path().size() > enabled.withoutMacroRun().path().size();
-        boolean degraded = !disabled.success() || worsePath || shortcutEdge(disabled, campaignCase).isEmpty();
+        boolean degraded = !disabled.success()
+            || withoutPathLength > withPathLength
+            || withoutStatesExplored > withStatesExplored
+            || shortcutEdge(disabled, campaignCase).isEmpty();
         String notes = disabled.success()
             ? disabled.failureReason().isBlank()
                 ? "disabled path length " + disabled.withoutMacroRun().path().size()
@@ -381,6 +384,7 @@ public final class DiscoveryCampaignSevenRunner {
             notes = notes == null ? "" : notes;
             smallGraphMessage = smallGraphMessage == null ? "" : smallGraphMessage;
             structuredAblation = structuredAblation == null ? AblationEvidence.statusOnly(ablationStatus) : structuredAblation;
+            ablationStatus = structuredAblation.ablationStatus();
         }
     }
 

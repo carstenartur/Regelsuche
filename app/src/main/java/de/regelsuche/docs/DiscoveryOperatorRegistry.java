@@ -74,10 +74,24 @@ public final class DiscoveryOperatorRegistry {
         }
         List<HypothesisOperator> operators = new ArrayList<>();
         for (String operatorId : profile.enabledOperatorIds()) {
-            if (operatorId == null || operatorId.isBlank() || disabledOperatorIds.contains(operatorId)) {
+            if (operatorId == null || operatorId.isBlank()) {
                 continue;
             }
             DiscoveryOperatorProvider.DiscoveryOperatorDefinition definition = operatorsById.get(operatorId);
+            String resolvedId = operatorId;
+            if (definition == null) {
+                // Also accept rule IDs (e.g. "hypothesis_*") in addition to definition IDs
+                String defId = operatorIdForRule(operatorId);
+                if (!defId.isBlank()) {
+                    definition = operatorsById.get(defId);
+                    resolvedId = defId;
+                }
+            }
+            // Check the disabled set after resolution so that disabling by definition ID
+            // also suppresses operators looked up via their rule ID, and vice versa.
+            if (disabledOperatorIds.contains(operatorId) || disabledOperatorIds.contains(resolvedId)) {
+                continue;
+            }
             if (definition == null) {
                 continue;
             }
