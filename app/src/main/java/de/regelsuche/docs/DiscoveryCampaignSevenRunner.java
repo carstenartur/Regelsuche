@@ -65,9 +65,11 @@ public final class DiscoveryCampaignSevenRunner {
     CampaignReport writeReport(Path outputDirectory, CampaignReport report) {
         try {
             Files.createDirectories(outputDirectory);
+            PromotionDecider promotionDecider = new PromotionDecider();
             List<PromotionRecord> promotionRecords = report.results().stream()
-                .map(result -> new PromotionDecider()
-                    .decide(PromotionObservation.fromCampaignSeven(result, report.id())))
+                .map(result -> promotionDecider.decide(
+                    PromotionObservation.fromCampaignSeven(result, report.id()),
+                    result.structuredAblation()))
                 .toList();
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("discovery-campaign-7.json"),
@@ -149,6 +151,7 @@ public final class DiscoveryCampaignSevenRunner {
             ? AblationResult.notApplicable()
             : runAblation(campaignCase, enabled);
         DiscoveryBenchmarkEvidence.EvidenceEdge shortcut = shortcutEdge(enabled, campaignCase).orElse(null);
+        String ablationExplanation = campaignCase.notes().isBlank() ? ablation.notes() : campaignCase.notes();
         return new CaseResult(
             campaignCase.id(),
             campaignCase.family(),
@@ -164,8 +167,9 @@ public final class DiscoveryCampaignSevenRunner {
             shortcut == null ? "" : shortcut.operatorId(),
             shortcut == null ? List.of() : shortcut.assumptions(),
             enabled.withoutMacroRun().appliedRuleIds(),
-            campaignCase.notes(),
-            enabled.smallGraphMessage()
+            ablationExplanation,
+            enabled.smallGraphMessage(),
+            ablation.toStructuredEvidence(ablationExplanation)
         );
     }
 
@@ -175,6 +179,10 @@ public final class DiscoveryCampaignSevenRunner {
         registry.disable(campaignCase.primaryOperatorId());
         DiscoveryBenchmarkEvidence disabled = new DiscoveryBenchmarkExecutor(loader, registry)
             .execute(campaignCase.scenario());
+        int withPathLength = Math.max(0, enabled.withoutMacroRun().path().size() - 1);
+        long withStatesExplored = enabled.withoutMacroRun().analytics().statesExplored();
+        int withoutPathLength = Math.max(0, disabled.withoutMacroRun().path().size() - 1);
+        long withoutStatesExplored = disabled.withoutMacroRun().analytics().statesExplored();
         boolean worsePath = disabled.withoutMacroRun().path().size() > enabled.withoutMacroRun().path().size();
         boolean degraded = !disabled.success() || worsePath || shortcutEdge(disabled, campaignCase).isEmpty();
         String notes = disabled.success()
@@ -182,7 +190,16 @@ public final class DiscoveryCampaignSevenRunner {
                 ? "disabled path length " + disabled.withoutMacroRun().path().size()
                 : disabled.failureReason()
             : disabled.failureReason();
-        return new AblationResult(degraded ? "DEGRADED" : "UNCHANGED", notes);
+        return new AblationResult(
+            degraded ? "DEGRADED" : "UNCHANGED",
+            notes,
+            enabled.success(),
+            withPathLength,
+            withStatesExplored,
+            disabled.success(),
+            withoutPathLength,
+            withoutStatesExplored
+        );
     }
 
     private Optional<DiscoveryBenchmarkEvidence.EvidenceEdge> shortcutEdge(
@@ -348,7 +365,8 @@ public final class DiscoveryCampaignSevenRunner {
         List<String> shortcutAssumptions,
         List<String> rulePath,
         String notes,
-        String smallGraphMessage
+        String smallGraphMessage,
+        AblationEvidence structuredAblation
     ) {
         public CaseResult {
             failureReason = failureReason == null ? "" : failureReason;
@@ -362,6 +380,7 @@ public final class DiscoveryCampaignSevenRunner {
             rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
             notes = notes == null ? "" : notes;
             smallGraphMessage = smallGraphMessage == null ? "" : smallGraphMessage;
+            structuredAblation = structuredAblation == null ? AblationEvidence.statusOnly(ablationStatus) : structuredAblation;
         }
     }
 
@@ -414,9 +433,36 @@ public final class DiscoveryCampaignSevenRunner {
         }
     }
 
-    private record AblationResult(String status, String notes) {
+    private record AblationResult(
+        String status,
+        String notes,
+        boolean withSuccess,
+        int withPathLength,
+        long withStatesExplored,
+        boolean withoutSuccess,
+        int withoutPathLength,
+        long withoutStatesExplored
+    ) {
         private static AblationResult notApplicable() {
-            return new AblationResult("N/A", "");
+            return new AblationResult("N/A", "", false, -1, -1L, false, -1, -1L);
+        }
+
+        private AblationEvidence toStructuredEvidence(String explanation) {
+            if ("N/A".equals(status) || withPathLength < 0) {
+                return AblationEvidence.statusOnly(status, explanation);
+            }
+            AblationEvidence compared = AblationEvidence.compare(
+                withSuccess, withPathLength, withStatesExplored,
+                withoutSuccess, withoutPathLength, withoutStatesExplored,
+                explanation
+            );
+            return new AblationEvidence(
+                compared.withCandidate(),
+                compared.withoutCandidate(),
+                compared.improvementRatio(),
+                status,
+                compared.explanation()
+            );
         }
     }
 }
