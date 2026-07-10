@@ -80,200 +80,207 @@ import java.util.stream.Collectors;
 <span class="fc" id="L80">                supportingExampleIds.size(),</span>
                 supportingExampleIds,
                 supportingCandidateIds,
-<span class="fc" id="L83">                pattern.parameterRelations(),</span>
-<span class="fc" id="L84">                pattern.expressionPlaceholderValues(),</span>
+<span class="fc" id="L83">                deduplicatedExamples.stream()</span>
+<span class="fc" id="L84">                    .map(example -&gt; new SupportExampleRef(</span>
+<span class="fc" id="L85">                        example.exampleId(),</span>
+<span class="fc" id="L86">                        example.inputExpression(),</span>
+<span class="fc" id="L87">                        example.targetExpression()</span>
+                    ))
+<span class="fc" id="L89">                    .toList(),</span>
+<span class="fc" id="L90">                pattern.parameterRelations(),</span>
+<span class="fc" id="L91">                pattern.expressionPlaceholderValues(),</span>
                 &quot;GENERALIZED_FROM_SUPPORT&quot;
             ));
-<span class="fc" id="L87">        }</span>
-<span class="fc" id="L88">        return new PatternHypothesisReport(</span>
-<span class="fc" id="L89">            hypotheses.stream()</span>
-<span class="fc" id="L90">                .sorted(Comparator.comparing(GeneralizedHypothesis::hypothesisId))</span>
-<span class="fc" id="L91">                .toList(),</span>
-<span class="fc" id="L92">            rejected.stream()</span>
-<span class="fc" id="L93">                .sorted(Comparator.comparing(RejectedCluster::clusterKey))</span>
-<span class="fc" id="L94">                .toList()</span>
+<span class="fc" id="L94">        }</span>
+<span class="fc" id="L95">        return new PatternHypothesisReport(</span>
+<span class="fc" id="L96">            hypotheses.stream()</span>
+<span class="fc" id="L97">                .sorted(Comparator.comparing(GeneralizedHypothesis::hypothesisId))</span>
+<span class="fc" id="L98">                .toList(),</span>
+<span class="fc" id="L99">            rejected.stream()</span>
+<span class="fc" id="L100">                .sorted(Comparator.comparing(RejectedCluster::clusterKey))</span>
+<span class="fc" id="L101">                .toList()</span>
         );
     }
 
     PatternHypothesisReport write(Path outputDirectory, DiscoveryCandidateStore.CandidateStoreReport storeReport) {
         try {
-<span class="fc" id="L100">            Files.createDirectories(outputDirectory);</span>
-<span class="fc" id="L101">            PatternHypothesisReport report = mine(storeReport);</span>
-<span class="fc" id="L102">            AtomicJsonFile.writeUtf8(</span>
-<span class="fc" id="L103">                outputDirectory.resolve(&quot;pattern-hypotheses.json&quot;),</span>
-<span class="fc" id="L104">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+<span class="fc" id="L107">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L108">            PatternHypothesisReport report = mine(storeReport);</span>
+<span class="fc" id="L109">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L110">                outputDirectory.resolve(&quot;pattern-hypotheses.json&quot;),</span>
+<span class="fc" id="L111">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
             );
-<span class="fc" id="L106">            Files.writeString(</span>
-<span class="fc" id="L107">                outputDirectory.resolve(&quot;operator-suggestions.md&quot;),</span>
-<span class="fc" id="L108">                renderOperatorSuggestions(report),</span>
+<span class="fc" id="L113">            Files.writeString(</span>
+<span class="fc" id="L114">                outputDirectory.resolve(&quot;operator-suggestions.md&quot;),</span>
+<span class="fc" id="L115">                renderOperatorSuggestions(report),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L111">            Files.writeString(</span>
-<span class="fc" id="L112">                outputDirectory.resolve(&quot;pattern-hypotheses.md&quot;),</span>
-<span class="fc" id="L113">                renderPatternHypotheses(report),</span>
+<span class="fc" id="L118">            Files.writeString(</span>
+<span class="fc" id="L119">                outputDirectory.resolve(&quot;pattern-hypotheses.md&quot;),</span>
+<span class="fc" id="L120">                renderPatternHypotheses(report),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L116">            return report;</span>
-<span class="nc" id="L117">        } catch (IOException exception) {</span>
-<span class="nc" id="L118">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L123">            return report;</span>
+<span class="nc" id="L124">        } catch (IOException exception) {</span>
+<span class="nc" id="L125">            throw new UncheckedIOException(exception);</span>
         }
     }
 
     String renderOperatorSuggestions(PatternHypothesisReport report) {
-<span class="fc" id="L123">        StringBuilder out = new StringBuilder(&quot;# Operator suggestions from generalized hypotheses\n\n&quot;);</span>
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (report.hypotheses().isEmpty()) {</span>
-<span class="nc" id="L125">            out.append(&quot;- none\n&quot;);</span>
+<span class="fc" id="L130">        StringBuilder out = new StringBuilder(&quot;# Operator suggestions from generalized hypotheses\n\n&quot;);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (report.hypotheses().isEmpty()) {</span>
+<span class="nc" id="L132">            out.append(&quot;- none\n&quot;);</span>
         } else {
-<span class="fc bfc" id="L127" title="All 2 branches covered.">            for (GeneralizedHypothesis hypothesis : report.hypotheses()) {</span>
-<span class="fc" id="L128">                out.append(&quot;- &quot;).append(escape(hypothesis.hypothesisId()))</span>
-<span class="fc" id="L129">                    .append(&quot;: `&quot;).append(escapeInlineCode(hypothesis.leftPattern()))</span>
-<span class="fc" id="L130">                    .append(&quot; -&gt; &quot;).append(escapeInlineCode(hypothesis.rightPattern()))</span>
-<span class="fc" id="L131">                    .append(&quot;` (family=&quot;).append(escape(hypothesis.family()))</span>
-<span class="fc" id="L132">                    .append(&quot;, operator=&quot;).append(escape(orDash(hypothesis.operatorId())))</span>
-<span class="fc" id="L133">                    .append(&quot;, support=&quot;).append(hypothesis.supportCount())</span>
-<span class="fc" id="L134">                    .append(&quot;, examples=&quot;).append(escape(String.join(&quot;, &quot;, hypothesis.supportingExampleIds())))</span>
-<span class="fc" id="L135">                    .append(&quot;)\n&quot;);</span>
-<span class="fc" id="L136">            }</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (GeneralizedHypothesis hypothesis : report.hypotheses()) {</span>
+<span class="fc" id="L135">                out.append(&quot;- &quot;).append(escape(hypothesis.hypothesisId()))</span>
+<span class="fc" id="L136">                    .append(&quot;: `&quot;).append(escapeInlineCode(hypothesis.leftPattern()))</span>
+<span class="fc" id="L137">                    .append(&quot; -&gt; &quot;).append(escapeInlineCode(hypothesis.rightPattern()))</span>
+<span class="fc" id="L138">                    .append(&quot;` (family=&quot;).append(escape(hypothesis.family()))</span>
+<span class="fc" id="L139">                    .append(&quot;, operator=&quot;).append(escape(orDash(hypothesis.operatorId())))</span>
+<span class="fc" id="L140">                    .append(&quot;, support=&quot;).append(hypothesis.supportCount())</span>
+<span class="fc" id="L141">                    .append(&quot;, examples=&quot;).append(escape(String.join(&quot;, &quot;, hypothesis.supportingExampleIds())))</span>
+<span class="fc" id="L142">                    .append(&quot;)\n&quot;);</span>
+<span class="fc" id="L143">            }</span>
         }
-<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (!report.rejectedClusters().isEmpty()) {</span>
-<span class="fc" id="L139">            out.append(&quot;\n## Rejected clusters\n\n&quot;);</span>
-<span class="fc bfc" id="L140" title="All 2 branches covered.">            for (RejectedCluster rejected : report.rejectedClusters()) {</span>
-<span class="fc" id="L141">                out.append(&quot;- &quot;).append(escape(rejected.clusterKey()))</span>
-<span class="fc" id="L142">                    .append(&quot;: &quot;).append(escape(rejected.reason()))</span>
-<span class="fc" id="L143">                    .append(&quot; (support=&quot;).append(rejected.supportCount())</span>
-<span class="fc" id="L144">                    .append(&quot;)\n&quot;);</span>
-<span class="fc" id="L145">            }</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (!report.rejectedClusters().isEmpty()) {</span>
+<span class="fc" id="L146">            out.append(&quot;\n## Rejected clusters\n\n&quot;);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            for (RejectedCluster rejected : report.rejectedClusters()) {</span>
+<span class="fc" id="L148">                out.append(&quot;- &quot;).append(escape(rejected.clusterKey()))</span>
+<span class="fc" id="L149">                    .append(&quot;: &quot;).append(escape(rejected.reason()))</span>
+<span class="fc" id="L150">                    .append(&quot; (support=&quot;).append(rejected.supportCount())</span>
+<span class="fc" id="L151">                    .append(&quot;)\n&quot;);</span>
+<span class="fc" id="L152">            }</span>
         }
-<span class="fc" id="L147">        return out.toString();</span>
+<span class="fc" id="L154">        return out.toString();</span>
     }
 
     String renderPatternHypotheses(PatternHypothesisReport report) {
-<span class="fc" id="L151">        StringBuilder out = new StringBuilder(&quot;# Pattern hypotheses\n\n&quot;);</span>
-<span class="fc" id="L152">        out.append(&quot;| Hypothesis | Family | Operator | Support | Left pattern | Right pattern | Examples | Candidates |\n&quot;);</span>
-<span class="fc" id="L153">        out.append(&quot;| --- | --- | --- | ---: | --- | --- | --- | --- |\n&quot;);</span>
-<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (GeneralizedHypothesis hypothesis : report.hypotheses()) {</span>
-<span class="fc" id="L155">            out.append(&quot;| &quot;).append(escape(hypothesis.hypothesisId()))</span>
-<span class="fc" id="L156">                .append(&quot; | &quot;).append(escape(hypothesis.family()))</span>
-<span class="fc" id="L157">                .append(&quot; | &quot;).append(escape(orDash(hypothesis.operatorId())))</span>
-<span class="fc" id="L158">                .append(&quot; | &quot;).append(hypothesis.supportCount())</span>
-<span class="fc" id="L159">                .append(&quot; | `&quot;).append(escapeInlineCode(hypothesis.leftPattern())).append(&quot;`&quot;)</span>
-<span class="fc" id="L160">                .append(&quot; | `&quot;).append(escapeInlineCode(hypothesis.rightPattern())).append(&quot;`&quot;)</span>
-<span class="fc" id="L161">                .append(&quot; | &quot;).append(escape(String.join(&quot;, &quot;, hypothesis.supportingExampleIds())))</span>
-<span class="fc" id="L162">                .append(&quot; | &quot;).append(escape(String.join(&quot;, &quot;, hypothesis.supportingCandidateIds())))</span>
-<span class="fc" id="L163">                .append(&quot; |\n&quot;);</span>
-<span class="fc" id="L164">        }</span>
-<span class="fc" id="L165">        out.append(&quot;\n## Parameter relations\n\n&quot;);</span>
-<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (GeneralizedHypothesis hypothesis : report.hypotheses()) {</span>
-<span class="fc" id="L167">            out.append(&quot;### &quot;).append(escape(hypothesis.hypothesisId())).append(&quot;\n\n&quot;);</span>
-<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (hypothesis.parameterRelations().isEmpty()) {</span>
-<span class="nc" id="L169">                out.append(&quot;- none\n&quot;);</span>
+<span class="fc" id="L158">        StringBuilder out = new StringBuilder(&quot;# Pattern hypotheses\n\n&quot;);</span>
+<span class="fc" id="L159">        out.append(&quot;| Hypothesis | Family | Operator | Support | Left pattern | Right pattern | Examples | Candidates |\n&quot;);</span>
+<span class="fc" id="L160">        out.append(&quot;| --- | --- | --- | ---: | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (GeneralizedHypothesis hypothesis : report.hypotheses()) {</span>
+<span class="fc" id="L162">            out.append(&quot;| &quot;).append(escape(hypothesis.hypothesisId()))</span>
+<span class="fc" id="L163">                .append(&quot; | &quot;).append(escape(hypothesis.family()))</span>
+<span class="fc" id="L164">                .append(&quot; | &quot;).append(escape(orDash(hypothesis.operatorId())))</span>
+<span class="fc" id="L165">                .append(&quot; | &quot;).append(hypothesis.supportCount())</span>
+<span class="fc" id="L166">                .append(&quot; | `&quot;).append(escapeInlineCode(hypothesis.leftPattern())).append(&quot;`&quot;)</span>
+<span class="fc" id="L167">                .append(&quot; | `&quot;).append(escapeInlineCode(hypothesis.rightPattern())).append(&quot;`&quot;)</span>
+<span class="fc" id="L168">                .append(&quot; | &quot;).append(escape(String.join(&quot;, &quot;, hypothesis.supportingExampleIds())))</span>
+<span class="fc" id="L169">                .append(&quot; | &quot;).append(escape(String.join(&quot;, &quot;, hypothesis.supportingCandidateIds())))</span>
+<span class="fc" id="L170">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L171">        }</span>
+<span class="fc" id="L172">        out.append(&quot;\n## Parameter relations\n\n&quot;);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        for (GeneralizedHypothesis hypothesis : report.hypotheses()) {</span>
+<span class="fc" id="L174">            out.append(&quot;### &quot;).append(escape(hypothesis.hypothesisId())).append(&quot;\n\n&quot;);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (hypothesis.parameterRelations().isEmpty()) {</span>
+<span class="nc" id="L176">                out.append(&quot;- none\n&quot;);</span>
             } else {
-<span class="fc bfc" id="L171" title="All 2 branches covered.">                for (String relation : hypothesis.parameterRelations()) {</span>
-<span class="fc" id="L172">                    out.append(&quot;- &quot;).append(escape(relation)).append('\n');</span>
-<span class="fc" id="L173">                }</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                for (String relation : hypothesis.parameterRelations()) {</span>
+<span class="fc" id="L179">                    out.append(&quot;- &quot;).append(escape(relation)).append('\n');</span>
+<span class="fc" id="L180">                }</span>
             }
-<span class="fc" id="L175">            out.append('\n');</span>
-<span class="fc" id="L176">        }</span>
-<span class="fc" id="L177">        out.append(&quot;## Expression placeholder values\n\n&quot;);</span>
-<span class="fc bfc" id="L178" title="All 2 branches covered.">        for (GeneralizedHypothesis hypothesis : report.hypotheses()) {</span>
-<span class="fc" id="L179">            out.append(&quot;### &quot;).append(escape(hypothesis.hypothesisId())).append(&quot;\n\n&quot;);</span>
-<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            if (hypothesis.expressionPlaceholderValues().isEmpty()) {</span>
-<span class="fc" id="L181">                out.append(&quot;- none\n&quot;);</span>
+<span class="fc" id="L182">            out.append('\n');</span>
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">        out.append(&quot;## Expression placeholder values\n\n&quot;);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (GeneralizedHypothesis hypothesis : report.hypotheses()) {</span>
+<span class="fc" id="L186">            out.append(&quot;### &quot;).append(escape(hypothesis.hypothesisId())).append(&quot;\n\n&quot;);</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (hypothesis.expressionPlaceholderValues().isEmpty()) {</span>
+<span class="fc" id="L188">                out.append(&quot;- none\n&quot;);</span>
             } else {
-<span class="nc" id="L183">                hypothesis.expressionPlaceholderValues().entrySet().stream()</span>
-<span class="nc" id="L184">                    .sorted(Map.Entry.comparingByKey())</span>
-<span class="nc" id="L185">                    .forEach(entry -&gt; out.append(&quot;- &quot;)</span>
-<span class="nc" id="L186">                        .append(escape(entry.getKey()))</span>
-<span class="nc" id="L187">                        .append(&quot;: &quot;)</span>
-<span class="nc" id="L188">                        .append(escape(String.join(&quot;, &quot;, entry.getValue())))</span>
-<span class="nc" id="L189">                        .append('\n'));</span>
+<span class="nc" id="L190">                hypothesis.expressionPlaceholderValues().entrySet().stream()</span>
+<span class="nc" id="L191">                    .sorted(Map.Entry.comparingByKey())</span>
+<span class="nc" id="L192">                    .forEach(entry -&gt; out.append(&quot;- &quot;)</span>
+<span class="nc" id="L193">                        .append(escape(entry.getKey()))</span>
+<span class="nc" id="L194">                        .append(&quot;: &quot;)</span>
+<span class="nc" id="L195">                        .append(escape(String.join(&quot;, &quot;, entry.getValue())))</span>
+<span class="nc" id="L196">                        .append('\n'));</span>
             }
-<span class="fc" id="L191">            out.append('\n');</span>
-<span class="fc" id="L192">        }</span>
-<span class="fc" id="L193">        return out.toString();</span>
+<span class="fc" id="L198">            out.append('\n');</span>
+<span class="fc" id="L199">        }</span>
+<span class="fc" id="L200">        return out.toString();</span>
     }
 
     private List&lt;SupportExample&gt; supportExamples(DiscoveryCandidateStore.CandidateEntry entry) {
-<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (entry.lifecycleStatus() == DiscoveryCandidateStore.CandidateLifecycleStatus.REJECTED) {</span>
-<span class="nc" id="L198">            return List.of();</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (entry.lifecycleStatus() == DiscoveryCandidateStore.CandidateLifecycleStatus.REJECTED) {</span>
+<span class="nc" id="L205">            return List.of();</span>
         }
-<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (entry.operatorId().isBlank()) {</span>
-<span class="nc" id="L201">            return List.of();</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (entry.operatorId().isBlank()) {</span>
+<span class="nc" id="L208">            return List.of();</span>
         }
-<span class="fc" id="L203">        List&lt;SupportExample&gt; examples = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (DiscoveryCandidateStore.ConcreteExample example : entry.concreteExamples()) {</span>
-<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (example.lifecycleStatus() == DiscoveryCandidateStore.CandidateLifecycleStatus.REJECTED) {</span>
-<span class="nc" id="L206">                continue;</span>
+<span class="fc" id="L210">        List&lt;SupportExample&gt; examples = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        for (DiscoveryCandidateStore.ConcreteExample example : entry.concreteExamples()) {</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            if (example.lifecycleStatus() == DiscoveryCandidateStore.CandidateLifecycleStatus.REJECTED) {</span>
+<span class="nc" id="L213">                continue;</span>
             }
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (&quot;DISAGREE&quot;.equalsIgnoreCase(example.oracleStatus())) {</span>
-<span class="nc" id="L209">                continue;</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (&quot;DISAGREE&quot;.equalsIgnoreCase(example.oracleStatus())) {</span>
+<span class="nc" id="L216">                continue;</span>
             }
-<span class="fc" id="L211">            examples.add(new SupportExample(</span>
-<span class="fc" id="L212">                example.exampleId(),</span>
-<span class="fc" id="L213">                entry.candidateId(),</span>
-<span class="fc" id="L214">                entry.family(),</span>
-<span class="fc" id="L215">                entry.operatorId(),</span>
-<span class="fc" id="L216">                example.inputExpression(),</span>
-<span class="fc" id="L217">                example.targetExpression(),</span>
-<span class="fc" id="L218">                entry.rulePath(),</span>
-<span class="fc" id="L219">                example.oracleStatus()</span>
+<span class="fc" id="L218">            examples.add(new SupportExample(</span>
+<span class="fc" id="L219">                example.exampleId(),</span>
+<span class="fc" id="L220">                entry.candidateId(),</span>
+<span class="fc" id="L221">                entry.family(),</span>
+<span class="fc" id="L222">                entry.operatorId(),</span>
+<span class="fc" id="L223">                example.inputExpression(),</span>
+<span class="fc" id="L224">                example.targetExpression(),</span>
+<span class="fc" id="L225">                entry.rulePath(),</span>
+<span class="fc" id="L226">                example.oracleStatus()</span>
             ));
-<span class="fc" id="L221">        }</span>
-<span class="fc" id="L222">        return examples;</span>
+<span class="fc" id="L228">        }</span>
+<span class="fc" id="L229">        return examples;</span>
     }
 
     private SuccessfulTransformationPath toPath(SupportExample example) {
-<span class="fc" id="L226">        int beforeCost = Math.max(1, example.inputExpression().replaceAll(&quot;\\s+&quot;, &quot;&quot;).length() + 8);</span>
-<span class="fc" id="L227">        int afterCost = Math.max(1, example.targetExpression().replaceAll(&quot;\\s+&quot;, &quot;&quot;).length());</span>
-<span class="fc" id="L228">        return new SuccessfulTransformationPath(</span>
-<span class="fc" id="L229">            example.exampleId(),</span>
-<span class="fc" id="L230">            example.inputExpression(),</span>
-<span class="fc" id="L231">            example.targetExpression(),</span>
-<span class="fc" id="L232">            List.of(example.inputExpression(), example.targetExpression()),</span>
-<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            example.rulePath().isEmpty() ? List.of(example.operatorId()) : example.rulePath(),</span>
+<span class="fc" id="L233">        int beforeCost = Math.max(1, example.inputExpression().replaceAll(&quot;\\s+&quot;, &quot;&quot;).length() + 8);</span>
+<span class="fc" id="L234">        int afterCost = Math.max(1, example.targetExpression().replaceAll(&quot;\\s+&quot;, &quot;&quot;).length());</span>
+<span class="fc" id="L235">        return new SuccessfulTransformationPath(</span>
+<span class="fc" id="L236">            example.exampleId(),</span>
+<span class="fc" id="L237">            example.inputExpression(),</span>
+<span class="fc" id="L238">            example.targetExpression(),</span>
+<span class="fc" id="L239">            List.of(example.inputExpression(), example.targetExpression()),</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            example.rulePath().isEmpty() ? List.of(example.operatorId()) : example.rulePath(),</span>
             new ExpressionScore(beforeCost, 0, 0, 0, 0),
             new ExpressionScore(afterCost, 0, 0, 0, 0),
             true,
-<span class="fc" id="L237">            example.oracleStatus(),</span>
-<span class="fc" id="L238">            Map.of(&quot;family&quot;, example.family(), &quot;operator&quot;, example.operatorId())</span>
+<span class="fc" id="L244">            example.oracleStatus(),</span>
+<span class="fc" id="L245">            Map.of(&quot;family&quot;, example.family(), &quot;operator&quot;, example.operatorId())</span>
         );
     }
 
     private RejectedCluster reject(String clusterKey, List&lt;SupportExample&gt; examples, String reason) {
-<span class="fc" id="L243">        return new RejectedCluster(</span>
+<span class="fc" id="L250">        return new RejectedCluster(</span>
             clusterKey,
-<span class="fc" id="L245">            examples.size(),</span>
-<span class="fc" id="L246">            examples.stream().map(SupportExample::exampleId).distinct().toList(),</span>
+<span class="fc" id="L252">            examples.size(),</span>
+<span class="fc" id="L253">            examples.stream().map(SupportExample::exampleId).distinct().toList(),</span>
             reason
         );
     }
 
     private String hypothesisId(String family, String operatorId, String leftPattern, String rightPattern) {
-<span class="pc bpc" id="L252" title="2 of 4 branches missed.">        String seed = (family == null ? &quot;&quot; : family) + &quot;|&quot; + (operatorId == null ? &quot;&quot; : operatorId)</span>
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">        String seed = (family == null ? &quot;&quot; : family) + &quot;|&quot; + (operatorId == null ? &quot;&quot; : operatorId)</span>
             + &quot;|&quot; + leftPattern + &quot;-&gt;&quot; + rightPattern;
-<span class="fc" id="L254">        return &quot;hypothesis-&quot; + Integer.toHexString(seed.hashCode());</span>
+<span class="fc" id="L261">        return &quot;hypothesis-&quot; + Integer.toHexString(seed.hashCode());</span>
     }
 
     private String orDash(String value) {
-<span class="pc bpc" id="L258" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
     }
 
     private String escape(String value) {
-<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
     }
 
     private String escapeInlineCode(String value) {
-<span class="fc" id="L266">        return escape(value).replace(&quot;`&quot;, &quot;\\`&quot;);</span>
+<span class="fc" id="L273">        return escape(value).replace(&quot;`&quot;, &quot;\\`&quot;);</span>
     }
 
     record PatternHypothesisReport(
         List&lt;GeneralizedHypothesis&gt; hypotheses,
         List&lt;RejectedCluster&gt; rejectedClusters
     ) {
-<span class="fc" id="L273">        PatternHypothesisReport {</span>
-<span class="pc bpc" id="L274" title="1 of 2 branches missed.">            hypotheses = hypotheses == null ? List.of() : List.copyOf(hypotheses);</span>
-<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            rejectedClusters = rejectedClusters == null ? List.of() : List.copyOf(rejectedClusters);</span>
-<span class="fc" id="L276">        }</span>
+<span class="fc" id="L280">        PatternHypothesisReport {</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">            hypotheses = hypotheses == null ? List.of() : List.copyOf(hypotheses);</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">            rejectedClusters = rejectedClusters == null ? List.of() : List.copyOf(rejectedClusters);</span>
+<span class="fc" id="L283">        }</span>
     }
 
     record GeneralizedHypothesis(
@@ -285,24 +292,34 @@ import java.util.stream.Collectors;
         int supportCount,
         List&lt;String&gt; supportingExampleIds,
         List&lt;String&gt; supportingCandidateIds,
+        List&lt;SupportExampleRef&gt; supportExamples,
         List&lt;String&gt; parameterRelations,
         Map&lt;String, List&lt;String&gt;&gt; expressionPlaceholderValues,
         String confidence
     ) {
-<span class="fc" id="L292">        GeneralizedHypothesis {</span>
-<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            supportingExampleIds = supportingExampleIds == null ? List.of() : List.copyOf(supportingExampleIds);</span>
-<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            supportingCandidateIds = supportingCandidateIds == null ? List.of() : List.copyOf(supportingCandidateIds);</span>
-<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            parameterRelations = parameterRelations == null ? List.of() : List.copyOf(parameterRelations);</span>
-<span class="pc bpc" id="L296" title="1 of 2 branches missed.">            expressionPlaceholderValues = expressionPlaceholderValues == null ? Map.of() : Map.copyOf(expressionPlaceholderValues);</span>
-<span class="pc bpc" id="L297" title="1 of 2 branches missed.">            confidence = confidence == null ? &quot;&quot; : confidence;</span>
-<span class="fc" id="L298">        }</span>
+<span class="fc" id="L300">        GeneralizedHypothesis {</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            supportingExampleIds = supportingExampleIds == null ? List.of() : List.copyOf(supportingExampleIds);</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            supportingCandidateIds = supportingCandidateIds == null ? List.of() : List.copyOf(supportingCandidateIds);</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            supportExamples = supportExamples == null ? List.of() : List.copyOf(supportExamples);</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">            parameterRelations = parameterRelations == null ? List.of() : List.copyOf(parameterRelations);</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            expressionPlaceholderValues = expressionPlaceholderValues == null ? Map.of() : Map.copyOf(expressionPlaceholderValues);</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            confidence = confidence == null ? &quot;&quot; : confidence;</span>
+<span class="fc" id="L307">        }</span>
+    }
+
+    record SupportExampleRef(String exampleId, String inputExpression, String targetExpression) {
+<span class="fc" id="L311">        SupportExampleRef {</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">            exampleId = exampleId == null ? &quot;&quot; : exampleId;</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="fc" id="L315">        }</span>
     }
 
     record RejectedCluster(String clusterKey, int supportCount, List&lt;String&gt; exampleIds, String reason) {
-<span class="fc" id="L302">        RejectedCluster {</span>
-<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            exampleIds = exampleIds == null ? List.of() : List.copyOf(exampleIds);</span>
-<span class="pc bpc" id="L304" title="1 of 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
-<span class="fc" id="L305">        }</span>
+<span class="fc" id="L319">        RejectedCluster {</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            exampleIds = exampleIds == null ? List.of() : List.copyOf(exampleIds);</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
+<span class="fc" id="L322">        }</span>
     }
 
     private record SupportExample(
@@ -315,19 +332,19 @@ import java.util.stream.Collectors;
         List&lt;String&gt; rulePath,
         String oracleStatus
     ) {
-<span class="fc" id="L318">        private SupportExample {</span>
-<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            exampleId = exampleId == null ? &quot;&quot; : exampleId;</span>
-<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            candidateId = candidateId == null ? &quot;&quot; : candidateId;</span>
-<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            family = family == null ? &quot;&quot; : family;</span>
-<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
-<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
-<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
-<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
-<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
-<span class="fc" id="L327">        }</span>
+<span class="fc" id="L335">        private SupportExample {</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">            exampleId = exampleId == null ? &quot;&quot; : exampleId;</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            candidateId = candidateId == null ? &quot;&quot; : candidateId;</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">            family = family == null ? &quot;&quot; : family;</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="fc" id="L344">        }</span>
 
         private String clusterKey() {
-<span class="fc" id="L330">            return family + &quot;|&quot; + operatorId;</span>
+<span class="fc" id="L347">            return family + &quot;|&quot; + operatorId;</span>
         }
     }
 }

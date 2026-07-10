@@ -2,9 +2,20 @@
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
 import de.regelsuche.transform.RepeatedSubexpressionFactorizationHypothesisOperator;
 import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
+import de.regelsuche.transform.Transformation;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -14,139 +25,206 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Validates mined generalized pattern hypotheses on generated holdout cases.
  *
- * &lt;p&gt;This closes the first automated discovery loop after pattern mining: support examples are no longer
- * enough for promotion. A generalized hypothesis must also succeed on generated holdout cases, survive
- * oracle validation, show useful ablation, and pass the public evidence gate.&lt;/p&gt;
+ * &lt;p&gt;The generator deliberately separates support examples from validation by using deterministic
+ * structural templates per operator family, filtering exact / canonical / alpha-equivalent /
+ * inverse leakage against the mined support examples, and reporting coverage separately from the
+ * benchmark/oracle evidence gathered on a representative positive sample.&lt;/p&gt;
  */
-<span class="fc" id="L29">final class GeneralizedHypothesisValidationRunner {</span>
+<span class="fc" id="L46">final class GeneralizedHypothesisValidationRunner {</span>
     static final String SOURCE_CAMPAIGN = &quot;pattern-hypothesis-validation&quot;;
 
-<span class="fc" id="L32">    private static final ObjectMapper JSON = new ObjectMapper()</span>
-<span class="fc" id="L33">        .findAndRegisterModules()</span>
-<span class="fc" id="L34">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+<span class="fc" id="L49">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L50">        .findAndRegisterModules()</span>
+<span class="fc" id="L51">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
 
-<span class="fc" id="L36">    private final DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();</span>
-<span class="fc" id="L37">    private final PromotionDecider decider = new PromotionDecider();</span>
-<span class="fc" id="L38">    private final PublicEvidenceGate publicEvidenceGate = new PublicEvidenceGate();</span>
+    private static final String GENERATOR_VERSION = &quot;holdout-generator-v2&quot;;
+    private static final long GENERATOR_SEED = 214L;
+    private static final int MIN_POSITIVE_HOLDOUTS = 100;
+    private static final int MIN_NEGATIVE_HOLDOUTS = 100;
+    private static final int BENCHMARK_SAMPLE_SIZE = 8;
+    private static final String COVERAGE_NOTE =
+        &quot;Generator coverage counts deterministic holdouts; oracle/ablation evidence only covers the benchmarked positive sample.&quot;;
+
+<span class="fc" id="L61">    private final DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();</span>
+<span class="fc" id="L62">    private final PromotionDecider decider = new PromotionDecider();</span>
+<span class="fc" id="L63">    private final PublicEvidenceGate publicEvidenceGate = new PublicEvidenceGate();</span>
+<span class="fc" id="L64">    private final HoldoutLeakageChecker leakageChecker = new HoldoutLeakageChecker();</span>
+<span class="fc" id="L65">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
 
     ValidationReport run(PatternHypothesisMiner.PatternHypothesisReport patternReport) {
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        List&lt;PatternHypothesisMiner.GeneralizedHypothesis&gt; hypotheses = patternReport == null</span>
-<span class="nc" id="L42">            ? List.of()</span>
-<span class="fc" id="L43">            : patternReport.hypotheses();</span>
-<span class="fc" id="L44">        List&lt;ValidatedHypothesis&gt; validated = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L45">        List&lt;RejectedHypothesis&gt; rejected = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L46">        List&lt;PromotionRecord&gt; promotionRecords = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        List&lt;PatternHypothesisMiner.GeneralizedHypothesis&gt; hypotheses = patternReport == null</span>
+<span class="nc" id="L69">            ? List.of()</span>
+<span class="fc" id="L70">            : patternReport.hypotheses();</span>
+<span class="fc" id="L71">        List&lt;ValidatedHypothesis&gt; validated = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L72">        List&lt;RejectedHypothesis&gt; rejected = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L73">        List&lt;PromotionRecord&gt; promotionRecords = new ArrayList&lt;&gt;();</span>
 
-<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (PatternHypothesisMiner.GeneralizedHypothesis hypothesis : hypotheses) {</span>
-<span class="fc" id="L49">            List&lt;HoldoutCase&gt; holdouts = holdoutCases(hypothesis);</span>
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (holdouts.isEmpty()) {</span>
-<span class="nc" id="L51">                rejected.add(new RejectedHypothesis(hypothesis.hypothesisId(), hypothesis.family(), hypothesis.operatorId(),</span>
-                    &quot;no-holdout-generator&quot;));
-<span class="nc" id="L53">                continue;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (PatternHypothesisMiner.GeneralizedHypothesis hypothesis : hypotheses) {</span>
+<span class="fc" id="L76">            GeneratedHoldoutSuite holdouts = holdoutCases(hypothesis);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (holdouts.positiveHoldouts().size() &lt; MIN_POSITIVE_HOLDOUTS) {</span>
+<span class="nc" id="L78">                rejected.add(new RejectedHypothesis(hypothesis.hypothesisId(), hypothesis.family(), hypothesis.operatorId(),</span>
+<span class="nc" id="L79">                    &quot;insufficient-positive-holdouts:&quot; + holdouts.positiveHoldouts().size()));</span>
+<span class="nc" id="L80">                continue;</span>
             }
-<span class="fc" id="L55">            ValidatedHypothesis result = validate(hypothesis, holdouts);</span>
-<span class="fc" id="L56">            validated.add(result);</span>
-<span class="fc" id="L57">            promotionRecords.add(result.promotionRecord());</span>
-<span class="fc" id="L58">        }</span>
-<span class="fc" id="L59">        long publicAccepted = validated.stream().filter(ValidatedHypothesis::publicEvidenceAccepted).count();</span>
-<span class="fc" id="L60">        return new ValidationReport(</span>
-<span class="fc" id="L61">            validated.stream().sorted(Comparator.comparing(ValidatedHypothesis::hypothesisId)).toList(),</span>
-<span class="fc" id="L62">            rejected.stream().sorted(Comparator.comparing(RejectedHypothesis::hypothesisId)).toList(),</span>
-<span class="fc" id="L63">            promotionRecords.stream().sorted(Comparator.comparing(PromotionRecord::candidateId)).toList(),</span>
-            publicAccepted
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (holdouts.negativeHoldouts().size() &lt; MIN_NEGATIVE_HOLDOUTS) {</span>
+<span class="nc" id="L83">                rejected.add(new RejectedHypothesis(hypothesis.hypothesisId(), hypothesis.family(), hypothesis.operatorId(),</span>
+<span class="nc" id="L84">                    &quot;insufficient-negative-holdouts:&quot; + holdouts.negativeHoldouts().size()));</span>
+<span class="nc" id="L85">                continue;</span>
+            }
+<span class="fc" id="L87">            List&lt;LeakageFinding&gt; remainingLeakage = leakageChecker.findLeakage(hypothesis.supportExamples(),</span>
+<span class="fc" id="L88">                holdouts.allHoldouts());</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (!remainingLeakage.isEmpty()) {</span>
+<span class="nc" id="L90">                throw new IllegalStateException(&quot;holdout leakage detected for &quot; + hypothesis.hypothesisId() + &quot;: &quot; + remainingLeakage);</span>
+            }
+<span class="fc" id="L92">            ValidatedHypothesis result = validate(hypothesis, holdouts);</span>
+<span class="fc" id="L93">            validated.add(result);</span>
+<span class="fc" id="L94">            promotionRecords.add(result.promotionRecord());</span>
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">        long publicAccepted = validated.stream().filter(ValidatedHypothesis::publicEvidenceAccepted).count();</span>
+<span class="fc" id="L97">        return new ValidationReport(</span>
+<span class="fc" id="L98">            validated.stream().sorted(Comparator.comparing(ValidatedHypothesis::hypothesisId)).toList(),</span>
+<span class="fc" id="L99">            rejected.stream().sorted(Comparator.comparing(RejectedHypothesis::hypothesisId)).toList(),</span>
+<span class="fc" id="L100">            promotionRecords.stream().sorted(Comparator.comparing(PromotionRecord::candidateId)).toList(),</span>
+            publicAccepted,
+<span class="fc" id="L102">            aggregateCoverage(validated)</span>
         );
     }
 
     ValidationReport write(Path outputDirectory, PatternHypothesisMiner.PatternHypothesisReport patternReport) {
         try {
-<span class="fc" id="L70">            Files.createDirectories(outputDirectory);</span>
-<span class="fc" id="L71">            ValidationReport report = run(patternReport);</span>
-<span class="fc" id="L72">            AtomicJsonFile.writeUtf8(</span>
-<span class="fc" id="L73">                outputDirectory.resolve(&quot;validated-hypotheses.json&quot;),</span>
-<span class="fc" id="L74">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+<span class="fc" id="L108">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L109">            ValidationReport report = run(patternReport);</span>
+<span class="fc" id="L110">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L111">                outputDirectory.resolve(&quot;validated-hypotheses.json&quot;),</span>
+<span class="fc" id="L112">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
             );
-<span class="fc" id="L76">            Files.writeString(</span>
-<span class="fc" id="L77">                outputDirectory.resolve(&quot;validated-hypotheses.md&quot;),</span>
-<span class="fc" id="L78">                renderMarkdown(report),</span>
+<span class="fc" id="L114">            Files.writeString(</span>
+<span class="fc" id="L115">                outputDirectory.resolve(&quot;validated-hypotheses.md&quot;),</span>
+<span class="fc" id="L116">                renderMarkdown(report),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L81">            return report;</span>
-<span class="nc" id="L82">        } catch (IOException exception) {</span>
-<span class="nc" id="L83">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L119">            return report;</span>
+<span class="nc" id="L120">        } catch (IOException exception) {</span>
+<span class="nc" id="L121">            throw new UncheckedIOException(exception);</span>
         }
     }
 
     private ValidatedHypothesis validate(
         PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
-        List&lt;HoldoutCase&gt; holdouts
+        GeneratedHoldoutSuite holdouts
     ) {
-<span class="fc" id="L91">        List&lt;HoldoutResult&gt; results = holdouts.stream()</span>
-<span class="fc" id="L92">            .map(holdout -&gt; validateHoldout(hypothesis, holdout))</span>
-<span class="fc" id="L93">            .toList();</span>
-<span class="fc" id="L94">        AblationEvidence ablation = aggregateAblation(hypothesis, results);</span>
-<span class="fc" id="L95">        PromotionRecord record = promotionRecord(hypothesis, results, ablation);</span>
-<span class="fc" id="L96">        PublicEvidenceGate.GateDecision gateDecision = publicEvidenceGate.evaluate(record, NoveltyStatus.NEW);</span>
-<span class="fc" id="L97">        return new ValidatedHypothesis(</span>
-<span class="fc" id="L98">            hypothesis.hypothesisId(),</span>
-<span class="fc" id="L99">            hypothesis.family(),</span>
-<span class="fc" id="L100">            hypothesis.operatorId(),</span>
-<span class="fc" id="L101">            hypothesis.leftPattern(),</span>
-<span class="fc" id="L102">            hypothesis.rightPattern(),</span>
-<span class="fc" id="L103">            hypothesis.supportCount(),</span>
-<span class="fc" id="L104">            hypothesis.supportingExampleIds(),</span>
+<span class="fc" id="L129">        List&lt;HoldoutResult&gt; results = holdouts.positiveHoldouts().stream()</span>
+<span class="fc" id="L130">            .limit(BENCHMARK_SAMPLE_SIZE)</span>
+<span class="fc" id="L131">            .map(holdout -&gt; validatePositiveHoldout(hypothesis, holdout))</span>
+<span class="fc" id="L132">            .toList();</span>
+<span class="fc" id="L133">        List&lt;NegativeHoldoutResult&gt; negativeResults = holdouts.negativeHoldouts().stream()</span>
+<span class="fc" id="L134">            .map(holdout -&gt; validateNegativeHoldout(hypothesis, holdout))</span>
+<span class="fc" id="L135">            .toList();</span>
+<span class="fc" id="L136">        AblationEvidence ablation = aggregateAblation(hypothesis, results);</span>
+<span class="fc" id="L137">        PromotionRecord record = promotionRecord(hypothesis, results, negativeResults, ablation, holdouts.generatorCoverage());</span>
+<span class="fc" id="L138">        PublicEvidenceGate.GateDecision gateDecision = publicEvidenceGate.evaluate(record, NoveltyStatus.NEW);</span>
+<span class="fc" id="L139">        return new ValidatedHypothesis(</span>
+<span class="fc" id="L140">            hypothesis.hypothesisId(),</span>
+<span class="fc" id="L141">            hypothesis.family(),</span>
+<span class="fc" id="L142">            hypothesis.operatorId(),</span>
+<span class="fc" id="L143">            hypothesis.leftPattern(),</span>
+<span class="fc" id="L144">            hypothesis.rightPattern(),</span>
+<span class="fc" id="L145">            hypothesis.supportCount(),</span>
+<span class="fc" id="L146">            hypothesis.supportingExampleIds(),</span>
             results,
+            negativeResults,
             ablation,
             record,
-<span class="fc" id="L108">            gateDecision.accepted(),</span>
-<span class="fc" id="L109">            gateDecision.rejectionReasons()</span>
+<span class="fc" id="L151">            gateDecision.accepted(),</span>
+<span class="fc" id="L152">            gateDecision.rejectionReasons(),</span>
+<span class="fc" id="L153">            holdouts.generatorCoverage()</span>
         );
     }
 
-    private HoldoutResult validateHoldout(
+    private HoldoutResult validatePositiveHoldout(
         PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
         HoldoutCase holdout
     ) {
-<span class="fc" id="L117">        DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(</span>
-<span class="fc" id="L118">            holdout.id(),</span>
-<span class="fc" id="L119">            holdout.id(),</span>
-<span class="fc" id="L120">            holdout.inputExpression(),</span>
-<span class="fc" id="L121">            holdout.targetExpression(),</span>
-<span class="fc" id="L122">            List.of(),</span>
-<span class="fc" id="L123">            List.of(hypothesis.operatorId()),</span>
-<span class="fc" id="L124">            holdout.enabledRulePacks(),</span>
-<span class="fc" id="L125">            List.of(),</span>
-<span class="fc" id="L126">            List.of(),</span>
-<span class="fc" id="L127">            List.of(hypothesis.operatorId()),</span>
+<span class="fc" id="L161">        DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(</span>
+<span class="fc" id="L162">            holdout.id(),</span>
+<span class="fc" id="L163">            holdout.id(),</span>
+<span class="fc" id="L164">            holdout.inputExpression(),</span>
+<span class="fc" id="L165">            holdout.targetExpression(),</span>
+<span class="fc" id="L166">            List.of(),</span>
+<span class="fc" id="L167">            List.of(hypothesis.operatorId()),</span>
+<span class="fc" id="L168">            holdout.enabledRulePacks(),</span>
+<span class="fc" id="L169">            List.of(),</span>
+<span class="fc" id="L170">            List.of(),</span>
+<span class="fc" id="L171">            List.of(hypothesis.operatorId()),</span>
             new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
             new DiscoveryBenchmarkScenario.Budgets(8, 240, 5000),
             new DiscoveryBenchmarkScenario.Gallery(false, 1, 2)
         );
-<span class="fc" id="L132">        DiscoveryBenchmarkEvidence withCandidate = new DiscoveryBenchmarkExecutor(loader).execute(scenario);</span>
-<span class="fc" id="L133">        DiscoveryOperatorRegistry disabledRegistry = new DiscoveryOperatorRegistry()</span>
-<span class="fc" id="L134">            .register(new DefaultDiscoveryOperatorProvider());</span>
-<span class="fc" id="L135">        disabledRegistry.disable(hypothesis.operatorId());</span>
-<span class="fc" id="L136">        DiscoveryBenchmarkEvidence withoutCandidate = new DiscoveryBenchmarkExecutor(loader, disabledRegistry).execute(scenario);</span>
-<span class="fc" id="L137">        return new HoldoutResult(</span>
-<span class="fc" id="L138">            holdout.id(),</span>
-<span class="fc" id="L139">            holdout.inputExpression(),</span>
-<span class="fc" id="L140">            holdout.targetExpression(),</span>
-<span class="fc" id="L141">            withCandidate.success(),</span>
-<span class="fc" id="L142">            pathLength(withCandidate),</span>
-<span class="fc" id="L143">            statesExplored(withCandidate),</span>
-<span class="fc" id="L144">            withoutCandidate.success(),</span>
-<span class="fc" id="L145">            pathLength(withoutCandidate),</span>
-<span class="fc" id="L146">            statesExplored(withoutCandidate),</span>
-<span class="fc" id="L147">            withCandidate.oracleStatus(),</span>
-<span class="fc" id="L148">            withCandidate.oracleEvidence(),</span>
-<span class="fc" id="L149">            aggregateRulePath(withCandidate)</span>
+<span class="fc" id="L176">        DiscoveryBenchmarkEvidence withCandidate = new DiscoveryBenchmarkExecutor(loader).execute(scenario);</span>
+<span class="fc" id="L177">        DiscoveryOperatorRegistry disabledRegistry = new DiscoveryOperatorRegistry()</span>
+<span class="fc" id="L178">            .register(new DefaultDiscoveryOperatorProvider());</span>
+<span class="fc" id="L179">        disabledRegistry.disable(hypothesis.operatorId());</span>
+<span class="fc" id="L180">        DiscoveryBenchmarkEvidence withoutCandidate = new DiscoveryBenchmarkExecutor(loader, disabledRegistry).execute(scenario);</span>
+<span class="fc" id="L181">        return new HoldoutResult(</span>
+<span class="fc" id="L182">            holdout.id(),</span>
+<span class="fc" id="L183">            holdout.inputExpression(),</span>
+<span class="fc" id="L184">            holdout.targetExpression(),</span>
+<span class="fc" id="L185">            holdout.templateId(),</span>
+<span class="fc" id="L186">            holdout.structureClass(),</span>
+<span class="fc" id="L187">            holdout.domainClass(),</span>
+<span class="fc" id="L188">            holdout.assumptionClass(),</span>
+<span class="fc" id="L189">            holdout.seed(),</span>
+<span class="fc" id="L190">            holdout.generatorVersion(),</span>
+<span class="fc" id="L191">            holdout.provenance(),</span>
+<span class="fc" id="L192">            withCandidate.success(),</span>
+<span class="fc" id="L193">            pathLength(withCandidate),</span>
+<span class="fc" id="L194">            statesExplored(withCandidate),</span>
+<span class="fc" id="L195">            withoutCandidate.success(),</span>
+<span class="fc" id="L196">            pathLength(withoutCandidate),</span>
+<span class="fc" id="L197">            statesExplored(withoutCandidate),</span>
+<span class="fc" id="L198">            withCandidate.oracleStatus(),</span>
+<span class="fc" id="L199">            withCandidate.oracleEvidence(),</span>
+<span class="fc" id="L200">            aggregateRulePath(withCandidate)</span>
+        );
+    }
+
+    private NegativeHoldoutResult validateNegativeHoldout(
+        PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
+        HoldoutCase holdout
+    ) {
+<span class="fc" id="L208">        HypothesisOperator operator = operatorFor(hypothesis.operatorId());</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        List&lt;Transformation&gt; candidates = operator == null ? List.of() : operator.generateCandidates(holdout.inputExpression());</span>
+<span class="pc" id="L210">        boolean operatorFired = candidates.stream().anyMatch(candidate -&gt; hypothesis.operatorId().equals(candidate.rule()));</span>
+<span class="fc" id="L211">        boolean rewroteToForbiddenTarget = candidates.stream().anyMatch(candidate -&gt;</span>
+<span class="nc" id="L212">            comparableExpressionKey(candidate.transformedExpression()).equals(comparableExpressionKey(holdout.targetExpression())));</span>
+<span class="fc" id="L213">        return new NegativeHoldoutResult(</span>
+<span class="fc" id="L214">            holdout.id(),</span>
+<span class="fc" id="L215">            holdout.inputExpression(),</span>
+<span class="fc" id="L216">            holdout.targetExpression(),</span>
+<span class="fc" id="L217">            holdout.templateId(),</span>
+<span class="fc" id="L218">            holdout.structureClass(),</span>
+<span class="fc" id="L219">            holdout.domainClass(),</span>
+<span class="fc" id="L220">            holdout.assumptionClass(),</span>
+<span class="fc" id="L221">            holdout.seed(),</span>
+<span class="fc" id="L222">            holdout.generatorVersion(),</span>
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">            holdout.provenance(),</span>
+            !operatorFired &amp;&amp; !rewroteToForbiddenTarget,
+            operatorFired,
+            rewroteToForbiddenTarget,
+<span class="fc" id="L227">            candidates.stream().map(Transformation::transformedExpression).limit(5).toList()</span>
         );
     }
 
@@ -154,201 +232,834 @@ import java.util.Set;
         PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
         List&lt;HoldoutResult&gt; results
     ) {
-<span class="fc" id="L157">        boolean withSuccess = results.stream().allMatch(HoldoutResult::withSuccess);</span>
-<span class="fc" id="L158">        boolean withoutSuccess = results.stream().allMatch(HoldoutResult::withoutSuccess);</span>
-<span class="fc" id="L159">        int withPathLength = results.stream().mapToInt(HoldoutResult::withPathLength).sum();</span>
-<span class="fc" id="L160">        int withoutPathLength = results.stream().mapToInt(HoldoutResult::withoutPathLength).sum();</span>
-<span class="fc" id="L161">        long withStatesExplored = results.stream().mapToLong(HoldoutResult::withStatesExplored).sum();</span>
-<span class="fc" id="L162">        long withoutStatesExplored = results.stream().mapToLong(HoldoutResult::withoutStatesExplored).sum();</span>
-<span class="fc" id="L163">        return AblationEvidence.compare(</span>
+<span class="pc bpc" id="L235" title="2 of 4 branches missed.">        boolean withSuccess = !results.isEmpty() &amp;&amp; results.stream().allMatch(HoldoutResult::withSuccess);</span>
+<span class="pc bpc" id="L236" title="2 of 4 branches missed.">        boolean withoutSuccess = !results.isEmpty() &amp;&amp; results.stream().allMatch(HoldoutResult::withoutSuccess);</span>
+<span class="fc" id="L237">        int withPathLength = results.stream().mapToInt(HoldoutResult::withPathLength).sum();</span>
+<span class="fc" id="L238">        int withoutPathLength = results.stream().mapToInt(HoldoutResult::withoutPathLength).sum();</span>
+<span class="fc" id="L239">        long withStatesExplored = results.stream().mapToLong(HoldoutResult::withStatesExplored).sum();</span>
+<span class="fc" id="L240">        long withoutStatesExplored = results.stream().mapToLong(HoldoutResult::withoutStatesExplored).sum();</span>
+<span class="fc" id="L241">        return AblationEvidence.compare(</span>
             withSuccess,
             withPathLength,
             withStatesExplored,
             withoutSuccess,
             withoutPathLength,
             withoutStatesExplored,
-<span class="fc" id="L170">            &quot;holdout validation for &quot; + hypothesis.hypothesisId() + &quot; on &quot; + results.size() + &quot; generated cases&quot;</span>
+<span class="fc" id="L248">            &quot;holdout validation for &quot; + hypothesis.hypothesisId() + &quot; on &quot; + results.size() + &quot; benchmarked positive cases&quot;</span>
         );
     }
 
     private PromotionRecord promotionRecord(
         PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
         List&lt;HoldoutResult&gt; results,
-        AblationEvidence ablation
+        List&lt;NegativeHoldoutResult&gt; negativeResults,
+        AblationEvidence ablation,
+        GeneratorCoverage coverage
     ) {
-<span class="fc" id="L179">        HoldoutResult representative = results.getFirst();</span>
-<span class="fc" id="L180">        List&lt;String&gt; rulePath = results.stream()</span>
-<span class="fc" id="L181">            .flatMap(result -&gt; result.rulePath().stream())</span>
-<span class="pc bpc" id="L182" title="2 of 4 branches missed.">            .filter(rule -&gt; rule != null &amp;&amp; !rule.isBlank())</span>
-<span class="fc" id="L183">            .distinct()</span>
-<span class="fc" id="L184">            .toList();</span>
-<span class="fc" id="L185">        List&lt;String&gt; assumptions = assumptions(hypothesis, results);</span>
-<span class="fc" id="L186">        PromotionObservation observation = new PromotionObservation(</span>
-<span class="fc" id="L187">            hypothesis.hypothesisId() + &quot;-holdout&quot;,</span>
+<span class="fc" id="L259">        HoldoutResult representative = results.getFirst();</span>
+<span class="fc" id="L260">        List&lt;String&gt; rulePath = results.stream()</span>
+<span class="fc" id="L261">            .flatMap(result -&gt; result.rulePath().stream())</span>
+<span class="pc bpc" id="L262" title="2 of 4 branches missed.">            .filter(rule -&gt; rule != null &amp;&amp; !rule.isBlank())</span>
+<span class="fc" id="L263">            .distinct()</span>
+<span class="fc" id="L264">            .toList();</span>
+<span class="fc" id="L265">        List&lt;String&gt; assumptions = assumptions(hypothesis, results, negativeResults, coverage);</span>
+<span class="fc" id="L266">        PromotionObservation observation = new PromotionObservation(</span>
+<span class="fc" id="L267">            hypothesis.hypothesisId() + &quot;-holdout&quot;,</span>
             SOURCE_CAMPAIGN,
-<span class="fc" id="L189">            LocalDate.of(2026, 12, 1).toString(),</span>
-<span class="fc" id="L190">            hypothesis.family(),</span>
-<span class="fc" id="L191">            representative.inputExpression(),</span>
-<span class="fc" id="L192">            representative.targetExpression(),</span>
-<span class="fc" id="L193">            results.stream().allMatch(HoldoutResult::withSuccess),</span>
-<span class="fc" id="L194">            oracleStatus(results),</span>
-<span class="fc" id="L195">            oracleEvidence(results),</span>
-<span class="fc" id="L196">            ablation.ablationStatus(),</span>
-<span class="fc" id="L197">            hypothesis.operatorId(),</span>
-<span class="fc" id="L198">            sourcePack(hypothesis.operatorId()),</span>
+<span class="fc" id="L269">            LocalDate.of(2026, 12, 1).toString(),</span>
+<span class="fc" id="L270">            hypothesis.family(),</span>
+<span class="fc" id="L271">            representative.inputExpression(),</span>
+<span class="fc" id="L272">            representative.targetExpression(),</span>
+<span class="pc bpc" id="L273" title="2 of 4 branches missed.">            results.stream().allMatch(HoldoutResult::withSuccess) &amp;&amp; negativeResults.stream().allMatch(NegativeHoldoutResult::blocked),</span>
+<span class="fc" id="L274">            oracleStatus(results),</span>
+<span class="fc" id="L275">            oracleEvidence(results),</span>
+<span class="fc" id="L276">            ablation.ablationStatus(),</span>
+<span class="fc" id="L277">            hypothesis.operatorId(),</span>
+<span class="fc" id="L278">            sourcePack(hypothesis.operatorId()),</span>
             assumptions,
-<span class="fc" id="L200">            &quot;generalized from &quot; + hypothesis.supportCount() + &quot; support examples and validated on generated holdouts&quot;,</span>
+<span class="fc" id="L280">            &quot;generalized from &quot; + hypothesis.supportCount()</span>
+<span class="fc" id="L281">                + &quot; support examples; generated &quot; + coverage.generatedPositiveCount()</span>
+<span class="fc" id="L282">                + &quot; positive and &quot; + coverage.generatedNegativeCount()</span>
+<span class="fc" id="L283">                + &quot; negative holdouts; benchmarked &quot; + results.size() + &quot; positive cases&quot;,</span>
             rulePath,
-<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            !rulePath.isEmpty(),</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            !rulePath.isEmpty(),</span>
             false,
-<span class="fc" id="L204">            fallbackUsed(rulePath),</span>
-<span class="fc" id="L205">            macroOpportunity(hypothesis.family(), rulePath)</span>
+<span class="fc" id="L287">            fallbackUsed(rulePath),</span>
+<span class="fc" id="L288">            macroOpportunity(hypothesis.family(), rulePath)</span>
         );
-<span class="fc" id="L207">        return decider.decide(observation, ablation);</span>
+<span class="fc" id="L290">        return decider.decide(observation, ablation);</span>
     }
 
-    private List&lt;String&gt; assumptions(PatternHypothesisMiner.GeneralizedHypothesis hypothesis, List&lt;HoldoutResult&gt; results) {
-<span class="fc" id="L211">        List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L212">        assumptions.add(&quot;generatedHypothesis.id=&quot; + hypothesis.hypothesisId());</span>
-<span class="fc" id="L213">        assumptions.add(&quot;generatedHypothesis.supportCount=&quot; + hypothesis.supportCount());</span>
-<span class="fc" id="L214">        assumptions.add(&quot;generatedHypothesis.leftPattern=&quot; + hypothesis.leftPattern());</span>
-<span class="fc" id="L215">        assumptions.add(&quot;generatedHypothesis.rightPattern=&quot; + hypothesis.rightPattern());</span>
-<span class="fc" id="L216">        assumptions.addAll(hypothesis.parameterRelations().stream()</span>
-<span class="fc" id="L217">            .map(relation -&gt; &quot;generatedHypothesis.parameterRelation=&quot; + relation)</span>
-<span class="fc" id="L218">            .toList());</span>
-<span class="fc" id="L219">        assumptions.addAll(results.stream()</span>
-<span class="fc" id="L220">            .map(result -&gt; &quot;generatedHoldout.&quot; + result.holdoutId() + &quot;=&quot;</span>
-<span class="fc" id="L221">                + result.inputExpression() + &quot; -&gt; &quot; + result.targetExpression())</span>
-<span class="fc" id="L222">            .toList());</span>
-<span class="fc" id="L223">        return List.copyOf(assumptions);</span>
+    private List&lt;String&gt; assumptions(
+        PatternHypothesisMiner.GeneralizedHypothesis hypothesis,
+        List&lt;HoldoutResult&gt; results,
+        List&lt;NegativeHoldoutResult&gt; negativeResults,
+        GeneratorCoverage coverage
+    ) {
+<span class="fc" id="L299">        List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L300">        assumptions.add(&quot;generatedHypothesis.id=&quot; + hypothesis.hypothesisId());</span>
+<span class="fc" id="L301">        assumptions.add(&quot;generatedHypothesis.supportCount=&quot; + hypothesis.supportCount());</span>
+<span class="fc" id="L302">        assumptions.add(&quot;generatedHypothesis.leftPattern=&quot; + hypothesis.leftPattern());</span>
+<span class="fc" id="L303">        assumptions.add(&quot;generatedHypothesis.rightPattern=&quot; + hypothesis.rightPattern());</span>
+<span class="fc" id="L304">        assumptions.add(&quot;generatedHoldout.seed=&quot; + GENERATOR_SEED);</span>
+<span class="fc" id="L305">        assumptions.add(&quot;generatedHoldout.version=&quot; + GENERATOR_VERSION);</span>
+<span class="fc" id="L306">        assumptions.add(&quot;generatedHoldout.positiveCount=&quot; + coverage.generatedPositiveCount());</span>
+<span class="fc" id="L307">        assumptions.add(&quot;generatedHoldout.negativeCount=&quot; + coverage.generatedNegativeCount());</span>
+<span class="fc" id="L308">        assumptions.add(&quot;generatedHoldout.filteredLeakageCount=&quot; + coverage.filteredLeakageCount());</span>
+<span class="fc" id="L309">        assumptions.addAll(hypothesis.parameterRelations().stream()</span>
+<span class="fc" id="L310">            .map(relation -&gt; &quot;generatedHypothesis.parameterRelation=&quot; + relation)</span>
+<span class="fc" id="L311">            .toList());</span>
+<span class="fc" id="L312">        assumptions.addAll(results.stream()</span>
+<span class="fc" id="L313">            .map(result -&gt; &quot;generatedHoldout.&quot; + result.holdoutId() + &quot;=&quot;</span>
+<span class="fc" id="L314">                + result.inputExpression() + &quot; -&gt; &quot; + result.targetExpression()</span>
+<span class="fc" id="L315">                + &quot; [&quot; + result.templateId() + &quot;]&quot;)</span>
+<span class="fc" id="L316">            .toList());</span>
+<span class="fc" id="L317">        assumptions.addAll(negativeResults.stream()</span>
+<span class="fc" id="L318">            .limit(5)</span>
+<span class="fc" id="L319">            .map(result -&gt; &quot;negativeHoldout.&quot; + result.holdoutId() + &quot;=&quot;</span>
+<span class="fc" id="L320">                + result.inputExpression() + &quot; !-&gt; &quot; + result.targetExpression()</span>
+<span class="fc" id="L321">                + &quot; blocked=&quot; + result.blocked())</span>
+<span class="fc" id="L322">            .toList());</span>
+<span class="fc" id="L323">        return List.copyOf(assumptions);</span>
     }
 
-    private List&lt;HoldoutCase&gt; holdoutCases(PatternHypothesisMiner.GeneralizedHypothesis hypothesis) {
-<span class="fc" id="L227">        String operator = hypothesis.operatorId();</span>
-<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID.equals(operator)) {</span>
-<span class="fc" id="L229">            return List.of(</span>
-<span class="fc" id="L230">                new HoldoutCase(&quot;holdout-rsf-explicit-uv&quot;, &quot;u * v + u * w&quot;, &quot;u * (v + w)&quot;, List.of()),</span>
-<span class="fc" id="L231">                new HoldoutCase(&quot;holdout-rsf-explicit-mn&quot;, &quot;m * n - m * p&quot;, &quot;m * (n - p)&quot;, List.of())</span>
-            );
+    private GeneratedHoldoutSuite holdoutCases(PatternHypothesisMiner.GeneralizedHypothesis hypothesis) {
+<span class="fc" id="L327">        HypothesisOperator operator = operatorFor(hypothesis.operatorId());</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (operator == null) {</span>
+<span class="nc" id="L329">            return GeneratedHoldoutSuite.empty();</span>
         }
-<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (TelescopingFractionHypothesisOperator.RULE_ID.equals(operator)) {</span>
-<span class="nc" id="L235">            return List.of(</span>
-<span class="nc" id="L236">                new HoldoutCase(&quot;holdout-tel-q56&quot;, &quot;1 / ((q + 5) * (q + 6))&quot;, &quot;1 / (q + 5) - 1 / (q + 6)&quot;, List.of()),</span>
-<span class="nc" id="L237">                new HoldoutCase(&quot;holdout-tel-r78&quot;, &quot;1 / ((r + 7) * (r + 8))&quot;, &quot;1 / (r + 7) - 1 / (r + 8)&quot;, List.of())</span>
-            );
+<span class="pc bpc" id="L331" title="3 of 4 branches missed.">        List&lt;HoldoutCase&gt; generated = switch (hypothesis.operatorId()) {</span>
+<span class="fc" id="L332">            case RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID -&gt; repeatedSubexpressionHoldouts(operator);</span>
+<span class="nc" id="L333">            case TelescopingFractionHypothesisOperator.RULE_ID -&gt; telescopingHoldouts(operator);</span>
+<span class="nc" id="L334">            case RationalNormalizationHypothesisOperator.RULE_ID -&gt; rationalNormalizationHoldouts(operator);</span>
+<span class="pc" id="L335">            default -&gt; List.of();</span>
+        };
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (generated.isEmpty()) {</span>
+<span class="nc" id="L338">            return GeneratedHoldoutSuite.empty();</span>
         }
-<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (RationalNormalizationHypothesisOperator.RULE_ID.equals(operator)) {</span>
-<span class="nc" id="L241">            return List.of(</span>
-<span class="nc" id="L242">                new HoldoutCase(&quot;holdout-rn-shared-denom-add&quot;, &quot;alpha / gamma + beta / gamma&quot;, &quot;(alpha + beta) / gamma&quot;, List.of()),</span>
-<span class="nc" id="L243">                new HoldoutCase(&quot;holdout-rn-shared-denom-sub&quot;, &quot;alpha / gamma - beta / gamma&quot;, &quot;(alpha - beta) / gamma&quot;, List.of())</span>
-            );
+<span class="fc" id="L340">        List&lt;LeakageFinding&gt; leakage = leakageChecker.findLeakage(hypothesis.supportExamples(), generated);</span>
+<span class="fc" id="L341">        Set&lt;String&gt; leakingIds = leakage.stream().map(LeakageFinding::holdoutId).collect(Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L342">        List&lt;HoldoutCase&gt; filtered = generated.stream()</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            .filter(holdout -&gt; !leakingIds.contains(holdout.id()))</span>
+<span class="fc" id="L344">            .toList();</span>
+<span class="fc" id="L345">        List&lt;HoldoutCase&gt; positives = filtered.stream()</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            .filter(holdout -&gt; holdout.expectation() == HoldoutExpectation.POSITIVE)</span>
+<span class="fc" id="L347">            .toList();</span>
+<span class="fc" id="L348">        List&lt;HoldoutCase&gt; negatives = filtered.stream()</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            .filter(holdout -&gt; holdout.expectation() == HoldoutExpectation.NEGATIVE)</span>
+<span class="fc" id="L350">            .toList();</span>
+<span class="fc" id="L351">        return new GeneratedHoldoutSuite(</span>
+            positives,
+            negatives,
+<span class="fc" id="L354">            coverage(filtered, leakage)</span>
+        );
+    }
+
+    private List&lt;HoldoutCase&gt; repeatedSubexpressionHoldouts(HypothesisOperator operator) {
+<span class="fc" id="L359">        List&lt;HoldoutCase&gt; holdouts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L360">        String[] factors = {&quot;u&quot;, &quot;v&quot;, &quot;w&quot;, &quot;m&quot;, &quot;n&quot;};</span>
+<span class="fc" id="L361">        String[] leftTerms = {&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;r&quot;, &quot;s&quot;};</span>
+<span class="fc" id="L362">        String[] rightTerms = {&quot;d&quot;, &quot;e&quot;, &quot;f&quot;, &quot;t&quot;, &quot;z&quot;};</span>
+<span class="fc" id="L363">        addGeneratedFactorizationPositives(holdouts, operator, &quot;rsf-plus-offset&quot;, &quot;factorization-offset-plus&quot;, &quot;+&quot;, factors, leftTerms, rightTerms);</span>
+<span class="fc" id="L364">        addGeneratedFactorizationPositives(holdouts, operator, &quot;rsf-minus-offset&quot;, &quot;factorization-offset-minus&quot;, &quot;-&quot;, factors, leftTerms, rightTerms);</span>
+<span class="fc" id="L365">        addGeneratedFactorizationSumPositives(holdouts, operator, &quot;rsf-plus-symbolic&quot;, &quot;factorization-symbolic-plus&quot;, &quot;+&quot;, factors, leftTerms, rightTerms);</span>
+<span class="fc" id="L366">        addGeneratedFactorizationNegatives(holdouts, &quot;rsf-negative-mismatch&quot;, &quot;factorization-boundary&quot;, factors, leftTerms, rightTerms);</span>
+<span class="fc" id="L367">        addGeneratedFactorizationNegativeDifferences(holdouts, &quot;rsf-negative-symbolic&quot;, &quot;factorization-boundary-symbolic&quot;, factors, leftTerms, rightTerms);</span>
+<span class="fc" id="L368">        return holdouts;</span>
+    }
+
+    private List&lt;HoldoutCase&gt; telescopingHoldouts(HypothesisOperator operator) {
+<span class="nc" id="L372">        List&lt;HoldoutCase&gt; holdouts = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L373">        String[] bases = {&quot;x&quot;, &quot;q&quot;, &quot;r&quot;, &quot;t&quot;, &quot;u&quot;};</span>
+<span class="nc" id="L374">        String[] extras = {&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;m&quot;, &quot;n&quot;};</span>
+<span class="nc" id="L375">        addGeneratedTelescopingBasePositives(holdouts, operator, &quot;tel-base&quot;, &quot;adjacent-base&quot;, bases);</span>
+<span class="nc" id="L376">        addGeneratedTelescopingCompositePositives(holdouts, operator, &quot;tel-composite&quot;, &quot;adjacent-composite&quot;, bases, extras);</span>
+<span class="nc" id="L377">        addGeneratedTelescopingScaledPositives(holdouts, operator, &quot;tel-scaled&quot;, &quot;adjacent-scaled&quot;, bases);</span>
+<span class="nc" id="L378">        addGeneratedTelescopingGapNegatives(holdouts, &quot;tel-gap&quot;, &quot;non-adjacent-gap&quot;, bases);</span>
+<span class="nc" id="L379">        addGeneratedTelescopingSymbolNegatives(holdouts, &quot;tel-symbolic-numerator&quot;, &quot;non-numeric-numerator&quot;, bases, extras);</span>
+<span class="nc" id="L380">        addGeneratedTelescopingMixedNegatives(holdouts, &quot;tel-mixed-base&quot;, &quot;non-adjacent-symbolic&quot;, bases, extras);</span>
+<span class="nc" id="L381">        return holdouts;</span>
+    }
+
+    private List&lt;HoldoutCase&gt; rationalNormalizationHoldouts(HypothesisOperator operator) {
+<span class="nc" id="L385">        List&lt;HoldoutCase&gt; holdouts = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L386">        String[] numerators = {&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;m&quot;, &quot;n&quot;};</span>
+<span class="nc" id="L387">        String[] denominators = {&quot;d&quot;, &quot;g&quot;, &quot;h&quot;, &quot;q&quot;, &quot;r&quot;};</span>
+<span class="nc" id="L388">        addGeneratedRationalPositives(holdouts, operator, &quot;rn-add-shared&quot;, &quot;shared-denominator-add&quot;, &quot;+&quot;, numerators, denominators);</span>
+<span class="nc" id="L389">        addGeneratedRationalPositives(holdouts, operator, &quot;rn-sub-shared&quot;, &quot;shared-denominator-sub&quot;, &quot;-&quot;, numerators, denominators);</span>
+<span class="nc" id="L390">        addGeneratedRationalCompositePositives(holdouts, operator, &quot;rn-add-composite&quot;, &quot;shared-denominator-composite&quot;, numerators, denominators);</span>
+<span class="nc" id="L391">        addGeneratedRationalNegativeDenominatorCases(holdouts, &quot;rn-negative-different&quot;, &quot;mismatched-denominator&quot;, numerators, denominators);</span>
+<span class="nc" id="L392">        addGeneratedRationalNegativeCompositeCases(holdouts, &quot;rn-negative-offset&quot;, &quot;near-miss-denominator&quot;, numerators, denominators);</span>
+<span class="nc" id="L393">        addGeneratedRationalNegativeProductCases(holdouts, &quot;rn-negative-product&quot;, &quot;non-additive-boundary&quot;, numerators, denominators);</span>
+<span class="nc" id="L394">        return holdouts;</span>
+    }
+
+    private void addGeneratedFactorizationPositives(
+        List&lt;HoldoutCase&gt; holdouts,
+        HypothesisOperator operator,
+        String templateId,
+        String structureClass,
+        String sign,
+        String[] factors,
+        String[] leftTerms,
+        String[] rightTerms
+    ) {
+<span class="fc" id="L407">        int index = 0;</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">        for (int offset = 1; offset &lt;= 4; offset++) {</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">            for (String factor : factors) {</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">                for (String left : leftTerms) {</span>
+<span class="fc" id="L411">                    String right = rightTerms[index % rightTerms.length];</span>
+<span class="fc" id="L412">                    String common = &quot;(&quot; + factor + &quot; + &quot; + offset + &quot;)&quot;;</span>
+<span class="fc" id="L413">                    String input = common + &quot; * &quot; + left + &quot; &quot; + sign + &quot; &quot; + common + &quot; * &quot; + right;</span>
+<span class="fc" id="L414">                    String id = templateId + &quot;-&quot; + factor + &quot;-&quot; + left + &quot;-&quot; + right + &quot;-&quot; + offset;</span>
+<span class="fc" id="L415">                    positiveHoldout(operator, id, input, templateId, structureClass, &quot;polynomial&quot;, &quot;none&quot;)</span>
+<span class="fc" id="L416">                        .ifPresent(holdouts::add);</span>
+<span class="fc" id="L417">                    index++;</span>
+                }
+            }
         }
-<span class="nc" id="L246">        return List.of();</span>
+<span class="fc" id="L421">    }</span>
+
+    private void addGeneratedFactorizationSumPositives(
+        List&lt;HoldoutCase&gt; holdouts,
+        HypothesisOperator operator,
+        String templateId,
+        String structureClass,
+        String sign,
+        String[] factors,
+        String[] leftTerms,
+        String[] rightTerms
+    ) {
+<span class="fc" id="L433">        int index = 0;</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        for (String factor : factors) {</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">            for (String extra : leftTerms) {</span>
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">                if (factor.equals(extra)) {</span>
+<span class="nc" id="L437">                    continue;</span>
+                }
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                for (String left : rightTerms) {</span>
+<span class="fc" id="L440">                    String right = leftTerms[index % leftTerms.length];</span>
+<span class="fc" id="L441">                    String common = &quot;(&quot; + factor + &quot; + &quot; + extra + &quot;)&quot;;</span>
+<span class="fc" id="L442">                    String input = common + &quot; * &quot; + left + &quot; &quot; + sign + &quot; &quot; + common + &quot; * &quot; + right;</span>
+<span class="fc" id="L443">                    String id = templateId + &quot;-&quot; + factor + &quot;-&quot; + extra + &quot;-&quot; + left + &quot;-&quot; + right;</span>
+<span class="fc" id="L444">                    positiveHoldout(operator, id, input, templateId, structureClass, &quot;polynomial&quot;, &quot;none&quot;)</span>
+<span class="fc" id="L445">                        .ifPresent(holdouts::add);</span>
+<span class="fc" id="L446">                    index++;</span>
+                }
+            }
+        }
+<span class="fc" id="L450">    }</span>
+
+    private void addGeneratedFactorizationNegatives(
+        List&lt;HoldoutCase&gt; holdouts,
+        String templateId,
+        String structureClass,
+        String[] factors,
+        String[] leftTerms,
+        String[] rightTerms
+    ) {
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        for (int offset = 1; offset &lt;= 4; offset++) {</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">            for (String factor : factors) {</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">                for (int index = 0; index &lt; leftTerms.length; index++) {</span>
+<span class="fc" id="L463">                    String left = leftTerms[index];</span>
+<span class="fc" id="L464">                    String right = rightTerms[index];</span>
+<span class="fc" id="L465">                    String input = &quot;(&quot; + factor + &quot; + &quot; + offset + &quot;) * &quot; + left + &quot; + &quot; + factor + &quot; * &quot; + right;</span>
+<span class="fc" id="L466">                    String target = &quot;(&quot; + factor + &quot; + &quot; + offset + &quot;) * (&quot; + left + &quot; + &quot; + right + &quot;)&quot;;</span>
+<span class="fc" id="L467">                    holdouts.add(negativeHoldout(</span>
+                        templateId + &quot;-&quot; + factor + &quot;-&quot; + left + &quot;-&quot; + right + &quot;-&quot; + offset,
+                        input,
+                        target,
+                        templateId,
+                        structureClass,
+                        &quot;polynomial&quot;,
+                        &quot;none&quot;
+                    ));
+                }
+            }
+        }
+<span class="fc" id="L479">    }</span>
+
+    private void addGeneratedFactorizationNegativeDifferences(
+        List&lt;HoldoutCase&gt; holdouts,
+        String templateId,
+        String structureClass,
+        String[] factors,
+        String[] leftTerms,
+        String[] rightTerms
+    ) {
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        for (String factor : factors) {</span>
+<span class="fc bfc" id="L490" title="All 2 branches covered.">            for (int index = 0; index &lt; leftTerms.length; index++) {</span>
+<span class="fc" id="L491">                String extra = rightTerms[index];</span>
+<span class="fc" id="L492">                String left = leftTerms[index];</span>
+<span class="fc" id="L493">                String right = rightTerms[(index + 1) % rightTerms.length];</span>
+<span class="fc" id="L494">                String input = &quot;(&quot; + factor + &quot; + &quot; + extra + &quot;) * &quot; + left + &quot; - (&quot; + factor + &quot; + &quot; + right + &quot;) * &quot; + extra;</span>
+<span class="fc" id="L495">                String target = &quot;(&quot; + factor + &quot; + &quot; + extra + &quot;) * (&quot; + left + &quot; - &quot; + extra + &quot;)&quot;;</span>
+<span class="fc" id="L496">                holdouts.add(negativeHoldout(</span>
+                    templateId + &quot;-&quot; + factor + &quot;-&quot; + left + &quot;-&quot; + extra + &quot;-&quot; + right,
+                    input,
+                    target,
+                    templateId,
+                    structureClass,
+                    &quot;polynomial&quot;,
+                    &quot;none&quot;
+                ));
+            }
+        }
+<span class="fc" id="L507">    }</span>
+
+    private void addGeneratedTelescopingBasePositives(
+        List&lt;HoldoutCase&gt; holdouts,
+        HypothesisOperator operator,
+        String templateId,
+        String structureClass,
+        String[] bases
+    ) {
+<span class="nc bnc" id="L516" title="All 2 branches missed.">        for (int numerator = 1; numerator &lt;= 4; numerator++) {</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">            for (String base : bases) {</span>
+<span class="nc bnc" id="L518" title="All 2 branches missed.">                for (int offset = 1; offset &lt;= 6; offset++) {</span>
+<span class="nc" id="L519">                    String lower = &quot;(&quot; + base + &quot; + &quot; + offset + &quot;)&quot;;</span>
+<span class="nc" id="L520">                    String upper = &quot;(&quot; + base + &quot; + &quot; + (offset + 1) + &quot;)&quot;;</span>
+<span class="nc" id="L521">                    String input = numerator + &quot; / (&quot; + lower + &quot; * &quot; + upper + &quot;)&quot;;</span>
+<span class="nc" id="L522">                    String id = templateId + &quot;-&quot; + numerator + &quot;-&quot; + base + &quot;-&quot; + offset;</span>
+<span class="nc" id="L523">                    positiveHoldout(operator, id, input, templateId, structureClass, &quot;rational&quot;, &quot;adjacent-factors&quot;)</span>
+<span class="nc" id="L524">                        .ifPresent(holdouts::add);</span>
+                }
+            }
+        }
+<span class="nc" id="L528">    }</span>
+
+    private void addGeneratedTelescopingCompositePositives(
+        List&lt;HoldoutCase&gt; holdouts,
+        HypothesisOperator operator,
+        String templateId,
+        String structureClass,
+        String[] bases,
+        String[] extras
+    ) {
+<span class="nc bnc" id="L538" title="All 2 branches missed.">        for (int numerator = 1; numerator &lt;= 4; numerator++) {</span>
+<span class="nc bnc" id="L539" title="All 2 branches missed.">            for (String base : bases) {</span>
+<span class="nc bnc" id="L540" title="All 2 branches missed.">                for (String extra : extras) {</span>
+<span class="nc bnc" id="L541" title="All 2 branches missed.">                    if (base.equals(extra)) {</span>
+<span class="nc" id="L542">                        continue;</span>
+                    }
+<span class="nc" id="L544">                    String symbolic = &quot;((&quot; + base + &quot; + &quot; + extra + &quot;) + 2)&quot;;</span>
+<span class="nc" id="L545">                    String upper = &quot;((&quot; + base + &quot; + &quot; + extra + &quot;) + 3)&quot;;</span>
+<span class="nc" id="L546">                    String input = numerator + &quot; / (&quot; + symbolic + &quot; * &quot; + upper + &quot;)&quot;;</span>
+<span class="nc" id="L547">                    String id = templateId + &quot;-&quot; + numerator + &quot;-&quot; + base + &quot;-&quot; + extra;</span>
+<span class="nc" id="L548">                    positiveHoldout(operator, id, input, templateId, structureClass, &quot;rational&quot;, &quot;adjacent-factors&quot;)</span>
+<span class="nc" id="L549">                        .ifPresent(holdouts::add);</span>
+                }
+            }
+        }
+<span class="nc" id="L553">    }</span>
+
+    private void addGeneratedTelescopingScaledPositives(
+        List&lt;HoldoutCase&gt; holdouts,
+        HypothesisOperator operator,
+        String templateId,
+        String structureClass,
+        String[] bases
+    ) {
+<span class="nc bnc" id="L562" title="All 2 branches missed.">        for (String base : bases) {</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">            for (int offset = 2; offset &lt;= 6; offset++) {</span>
+<span class="nc" id="L564">                String lower = &quot;((&quot; + base + &quot; + 1) + &quot; + offset + &quot;)&quot;;</span>
+<span class="nc" id="L565">                String upper = &quot;((&quot; + base + &quot; + 1) + &quot; + (offset + 1) + &quot;)&quot;;</span>
+<span class="nc" id="L566">                String input = &quot;5 / (&quot; + lower + &quot; * &quot; + upper + &quot;)&quot;;</span>
+<span class="nc" id="L567">                String id = templateId + &quot;-&quot; + base + &quot;-&quot; + offset;</span>
+<span class="nc" id="L568">                positiveHoldout(operator, id, input, templateId, structureClass, &quot;rational&quot;, &quot;adjacent-factors&quot;)</span>
+<span class="nc" id="L569">                    .ifPresent(holdouts::add);</span>
+            }
+        }
+<span class="nc" id="L572">    }</span>
+
+    private void addGeneratedTelescopingGapNegatives(
+        List&lt;HoldoutCase&gt; holdouts,
+        String templateId,
+        String structureClass,
+        String[] bases
+    ) {
+<span class="nc bnc" id="L580" title="All 2 branches missed.">        for (int numerator = 1; numerator &lt;= 4; numerator++) {</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">            for (String base : bases) {</span>
+<span class="nc bnc" id="L582" title="All 2 branches missed.">                for (int offset = 1; offset &lt;= 6; offset++) {</span>
+<span class="nc" id="L583">                    String lower = &quot;(&quot; + base + &quot; + &quot; + offset + &quot;)&quot;;</span>
+<span class="nc" id="L584">                    String upper = &quot;(&quot; + base + &quot; + &quot; + (offset + 2) + &quot;)&quot;;</span>
+<span class="nc" id="L585">                    String input = numerator + &quot; / (&quot; + lower + &quot; * &quot; + upper + &quot;)&quot;;</span>
+<span class="nc" id="L586">                    String target = numerator + &quot; / &quot; + lower + &quot; - &quot; + numerator + &quot; / &quot; + upper;</span>
+<span class="nc" id="L587">                    holdouts.add(negativeHoldout(</span>
+                        templateId + &quot;-&quot; + numerator + &quot;-&quot; + base + &quot;-&quot; + offset,
+                        input,
+                        target,
+                        templateId,
+                        structureClass,
+                        &quot;rational&quot;,
+                        &quot;non-adjacent-factors&quot;
+                    ));
+                }
+            }
+        }
+<span class="nc" id="L599">    }</span>
+
+    private void addGeneratedTelescopingSymbolNegatives(
+        List&lt;HoldoutCase&gt; holdouts,
+        String templateId,
+        String structureClass,
+        String[] bases,
+        String[] extras
+    ) {
+<span class="nc bnc" id="L608" title="All 2 branches missed.">        for (String base : bases) {</span>
+<span class="nc bnc" id="L609" title="All 2 branches missed.">            for (String extra : extras) {</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">                if (base.equals(extra)) {</span>
+<span class="nc" id="L611">                    continue;</span>
+                }
+<span class="nc" id="L613">                String lower = &quot;(&quot; + base + &quot; + 1)&quot;;</span>
+<span class="nc" id="L614">                String upper = &quot;(&quot; + base + &quot; + 2)&quot;;</span>
+<span class="nc" id="L615">                String input = extra + &quot; / (&quot; + lower + &quot; * &quot; + upper + &quot;)&quot;;</span>
+<span class="nc" id="L616">                String target = extra + &quot; / &quot; + lower + &quot; - &quot; + extra + &quot; / &quot; + upper;</span>
+<span class="nc" id="L617">                holdouts.add(negativeHoldout(</span>
+                    templateId + &quot;-&quot; + base + &quot;-&quot; + extra,
+                    input,
+                    target,
+                    templateId,
+                    structureClass,
+                    &quot;rational&quot;,
+                    &quot;non-numeric-numerator&quot;
+                ));
+            }
+        }
+<span class="nc" id="L628">    }</span>
+
+    private void addGeneratedTelescopingMixedNegatives(
+        List&lt;HoldoutCase&gt; holdouts,
+        String templateId,
+        String structureClass,
+        String[] bases,
+        String[] extras
+    ) {
+<span class="nc bnc" id="L637" title="All 2 branches missed.">        for (String base : bases) {</span>
+<span class="nc bnc" id="L638" title="All 2 branches missed.">            for (String extra : extras) {</span>
+<span class="nc bnc" id="L639" title="All 2 branches missed.">                if (base.equals(extra)) {</span>
+<span class="nc" id="L640">                    continue;</span>
+                }
+<span class="nc" id="L642">                String lower = &quot;(&quot; + base + &quot; + 2)&quot;;</span>
+<span class="nc" id="L643">                String upper = &quot;(&quot; + extra + &quot; + 3)&quot;;</span>
+<span class="nc" id="L644">                String input = &quot;3 / (&quot; + lower + &quot; * &quot; + upper + &quot;)&quot;;</span>
+<span class="nc" id="L645">                String target = &quot;3 / &quot; + lower + &quot; - 3 / &quot; + upper;</span>
+<span class="nc" id="L646">                holdouts.add(negativeHoldout(</span>
+                    templateId + &quot;-&quot; + base + &quot;-&quot; + extra,
+                    input,
+                    target,
+                    templateId,
+                    structureClass,
+                    &quot;rational&quot;,
+                    &quot;mismatched-symbolic-base&quot;
+                ));
+            }
+        }
+<span class="nc" id="L657">    }</span>
+
+    private void addGeneratedRationalPositives(
+        List&lt;HoldoutCase&gt; holdouts,
+        HypothesisOperator operator,
+        String templateId,
+        String structureClass,
+        String sign,
+        String[] numerators,
+        String[] denominators
+    ) {
+<span class="nc bnc" id="L668" title="All 2 branches missed.">        for (String denominator : denominators) {</span>
+<span class="nc bnc" id="L669" title="All 2 branches missed.">            for (String left : numerators) {</span>
+<span class="nc bnc" id="L670" title="All 2 branches missed.">                for (String right : numerators) {</span>
+<span class="nc bnc" id="L671" title="All 2 branches missed.">                    if (left.equals(right)) {</span>
+<span class="nc" id="L672">                        continue;</span>
+                    }
+<span class="nc" id="L674">                    String input = left + &quot; / &quot; + denominator + &quot; &quot; + sign + &quot; &quot; + right + &quot; / &quot; + denominator;</span>
+<span class="nc" id="L675">                    String id = templateId + &quot;-&quot; + denominator + &quot;-&quot; + left + &quot;-&quot; + right;</span>
+<span class="nc" id="L676">                    positiveHoldout(operator, id, input, templateId, structureClass, &quot;rational&quot;, &quot;shared-denominator&quot;)</span>
+<span class="nc" id="L677">                        .ifPresent(holdouts::add);</span>
+                }
+            }
+        }
+<span class="nc" id="L681">    }</span>
+
+    private void addGeneratedRationalCompositePositives(
+        List&lt;HoldoutCase&gt; holdouts,
+        HypothesisOperator operator,
+        String templateId,
+        String structureClass,
+        String[] numerators,
+        String[] denominators
+    ) {
+<span class="nc bnc" id="L691" title="All 2 branches missed.">        for (String denominator : denominators) {</span>
+<span class="nc bnc" id="L692" title="All 2 branches missed.">            for (String left : numerators) {</span>
+<span class="nc bnc" id="L693" title="All 2 branches missed.">                for (String right : numerators) {</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">                    if (left.equals(right)) {</span>
+<span class="nc" id="L695">                        continue;</span>
+                    }
+<span class="nc" id="L697">                    String shared = &quot;(&quot; + denominator + &quot; + 1)&quot;;</span>
+<span class="nc" id="L698">                    String input = &quot;(&quot; + left + &quot; + &quot; + right + &quot;) / &quot; + shared + &quot; + &quot; + left + &quot; / &quot; + shared;</span>
+<span class="nc" id="L699">                    String id = templateId + &quot;-&quot; + denominator + &quot;-&quot; + left + &quot;-&quot; + right;</span>
+<span class="nc" id="L700">                    positiveHoldout(operator, id, input, templateId, structureClass, &quot;rational&quot;, &quot;shared-denominator&quot;)</span>
+<span class="nc" id="L701">                        .ifPresent(holdouts::add);</span>
+                }
+            }
+        }
+<span class="nc" id="L705">    }</span>
+
+    private void addGeneratedRationalNegativeDenominatorCases(
+        List&lt;HoldoutCase&gt; holdouts,
+        String templateId,
+        String structureClass,
+        String[] numerators,
+        String[] denominators
+    ) {
+<span class="nc bnc" id="L714" title="All 2 branches missed.">        for (int index = 0; index &lt; denominators.length; index++) {</span>
+<span class="nc" id="L715">            String leftDenominator = denominators[index];</span>
+<span class="nc" id="L716">            String rightDenominator = denominators[(index + 1) % denominators.length];</span>
+<span class="nc bnc" id="L717" title="All 2 branches missed.">            for (String left : numerators) {</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">                for (String right : numerators) {</span>
+<span class="nc bnc" id="L719" title="All 2 branches missed.">                    if (left.equals(right)) {</span>
+<span class="nc" id="L720">                        continue;</span>
+                    }
+<span class="nc" id="L722">                    String input = left + &quot; / &quot; + leftDenominator + &quot; + &quot; + right + &quot; / &quot; + rightDenominator;</span>
+<span class="nc" id="L723">                    String target = &quot;(&quot; + left + &quot; + &quot; + right + &quot;) / &quot; + leftDenominator;</span>
+<span class="nc" id="L724">                    holdouts.add(negativeHoldout(</span>
+                        templateId + &quot;-&quot; + leftDenominator + &quot;-&quot; + rightDenominator + &quot;-&quot; + left + &quot;-&quot; + right,
+                        input,
+                        target,
+                        templateId,
+                        structureClass,
+                        &quot;rational&quot;,
+                        &quot;mismatched-denominator&quot;
+                    ));
+                }
+            }
+        }
+<span class="nc" id="L736">    }</span>
+
+    private void addGeneratedRationalNegativeCompositeCases(
+        List&lt;HoldoutCase&gt; holdouts,
+        String templateId,
+        String structureClass,
+        String[] numerators,
+        String[] denominators
+    ) {
+<span class="nc bnc" id="L745" title="All 2 branches missed.">        for (String denominator : denominators) {</span>
+<span class="nc bnc" id="L746" title="All 2 branches missed.">            for (String left : numerators) {</span>
+<span class="nc bnc" id="L747" title="All 2 branches missed.">                for (String right : numerators) {</span>
+<span class="nc bnc" id="L748" title="All 2 branches missed.">                    if (left.equals(right)) {</span>
+<span class="nc" id="L749">                        continue;</span>
+                    }
+<span class="nc" id="L751">                    String input = left + &quot; / (&quot; + denominator + &quot; + 1) - &quot; + right + &quot; / (&quot; + denominator + &quot; + 2)&quot;;</span>
+<span class="nc" id="L752">                    String target = &quot;(&quot; + left + &quot; - &quot; + right + &quot;) / (&quot; + denominator + &quot; + 1)&quot;;</span>
+<span class="nc" id="L753">                    holdouts.add(negativeHoldout(</span>
+                        templateId + &quot;-&quot; + denominator + &quot;-&quot; + left + &quot;-&quot; + right,
+                        input,
+                        target,
+                        templateId,
+                        structureClass,
+                        &quot;rational&quot;,
+                        &quot;near-miss-denominator&quot;
+                    ));
+                }
+            }
+        }
+<span class="nc" id="L765">    }</span>
+
+    private void addGeneratedRationalNegativeProductCases(
+        List&lt;HoldoutCase&gt; holdouts,
+        String templateId,
+        String structureClass,
+        String[] numerators,
+        String[] denominators
+    ) {
+<span class="nc bnc" id="L774" title="All 2 branches missed.">        for (String denominator : denominators) {</span>
+<span class="nc bnc" id="L775" title="All 2 branches missed.">            for (String left : numerators) {</span>
+<span class="nc bnc" id="L776" title="All 2 branches missed.">                for (String right : numerators) {</span>
+<span class="nc bnc" id="L777" title="All 2 branches missed.">                    if (left.equals(right)) {</span>
+<span class="nc" id="L778">                        continue;</span>
+                    }
+<span class="nc" id="L780">                    String input = &quot;(&quot; + left + &quot; / &quot; + denominator + &quot;) * (&quot; + right + &quot; / &quot; + denominator + &quot;)&quot;;</span>
+<span class="nc" id="L781">                    String target = &quot;(&quot; + left + &quot; * &quot; + right + &quot;) / &quot; + denominator;</span>
+<span class="nc" id="L782">                    holdouts.add(negativeHoldout(</span>
+                        templateId + &quot;-&quot; + denominator + &quot;-&quot; + left + &quot;-&quot; + right,
+                        input,
+                        target,
+                        templateId,
+                        structureClass,
+                        &quot;rational&quot;,
+                        &quot;non-additive-boundary&quot;
+                    ));
+                }
+            }
+        }
+<span class="nc" id="L794">    }</span>
+
+    private java.util.Optional&lt;HoldoutCase&gt; positiveHoldout(
+        HypothesisOperator operator,
+        String id,
+        String input,
+        String templateId,
+        String structureClass,
+        String domainClass,
+        String assumptionClass
+    ) {
+<span class="fc" id="L805">        return operator.generateCandidates(input).stream()</span>
+<span class="fc" id="L806">            .findFirst()</span>
+<span class="fc" id="L807">            .map(transformation -&gt; new HoldoutCase(</span>
+                id,
+                input,
+<span class="fc" id="L810">                transformation.transformedExpression(),</span>
+                HoldoutExpectation.POSITIVE,
+                templateId,
+                structureClass,
+                domainClass,
+                assumptionClass,
+                GENERATOR_SEED,
+                GENERATOR_VERSION,
+                &quot;deterministic:&quot; + templateId,
+<span class="fc" id="L819">                List.of()</span>
+            ));
+    }
+
+    private HoldoutCase negativeHoldout(
+        String id,
+        String input,
+        String target,
+        String templateId,
+        String structureClass,
+        String domainClass,
+        String assumptionClass
+    ) {
+<span class="fc" id="L832">        return new HoldoutCase(</span>
+            id,
+            input,
+            target,
+            HoldoutExpectation.NEGATIVE,
+            templateId,
+            structureClass,
+            domainClass,
+            assumptionClass,
+            GENERATOR_SEED,
+            GENERATOR_VERSION,
+            &quot;deterministic:&quot; + templateId,
+<span class="fc" id="L844">            List.of()</span>
+        );
+    }
+
+    private GeneratorCoverage coverage(List&lt;HoldoutCase&gt; holdouts, List&lt;LeakageFinding&gt; filteredLeakage) {
+<span class="fc" id="L849">        return new GeneratorCoverage(</span>
+<span class="fc bfc" id="L850" title="All 2 branches covered.">            holdouts.stream().filter(holdout -&gt; holdout.expectation() == HoldoutExpectation.POSITIVE).count(),</span>
+<span class="fc bfc" id="L851" title="All 2 branches covered.">            holdouts.stream().filter(holdout -&gt; holdout.expectation() == HoldoutExpectation.NEGATIVE).count(),</span>
+<span class="fc" id="L852">            countBy(holdouts, HoldoutCase::templateId),</span>
+<span class="fc" id="L853">            countBy(holdouts, HoldoutCase::structureClass),</span>
+<span class="fc" id="L854">            countBy(holdouts, HoldoutCase::domainClass),</span>
+<span class="fc" id="L855">            countBy(holdouts, HoldoutCase::assumptionClass),</span>
+<span class="fc" id="L856">            filteredLeakage.size(),</span>
+<span class="fc" id="L857">            countLeakageByKind(filteredLeakage),</span>
+            COVERAGE_NOTE
+        );
+    }
+
+    private GeneratorCoverage aggregateCoverage(List&lt;ValidatedHypothesis&gt; validatedHypotheses) {
+<span class="fc" id="L863">        long positives = validatedHypotheses.stream()</span>
+<span class="fc" id="L864">            .map(ValidatedHypothesis::generatorCoverage)</span>
+<span class="fc" id="L865">            .mapToLong(GeneratorCoverage::generatedPositiveCount)</span>
+<span class="fc" id="L866">            .sum();</span>
+<span class="fc" id="L867">        long negatives = validatedHypotheses.stream()</span>
+<span class="fc" id="L868">            .map(ValidatedHypothesis::generatorCoverage)</span>
+<span class="fc" id="L869">            .mapToLong(GeneratorCoverage::generatedNegativeCount)</span>
+<span class="fc" id="L870">            .sum();</span>
+<span class="fc" id="L871">        long filteredLeakage = validatedHypotheses.stream()</span>
+<span class="fc" id="L872">            .map(ValidatedHypothesis::generatorCoverage)</span>
+<span class="fc" id="L873">            .mapToLong(GeneratorCoverage::filteredLeakageCount)</span>
+<span class="fc" id="L874">            .sum();</span>
+<span class="fc" id="L875">        return new GeneratorCoverage(</span>
+            positives,
+            negatives,
+<span class="fc" id="L878">            mergeMaps(validatedHypotheses, coverage -&gt; coverage.byTemplate()),</span>
+<span class="fc" id="L879">            mergeMaps(validatedHypotheses, coverage -&gt; coverage.byStructureClass()),</span>
+<span class="fc" id="L880">            mergeMaps(validatedHypotheses, coverage -&gt; coverage.byDomain()),</span>
+<span class="fc" id="L881">            mergeMaps(validatedHypotheses, coverage -&gt; coverage.byAssumptionClass()),</span>
+            filteredLeakage,
+<span class="fc" id="L883">            mergeMaps(validatedHypotheses, coverage -&gt; coverage.filteredLeakageByKind()),</span>
+            COVERAGE_NOTE
+        );
+    }
+
+    private Map&lt;String, Long&gt; countBy(List&lt;HoldoutCase&gt; holdouts, java.util.function.Function&lt;HoldoutCase, String&gt; keyExtractor) {
+<span class="fc" id="L889">        return holdouts.stream()</span>
+<span class="fc" id="L890">            .collect(Collectors.groupingBy(</span>
+<span class="fc" id="L891">                holdout -&gt; keyExtractor.apply(holdout),</span>
+                LinkedHashMap::new,
+<span class="fc" id="L893">                Collectors.counting()</span>
+            ));
+    }
+
+    private Map&lt;String, Long&gt; countLeakageByKind(List&lt;LeakageFinding&gt; leakage) {
+<span class="fc" id="L898">        return leakage.stream()</span>
+<span class="fc" id="L899">            .collect(Collectors.groupingBy(</span>
+<span class="fc" id="L900">                finding -&gt; finding.kind().name().toLowerCase(Locale.ROOT),</span>
+                LinkedHashMap::new,
+<span class="fc" id="L902">                Collectors.counting()</span>
+            ));
+    }
+
+    private Map&lt;String, Long&gt; mergeMaps(
+        List&lt;ValidatedHypothesis&gt; hypotheses,
+        java.util.function.Function&lt;GeneratorCoverage, Map&lt;String, Long&gt;&gt; extractor
+    ) {
+<span class="fc" id="L910">        LinkedHashMap&lt;String, Long&gt; merged = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L911" title="All 2 branches covered.">        for (ValidatedHypothesis hypothesis : hypotheses) {</span>
+<span class="fc" id="L912">            extractor.apply(hypothesis.generatorCoverage()).forEach((key, value) -&gt; merged.merge(key, value, Long::sum));</span>
+<span class="fc" id="L913">        }</span>
+<span class="fc" id="L914">        return Map.copyOf(merged);</span>
+    }
+
+    private HypothesisOperator operatorFor(String operatorId) {
+<span class="pc bpc" id="L918" title="1 of 2 branches missed.">        if (RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
+<span class="fc" id="L919">            return new RepeatedSubexpressionFactorizationHypothesisOperator();</span>
+        }
+<span class="nc bnc" id="L921" title="All 2 branches missed.">        if (TelescopingFractionHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
+<span class="nc" id="L922">            return new TelescopingFractionHypothesisOperator();</span>
+        }
+<span class="nc bnc" id="L924" title="All 2 branches missed.">        if (RationalNormalizationHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
+<span class="nc" id="L925">            return new RationalNormalizationHypothesisOperator();</span>
+        }
+<span class="nc" id="L927">        return null;</span>
     }
 
     private static boolean fallbackUsed(List&lt;String&gt; rulePath) {
-<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        return rulePath != null &amp;&amp; rulePath.stream()</span>
-<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            .filter(ruleId -&gt; ruleId != null)</span>
-<span class="fc" id="L252">            .map(ruleId -&gt; ruleId.toLowerCase(Locale.ROOT))</span>
-<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            .anyMatch(ruleId -&gt; ruleId.contains(&quot;fallback&quot;));</span>
+<span class="pc bpc" id="L931" title="1 of 2 branches missed.">        return rulePath != null &amp;&amp; rulePath.stream()</span>
+<span class="pc bpc" id="L932" title="1 of 2 branches missed.">            .filter(ruleId -&gt; ruleId != null)</span>
+<span class="fc" id="L933">            .map(ruleId -&gt; ruleId.toLowerCase(Locale.ROOT))</span>
+<span class="pc bpc" id="L934" title="1 of 2 branches missed.">            .anyMatch(ruleId -&gt; ruleId.contains(&quot;fallback&quot;));</span>
     }
 
     private static boolean macroOpportunity(String family, List&lt;String&gt; rulePath) {
-<span class="pc bpc" id="L257" title="3 of 6 branches missed.">        return &quot;substitution&quot;.equals(family) || (rulePath != null &amp;&amp; rulePath.size() &gt;= 2);</span>
+<span class="pc bpc" id="L938" title="3 of 6 branches missed.">        return &quot;substitution&quot;.equals(family) || (rulePath != null &amp;&amp; rulePath.size() &gt;= 2);</span>
     }
 
     private String sourcePack(String operatorId) {
-<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
-<span class="fc" id="L262">            return &quot;sympy-polynomial-basic&quot;;</span>
+<span class="pc bpc" id="L942" title="1 of 2 branches missed.">        if (RepeatedSubexpressionFactorizationHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
+<span class="fc" id="L943">            return &quot;sympy-polynomial-basic&quot;;</span>
         }
-<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (TelescopingFractionHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
-<span class="nc" id="L265">            return &quot;sympy-rational-basic&quot;;</span>
+<span class="nc bnc" id="L945" title="All 2 branches missed.">        if (TelescopingFractionHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
+<span class="nc" id="L946">            return &quot;sympy-rational-basic&quot;;</span>
         }
-<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (RationalNormalizationHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
-<span class="nc" id="L268">            return &quot;rational-basic&quot;;</span>
+<span class="nc bnc" id="L948" title="All 2 branches missed.">        if (RationalNormalizationHypothesisOperator.RULE_ID.equals(operatorId)) {</span>
+<span class="nc" id="L949">            return &quot;rational-basic&quot;;</span>
         }
-<span class="nc" id="L270">        return &quot;generated-holdout&quot;;</span>
+<span class="nc" id="L951">        return &quot;generated-holdout&quot;;</span>
     }
 
     private int pathLength(DiscoveryBenchmarkEvidence evidence) {
-<span class="fc" id="L274">        return Math.max(0, evidence.withoutMacroRun().path().size() - 1);</span>
+<span class="fc" id="L955">        return Math.max(0, evidence.withoutMacroRun().path().size() - 1);</span>
     }
 
     private long statesExplored(DiscoveryBenchmarkEvidence evidence) {
-<span class="fc" id="L278">        return evidence.withoutMacroRun().analytics().statesExplored();</span>
+<span class="fc" id="L959">        return evidence.withoutMacroRun().analytics().statesExplored();</span>
     }
 
     private List&lt;String&gt; aggregateRulePath(DiscoveryBenchmarkEvidence evidence) {
-<span class="fc" id="L282">        List&lt;String&gt; path = evidence.withoutMacroRun().appliedRuleIds();</span>
-<span class="pc bpc" id="L283" title="2 of 4 branches missed.">        if (path == null || path.isEmpty()) {</span>
-<span class="nc" id="L284">            return List.of();</span>
+<span class="fc" id="L963">        List&lt;String&gt; path = evidence.withoutMacroRun().appliedRuleIds();</span>
+<span class="pc bpc" id="L964" title="2 of 4 branches missed.">        if (path == null || path.isEmpty()) {</span>
+<span class="nc" id="L965">            return List.of();</span>
         }
-<span class="fc" id="L286">        return List.copyOf(path);</span>
+<span class="fc" id="L967">        return List.copyOf(path);</span>
     }
 
     private String oracleStatus(List&lt;HoldoutResult&gt; results) {
-<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt; &quot;DISAGREE&quot;.equalsIgnoreCase(result.oracleStatus()))) {</span>
-<span class="nc" id="L291">            return &quot;DISAGREE&quot;;</span>
+<span class="pc bpc" id="L971" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt; &quot;DISAGREE&quot;.equalsIgnoreCase(result.oracleStatus()))) {</span>
+<span class="nc" id="L972">            return &quot;DISAGREE&quot;;</span>
         }
-<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt; &quot;AGREE&quot;.equalsIgnoreCase(result.oracleStatus()))) {</span>
-<span class="nc" id="L294">            return &quot;AGREE&quot;;</span>
+<span class="pc bpc" id="L974" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt; &quot;AGREE&quot;.equalsIgnoreCase(result.oracleStatus()))) {</span>
+<span class="nc" id="L975">            return &quot;AGREE&quot;;</span>
         }
-<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt; &quot;UNKNOWN&quot;.equalsIgnoreCase(result.oracleStatus()))) {</span>
-<span class="nc" id="L297">            return &quot;UNKNOWN&quot;;</span>
+<span class="pc bpc" id="L977" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt; &quot;UNKNOWN&quot;.equalsIgnoreCase(result.oracleStatus()))) {</span>
+<span class="nc" id="L978">            return &quot;UNKNOWN&quot;;</span>
         }
-<span class="fc" id="L299">        return &quot;UNAVAILABLE&quot;;</span>
+<span class="fc" id="L980">        return &quot;UNAVAILABLE&quot;;</span>
     }
 
     private String oracleEvidence(List&lt;HoldoutResult&gt; results) {
-<span class="fc" id="L303">        Set&lt;String&gt; evidence = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (HoldoutResult result : results) {</span>
-<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (!result.oracleEvidence().isBlank()) {</span>
-<span class="fc" id="L306">                evidence.add(result.holdoutId() + &quot;: &quot; + result.oracleEvidence());</span>
+<span class="fc" id="L984">        Set&lt;String&gt; evidence = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L985" title="All 2 branches covered.">        for (HoldoutResult result : results) {</span>
+<span class="pc bpc" id="L986" title="1 of 2 branches missed.">            if (!result.oracleEvidence().isBlank()) {</span>
+<span class="fc" id="L987">                evidence.add(result.holdoutId() + &quot;: &quot; + result.oracleEvidence());</span>
             }
-<span class="fc" id="L308">        }</span>
-<span class="fc" id="L309">        return String.join(&quot;; &quot;, evidence);</span>
+<span class="fc" id="L989">        }</span>
+<span class="fc" id="L990">        return String.join(&quot;; &quot;, evidence);</span>
     }
 
     String renderMarkdown(ValidationReport report) {
-<span class="fc" id="L313">        StringBuilder out = new StringBuilder(&quot;# Validated generalized hypotheses\n\n&quot;);</span>
-<span class="fc" id="L314">        out.append(&quot;| Hypothesis | Family | Operator | Support | Holdouts | Ablation | Public evidence |\n&quot;);</span>
-<span class="fc" id="L315">        out.append(&quot;| --- | --- | --- | ---: | ---: | --- | --- |\n&quot;);</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">        for (ValidatedHypothesis hypothesis : report.validatedHypotheses()) {</span>
-<span class="fc" id="L317">            out.append(&quot;| &quot;).append(escape(hypothesis.hypothesisId()))</span>
-<span class="fc" id="L318">                .append(&quot; | &quot;).append(escape(hypothesis.family()))</span>
-<span class="fc" id="L319">                .append(&quot; | &quot;).append(escape(hypothesis.operatorId()))</span>
-<span class="fc" id="L320">                .append(&quot; | &quot;).append(hypothesis.supportCount())</span>
-<span class="fc" id="L321">                .append(&quot; | &quot;).append(hypothesis.holdoutResults().size())</span>
-<span class="fc" id="L322">                .append(&quot; | &quot;).append(escape(hypothesis.ablationEvidence().ablationStatus()))</span>
-<span class="pc bpc" id="L323" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(hypothesis.publicEvidenceAccepted() ? &quot;accepted&quot; : escape(String.join(&quot;, &quot;, hypothesis.publicEvidenceRejectionReasons())))</span>
-<span class="fc" id="L324">                .append(&quot; |\n&quot;);</span>
-<span class="fc" id="L325">        }</span>
-<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (!report.rejectedHypotheses().isEmpty()) {</span>
-<span class="nc" id="L327">            out.append(&quot;\n## Rejected hypotheses\n\n&quot;);</span>
-<span class="nc bnc" id="L328" title="All 2 branches missed.">            for (RejectedHypothesis rejected : report.rejectedHypotheses()) {</span>
-<span class="nc" id="L329">                out.append(&quot;- &quot;).append(escape(rejected.hypothesisId()))</span>
-<span class="nc" id="L330">                    .append(&quot;: &quot;).append(escape(rejected.reason()))</span>
-<span class="nc" id="L331">                    .append(&quot;\n&quot;);</span>
-<span class="nc" id="L332">            }</span>
+<span class="fc" id="L994">        StringBuilder out = new StringBuilder(&quot;# Validated generalized hypotheses\n\n&quot;);</span>
+<span class="fc" id="L995">        out.append(&quot;&gt; &quot;).append(COVERAGE_NOTE).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L996">        out.append(&quot;| Hypothesis | Family | Operator | Support | Generated + | Generated - | Benchmarked + | Negative gate | Ablation | Public evidence |\n&quot;);</span>
+<span class="fc" id="L997">        out.append(&quot;| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L998" title="All 2 branches covered.">        for (ValidatedHypothesis hypothesis : report.validatedHypotheses()) {</span>
+<span class="fc" id="L999">            long blockedNegatives = hypothesis.negativeHoldoutResults().stream()</span>
+<span class="fc" id="L1000">                .filter(NegativeHoldoutResult::blocked)</span>
+<span class="fc" id="L1001">                .count();</span>
+<span class="fc" id="L1002">            out.append(&quot;| &quot;).append(escape(hypothesis.hypothesisId()))</span>
+<span class="fc" id="L1003">                .append(&quot; | &quot;).append(escape(hypothesis.family()))</span>
+<span class="fc" id="L1004">                .append(&quot; | &quot;).append(escape(hypothesis.operatorId()))</span>
+<span class="fc" id="L1005">                .append(&quot; | &quot;).append(hypothesis.supportCount())</span>
+<span class="fc" id="L1006">                .append(&quot; | &quot;).append(hypothesis.generatorCoverage().generatedPositiveCount())</span>
+<span class="fc" id="L1007">                .append(&quot; | &quot;).append(hypothesis.generatorCoverage().generatedNegativeCount())</span>
+<span class="fc" id="L1008">                .append(&quot; | &quot;).append(hypothesis.holdoutResults().size())</span>
+<span class="fc" id="L1009">                .append(&quot; | &quot;).append(blockedNegatives).append(&quot;/&quot;).append(hypothesis.negativeHoldoutResults().size())</span>
+<span class="fc" id="L1010">                .append(&quot; | &quot;).append(escape(hypothesis.ablationEvidence().ablationStatus()))</span>
+<span class="pc bpc" id="L1011" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(hypothesis.publicEvidenceAccepted() ? &quot;accepted&quot; : escape(String.join(&quot;, &quot;, hypothesis.publicEvidenceRejectionReasons())))</span>
+<span class="fc" id="L1012">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L1013">        }</span>
+<span class="fc" id="L1014">        out.append(&quot;\n## Generator coverage\n\n&quot;);</span>
+<span class="fc" id="L1015">        out.append(&quot;- positive holdouts: &quot;).append(report.generatorCoverage().generatedPositiveCount()).append('\n');</span>
+<span class="fc" id="L1016">        out.append(&quot;- negative holdouts: &quot;).append(report.generatorCoverage().generatedNegativeCount()).append('\n');</span>
+<span class="fc" id="L1017">        out.append(&quot;- filtered leakage cases: &quot;).append(report.generatorCoverage().filteredLeakageCount()).append('\n');</span>
+<span class="fc" id="L1018">        out.append(&quot;- template coverage: &quot;).append(escape(report.generatorCoverage().byTemplate().toString())).append('\n');</span>
+<span class="fc" id="L1019">        out.append(&quot;- structure coverage: &quot;).append(escape(report.generatorCoverage().byStructureClass().toString())).append('\n');</span>
+<span class="fc" id="L1020">        out.append(&quot;- domain coverage: &quot;).append(escape(report.generatorCoverage().byDomain().toString())).append('\n');</span>
+<span class="fc" id="L1021">        out.append(&quot;- assumption coverage: &quot;).append(escape(report.generatorCoverage().byAssumptionClass().toString())).append('\n');</span>
+<span class="fc" id="L1022">        out.append(&quot;- leakage coverage: &quot;).append(escape(report.generatorCoverage().filteredLeakageByKind().toString())).append('\n');</span>
+<span class="pc bpc" id="L1023" title="1 of 2 branches missed.">        if (!report.rejectedHypotheses().isEmpty()) {</span>
+<span class="nc" id="L1024">            out.append(&quot;\n## Rejected hypotheses\n\n&quot;);</span>
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">            for (RejectedHypothesis rejected : report.rejectedHypotheses()) {</span>
+<span class="nc" id="L1026">                out.append(&quot;- &quot;).append(escape(rejected.hypothesisId()))</span>
+<span class="nc" id="L1027">                    .append(&quot;: &quot;).append(escape(rejected.reason()))</span>
+<span class="nc" id="L1028">                    .append(&quot;\n&quot;);</span>
+<span class="nc" id="L1029">            }</span>
         }
-<span class="fc" id="L334">        return out.toString();</span>
+<span class="fc" id="L1031">        return out.toString();</span>
     }
 
     private String escape(String value) {
-<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L1035" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    private String normalize(String value) {
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">        return value == null ? &quot;&quot; : value.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+    }
+
+    private String comparableExpressionKey(String expression) {
+        try {
+<span class="fc" id="L1044">            return canonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L1045">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L1046">            return normalize(expression);</span>
+        }
     }
 
     record ValidationReport(
         List&lt;ValidatedHypothesis&gt; validatedHypotheses,
         List&lt;RejectedHypothesis&gt; rejectedHypotheses,
         List&lt;PromotionRecord&gt; promotionRecords,
-        long publicAcceptedCount
+        long publicAcceptedCount,
+        GeneratorCoverage generatorCoverage
     ) {
-<span class="fc" id="L347">        ValidationReport {</span>
-<span class="pc bpc" id="L348" title="1 of 2 branches missed.">            validatedHypotheses = validatedHypotheses == null ? List.of() : List.copyOf(validatedHypotheses);</span>
-<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            rejectedHypotheses = rejectedHypotheses == null ? List.of() : List.copyOf(rejectedHypotheses);</span>
-<span class="pc bpc" id="L350" title="1 of 2 branches missed.">            promotionRecords = promotionRecords == null ? List.of() : List.copyOf(promotionRecords);</span>
-<span class="fc" id="L351">        }</span>
+<span class="fc" id="L1057">        ValidationReport {</span>
+<span class="pc bpc" id="L1058" title="1 of 2 branches missed.">            validatedHypotheses = validatedHypotheses == null ? List.of() : List.copyOf(validatedHypotheses);</span>
+<span class="pc bpc" id="L1059" title="1 of 2 branches missed.">            rejectedHypotheses = rejectedHypotheses == null ? List.of() : List.copyOf(rejectedHypotheses);</span>
+<span class="pc bpc" id="L1060" title="1 of 2 branches missed.">            promotionRecords = promotionRecords == null ? List.of() : List.copyOf(promotionRecords);</span>
+<span class="pc bpc" id="L1061" title="1 of 2 branches missed.">            generatorCoverage = generatorCoverage == null ? GeneratorCoverage.empty() : generatorCoverage;</span>
+<span class="fc" id="L1062">        }</span>
     }
 
     record ValidatedHypothesis(
@@ -360,28 +1071,39 @@ import java.util.Set;
         int supportCount,
         List&lt;String&gt; supportingExampleIds,
         List&lt;HoldoutResult&gt; holdoutResults,
+        List&lt;NegativeHoldoutResult&gt; negativeHoldoutResults,
         AblationEvidence ablationEvidence,
         PromotionRecord promotionRecord,
         boolean publicEvidenceAccepted,
-        List&lt;String&gt; publicEvidenceRejectionReasons
+        List&lt;String&gt; publicEvidenceRejectionReasons,
+        GeneratorCoverage generatorCoverage
     ) {
-<span class="fc" id="L368">        ValidatedHypothesis {</span>
-<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            supportingExampleIds = supportingExampleIds == null ? List.of() : List.copyOf(supportingExampleIds);</span>
-<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            holdoutResults = holdoutResults == null ? List.of() : List.copyOf(holdoutResults);</span>
-<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            publicEvidenceRejectionReasons = publicEvidenceRejectionReasons == null ? List.of() : List.copyOf(publicEvidenceRejectionReasons);</span>
-<span class="fc" id="L372">        }</span>
+<span class="fc" id="L1081">        ValidatedHypothesis {</span>
+<span class="pc bpc" id="L1082" title="1 of 2 branches missed.">            supportingExampleIds = supportingExampleIds == null ? List.of() : List.copyOf(supportingExampleIds);</span>
+<span class="pc bpc" id="L1083" title="1 of 2 branches missed.">            holdoutResults = holdoutResults == null ? List.of() : List.copyOf(holdoutResults);</span>
+<span class="pc bpc" id="L1084" title="1 of 2 branches missed.">            negativeHoldoutResults = negativeHoldoutResults == null ? List.of() : List.copyOf(negativeHoldoutResults);</span>
+<span class="pc bpc" id="L1085" title="1 of 2 branches missed.">            publicEvidenceRejectionReasons = publicEvidenceRejectionReasons == null ? List.of() : List.copyOf(publicEvidenceRejectionReasons);</span>
+<span class="pc bpc" id="L1086" title="1 of 2 branches missed.">            generatorCoverage = generatorCoverage == null ? GeneratorCoverage.empty() : generatorCoverage;</span>
+<span class="fc" id="L1087">        }</span>
     }
 
     record RejectedHypothesis(String hypothesisId, String family, String operatorId, String reason) {
-<span class="nc" id="L376">        RejectedHypothesis {</span>
-<span class="nc bnc" id="L377" title="All 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
-<span class="nc" id="L378">        }</span>
+<span class="nc" id="L1091">        RejectedHypothesis {</span>
+<span class="nc bnc" id="L1092" title="All 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
+<span class="nc" id="L1093">        }</span>
     }
 
     record HoldoutResult(
         String holdoutId,
         String inputExpression,
         String targetExpression,
+        String templateId,
+        String structureClass,
+        String domainClass,
+        String assumptionClass,
+        long seed,
+        String generatorVersion,
+        String provenance,
         boolean withSuccess,
         int withPathLength,
         long withStatesExplored,
@@ -392,17 +1114,289 @@ import java.util.Set;
         String oracleEvidence,
         List&lt;String&gt; rulePath
     ) {
-<span class="fc" id="L395">        HoldoutResult {</span>
-<span class="pc bpc" id="L396" title="2 of 4 branches missed.">            oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
-<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
-<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
-<span class="fc" id="L399">        }</span>
+<span class="fc" id="L1117">        HoldoutResult {</span>
+<span class="pc bpc" id="L1118" title="1 of 2 branches missed.">            templateId = templateId == null ? &quot;&quot; : templateId;</span>
+<span class="pc bpc" id="L1119" title="1 of 2 branches missed.">            structureClass = structureClass == null ? &quot;&quot; : structureClass;</span>
+<span class="pc bpc" id="L1120" title="1 of 2 branches missed.">            domainClass = domainClass == null ? &quot;&quot; : domainClass;</span>
+<span class="pc bpc" id="L1121" title="1 of 2 branches missed.">            assumptionClass = assumptionClass == null ? &quot;&quot; : assumptionClass;</span>
+<span class="pc bpc" id="L1122" title="1 of 2 branches missed.">            generatorVersion = generatorVersion == null ? &quot;&quot; : generatorVersion;</span>
+<span class="pc bpc" id="L1123" title="1 of 2 branches missed.">            provenance = provenance == null ? &quot;&quot; : provenance;</span>
+<span class="pc bpc" id="L1124" title="2 of 4 branches missed.">            oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L1125" title="1 of 2 branches missed.">            oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
+<span class="pc bpc" id="L1126" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="fc" id="L1127">        }</span>
     }
 
-    private record HoldoutCase(String id, String inputExpression, String targetExpression, List&lt;String&gt; enabledRulePacks) {
-<span class="fc" id="L403">        private HoldoutCase {</span>
-<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            enabledRulePacks = enabledRulePacks == null ? List.of() : List.copyOf(enabledRulePacks);</span>
-<span class="fc" id="L405">        }</span>
+    record NegativeHoldoutResult(
+        String holdoutId,
+        String inputExpression,
+        String targetExpression,
+        String templateId,
+        String structureClass,
+        String domainClass,
+        String assumptionClass,
+        long seed,
+        String generatorVersion,
+        String provenance,
+        boolean blocked,
+        boolean operatorFired,
+        boolean rewroteToForbiddenTarget,
+        List&lt;String&gt; generatedCandidates
+    ) {
+<span class="fc" id="L1146">        NegativeHoldoutResult {</span>
+<span class="pc bpc" id="L1147" title="1 of 2 branches missed.">            templateId = templateId == null ? &quot;&quot; : templateId;</span>
+<span class="pc bpc" id="L1148" title="1 of 2 branches missed.">            structureClass = structureClass == null ? &quot;&quot; : structureClass;</span>
+<span class="pc bpc" id="L1149" title="1 of 2 branches missed.">            domainClass = domainClass == null ? &quot;&quot; : domainClass;</span>
+<span class="pc bpc" id="L1150" title="1 of 2 branches missed.">            assumptionClass = assumptionClass == null ? &quot;&quot; : assumptionClass;</span>
+<span class="pc bpc" id="L1151" title="1 of 2 branches missed.">            generatorVersion = generatorVersion == null ? &quot;&quot; : generatorVersion;</span>
+<span class="pc bpc" id="L1152" title="1 of 2 branches missed.">            provenance = provenance == null ? &quot;&quot; : provenance;</span>
+<span class="pc bpc" id="L1153" title="1 of 2 branches missed.">            generatedCandidates = generatedCandidates == null ? List.of() : List.copyOf(generatedCandidates);</span>
+<span class="fc" id="L1154">        }</span>
+    }
+
+    record GeneratorCoverage(
+        long generatedPositiveCount,
+        long generatedNegativeCount,
+        Map&lt;String, Long&gt; byTemplate,
+        Map&lt;String, Long&gt; byStructureClass,
+        Map&lt;String, Long&gt; byDomain,
+        Map&lt;String, Long&gt; byAssumptionClass,
+        long filteredLeakageCount,
+        Map&lt;String, Long&gt; filteredLeakageByKind,
+        String note
+    ) {
+<span class="fc" id="L1168">        GeneratorCoverage {</span>
+<span class="pc bpc" id="L1169" title="1 of 2 branches missed.">            byTemplate = byTemplate == null ? Map.of() : Map.copyOf(byTemplate);</span>
+<span class="pc bpc" id="L1170" title="1 of 2 branches missed.">            byStructureClass = byStructureClass == null ? Map.of() : Map.copyOf(byStructureClass);</span>
+<span class="pc bpc" id="L1171" title="1 of 2 branches missed.">            byDomain = byDomain == null ? Map.of() : Map.copyOf(byDomain);</span>
+<span class="pc bpc" id="L1172" title="1 of 2 branches missed.">            byAssumptionClass = byAssumptionClass == null ? Map.of() : Map.copyOf(byAssumptionClass);</span>
+<span class="pc bpc" id="L1173" title="1 of 2 branches missed.">            filteredLeakageByKind = filteredLeakageByKind == null ? Map.of() : Map.copyOf(filteredLeakageByKind);</span>
+<span class="pc bpc" id="L1174" title="1 of 2 branches missed.">            note = note == null ? &quot;&quot; : note;</span>
+<span class="fc" id="L1175">        }</span>
+
+        private static GeneratorCoverage empty() {
+<span class="nc" id="L1178">            return new GeneratorCoverage(0, 0, Map.of(), Map.of(), Map.of(), Map.of(), 0, Map.of(), COVERAGE_NOTE);</span>
+        }
+    }
+
+    private record GeneratedHoldoutSuite(
+        List&lt;HoldoutCase&gt; positiveHoldouts,
+        List&lt;HoldoutCase&gt; negativeHoldouts,
+        GeneratorCoverage generatorCoverage
+    ) {
+<span class="fc" id="L1187">        private GeneratedHoldoutSuite {</span>
+<span class="pc bpc" id="L1188" title="1 of 2 branches missed.">            positiveHoldouts = positiveHoldouts == null ? List.of() : List.copyOf(positiveHoldouts);</span>
+<span class="pc bpc" id="L1189" title="1 of 2 branches missed.">            negativeHoldouts = negativeHoldouts == null ? List.of() : List.copyOf(negativeHoldouts);</span>
+<span class="pc bpc" id="L1190" title="1 of 2 branches missed.">            generatorCoverage = generatorCoverage == null ? GeneratorCoverage.empty() : generatorCoverage;</span>
+<span class="fc" id="L1191">        }</span>
+
+        private List&lt;HoldoutCase&gt; allHoldouts() {
+<span class="fc" id="L1194">            ArrayList&lt;HoldoutCase&gt; all = new ArrayList&lt;&gt;(positiveHoldouts);</span>
+<span class="fc" id="L1195">            all.addAll(negativeHoldouts);</span>
+<span class="fc" id="L1196">            return List.copyOf(all);</span>
+        }
+
+        private static GeneratedHoldoutSuite empty() {
+<span class="nc" id="L1200">            return new GeneratedHoldoutSuite(List.of(), List.of(), GeneratorCoverage.empty());</span>
+        }
+    }
+
+<span class="fc" id="L1204">    private enum HoldoutExpectation {</span>
+<span class="fc" id="L1205">        POSITIVE,</span>
+<span class="fc" id="L1206">        NEGATIVE</span>
+    }
+
+    private record HoldoutCase(
+        String id,
+        String inputExpression,
+        String targetExpression,
+        HoldoutExpectation expectation,
+        String templateId,
+        String structureClass,
+        String domainClass,
+        String assumptionClass,
+        long seed,
+        String generatorVersion,
+        String provenance,
+        List&lt;String&gt; enabledRulePacks
+    ) {
+<span class="fc" id="L1223">        private HoldoutCase {</span>
+<span class="pc bpc" id="L1224" title="1 of 2 branches missed.">            id = id == null ? &quot;&quot; : id;</span>
+<span class="pc bpc" id="L1225" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
+<span class="pc bpc" id="L1226" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="pc bpc" id="L1227" title="1 of 2 branches missed.">            expectation = expectation == null ? HoldoutExpectation.POSITIVE : expectation;</span>
+<span class="pc bpc" id="L1228" title="1 of 2 branches missed.">            templateId = templateId == null ? &quot;&quot; : templateId;</span>
+<span class="pc bpc" id="L1229" title="1 of 2 branches missed.">            structureClass = structureClass == null ? &quot;&quot; : structureClass;</span>
+<span class="pc bpc" id="L1230" title="1 of 2 branches missed.">            domainClass = domainClass == null ? &quot;&quot; : domainClass;</span>
+<span class="pc bpc" id="L1231" title="1 of 2 branches missed.">            assumptionClass = assumptionClass == null ? &quot;&quot; : assumptionClass;</span>
+<span class="pc bpc" id="L1232" title="1 of 2 branches missed.">            generatorVersion = generatorVersion == null ? &quot;&quot; : generatorVersion;</span>
+<span class="pc bpc" id="L1233" title="1 of 2 branches missed.">            provenance = provenance == null ? &quot;&quot; : provenance;</span>
+<span class="pc bpc" id="L1234" title="1 of 2 branches missed.">            enabledRulePacks = enabledRulePacks == null ? List.of() : List.copyOf(enabledRulePacks);</span>
+<span class="fc" id="L1235">        }</span>
+    }
+
+<span class="fc" id="L1238">    private enum LeakageKind {</span>
+<span class="fc" id="L1239">        EXACT,</span>
+<span class="fc" id="L1240">        CANONICAL_FORM,</span>
+<span class="fc" id="L1241">        ALPHA_EQUIVALENT,</span>
+<span class="fc" id="L1242">        INVERSE</span>
+    }
+
+    private record LeakageFinding(String holdoutId, String supportExampleId, LeakageKind kind) {
+<span class="fc" id="L1246">        private LeakageFinding {</span>
+<span class="pc bpc" id="L1247" title="1 of 2 branches missed.">            holdoutId = holdoutId == null ? &quot;&quot; : holdoutId;</span>
+<span class="pc bpc" id="L1248" title="1 of 2 branches missed.">            supportExampleId = supportExampleId == null ? &quot;&quot; : supportExampleId;</span>
+<span class="pc bpc" id="L1249" title="1 of 2 branches missed.">            kind = kind == null ? LeakageKind.CANONICAL_FORM : kind;</span>
+<span class="fc" id="L1250">        }</span>
+    }
+
+<span class="fc" id="L1253">    private static final class HoldoutLeakageChecker {</span>
+<span class="fc" id="L1254">        private static final Pattern IDENTIFIER = Pattern.compile(&quot;[A-Za-z_][A-Za-z0-9_]*&quot;);</span>
+
+<span class="fc" id="L1256">        private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L1257">        private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+
+        List&lt;LeakageFinding&gt; findLeakage(
+            List&lt;PatternHypothesisMiner.SupportExampleRef&gt; supportExamples,
+            List&lt;HoldoutCase&gt; holdouts
+        ) {
+<span class="fc" id="L1263">            List&lt;LeakageFinding&gt; findings = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L1264" title="1 of 4 branches missed.">            for (HoldoutCase holdout : holdouts == null ? List.&lt;HoldoutCase&gt;of() : holdouts) {</span>
+<span class="pc bpc" id="L1265" title="1 of 4 branches missed.">                for (PatternHypothesisMiner.SupportExampleRef support : supportExamples == null</span>
+<span class="nc" id="L1266">                    ? List.&lt;PatternHypothesisMiner.SupportExampleRef&gt;of()</span>
+<span class="fc" id="L1267">                    : supportExamples) {</span>
+<span class="fc" id="L1268">                    LeakageKind kind = classify(support, holdout);</span>
+<span class="fc bfc" id="L1269" title="All 2 branches covered.">                    if (kind != null) {</span>
+<span class="fc" id="L1270">                        findings.add(new LeakageFinding(holdout.id(), support.exampleId(), kind));</span>
+<span class="fc" id="L1271">                        break;</span>
+                    }
+<span class="fc" id="L1273">                }</span>
+<span class="fc" id="L1274">            }</span>
+<span class="fc" id="L1275">            return List.copyOf(findings);</span>
+        }
+
+        private LeakageKind classify(PatternHypothesisMiner.SupportExampleRef support, HoldoutCase holdout) {
+<span class="fc" id="L1279">            String supportRaw = rawPairKey(support.inputExpression(), support.targetExpression());</span>
+<span class="fc" id="L1280">            String holdoutRaw = rawPairKey(holdout.inputExpression(), holdout.targetExpression());</span>
+<span class="fc bfc" id="L1281" title="All 2 branches covered.">            if (supportRaw.equals(holdoutRaw)) {</span>
+<span class="fc" id="L1282">                return LeakageKind.EXACT;</span>
+            }
+
+<span class="fc" id="L1285">            String supportCanonical = canonicalPairKey(support.inputExpression(), support.targetExpression());</span>
+<span class="fc" id="L1286">            String holdoutCanonical = canonicalPairKey(holdout.inputExpression(), holdout.targetExpression());</span>
+<span class="pc bpc" id="L1287" title="1 of 2 branches missed.">            if (supportCanonical.equals(holdoutCanonical)) {</span>
+<span class="nc" id="L1288">                return LeakageKind.CANONICAL_FORM;</span>
+            }
+
+<span class="fc" id="L1291">            String supportAlpha = alphaPairKey(support.inputExpression(), support.targetExpression());</span>
+<span class="fc" id="L1292">            String holdoutAlpha = alphaPairKey(holdout.inputExpression(), holdout.targetExpression());</span>
+<span class="fc bfc" id="L1293" title="All 2 branches covered.">            if (supportAlpha.equals(holdoutAlpha)) {</span>
+<span class="fc" id="L1294">                return LeakageKind.ALPHA_EQUIVALENT;</span>
+            }
+
+<span class="pc bpc" id="L1297" title="1 of 2 branches missed.">            if (holdoutRaw.equals(rawPairKey(support.targetExpression(), support.inputExpression()))</span>
+<span class="pc bpc" id="L1298" title="1 of 2 branches missed.">                || holdoutCanonical.equals(canonicalPairKey(support.targetExpression(), support.inputExpression()))</span>
+<span class="pc bpc" id="L1299" title="1 of 2 branches missed.">                || holdoutAlpha.equals(alphaPairKey(support.targetExpression(), support.inputExpression()))) {</span>
+<span class="nc" id="L1300">                return LeakageKind.INVERSE;</span>
+            }
+<span class="fc" id="L1302">            return null;</span>
+        }
+
+        private String rawPairKey(String input, String target) {
+<span class="fc" id="L1306">            return normalize(input) + &quot;-&gt;&quot; + normalize(target);</span>
+        }
+
+        private String canonicalPairKey(String input, String target) {
+<span class="fc" id="L1310">            return canonicalExpressionKey(input) + &quot;-&gt;&quot; + canonicalExpressionKey(target);</span>
+        }
+
+        private String alphaPairKey(String input, String target) {
+<span class="fc" id="L1314">            Map&lt;String, String&gt; variableMap = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L1315">            return alphaExpressionKey(input, variableMap) + &quot;-&gt;&quot; + alphaExpressionKey(target, variableMap);</span>
+        }
+
+        private String canonicalExpressionKey(String expression) {
+            try {
+<span class="fc" id="L1320">                return canonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L1321">            } catch (RuntimeException exception) {</span>
+<span class="nc" id="L1322">                return normalize(expression);</span>
+            }
+        }
+
+        private String alphaExpressionKey(String expression, Map&lt;String, String&gt; variableMap) {
+<span class="fc" id="L1327">            Expr parsed = parseCanonical(expression);</span>
+<span class="pc bpc" id="L1328" title="1 of 2 branches missed.">            if (parsed == null) {</span>
+<span class="nc" id="L1329">                return alphaNormalizeLexically(expression, variableMap);</span>
+            }
+<span class="fc" id="L1331">            return astKey(parsed, variableMap);</span>
+        }
+
+        private Expr parseCanonical(String expression) {
+            try {
+<span class="fc" id="L1336">                String canonical = canonicalizer.canonicalize(expression);</span>
+<span class="fc" id="L1337">                return parser.parse(new InputRequest(InputType.TERM, canonical)).terms().getFirst();</span>
+<span class="nc" id="L1338">            } catch (RuntimeException exception) {</span>
+<span class="nc" id="L1339">                return null;</span>
+            }
+        }
+
+        private String astKey(Expr expression, Map&lt;String, String&gt; variableMap) {
+<span class="fc bfc" id="L1344" title="All 2 branches covered.">            if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc" id="L1345">                return &quot;bin(&quot; + binaryExpr.operator().name()</span>
+<span class="fc" id="L1346">                    + &quot;,&quot; + astKey(binaryExpr.left(), variableMap)</span>
+<span class="fc" id="L1347">                    + &quot;,&quot; + astKey(binaryExpr.right(), variableMap)</span>
+                    + &quot;)&quot;;
+            }
+<span class="pc bpc" id="L1350" title="1 of 2 branches missed.">            if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="nc" id="L1351">                List&lt;String&gt; argumentKeys = functionExpr.arguments().stream()</span>
+<span class="nc" id="L1352">                    .map(argument -&gt; astKey(argument, variableMap))</span>
+<span class="nc" id="L1353">                    .toList();</span>
+<span class="nc" id="L1354">                return &quot;fn(&quot; + functionExpr.name().toLowerCase(Locale.ROOT)</span>
+<span class="nc" id="L1355">                    + &quot;,&quot; + String.join(&quot;,&quot;, argumentKeys)</span>
+                    + &quot;)&quot;;
+            }
+<span class="fc bfc" id="L1358" title="All 2 branches covered.">            if (expression instanceof VariableExpr variableExpr) {</span>
+<span class="fc" id="L1359">                String variable = variableExpr.name();</span>
+<span class="pc bpc" id="L1360" title="1 of 2 branches missed.">                if (variableMap != null) {</span>
+<span class="fc" id="L1361">                    variable = variableMap.computeIfAbsent(variable, ignored -&gt; &quot;v&quot; + variableMap.size());</span>
+                }
+<span class="fc" id="L1363">                return &quot;var(&quot; + variable + &quot;)&quot;;</span>
+            }
+<span class="pc bpc" id="L1365" title="1 of 2 branches missed.">            if (expression instanceof NumberExpr numberExpr) {</span>
+<span class="fc" id="L1366">                return &quot;num(&quot; + formatNumber(numberExpr.value()) + &quot;)&quot;;</span>
+            }
+<span class="nc" id="L1368">            return &quot;unknown(&quot; + expression + &quot;)&quot;;</span>
+        }
+
+        private String alphaNormalizeLexically(String expression, Map&lt;String, String&gt; variableMap) {
+<span class="nc" id="L1372">            String normalized = normalize(expression);</span>
+<span class="nc" id="L1373">            Matcher matcher = IDENTIFIER.matcher(normalized);</span>
+<span class="nc" id="L1374">            StringBuilder out = new StringBuilder();</span>
+<span class="nc bnc" id="L1375" title="All 2 branches missed.">            while (matcher.find()) {</span>
+<span class="nc" id="L1376">                String identifier = matcher.group();</span>
+<span class="nc bnc" id="L1377" title="All 2 branches missed.">                String replacement = isFunctionCall(normalized, matcher.end())</span>
+<span class="nc" id="L1378">                    ? identifier.toLowerCase(Locale.ROOT)</span>
+<span class="nc" id="L1379">                    : variableMap.computeIfAbsent(identifier, ignored -&gt; &quot;v&quot; + variableMap.size());</span>
+<span class="nc" id="L1380">                matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));</span>
+<span class="nc" id="L1381">            }</span>
+<span class="nc" id="L1382">            matcher.appendTail(out);</span>
+<span class="nc" id="L1383">            return out.toString();</span>
+        }
+
+        private static boolean isFunctionCall(String expression, int endIndex) {
+<span class="nc bnc" id="L1387" title="All 4 branches missed.">            return endIndex &lt; expression.length() &amp;&amp; expression.charAt(endIndex) == '(';</span>
+        }
+
+        private static String normalize(String expression) {
+<span class="pc bpc" id="L1391" title="1 of 2 branches missed.">            return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+        }
+
+        private static String formatNumber(double value) {
+<span class="pc bpc" id="L1395" title="2 of 4 branches missed.">            if (Double.isFinite(value) &amp;&amp; Math.rint(value) == value) {</span>
+<span class="fc" id="L1396">                return Long.toString((long) value);</span>
+            }
+<span class="nc" id="L1398">            return Double.toString(value);</span>
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
