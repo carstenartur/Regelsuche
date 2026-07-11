@@ -40,34 +40,28 @@ public final class ProofScriptValidator {
             return new ValidationResult(violations);
         }
         String effectiveTool = tool == null ? "" : tool;
-        String[] lines = script.split("\n");
-
-        for (String line : lines) {
+        boolean foundAdmitted = false;
+        boolean foundPlaceholder = false;
+        for (String line : script.split("\n")) {
             String stripped = line.stripLeading();
             // Skip comment lines
             if (stripped.startsWith("--") || stripped.startsWith("//") || stripped.startsWith(";")) {
                 continue;
             }
-            // Admitted statements
-            if (containsWord(stripped, "sorry") || containsWord(stripped, "admit")) {
+            if (!foundAdmitted && (containsWord(stripped, "sorry") || containsWord(stripped, "admit"))) {
                 violations.add("admitted-statement");
-                break;
+                foundAdmitted = true;
             }
-        }
-
-        // Unsupported placeholders: ?goal tactic holes or bare underscore
-        for (String line : lines) {
-            String stripped = line.stripLeading();
-            if (stripped.startsWith("--") || stripped.startsWith("//") || stripped.startsWith(";")) {
-                continue;
-            }
-            if (containsWord(stripped, "?goal")
-                    || (containsWord(stripped, "_") && !"smtlib2".equals(effectiveTool))) {
+            if (!foundPlaceholder
+                    && (containsWord(stripped, "?goal")
+                        || (containsWord(stripped, "_") && !"smtlib2".equals(effectiveTool)))) {
                 violations.add("unsupported-placeholder");
+                foundPlaceholder = true;
+            }
+            if (foundAdmitted && foundPlaceholder) {
                 break;
             }
         }
-
         return new ValidationResult(violations);
     }
 
