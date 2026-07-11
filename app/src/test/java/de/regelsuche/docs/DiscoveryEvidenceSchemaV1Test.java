@@ -3,7 +3,10 @@ package de.regelsuche.docs;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -74,6 +77,40 @@ class DiscoveryEvidenceSchemaV1Test {
 
         assertNotEquals(recordedHash, recomputed);
         assertThrows(IllegalStateException.class, () -> schema.assertValidDocument(schema.read(tempEvidence), tempDir));
+    }
+
+    @Test
+    void publicProfileRequiresCanonicalEvidenceIdToMatchHashEvenWithoutArtifactsDirectory() throws IOException {
+        Path example = locateRepoRoot().resolve("docs/examples/discovery-evidence/v1/valid-public.json");
+        ObjectNode document = (ObjectNode) schema.read(example);
+        document.put("canonicalEvidenceId", DiscoveryEvidenceSchemaV1.SCHEMA_ID + "#sha256:" + "0".repeat(64));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+            () -> schema.assertValidDocument(document, null));
+        assertTrue(exception.getMessage().contains("canonicalEvidenceId must match schemaId + canonicalEvidenceHash"));
+    }
+
+    @Test
+    void duplicateProfilesAreRejected() throws IOException {
+        Path example = locateRepoRoot().resolve("docs/examples/discovery-evidence/v1/valid-public.json");
+        ObjectNode document = (ObjectNode) schema.read(example);
+        ArrayNode profiles = (ArrayNode) document.path("profiles");
+        profiles.add("public");
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+            () -> schema.assertValidDocument(document, null));
+        assertTrue(exception.getMessage().contains("duplicate profile: public"));
+    }
+
+    @Test
+    void recomputeCanonicalEvidenceHashRejectsArtifactPathTraversal(@TempDir Path tempDir) throws IOException {
+        Path example = locateRepoRoot().resolve("docs/examples/discovery-evidence/v1/valid-public.json");
+        ObjectNode document = (ObjectNode) schema.read(example);
+        ((ObjectNode) document.path("artifacts").path(0)).put("path", "../outside.md");
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+            () -> schema.recomputeCanonicalEvidenceHash(document, tempDir));
+        assertTrue(exception.getMessage().contains("artifact path escapes evidence directory"));
     }
 
     private static void copyDirectory(Path source, Path target) throws IOException {

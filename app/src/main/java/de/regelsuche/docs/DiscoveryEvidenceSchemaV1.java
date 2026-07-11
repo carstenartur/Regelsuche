@@ -79,8 +79,12 @@ final class DiscoveryEvidenceSchemaV1 {
                 if (!(artifactNode instanceof ObjectNode objectNode)) {
                     continue;
                 }
-                Path artifactPath = evidenceDirectory.resolve(objectNode.path("path").asText("")).normalize();
-                objectNode.put("sha256", "sha256:" + sha256(Files.exists(artifactPath) ? readBytes(artifactPath) : new byte[0]));
+                String relativePath = objectNode.path("path").asText("");
+                Path artifactPath = resolveArtifactPath(evidenceDirectory, relativePath);
+                if (!Files.isRegularFile(artifactPath)) {
+                    throw new IllegalStateException("artifact file missing: " + relativePath);
+                }
+                objectNode.put("sha256", "sha256:" + sha256(readBytes(artifactPath)));
             }
         }
         try {
@@ -452,6 +456,12 @@ final class DiscoveryEvidenceSchemaV1 {
                     errors.add("public profile requires proof confirmations when proof.required=true");
                 }
             }
+            if (root.hasNonNull("canonicalEvidenceHash") && root.hasNonNull("canonicalEvidenceId")) {
+                String expectedId = canonicalEvidenceId(root.path("canonicalEvidenceHash").asText(""));
+                if (!expectedId.equals(root.path("canonicalEvidenceId").asText())) {
+                    errors.add("canonicalEvidenceId must match schemaId + canonicalEvidenceHash");
+                }
+            }
         }
 
         if (evidenceDirectory != null && root.path("artifacts").isArray()) {
@@ -462,8 +472,14 @@ final class DiscoveryEvidenceSchemaV1 {
                 }
                 String relativePath = artifact.path("path").asText("");
                 String expected = artifact.path("sha256").asText("");
-                Path artifactPath = evidenceDirectory.resolve(relativePath).normalize();
-                if (!Files.exists(artifactPath)) {
+                Path artifactPath;
+                try {
+                    artifactPath = resolveArtifactPath(evidenceDirectory, relativePath);
+                } catch (IllegalStateException exception) {
+                    errors.add(exception.getMessage());
+                    continue;
+                }
+                if (!Files.isRegularFile(artifactPath)) {
                     errors.add("artifact file missing: " + relativePath);
                     continue;
                 }
@@ -473,15 +489,13 @@ final class DiscoveryEvidenceSchemaV1 {
                 }
             }
             if (root.hasNonNull("canonicalEvidenceHash")) {
-                String recomputed = recomputeCanonicalEvidenceHash(root, evidenceDirectory);
-                if (!recomputed.equals(root.path("canonicalEvidenceHash").asText())) {
-                    errors.add("canonicalEvidenceHash does not match canonical artifact state");
-                }
-            }
-            if (root.hasNonNull("canonicalEvidenceId")) {
-                String expectedId = canonicalEvidenceId(root.path("canonicalEvidenceHash").asText(""));
-                if (!expectedId.equals(root.path("canonicalEvidenceId").asText())) {
-                    errors.add("canonicalEvidenceId must match schemaId + canonicalEvidenceHash");
+                try {
+                    String recomputed = recomputeCanonicalEvidenceHash(root, evidenceDirectory);
+                    if (!recomputed.equals(root.path("canonicalEvidenceHash").asText())) {
+                        errors.add("canonicalEvidenceHash does not match canonical artifact state");
+                    }
+                } catch (IllegalStateException exception) {
+                    errors.add(exception.getMessage());
                 }
             }
         }
@@ -500,13 +514,24 @@ final class DiscoveryEvidenceSchemaV1 {
             if (!PROFILE_ORDER.contains(value)) {
                 errors.add("unknown profile: " + value);
             }
-            profiles.add(value);
+            if (!profiles.add(value)) {
+                errors.add("duplicate profile: " + value);
+            }
         }
         List<String> canonicalOrder = PROFILE_ORDER.stream().filter(profiles::contains).toList();
         if (!canonicalOrder.equals(List.copyOf(profiles))) {
             errors.add("profiles must use canonical order " + canonicalOrder);
         }
         return profiles;
+    }
+
+    private Path resolveArtifactPath(Path evidenceDirectory, String relativePath) {
+        Path normalizedEvidenceDirectory = evidenceDirectory.toAbsolutePath().normalize();
+        Path artifactPath = normalizedEvidenceDirectory.resolve(relativePath).normalize();
+        if (!artifactPath.startsWith(normalizedEvidenceDirectory)) {
+            throw new IllegalStateException("artifact path escapes evidence directory: " + relativePath);
+        }
+        return artifactPath;
     }
 
     private void requireText(JsonNode node, String field, List<String> errors) {

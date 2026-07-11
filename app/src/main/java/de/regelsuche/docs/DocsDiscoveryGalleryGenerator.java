@@ -82,18 +82,12 @@ public final class DocsDiscoveryGalleryGenerator {
         String relativeSummary = slug + "/summary.md";
 
         Files.writeString(svgPath, svgWriter.write(evidence, "evidence.json"), StandardCharsets.UTF_8);
-        Files.writeString(summaryPath, renderSummary(scenario, evidence, null), StandardCharsets.UTF_8);
+        Files.writeString(summaryPath, renderSummary(scenario, evidence), StandardCharsets.UTF_8);
         List<DiscoveryEvidenceSchemaV1.ArtifactDescriptor> artifacts = List.of(
             artifact("summary", summaryPath, "summary.md", "text/markdown"),
             artifact("search-space", svgPath, "search-space.svg", "image/svg+xml")
         );
         DiscoveryEvidenceSchemaV1.EvidenceDocument document = evidenceSchema.createDocument(scenario, evidence, gateDecision, artifacts);
-        Files.writeString(summaryPath, renderSummary(scenario, evidence, document), StandardCharsets.UTF_8);
-        artifacts = List.of(
-            artifact("summary", summaryPath, "summary.md", "text/markdown"),
-            artifact("search-space", svgPath, "search-space.svg", "image/svg+xml")
-        );
-        document = evidenceSchema.createDocument(scenario, evidence, gateDecision, artifacts);
         evidenceSchema.assertValidDocument(document.body(), scenarioDir);
         AtomicJsonFile.writeUtf8(evidencePath, evidenceSchema.prettyJson(document.body()));
         return new PublicScenarioArtifact(scenario, evidence, relativeEvidence, relativeSvg, relativeSummary,
@@ -210,8 +204,7 @@ public final class DocsDiscoveryGalleryGenerator {
 
     private String renderSummary(
         DiscoveryBenchmarkScenario scenario,
-        DiscoveryBenchmarkEvidence evidence,
-        DiscoveryEvidenceSchemaV1.EvidenceDocument document
+        DiscoveryBenchmarkEvidence evidence
     ) {
         return """
                 # ${name}
