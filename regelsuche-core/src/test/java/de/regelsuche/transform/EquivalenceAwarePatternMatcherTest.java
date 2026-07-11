@@ -68,10 +68,10 @@ class EquivalenceAwarePatternMatcherTest {
     }
 
     @Test
-    void unsupportedNonMonomialExpressionsRemainConservative() {
+    void fallsBackToExactStructuralBindingsOutsideMonomialFragment() {
         PatternRewriteRule rule = completeSquareRule(RecognitionProfile.algebraicAc());
 
-        assertFalse(rule.matches(parser.parseTerm("x^2 + 2 * x * sin(a) + sin(a)^2")));
+        assertTrue(rule.matches(parser.parseTerm("x^2 + 2 * x * sin(a) + sin(a)^2")));
         assertFalse(rule.matches(parser.parseTerm("x^2 + 2 * x * a + 1 / 0 * a^2")));
     }
 
