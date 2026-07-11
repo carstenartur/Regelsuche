@@ -17,7 +17,7 @@ class EquivalenceAwarePatternMatcherTest {
     @Test
     void recognizesCompleteSquareAcrossEquivalentAddAndMultiplyTrees() {
         PatternRewriteRule rule = completeSquareRule(RecognitionProfile.arithmeticAc());
-        Expr reorderedAndRegrouped = parser.parseTerm("a^2 + 2 * a * x + x^2");
+        Expr reorderedAndRegrouped = parser.parseTerm("x^2 + a^2 + 2 * a * x");
 
         assertTrue(rule.matches(reorderedAndRegrouped));
         assertEquals(parser.parseTerm("(x + a)^2"), rule.apply(reorderedAndRegrouped));
@@ -27,7 +27,7 @@ class EquivalenceAwarePatternMatcherTest {
     void exactRecognitionRemainsTheDefault() {
         PatternRewriteRule rule = completeSquareRule(RecognitionProfile.exact());
 
-        assertFalse(rule.matches(parser.parseTerm("a^2 + 2 * a * x + x^2")));
+        assertFalse(rule.matches(parser.parseTerm("x^2 + a^2 + 2 * a * x")));
         assertTrue(rule.matches(parser.parseTerm("x^2 + 2 * x * a + a^2")));
     }
 

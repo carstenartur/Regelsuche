@@ -22,6 +22,8 @@ import java.util.Map;
  * materialising every equivalent AST.</p>
  */
 public final class EquivalenceAwarePatternMatcher {
+    private static final int MAX_COMMUTATIVE_OPERANDS = 8;
+
     private EquivalenceAwarePatternMatcher() {
     }
 
@@ -87,6 +89,11 @@ public final class EquivalenceAwarePatternMatcher {
             return false;
         }
         if (profile.isCommutative(operation.operator())) {
+            if (patternOperands.size() > MAX_COMMUTATIVE_OPERANDS) {
+                throw new IllegalArgumentException(
+                    "Commutative matching supports at most " + MAX_COMMUTATIVE_OPERANDS + " operands"
+                );
+            }
             return matchCommutative(patternOperands, expressionOperands, 0, bindings, profile);
         }
         for (int i = 0; i < patternOperands.size(); i++) {
