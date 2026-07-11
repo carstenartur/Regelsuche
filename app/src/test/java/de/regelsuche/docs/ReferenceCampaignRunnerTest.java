@@ -58,6 +58,12 @@ class ReferenceCampaignRunnerTest {
             "provenance.graph.json must be written");
         assertTrue(Files.isDirectory(tempDir.resolve("proof")),
             "proof/ directory must be created");
+        assertTrue(Files.exists(tempDir.resolve("reference-campaign-timeline.html")),
+            "reference-campaign-timeline.html must be written");
+        assertTrue(Files.exists(tempDir.resolve("reference-campaign-timeline.md")),
+            "reference-campaign-timeline.md must be written");
+        assertTrue(Files.exists(tempDir.resolve("reference-campaign-observatory.html")),
+            "reference-campaign-observatory.html must be written");
     }
 
     @Test

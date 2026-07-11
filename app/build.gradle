@@ -321,6 +321,15 @@ tasks.register('runReferenceCampaign', JavaExec) {
     args rootProject.projectDir.absolutePath
 }
 
+tasks.register('generateStaticReferencePage', JavaExec) {
+    description = 'Generates a statically deployable versioned reference page for the canonical discovery campaign under app/build/reports/static-reference-page.'
+    group = 'documentation'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.docs.StaticReferencePageGenerator'
+    args rootProject.projectDir.absolutePath
+}
+
 tasks.register('runDiscoveryPromotionPipeline', JavaExec) {
     description = 'Runs the discovery promotion pipeline and writes reports under app/build/reports/discovery-promotion.'
     group = 'documentation'

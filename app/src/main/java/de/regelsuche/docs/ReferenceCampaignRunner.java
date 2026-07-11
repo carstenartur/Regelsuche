@@ -204,6 +204,29 @@ public final class ReferenceCampaignRunner {
                     List.of(report.promotionRecord()));
             }
 
+            // reference-campaign-timeline.html (HTML story timeline)
+            DiscoveryStoryTimelineWriter timelineWriter = new DiscoveryStoryTimelineWriter();
+            Files.writeString(
+                outputDirectory.resolve("reference-campaign-timeline.html"),
+                timelineWriter.renderHtml(report, DiscoveryStoryTimelineWriter.ResultMode.LIVE),
+                StandardCharsets.UTF_8
+            );
+
+            // reference-campaign-timeline.md (Markdown research digest)
+            Files.writeString(
+                outputDirectory.resolve("reference-campaign-timeline.md"),
+                timelineWriter.renderMarkdown(report, DiscoveryStoryTimelineWriter.ResultMode.LIVE),
+                StandardCharsets.UTF_8
+            );
+
+            // reference-campaign-observatory.html (observatory view)
+            DiscoveryObservatoryWriter observatoryWriter = new DiscoveryObservatoryWriter();
+            Files.writeString(
+                outputDirectory.resolve("reference-campaign-observatory.html"),
+                observatoryWriter.renderHtml(report, DiscoveryStoryTimelineWriter.ResultMode.LIVE),
+                StandardCharsets.UTF_8
+            );
+
             return report;
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
