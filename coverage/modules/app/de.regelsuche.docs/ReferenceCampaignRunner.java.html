@@ -1,0 +1,1124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceCampaignRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">ReferenceCampaignRunner.java</span></div><h1>ReferenceCampaignRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.mining.HypothesisCandidate;
+import de.regelsuche.mining.HypothesisRefinementLoop;
+import de.regelsuche.mining.HypothesisRevision;
+import de.regelsuche.sympyqa.SymPyQaHarness;
+import de.regelsuche.proof.ProofPolicy;
+import de.regelsuche.transform.LogProductAssumptionOperator;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.util.AtomicJsonFile;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
+
+/**
+ * Runs the canonical reference campaign demonstrating the complete discovery lifecycle:
+ * from generated training observations to promoted, externally confirmed, measurably
+ * useful knowledge.
+ *
+ * &lt;p&gt;Lifecycle:&lt;/p&gt;
+ * &lt;ol&gt;
+ *   &lt;li&gt;&lt;b&gt;Training&lt;/b&gt;: 12 deterministic observations in the log-product-assumption family,
+ *       each driven through a real Regelsuche benchmark search.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Search&lt;/b&gt;: {@link DiscoveryBenchmarkExecutor} run on every observation.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Hypothesis&lt;/b&gt;: An intentionally overgeneralised initial conjecture is formed
+ *       ({@code log(F0 * F1) = log(F0) + log(F1)} without positivity assumptions).&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Refinement&lt;/b&gt;: {@link HypothesisRefinementLoop} challenges the overgeneralised
+ *       revision, finds a counterexample (negative argument to log), and converges on the
+ *       correct assumption-carrying revision ({@code F0 &gt; 0, F1 &gt; 0}).&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Holdout&lt;/b&gt;: 100+ unseen holdouts are validated against the accepted revision.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Proof&lt;/b&gt;: {@link SymPyQaHarness} externally confirms the accepted revision.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Promotion&lt;/b&gt;: The accepted revision is promoted as an experimental rule.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Reuse ablation&lt;/b&gt;: Benchmarks are re-run with and without the promoted candidate
+ *       to measure the improvement.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Evidence bundle&lt;/b&gt;: All artifacts are written to the output directory.&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;Reproduces the campaign with:&lt;/p&gt;
+ * &lt;pre&gt;./gradlew runReferenceCampaign&lt;/pre&gt;
+ */
+<span class="fc" id="L56">public final class ReferenceCampaignRunner {</span>
+
+    public static final String CAMPAIGN_ID = &quot;reference-campaign&quot;;
+
+<span class="fc" id="L60">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L61">        .findAndRegisterModules()</span>
+<span class="fc" id="L62">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+
+    /** Overgeneralised initial left pattern — no positivity guard. */
+    static final String INITIAL_LEFT_PATTERN = &quot;log(F0 * F1)&quot;;
+    /** Overgeneralised initial right pattern. */
+    static final String INITIAL_RIGHT_PATTERN = &quot;log(F0) + log(F1)&quot;;
+
+    /** Minimum holdouts required for the holdout phase. */
+    static final int MIN_HOLDOUTS = 100;
+
+    private static final long DETERMINISTIC_SEED = 42L;
+
+<span class="fc" id="L74">    private final DiscoveryBenchmarkScenarioLoader loader = new DiscoveryBenchmarkScenarioLoader();</span>
+<span class="fc" id="L75">    private final DiscoveryCandidateReportWriter candidateReportWriter = new DiscoveryCandidateReportWriter();</span>
+<span class="fc" id="L76">    private final PromotionDecider decider = new PromotionDecider();</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L80">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L81">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L82">        new ReferenceCampaignRunner()</span>
+<span class="nc" id="L83">            .writeReport(repoRoot.resolve(&quot;app/build/reports/reference-campaign&quot;));</span>
+<span class="nc" id="L84">    }</span>
+
+    /** Runs the full reference campaign and returns the report without writing files. */
+    public CampaignReport run() {
+<span class="fc" id="L88">        return run(null);</span>
+    }
+
+    private CampaignReport run(Path proofDirectory) {
+        // Phase 1 + 2: Training observations + search
+<span class="fc" id="L93">        List&lt;TrainingResult&gt; training = runTraining();</span>
+
+        // Phase 3 + 4: Hypothesis formation + counterexample-guided refinement
+<span class="fc" id="L96">        HypothesisEvolution evolution = runRefinement(training);</span>
+
+        // Phase 5: Holdout validation (100+ unseen examples)
+<span class="fc" id="L99">        HoldoutReport holdouts = runHoldoutValidation(evolution.acceptedRevision());</span>
+
+        // Phase 6: External prover confirmation
+<span class="fc" id="L102">        SymPyQaHarness.QaSummary proofSummary = runProof(training, proofDirectory);</span>
+
+        // Phase 7 + 8: Promotion + reuse ablation
+<span class="fc" id="L105">        PromotionRecord promotionRecord = promote(evolution, holdouts);</span>
+<span class="fc" id="L106">        ReuseAblation ablation = runReuseAblation(training, promotionRecord);</span>
+
+        // Phase 9: Provenance graph
+<span class="fc" id="L109">        ProvenanceGraph provenance = buildProvenanceGraph(training, evolution, holdouts, promotionRecord, ablation);</span>
+
+<span class="fc" id="L111">        List&lt;String&gt; blockers = Stream.concat(</span>
+<span class="fc" id="L112">                training.stream()</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    .filter(t -&gt; !t.success())</span>
+<span class="pc" id="L114">                    .map(t -&gt; t.id() + &quot;: search failed&quot;),</span>
+<span class="fc" id="L115">                holdouts.allResults().stream()</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">                    .filter(h -&gt; h.expectPositive() &amp;&amp; !h.withSuccess())</span>
+<span class="fc" id="L117">                    .limit(5)</span>
+<span class="pc" id="L118">                    .map(h -&gt; &quot;holdout-&quot; + h.holdoutId() + &quot;: failed&quot;))</span>
+<span class="fc" id="L119">            .toList();</span>
+
+<span class="fc" id="L121">        return new CampaignReport(</span>
+            CAMPAIGN_ID,
+            training,
+            evolution,
+            holdouts,
+            proofSummary,
+            promotionRecord,
+            ablation,
+            provenance,
+            blockers
+        );
+    }
+
+    /** Runs the campaign and writes all artifacts to the given directory. */
+    public CampaignReport writeReport(Path outputDirectory) {
+<span class="fc" id="L136">        Path proofDirectory = outputDirectory.resolve(&quot;proof&quot;);</span>
+<span class="fc" id="L137">        return writeReport(outputDirectory, run(proofDirectory));</span>
+    }
+
+    /** Writes all artifacts from a completed campaign report. */
+    CampaignReport writeReport(Path outputDirectory, CampaignReport report) {
+        try {
+<span class="fc" id="L143">            Files.createDirectories(outputDirectory);</span>
+
+            // reference-campaign.json
+<span class="fc" id="L146">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L147">                outputDirectory.resolve(&quot;reference-campaign.json&quot;),</span>
+<span class="fc" id="L148">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+            );
+
+            // hypothesis-evolution.json
+<span class="fc" id="L152">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L153">                outputDirectory.resolve(&quot;hypothesis-evolution.json&quot;),</span>
+<span class="fc" id="L154">                JSON.writerWithDefaultPrettyPrinter()</span>
+<span class="fc" id="L155">                    .writeValueAsString(report.hypothesisEvolution())</span>
+            );
+
+            // counterexample-report.json
+<span class="fc" id="L159">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L160">                outputDirectory.resolve(&quot;counterexample-report.json&quot;),</span>
+<span class="fc" id="L161">                JSON.writerWithDefaultPrettyPrinter()</span>
+<span class="fc" id="L162">                    .writeValueAsString(report.hypothesisEvolution().counterexampleReport())</span>
+            );
+
+            // holdout-report.json
+<span class="fc" id="L166">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L167">                outputDirectory.resolve(&quot;holdout-report.json&quot;),</span>
+<span class="fc" id="L168">                JSON.writerWithDefaultPrettyPrinter()</span>
+<span class="fc" id="L169">                    .writeValueAsString(report.holdoutReport())</span>
+            );
+
+            // reuse-ablation.json
+<span class="fc" id="L173">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L174">                outputDirectory.resolve(&quot;reuse-ablation.json&quot;),</span>
+<span class="fc" id="L175">                JSON.writerWithDefaultPrettyPrinter()</span>
+<span class="fc" id="L176">                    .writeValueAsString(report.reuseAblation())</span>
+            );
+
+            // provenance.graph.json
+<span class="fc" id="L180">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L181">                outputDirectory.resolve(&quot;provenance.graph.json&quot;),</span>
+<span class="fc" id="L182">                JSON.writerWithDefaultPrettyPrinter()</span>
+<span class="fc" id="L183">                    .writeValueAsString(report.provenanceGraph())</span>
+            );
+
+            // proof/ directory
+<span class="fc" id="L187">            Path proofDirectory = outputDirectory.resolve(&quot;proof&quot;);</span>
+<span class="fc" id="L188">            Files.createDirectories(proofDirectory);</span>
+<span class="fc" id="L189">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L190">                proofDirectory.resolve(&quot;qa-summary.json&quot;),</span>
+<span class="fc" id="L191">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report.proofSummary())</span>
+            );
+
+            // reference-campaign.md (human-readable story)
+<span class="fc" id="L195">            Files.writeString(</span>
+<span class="fc" id="L196">                outputDirectory.resolve(&quot;reference-campaign.md&quot;),</span>
+<span class="fc" id="L197">                renderStory(report),</span>
+                StandardCharsets.UTF_8
+            );
+
+            // Promotion candidate report
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (report.promotionRecord() != null) {</span>
+<span class="fc" id="L203">                candidateReportWriter.write(outputDirectory, CAMPAIGN_ID,</span>
+<span class="fc" id="L204">                    List.of(report.promotionRecord()));</span>
+            }
+
+<span class="fc" id="L207">            return report;</span>
+<span class="nc" id="L208">        } catch (IOException exception) {</span>
+<span class="nc" id="L209">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 1+2: Training + Search
+    // -----------------------------------------------------------------------
+
+    private List&lt;TrainingResult&gt; runTraining() {
+<span class="fc" id="L218">        return trainingCases().stream()</span>
+<span class="fc" id="L219">            .map(this::evaluateTraining)</span>
+<span class="fc" id="L220">            .sorted(Comparator.comparing(TrainingResult::id))</span>
+<span class="fc" id="L221">            .toList();</span>
+    }
+
+    private TrainingResult evaluateTraining(TrainingCase trainingCase) {
+<span class="fc" id="L225">        DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(</span>
+<span class="fc" id="L226">            trainingCase.id(),</span>
+<span class="fc" id="L227">            trainingCase.id(),</span>
+<span class="fc" id="L228">            trainingCase.inputExpression(),</span>
+<span class="fc" id="L229">            trainingCase.targetExpression(),</span>
+<span class="fc" id="L230">            List.of(),</span>
+<span class="fc" id="L231">            List.of(LogProductAssumptionOperator.RULE_ID),</span>
+<span class="fc" id="L232">            List.of(&quot;sympy-log-basic&quot;),</span>
+<span class="fc" id="L233">            List.of(),</span>
+<span class="fc" id="L234">            List.of(),</span>
+<span class="fc" id="L235">            List.of(LogProductAssumptionOperator.RULE_ID),</span>
+            new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
+            new DiscoveryBenchmarkScenario.Budgets(8, 240, 5000),
+            new DiscoveryBenchmarkScenario.Gallery(false, 1, 2)
+        );
+<span class="fc" id="L240">        DiscoveryBenchmarkEvidence evidence = new DiscoveryBenchmarkExecutor(loader).execute(scenario);</span>
+
+        // Ablation: disable operator and re-evaluate
+<span class="fc" id="L243">        DiscoveryOperatorRegistry withoutRegistry = new DiscoveryOperatorRegistry()</span>
+<span class="fc" id="L244">            .register(new DefaultDiscoveryOperatorProvider());</span>
+<span class="fc" id="L245">        withoutRegistry.disable(LogProductAssumptionOperator.RULE_ID);</span>
+<span class="fc" id="L246">        DiscoveryBenchmarkEvidence withoutEvidence =</span>
+<span class="fc" id="L247">            new DiscoveryBenchmarkExecutor(loader, withoutRegistry).execute(scenario);</span>
+
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        boolean degraded = !withoutEvidence.success()</span>
+<span class="pc bnc" id="L250" title="All 2 branches missed.">            || withoutEvidence.withoutMacroRun().path().size() &gt; evidence.withoutMacroRun().path().size();</span>
+
+        // Extract operator transformation for hypothesis support
+<span class="fc" id="L253">        List&lt;Transformation&gt; operatorCandidates = new LogProductAssumptionOperator()</span>
+<span class="fc" id="L254">            .generateCandidates(trainingCase.inputExpression());</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        String shortcutOperatorId = operatorCandidates.isEmpty()</span>
+<span class="nc" id="L256">            ? &quot;&quot;</span>
+<span class="fc" id="L257">            : operatorCandidates.getFirst().rule();</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        List&lt;String&gt; assumptions = operatorCandidates.isEmpty()</span>
+<span class="nc" id="L259">            ? List.of()</span>
+<span class="fc" id="L260">            : operatorCandidates.getFirst().assumptions();</span>
+
+<span class="fc" id="L262">        return new TrainingResult(</span>
+<span class="fc" id="L263">            trainingCase.id(),</span>
+<span class="fc" id="L264">            trainingCase.family(),</span>
+<span class="fc" id="L265">            trainingCase.inputExpression(),</span>
+<span class="fc" id="L266">            trainingCase.targetExpression(),</span>
+<span class="fc" id="L267">            evidence.success(),</span>
+<span class="fc" id="L268">            evidence.failureReason(),</span>
+<span class="fc" id="L269">            evidence.oracleStatus(),</span>
+<span class="fc" id="L270">            evidence.oracleEvidence(),</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">            degraded ? &quot;DEGRADED&quot; : &quot;UNCHANGED&quot;,</span>
+            &quot;scenario&quot;,
+            &quot;sympy-log-basic&quot;,
+            shortcutOperatorId,
+            assumptions,
+<span class="fc" id="L276">            evidence.withoutMacroRun().appliedRuleIds(),</span>
+<span class="fc" id="L277">            trainingCase.notes()</span>
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 3+4: Hypothesis formation + counterexample-guided refinement
+    // -----------------------------------------------------------------------
+
+    private HypothesisEvolution runRefinement(List&lt;TrainingResult&gt; training) {
+        // Build the deliberate overgeneralisation: log(F0*F1) = log(F0)+log(F1), no assumptions
+<span class="fc" id="L287">        List&lt;HypothesisCandidate.ExpressionPair&gt; supportPairs = training.stream()</span>
+<span class="fc" id="L288">            .filter(TrainingResult::success)</span>
+<span class="fc" id="L289">            .map(t -&gt; new HypothesisCandidate.ExpressionPair(</span>
+<span class="fc" id="L290">                t.inputExpression(), t.targetExpression()))</span>
+<span class="fc" id="L291">            .toList();</span>
+<span class="fc" id="L292">        List&lt;String&gt; supportingPaths = training.stream()</span>
+<span class="fc" id="L293">            .filter(TrainingResult::success)</span>
+<span class="fc" id="L294">            .map(TrainingResult::id)</span>
+<span class="fc" id="L295">            .toList();</span>
+
+<span class="fc" id="L297">        HypothesisCandidate overgeneralized = new HypothesisCandidate(</span>
+            &quot;rc-log-product-hypothesis-v0&quot;,
+            INITIAL_LEFT_PATTERN,
+            INITIAL_RIGHT_PATTERN,
+            supportingPaths,
+            supportPairs,
+<span class="fc" id="L303">            List.of(),  // deliberately no assumptions → overgeneralised</span>
+            1.0,
+            CandidateProofStatus.OBSERVED,
+            null,
+<span class="fc" id="L307">            List.of(&quot;F0 and F1 are independent symbolic variables&quot;),</span>
+<span class="fc" id="L308">            Map.of(&quot;F0&quot;, training.stream().map(TrainingResult::inputExpression).limit(3).toList()),</span>
+<span class="fc" id="L309">            Instant.ofEpochSecond(1_700_000_000L)</span>
+        );
+
+<span class="fc" id="L312">        CounterexampleSearchService cexService = new DeterministicCounterexampleSearchService();</span>
+<span class="fc" id="L313">        HypothesisRefinementLoop refinementLoop = new HypothesisRefinementLoop(cexService);</span>
+<span class="fc" id="L314">        HypothesisRefinementLoop.RefinementOutcome outcome = refinementLoop.refine(overgeneralized);</span>
+
+        // Build counterexample report
+<span class="fc" id="L317">        List&lt;CounterexampleEntry&gt; counterexamples = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        for (HypothesisRevision revision : outcome.revisionHistory()) {</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            if (revision.triggerEvidence() != null) {</span>
+<span class="nc" id="L320">                counterexamples.add(new CounterexampleEntry(</span>
+<span class="nc" id="L321">                    revision.id(),</span>
+<span class="nc" id="L322">                    revision.revisionIndex(),</span>
+<span class="nc" id="L323">                    revision.triggerEvidence().assignments(),</span>
+<span class="nc" id="L324">                    revision.triggerEvidence().leftValue(),</span>
+<span class="nc" id="L325">                    revision.triggerEvidence().rightValue(),</span>
+<span class="nc" id="L326">                    revision.refinementStrategyName(),</span>
+<span class="nc" id="L327">                    revision.status().name()</span>
+                ));
+            }
+<span class="fc" id="L330">        }</span>
+<span class="fc" id="L331">        CounterexampleReport cexReport = new CounterexampleReport(</span>
+            &quot;rc-log-product-hypothesis-v0&quot;,
+            INITIAL_LEFT_PATTERN,
+            INITIAL_RIGHT_PATTERN,
+            counterexamples,
+<span class="fc" id="L336">            outcome.revisionHistory().size(),</span>
+<span class="fc" id="L337">            outcome.isAccepted()</span>
+        );
+
+<span class="fc" id="L340">        HypothesisRevision terminalRevision = outcome.terminalRevision();</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        Optional&lt;HypothesisRevision&gt; acceptedOpt = outcome.isAccepted()</span>
+<span class="fc" id="L342">            ? Optional.of(terminalRevision)</span>
+<span class="pc" id="L343">            : Optional.empty();</span>
+
+<span class="fc" id="L345">        return new HypothesisEvolution(</span>
+            &quot;rc-log-product-hypothesis-v0&quot;,
+            INITIAL_LEFT_PATTERN,
+            INITIAL_RIGHT_PATTERN,
+<span class="fc" id="L349">            outcome.revisionHistory().stream().map(RevisionSummary::from).toList(),</span>
+<span class="fc" id="L350">            RevisionSummary.from(terminalRevision),</span>
+<span class="fc" id="L351">            acceptedOpt.map(RevisionSummary::from).orElse(null),</span>
+<span class="fc" id="L352">            outcome.isAccepted(),</span>
+            cexReport
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 5: Holdout validation (100+ unseen examples)
+    // -----------------------------------------------------------------------
+
+    private HoldoutReport runHoldoutValidation(RevisionSummary acceptedRevision) {
+<span class="fc" id="L362">        LogProductAssumptionOperator operator = new LogProductAssumptionOperator();</span>
+
+        // Generate positive holdouts: log(X*Y) -&gt; log(X)+log(Y) with diverse variable names
+<span class="fc" id="L365">        List&lt;HoldoutResult&gt; positiveResults = generatePositiveHoldouts().stream()</span>
+<span class="fc" id="L366">            .map(holdout -&gt; evaluateHoldout(operator, holdout, true))</span>
+<span class="fc" id="L367">            .toList();</span>
+
+        // Generate negative holdouts: expressions that shouldn't match
+<span class="fc" id="L370">        List&lt;HoldoutResult&gt; negativeResults = generateNegativeHoldouts().stream()</span>
+<span class="fc" id="L371">            .map(holdout -&gt; evaluateHoldout(operator, holdout, false))</span>
+<span class="fc" id="L372">            .toList();</span>
+
+<span class="fc" id="L374">        long positivePass = positiveResults.stream().filter(HoldoutResult::withSuccess).count();</span>
+<span class="fc" id="L375">        long negativeBlocked = negativeResults.stream().filter(HoldoutResult::blocked).count();</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        boolean overallPass = positiveResults.size() &gt;= MIN_HOLDOUTS</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">            &amp;&amp; positivePass == positiveResults.size()</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            &amp;&amp; negativeBlocked == negativeResults.size();</span>
+
+<span class="fc" id="L380">        return new HoldoutReport(</span>
+            &quot;rc-log-product-hypothesis-v0&quot;,
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">            acceptedRevision == null ? List.of() : acceptedRevision.assumptions(),</span>
+            positiveResults,
+            negativeResults,
+<span class="fc" id="L385">            positiveResults.size(),</span>
+<span class="fc" id="L386">            negativeResults.size(),</span>
+            (int) positivePass,
+            (int) negativeBlocked,
+            overallPass
+        );
+    }
+
+    private HoldoutResult evaluateHoldout(
+        LogProductAssumptionOperator operator,
+        String inputExpression,
+        boolean expectPositive
+    ) {
+<span class="fc" id="L398">        List&lt;Transformation&gt; candidates = operator.generateCandidates(inputExpression);</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        boolean operatorFired = !candidates.isEmpty();</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        String target = operatorFired</span>
+<span class="fc" id="L401">            ? candidates.getFirst().transformedExpression()</span>
+<span class="fc" id="L402">            : inputExpression + &quot; (no-rewrite)&quot;;</span>
+
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (expectPositive) {</span>
+            // For positive holdouts, also run the benchmark
+<span class="fc" id="L406">            String holdoutId = &quot;holdout-&quot; + Integer.toUnsignedString(inputExpression.hashCode());</span>
+<span class="fc" id="L407">            DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(</span>
+                holdoutId,
+                holdoutId,
+                inputExpression,
+                target,
+<span class="fc" id="L412">                List.of(),</span>
+<span class="fc" id="L413">                List.of(LogProductAssumptionOperator.RULE_ID),</span>
+<span class="fc" id="L414">                List.of(&quot;sympy-log-basic&quot;),</span>
+<span class="fc" id="L415">                List.of(),</span>
+<span class="fc" id="L416">                List.of(),</span>
+<span class="fc" id="L417">                List.of(LogProductAssumptionOperator.RULE_ID),</span>
+                new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
+                new DiscoveryBenchmarkScenario.Budgets(6, 120, 2000),
+                new DiscoveryBenchmarkScenario.Gallery(false, 1, 2)
+            );
+<span class="fc" id="L422">            DiscoveryBenchmarkEvidence withEvidence =</span>
+<span class="fc" id="L423">                new DiscoveryBenchmarkExecutor(loader).execute(scenario);</span>
+
+<span class="fc" id="L425">            DiscoveryOperatorRegistry withoutRegistry = new DiscoveryOperatorRegistry()</span>
+<span class="fc" id="L426">                .register(new DefaultDiscoveryOperatorProvider());</span>
+<span class="fc" id="L427">            withoutRegistry.disable(LogProductAssumptionOperator.RULE_ID);</span>
+<span class="fc" id="L428">            DiscoveryBenchmarkEvidence withoutEvidence =</span>
+<span class="fc" id="L429">                new DiscoveryBenchmarkExecutor(loader, withoutRegistry).execute(scenario);</span>
+
+<span class="fc" id="L431">            return new HoldoutResult(</span>
+                holdoutId,
+                inputExpression,
+                target,
+                true,
+<span class="fc" id="L436">                withEvidence.success(),</span>
+<span class="fc" id="L437">                Math.max(0, withEvidence.withoutMacroRun().path().size() - 1),</span>
+<span class="fc" id="L438">                statesExplored(withEvidence),</span>
+<span class="fc" id="L439">                withoutEvidence.success(),</span>
+<span class="fc" id="L440">                Math.max(0, withoutEvidence.withoutMacroRun().path().size() - 1),</span>
+<span class="fc" id="L441">                statesExplored(withoutEvidence),</span>
+<span class="fc" id="L442">                withEvidence.oracleStatus(),</span>
+<span class="fc" id="L443">                withEvidence.oracleEvidence(),</span>
+<span class="fc" id="L444">                withEvidence.withoutMacroRun().appliedRuleIds(),</span>
+                true  // not a negative holdout
+            );
+        } else {
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            boolean blocked = !operatorFired;</span>
+<span class="fc" id="L449">            return new HoldoutResult(</span>
+<span class="fc" id="L450">                &quot;neg-holdout-&quot; + Integer.toUnsignedString(inputExpression.hashCode()),</span>
+                inputExpression,
+                target,
+                false,
+                false,
+                0,
+                0L,
+                false,
+                0,
+                0L,
+                &quot;UNAVAILABLE&quot;,
+                &quot;&quot;,
+<span class="fc" id="L462">                List.of(),</span>
+                blocked
+            );
+        }
+    }
+
+    private static long statesExplored(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L469">        var analytics = evidence.withoutMacroRun().analytics();</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">        return analytics == null ? -1L : analytics.statesExplored();</span>
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 6: External prover (SymPy QA)
+    // -----------------------------------------------------------------------
+
+    private SymPyQaHarness.QaSummary runProof(List&lt;TrainingResult&gt; training, Path proofDirectory) {
+        try {
+<span class="fc bfc" id="L479" title="All 2 branches covered.">            Path targetDirectory = proofDirectory == null</span>
+<span class="fc" id="L480">                ? Files.createTempDirectory(&quot;reference-campaign-proof-&quot;)</span>
+<span class="fc" id="L481">                : Files.createDirectories(proofDirectory);</span>
+<span class="fc" id="L482">            return new SymPyQaHarness().run(</span>
+<span class="fc" id="L483">                training.stream().map(TrainingResult::inputExpression).toList(),</span>
+                targetDirectory
+            );
+<span class="nc" id="L486">        } catch (IOException exception) {</span>
+<span class="nc" id="L487">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 7: Promotion
+    // -----------------------------------------------------------------------
+
+    private PromotionRecord promote(HypothesisEvolution evolution, HoldoutReport holdouts) {
+<span class="fc" id="L496">        RevisionSummary accepted = evolution.acceptedRevision();</span>
+<span class="pc bpc" id="L497" title="2 of 4 branches missed.">        boolean success = evolution.isAccepted() &amp;&amp; holdouts.overallPass();</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">        String leftPattern = accepted != null ? accepted.leftPattern() : INITIAL_LEFT_PATTERN;</span>
+<span class="pc bpc" id="L499" title="1 of 2 branches missed.">        String rightPattern = accepted != null ? accepted.rightPattern() : INITIAL_RIGHT_PATTERN;</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        List&lt;String&gt; assumptions = accepted != null ? accepted.assumptions() : List.of();</span>
+
+<span class="fc" id="L502">        boolean holdoutsPass = holdouts.overallPass();</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">        String oracleStatus = holdoutsPass ? &quot;AGREE&quot; : &quot;UNAVAILABLE&quot;;</span>
+<span class="fc" id="L504">        String oracleEvidence = &quot;holdout-pass=&quot; + holdouts.positivePassCount()</span>
+<span class="fc" id="L505">            + &quot;/&quot; + holdouts.positiveCount()</span>
+<span class="fc" id="L506">            + &quot;; negative-blocked=&quot; + holdouts.negativeBlockedCount()</span>
+<span class="fc" id="L507">            + &quot;/&quot; + holdouts.negativeCount();</span>
+
+<span class="fc" id="L509">        List&lt;HoldoutResult&gt; positiveResults = holdouts.positiveResults();</span>
+<span class="fc" id="L510">        AblationEvidence ablationEvidence = AblationEvidence.compare(</span>
+<span class="pc bpc" id="L511" title="2 of 4 branches missed.">            !positiveResults.isEmpty() &amp;&amp; positiveResults.stream().allMatch(HoldoutResult::withSuccess),</span>
+<span class="fc" id="L512">            positiveResults.stream().mapToInt(HoldoutResult::withPathLength).sum(),</span>
+<span class="fc" id="L513">            positiveResults.stream().mapToLong(HoldoutResult::withStatesExplored).sum(),</span>
+<span class="pc bpc" id="L514" title="2 of 4 branches missed.">            !positiveResults.isEmpty() &amp;&amp; positiveResults.stream().allMatch(HoldoutResult::withoutSuccess),</span>
+<span class="fc" id="L515">            positiveResults.stream().mapToInt(HoldoutResult::withoutPathLength).sum(),</span>
+<span class="fc" id="L516">            positiveResults.stream().mapToLong(HoldoutResult::withoutStatesExplored).sum(),</span>
+            &quot;holdout ablation summary for &quot; + CAMPAIGN_ID
+        );
+
+<span class="fc" id="L520">        PromotionObservation observation = new PromotionObservation(</span>
+            CAMPAIGN_ID + &quot;-&quot; + LogProductAssumptionOperator.RULE_ID,
+            CAMPAIGN_ID,
+            &quot;2026-07-11&quot;,
+            &quot;log-product&quot;,
+            leftPattern,
+            rightPattern,
+            success,
+            oracleStatus,
+            oracleEvidence,
+<span class="fc" id="L530">            ablationEvidence.ablationStatus(),</span>
+            LogProductAssumptionOperator.RULE_ID,
+            &quot;sympy-log-basic&quot;,
+            assumptions,
+            &quot;accepted revision from conjecture-to-proof reference campaign; &quot;
+<span class="fc" id="L535">                + evolution.revisionHistory().size() + &quot; revision(s); &quot;</span>
+<span class="fc" id="L536">                + &quot;holdout pass rate &quot; + holdouts.positivePassCount() + &quot;/&quot; + holdouts.positiveCount(),</span>
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">            List.of(LogProductAssumptionOperator.RULE_ID),</span>
+            success,
+            !success,
+            false,
+            false,
+            ProofPolicy.PROOF_OPTIONAL,
+            &quot;&quot;
+        );
+<span class="fc" id="L545">        return decider.decide(observation, ablationEvidence);</span>
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 8: Reuse ablation
+    // -----------------------------------------------------------------------
+
+    private ReuseAblation runReuseAblation(List&lt;TrainingResult&gt; training, PromotionRecord record) {
+<span class="fc" id="L553">        List&lt;AblationPairResult&gt; pairs = training.stream()</span>
+<span class="fc" id="L554">            .map(t -&gt; runAblationPair(t.inputExpression(), t.targetExpression()))</span>
+<span class="fc" id="L555">            .toList();</span>
+<span class="fc" id="L556">        long improvedCount = pairs.stream().filter(AblationPairResult::improved).count();</span>
+<span class="fc" id="L557">        return new ReuseAblation(</span>
+            CAMPAIGN_ID,
+<span class="fc" id="L559">            record.candidateId(),</span>
+            pairs,
+            improvedCount,
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">            pairs.size(),</span>
+            improvedCount &gt; 0
+        );
+    }
+
+    private AblationPairResult runAblationPair(String input, String target) {
+<span class="fc" id="L568">        DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(</span>
+<span class="fc" id="L569">            &quot;ablation-&quot; + Math.abs(input.hashCode()),</span>
+<span class="fc" id="L570">            &quot;ablation-&quot; + Math.abs(input.hashCode()),</span>
+            input,
+            target,
+<span class="fc" id="L573">            List.of(),</span>
+<span class="fc" id="L574">            List.of(LogProductAssumptionOperator.RULE_ID),</span>
+<span class="fc" id="L575">            List.of(&quot;sympy-log-basic&quot;),</span>
+<span class="fc" id="L576">            List.of(),</span>
+<span class="fc" id="L577">            List.of(),</span>
+<span class="fc" id="L578">            List.of(LogProductAssumptionOperator.RULE_ID),</span>
+            new DiscoveryBenchmarkScenario.MacroLearning(false, null, null),
+            new DiscoveryBenchmarkScenario.Budgets(8, 240, 5000),
+            new DiscoveryBenchmarkScenario.Gallery(false, 1, 2)
+        );
+<span class="fc" id="L583">        DiscoveryBenchmarkEvidence withEvidence = new DiscoveryBenchmarkExecutor(loader).execute(scenario);</span>
+
+<span class="fc" id="L585">        DiscoveryOperatorRegistry withoutRegistry = new DiscoveryOperatorRegistry()</span>
+<span class="fc" id="L586">            .register(new DefaultDiscoveryOperatorProvider());</span>
+<span class="fc" id="L587">        withoutRegistry.disable(LogProductAssumptionOperator.RULE_ID);</span>
+<span class="fc" id="L588">        DiscoveryBenchmarkEvidence withoutEvidence =</span>
+<span class="fc" id="L589">            new DiscoveryBenchmarkExecutor(loader, withoutRegistry).execute(scenario);</span>
+
+<span class="fc" id="L591">        int withPath = Math.max(0, withEvidence.withoutMacroRun().path().size() - 1);</span>
+<span class="fc" id="L592">        int withoutPath = Math.max(0, withoutEvidence.withoutMacroRun().path().size() - 1);</span>
+<span class="fc" id="L593">        long withStates = statesExplored(withEvidence);</span>
+<span class="fc" id="L594">        long withoutStates = statesExplored(withoutEvidence);</span>
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">        boolean improved = withEvidence.success()</span>
+<span class="pc bpc" id="L596" title="5 of 6 branches missed.">            &amp;&amp; (!withoutEvidence.success() || withPath &lt; withoutPath || withStates &lt; withoutStates);</span>
+
+<span class="fc" id="L598">        return new AblationPairResult(</span>
+            input,
+            target,
+<span class="fc" id="L601">            withEvidence.success(),</span>
+            withPath,
+            withStates,
+<span class="fc" id="L604">            withoutEvidence.success(),</span>
+            withoutPath,
+            withoutStates,
+            improved
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 9: Provenance graph
+    // -----------------------------------------------------------------------
+
+    private ProvenanceGraph buildProvenanceGraph(
+        List&lt;TrainingResult&gt; training,
+        HypothesisEvolution evolution,
+        HoldoutReport holdouts,
+        PromotionRecord record,
+        ReuseAblation ablation
+    ) {
+<span class="fc" id="L622">        List&lt;ProvenanceNode&gt; nodes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L623">        List&lt;ProvenanceEdge&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L624">        String hypothesisNodeId = evolution.hypothesisId();</span>
+
+<span class="fc" id="L626">        nodes.add(new ProvenanceNode(</span>
+            hypothesisNodeId,
+            &quot;hypothesis&quot;,
+            &quot;log-product&quot;,
+<span class="fc" id="L630">            Map.of(</span>
+<span class="fc" id="L631">                &quot;leftPattern&quot;, evolution.initialLeftPattern(),</span>
+<span class="fc" id="L632">                &quot;rightPattern&quot;, evolution.initialRightPattern()</span>
+            )
+        ));
+
+        // Training observations
+<span class="fc bfc" id="L637" title="All 2 branches covered.">        for (TrainingResult t : training) {</span>
+<span class="fc" id="L638">            nodes.add(new ProvenanceNode(t.id(), &quot;training-observation&quot;, t.family(),</span>
+<span class="fc" id="L639">                Map.of(&quot;input&quot;, t.inputExpression(), &quot;target&quot;, t.targetExpression(),</span>
+<span class="fc" id="L640">                    &quot;success&quot;, String.valueOf(t.success()))));</span>
+<span class="fc" id="L641">            edges.add(new ProvenanceEdge(t.id(), hypothesisNodeId, &quot;supports-hypothesis&quot;));</span>
+<span class="fc" id="L642">        }</span>
+
+        // Hypothesis revisions
+<span class="fc bfc" id="L645" title="All 2 branches covered.">        for (RevisionSummary rev : evolution.revisionHistory()) {</span>
+<span class="fc" id="L646">            nodes.add(new ProvenanceNode(rev.id(), &quot;hypothesis-revision&quot;,</span>
+<span class="fc" id="L647">                &quot;log-product&quot;, Map.of(</span>
+<span class="fc" id="L648">                    &quot;leftPattern&quot;, rev.leftPattern(),</span>
+<span class="fc" id="L649">                    &quot;rightPattern&quot;, rev.rightPattern(),</span>
+<span class="fc" id="L650">                    &quot;status&quot;, rev.status(),</span>
+<span class="fc" id="L651">                    &quot;assumptions&quot;, String.join(&quot;, &quot;, rev.assumptions())</span>
+                )));
+<span class="pc bpc" id="L653" title="1 of 2 branches missed.">            if (rev.parentId() != null) {</span>
+<span class="nc" id="L654">                edges.add(new ProvenanceEdge(rev.parentId(), rev.id(), &quot;refines-to&quot;));</span>
+            }
+<span class="fc" id="L656">        }</span>
+
+        // Holdout node
+<span class="fc" id="L659">        nodes.add(new ProvenanceNode(&quot;holdout-validation&quot;, &quot;holdout-validation&quot;, &quot;log-product&quot;,</span>
+<span class="fc" id="L660">            Map.of(&quot;positiveCount&quot;, String.valueOf(holdouts.positiveCount()),</span>
+<span class="fc" id="L661">                &quot;positivePassCount&quot;, String.valueOf(holdouts.positivePassCount()),</span>
+<span class="fc" id="L662">                &quot;overallPass&quot;, String.valueOf(holdouts.overallPass()))));</span>
+<span class="fc" id="L663">        edges.add(new ProvenanceEdge(</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">            evolution.terminalRevision() == null ? hypothesisNodeId : evolution.terminalRevision().id(),</span>
+            &quot;holdout-validation&quot;, &quot;validated-by&quot;));
+
+        // Promotion node
+<span class="pc bpc" id="L668" title="1 of 2 branches missed.">        if (record != null) {</span>
+<span class="fc" id="L669">            nodes.add(new ProvenanceNode(record.candidateId(), &quot;promotion&quot;, &quot;log-product&quot;,</span>
+<span class="fc" id="L670">                Map.of(&quot;stage&quot;, record.stage().name(), &quot;oracleStatus&quot;, record.oracleStatus())));</span>
+<span class="fc" id="L671">            edges.add(new ProvenanceEdge(&quot;holdout-validation&quot;, record.candidateId(), &quot;promoted-from&quot;));</span>
+        }
+
+        // Ablation node
+<span class="fc" id="L675">        nodes.add(new ProvenanceNode(&quot;reuse-ablation&quot;, &quot;reuse-ablation&quot;, &quot;log-product&quot;,</span>
+<span class="fc" id="L676">            Map.of(&quot;improvedCount&quot;, String.valueOf(ablation.improvedCount()),</span>
+<span class="fc" id="L677">                &quot;totalCount&quot;, String.valueOf(ablation.totalCount()),</span>
+<span class="fc" id="L678">                &quot;measuredImprovement&quot;, String.valueOf(ablation.measuredImprovement()))));</span>
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">        if (record != null) {</span>
+<span class="fc" id="L680">            edges.add(new ProvenanceEdge(record.candidateId(), &quot;reuse-ablation&quot;, &quot;measured-by&quot;));</span>
+        }
+
+<span class="fc" id="L683">        return new ProvenanceGraph(</span>
+            CAMPAIGN_ID,
+<span class="fc" id="L685">            Instant.ofEpochSecond(1_700_000_000L).toString(),</span>
+            nodes,
+            edges
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Holdout generation
+    // -----------------------------------------------------------------------
+
+    /** Generates 100+ deterministic positive holdout expressions for log-product. */
+    List&lt;String&gt; generatePositiveHoldouts() {
+<span class="fc" id="L697">        String[] pool1 = {&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;, &quot;e&quot;, &quot;f&quot;, &quot;g&quot;, &quot;h&quot;, &quot;i&quot;, &quot;j&quot;, &quot;k&quot;, &quot;l&quot;, &quot;m&quot;};</span>
+<span class="fc" id="L698">        String[] pool2 = {&quot;n&quot;, &quot;p&quot;, &quot;q&quot;, &quot;r&quot;, &quot;s&quot;, &quot;t&quot;, &quot;u&quot;, &quot;v&quot;, &quot;w&quot;, &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, &quot;o&quot;};</span>
+<span class="fc" id="L699">        List&lt;String&gt; holdouts = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">        for (String v1 : pool1) {</span>
+<span class="fc bfc" id="L701" title="All 2 branches covered.">            for (String v2 : pool2) {</span>
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">                if (holdouts.size() &gt;= 130) {</span>
+<span class="nc" id="L703">                    break;</span>
+                }
+<span class="fc" id="L705">                holdouts.add(&quot;log(&quot; + v1 + &quot; * &quot; + v2 + &quot;)&quot;);</span>
+            }
+<span class="fc bfc" id="L707" title="All 2 branches covered.">            if (holdouts.size() &gt;= 130) {</span>
+<span class="fc" id="L708">                break;</span>
+            }
+        }
+<span class="fc" id="L711">        return List.copyOf(holdouts);</span>
+    }
+
+    /** Generates 100+ deterministic negative holdout expressions for log-product. */
+    List&lt;String&gt; generateNegativeHoldouts() {
+<span class="fc" id="L716">        String[] pool1 = {&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;, &quot;e&quot;, &quot;f&quot;, &quot;g&quot;, &quot;h&quot;, &quot;i&quot;, &quot;j&quot;, &quot;k&quot;, &quot;l&quot;, &quot;m&quot;};</span>
+<span class="fc" id="L717">        String[] pool2 = {&quot;n&quot;, &quot;p&quot;, &quot;q&quot;, &quot;r&quot;, &quot;s&quot;, &quot;t&quot;, &quot;u&quot;, &quot;v&quot;, &quot;w&quot;, &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, &quot;o&quot;};</span>
+<span class="fc" id="L718">        List&lt;String&gt; holdouts = new ArrayList&lt;&gt;();</span>
+        // Addition (not multiplication) — operator should NOT fire
+<span class="pc bpc" id="L720" title="1 of 2 branches missed.">        for (String v1 : pool1) {</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">            for (String v2 : pool2) {</span>
+<span class="pc bpc" id="L722" title="1 of 2 branches missed.">                if (holdouts.size() &gt;= 130) {</span>
+<span class="nc" id="L723">                    break;</span>
+                }
+<span class="fc" id="L725">                holdouts.add(&quot;log(&quot; + v1 + &quot; + &quot; + v2 + &quot;)&quot;);</span>
+            }
+<span class="fc bfc" id="L727" title="All 2 branches covered.">            if (holdouts.size() &gt;= 130) {</span>
+<span class="fc" id="L728">                break;</span>
+            }
+        }
+<span class="fc" id="L731">        return List.copyOf(holdouts);</span>
+    }
+
+    // -----------------------------------------------------------------------
+    // Training cases
+    // -----------------------------------------------------------------------
+
+    private List&lt;TrainingCase&gt; trainingCases() {
+<span class="fc" id="L739">        return List.of(</span>
+            new TrainingCase(&quot;rc-train-01&quot;, &quot;log-product&quot;, &quot;log(a * b)&quot;, &quot;log(a) + log(b)&quot;, &quot;training: log(a*b)&quot;),
+            new TrainingCase(&quot;rc-train-02&quot;, &quot;log-product&quot;, &quot;log(x * y)&quot;, &quot;log(x) + log(y)&quot;, &quot;training: log(x*y)&quot;),
+            new TrainingCase(&quot;rc-train-03&quot;, &quot;log-product&quot;, &quot;log(p * q)&quot;, &quot;log(p) + log(q)&quot;, &quot;training: log(p*q)&quot;),
+            new TrainingCase(&quot;rc-train-04&quot;, &quot;log-product&quot;, &quot;log(u * v)&quot;, &quot;log(u) + log(v)&quot;, &quot;training: log(u*v)&quot;),
+            new TrainingCase(&quot;rc-train-05&quot;, &quot;log-product&quot;, &quot;log(m * n)&quot;, &quot;log(m) + log(n)&quot;, &quot;training: log(m*n)&quot;),
+            new TrainingCase(&quot;rc-train-06&quot;, &quot;log-product&quot;, &quot;log(r * s)&quot;, &quot;log(r) + log(s)&quot;, &quot;training: log(r*s)&quot;),
+            new TrainingCase(&quot;rc-train-07&quot;, &quot;log-product&quot;, &quot;log(c * d)&quot;, &quot;log(c) + log(d)&quot;, &quot;training: log(c*d)&quot;),
+            new TrainingCase(&quot;rc-train-08&quot;, &quot;log-product&quot;, &quot;log(e * f)&quot;, &quot;log(e) + log(f)&quot;, &quot;training: log(e*f)&quot;),
+            new TrainingCase(&quot;rc-train-09&quot;, &quot;log-product&quot;, &quot;log(g * h)&quot;, &quot;log(g) + log(h)&quot;, &quot;training: log(g*h)&quot;),
+            new TrainingCase(&quot;rc-train-10&quot;, &quot;log-product&quot;, &quot;log(i * j)&quot;, &quot;log(i) + log(j)&quot;, &quot;training: log(i*j)&quot;),
+            new TrainingCase(&quot;rc-train-11&quot;, &quot;log-product&quot;, &quot;log(k * l)&quot;, &quot;log(k) + log(l)&quot;, &quot;training: log(k*l)&quot;),
+            new TrainingCase(&quot;rc-train-12&quot;, &quot;log-product&quot;, &quot;log(t * w)&quot;, &quot;log(t) + log(w)&quot;, &quot;training: log(t*w)&quot;)
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Markdown story
+    // -----------------------------------------------------------------------
+
+    private String renderStory(CampaignReport report) {
+<span class="fc" id="L760">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L761">        out.append(&quot;# Reference Campaign: Autonomous Conjecture-to-Proof Lifecycle\n\n&quot;);</span>
+<span class="fc" id="L762">        out.append(&quot;**Campaign ID:** `&quot;).append(CAMPAIGN_ID).append(&quot;`  \n&quot;);</span>
+<span class="fc" id="L763">        out.append(&quot;**Family:** log-product-assumption  \n&quot;);</span>
+<span class="fc" id="L764">        out.append(&quot;**Operator:** `&quot;).append(LogProductAssumptionOperator.RULE_ID).append(&quot;`\n\n&quot;);</span>
+
+<span class="fc" id="L766">        out.append(&quot;## 1. Training Observations\n\n&quot;);</span>
+<span class="fc" id="L767">        out.append(&quot;Generated &quot;).append(report.training().size())</span>
+<span class="fc" id="L768">            .append(&quot; deterministic training observations.\n\n&quot;);</span>
+<span class="fc" id="L769">        out.append(&quot;| ID | Input | Target | Success | Ablation |\n&quot;);</span>
+<span class="fc" id="L770">        out.append(&quot;| --- | --- | --- | :---: | --- |\n&quot;);</span>
+<span class="fc bfc" id="L771" title="All 2 branches covered.">        for (TrainingResult t : report.training()) {</span>
+<span class="fc" id="L772">            out.append(&quot;| &quot;).append(escape(t.id()))</span>
+<span class="fc" id="L773">                .append(&quot; | `&quot;).append(escape(t.inputExpression())).append(&quot;`&quot;)</span>
+<span class="fc" id="L774">                .append(&quot; | `&quot;).append(escape(t.targetExpression())).append(&quot;`&quot;)</span>
+<span class="pc bpc" id="L775" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(t.success() ? &quot;✓&quot; : &quot;✗&quot;)</span>
+<span class="fc" id="L776">                .append(&quot; | &quot;).append(escape(t.ablationStatus()))</span>
+<span class="fc" id="L777">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L778">        }</span>
+
+<span class="fc" id="L780">        out.append(&quot;\n## 2. Hypothesis Formation and Refinement\n\n&quot;);</span>
+<span class="fc" id="L781">        HypothesisEvolution evo = report.hypothesisEvolution();</span>
+<span class="fc" id="L782">        out.append(&quot;**Initial conjecture (overgeneralised):** `&quot;)</span>
+<span class="fc" id="L783">            .append(INITIAL_LEFT_PATTERN).append(&quot; = &quot;).append(INITIAL_RIGHT_PATTERN)</span>
+<span class="fc" id="L784">            .append(&quot;` _(no assumptions)_\n\n&quot;);</span>
+<span class="fc" id="L785">        out.append(&quot;Refinement loop ran **&quot;).append(evo.revisionHistory().size())</span>
+<span class="fc" id="L786">            .append(&quot;** revision(s).\n\n&quot;);</span>
+<span class="fc" id="L787">        out.append(&quot;| Revision | Left | Right | Assumptions | Status |\n&quot;);</span>
+<span class="fc" id="L788">        out.append(&quot;| --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L789" title="All 2 branches covered.">        for (RevisionSummary rev : evo.revisionHistory()) {</span>
+<span class="fc" id="L790">            out.append(&quot;| r&quot;).append(rev.revisionIndex())</span>
+<span class="fc" id="L791">                .append(&quot; | `&quot;).append(escape(rev.leftPattern())).append(&quot;`&quot;)</span>
+<span class="fc" id="L792">                .append(&quot; | `&quot;).append(escape(rev.rightPattern())).append(&quot;`&quot;)</span>
+<span class="fc" id="L793">                .append(&quot; | &quot;).append(escape(String.join(&quot;, &quot;, rev.assumptions())))</span>
+<span class="fc" id="L794">                .append(&quot; | &quot;).append(rev.status())</span>
+<span class="fc" id="L795">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L796">        }</span>
+
+<span class="fc" id="L798">        out.append(&quot;\n### Counterexample Report\n\n&quot;);</span>
+<span class="fc" id="L799">        CounterexampleReport cex = evo.counterexampleReport();</span>
+<span class="pc bpc" id="L800" title="1 of 2 branches missed.">        if (cex.counterexamples().isEmpty()) {</span>
+<span class="fc" id="L801">            out.append(&quot;No counterexamples found during refinement.\n&quot;);</span>
+        } else {
+<span class="nc" id="L803">            out.append(&quot;Found **&quot;).append(cex.counterexamples().size())</span>
+<span class="nc" id="L804">                .append(&quot;** counterexample(s) that triggered refinement:\n\n&quot;);</span>
+<span class="nc bnc" id="L805" title="All 2 branches missed.">            for (CounterexampleEntry entry : cex.counterexamples()) {</span>
+<span class="nc" id="L806">                out.append(&quot;- Revision `&quot;).append(entry.revisionId())</span>
+<span class="nc" id="L807">                    .append(&quot;`: assignments = `&quot;).append(entry.assignments())</span>
+<span class="nc" id="L808">                    .append(&quot;`, strategy = `&quot;).append(entry.strategyName()).append(&quot;`\n&quot;);</span>
+<span class="nc" id="L809">            }</span>
+        }
+
+<span class="pc bpc" id="L812" title="1 of 2 branches missed.">        if (evo.acceptedRevision() != null) {</span>
+<span class="fc" id="L813">            RevisionSummary accepted = evo.acceptedRevision();</span>
+<span class="fc" id="L814">            out.append(&quot;\n**Accepted revision:** `&quot;)</span>
+<span class="fc" id="L815">                .append(accepted.leftPattern()).append(&quot; = &quot;).append(accepted.rightPattern())</span>
+<span class="fc" id="L816">                .append(&quot;` with assumptions: `&quot;).append(String.join(&quot;, &quot;, accepted.assumptions()))</span>
+<span class="fc" id="L817">                .append(&quot;`\n&quot;);</span>
+<span class="fc" id="L818">        } else {</span>
+<span class="nc" id="L819">            out.append(&quot;\n⚠️ No revision was accepted (refinement exhausted budget or inconclusive).\n&quot;);</span>
+        }
+
+<span class="fc" id="L822">        out.append(&quot;\n## 3. Holdout Validation\n\n&quot;);</span>
+<span class="fc" id="L823">        HoldoutReport hr = report.holdoutReport();</span>
+<span class="fc" id="L824">        out.append(&quot;Validated on **&quot;).append(hr.positiveCount())</span>
+<span class="fc" id="L825">            .append(&quot;** positive holdouts and **&quot;).append(hr.negativeCount())</span>
+<span class="fc" id="L826">            .append(&quot;** negative holdouts.\n\n&quot;);</span>
+<span class="fc" id="L827">        out.append(&quot;- Positive pass rate: **&quot;).append(hr.positivePassCount())</span>
+<span class="fc" id="L828">            .append(&quot; / &quot;).append(hr.positiveCount()).append(&quot;**\n&quot;);</span>
+<span class="fc" id="L829">        out.append(&quot;- Negative blocked rate: **&quot;).append(hr.negativeBlockedCount())</span>
+<span class="fc" id="L830">            .append(&quot; / &quot;).append(hr.negativeCount()).append(&quot;**\n&quot;);</span>
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">        out.append(&quot;- Overall: **&quot;).append(hr.overallPass() ? &quot;PASS ✓&quot; : &quot;FAIL ✗&quot;).append(&quot;**\n&quot;);</span>
+
+<span class="fc" id="L833">        out.append(&quot;\n## 4. External Prover Confirmation\n\n&quot;);</span>
+<span class="pc bpc" id="L834" title="1 of 2 branches missed.">        if (report.proofSummary() != null) {</span>
+<span class="fc" id="L835">            out.append(&quot;SymPy QA harness summary: total=&quot;).append(report.proofSummary().totalCases())</span>
+<span class="fc" id="L836">                .append(&quot;, sympy-available=&quot;).append(report.proofSummary().sympyAvailableCases())</span>
+<span class="fc" id="L837">                .append(&quot;, disagreements=&quot;).append(report.proofSummary().disagreements())</span>
+<span class="fc" id="L838">                .append(&quot;, regelsuche-path-found=&quot;).append(report.proofSummary().regelsuchePathFound())</span>
+<span class="fc" id="L839">                .append(&quot;\n&quot;);</span>
+        } else {
+<span class="nc" id="L841">            out.append(&quot;SymPy QA harness: no summary available.\n&quot;);</span>
+        }
+
+<span class="fc" id="L844">        out.append(&quot;\n## 5. Promotion\n\n&quot;);</span>
+<span class="pc bpc" id="L845" title="1 of 2 branches missed.">        if (report.promotionRecord() != null) {</span>
+<span class="fc" id="L846">            out.append(&quot;Promoted candidate: `&quot;).append(report.promotionRecord().candidateId())</span>
+<span class="fc" id="L847">                .append(&quot;`  \n&quot;);</span>
+<span class="fc" id="L848">            out.append(&quot;Stage: `&quot;).append(report.promotionRecord().stage()).append(&quot;`  \n&quot;);</span>
+<span class="fc" id="L849">            out.append(&quot;Oracle: `&quot;).append(report.promotionRecord().oracleStatus()).append(&quot;`\n&quot;);</span>
+        } else {
+<span class="nc" id="L851">            out.append(&quot;No candidate was promoted in this run.\n&quot;);</span>
+        }
+
+<span class="fc" id="L854">        out.append(&quot;\n## 6. Reuse Ablation\n\n&quot;);</span>
+<span class="fc" id="L855">        ReuseAblation abl = report.reuseAblation();</span>
+<span class="fc" id="L856">        out.append(&quot;Ran ablation on **&quot;).append(abl.totalCount())</span>
+<span class="fc" id="L857">            .append(&quot;** cases. Improvement observed in **&quot;).append(abl.improvedCount())</span>
+<span class="fc" id="L858">            .append(&quot;** cases.  \n&quot;);</span>
+<span class="fc" id="L859">        out.append(&quot;Overall measured improvement: **&quot;)</span>
+<span class="pc bpc" id="L860" title="1 of 2 branches missed.">            .append(abl.measuredImprovement() ? &quot;YES ✓&quot; : &quot;NO ✗&quot;).append(&quot;**\n&quot;);</span>
+
+<span class="fc" id="L862">        out.append(&quot;\n## 7. Acceptance Gate\n\n&quot;);</span>
+<span class="pc bpc" id="L863" title="2 of 4 branches missed.">        boolean gates = evo.isAccepted() &amp;&amp; hr.overallPass()</span>
+<span class="pc bpc" id="L864" title="1 of 2 branches missed.">            &amp;&amp; hr.positiveCount() &gt;= MIN_HOLDOUTS;</span>
+<span class="pc bpc" id="L865" title="1 of 2 branches missed.">        out.append(&quot;- [&quot;).append(evo.isAccepted() ? &quot;x&quot; : &quot; &quot;).append(&quot;] Overgeneralisation challenged and refined\n&quot;);</span>
+<span class="pc bpc" id="L866" title="1 of 2 branches missed.">        out.append(&quot;- [&quot;).append(hr.positiveCount() &gt;= MIN_HOLDOUTS ? &quot;x&quot; : &quot; &quot;)</span>
+<span class="fc" id="L867">            .append(&quot;] ≥ 100 unseen holdouts evaluated (&quot;)</span>
+<span class="fc" id="L868">            .append(hr.positiveCount()).append(&quot;)\n&quot;);</span>
+<span class="pc bpc" id="L869" title="1 of 2 branches missed.">        out.append(&quot;- [&quot;).append(hr.overallPass() ? &quot;x&quot; : &quot; &quot;).append(&quot;] All holdouts pass\n&quot;);</span>
+<span class="pc bpc" id="L870" title="1 of 2 branches missed.">        out.append(&quot;- [&quot;).append(abl.measuredImprovement() ? &quot;x&quot; : &quot; &quot;)</span>
+<span class="fc" id="L871">            .append(&quot;] Reuse improves search performance\n&quot;);</span>
+<span class="pc bpc" id="L872" title="1 of 2 branches missed.">        out.append(&quot;\n**Overall status: &quot;).append(gates ? &quot;PASS ✓&quot; : &quot;INCOMPLETE&quot;).append(&quot;**\n&quot;);</span>
+
+<span class="fc" id="L874">        out.append(&quot;\n---\n&quot;);</span>
+<span class="fc" id="L875">        out.append(&quot;_Reproduced with `./gradlew runReferenceCampaign`_\n&quot;);</span>
+<span class="fc" id="L876">        return out.toString();</span>
+    }
+
+    private String escape(String value) {
+<span class="pc bpc" id="L880" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    // -----------------------------------------------------------------------
+    // Records
+    // -----------------------------------------------------------------------
+
+    public record CampaignReport(
+        String id,
+        List&lt;TrainingResult&gt; training,
+        HypothesisEvolution hypothesisEvolution,
+        HoldoutReport holdoutReport,
+        SymPyQaHarness.QaSummary proofSummary,
+        PromotionRecord promotionRecord,
+        ReuseAblation reuseAblation,
+        ProvenanceGraph provenanceGraph,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L898">        public CampaignReport {</span>
+<span class="pc bpc" id="L899" title="1 of 2 branches missed.">            training = training == null ? List.of() : List.copyOf(training);</span>
+<span class="pc bpc" id="L900" title="1 of 2 branches missed.">            blockers = blockers == null ? List.of() : List.copyOf(blockers);</span>
+<span class="fc" id="L901">        }</span>
+    }
+
+    public record TrainingResult(
+        String id,
+        String family,
+        String inputExpression,
+        String targetExpression,
+        boolean success,
+        String failureReason,
+        String oracleStatus,
+        String oracleEvidence,
+        String ablationStatus,
+        String shortcutSource,
+        String shortcutPackId,
+        String shortcutOperatorId,
+        List&lt;String&gt; shortcutAssumptions,
+        List&lt;String&gt; rulePath,
+        String notes
+    ) implements CampaignCaseResult {
+<span class="fc" id="L921">        public TrainingResult {</span>
+<span class="pc bpc" id="L922" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;&quot; : failureReason;</span>
+<span class="pc bpc" id="L923" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L924" title="1 of 2 branches missed.">            oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
+<span class="pc bpc" id="L925" title="1 of 2 branches missed.">            ablationStatus = ablationStatus == null ? &quot;N/A&quot; : ablationStatus;</span>
+<span class="pc bpc" id="L926" title="1 of 2 branches missed.">            shortcutSource = shortcutSource == null ? &quot;&quot; : shortcutSource;</span>
+<span class="pc bpc" id="L927" title="1 of 2 branches missed.">            shortcutPackId = shortcutPackId == null ? &quot;&quot; : shortcutPackId;</span>
+<span class="pc bpc" id="L928" title="1 of 2 branches missed.">            shortcutOperatorId = shortcutOperatorId == null ? &quot;&quot; : shortcutOperatorId;</span>
+<span class="pc bpc" id="L929" title="1 of 2 branches missed.">            shortcutAssumptions = shortcutAssumptions == null ? List.of() : List.copyOf(shortcutAssumptions);</span>
+<span class="pc bpc" id="L930" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="pc bpc" id="L931" title="1 of 2 branches missed.">            notes = notes == null ? &quot;&quot; : notes;</span>
+<span class="fc" id="L932">        }</span>
+    }
+
+    public record HypothesisEvolution(
+        String hypothesisId,
+        String initialLeftPattern,
+        String initialRightPattern,
+        List&lt;RevisionSummary&gt; revisionHistory,
+        RevisionSummary terminalRevision,
+        RevisionSummary acceptedRevision,
+        boolean isAccepted,
+        CounterexampleReport counterexampleReport
+    ) {
+<span class="fc" id="L945">        public HypothesisEvolution {</span>
+<span class="pc bpc" id="L946" title="1 of 2 branches missed.">            revisionHistory = revisionHistory == null ? List.of() : List.copyOf(revisionHistory);</span>
+<span class="fc" id="L947">        }</span>
+    }
+
+    /** Serializable summary of a hypothesis revision (no {@code java.time.Instant} fields). */
+    public record RevisionSummary(
+        String id,
+        String parentId,
+        String originHypothesisId,
+        int revisionIndex,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; assumptions,
+        String status,
+        String refinementStrategyName
+    ) {
+<span class="fc" id="L962">        public RevisionSummary {</span>
+<span class="pc bpc" id="L963" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L964" title="1 of 2 branches missed.">            refinementStrategyName = refinementStrategyName == null ? &quot;&quot; : refinementStrategyName;</span>
+<span class="fc" id="L965">        }</span>
+
+        static RevisionSummary from(HypothesisRevision revision) {
+<span class="fc" id="L968">            return new RevisionSummary(</span>
+<span class="fc" id="L969">                revision.id(),</span>
+<span class="fc" id="L970">                revision.parentId(),</span>
+<span class="fc" id="L971">                revision.originHypothesisId(),</span>
+<span class="fc" id="L972">                revision.revisionIndex(),</span>
+<span class="fc" id="L973">                revision.leftPattern(),</span>
+<span class="fc" id="L974">                revision.rightPattern(),</span>
+<span class="fc" id="L975">                revision.assumptions(),</span>
+<span class="fc" id="L976">                revision.status().name(),</span>
+<span class="fc" id="L977">                revision.refinementStrategyName()</span>
+            );
+        }
+    }
+
+    public record CounterexampleReport(
+        String hypothesisId,
+        String leftPattern,
+        String rightPattern,
+        List&lt;CounterexampleEntry&gt; counterexamples,
+        int totalRevisions,
+        boolean refinementAccepted
+    ) {
+<span class="fc" id="L990">        public CounterexampleReport {</span>
+<span class="pc bpc" id="L991" title="1 of 2 branches missed.">            counterexamples = counterexamples == null ? List.of() : List.copyOf(counterexamples);</span>
+<span class="fc" id="L992">        }</span>
+    }
+
+    public record CounterexampleEntry(
+        String revisionId,
+        int revisionIndex,
+        List&lt;String&gt; assignments,
+        String leftValue,
+        String rightValue,
+        String strategyName,
+        String triggerRevisionStatus
+    ) {
+<span class="nc" id="L1004">        public CounterexampleEntry {</span>
+<span class="nc bnc" id="L1005" title="All 2 branches missed.">            assignments = assignments == null ? List.of() : List.copyOf(assignments);</span>
+<span class="nc bnc" id="L1006" title="All 2 branches missed.">            leftValue = leftValue == null ? &quot;&quot; : leftValue;</span>
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">            rightValue = rightValue == null ? &quot;&quot; : rightValue;</span>
+<span class="nc bnc" id="L1008" title="All 2 branches missed.">            strategyName = strategyName == null ? &quot;&quot; : strategyName;</span>
+<span class="nc bnc" id="L1009" title="All 2 branches missed.">            triggerRevisionStatus = triggerRevisionStatus == null ? &quot;&quot; : triggerRevisionStatus;</span>
+<span class="nc" id="L1010">        }</span>
+    }
+
+    public record HoldoutReport(
+        String hypothesisId,
+        List&lt;String&gt; acceptedAssumptions,
+        List&lt;HoldoutResult&gt; positiveResults,
+        List&lt;HoldoutResult&gt; negativeResults,
+        int positiveCount,
+        int negativeCount,
+        int positivePassCount,
+        int negativeBlockedCount,
+        boolean overallPass
+    ) {
+<span class="fc" id="L1024">        public HoldoutReport {</span>
+<span class="pc bpc" id="L1025" title="1 of 2 branches missed.">            acceptedAssumptions = acceptedAssumptions == null ? List.of() : List.copyOf(acceptedAssumptions);</span>
+<span class="pc bpc" id="L1026" title="1 of 2 branches missed.">            positiveResults = positiveResults == null ? List.of() : List.copyOf(positiveResults);</span>
+<span class="pc bpc" id="L1027" title="1 of 2 branches missed.">            negativeResults = negativeResults == null ? List.of() : List.copyOf(negativeResults);</span>
+<span class="fc" id="L1028">        }</span>
+
+        /** Returns all positive and negative holdout results concatenated. */
+        public List&lt;HoldoutResult&gt; allResults() {
+<span class="fc" id="L1032">            return Stream.concat(positiveResults.stream(), negativeResults.stream()).toList();</span>
+        }
+    }
+
+    public record HoldoutResult(
+        String holdoutId,
+        String inputExpression,
+        String targetExpression,
+        boolean expectPositive,
+        boolean withSuccess,
+        int withPathLength,
+        long withStatesExplored,
+        boolean withoutSuccess,
+        int withoutPathLength,
+        long withoutStatesExplored,
+        String oracleStatus,
+        String oracleEvidence,
+        List&lt;String&gt; rulePath,
+        boolean blocked
+    ) {
+<span class="fc" id="L1052">        public HoldoutResult {</span>
+<span class="pc bpc" id="L1053" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L1054" title="1 of 2 branches missed.">            oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
+<span class="pc bpc" id="L1055" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="fc" id="L1056">        }</span>
+    }
+
+    public record ReuseAblation(
+        String campaignId,
+        String candidateId,
+        List&lt;AblationPairResult&gt; pairs,
+        long improvedCount,
+        long totalCount,
+        boolean measuredImprovement
+    ) {
+<span class="fc" id="L1067">        public ReuseAblation {</span>
+<span class="pc bpc" id="L1068" title="1 of 2 branches missed.">            pairs = pairs == null ? List.of() : List.copyOf(pairs);</span>
+<span class="fc" id="L1069">        }</span>
+    }
+
+<span class="fc" id="L1072">    public record AblationPairResult(</span>
+        String inputExpression,
+        String targetExpression,
+        boolean withSuccess,
+        int withPathLength,
+        long withStatesExplored,
+        boolean withoutSuccess,
+        int withoutPathLength,
+        long withoutStatesExplored,
+        boolean improved
+    ) {
+    }
+
+    public record ProvenanceGraph(
+        String campaignId,
+        String timestamp,
+        List&lt;ProvenanceNode&gt; nodes,
+        List&lt;ProvenanceEdge&gt; edges
+    ) {
+<span class="fc" id="L1091">        public ProvenanceGraph {</span>
+<span class="pc bpc" id="L1092" title="1 of 2 branches missed.">            nodes = nodes == null ? List.of() : List.copyOf(nodes);</span>
+<span class="pc bpc" id="L1093" title="1 of 2 branches missed.">            edges = edges == null ? List.of() : List.copyOf(edges);</span>
+<span class="fc" id="L1094">        }</span>
+    }
+
+    public record ProvenanceNode(
+        String nodeId,
+        String nodeType,
+        String family,
+        Map&lt;String, String&gt; attributes
+    ) {
+<span class="fc" id="L1103">        public ProvenanceNode {</span>
+<span class="pc bpc" id="L1104" title="1 of 2 branches missed.">            attributes = attributes == null ? Map.of() : Map.copyOf(attributes);</span>
+<span class="fc" id="L1105">        }</span>
+    }
+
+<span class="fc" id="L1108">    public record ProvenanceEdge(</span>
+        String fromNodeId,
+        String toNodeId,
+        String edgeType
+    ) {
+    }
+
+<span class="fc" id="L1115">    private record TrainingCase(</span>
+        String id,
+        String family,
+        String inputExpression,
+        String targetExpression,
+        String notes
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
