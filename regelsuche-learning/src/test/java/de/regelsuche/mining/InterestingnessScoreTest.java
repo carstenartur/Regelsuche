@@ -2,8 +2,10 @@ package de.regelsuche.mining;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -110,11 +112,24 @@ class InterestingnessScoreTest {
         HypothesisCandidate hypothesis = candidate("divide", "x / x", "1", List.of("p1"), List.of(), 0.0)
             .withAssumptions(List.of("x != 0", "y > 0"));
 
-        HypothesisCandidate minimized = AssumptionMinimizer.minimize(hypothesis,
-            candidate -> candidate.assumptions().contains("x != 0"));
+        AssumptionMinimizer.MinimizationResult result = AssumptionMinimizer.analyze(hypothesis,
+            candidate -> candidate.assumptions().contains("x != 0")
+                ? CounterexampleSearchService.CounterexampleSearchResult.noCounterexample()
+                : CounterexampleSearchService.CounterexampleSearchResult.counterexampleFound(
+                    new CounterexampleSearchService.Counterexample(List.of("x=0"), "undefined", "1"),
+                    List.of(),
+                    List.of("numeric-boundary-values")
+                ));
+        HypothesisCandidate minimized = result.minimizedCandidate();
 
         assertTrue(minimized.assumptions().contains("x != 0"));
-        assertTrue(!minimized.assumptions().contains("y > 0"));
+        assertFalse(minimized.assumptions().contains("y > 0"));
+        assertTrue(result.judgements().stream().anyMatch(judgement ->
+            judgement.assumption().equals("x != 0")
+                && judgement.classification() == CounterexampleSearchService.AssumptionClassification.REQUIRED));
+        assertTrue(result.judgements().stream().anyMatch(judgement ->
+            judgement.assumption().equals("y > 0")
+                && judgement.classification() == CounterexampleSearchService.AssumptionClassification.REDUNDANT_WITHIN_TESTED_EVIDENCE));
     }
 
     private static HypothesisCandidate candidate(

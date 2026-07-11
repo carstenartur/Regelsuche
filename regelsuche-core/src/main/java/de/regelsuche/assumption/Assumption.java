@@ -32,21 +32,29 @@ public record Assumption(Kind kind, String expression, List<String> symbols) {
     public enum Kind {
         /** Denominator (or other given subterm) must be non-zero. */
         NON_ZERO,
-        /** Variable is known to be real-valued. */
-        REAL,
-        /** Variable is known to be integer-valued. */
-        INTEGER,
-        /** Variable is known to be rational-valued. */
-        RATIONAL,
         /** Argument must be strictly positive. */
         POSITIVE,
         /** Argument must be non-negative. */
         NON_NEGATIVE,
+        /** Variable is known to be integer-valued. */
+        INTEGER,
+        /** Variable is known to be a natural number. */
+        NATURAL,
+        /** Expression admits a multiplicative inverse. */
+        INVERTIBLE,
+        /** Variable belongs to a particular domain (e.g. integer). */
+        DOMAIN_MEMBERSHIP,
+        /** Free-form predicate with no dedicated structural kind. */
+        CUSTOM_PREDICATE,
+        /** Variable is known to be real-valued. */
+        REAL,
+        /** Variable is known to be rational-valued. */
+        RATIONAL,
         /** Explicitly unknown / inconclusive domain information. */
         UNKNOWN,
-        /** Variable belongs to a particular domain (e.g. integer). */
+        /** @deprecated Use {@link #DOMAIN_MEMBERSHIP}. */
         DOMAIN,
-        /** Free-form predicate. */
+        /** @deprecated Use {@link #CUSTOM_PREDICATE}. */
         CUSTOM
     }
 
@@ -78,6 +86,22 @@ public record Assumption(Kind kind, String expression, List<String> symbols) {
 
     public static Assumption integer(String symbol) {
         return new Assumption(Kind.INTEGER, symbol + " ∈ Z", List.of(symbol));
+    }
+
+    public static Assumption natural(String symbol) {
+        return new Assumption(Kind.NATURAL, symbol + " ∈ N", List.of(symbol));
+    }
+
+    public static Assumption invertible(String expression) {
+        return new Assumption(Kind.INVERTIBLE, expression + " invertible", List.of(expression));
+    }
+
+    public static Assumption domainMembership(String expression, String domain) {
+        return new Assumption(Kind.DOMAIN_MEMBERSHIP, expression + " ∈ " + domain, List.of(expression));
+    }
+
+    public static Assumption customPredicate(String predicate, List<String> symbols) {
+        return new Assumption(Kind.CUSTOM_PREDICATE, predicate, symbols);
     }
 
     public static Assumption rational(String symbol) {
@@ -122,8 +146,10 @@ public record Assumption(Kind kind, String expression, List<String> symbols) {
         }
         return switch (required) {
             case NON_ZERO -> known == Kind.POSITIVE;
-            case RATIONAL -> known == Kind.INTEGER;
-            case REAL -> known == Kind.INTEGER || known == Kind.RATIONAL || known == Kind.POSITIVE || known == Kind.NON_NEGATIVE;
+            case INTEGER -> known == Kind.NATURAL;
+            case RATIONAL -> known == Kind.INTEGER || known == Kind.NATURAL;
+            case REAL -> known == Kind.INTEGER || known == Kind.NATURAL
+                || known == Kind.RATIONAL || known == Kind.POSITIVE || known == Kind.NON_NEGATIVE;
             default -> false;
         };
     }

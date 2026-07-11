@@ -46,17 +46,20 @@ public class LeanProofBridge implements ProofBridge {
 
     private String toLeanProp(Assumption assumption) {
         return switch (assumption.kind()) {
-            case NON_ZERO -> assumption.symbols().isEmpty()
+            case NON_ZERO, INVERTIBLE -> assumption.symbols().isEmpty()
                 ? assumption.expression()
                 : assumption.symbols().get(0) + " ≠ 0";
             case REAL, INTEGER, RATIONAL, UNKNOWN -> "True";
+            case NATURAL -> assumption.symbols().isEmpty()
+                ? assumption.expression()
+                : "0 ≤ " + assumption.symbols().get(0);
             case POSITIVE -> assumption.symbols().isEmpty()
                 ? assumption.expression()
                 : assumption.symbols().get(0) + " > 0";
             case NON_NEGATIVE -> assumption.symbols().isEmpty()
                 ? assumption.expression()
                 : assumption.symbols().get(0) + " ≥ 0";
-            case DOMAIN, CUSTOM -> assumption.expression();
+            case DOMAIN_MEMBERSHIP, DOMAIN, CUSTOM_PREDICATE, CUSTOM -> assumption.expression();
         };
     }
 }
