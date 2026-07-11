@@ -14,8 +14,13 @@ import java.util.Set;
  */
 public record RecognitionProfile(
     Set<BinaryOperator> associativeOperators,
-    Set<BinaryOperator> commutativeOperators
+    Set<BinaryOperator> commutativeOperators,
+    boolean inferAlgebraicBindings
 ) {
+    public RecognitionProfile(Set<BinaryOperator> associativeOperators, Set<BinaryOperator> commutativeOperators) {
+        this(associativeOperators, commutativeOperators, false);
+    }
+
     public RecognitionProfile {
         associativeOperators = immutableEnumSet(associativeOperators);
         commutativeOperators = immutableEnumSet(commutativeOperators);
@@ -25,16 +30,27 @@ public record RecognitionProfile(
     }
 
     public static RecognitionProfile exact() {
-        return new RecognitionProfile(Set.of(), Set.of());
+        return new RecognitionProfile(Set.of(), Set.of(), false);
     }
 
     /**
-     * Algebraic recognition modulo associativity and commutativity of addition
-     * and multiplication.
+     * Recognition modulo associativity and commutativity of addition and
+     * multiplication, without solving algebraic placeholder bindings.
      */
     public static RecognitionProfile arithmeticAc() {
         Set<BinaryOperator> operators = EnumSet.of(BinaryOperator.ADD, BinaryOperator.MUL);
-        return new RecognitionProfile(operators, operators);
+        return new RecognitionProfile(operators, operators, false);
+    }
+
+    /**
+     * AC recognition plus bounded monomial binding inference. This profile can
+     * infer bindings such as {@code A = 3/2*a} from a square term
+     * {@code 9/4*a^2} and checks every later occurrence modulo normalized
+     * numeric coefficients and powers.
+     */
+    public static RecognitionProfile algebraicAc() {
+        Set<BinaryOperator> operators = EnumSet.of(BinaryOperator.ADD, BinaryOperator.MUL);
+        return new RecognitionProfile(operators, operators, true);
     }
 
     public boolean isAssociative(BinaryOperator operator) {
