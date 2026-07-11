@@ -1,0 +1,94 @@
+{
+  "schemaId": "regelsuche.discovery-evidence/v1",
+  "profiles": ["observed", "validated", "promoted", "public"],
+  "canonicalEvidenceHash": "sha256:0123456789abcdef",
+  "canonicalEvidenceId": "regelsuche.discovery-evidence/v1#sha256:0123456789abcdef",
+  "producer": {
+    "producerId": "docs-example",
+    "producerVersion": "1",
+    "implementation": "example",
+    "sourceRef": "docs",
+    "schemaPath": "docs/schemas/regelsuche.discovery-evidence-v1.schema.json",
+    "extensions": {}
+  },
+  "subject": {
+    "id": "invalid-missing-required-proof",
+    "kind": "DISCOVERY_SCENARIO",
+    "title": "Invalid example",
+    "inputExpression": "a+b",
+    "targetExpression": "b+a",
+    "extensions": {}
+  },
+  "claims": [
+    {
+      "id": "claim-1",
+      "kind": "GENERATED_SUMMARY",
+      "outcome": "SUPPORTED",
+      "statement": "Required proof is missing.",
+      "evidenceRefs": ["observation-1", "oracle-1"],
+      "extensions": {}
+    }
+  ],
+  "observations": [
+    {
+      "id": "observation-1",
+      "kind": "SEARCH_TRACE",
+      "outcome": "OBSERVED",
+      "extensions": {}
+    }
+  ],
+  "generalizedHypothesis": {
+    "statement": "Hypothesis.",
+    "family": "example",
+    "status": "SUPPORTED",
+    "extensions": {}
+  },
+  "revisions": [],
+  "assumptions": [],
+  "counterexamples": [],
+  "holdouts": [],
+  "oracleResults": [
+    {
+      "id": "oracle-1",
+      "kind": "EXTERNAL_VALIDATION",
+      "status": "AGREE",
+      "outcome": "CONFIRMED",
+      "extensions": {}
+    }
+  ],
+  "provenance": {
+    "traceSource": "REGELSUCHE_SEARCH",
+    "extensions": {}
+  },
+  "novelty": {
+    "status": "DOCUMENTED_BENCHMARK",
+    "extensions": {}
+  },
+  "ablation": {
+    "kind": "ABLATION_STUDY",
+    "status": "DEGRADED",
+    "outcome": "CONFIRMED",
+    "extensions": {}
+  },
+  "proof": {
+    "required": true,
+    "policy": "REQUIRED",
+    "outcome": "NOT_REQUESTED",
+    "confirmations": [],
+    "extensions": {}
+  },
+  "promotion": {
+    "status": "PUBLIC",
+    "eligible": true,
+    "extensions": {}
+  },
+  "artifacts": [
+    {
+      "name": "summary",
+      "path": "summary.md",
+      "mediaType": "text/markdown",
+      "sha256": "sha256:abcdef"
+    }
+  ],
+  "extensions": {}
+}

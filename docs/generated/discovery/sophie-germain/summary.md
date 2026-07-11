@@ -1,6 +1,6 @@
 # Sophie-Germain hidden structure
 
-- generatedBy: `DocsDiscoveryGalleryGenerator`
+- generatedBy: `regelsuche.discovery-gallery`
 - scenarioId: `sophie-germain`
 - inputExpression: `x ^ 4 + 4 * y ^ 4`
 - targetExpression: `(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)`

@@ -15,6 +15,7 @@ Public entries are admitted only after `PublicBenchmarkEvidenceGate` accepts the
 - Macro reused: `macro_3bbfed5b`
 - Search-space excerpt: [SVG](generated/discovery/complete-square/search-space.svg)
 - Evidence JSON link: [evidence.json](generated/discovery/complete-square/evidence.json)
+- Canonical evidence ID: [`regelsuche.discovery-evidence/v1#sha256:98ad53da0459ab21e42d39419b5fd18056dcb6d4aee01f7b904afdb888ba3192`](generated/discovery/complete-square/evidence.json)
 
 <img src="generated/discovery/complete-square/search-space.svg" alt="Generated evidence search-space for complete-square-factorization">
 
@@ -30,6 +31,7 @@ Public entries are admitted only after `PublicBenchmarkEvidenceGate` accepts the
 - Macro reused: `macro_6bd0496b`
 - Search-space excerpt: [SVG](generated/discovery/sophie-germain/search-space.svg)
 - Evidence JSON link: [evidence.json](generated/discovery/sophie-germain/evidence.json)
+- Canonical evidence ID: [`regelsuche.discovery-evidence/v1#sha256:ad5a70e80124c9154f03c870b1f1b6d26fe482463eeb991d805f14eef38a1f31`](generated/discovery/sophie-germain/evidence.json)
 
 <img src="generated/discovery/sophie-germain/search-space.svg" alt="Generated evidence search-space for sophie-germain">
 

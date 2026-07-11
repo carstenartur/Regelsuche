@@ -7,3 +7,5 @@ Regenerate with:
 ```
 ./gradlew :app:generateDiscoveryGallery
 ```
+
+The generated evidence documents implement `regelsuche.discovery-evidence/v1`.

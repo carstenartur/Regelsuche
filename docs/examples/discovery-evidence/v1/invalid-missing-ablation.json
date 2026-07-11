@@ -1,0 +1,79 @@
+{
+  "schemaId": "regelsuche.discovery-evidence/v1",
+  "profiles": ["observed", "validated", "promoted"],
+  "producer": {
+    "producerId": "docs-example",
+    "producerVersion": "1",
+    "implementation": "example",
+    "sourceRef": "docs",
+    "schemaPath": "docs/schemas/regelsuche.discovery-evidence-v1.schema.json",
+    "extensions": {}
+  },
+  "subject": {
+    "id": "invalid-missing-ablation",
+    "kind": "DISCOVERY_SCENARIO",
+    "title": "Invalid example",
+    "inputExpression": "a+b",
+    "targetExpression": "b+a",
+    "extensions": {}
+  },
+  "claims": [
+    {
+      "id": "claim-1",
+      "kind": "GENERATED_SUMMARY",
+      "outcome": "SUPPORTED",
+      "statement": "Missing ablation should fail promoted profile.",
+      "evidenceRefs": ["observation-1", "oracle-1"],
+      "extensions": {}
+    }
+  ],
+  "observations": [
+    {
+      "id": "observation-1",
+      "kind": "SEARCH_TRACE",
+      "outcome": "OBSERVED",
+      "extensions": {}
+    }
+  ],
+  "generalizedHypothesis": {
+    "statement": "Hypothesis.",
+    "family": "example",
+    "status": "SUPPORTED",
+    "extensions": {}
+  },
+  "revisions": [],
+  "assumptions": [],
+  "counterexamples": [],
+  "holdouts": [],
+  "oracleResults": [
+    {
+      "id": "oracle-1",
+      "kind": "EXTERNAL_VALIDATION",
+      "status": "AGREE",
+      "outcome": "CONFIRMED",
+      "extensions": {}
+    }
+  ],
+  "provenance": {
+    "traceSource": "REGELSUCHE_SEARCH",
+    "extensions": {}
+  },
+  "novelty": {
+    "status": "UNKNOWN",
+    "extensions": {}
+  },
+  "proof": {
+    "required": false,
+    "policy": "OPTIONAL",
+    "outcome": "NOT_REQUESTED",
+    "confirmations": [],
+    "extensions": {}
+  },
+  "promotion": {
+    "status": "PROMOTED",
+    "eligible": true,
+    "extensions": {}
+  },
+  "artifacts": [],
+  "extensions": {}
+}

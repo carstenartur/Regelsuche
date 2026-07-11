@@ -1,0 +1,139 @@
+{
+  "schemaId": "regelsuche.discovery-evidence/v1",
+  "profiles": ["observed", "validated", "promoted", "public"],
+  "canonicalEvidenceHash": "sha256:0123456789abcdef",
+  "canonicalEvidenceId": "regelsuche.discovery-evidence/v1#sha256:0123456789abcdef",
+  "producer": {
+    "producerId": "docs-example",
+    "producerVersion": "1",
+    "implementation": "example",
+    "sourceRef": "docs",
+    "schemaPath": "docs/schemas/regelsuche.discovery-evidence-v1.schema.json",
+    "extensions": {}
+  },
+  "subject": {
+    "id": "example-public",
+    "kind": "DISCOVERY_SCENARIO",
+    "title": "Public example",
+    "inputExpression": "x^2+6*x+5",
+    "targetExpression": "(x+1)*(x+5)",
+    "extensions": {}
+  },
+  "claims": [
+    {
+      "id": "claim-1",
+      "kind": "GENERATED_SUMMARY",
+      "outcome": "SUPPORTED",
+      "statement": "Generated evidence is ready for public publication.",
+      "evidenceRefs": ["observation-1", "oracle-1", "ablation-1"],
+      "extensions": {}
+    }
+  ],
+  "observations": [
+    {
+      "id": "observation-1",
+      "kind": "SEARCH_TRACE",
+      "outcome": "OBSERVED",
+      "pathCount": 2,
+      "nodeCount": 13,
+      "edgeCount": 32,
+      "bridgeRulesUsed": ["complete_square_bridge", "ast_square_difference_factor"],
+      "learnedMacros": ["macro-a"],
+      "reusedMacros": ["macro-a"],
+      "validationStatus": "PASS",
+      "sourceFields": ["nodes", "edges", "analytics", "artifacts"],
+      "extensions": {}
+    }
+  ],
+  "generalizedHypothesis": {
+    "statement": "Complete-square factorization generalizes to a public benchmark candidate.",
+    "family": "complete_square",
+    "rulePath": ["complete_square_bridge", "ast_square_difference_factor"],
+    "status": "SUPPORTED",
+    "extensions": {}
+  },
+  "revisions": [],
+  "assumptions": [],
+  "counterexamples": [],
+  "holdouts": [
+    {
+      "id": "without-macro",
+      "kind": "REPLAY_RUN",
+      "success": true,
+      "pathLength": 3,
+      "statesExplored": 4,
+      "extensions": {}
+    },
+    {
+      "id": "with-macro",
+      "kind": "REPLAY_RUN",
+      "success": true,
+      "pathLength": 1,
+      "statesExplored": 2,
+      "extensions": {}
+    }
+  ],
+  "oracleResults": [
+    {
+      "id": "oracle-1",
+      "kind": "EXTERNAL_VALIDATION",
+      "status": "UNAVAILABLE",
+      "outcome": "INCONCLUSIVE",
+      "evidence": "",
+      "extensions": {}
+    }
+  ],
+  "provenance": {
+    "traceSource": "REGELSUCHE_SEARCH",
+    "enabledOperators": ["complete_square_bridge"],
+    "extensions": {}
+  },
+  "novelty": {
+    "status": "DOCUMENTED_BENCHMARK",
+    "matchedEvidenceIds": [],
+    "rationale": "Public benchmark example.",
+    "extensions": {}
+  },
+  "ablation": {
+    "kind": "ABLATION_STUDY",
+    "status": "DEGRADED",
+    "outcome": "CONFIRMED",
+    "improvementRatio": 0.5,
+    "withCandidate": {
+      "success": true,
+      "pathLength": 1,
+      "statesExplored": 2
+    },
+    "withoutCandidate": {
+      "success": true,
+      "pathLength": 3,
+      "statesExplored": 4
+    },
+    "explanation": "Macro reuse reduces path length.",
+    "extensions": {}
+  },
+  "proof": {
+    "required": false,
+    "policy": "OPTIONAL",
+    "outcome": "NOT_REQUESTED",
+    "confirmations": [],
+    "extensions": {}
+  },
+  "promotion": {
+    "status": "PUBLIC",
+    "eligible": true,
+    "gateAccepted": true,
+    "gateId": "public-benchmark-evidence-gate",
+    "rejectionReasons": [],
+    "extensions": {}
+  },
+  "artifacts": [
+    {
+      "name": "summary",
+      "path": "summary.md",
+      "mediaType": "text/markdown",
+      "sha256": "sha256:abcdef"
+    }
+  ],
+  "extensions": {}
+}

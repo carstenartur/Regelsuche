@@ -21,7 +21,9 @@ class GalleryConsistencyTest {
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
     private static final Path REPO_ROOT = locateRepoRoot();
     private static final Pattern GENERATED_LINK = Pattern.compile("generated/discovery/([^)]*(?:evidence\\.json|search-space\\.svg))");
-    private static final Pattern README_EVIDENCE_ROW = Pattern.compile("\\|\\s*(Complete square|Sophie-Germain)\\s*\\|\\s*yes\\s*\\|\\s*yes\\s*\\|\\s*yes\\s*\\|\\s*\\[link]\\(([^)]+)\\)");
+    private static final Pattern README_EVIDENCE_ROW = Pattern.compile(
+        "\\|\\s*(Complete square|Sophie-Germain)\\s*\\|\\s*yes\\s*\\|\\s*yes\\s*\\|\\s*yes\\s*\\|\\s*\\[([^\\]]+)]\\(([^)]+)\\)");
+    private final DiscoveryEvidenceSchemaV1 schema = new DiscoveryEvidenceSchemaV1();
 
     @Test
     void galleryReferencesOnlySuccessfulGeneratedEvidence() throws IOException {
@@ -49,6 +51,9 @@ class GalleryConsistencyTest {
             JsonNode evidence = JSON.readTree(evidenceFile.toFile());
             assertTrue(evidence.path("success").asBoolean(), evidenceFile.toString());
             assertEquals(DocsDiscoveryGalleryGenerator.GENERATED_BY, evidence.path("generatedBy").asText());
+            assertEquals(DiscoveryEvidenceSchemaV1.SCHEMA_ID, evidence.path("schemaId").asText());
+            assertTrue(evidence.path("profiles").toString().contains("public"), evidenceFile.toString());
+            schema.assertValidDocument(evidence, evidenceFile.getParent());
             Path svg = evidenceFile.getParent().resolve("search-space.svg");
             assertTrue(svgFiles.contains(svg), "Gallery must link SVG next to " + evidenceFile);
             String svgContent = Files.readString(svg, StandardCharsets.UTF_8);
@@ -79,9 +84,12 @@ class GalleryConsistencyTest {
         int rows = 0;
         while (matcher.find()) {
             rows++;
-            Path evidencePath = REPO_ROOT.resolve(matcher.group(2)).normalize();
-            assertTrue(Files.exists(evidencePath), "README evidence link must exist: " + matcher.group(2));
+            String canonicalLinkText = matcher.group(2);
+            Path evidencePath = REPO_ROOT.resolve(matcher.group(3)).normalize();
+            assertTrue(canonicalLinkText.startsWith(DiscoveryEvidenceSchemaV1.SCHEMA_ID + "#sha256:"), canonicalLinkText);
+            assertTrue(Files.exists(evidencePath), "README evidence link must exist: " + matcher.group(3));
             JsonNode evidence = JSON.readTree(evidencePath.toFile());
+            assertEquals(canonicalLinkText, evidence.path("canonicalEvidenceId").asText(), matcher.group(1));
             assertTrue(evidence.path("success").asBoolean(), matcher.group(1));
             assertFalse(evidence.path("bridgeRulesUsed").isEmpty(), matcher.group(1));
             assertFalse(evidence.path("learnedMacros").isEmpty(), matcher.group(1));
