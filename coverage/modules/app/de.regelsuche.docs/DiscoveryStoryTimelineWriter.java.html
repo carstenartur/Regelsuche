@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryStoryTimelineWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryStoryTimelineWriter.java</span></div><h1>DiscoveryStoryTimelineWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import java.util.List;
+
+/**
+ * Generates HTML and Markdown discovery story timelines from a {@link ReferenceCampaignRunner.CampaignReport}.
+ *
+ * &lt;p&gt;The timeline follows the canonical 7-stage discovery lifecycle:&lt;/p&gt;
+ * &lt;ol&gt;
+ *   &lt;li&gt;&lt;b&gt;Observe&lt;/b&gt; – search traces and training observations&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Generalize&lt;/b&gt; – initial conjecture formation&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Challenge&lt;/b&gt; – counterexample search against the conjecture&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Refine&lt;/b&gt; – assumption-guarded refinement&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Validate&lt;/b&gt; – holdout validation on unseen examples&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Prove&lt;/b&gt; – external prover confirmation&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Learn&lt;/b&gt; – promotion and measured reuse improvement&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;Honesty invariants enforced by this class:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Observation ≠ proof: search success is labelled {@code SEARCH_FOUND_PATH}, not {@code PROVED}.&lt;/li&gt;
+ *   &lt;li&gt;No-counterexample-found ≠ proof: absence of counterexamples is surfaced verbatim.&lt;/li&gt;
+ *   &lt;li&gt;Script generation ≠ prover confirmation: SymPy availability is checked and surfaced.&lt;/li&gt;
+ *   &lt;li&gt;Training success ≠ holdout success: both pass-rates are shown separately.&lt;/li&gt;
+ *   &lt;li&gt;Live execution vs. replayed vs. pre-generated are labelled explicitly via {@code resultMode}.&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+<span class="fc" id="L28">public final class DiscoveryStoryTimelineWriter {</span>
+
+    /** Identifies how the displayed evidence was produced. */
+<span class="fc" id="L31">    public enum ResultMode {</span>
+        /** The evidence was produced by a live run of the discovery engine. */
+<span class="fc" id="L33">        LIVE,</span>
+        /** The evidence was replayed from a canonical evidence bundle. */
+<span class="fc" id="L35">        REPLAYED_FROM_CANONICAL,</span>
+        /** The evidence was pre-generated for a versioned reference release. */
+<span class="fc" id="L37">        PRE_GENERATED_REFERENCE</span>
+    }
+
+    /** Writes an HTML research digest. */
+    public String renderHtml(ReferenceCampaignRunner.CampaignReport report, ResultMode mode) {
+<span class="fc" id="L42">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L43">        sb.append(&quot;&lt;!DOCTYPE html&gt;\n&lt;html lang=\&quot;en\&quot;&gt;\n&lt;head&gt;\n&quot;);</span>
+<span class="fc" id="L44">        sb.append(&quot;&lt;meta charset=\&quot;UTF-8\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L45">        sb.append(&quot;&lt;meta name=\&quot;viewport\&quot; content=\&quot;width=device-width, initial-scale=1.0\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L46">        sb.append(&quot;&lt;title&gt;Discovery Story Timeline – &quot;).append(esc(report.id())).append(&quot;&lt;/title&gt;\n&quot;);</span>
+<span class="fc" id="L47">        sb.append(&quot;&lt;style&gt;\n&quot;);</span>
+<span class="fc" id="L48">        sb.append(&quot;body{font-family:sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem;}\n&quot;);</span>
+<span class="fc" id="L49">        sb.append(&quot;.mode-banner{padding:.5rem 1rem;border-radius:4px;font-weight:bold;margin-bottom:1rem;}\n&quot;);</span>
+<span class="fc" id="L50">        sb.append(&quot;.mode-live{background:#d4edda;color:#155724;}\n&quot;);</span>
+<span class="fc" id="L51">        sb.append(&quot;.mode-replayed{background:#d1ecf1;color:#0c5460;}\n&quot;);</span>
+<span class="fc" id="L52">        sb.append(&quot;.mode-pregenerated{background:#fff3cd;color:#856404;}\n&quot;);</span>
+<span class="fc" id="L53">        sb.append(&quot;.timeline{position:relative;padding-left:2rem;}\n&quot;);</span>
+<span class="fc" id="L54">        sb.append(&quot;.stage{position:relative;margin-bottom:2rem;padding:1rem 1rem 1rem 1.5rem;&quot;);</span>
+<span class="fc" id="L55">        sb.append(&quot;border-left:4px solid #adb5bd;border-radius:0 4px 4px 0;background:#f8f9fa;}\n&quot;);</span>
+<span class="fc" id="L56">        sb.append(&quot;.stage.done{border-left-color:#28a745;}\n&quot;);</span>
+<span class="fc" id="L57">        sb.append(&quot;.stage.inconclusive{border-left-color:#ffc107;}\n&quot;);</span>
+<span class="fc" id="L58">        sb.append(&quot;.stage.blocked{border-left-color:#dc3545;}\n&quot;);</span>
+<span class="fc" id="L59">        sb.append(&quot;.stage-title{font-size:1.1rem;font-weight:bold;margin-bottom:.5rem;}\n&quot;);</span>
+<span class="fc" id="L60">        sb.append(&quot;.stage-badge{display:inline-block;padding:.2rem .5rem;border-radius:3px;&quot;);</span>
+<span class="fc" id="L61">        sb.append(&quot;font-size:.8rem;margin-left:.5rem;}\n&quot;);</span>
+<span class="fc" id="L62">        sb.append(&quot;.badge-done{background:#28a745;color:#fff;}\n&quot;);</span>
+<span class="fc" id="L63">        sb.append(&quot;.badge-inconclusive{background:#ffc107;color:#212529;}\n&quot;);</span>
+<span class="fc" id="L64">        sb.append(&quot;.badge-blocked{background:#dc3545;color:#fff;}\n&quot;);</span>
+<span class="fc" id="L65">        sb.append(&quot;.badge-skipped{background:#6c757d;color:#fff;}\n&quot;);</span>
+<span class="fc" id="L66">        sb.append(&quot;.evidence-link{font-size:.85rem;margin-top:.5rem;}\n&quot;);</span>
+<span class="fc" id="L67">        sb.append(&quot;table{border-collapse:collapse;width:100%;margin:.5rem 0;font-size:.85rem;}\n&quot;);</span>
+<span class="fc" id="L68">        sb.append(&quot;th,td{border:1px solid #dee2e6;padding:.3rem .6rem;text-align:left;}\n&quot;);</span>
+<span class="fc" id="L69">        sb.append(&quot;th{background:#e9ecef;}\n&quot;);</span>
+<span class="fc" id="L70">        sb.append(&quot;.honesty-note{font-size:.8rem;color:#6c757d;font-style:italic;margin-top:.3rem;}\n&quot;);</span>
+<span class="fc" id="L71">        sb.append(&quot;&lt;/style&gt;\n&lt;/head&gt;\n&lt;body&gt;\n&quot;);</span>
+
+<span class="fc" id="L73">        sb.append(&quot;&lt;h1&gt;Discovery Story Timeline&lt;/h1&gt;\n&quot;);</span>
+<span class="fc" id="L74">        sb.append(&quot;&lt;p&gt;&lt;strong&gt;Campaign:&lt;/strong&gt; &lt;code&gt;&quot;).append(esc(report.id())).append(&quot;&lt;/code&gt;&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L75">        sb.append(renderModeBanner(mode));</span>
+
+<span class="fc" id="L77">        sb.append(&quot;&lt;div class=\&quot;timeline\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L78">        sb.append(renderObserveStage(report));</span>
+<span class="fc" id="L79">        sb.append(renderGeneralizeStage(report));</span>
+<span class="fc" id="L80">        sb.append(renderChallengeStage(report));</span>
+<span class="fc" id="L81">        sb.append(renderRefineStage(report));</span>
+<span class="fc" id="L82">        sb.append(renderValidateStage(report));</span>
+<span class="fc" id="L83">        sb.append(renderProveStage(report));</span>
+<span class="fc" id="L84">        sb.append(renderLearnStage(report));</span>
+<span class="fc" id="L85">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!report.blockers().isEmpty()) {</span>
+<span class="nc" id="L88">            sb.append(&quot;&lt;h2&gt;Blockers&lt;/h2&gt;\n&lt;ul&gt;\n&quot;);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            for (String b : report.blockers()) {</span>
+<span class="nc" id="L90">                sb.append(&quot;&lt;li&gt;&quot;).append(esc(b)).append(&quot;&lt;/li&gt;\n&quot;);</span>
+<span class="nc" id="L91">            }</span>
+<span class="nc" id="L92">            sb.append(&quot;&lt;/ul&gt;\n&quot;);</span>
+        }
+
+<span class="fc" id="L95">        sb.append(&quot;&lt;/body&gt;\n&lt;/html&gt;\n&quot;);</span>
+<span class="fc" id="L96">        return sb.toString();</span>
+    }
+
+    /** Writes a Markdown research digest. */
+    public String renderMarkdown(ReferenceCampaignRunner.CampaignReport report, ResultMode mode) {
+<span class="fc" id="L101">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L102">        out.append(&quot;# Discovery Story Timeline\n\n&quot;);</span>
+<span class="fc" id="L103">        out.append(&quot;**Campaign:** `&quot;).append(report.id()).append(&quot;`  \n&quot;);</span>
+<span class="fc" id="L104">        out.append(&quot;**Evidence mode:** &quot;).append(modeLabel(mode)).append(&quot;\n\n&quot;);</span>
+
+<span class="fc" id="L106">        out.append(&quot;---\n\n&quot;);</span>
+<span class="fc" id="L107">        out.append(&quot;## Stage 1 – Observe\n\n&quot;);</span>
+<span class="fc" id="L108">        appendObserveMd(out, report);</span>
+
+<span class="fc" id="L110">        out.append(&quot;## Stage 2 – Generalize\n\n&quot;);</span>
+<span class="fc" id="L111">        appendGeneralizeMd(out, report);</span>
+
+<span class="fc" id="L113">        out.append(&quot;## Stage 3 – Challenge\n\n&quot;);</span>
+<span class="fc" id="L114">        appendChallengeMd(out, report);</span>
+
+<span class="fc" id="L116">        out.append(&quot;## Stage 4 – Refine\n\n&quot;);</span>
+<span class="fc" id="L117">        appendRefineMd(out, report);</span>
+
+<span class="fc" id="L119">        out.append(&quot;## Stage 5 – Validate\n\n&quot;);</span>
+<span class="fc" id="L120">        appendValidateMd(out, report);</span>
+
+<span class="fc" id="L122">        out.append(&quot;## Stage 6 – Prove\n\n&quot;);</span>
+<span class="fc" id="L123">        appendProveMd(out, report);</span>
+
+<span class="fc" id="L125">        out.append(&quot;## Stage 7 – Learn\n\n&quot;);</span>
+<span class="fc" id="L126">        appendLearnMd(out, report);</span>
+
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (!report.blockers().isEmpty()) {</span>
+<span class="nc" id="L129">            out.append(&quot;## Blockers\n\n&quot;);</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            for (String b : report.blockers()) {</span>
+<span class="nc" id="L131">                out.append(&quot;- &quot;).append(b).append(&quot;\n&quot;);</span>
+<span class="nc" id="L132">            }</span>
+<span class="nc" id="L133">            out.append(&quot;\n&quot;);</span>
+        }
+
+<span class="fc" id="L136">        out.append(&quot;---\n&quot;);</span>
+<span class="fc" id="L137">        out.append(&quot;_Generated by `DiscoveryStoryTimelineWriter`. Evidence mode: &quot;)</span>
+<span class="fc" id="L138">            .append(modeLabel(mode)).append(&quot;._\n&quot;);</span>
+<span class="fc" id="L139">        return out.toString();</span>
+    }
+
+    // -----------------------------------------------------------------------
+    // HTML stage renderers
+    // -----------------------------------------------------------------------
+
+    private String renderModeBanner(ResultMode mode) {
+<span class="fc bfc" id="L147" title="All 3 branches covered.">        String cssClass = switch (mode) {</span>
+<span class="fc" id="L148">            case LIVE -&gt; &quot;mode-live&quot;;</span>
+<span class="fc" id="L149">            case REPLAYED_FROM_CANONICAL -&gt; &quot;mode-replayed&quot;;</span>
+<span class="fc" id="L150">            case PRE_GENERATED_REFERENCE -&gt; &quot;mode-pregenerated&quot;;</span>
+        };
+<span class="fc" id="L152">        return &quot;&lt;div class=\&quot;mode-banner &quot; + cssClass + &quot;\&quot;&gt;&quot; + esc(modeLabel(mode)) + &quot;&lt;/div&gt;\n&quot;;</span>
+    }
+
+    private String renderObserveStage(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L156">        List&lt;ReferenceCampaignRunner.TrainingResult&gt; training = report.training();</span>
+<span class="fc" id="L157">        long successCount = training.stream().filter(ReferenceCampaignRunner.TrainingResult::success).count();</span>
+<span class="pc bpc" id="L158" title="2 of 4 branches missed.">        boolean done = !training.isEmpty() &amp;&amp; successCount &gt; 0;</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        String status = done ? &quot;done&quot; : &quot;inconclusive&quot;;</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        String badge = done ? &quot;OBSERVED&quot; : &quot;INCONCLUSIVE&quot;;</span>
+
+<span class="fc" id="L162">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L163">        sb.append(stageOpen(&quot;1 – Observe&quot;, status, badge));</span>
+<span class="fc" id="L164">        sb.append(&quot;&lt;p&gt;Ran &lt;strong&gt;&quot;).append(training.size())</span>
+<span class="fc" id="L165">            .append(&quot;&lt;/strong&gt; training observations; &lt;strong&gt;&quot;).append(successCount)</span>
+<span class="fc" id="L166">            .append(&quot;&lt;/strong&gt; found a path.&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L167">        sb.append(&quot;&lt;p class=\&quot;honesty-note\&quot;&gt;⚠️ Search-found-path ≠ mathematical proof. &quot;)</span>
+<span class="fc" id="L168">            .append(&quot;Counterexamples may still exist.&lt;/p&gt;\n&quot;);</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (!training.isEmpty()) {</span>
+<span class="fc" id="L170">            sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;ID&lt;/th&gt;&lt;th&gt;Input&lt;/th&gt;&lt;th&gt;Target&lt;/th&gt;&lt;th&gt;Path found&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            for (ReferenceCampaignRunner.TrainingResult t : training) {</span>
+<span class="fc" id="L172">                sb.append(&quot;&lt;tr&gt;&lt;td&gt;&quot;).append(esc(t.id())).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L173">                    .append(&quot;&lt;td&gt;&lt;code&gt;&quot;).append(esc(t.inputExpression())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L174">                    .append(&quot;&lt;td&gt;&lt;code&gt;&quot;).append(esc(t.targetExpression())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                    .append(&quot;&lt;td&gt;&quot;).append(t.success() ? &quot;✓ SEARCH_FOUND_PATH&quot; : &quot;✗ NOT_FOUND&quot;).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L176">                    .append(&quot;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc" id="L177">            }</span>
+<span class="fc" id="L178">            sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+        }
+<span class="fc" id="L180">        sb.append(stageClose());</span>
+<span class="fc" id="L181">        return sb.toString();</span>
+    }
+
+    private String renderGeneralizeStage(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L185">        ReferenceCampaignRunner.HypothesisEvolution evo = report.hypothesisEvolution();</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        boolean done = evo != null;</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        String status = done ? &quot;done&quot; : &quot;blocked&quot;;</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        String badge = done ? &quot;GENERALIZED&quot; : &quot;BLOCKED&quot;;</span>
+
+<span class="fc" id="L190">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L191">        sb.append(stageOpen(&quot;2 – Generalize&quot;, status, badge));</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (evo != null) {</span>
+<span class="fc" id="L193">            sb.append(&quot;&lt;p&gt;Initial conjecture (intentionally overgeneralised — no positivity assumptions):&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L194">            sb.append(&quot;&lt;p&gt;&lt;code&gt;&quot;).append(esc(evo.initialLeftPattern()))</span>
+<span class="fc" id="L195">                .append(&quot; = &quot;).append(esc(evo.initialRightPattern())).append(&quot;&lt;/code&gt;&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L196">            sb.append(&quot;&lt;p class=\&quot;honesty-note\&quot;&gt;⚠️ This conjecture is deliberately overgeneralised. &quot;)</span>
+<span class="fc" id="L197">                .append(&quot;It will be challenged in the next stage.&lt;/p&gt;\n&quot;);</span>
+        } else {
+<span class="nc" id="L199">            sb.append(&quot;&lt;p&gt;No hypothesis formed.&lt;/p&gt;\n&quot;);</span>
+        }
+<span class="fc" id="L201">        sb.append(stageClose());</span>
+<span class="fc" id="L202">        return sb.toString();</span>
+    }
+
+    private String renderChallengeStage(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L206">        ReferenceCampaignRunner.HypothesisEvolution evo = report.hypothesisEvolution();</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        boolean hasCex = evo != null</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            &amp;&amp; evo.counterexampleReport() != null</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            &amp;&amp; !evo.counterexampleReport().counterexamples().isEmpty();</span>
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        String status = hasCex ? &quot;done&quot; : (evo != null ? &quot;inconclusive&quot; : &quot;blocked&quot;);</span>
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">        String badge = hasCex ? &quot;CHALLENGED&quot; : (evo != null ? &quot;NO_CEX_FOUND&quot; : &quot;BLOCKED&quot;);</span>
+
+<span class="fc" id="L213">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L214">        sb.append(stageOpen(&quot;3 – Challenge&quot;, status, badge));</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (evo != null &amp;&amp; evo.counterexampleReport() != null) {</span>
+<span class="fc" id="L216">            ReferenceCampaignRunner.CounterexampleReport cex = evo.counterexampleReport();</span>
+<span class="fc" id="L217">            sb.append(&quot;&lt;p class=\&quot;honesty-note\&quot;&gt;⚠️ No-counterexample-found ≠ proof. &quot;)</span>
+<span class="fc" id="L218">                .append(&quot;Absence of counterexamples only triggers refinement, not confirmation.&lt;/p&gt;\n&quot;);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            if (hasCex) {</span>
+<span class="nc" id="L220">                sb.append(&quot;&lt;p&gt;Found &lt;strong&gt;&quot;).append(cex.counterexamples().size())</span>
+<span class="nc" id="L221">                    .append(&quot;&lt;/strong&gt; counterexample(s) that triggered refinement:&lt;/p&gt;\n&quot;);</span>
+<span class="nc" id="L222">                sb.append(&quot;&lt;ul&gt;\n&quot;);</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                for (ReferenceCampaignRunner.CounterexampleEntry entry : cex.counterexamples()) {</span>
+<span class="nc" id="L224">                    sb.append(&quot;&lt;li&gt;Revision &lt;code&gt;&quot;).append(esc(entry.revisionId()))</span>
+<span class="nc" id="L225">                        .append(&quot;&lt;/code&gt;: assignments = &lt;code&gt;&quot;).append(esc(String.join(&quot;, &quot;, entry.assignments())))</span>
+<span class="nc" id="L226">                        .append(&quot;&lt;/code&gt;, strategy = &lt;code&gt;&quot;).append(esc(entry.strategyName()))</span>
+<span class="nc" id="L227">                        .append(&quot;&lt;/code&gt;&lt;/li&gt;\n&quot;);</span>
+<span class="nc" id="L228">                }</span>
+<span class="nc" id="L229">                sb.append(&quot;&lt;/ul&gt;\n&quot;);</span>
+            } else {
+<span class="fc" id="L231">                sb.append(&quot;&lt;p&gt;No counterexamples found (the initial conjecture was not falsified by search).&lt;/p&gt;\n&quot;);</span>
+            }
+<span class="fc" id="L233">        } else {</span>
+<span class="nc" id="L234">            sb.append(&quot;&lt;p&gt;Challenge stage not reached.&lt;/p&gt;\n&quot;);</span>
+        }
+<span class="fc" id="L236">        sb.append(stageClose());</span>
+<span class="fc" id="L237">        return sb.toString();</span>
+    }
+
+    private String renderRefineStage(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L241">        ReferenceCampaignRunner.HypothesisEvolution evo = report.hypothesisEvolution();</span>
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">        boolean hasRevisions = evo != null &amp;&amp; !evo.revisionHistory().isEmpty();</span>
+<span class="pc bpc" id="L243" title="4 of 6 branches missed.">        String status = (evo != null &amp;&amp; evo.isAccepted()) ? &quot;done&quot; : (hasRevisions ? &quot;inconclusive&quot; : &quot;blocked&quot;);</span>
+<span class="pc bpc" id="L244" title="4 of 6 branches missed.">        String badge = (evo != null &amp;&amp; evo.isAccepted()) ? &quot;REFINED&quot; : (hasRevisions ? &quot;IN_PROGRESS&quot; : &quot;BLOCKED&quot;);</span>
+
+<span class="fc" id="L246">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L247">        sb.append(stageOpen(&quot;4 – Refine&quot;, status, badge));</span>
+<span class="pc bpc" id="L248" title="2 of 4 branches missed.">        if (evo != null &amp;&amp; hasRevisions) {</span>
+<span class="fc" id="L249">            sb.append(&quot;&lt;p&gt;Ran &lt;strong&gt;&quot;).append(evo.revisionHistory().size())</span>
+<span class="fc" id="L250">                .append(&quot;&lt;/strong&gt; revision(s):&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L251">            sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Revision&lt;/th&gt;&lt;th&gt;Left&lt;/th&gt;&lt;th&gt;Right&lt;/th&gt;&lt;th&gt;Assumptions&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            for (ReferenceCampaignRunner.RevisionSummary rev : evo.revisionHistory()) {</span>
+<span class="fc" id="L253">                sb.append(&quot;&lt;tr&gt;&lt;td&gt;r&quot;).append(rev.revisionIndex()).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L254">                    .append(&quot;&lt;td&gt;&lt;code&gt;&quot;).append(esc(rev.leftPattern())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L255">                    .append(&quot;&lt;td&gt;&lt;code&gt;&quot;).append(esc(rev.rightPattern())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L256">                    .append(&quot;&lt;td&gt;&quot;).append(esc(String.join(&quot;, &quot;, rev.assumptions()))).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L257">                    .append(&quot;&lt;td&gt;&quot;).append(esc(rev.status())).append(&quot;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc" id="L258">            }</span>
+<span class="fc" id="L259">            sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (evo.acceptedRevision() != null) {</span>
+<span class="fc" id="L261">                ReferenceCampaignRunner.RevisionSummary accepted = evo.acceptedRevision();</span>
+<span class="fc" id="L262">                sb.append(&quot;&lt;p&gt;&lt;strong&gt;Accepted revision:&lt;/strong&gt; &lt;code&gt;&quot;)</span>
+<span class="fc" id="L263">                    .append(esc(accepted.leftPattern())).append(&quot; = &quot;)</span>
+<span class="fc" id="L264">                    .append(esc(accepted.rightPattern())).append(&quot;&lt;/code&gt;&quot;)</span>
+<span class="fc" id="L265">                    .append(&quot; with assumptions: &lt;code&gt;&quot;)</span>
+<span class="fc" id="L266">                    .append(esc(String.join(&quot;, &quot;, accepted.assumptions()))).append(&quot;&lt;/code&gt;&lt;/p&gt;\n&quot;);</span>
+            }
+<span class="fc" id="L268">            sb.append(&quot;&lt;p&gt;Rejected/inconclusive revisions remain inspectable in the table above.&lt;/p&gt;\n&quot;);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        } else if (evo != null) {</span>
+<span class="nc" id="L270">            sb.append(&quot;&lt;p&gt;No refinement revisions recorded.&lt;/p&gt;\n&quot;);</span>
+        } else {
+<span class="nc" id="L272">            sb.append(&quot;&lt;p&gt;Refinement stage not reached.&lt;/p&gt;\n&quot;);</span>
+        }
+<span class="fc" id="L274">        sb.append(stageClose());</span>
+<span class="fc" id="L275">        return sb.toString();</span>
+    }
+
+    private String renderValidateStage(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L279">        ReferenceCampaignRunner.HoldoutReport hr = report.holdoutReport();</span>
+<span class="pc bpc" id="L280" title="2 of 4 branches missed.">        boolean done = hr != null &amp;&amp; hr.overallPass();</span>
+<span class="pc bpc" id="L281" title="3 of 4 branches missed.">        String status = done ? &quot;done&quot; : (hr != null ? &quot;inconclusive&quot; : &quot;blocked&quot;);</span>
+<span class="pc bpc" id="L282" title="3 of 4 branches missed.">        String badge = done ? &quot;VALIDATED&quot; : (hr != null ? &quot;PARTIAL&quot; : &quot;BLOCKED&quot;);</span>
+
+<span class="fc" id="L284">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L285">        sb.append(stageOpen(&quot;5 – Validate&quot;, status, badge));</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (hr != null) {</span>
+<span class="fc" id="L287">            sb.append(&quot;&lt;p class=\&quot;honesty-note\&quot;&gt;⚠️ Holdout success ≠ mathematical proof. &quot;)</span>
+<span class="fc" id="L288">                .append(&quot;Holdouts cover unseen examples but cannot exhaust all cases.&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L289">            sb.append(&quot;&lt;p&gt;Positive holdouts: &lt;strong&gt;&quot;).append(hr.positivePassCount())</span>
+<span class="fc" id="L290">                .append(&quot; / &quot;).append(hr.positiveCount()).append(&quot;&lt;/strong&gt; passed.  &quot;);</span>
+<span class="fc" id="L291">            sb.append(&quot;Negative holdouts: &lt;strong&gt;&quot;).append(hr.negativeBlockedCount())</span>
+<span class="fc" id="L292">                .append(&quot; / &quot;).append(hr.negativeCount()).append(&quot;&lt;/strong&gt; correctly blocked.&lt;/p&gt;\n&quot;);</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            sb.append(&quot;&lt;p&gt;Overall: &lt;strong&gt;&quot;).append(done ? &quot;PASS ✓&quot; : &quot;FAIL ✗&quot;).append(&quot;&lt;/strong&gt;&lt;/p&gt;\n&quot;);</span>
+        } else {
+<span class="nc" id="L295">            sb.append(&quot;&lt;p&gt;Holdout validation not reached.&lt;/p&gt;\n&quot;);</span>
+        }
+<span class="fc" id="L297">        sb.append(stageClose());</span>
+<span class="fc" id="L298">        return sb.toString();</span>
+    }
+
+    private String renderProveStage(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L302">        de.regelsuche.sympyqa.SymPyQaHarness.QaSummary proof = report.proofSummary();</span>
+<span class="pc bpc" id="L303" title="2 of 4 branches missed.">        boolean sympyUsed = proof != null &amp;&amp; proof.sympyAvailableCases() &gt; 0;</span>
+<span class="pc bpc" id="L304" title="3 of 4 branches missed.">        boolean done = sympyUsed &amp;&amp; proof.disagreements() == 0;</span>
+<span class="pc bpc" id="L305" title="2 of 4 branches missed.">        String status = done ? &quot;done&quot; : (proof != null ? &quot;inconclusive&quot; : &quot;blocked&quot;);</span>
+<span class="pc bpc" id="L306" title="3 of 6 branches missed.">        String badge = done ? &quot;EXTERNALLY_CONFIRMED&quot; : (sympyUsed ? &quot;DISAGREEMENTS_PRESENT&quot; : (proof != null ? &quot;SYMPY_UNAVAILABLE&quot; : &quot;BLOCKED&quot;));</span>
+
+<span class="fc" id="L308">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L309">        sb.append(stageOpen(&quot;6 – Prove&quot;, status, badge));</span>
+<span class="fc" id="L310">        sb.append(&quot;&lt;p class=\&quot;honesty-note\&quot;&gt;⚠️ Script-generation ≠ prover confirmation. &quot;)</span>
+<span class="fc" id="L311">            .append(&quot;Prover availability is checked at runtime. Missing SymPy means this stage is skipped.&lt;/p&gt;\n&quot;);</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (proof != null) {</span>
+<span class="fc" id="L313">            sb.append(&quot;&lt;p&gt;SymPy QA harness: total=&lt;strong&gt;&quot;).append(proof.totalCases())</span>
+<span class="fc" id="L314">                .append(&quot;&lt;/strong&gt;, sympy-cases=&lt;strong&gt;&quot;).append(proof.sympyAvailableCases())</span>
+<span class="fc" id="L315">                .append(&quot;&lt;/strong&gt;, disagreements=&lt;strong&gt;&quot;).append(proof.disagreements())</span>
+<span class="fc" id="L316">                .append(&quot;&lt;/strong&gt;, path-found=&lt;strong&gt;&quot;).append(proof.regelsuchePathFound())</span>
+<span class="fc" id="L317">                .append(&quot;&lt;/strong&gt;.&lt;/p&gt;\n&quot;);</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            if (!sympyUsed) {</span>
+<span class="fc" id="L319">                sb.append(&quot;&lt;p&gt;&lt;em&gt;SymPy not available in this environment – external confirmation skipped.&lt;/em&gt;&lt;/p&gt;\n&quot;);</span>
+            }
+        } else {
+<span class="nc" id="L322">            sb.append(&quot;&lt;p&gt;Proof stage not reached.&lt;/p&gt;\n&quot;);</span>
+        }
+<span class="fc" id="L324">        sb.append(stageClose());</span>
+<span class="fc" id="L325">        return sb.toString();</span>
+    }
+
+    private String renderLearnStage(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L329">        ReferenceCampaignRunner.ReuseAblation abl = report.reuseAblation();</span>
+<span class="pc bpc" id="L330" title="2 of 4 branches missed.">        boolean done = abl != null &amp;&amp; abl.measuredImprovement();</span>
+<span class="pc bpc" id="L331" title="3 of 4 branches missed.">        String status = done ? &quot;done&quot; : (abl != null ? &quot;inconclusive&quot; : &quot;blocked&quot;);</span>
+<span class="pc bpc" id="L332" title="3 of 4 branches missed.">        String badge = done ? &quot;LEARNED&quot; : (abl != null ? &quot;NO_IMPROVEMENT&quot; : &quot;BLOCKED&quot;);</span>
+
+<span class="fc" id="L334">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L335">        sb.append(stageOpen(&quot;7 – Learn&quot;, status, badge));</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        if (report.promotionRecord() != null) {</span>
+<span class="fc" id="L337">            sb.append(&quot;&lt;p&gt;Promoted candidate: &lt;code&gt;&quot;)</span>
+<span class="fc" id="L338">                .append(esc(report.promotionRecord().candidateId())).append(&quot;&lt;/code&gt;  \n&quot;);</span>
+<span class="fc" id="L339">            sb.append(&quot;Stage: &lt;code&gt;&quot;).append(esc(report.promotionRecord().stage().name()))</span>
+<span class="fc" id="L340">                .append(&quot;&lt;/code&gt;  Oracle: &lt;code&gt;&quot;).append(esc(report.promotionRecord().oracleStatus()))</span>
+<span class="fc" id="L341">                .append(&quot;&lt;/code&gt;&lt;/p&gt;\n&quot;);</span>
+        } else {
+<span class="nc" id="L343">            sb.append(&quot;&lt;p&gt;No candidate promoted in this run.&lt;/p&gt;\n&quot;);</span>
+        }
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        if (abl != null) {</span>
+<span class="fc" id="L346">            sb.append(&quot;&lt;p&gt;Reuse ablation: improved &lt;strong&gt;&quot;).append(abl.improvedCount())</span>
+<span class="fc" id="L347">                .append(&quot; / &quot;).append(abl.totalCount()).append(&quot;&lt;/strong&gt; cases.  &quot;)</span>
+<span class="fc" id="L348">                .append(&quot;Measured improvement: &lt;strong&gt;&quot;)</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">                .append(abl.measuredImprovement() ? &quot;YES ✓&quot; : &quot;NO ✗&quot;).append(&quot;&lt;/strong&gt;&lt;/p&gt;\n&quot;);</span>
+        }
+<span class="fc" id="L351">        sb.append(stageClose());</span>
+<span class="fc" id="L352">        return sb.toString();</span>
+    }
+
+    // -----------------------------------------------------------------------
+    // Markdown stage renderers
+    // -----------------------------------------------------------------------
+
+    private void appendObserveMd(StringBuilder out, ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L360">        List&lt;ReferenceCampaignRunner.TrainingResult&gt; training = report.training();</span>
+<span class="fc" id="L361">        long successCount = training.stream().filter(ReferenceCampaignRunner.TrainingResult::success).count();</span>
+<span class="fc" id="L362">        out.append(&quot;_⚠️ Search-found-path ≠ mathematical proof._\n\n&quot;);</span>
+<span class="fc" id="L363">        out.append(&quot;Ran **&quot;).append(training.size()).append(&quot;** training observations; **&quot;)</span>
+<span class="fc" id="L364">            .append(successCount).append(&quot;** found a path (SEARCH_FOUND_PATH).\n\n&quot;);</span>
+<span class="fc" id="L365">        out.append(&quot;| ID | Input | Target | Path found |\n&quot;);</span>
+<span class="fc" id="L366">        out.append(&quot;| --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        for (ReferenceCampaignRunner.TrainingResult t : training) {</span>
+<span class="fc" id="L368">            out.append(&quot;| &quot;).append(mdEsc(t.id()))</span>
+<span class="fc" id="L369">                .append(&quot; | `&quot;).append(mdEsc(t.inputExpression())).append(&quot;`&quot;)</span>
+<span class="fc" id="L370">                .append(&quot; | `&quot;).append(mdEsc(t.targetExpression())).append(&quot;`&quot;)</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(t.success() ? &quot;✓&quot; : &quot;✗&quot;)</span>
+<span class="fc" id="L372">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L373">        }</span>
+<span class="fc" id="L374">        out.append(&quot;\n&quot;);</span>
+<span class="fc" id="L375">    }</span>
+
+    private void appendGeneralizeMd(StringBuilder out, ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L378">        ReferenceCampaignRunner.HypothesisEvolution evo = report.hypothesisEvolution();</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (evo != null) {</span>
+<span class="fc" id="L380">            out.append(&quot;Initial conjecture (intentionally overgeneralised — no positivity assumptions):\n\n&quot;);</span>
+<span class="fc" id="L381">            out.append(&quot;&gt; `&quot;).append(evo.initialLeftPattern()).append(&quot; = &quot;)</span>
+<span class="fc" id="L382">                .append(evo.initialRightPattern()).append(&quot;`\n\n&quot;);</span>
+        } else {
+<span class="nc" id="L384">            out.append(&quot;No hypothesis formed.\n\n&quot;);</span>
+        }
+<span class="fc" id="L386">    }</span>
+
+    private void appendChallengeMd(StringBuilder out, ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L389">        ReferenceCampaignRunner.HypothesisEvolution evo = report.hypothesisEvolution();</span>
+<span class="fc" id="L390">        out.append(&quot;_⚠️ No-counterexample-found ≠ proof._\n\n&quot;);</span>
+<span class="pc bpc" id="L391" title="2 of 4 branches missed.">        if (evo != null &amp;&amp; evo.counterexampleReport() != null) {</span>
+<span class="fc" id="L392">            ReferenceCampaignRunner.CounterexampleReport cex = evo.counterexampleReport();</span>
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">            if (!cex.counterexamples().isEmpty()) {</span>
+<span class="nc" id="L394">                out.append(&quot;Found **&quot;).append(cex.counterexamples().size())</span>
+<span class="nc" id="L395">                    .append(&quot;** counterexample(s):\n\n&quot;);</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">                for (ReferenceCampaignRunner.CounterexampleEntry entry : cex.counterexamples()) {</span>
+<span class="nc" id="L397">                    out.append(&quot;- Revision `&quot;).append(entry.revisionId())</span>
+<span class="nc" id="L398">                        .append(&quot;`: `&quot;).append(String.join(&quot;, &quot;, entry.assignments()))</span>
+<span class="nc" id="L399">                        .append(&quot;`, strategy `&quot;).append(entry.strategyName()).append(&quot;`\n&quot;);</span>
+<span class="nc" id="L400">                }</span>
+<span class="nc" id="L401">                out.append(&quot;\n&quot;);</span>
+            } else {
+<span class="fc" id="L403">                out.append(&quot;No counterexamples found.\n\n&quot;);</span>
+            }
+<span class="fc" id="L405">        } else {</span>
+<span class="nc" id="L406">            out.append(&quot;Challenge stage not reached.\n\n&quot;);</span>
+        }
+<span class="fc" id="L408">    }</span>
+
+    private void appendRefineMd(StringBuilder out, ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L411">        ReferenceCampaignRunner.HypothesisEvolution evo = report.hypothesisEvolution();</span>
+<span class="pc bpc" id="L412" title="2 of 4 branches missed.">        if (evo != null &amp;&amp; !evo.revisionHistory().isEmpty()) {</span>
+<span class="fc" id="L413">            out.append(&quot;Ran **&quot;).append(evo.revisionHistory().size()).append(&quot;** revision(s):\n\n&quot;);</span>
+<span class="fc" id="L414">            out.append(&quot;| Revision | Left | Right | Assumptions | Status |\n&quot;);</span>
+<span class="fc" id="L415">            out.append(&quot;| --- | --- | --- | --- | --- |\n&quot;);</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            for (ReferenceCampaignRunner.RevisionSummary rev : evo.revisionHistory()) {</span>
+<span class="fc" id="L417">                out.append(&quot;| r&quot;).append(rev.revisionIndex())</span>
+<span class="fc" id="L418">                    .append(&quot; | `&quot;).append(mdEsc(rev.leftPattern())).append(&quot;`&quot;)</span>
+<span class="fc" id="L419">                    .append(&quot; | `&quot;).append(mdEsc(rev.rightPattern())).append(&quot;`&quot;)</span>
+<span class="fc" id="L420">                    .append(&quot; | &quot;).append(mdEsc(String.join(&quot;, &quot;, rev.assumptions())))</span>
+<span class="fc" id="L421">                    .append(&quot; | &quot;).append(rev.status())</span>
+<span class="fc" id="L422">                    .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L423">            }</span>
+<span class="fc" id="L424">            out.append(&quot;\n&quot;);</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">            if (evo.acceptedRevision() != null) {</span>
+<span class="fc" id="L426">                ReferenceCampaignRunner.RevisionSummary accepted = evo.acceptedRevision();</span>
+<span class="fc" id="L427">                out.append(&quot;**Accepted:** `&quot;).append(accepted.leftPattern()).append(&quot; = &quot;)</span>
+<span class="fc" id="L428">                    .append(accepted.rightPattern()).append(&quot;` with `&quot;)</span>
+<span class="fc" id="L429">                    .append(String.join(&quot;, &quot;, accepted.assumptions())).append(&quot;`\n\n&quot;);</span>
+<span class="fc" id="L430">            }</span>
+        } else {
+<span class="nc" id="L432">            out.append(&quot;No refinement revisions.\n\n&quot;);</span>
+        }
+<span class="fc" id="L434">    }</span>
+
+    private void appendValidateMd(StringBuilder out, ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L437">        ReferenceCampaignRunner.HoldoutReport hr = report.holdoutReport();</span>
+<span class="fc" id="L438">        out.append(&quot;_⚠️ Holdout success ≠ mathematical proof._\n\n&quot;);</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">        if (hr != null) {</span>
+<span class="fc" id="L440">            out.append(&quot;- Positive holdouts: **&quot;).append(hr.positivePassCount())</span>
+<span class="fc" id="L441">                .append(&quot; / &quot;).append(hr.positiveCount()).append(&quot;** passed\n&quot;);</span>
+<span class="fc" id="L442">            out.append(&quot;- Negative holdouts: **&quot;).append(hr.negativeBlockedCount())</span>
+<span class="fc" id="L443">                .append(&quot; / &quot;).append(hr.negativeCount()).append(&quot;** blocked\n&quot;);</span>
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">            out.append(&quot;- Overall: **&quot;).append(hr.overallPass() ? &quot;PASS ✓&quot; : &quot;FAIL ✗&quot;).append(&quot;**\n\n&quot;);</span>
+        } else {
+<span class="nc" id="L446">            out.append(&quot;Holdout validation not reached.\n\n&quot;);</span>
+        }
+<span class="fc" id="L448">    }</span>
+
+    private void appendProveMd(StringBuilder out, ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L451">        de.regelsuche.sympyqa.SymPyQaHarness.QaSummary proof = report.proofSummary();</span>
+<span class="fc" id="L452">        out.append(&quot;_⚠️ Script-generation ≠ prover confirmation. SymPy availability checked at runtime._\n\n&quot;);</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        if (proof != null) {</span>
+<span class="fc" id="L454">            out.append(&quot;SymPy QA harness: total=**&quot;).append(proof.totalCases())</span>
+<span class="fc" id="L455">                .append(&quot;**, sympy-cases=**&quot;).append(proof.sympyAvailableCases())</span>
+<span class="fc" id="L456">                .append(&quot;**, disagreements=**&quot;).append(proof.disagreements())</span>
+<span class="fc" id="L457">                .append(&quot;**, path-found=**&quot;).append(proof.regelsuchePathFound()).append(&quot;**\n\n&quot;);</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">            if (proof.sympyAvailableCases() == 0) {</span>
+<span class="fc" id="L459">                out.append(&quot;_SymPy not available – external confirmation skipped._\n\n&quot;);</span>
+            }
+        } else {
+<span class="nc" id="L462">            out.append(&quot;Proof stage not reached.\n\n&quot;);</span>
+        }
+<span class="fc" id="L464">    }</span>
+
+    private void appendLearnMd(StringBuilder out, ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L467">        ReferenceCampaignRunner.ReuseAblation abl = report.reuseAblation();</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (report.promotionRecord() != null) {</span>
+<span class="fc" id="L469">            out.append(&quot;Promoted: `&quot;).append(report.promotionRecord().candidateId())</span>
+<span class="fc" id="L470">                .append(&quot;` (stage: `&quot;).append(report.promotionRecord().stage().name())</span>
+<span class="fc" id="L471">                .append(&quot;`, oracle: `&quot;).append(report.promotionRecord().oracleStatus()).append(&quot;`)\n\n&quot;);</span>
+        } else {
+<span class="nc" id="L473">            out.append(&quot;No candidate promoted.\n\n&quot;);</span>
+        }
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">        if (abl != null) {</span>
+<span class="fc" id="L476">            out.append(&quot;Reuse ablation: improved **&quot;).append(abl.improvedCount())</span>
+<span class="fc" id="L477">                .append(&quot; / &quot;).append(abl.totalCount()).append(&quot;** cases. &quot;)</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">                .append(&quot;Measured improvement: **&quot;).append(abl.measuredImprovement() ? &quot;YES ✓&quot; : &quot;NO ✗&quot;)</span>
+<span class="fc" id="L479">                .append(&quot;**\n\n&quot;);</span>
+        }
+<span class="fc" id="L481">    }</span>
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private String stageOpen(String title, String statusCss, String badge) {
+<span class="pc bpc" id="L488" title="2 of 4 branches missed.">        String badgeCss = switch (statusCss) {</span>
+<span class="fc" id="L489">            case &quot;done&quot; -&gt; &quot;badge-done&quot;;</span>
+<span class="fc" id="L490">            case &quot;inconclusive&quot; -&gt; &quot;badge-inconclusive&quot;;</span>
+<span class="nc" id="L491">            case &quot;blocked&quot; -&gt; &quot;badge-blocked&quot;;</span>
+<span class="pc" id="L492">            default -&gt; &quot;badge-skipped&quot;;</span>
+        };
+<span class="fc" id="L494">        return &quot;&lt;div class=\&quot;stage &quot; + statusCss + &quot;\&quot;&gt;\n&quot;</span>
+<span class="fc" id="L495">            + &quot;&lt;div class=\&quot;stage-title\&quot;&gt;Stage &quot; + esc(title)</span>
+<span class="fc" id="L496">            + &quot;&lt;span class=\&quot;stage-badge &quot; + badgeCss + &quot;\&quot;&gt;&quot; + esc(badge) + &quot;&lt;/span&gt;&lt;/div&gt;\n&quot;;</span>
+    }
+
+    private String stageClose() {
+<span class="fc" id="L500">        return &quot;&lt;/div&gt;\n&quot;;</span>
+    }
+
+    private String modeLabel(ResultMode mode) {
+<span class="fc bfc" id="L504" title="All 3 branches covered.">        return switch (mode) {</span>
+<span class="fc" id="L505">            case LIVE -&gt; &quot;LIVE EXECUTION&quot;;</span>
+<span class="fc" id="L506">            case REPLAYED_FROM_CANONICAL -&gt; &quot;REPLAYED FROM CANONICAL EVIDENCE&quot;;</span>
+<span class="fc" id="L507">            case PRE_GENERATED_REFERENCE -&gt; &quot;PRE-GENERATED REFERENCE EVIDENCE&quot;;</span>
+        };
+    }
+
+    private static String esc(String s) {
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L513">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L515">        return s.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
+<span class="fc" id="L516">            .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="fc" id="L517">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
+<span class="fc" id="L518">            .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+    }
+
+    private static String mdEsc(String s) {
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L523">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L525">        return s.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

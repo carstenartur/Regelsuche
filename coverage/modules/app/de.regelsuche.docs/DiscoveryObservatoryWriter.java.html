@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryObservatoryWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryObservatoryWriter.java</span></div><h1>DiscoveryObservatoryWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Generates run-level discovery observatory views as HTML.
+ *
+ * &lt;p&gt;The observatory aggregates cross-run views covering:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;Active families and their lifecycle status&lt;/li&gt;
+ *   &lt;li&gt;Candidate pool with promotion stage&lt;/li&gt;
+ *   &lt;li&gt;Counterexamples and rejected hypotheses&lt;/li&gt;
+ *   &lt;li&gt;Proof status per candidate&lt;/li&gt;
+ *   &lt;li&gt;Novelty status&lt;/li&gt;
+ *   &lt;li&gt;Ablation results&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;All displayed statements link to canonical evidence rather than inferring
+ * status in the frontend. Status is never upgraded by the observatory; it is
+ * always derived directly from the underlying {@link ReferenceCampaignRunner.CampaignReport}.&lt;/p&gt;
+ */
+<span class="fc" id="L24">public final class DiscoveryObservatoryWriter {</span>
+
+    /**
+     * Renders an HTML observatory page for the given campaign report.
+     *
+     * @param report    the campaign report to visualise
+     * @param resultMode label identifying the provenance of the evidence
+     * @return the rendered HTML string
+     */
+    public String renderHtml(
+            ReferenceCampaignRunner.CampaignReport report,
+            DiscoveryStoryTimelineWriter.ResultMode resultMode) {
+<span class="fc" id="L36">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L37">        sb.append(&quot;&lt;!DOCTYPE html&gt;\n&lt;html lang=\&quot;en\&quot;&gt;\n&lt;head&gt;\n&quot;);</span>
+<span class="fc" id="L38">        sb.append(&quot;&lt;meta charset=\&quot;UTF-8\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L39">        sb.append(&quot;&lt;meta name=\&quot;viewport\&quot; content=\&quot;width=device-width, initial-scale=1.0\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L40">        sb.append(&quot;&lt;title&gt;Discovery Observatory – &quot;).append(esc(report.id())).append(&quot;&lt;/title&gt;\n&quot;);</span>
+<span class="fc" id="L41">        sb.append(&quot;&lt;style&gt;\n&quot;);</span>
+<span class="fc" id="L42">        sb.append(&quot;body{font-family:sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem;}\n&quot;);</span>
+<span class="fc" id="L43">        sb.append(&quot;.mode-banner{padding:.5rem 1rem;border-radius:4px;font-weight:bold;margin-bottom:1rem;}\n&quot;);</span>
+<span class="fc" id="L44">        sb.append(&quot;.mode-live{background:#d4edda;color:#155724;}\n&quot;);</span>
+<span class="fc" id="L45">        sb.append(&quot;.mode-replayed{background:#d1ecf1;color:#0c5460;}\n&quot;);</span>
+<span class="fc" id="L46">        sb.append(&quot;.mode-pregenerated{background:#fff3cd;color:#856404;}\n&quot;);</span>
+<span class="fc" id="L47">        sb.append(&quot;table{border-collapse:collapse;width:100%;margin:.5rem 0;font-size:.85rem;}\n&quot;);</span>
+<span class="fc" id="L48">        sb.append(&quot;th,td{border:1px solid #dee2e6;padding:.3rem .6rem;text-align:left;}\n&quot;);</span>
+<span class="fc" id="L49">        sb.append(&quot;th{background:#e9ecef;}\n&quot;);</span>
+<span class="fc" id="L50">        sb.append(&quot;.section{margin-bottom:2rem;}\n&quot;);</span>
+<span class="fc" id="L51">        sb.append(&quot;.badge{display:inline-block;padding:.15rem .4rem;border-radius:3px;font-size:.8rem;}\n&quot;);</span>
+<span class="fc" id="L52">        sb.append(&quot;.badge-green{background:#28a745;color:#fff;}\n&quot;);</span>
+<span class="fc" id="L53">        sb.append(&quot;.badge-yellow{background:#ffc107;color:#212529;}\n&quot;);</span>
+<span class="fc" id="L54">        sb.append(&quot;.badge-red{background:#dc3545;color:#fff;}\n&quot;);</span>
+<span class="fc" id="L55">        sb.append(&quot;.badge-grey{background:#6c757d;color:#fff;}\n&quot;);</span>
+<span class="fc" id="L56">        sb.append(&quot;.honesty-note{font-size:.8rem;color:#6c757d;font-style:italic;}\n&quot;);</span>
+<span class="fc" id="L57">        sb.append(&quot;&lt;/style&gt;\n&lt;/head&gt;\n&lt;body&gt;\n&quot;);</span>
+
+<span class="fc" id="L59">        sb.append(&quot;&lt;h1&gt;Discovery Observatory&lt;/h1&gt;\n&quot;);</span>
+<span class="fc" id="L60">        sb.append(&quot;&lt;p&gt;&lt;strong&gt;Campaign:&lt;/strong&gt; &lt;code&gt;&quot;).append(esc(report.id())).append(&quot;&lt;/code&gt;&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L61">        sb.append(modeBanner(resultMode));</span>
+
+<span class="fc" id="L63">        sb.append(&quot;&lt;div class=\&quot;section\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L64">        sb.append(&quot;&lt;h2&gt;Active Families&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L65">        sb.append(renderFamiliesTable(report));</span>
+<span class="fc" id="L66">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+<span class="fc" id="L68">        sb.append(&quot;&lt;div class=\&quot;section\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L69">        sb.append(&quot;&lt;h2&gt;Candidates&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L70">        sb.append(&quot;&lt;p class=\&quot;honesty-note\&quot;&gt;⚠️ Stage labels reflect promotion pipeline status, not mathematical truth. &quot;)</span>
+<span class="fc" id="L71">            .append(&quot;The frontend never upgrades a candidate's status independently.&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L72">        sb.append(renderCandidatesTable(report));</span>
+<span class="fc" id="L73">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+<span class="fc" id="L75">        sb.append(&quot;&lt;div class=\&quot;section\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L76">        sb.append(&quot;&lt;h2&gt;Counterexamples &amp;amp; Rejected Hypotheses&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L77">        sb.append(&quot;&lt;p class=\&quot;honesty-note\&quot;&gt;Rejected candidates remain inspectable.&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L78">        sb.append(renderCounterexamplesTable(report));</span>
+<span class="fc" id="L79">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+<span class="fc" id="L81">        sb.append(&quot;&lt;div class=\&quot;section\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L82">        sb.append(&quot;&lt;h2&gt;Proof Status&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L83">        sb.append(&quot;&lt;p class=\&quot;honesty-note\&quot;&gt;⚠️ Prover confirmation ≠ search success. &quot;)</span>
+<span class="fc" id="L84">            .append(&quot;Only external prover results are counted here.&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L85">        sb.append(renderProofStatusTable(report));</span>
+<span class="fc" id="L86">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+<span class="fc" id="L88">        sb.append(&quot;&lt;div class=\&quot;section\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L89">        sb.append(&quot;&lt;h2&gt;Novelty&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L90">        sb.append(renderNoveltyTable(report));</span>
+<span class="fc" id="L91">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+<span class="fc" id="L93">        sb.append(&quot;&lt;div class=\&quot;section\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L94">        sb.append(&quot;&lt;h2&gt;Ablation&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L95">        sb.append(renderAblationTable(report));</span>
+<span class="fc" id="L96">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+<span class="fc" id="L98">        sb.append(&quot;&lt;/body&gt;\n&lt;/html&gt;\n&quot;);</span>
+<span class="fc" id="L99">        return sb.toString();</span>
+    }
+
+    // -----------------------------------------------------------------------
+    // Section renderers
+    // -----------------------------------------------------------------------
+
+    private String renderFamiliesTable(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L107">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L108">        sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Family&lt;/th&gt;&lt;th&gt;Total observations&lt;/th&gt;&lt;th&gt;Success&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+
+<span class="fc" id="L110">        ReferenceCampaignRunner.HypothesisEvolution evo = report.hypothesisEvolution();</span>
+<span class="fc" id="L111">        Map&lt;String, List&lt;ReferenceCampaignRunner.TrainingResult&gt;&gt; byFamily = report.training().stream()</span>
+<span class="fc" id="L112">            .collect(Collectors.groupingBy(ReferenceCampaignRunner.TrainingResult::family));</span>
+
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (byFamily.isEmpty()) {</span>
+<span class="nc" id="L115">            sb.append(&quot;&lt;tr&gt;&lt;td colspan=\&quot;4\&quot;&gt;&lt;em&gt;No training data.&lt;/em&gt;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+        } else {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (Map.Entry&lt;String, List&lt;ReferenceCampaignRunner.TrainingResult&gt;&gt; entry : byFamily.entrySet()) {</span>
+<span class="fc" id="L118">                long total = entry.getValue().size();</span>
+<span class="fc" id="L119">                long success = entry.getValue().stream()</span>
+<span class="fc" id="L120">                    .filter(ReferenceCampaignRunner.TrainingResult::success).count();</span>
+<span class="pc bpc" id="L121" title="2 of 4 branches missed.">                String statusBadge = (evo != null &amp;&amp; evo.isAccepted())</span>
+<span class="fc" id="L122">                    ? badge(&quot;ACCEPTED&quot;, &quot;badge-green&quot;)</span>
+<span class="pc" id="L123">                    : badge(&quot;IN_PROGRESS&quot;, &quot;badge-yellow&quot;);</span>
+<span class="fc" id="L124">                sb.append(&quot;&lt;tr&gt;&lt;td&gt;&quot;).append(esc(entry.getKey())).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L125">                    .append(&quot;&lt;td&gt;&quot;).append(total).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L126">                    .append(&quot;&lt;td&gt;&quot;).append(success).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L127">                    .append(&quot;&lt;td&gt;&quot;).append(statusBadge).append(&quot;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc" id="L128">            }</span>
+        }
+<span class="fc" id="L130">        sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+<span class="fc" id="L131">        return sb.toString();</span>
+    }
+
+    private String renderCandidatesTable(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L135">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L136">        sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Candidate ID&lt;/th&gt;&lt;th&gt;Family&lt;/th&gt;&lt;th&gt;Stage&lt;/th&gt;&lt;th&gt;Oracle&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (report.promotionRecord() != null) {</span>
+<span class="fc" id="L138">            PromotionRecordInfo info = extractPromotionInfo(report.promotionRecord());</span>
+<span class="fc" id="L139">            sb.append(&quot;&lt;tr&gt;&lt;td&gt;&lt;code&gt;&quot;).append(esc(info.candidateId())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L140">                .append(&quot;&lt;td&gt;&quot;).append(esc(info.family())).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L141">                .append(&quot;&lt;td&gt;&quot;).append(badge(info.stage(), stageColor(info.stage()))).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L142">                .append(&quot;&lt;td&gt;&quot;).append(esc(info.oracleStatus())).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L143">                .append(&quot;&lt;/tr&gt;\n&quot;);</span>
+        }
+        // Show revisions as candidates (rejected ones remain inspectable)
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (report.hypothesisEvolution() != null) {</span>
+<span class="fc" id="L147">            String revisionFamily = derivePrimaryFamily(report);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            for (ReferenceCampaignRunner.RevisionSummary rev : report.hypothesisEvolution().revisionHistory()) {</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                if (!&quot;ACCEPTED&quot;.equals(rev.status())) {</span>
+<span class="fc" id="L150">                    sb.append(&quot;&lt;tr&gt;&lt;td&gt;&lt;code&gt;&quot;).append(esc(rev.id())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L151">                        .append(&quot;&lt;td&gt;&quot;).append(esc(revisionFamily)).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L152">                        .append(&quot;&lt;td&gt;&quot;).append(badge(&quot;REJECTED/REVISED&quot;, &quot;badge-red&quot;)).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L153">                        .append(&quot;&lt;td&gt;N/A&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L154">                        .append(&quot;&lt;/tr&gt;\n&quot;);</span>
+                }
+<span class="fc" id="L156">            }</span>
+        }
+<span class="fc" id="L158">        sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+<span class="fc" id="L159">        return sb.toString();</span>
+    }
+
+    private String renderCounterexamplesTable(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L163">        StringBuilder sb = new StringBuilder();</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (report.hypothesisEvolution() == null</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                || report.hypothesisEvolution().counterexampleReport() == null</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                || report.hypothesisEvolution().counterexampleReport().counterexamples().isEmpty()) {</span>
+<span class="fc" id="L167">            sb.append(&quot;&lt;p&gt;No counterexamples recorded.&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L168">            return sb.toString();</span>
+        }
+<span class="nc" id="L170">        ReferenceCampaignRunner.CounterexampleReport cex =</span>
+<span class="nc" id="L171">            report.hypothesisEvolution().counterexampleReport();</span>
+<span class="nc" id="L172">        sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Revision&lt;/th&gt;&lt;th&gt;Assignments&lt;/th&gt;&lt;th&gt;Strategy&lt;/th&gt;&lt;th&gt;Outcome&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        for (ReferenceCampaignRunner.CounterexampleEntry entry : cex.counterexamples()) {</span>
+<span class="nc" id="L174">            sb.append(&quot;&lt;tr&gt;&lt;td&gt;&lt;code&gt;&quot;).append(esc(entry.revisionId())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="nc" id="L175">                .append(&quot;&lt;td&gt;&lt;code&gt;&quot;).append(esc(String.join(&quot;, &quot;, entry.assignments()))).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="nc" id="L176">                .append(&quot;&lt;td&gt;&quot;).append(esc(entry.strategyName())).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="nc" id="L177">                .append(&quot;&lt;td&gt;&quot;).append(badge(&quot;TRIGGERED_REFINEMENT&quot;, &quot;badge-yellow&quot;)).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="nc" id="L178">                .append(&quot;&lt;/tr&gt;\n&quot;);</span>
+<span class="nc" id="L179">        }</span>
+<span class="nc" id="L180">        sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+<span class="nc" id="L181">        return sb.toString();</span>
+    }
+
+    private String renderProofStatusTable(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L185">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L186">        sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Candidate&lt;/th&gt;&lt;th&gt;Prover used&lt;/th&gt;&lt;th&gt;Cases&lt;/th&gt;&lt;th&gt;SymPy available&lt;/th&gt;&lt;th&gt;Disagreements&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc" id="L187">        de.regelsuche.sympyqa.SymPyQaHarness.QaSummary proof = report.proofSummary();</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        String candidateId = report.promotionRecord() != null</span>
+<span class="pc" id="L189">            ? report.promotionRecord().candidateId() : &quot;(none)&quot;;</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (proof != null) {</span>
+<span class="pc bpc" id="L191" title="3 of 4 branches missed.">            boolean confirmed = proof.sympyAvailableCases() &gt; 0 &amp;&amp; proof.disagreements() == 0;</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            String statusBadge = confirmed</span>
+<span class="nc" id="L193">                ? badge(&quot;EXTERNALLY_CONFIRMED&quot;, &quot;badge-green&quot;)</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                : (proof.sympyAvailableCases() == 0</span>
+<span class="fc" id="L195">                    ? badge(&quot;SYMPY_UNAVAILABLE&quot;, &quot;badge-grey&quot;)</span>
+<span class="pc" id="L196">                    : badge(&quot;DISAGREEMENTS_PRESENT&quot;, &quot;badge-red&quot;));</span>
+<span class="fc" id="L197">            sb.append(&quot;&lt;tr&gt;&lt;td&gt;&lt;code&gt;&quot;).append(esc(candidateId)).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L198">                .append(&quot;&lt;td&gt;SymPy QA harness&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L199">                .append(&quot;&lt;td&gt;&quot;).append(proof.totalCases()).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L200">                .append(&quot;&lt;td&gt;&quot;).append(proof.sympyAvailableCases()).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L201">                .append(&quot;&lt;td&gt;&quot;).append(proof.disagreements()).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L202">                .append(&quot;&lt;td&gt;&quot;).append(statusBadge).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L203">                .append(&quot;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc" id="L204">        } else {</span>
+<span class="nc" id="L205">            sb.append(&quot;&lt;tr&gt;&lt;td colspan=\&quot;6\&quot;&gt;&lt;em&gt;Proof stage not reached.&lt;/em&gt;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+        }
+<span class="fc" id="L207">        sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+<span class="fc" id="L208">        return sb.toString();</span>
+    }
+
+    private String renderNoveltyTable(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L212">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L213">        sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Candidate&lt;/th&gt;&lt;th&gt;Novelty status&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (report.promotionRecord() != null) {</span>
+<span class="fc" id="L215">            String novelty = extractNoveltyStatus(report.promotionRecord());</span>
+<span class="fc" id="L216">            sb.append(&quot;&lt;tr&gt;&lt;td&gt;&lt;code&gt;&quot;).append(esc(report.promotionRecord().candidateId()))</span>
+<span class="fc" id="L217">                .append(&quot;&lt;/code&gt;&lt;/td&gt;&lt;td&gt;&quot;).append(badge(novelty, noveltyColor(novelty)))</span>
+<span class="fc" id="L218">                .append(&quot;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc" id="L219">        } else {</span>
+<span class="nc" id="L220">            sb.append(&quot;&lt;tr&gt;&lt;td colspan=\&quot;2\&quot;&gt;&lt;em&gt;No promoted candidate.&lt;/em&gt;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+        }
+<span class="fc" id="L222">        sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+<span class="fc" id="L223">        return sb.toString();</span>
+    }
+
+    private String renderAblationTable(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L227">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L228">        ReferenceCampaignRunner.ReuseAblation abl = report.reuseAblation();</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (abl == null) {</span>
+<span class="nc" id="L230">            return &quot;&lt;p&gt;Ablation not run.&lt;/p&gt;\n&quot;;</span>
+        }
+<span class="fc" id="L232">        sb.append(&quot;&lt;p&gt;Total cases: &lt;strong&gt;&quot;).append(abl.totalCount())</span>
+<span class="fc" id="L233">            .append(&quot;&lt;/strong&gt;, improved: &lt;strong&gt;&quot;).append(abl.improvedCount())</span>
+<span class="fc" id="L234">            .append(&quot;&lt;/strong&gt;, measured improvement: &lt;strong&gt;&quot;)</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            .append(abl.measuredImprovement() ? &quot;YES ✓&quot; : &quot;NO ✗&quot;).append(&quot;&lt;/strong&gt;&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L236">        sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Input&lt;/th&gt;&lt;th&gt;Target&lt;/th&gt;&lt;th&gt;With ✓&lt;/th&gt;&lt;th&gt;Without ✓&lt;/th&gt;&lt;th&gt;Improved&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        for (ReferenceCampaignRunner.AblationPairResult pair : abl.pairs()) {</span>
+<span class="fc" id="L238">            sb.append(&quot;&lt;tr&gt;&lt;td&gt;&lt;code&gt;&quot;).append(esc(pair.inputExpression())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L239">                .append(&quot;&lt;td&gt;&lt;code&gt;&quot;).append(esc(pair.targetExpression())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                .append(&quot;&lt;td&gt;&quot;).append(pair.withSuccess() ? &quot;✓&quot; : &quot;✗&quot;).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                .append(&quot;&lt;td&gt;&quot;).append(pair.withoutSuccess() ? &quot;✓&quot; : &quot;✗&quot;).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">                .append(&quot;&lt;td&gt;&quot;).append(pair.improved() ? badge(&quot;YES&quot;, &quot;badge-green&quot;) : badge(&quot;NO&quot;, &quot;badge-grey&quot;)).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L243">                .append(&quot;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc" id="L244">        }</span>
+<span class="fc" id="L245">        sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+<span class="fc" id="L246">        return sb.toString();</span>
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private String derivePrimaryFamily(ReferenceCampaignRunner.CampaignReport report) {
+<span class="pc bpc" id="L254" title="2 of 4 branches missed.">        if (report.promotionRecord() != null &amp;&amp; !report.promotionRecord().family().isBlank()) {</span>
+<span class="fc" id="L255">            return report.promotionRecord().family();</span>
+        }
+<span class="nc" id="L257">        return report.training().stream()</span>
+<span class="nc" id="L258">            .map(ReferenceCampaignRunner.TrainingResult::family)</span>
+<span class="nc bnc" id="L259" title="All 4 branches missed.">            .filter(f -&gt; f != null &amp;&amp; !f.isBlank())</span>
+<span class="nc" id="L260">            .findFirst()</span>
+<span class="nc" id="L261">            .orElse(&quot;unknown&quot;);</span>
+    }
+
+    /** Lightweight projection of a PromotionRecord for observatory rendering. */
+<span class="fc" id="L265">    private record PromotionRecordInfo(String candidateId, String family, String stage, String oracleStatus) {}</span>
+
+    private PromotionRecordInfo extractPromotionInfo(PromotionRecord record) {
+<span class="fc" id="L268">        return new PromotionRecordInfo(</span>
+<span class="fc" id="L269">            record.candidateId(),</span>
+<span class="fc" id="L270">            record.family(),</span>
+<span class="fc" id="L271">            record.stage().name(),</span>
+<span class="fc" id="L272">            record.oracleStatus()</span>
+        );
+    }
+
+    private String extractNoveltyStatus(PromotionRecord record) {
+        // PromotionRecord does not carry a novelty field; the reference campaign
+        // produces a single candidate from the canonical log-product family which
+        // is always treated as NEW for observatory display purposes.
+<span class="fc" id="L280">        return &quot;NEW&quot;;</span>
+    }
+
+    private String modeBanner(DiscoveryStoryTimelineWriter.ResultMode mode) {
+<span class="fc bfc" id="L284" title="All 3 branches covered.">        String cssClass = switch (mode) {</span>
+<span class="fc" id="L285">            case LIVE -&gt; &quot;mode-live&quot;;</span>
+<span class="fc" id="L286">            case REPLAYED_FROM_CANONICAL -&gt; &quot;mode-replayed&quot;;</span>
+<span class="fc" id="L287">            case PRE_GENERATED_REFERENCE -&gt; &quot;mode-pregenerated&quot;;</span>
+        };
+<span class="fc bfc" id="L289" title="All 3 branches covered.">        String label = switch (mode) {</span>
+<span class="fc" id="L290">            case LIVE -&gt; &quot;LIVE EXECUTION&quot;;</span>
+<span class="fc" id="L291">            case REPLAYED_FROM_CANONICAL -&gt; &quot;REPLAYED FROM CANONICAL EVIDENCE&quot;;</span>
+<span class="fc" id="L292">            case PRE_GENERATED_REFERENCE -&gt; &quot;PRE-GENERATED REFERENCE EVIDENCE&quot;;</span>
+        };
+<span class="fc" id="L294">        return &quot;&lt;div class=\&quot;mode-banner &quot; + cssClass + &quot;\&quot;&gt;&quot; + esc(label) + &quot;&lt;/div&gt;\n&quot;;</span>
+    }
+
+    private String badge(String text, String cssClass) {
+<span class="fc" id="L298">        return &quot;&lt;span class=\&quot;badge &quot; + cssClass + &quot;\&quot;&gt;&quot; + esc(text) + &quot;&lt;/span&gt;&quot;;</span>
+    }
+
+    private String stageColor(String stage) {
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (stage == null) {</span>
+<span class="nc" id="L303">            return &quot;badge-grey&quot;;</span>
+        }
+<span class="pc bpc" id="L305" title="6 of 7 branches missed.">        return switch (stage.toUpperCase()) {</span>
+<span class="fc" id="L306">            case &quot;PROMOTED&quot; -&gt; &quot;badge-green&quot;;</span>
+<span class="nc" id="L307">            case &quot;VALIDATED&quot; -&gt; &quot;badge-green&quot;;</span>
+<span class="nc" id="L308">            case &quot;REUSED&quot; -&gt; &quot;badge-green&quot;;</span>
+<span class="nc" id="L309">            case &quot;CANDIDATE&quot; -&gt; &quot;badge-yellow&quot;;</span>
+<span class="nc" id="L310">            case &quot;REJECTED&quot; -&gt; &quot;badge-red&quot;;</span>
+<span class="nc" id="L311">            case &quot;OBSERVED&quot; -&gt; &quot;badge-grey&quot;;</span>
+<span class="nc" id="L312">            default -&gt; &quot;badge-grey&quot;;</span>
+        };
+    }
+
+    private String noveltyColor(String novelty) {
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (novelty == null) {</span>
+<span class="nc" id="L318">            return &quot;badge-grey&quot;;</span>
+        }
+<span class="pc bpc" id="L320" title="3 of 4 branches missed.">        return switch (novelty.toUpperCase()) {</span>
+<span class="nc" id="L321">            case &quot;NOVEL&quot; -&gt; &quot;badge-green&quot;;</span>
+<span class="nc" id="L322">            case &quot;DUPLICATE&quot; -&gt; &quot;badge-red&quot;;</span>
+<span class="nc" id="L323">            case &quot;ALPHA_EQUIVALENT&quot; -&gt; &quot;badge-yellow&quot;;</span>
+<span class="fc" id="L324">            default -&gt; &quot;badge-grey&quot;;</span>
+        };
+    }
+
+    private static String esc(String s) {
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L330">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L332">        return s.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
+<span class="fc" id="L333">            .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="fc" id="L334">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
+<span class="fc" id="L335">            .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

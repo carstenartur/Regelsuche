@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StaticReferencePageGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">StaticReferencePageGenerator.java</span></div><h1>StaticReferencePageGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+/**
+ * Generates a versioned, statically deployable reference page for the canonical discovery campaign.
+ *
+ * &lt;p&gt;The generated page bundles:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;The complete discovery story timeline (all 7 lifecycle stages)&lt;/li&gt;
+ *   &lt;li&gt;The run-level observatory view&lt;/li&gt;
+ *   &lt;li&gt;A {@code Reproduce} section with exact Docker and Gradle commands&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;All displayed results are clearly labelled as either
+ * {@link DiscoveryStoryTimelineWriter.ResultMode#LIVE LIVE},
+ * {@link DiscoveryStoryTimelineWriter.ResultMode#REPLAYED_FROM_CANONICAL REPLAYED FROM CANONICAL}, or
+ * {@link DiscoveryStoryTimelineWriter.ResultMode#PRE_GENERATED_REFERENCE PRE-GENERATED REFERENCE}.&lt;/p&gt;
+ *
+ * &lt;p&gt;Artifact links are resolved at generation time; any path that does not yet exist
+ * is rendered with a {@code NOT_FOUND_AT_BUILD_TIME} badge so that CI can identify which
+ * artifacts still need to be generated (e.g. by running
+ * {@code ./gradlew runReferenceCampaign} or
+ * {@code ./gradlew :app:generateDiscoveryGallery}).&lt;/p&gt;
+ *
+ * &lt;p&gt;Reproduce with:&lt;/p&gt;
+ * &lt;pre&gt;./gradlew generateStaticReferencePage&lt;/pre&gt;
+ */
+<span class="fc" id="L34">public final class StaticReferencePageGenerator {</span>
+
+    /** Canonical version of the reference page format. */
+    public static final String PAGE_VERSION = &quot;1.0&quot;;
+
+<span class="fc" id="L39">    private final DiscoveryStoryTimelineWriter timelineWriter = new DiscoveryStoryTimelineWriter();</span>
+<span class="fc" id="L40">    private final DiscoveryObservatoryWriter observatoryWriter = new DiscoveryObservatoryWriter();</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        Path repoRoot = args.length == 0</span>
+<span class="nc" id="L44">            ? Path.of(&quot;.&quot;).toAbsolutePath().normalize()</span>
+<span class="nc" id="L45">            : Path.of(args[0]).toAbsolutePath().normalize();</span>
+<span class="nc" id="L46">        Path outputDir = repoRoot.resolve(&quot;app/build/reports/static-reference-page&quot;);</span>
+<span class="nc" id="L47">        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();</span>
+<span class="nc" id="L48">        ReferenceCampaignRunner.CampaignReport report = runner.run();</span>
+<span class="nc" id="L49">        new StaticReferencePageGenerator().generate(outputDir, report,</span>
+            DiscoveryStoryTimelineWriter.ResultMode.LIVE, repoRoot);
+<span class="nc" id="L51">    }</span>
+
+    /**
+     * Generates the static reference page directory.
+     *
+     * @param outputDir  target directory (created if absent)
+     * @param report     the campaign report to render
+     * @param resultMode label identifying the provenance of the evidence
+     * @param repoRoot   repository root used for resolving artifact links
+     */
+    public void generate(
+            Path outputDir,
+            ReferenceCampaignRunner.CampaignReport report,
+            DiscoveryStoryTimelineWriter.ResultMode resultMode,
+            Path repoRoot) {
+        try {
+<span class="fc" id="L67">            Files.createDirectories(outputDir);</span>
+
+            // index.html: the complete self-contained reference page
+<span class="fc" id="L70">            String indexHtml = renderIndexHtml(report, resultMode, repoRoot);</span>
+<span class="fc" id="L71">            Files.writeString(outputDir.resolve(&quot;index.html&quot;), indexHtml, StandardCharsets.UTF_8);</span>
+
+            // timeline.html: story timeline sub-page
+<span class="fc" id="L74">            String timelineHtml = timelineWriter.renderHtml(report, resultMode);</span>
+<span class="fc" id="L75">            Files.writeString(outputDir.resolve(&quot;timeline.html&quot;), timelineHtml, StandardCharsets.UTF_8);</span>
+
+            // observatory.html: observatory sub-page
+<span class="fc" id="L78">            String observatoryHtml = observatoryWriter.renderHtml(report, resultMode);</span>
+<span class="fc" id="L79">            Files.writeString(outputDir.resolve(&quot;observatory.html&quot;), observatoryHtml, StandardCharsets.UTF_8);</span>
+
+            // timeline.md: Markdown digest
+<span class="fc" id="L82">            String timelineMd = timelineWriter.renderMarkdown(report, resultMode);</span>
+<span class="fc" id="L83">            Files.writeString(outputDir.resolve(&quot;timeline.md&quot;), timelineMd, StandardCharsets.UTF_8);</span>
+
+            // version.txt: page version for CI checks
+<span class="fc" id="L86">            Files.writeString(outputDir.resolve(&quot;version.txt&quot;),</span>
+                PAGE_VERSION + &quot;\n&quot;, StandardCharsets.UTF_8);
+
+<span class="nc" id="L89">        } catch (IOException e) {</span>
+<span class="nc" id="L90">            throw new UncheckedIOException(e);</span>
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">    }</span>
+
+    // -----------------------------------------------------------------------
+    // HTML rendering
+    // -----------------------------------------------------------------------
+
+    private String renderIndexHtml(
+            ReferenceCampaignRunner.CampaignReport report,
+            DiscoveryStoryTimelineWriter.ResultMode resultMode,
+            Path repoRoot) {
+<span class="fc" id="L102">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L103">        sb.append(&quot;&lt;!DOCTYPE html&gt;\n&lt;html lang=\&quot;en\&quot;&gt;\n&lt;head&gt;\n&quot;);</span>
+<span class="fc" id="L104">        sb.append(&quot;&lt;meta charset=\&quot;UTF-8\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L105">        sb.append(&quot;&lt;meta name=\&quot;viewport\&quot; content=\&quot;width=device-width, initial-scale=1.0\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L106">        sb.append(&quot;&lt;title&gt;Regelsuche Discovery Reference – &quot;).append(esc(report.id())).append(&quot;&lt;/title&gt;\n&quot;);</span>
+<span class="fc" id="L107">        sb.append(&quot;&lt;style&gt;\n&quot;);</span>
+<span class="fc" id="L108">        sb.append(&quot;body{font-family:sans-serif;max-width:1000px;margin:2rem auto;padding:0 1rem;}\n&quot;);</span>
+<span class="fc" id="L109">        sb.append(&quot;.mode-banner{padding:.5rem 1rem;border-radius:4px;font-weight:bold;margin-bottom:1.5rem;}\n&quot;);</span>
+<span class="fc" id="L110">        sb.append(&quot;.mode-live{background:#d4edda;color:#155724;}\n&quot;);</span>
+<span class="fc" id="L111">        sb.append(&quot;.mode-replayed{background:#d1ecf1;color:#0c5460;}\n&quot;);</span>
+<span class="fc" id="L112">        sb.append(&quot;.mode-pregenerated{background:#fff3cd;color:#856404;}\n&quot;);</span>
+<span class="fc" id="L113">        sb.append(&quot;.nav{display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;}\n&quot;);</span>
+<span class="fc" id="L114">        sb.append(&quot;.nav a{padding:.4rem .8rem;background:#e9ecef;border-radius:4px;text-decoration:none;color:#333;}\n&quot;);</span>
+<span class="fc" id="L115">        sb.append(&quot;.nav a:hover{background:#dee2e6;}\n&quot;);</span>
+<span class="fc" id="L116">        sb.append(&quot;.reproduce{background:#f8f9fa;border:1px solid #dee2e6;border-radius:4px;padding:1rem 1.5rem;margin:1.5rem 0;}\n&quot;);</span>
+<span class="fc" id="L117">        sb.append(&quot;pre{background:#212529;color:#f8f9fa;padding:1rem;border-radius:4px;overflow-x:auto;font-size:.85rem;}\n&quot;);</span>
+<span class="fc" id="L118">        sb.append(&quot;code{font-family:monospace;}\n&quot;);</span>
+<span class="fc" id="L119">        sb.append(&quot;.section{margin-bottom:2rem;}\n&quot;);</span>
+<span class="fc" id="L120">        sb.append(&quot;table{border-collapse:collapse;width:100%;margin:.5rem 0;font-size:.85rem;}\n&quot;);</span>
+<span class="fc" id="L121">        sb.append(&quot;th,td{border:1px solid #dee2e6;padding:.3rem .6rem;text-align:left;}\n&quot;);</span>
+<span class="fc" id="L122">        sb.append(&quot;th{background:#e9ecef;}\n&quot;);</span>
+<span class="fc" id="L123">        sb.append(&quot;.badge{display:inline-block;padding:.15rem .4rem;border-radius:3px;font-size:.8rem;}\n&quot;);</span>
+<span class="fc" id="L124">        sb.append(&quot;.badge-green{background:#28a745;color:#fff;}\n&quot;);</span>
+<span class="fc" id="L125">        sb.append(&quot;.badge-yellow{background:#ffc107;color:#212529;}\n&quot;);</span>
+<span class="fc" id="L126">        sb.append(&quot;.badge-grey{background:#6c757d;color:#fff;}\n&quot;);</span>
+<span class="fc" id="L127">        sb.append(&quot;.honesty-note{font-size:.8rem;color:#6c757d;font-style:italic;margin:.5rem 0;}\n&quot;);</span>
+<span class="fc" id="L128">        sb.append(&quot;.version-footer{font-size:.8rem;color:#6c757d;border-top:1px solid #dee2e6;padding-top:1rem;margin-top:2rem;}\n&quot;);</span>
+<span class="fc" id="L129">        sb.append(&quot;&lt;/style&gt;\n&lt;/head&gt;\n&lt;body&gt;\n&quot;);</span>
+
+<span class="fc" id="L131">        sb.append(&quot;&lt;h1&gt;Regelsuche Discovery Reference Page&lt;/h1&gt;\n&quot;);</span>
+<span class="fc" id="L132">        sb.append(&quot;&lt;p&gt;&lt;strong&gt;Campaign:&lt;/strong&gt; &lt;code&gt;&quot;).append(esc(report.id())).append(&quot;&lt;/code&gt;  \n&quot;);</span>
+<span class="fc" id="L133">        sb.append(&quot;&lt;strong&gt;Version:&lt;/strong&gt; &quot;).append(PAGE_VERSION).append(&quot;&lt;/p&gt;\n&quot;);</span>
+
+        // Mode banner – must be unambiguous
+<span class="fc" id="L136">        sb.append(modeBanner(resultMode));</span>
+
+        // Navigation
+<span class="fc" id="L139">        sb.append(&quot;&lt;nav class=\&quot;nav\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L140">        sb.append(&quot;&lt;a href=\&quot;timeline.html\&quot;&gt;📋 Full Timeline&lt;/a&gt;\n&quot;);</span>
+<span class="fc" id="L141">        sb.append(&quot;&lt;a href=\&quot;observatory.html\&quot;&gt;🔭 Observatory&lt;/a&gt;\n&quot;);</span>
+<span class="fc" id="L142">        sb.append(&quot;&lt;a href=\&quot;timeline.md\&quot;&gt;📄 Markdown Digest&lt;/a&gt;\n&quot;);</span>
+<span class="fc" id="L143">        sb.append(&quot;&lt;/nav&gt;\n&quot;);</span>
+
+        // Quick status overview
+<span class="fc" id="L146">        sb.append(&quot;&lt;div class=\&quot;section\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L147">        sb.append(&quot;&lt;h2&gt;Discovery Status Overview&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L148">        sb.append(renderStatusOverview(report));</span>
+<span class="fc" id="L149">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+        // Reproduce section (exact Docker and Gradle commands)
+<span class="fc" id="L152">        sb.append(&quot;&lt;div class=\&quot;section reproduce\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L153">        sb.append(renderReproduceSection());</span>
+<span class="fc" id="L154">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+        // Honesty declaration
+<span class="fc" id="L157">        sb.append(&quot;&lt;div class=\&quot;section\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L158">        sb.append(&quot;&lt;h2&gt;Honesty Declaration&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L159">        sb.append(renderHonestyDeclaration(report));</span>
+<span class="fc" id="L160">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+        // Artifact links
+<span class="fc" id="L163">        sb.append(&quot;&lt;div class=\&quot;section\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L164">        sb.append(&quot;&lt;h2&gt;Canonical Evidence &amp;amp; Artifacts&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L165">        sb.append(renderArtifactLinks(repoRoot));</span>
+<span class="fc" id="L166">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+        // Footer
+<span class="fc" id="L169">        sb.append(&quot;&lt;div class=\&quot;version-footer\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L170">        sb.append(&quot;&lt;p&gt;Reference page version &quot;).append(PAGE_VERSION)</span>
+<span class="fc" id="L171">            .append(&quot;. Generated by &lt;code&gt;StaticReferencePageGenerator&lt;/code&gt;. &quot;)</span>
+<span class="fc" id="L172">            .append(&quot;Reproduce with &lt;code&gt;./gradlew generateStaticReferencePage&lt;/code&gt;.&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L173">        sb.append(&quot;&lt;/div&gt;\n&quot;);</span>
+
+<span class="fc" id="L175">        sb.append(&quot;&lt;/body&gt;\n&lt;/html&gt;\n&quot;);</span>
+<span class="fc" id="L176">        return sb.toString();</span>
+    }
+
+    private String renderStatusOverview(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L180">        ReferenceCampaignRunner.HypothesisEvolution evo = report.hypothesisEvolution();</span>
+<span class="fc" id="L181">        ReferenceCampaignRunner.HoldoutReport hr = report.holdoutReport();</span>
+<span class="fc" id="L182">        ReferenceCampaignRunner.ReuseAblation abl = report.reuseAblation();</span>
+<span class="pc bpc" id="L183" title="3 of 6 branches missed.">        boolean overallPass = evo != null &amp;&amp; evo.isAccepted()</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            &amp;&amp; hr != null &amp;&amp; hr.overallPass()</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            &amp;&amp; hr.positiveCount() &gt;= ReferenceCampaignRunner.MIN_HOLDOUTS;</span>
+
+<span class="fc" id="L187">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L188">        sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Gate&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;th&gt;Details&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+
+        // Training
+<span class="fc" id="L191">        long successCount = report.training().stream()</span>
+<span class="fc" id="L192">            .filter(ReferenceCampaignRunner.TrainingResult::success).count();</span>
+<span class="fc" id="L193">        sb.append(&quot;&lt;tr&gt;&lt;td&gt;Training observations&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="fc" id="L194">            .append(badge(successCount + &quot;/&quot; + report.training().size() + &quot; found path&quot;,</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                successCount &gt; 0 ? &quot;badge-green&quot; : &quot;badge-yellow&quot;))</span>
+<span class="fc" id="L196">            .append(&quot;&lt;/td&gt;&lt;td&gt;&lt;em&gt;SEARCH_FOUND_PATH ≠ proof&lt;/em&gt;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+
+        // Refinement
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">        boolean refined = evo != null &amp;&amp; evo.isAccepted();</span>
+<span class="fc" id="L200">        sb.append(&quot;&lt;tr&gt;&lt;td&gt;Hypothesis refined &amp;amp; accepted&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="pc bpc" id="L201" title="2 of 4 branches missed.">            .append(badge(refined ? &quot;YES&quot; : &quot;NO&quot;, refined ? &quot;badge-green&quot; : &quot;badge-yellow&quot;))</span>
+<span class="fc" id="L202">            .append(&quot;&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">            .append(evo != null ? evo.revisionHistory().size() + &quot; revision(s)&quot; : &quot;n/a&quot;)</span>
+<span class="fc" id="L204">            .append(&quot;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+
+        // Holdout
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">        boolean holdoutPass = hr != null &amp;&amp; hr.overallPass();</span>
+<span class="fc" id="L208">        sb.append(&quot;&lt;tr&gt;&lt;td&gt;Holdout validation (&amp;ge;100)&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            .append(badge(holdoutPass ? &quot;PASS&quot; : &quot;FAIL/INCOMPLETE&quot;,</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                holdoutPass ? &quot;badge-green&quot; : &quot;badge-yellow&quot;))</span>
+<span class="fc" id="L211">            .append(&quot;&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            .append(hr != null ? hr.positivePassCount() + &quot;/&quot; + hr.positiveCount() + &quot; positive&quot; : &quot;n/a&quot;)</span>
+<span class="fc" id="L213">            .append(&quot;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+
+        // Prover
+<span class="fc" id="L216">        de.regelsuche.sympyqa.SymPyQaHarness.QaSummary proof = report.proofSummary();</span>
+<span class="pc bpc" id="L217" title="4 of 6 branches missed.">        boolean proved = proof != null &amp;&amp; proof.sympyAvailableCases() &gt; 0 &amp;&amp; proof.disagreements() == 0;</span>
+<span class="fc" id="L218">        sb.append(&quot;&lt;tr&gt;&lt;td&gt;External prover (SymPy)&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="pc bpc" id="L219" title="3 of 6 branches missed.">            .append(badge(proved ? &quot;CONFIRMED&quot; : (proof != null &amp;&amp; proof.sympyAvailableCases() == 0</span>
+<span class="pc" id="L220">                    ? &quot;UNAVAILABLE&quot; : &quot;NOT_CONFIRMED&quot;),</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                proved ? &quot;badge-green&quot; : &quot;badge-grey&quot;))</span>
+<span class="fc" id="L222">            .append(&quot;&lt;/td&gt;&lt;td&gt;&lt;em&gt;Script-generation ≠ prover confirmation&lt;/em&gt;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+
+        // Ablation
+<span class="pc bpc" id="L225" title="2 of 4 branches missed.">        boolean improved = abl != null &amp;&amp; abl.measuredImprovement();</span>
+<span class="fc" id="L226">        sb.append(&quot;&lt;tr&gt;&lt;td&gt;Reuse ablation&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            .append(badge(improved ? &quot;IMPROVED&quot; : &quot;NO_IMPROVEMENT&quot;,</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                improved ? &quot;badge-green&quot; : &quot;badge-yellow&quot;))</span>
+<span class="fc" id="L229">            .append(&quot;&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            .append(abl != null ? abl.improvedCount() + &quot;/&quot; + abl.totalCount() : &quot;n/a&quot;)</span>
+<span class="fc" id="L231">            .append(&quot;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+
+<span class="fc" id="L233">        sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+<span class="fc" id="L234">        sb.append(&quot;&lt;p&gt;&lt;strong&gt;Overall discovery status: &quot;)</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            .append(badge(overallPass ? &quot;COMPLETE ✓&quot; : &quot;INCOMPLETE&quot;,</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                overallPass ? &quot;badge-green&quot; : &quot;badge-yellow&quot;))</span>
+<span class="fc" id="L237">            .append(&quot;&lt;/strong&gt;&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L238">        return sb.toString();</span>
+    }
+
+    private String renderReproduceSection() {
+<span class="fc" id="L242">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L243">        sb.append(&quot;&lt;h2 id=\&quot;reproduce\&quot;&gt;Reproduce&lt;/h2&gt;\n&quot;);</span>
+<span class="fc" id="L244">        sb.append(&quot;&lt;p&gt;All results can be reproduced exactly using the following commands:&lt;/p&gt;\n&quot;);</span>
+
+<span class="fc" id="L246">        sb.append(&quot;&lt;h3&gt;Gradle (local JVM)&lt;/h3&gt;\n&quot;);</span>
+<span class="fc" id="L247">        sb.append(&quot;&lt;pre&gt;# Run the canonical reference campaign\n&quot;);</span>
+<span class="fc" id="L248">        sb.append(&quot;./gradlew runReferenceCampaign\n\n&quot;);</span>
+<span class="fc" id="L249">        sb.append(&quot;# Generate the static reference page\n&quot;);</span>
+<span class="fc" id="L250">        sb.append(&quot;./gradlew generateStaticReferencePage\n\n&quot;);</span>
+<span class="fc" id="L251">        sb.append(&quot;# Run the discovery gallery (public evidence)\n&quot;);</span>
+<span class="fc" id="L252">        sb.append(&quot;./gradlew :app:generateDiscoveryGallery\n&lt;/pre&gt;\n&quot;);</span>
+
+<span class="fc" id="L254">        sb.append(&quot;&lt;h3&gt;Docker (isolated, reproducible environment)&lt;/h3&gt;\n&quot;);</span>
+<span class="fc" id="L255">        sb.append(&quot;&lt;pre&gt;# Build the proof image (includes Z3, cvc5; Lean opt-in)\n&quot;);</span>
+<span class="fc" id="L256">        sb.append(&quot;docker build -f Dockerfile.proof -t regelsuche-proof:latest .\n\n&quot;);</span>
+<span class="fc" id="L257">        sb.append(&quot;# Run the reference campaign inside Docker\n&quot;);</span>
+<span class="fc" id="L258">        sb.append(&quot;docker run --rm \\\n&quot;);</span>
+<span class="fc" id="L259">        sb.append(&quot;  -v \&quot;$(pwd)/app/build/reports:/app/build/reports\&quot; \\\n&quot;);</span>
+<span class="fc" id="L260">        sb.append(&quot;  regelsuche-proof:latest \\\n&quot;);</span>
+<span class="fc" id="L261">        sb.append(&quot;  ./gradlew runReferenceCampaign\n\n&quot;);</span>
+<span class="fc" id="L262">        sb.append(&quot;# Generate the static reference page inside Docker\n&quot;);</span>
+<span class="fc" id="L263">        sb.append(&quot;docker run --rm \\\n&quot;);</span>
+<span class="fc" id="L264">        sb.append(&quot;  -v \&quot;$(pwd)/app/build/reports:/app/build/reports\&quot; \\\n&quot;);</span>
+<span class="fc" id="L265">        sb.append(&quot;  regelsuche-proof:latest \\\n&quot;);</span>
+<span class="fc" id="L266">        sb.append(&quot;  ./gradlew generateStaticReferencePage\n&lt;/pre&gt;\n&quot;);</span>
+
+<span class="fc" id="L268">        sb.append(&quot;&lt;h3&gt;Artifact outputs&lt;/h3&gt;\n&quot;);</span>
+<span class="fc" id="L269">        sb.append(&quot;&lt;ul&gt;\n&quot;);</span>
+<span class="fc" id="L270">        sb.append(&quot;&lt;li&gt;&lt;code&gt;app/build/reports/reference-campaign/&lt;/code&gt; — reference campaign evidence bundle&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L271">        sb.append(&quot;&lt;li&gt;&lt;code&gt;app/build/reports/reference-campaign/reference-campaign.md&lt;/code&gt; — Markdown story&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L272">        sb.append(&quot;&lt;li&gt;&lt;code&gt;app/build/reports/reference-campaign/reference-campaign-timeline.html&lt;/code&gt; — HTML timeline&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L273">        sb.append(&quot;&lt;li&gt;&lt;code&gt;app/build/reports/reference-campaign/reference-campaign-observatory.html&lt;/code&gt; — observatory view&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L274">        sb.append(&quot;&lt;li&gt;&lt;code&gt;app/build/reports/static-reference-page/&lt;/code&gt; — statically deployable reference page&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L275">        sb.append(&quot;&lt;li&gt;&lt;code&gt;docs/generated/discovery/&lt;/code&gt; — public canonical evidence gallery&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L276">        sb.append(&quot;&lt;/ul&gt;\n&quot;);</span>
+<span class="fc" id="L277">        return sb.toString();</span>
+    }
+
+    private String renderHonestyDeclaration(ReferenceCampaignRunner.CampaignReport report) {
+<span class="fc" id="L281">        de.regelsuche.sympyqa.SymPyQaHarness.QaSummary proof = report.proofSummary();</span>
+<span class="pc bpc" id="L282" title="2 of 4 branches missed.">        boolean sympyUsed = proof != null &amp;&amp; proof.sympyAvailableCases() &gt; 0;</span>
+<span class="fc" id="L283">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L284">        sb.append(&quot;&lt;ul&gt;\n&quot;);</span>
+<span class="fc" id="L285">        sb.append(&quot;&lt;li&gt;&lt;strong&gt;Observation ≠ proof:&lt;/strong&gt; Search traces show a found path, not a mathematical proof.&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L286">        sb.append(&quot;&lt;li&gt;&lt;strong&gt;No-counterexample-found ≠ proof:&lt;/strong&gt; Absence of counterexamples triggers refinement, not confirmation.&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L287">        sb.append(&quot;&lt;li&gt;&lt;strong&gt;Script-generation ≠ prover confirmation:&lt;/strong&gt; SymPy availability is checked at runtime. &quot;)</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            .append(sympyUsed ? &quot;SymPy was available and produced results.&quot; : &quot;SymPy was &lt;strong&gt;not available&lt;/strong&gt; in this run.&quot;)</span>
+<span class="fc" id="L289">            .append(&quot;&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L290">        sb.append(&quot;&lt;li&gt;&lt;strong&gt;Training success ≠ holdout success:&lt;/strong&gt; Pass-rates for training and holdout sets are reported separately.&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L291">        sb.append(&quot;&lt;li&gt;&lt;strong&gt;Result mode:&lt;/strong&gt; The evidence shown on this page is explicitly labelled at the top of the page.&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L292">        sb.append(&quot;&lt;li&gt;&lt;strong&gt;Status upgrades:&lt;/strong&gt; The frontend never derives or upgrades a mathematical status on its own.&lt;/li&gt;\n&quot;);</span>
+<span class="fc" id="L293">        sb.append(&quot;&lt;/ul&gt;\n&quot;);</span>
+<span class="fc" id="L294">        return sb.toString();</span>
+    }
+
+    private String renderArtifactLinks(Path repoRoot) {
+<span class="fc" id="L298">        List&lt;ArtifactLink&gt; links = List.of(</span>
+            new ArtifactLink(&quot;Discovery Gallery Index&quot;, &quot;docs/generated/discovery/index.json&quot;,
+                &quot;docs/generated/discovery/index.json&quot;),
+            new ArtifactLink(&quot;Complete-square Evidence JSON&quot;,
+                &quot;docs/generated/discovery/complete-square/evidence.json&quot;,
+                &quot;docs/generated/discovery/complete-square/evidence.json&quot;),
+            new ArtifactLink(&quot;Sophie-Germain Evidence JSON&quot;,
+                &quot;docs/generated/discovery/sophie-germain/evidence.json&quot;,
+                &quot;docs/generated/discovery/sophie-germain/evidence.json&quot;),
+            new ArtifactLink(&quot;Reference Campaign Markdown&quot;,
+                &quot;app/build/reports/reference-campaign/reference-campaign.md&quot;,
+                null),
+            new ArtifactLink(&quot;Reference Campaign JSON&quot;,
+                &quot;app/build/reports/reference-campaign/reference-campaign.json&quot;,
+                null)
+        );
+
+<span class="fc" id="L315">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L316">        sb.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;Artifact&lt;/th&gt;&lt;th&gt;Path&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        for (ArtifactLink link : links) {</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            Path resolved = repoRoot != null ? repoRoot.resolve(link.path()) : null;</span>
+<span class="pc bpc" id="L319" title="3 of 4 branches missed.">            boolean exists = resolved != null &amp;&amp; Files.exists(resolved);</span>
+<span class="fc" id="L320">            sb.append(&quot;&lt;tr&gt;&lt;td&gt;&quot;).append(esc(link.label())).append(&quot;&lt;/td&gt;&quot;)</span>
+<span class="fc" id="L321">                .append(&quot;&lt;td&gt;&lt;code&gt;&quot;).append(esc(link.path())).append(&quot;&lt;/code&gt;&lt;/td&gt;&quot;)</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                .append(&quot;&lt;td&gt;&quot;).append(exists</span>
+<span class="nc" id="L323">                    ? badge(&quot;EXISTS&quot;, &quot;badge-green&quot;)</span>
+<span class="fc" id="L324">                    : badge(&quot;NOT_FOUND_AT_BUILD_TIME&quot;, &quot;badge-grey&quot;))</span>
+<span class="fc" id="L325">                .append(&quot;&lt;/td&gt;&lt;/tr&gt;\n&quot;);</span>
+<span class="fc" id="L326">        }</span>
+<span class="fc" id="L327">        sb.append(&quot;&lt;/table&gt;\n&quot;);</span>
+<span class="fc" id="L328">        sb.append(&quot;&lt;p class=\&quot;honesty-note\&quot;&gt;Artifact links that are NOT_FOUND_AT_BUILD_TIME are generated at runtime by &quot;)</span>
+<span class="fc" id="L329">            .append(&quot;&lt;code&gt;./gradlew runReferenceCampaign&lt;/code&gt; or &quot;)</span>
+<span class="fc" id="L330">            .append(&quot;&lt;code&gt;./gradlew :app:generateDiscoveryGallery&lt;/code&gt;.&lt;/p&gt;\n&quot;);</span>
+<span class="fc" id="L331">        return sb.toString();</span>
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+<span class="fc" id="L338">    private record ArtifactLink(String label, String path, String href) {}</span>
+
+    private String modeBanner(DiscoveryStoryTimelineWriter.ResultMode mode) {
+<span class="pc bpc" id="L341" title="1 of 3 branches missed.">        String cssClass = switch (mode) {</span>
+<span class="fc" id="L342">            case LIVE -&gt; &quot;mode-live&quot;;</span>
+<span class="nc" id="L343">            case REPLAYED_FROM_CANONICAL -&gt; &quot;mode-replayed&quot;;</span>
+<span class="fc" id="L344">            case PRE_GENERATED_REFERENCE -&gt; &quot;mode-pregenerated&quot;;</span>
+        };
+<span class="pc bpc" id="L346" title="1 of 3 branches missed.">        String label = switch (mode) {</span>
+<span class="fc" id="L347">            case LIVE -&gt; &quot;LIVE EXECUTION&quot;;</span>
+<span class="nc" id="L348">            case REPLAYED_FROM_CANONICAL -&gt; &quot;REPLAYED FROM CANONICAL EVIDENCE&quot;;</span>
+<span class="fc" id="L349">            case PRE_GENERATED_REFERENCE -&gt; &quot;PRE-GENERATED REFERENCE EVIDENCE&quot;;</span>
+        };
+<span class="fc" id="L351">        return &quot;&lt;div class=\&quot;mode-banner &quot; + cssClass + &quot;\&quot;&gt;&quot; + esc(label) + &quot;&lt;/div&gt;\n&quot;;</span>
+    }
+
+    private String badge(String text, String cssClass) {
+<span class="fc" id="L355">        return &quot;&lt;span class=\&quot;badge &quot; + cssClass + &quot;\&quot;&gt;&quot; + esc(text) + &quot;&lt;/span&gt;&quot;;</span>
+    }
+
+    private static String esc(String s) {
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L360">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L362">        return s.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
+<span class="fc" id="L363">            .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="fc" id="L364">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
+<span class="fc" id="L365">            .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
