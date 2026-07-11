@@ -47,6 +47,9 @@ public record RecognitionProfile(
      * infer bindings such as {@code A = 3/2*a} from a square term
      * {@code 9/4*a^2} and checks every later occurrence modulo normalized
      * numeric coefficients and powers.
+     *
+     * <p>This is deliberately not a general equation solver. Unsupported
+     * expressions retain the ordinary structural matching behavior.</p>
      */
     public static RecognitionProfile algebraicAc() {
         Set<BinaryOperator> operators = EnumSet.of(BinaryOperator.ADD, BinaryOperator.MUL);
