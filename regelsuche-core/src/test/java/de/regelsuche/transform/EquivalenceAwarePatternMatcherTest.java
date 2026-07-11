@@ -32,24 +32,39 @@ class EquivalenceAwarePatternMatcherTest {
     }
 
     @Test
-    void rejectsNearMissDespiteAssociativeCommutativeRecognition() {
+    void acOnlyRecognitionDoesNotInferChangedCoefficients() {
         PatternRewriteRule rule = completeSquareRule(RecognitionProfile.arithmeticAc());
 
-        assertFalse(rule.matches(parser.parseTerm("a^2 + 3 * a * x + x^2")));
-        assertFalse(rule.matches(parser.parseTerm("a^2 + 2 * a * y + x^2")));
+        assertFalse(rule.matches(parser.parseTerm("x^2 + 3 * a * x + (9 / 4) * a^2")));
     }
 
     @Test
-    void repeatedPlaceholderMustBindToTheSameExpression() {
+    void infersFractionalPlaceholderFromAllCompleteSquareTerms() {
+        PatternRewriteRule rule = completeSquareRule(RecognitionProfile.algebraicAc());
+
+        assertTrue(rule.matches(parser.parseTerm("x^2 + 3 * a * x + (9 / 4) * a^2")));
+        assertTrue(rule.matches(parser.parseTerm("x^2 + 2 * x * y + (4 / 9) * y^2")));
+    }
+
+    @Test
+    void rejectsCoefficientWhenOtherOccurrencesContradictInferredBinding() {
+        PatternRewriteRule rule = completeSquareRule(RecognitionProfile.algebraicAc());
+
+        assertFalse(rule.matches(parser.parseTerm("x^2 + 3 * a * x + a^2")));
+        assertFalse(rule.matches(parser.parseTerm("x^2 + 2 * a * y + a^2")));
+    }
+
+    @Test
+    void repeatedPlaceholderMustBindToTheSameEquivalentMonomial() {
         PatternRewriteRule rule = new PatternRewriteRule(
             "double-term",
             PatternExpr.op(ADD, PatternExpr.var("X"), PatternExpr.var("X")),
             PatternExpr.op(MUL, PatternExpr.num(2), PatternExpr.var("X")),
-            RecognitionProfile.arithmeticAc()
+            RecognitionProfile.algebraicAc()
         );
 
-        assertTrue(rule.matches(parser.parseTerm("value + value")));
-        assertFalse(rule.matches(parser.parseTerm("value + other")));
+        assertTrue(rule.matches(parser.parseTerm("2 * value + value * 2")));
+        assertFalse(rule.matches(parser.parseTerm("2 * value + 3 * value")));
     }
 
     private PatternRewriteRule completeSquareRule(RecognitionProfile profile) {
