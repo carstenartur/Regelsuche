@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PromotionObservation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">PromotionObservation.java</span></div><h1>PromotionObservation.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -23,236 +24,98 @@ record PromotionObservation(
     boolean evidenceExists,
     boolean curatedPathPresent,
     boolean fallbackUsed,
-    boolean macroOpportunity
+    boolean macroOpportunity,
+    ProofPolicy proofPolicy,
+    String proverExecutionStatus
 ) {
-<span class="fc" id="L28">    PromotionObservation {</span>
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        family = family == null ? &quot;&quot; : family;</span>
-<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        originalExpression = originalExpression == null ? &quot;&quot; : originalExpression;</span>
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        discoveredStructure = discoveredStructure == null ? &quot;&quot; : discoveredStructure;</span>
-<span class="pc bpc" id="L32" title="2 of 4 branches missed.">        oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
-<span class="pc bpc" id="L34" title="2 of 4 branches missed.">        ablationStatus = ablationStatus == null || ablationStatus.isBlank() ? &quot;N/A&quot; : ablationStatus;</span>
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        sourceOperator = sourceOperator == null ? &quot;&quot; : sourceOperator;</span>
-<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        sourcePack = sourcePack == null ? &quot;&quot; : sourcePack;</span>
-<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        rationale = rationale == null ? &quot;&quot; : rationale;</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
-<span class="fc" id="L40">    }</span>
+<span class="fc" id="L31">    PromotionObservation {</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        family = family == null ? &quot;&quot; : family;</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        originalExpression = originalExpression == null ? &quot;&quot; : originalExpression;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        discoveredStructure = discoveredStructure == null ? &quot;&quot; : discoveredStructure;</span>
+<span class="pc bpc" id="L35" title="2 of 4 branches missed.">        oracleStatus = oracleStatus == null || oracleStatus.isBlank() ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        oracleEvidence = oracleEvidence == null ? &quot;&quot; : oracleEvidence;</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">        ablationStatus = ablationStatus == null || ablationStatus.isBlank() ? &quot;N/A&quot; : ablationStatus;</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        sourceOperator = sourceOperator == null ? &quot;&quot; : sourceOperator;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        sourcePack = sourcePack == null ? &quot;&quot; : sourcePack;</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        rationale = rationale == null ? &quot;&quot; : rationale;</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        proofPolicy = proofPolicy == null ? ProofPolicy.PROOF_OPTIONAL : proofPolicy;</span>
+<span class="fc" id="L44">        proverExecutionStatus = ProofPolicy.normaliseExecutionStatus(proverExecutionStatus);</span>
+<span class="fc" id="L45">    }</span>
 
     AblationEvidence ablationEvidence() {
-<span class="fc" id="L43">        return AblationEvidence.statusOnly(ablationStatus, rationale);</span>
+<span class="fc" id="L48">        return AblationEvidence.statusOnly(ablationStatus, rationale);</span>
     }
 
-    static PromotionObservation fromCampaignOne(DiscoveryCampaignOneRunner.CaseResult result, String campaignId) {
-<span class="fc" id="L47">        return new PromotionObservation(</span>
-<span class="fc" id="L48">            result.id(),</span>
+    static PromotionObservation fromCampaignResult(CampaignCaseResult result, String campaignId) {
+<span class="fc" id="L52">        return new PromotionObservation(</span>
+<span class="fc" id="L53">            result.id(),</span>
             campaignId,
-<span class="fc" id="L50">            discoveryDateFor(campaignId),</span>
-<span class="fc" id="L51">            result.family(),</span>
-<span class="fc" id="L52">            result.inputExpression(),</span>
-<span class="fc" id="L53">            result.targetExpression(),</span>
-<span class="fc" id="L54">            result.success(),</span>
-<span class="fc" id="L55">            result.oracleStatus(),</span>
-<span class="fc" id="L56">            result.oracleEvidence(),</span>
-<span class="fc" id="L57">            result.ablationStatus(),</span>
-<span class="fc" id="L58">            result.shortcutOperatorId(),</span>
-<span class="fc" id="L59">            result.shortcutPackId(),</span>
-<span class="fc" id="L60">            result.shortcutAssumptions(),</span>
-<span class="fc" id="L61">            rationale(result.notes(), result.failureReason()),</span>
-<span class="fc" id="L62">            result.rulePath(),</span>
-<span class="fc bfc" id="L63" title="All 2 branches covered.">            !result.rulePath().isEmpty(),</span>
-<span class="fc" id="L64">            curatedPathPresent(result.shortcutSource()),</span>
-<span class="fc" id="L65">            fallbackUsed(result.rulePath()),</span>
-<span class="fc" id="L66">            macroOpportunity(result.family(), result.rulePath())</span>
-        );
-    }
-
-    static PromotionObservation fromCampaignTwo(DiscoveryCampaignTwoRunner.CaseResult result, String campaignId) {
-<span class="fc" id="L71">        return new PromotionObservation(</span>
-<span class="fc" id="L72">            result.id(),</span>
-            campaignId,
-<span class="fc" id="L74">            discoveryDateFor(campaignId),</span>
-<span class="fc" id="L75">            result.family(),</span>
-<span class="fc" id="L76">            result.inputExpression(),</span>
-<span class="fc" id="L77">            result.targetExpression(),</span>
-<span class="fc" id="L78">            result.success(),</span>
-<span class="fc" id="L79">            result.oracleStatus(),</span>
-<span class="fc" id="L80">            result.oracleEvidence(),</span>
-<span class="fc" id="L81">            result.ablationStatus(),</span>
-<span class="fc" id="L82">            result.shortcutOperatorId(),</span>
-<span class="fc" id="L83">            result.shortcutPackId(),</span>
-<span class="fc" id="L84">            result.shortcutAssumptions(),</span>
-<span class="fc" id="L85">            rationale(result.notes(), result.failureReason()),</span>
-<span class="fc" id="L86">            result.rulePath(),</span>
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            !result.rulePath().isEmpty(),</span>
-<span class="fc" id="L88">            curatedPathPresent(result.shortcutSource()),</span>
-<span class="fc" id="L89">            fallbackUsed(result.rulePath()),</span>
-<span class="fc" id="L90">            macroOpportunity(result.family(), result.rulePath())</span>
-        );
-    }
-
-    static PromotionObservation fromCampaignThree(DiscoveryCampaignThreeRunner.CaseResult result, String campaignId) {
-<span class="fc" id="L95">        return new PromotionObservation(</span>
-<span class="fc" id="L96">            result.id(),</span>
-            campaignId,
-<span class="fc" id="L98">            discoveryDateFor(campaignId),</span>
-<span class="fc" id="L99">            result.family(),</span>
-<span class="fc" id="L100">            result.inputExpression(),</span>
-<span class="fc" id="L101">            result.targetExpression(),</span>
-<span class="fc" id="L102">            result.success(),</span>
-<span class="fc" id="L103">            result.oracleStatus(),</span>
-<span class="fc" id="L104">            result.oracleEvidence(),</span>
-<span class="fc" id="L105">            result.ablationStatus(),</span>
-<span class="fc" id="L106">            result.shortcutOperatorId(),</span>
-<span class="fc" id="L107">            result.shortcutPackId(),</span>
-<span class="fc" id="L108">            result.shortcutAssumptions(),</span>
-<span class="fc" id="L109">            rationale(result.notes(), result.failureReason()),</span>
-<span class="fc" id="L110">            result.rulePath(),</span>
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            !result.rulePath().isEmpty(),</span>
-<span class="fc" id="L112">            curatedPathPresent(result.shortcutSource()),</span>
-<span class="fc" id="L113">            fallbackUsed(result.rulePath()),</span>
-<span class="fc" id="L114">            macroOpportunity(result.family(), result.rulePath())</span>
-        );
-    }
-
-    static PromotionObservation fromCampaignFive(DiscoveryCampaignFiveRunner.CaseResult result, String campaignId) {
-<span class="fc" id="L119">        return new PromotionObservation(</span>
-<span class="fc" id="L120">            result.id(),</span>
-            campaignId,
-<span class="fc" id="L122">            discoveryDateFor(campaignId),</span>
-<span class="fc" id="L123">            result.family(),</span>
-<span class="fc" id="L124">            result.inputExpression(),</span>
-<span class="fc" id="L125">            result.targetExpression(),</span>
-<span class="fc" id="L126">            result.success(),</span>
-<span class="fc" id="L127">            result.oracleStatus(),</span>
-<span class="fc" id="L128">            result.oracleEvidence(),</span>
-<span class="fc" id="L129">            result.ablationStatus(),</span>
-<span class="fc" id="L130">            result.shortcutOperatorId(),</span>
-<span class="fc" id="L131">            result.shortcutPackId(),</span>
-<span class="fc" id="L132">            result.shortcutAssumptions(),</span>
-<span class="fc" id="L133">            rationale(result.notes(), result.failureReason()),</span>
-<span class="fc" id="L134">            result.rulePath(),</span>
-<span class="fc bfc" id="L135" title="All 2 branches covered.">            !result.rulePath().isEmpty(),</span>
-<span class="fc" id="L136">            curatedPathPresent(result.shortcutSource()),</span>
-<span class="fc" id="L137">            fallbackUsed(result.rulePath()),</span>
-<span class="fc" id="L138">            macroOpportunity(result.family(), result.rulePath())</span>
-        );
-    }
-
-    static PromotionObservation fromCampaignSeven(DiscoveryCampaignSevenRunner.CaseResult result, String campaignId) {
-<span class="fc" id="L143">        return new PromotionObservation(</span>
-<span class="fc" id="L144">            result.id(),</span>
-            campaignId,
-<span class="fc" id="L146">            discoveryDateFor(campaignId),</span>
-<span class="fc" id="L147">            result.family(),</span>
-<span class="fc" id="L148">            result.inputExpression(),</span>
-<span class="fc" id="L149">            result.targetExpression(),</span>
-<span class="fc" id="L150">            result.success(),</span>
-<span class="fc" id="L151">            result.oracleStatus(),</span>
-<span class="fc" id="L152">            result.oracleEvidence(),</span>
-<span class="fc" id="L153">            result.ablationStatus(),</span>
-<span class="fc" id="L154">            result.shortcutOperatorId(),</span>
-<span class="fc" id="L155">            result.shortcutPackId(),</span>
-<span class="fc" id="L156">            result.shortcutAssumptions(),</span>
-<span class="fc" id="L157">            rationale(result.notes(), result.failureReason()),</span>
-<span class="fc" id="L158">            result.rulePath(),</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">            !result.rulePath().isEmpty(),</span>
-<span class="fc" id="L160">            curatedPathPresent(result.shortcutSource()),</span>
-<span class="fc" id="L161">            fallbackUsed(result.rulePath()),</span>
-<span class="fc" id="L162">            macroOpportunity(result.family(), result.rulePath())</span>
-        );
-    }
-
-    static PromotionObservation fromCampaignEight(DiscoveryCampaignEightRunner.CaseResult result, String campaignId) {
-<span class="fc" id="L167">        return new PromotionObservation(</span>
-<span class="fc" id="L168">            result.id(),</span>
-            campaignId,
-<span class="fc" id="L170">            discoveryDateFor(campaignId),</span>
-<span class="fc" id="L171">            result.family(),</span>
-<span class="fc" id="L172">            result.inputExpression(),</span>
-<span class="fc" id="L173">            result.targetExpression(),</span>
-<span class="fc" id="L174">            result.success(),</span>
-<span class="fc" id="L175">            result.oracleStatus(),</span>
-<span class="fc" id="L176">            result.oracleEvidence(),</span>
-<span class="fc" id="L177">            result.ablationStatus(),</span>
-<span class="fc" id="L178">            result.shortcutOperatorId(),</span>
-<span class="fc" id="L179">            result.shortcutPackId(),</span>
-<span class="fc" id="L180">            result.shortcutAssumptions(),</span>
-<span class="fc" id="L181">            rationale(result.notes(), result.failureReason()),</span>
-<span class="fc" id="L182">            result.rulePath(),</span>
-<span class="fc bfc" id="L183" title="All 2 branches covered.">            !result.rulePath().isEmpty(),</span>
-<span class="fc" id="L184">            curatedPathPresent(result.shortcutSource()),</span>
-<span class="fc" id="L185">            fallbackUsed(result.rulePath()),</span>
-<span class="fc" id="L186">            macroOpportunity(result.family(), result.rulePath())</span>
-        );
-    }
-
-    static PromotionObservation fromCampaignNine(DiscoveryCampaignNineRunner.CaseResult result, String campaignId) {
-<span class="fc" id="L191">        return new PromotionObservation(</span>
-<span class="fc" id="L192">            result.id(),</span>
-            campaignId,
-<span class="fc" id="L194">            discoveryDateFor(campaignId),</span>
-<span class="fc" id="L195">            result.family(),</span>
-<span class="fc" id="L196">            result.inputExpression(),</span>
-<span class="fc" id="L197">            result.targetExpression(),</span>
-<span class="fc" id="L198">            result.success(),</span>
-<span class="fc" id="L199">            result.oracleStatus(),</span>
-<span class="fc" id="L200">            result.oracleEvidence(),</span>
-<span class="fc" id="L201">            result.ablationStatus(),</span>
-<span class="fc" id="L202">            result.shortcutOperatorId(),</span>
-<span class="fc" id="L203">            result.shortcutPackId(),</span>
-<span class="fc" id="L204">            result.shortcutAssumptions(),</span>
-<span class="fc" id="L205">            rationale(result.notes(), result.failureReason()),</span>
-<span class="fc" id="L206">            result.rulePath(),</span>
-<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            !result.rulePath().isEmpty(),</span>
-<span class="fc" id="L208">            curatedPathPresent(result.shortcutSource()),</span>
-<span class="fc" id="L209">            fallbackUsed(result.rulePath()),</span>
-<span class="fc" id="L210">            macroOpportunity(result.family(), result.rulePath())</span>
+<span class="fc" id="L55">            discoveryDateFor(campaignId),</span>
+<span class="fc" id="L56">            result.family(),</span>
+<span class="fc" id="L57">            result.inputExpression(),</span>
+<span class="fc" id="L58">            result.targetExpression(),</span>
+<span class="fc" id="L59">            result.success(),</span>
+<span class="fc" id="L60">            result.oracleStatus(),</span>
+<span class="fc" id="L61">            result.oracleEvidence(),</span>
+<span class="fc" id="L62">            result.ablationStatus(),</span>
+<span class="fc" id="L63">            result.shortcutOperatorId(),</span>
+<span class="fc" id="L64">            result.shortcutPackId(),</span>
+<span class="fc" id="L65">            result.shortcutAssumptions(),</span>
+<span class="fc" id="L66">            rationale(result.notes(), result.failureReason()),</span>
+<span class="fc" id="L67">            result.rulePath(),</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            !result.rulePath().isEmpty(),</span>
+<span class="fc" id="L69">            curatedPathPresent(result.shortcutSource()),</span>
+<span class="fc" id="L70">            fallbackUsed(result.rulePath()),</span>
+<span class="fc" id="L71">            macroOpportunity(result.family(), result.rulePath()),</span>
+            ProofPolicy.PROOF_OPTIONAL,
+            &quot;&quot;
         );
     }
 
     static String discoveryDateFor(String campaignId) {
-<span class="pc bpc" id="L215" title="2 of 9 branches missed.">        int month = switch (campaignId) {</span>
-<span class="fc" id="L216">            case &quot;discovery-campaign-1&quot; -&gt; 1;</span>
-<span class="fc" id="L217">            case &quot;discovery-campaign-2&quot; -&gt; 2;</span>
-<span class="fc" id="L218">            case &quot;discovery-campaign-3&quot; -&gt; 3;</span>
-<span class="nc" id="L219">            case &quot;discovery-campaign-4&quot; -&gt; 4;</span>
-<span class="fc" id="L220">            case &quot;discovery-campaign-5&quot; -&gt; 5;</span>
-<span class="fc" id="L221">            case &quot;discovery-campaign-7&quot; -&gt; 7;</span>
-<span class="fc" id="L222">            case &quot;discovery-campaign-8&quot; -&gt; 8;</span>
-<span class="fc" id="L223">            case &quot;discovery-campaign-9&quot; -&gt; 9;</span>
-<span class="pc" id="L224">            default -&gt; 12;</span>
+<span class="pc bpc" id="L78" title="2 of 9 branches missed.">        int month = switch (campaignId) {</span>
+<span class="fc" id="L79">            case &quot;discovery-campaign-1&quot; -&gt; 1;</span>
+<span class="fc" id="L80">            case &quot;discovery-campaign-2&quot; -&gt; 2;</span>
+<span class="fc" id="L81">            case &quot;discovery-campaign-3&quot; -&gt; 3;</span>
+<span class="nc" id="L82">            case &quot;discovery-campaign-4&quot; -&gt; 4;</span>
+<span class="fc" id="L83">            case &quot;discovery-campaign-5&quot; -&gt; 5;</span>
+<span class="fc" id="L84">            case &quot;discovery-campaign-7&quot; -&gt; 7;</span>
+<span class="fc" id="L85">            case &quot;discovery-campaign-8&quot; -&gt; 8;</span>
+<span class="fc" id="L86">            case &quot;discovery-campaign-9&quot; -&gt; 9;</span>
+<span class="pc" id="L87">            default -&gt; 12;</span>
         };
-<span class="fc" id="L226">        return LocalDate.of(2026, month, 1).toString();</span>
+<span class="fc" id="L89">        return LocalDate.of(2026, month, 1).toString();</span>
     }
 
     private static boolean curatedPathPresent(String source) {
-<span class="pc bpc" id="L230" title="1 of 4 branches missed.">        if (source == null || source.isBlank()) {</span>
-<span class="fc" id="L231">            return false;</span>
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        if (source == null || source.isBlank()) {</span>
+<span class="fc" id="L94">            return false;</span>
         }
-<span class="fc" id="L233">        String normalized = source.toLowerCase(Locale.ROOT);</span>
-<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        return normalized.equals(&quot;scenario&quot;)</span>
-<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            || normalized.equals(&quot;scenario-generic&quot;)</span>
-<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            || normalized.equals(&quot;hardcoded&quot;)</span>
-<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            || normalized.contains(&quot;scenario-exact-path&quot;);</span>
+<span class="fc" id="L96">        String normalized = source.toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        return normalized.equals(&quot;scenario&quot;)</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            || normalized.equals(&quot;scenario-generic&quot;)</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            || normalized.equals(&quot;hardcoded&quot;)</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            || normalized.contains(&quot;scenario-exact-path&quot;);</span>
     }
 
     private static boolean fallbackUsed(List&lt;String&gt; rulePath) {
-<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        return rulePath != null &amp;&amp; rulePath.stream()</span>
-<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            .filter(ruleId -&gt; ruleId != null)</span>
-<span class="fc" id="L243">            .map(ruleId -&gt; ruleId.toLowerCase(Locale.ROOT))</span>
-<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            .anyMatch(ruleId -&gt; ruleId.contains(&quot;fallback&quot;));</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        return rulePath != null &amp;&amp; rulePath.stream()</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            .filter(ruleId -&gt; ruleId != null)</span>
+<span class="fc" id="L106">            .map(ruleId -&gt; ruleId.toLowerCase(Locale.ROOT))</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            .anyMatch(ruleId -&gt; ruleId.contains(&quot;fallback&quot;));</span>
     }
 
     private static boolean macroOpportunity(String family, List&lt;String&gt; rulePath) {
-<span class="pc bpc" id="L248" title="1 of 6 branches missed.">        return &quot;substitution&quot;.equals(family) || (rulePath != null &amp;&amp; rulePath.size() &gt;= 2);</span>
+<span class="pc bpc" id="L111" title="1 of 6 branches missed.">        return &quot;substitution&quot;.equals(family) || (rulePath != null &amp;&amp; rulePath.size() &gt;= 2);</span>
     }
 
     private static String rationale(String notes, String failureReason) {
-<span class="pc bpc" id="L252" title="2 of 4 branches missed.">        if (notes != null &amp;&amp; !notes.isBlank()) {</span>
-<span class="fc" id="L253">            return notes;</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">        if (notes != null &amp;&amp; !notes.isBlank()) {</span>
+<span class="fc" id="L116">            return notes;</span>
         }
-<span class="nc bnc" id="L255" title="All 2 branches missed.">        return failureReason == null ? &quot;&quot; : failureReason;</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        return failureReason == null ? &quot;&quot; : failureReason;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

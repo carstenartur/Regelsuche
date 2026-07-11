@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofConfirmation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofConfirmation.java</span></div><h1>ProofConfirmation.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import java.time.Instant;
+import java.util.Objects;
+
+/**
+ * Immutable snapshot that binds an external prover confirmation to the exact
+ * hypothesis revision and assumptions that were in effect at the time.
+ *
+ * &lt;p&gt;Confirmation is only meaningful for the specific {@code candidateRevisionHash}
+ * and {@code assumptionsFingerprint} it was recorded for. Any modification to
+ * the candidate statement or its assumptions renders the confirmation invalid
+ * and a fresh proof attempt is required.&lt;/p&gt;
+ *
+ * &lt;p&gt;Use {@link #isValidFor(String, String)} to check whether a cached
+ * confirmation still applies.&lt;/p&gt;
+ */
+public record ProofConfirmation(
+    String proverName,
+    String proverVersion,
+    String invocationCommand,
+    long timeoutMillis,
+    String exitState,
+    String artifactHash,
+    String assumptionsFingerprint,
+    String candidateRevisionHash,
+    Instant confirmedAt
+) {
+<span class="fc" id="L29">    public ProofConfirmation {</span>
+<span class="fc" id="L30">        Objects.requireNonNull(proverName, &quot;proverName&quot;);</span>
+<span class="fc" id="L31">        Objects.requireNonNull(exitState, &quot;exitState&quot;);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        proverVersion = proverVersion == null ? &quot;&quot; : proverVersion;</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        invocationCommand = invocationCommand == null ? &quot;&quot; : invocationCommand;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (timeoutMillis &lt; 0L) {</span>
+<span class="nc" id="L35">            timeoutMillis = 0L;</span>
+        }
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        artifactHash = artifactHash == null ? &quot;&quot; : artifactHash;</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        assumptionsFingerprint = assumptionsFingerprint == null ? &quot;&quot; : assumptionsFingerprint;</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        candidateRevisionHash = candidateRevisionHash == null ? &quot;&quot; : candidateRevisionHash;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        confirmedAt = confirmedAt == null ? Instant.now() : confirmedAt;</span>
+<span class="fc" id="L41">    }</span>
+
+    /**
+     * @return {@code true} only when the external prover returned
+     *         {@link ProverExecutionResult.Status#PROVER_CONFIRMED}.
+     */
+    public boolean isConfirmed() {
+<span class="fc" id="L48">        return ProverExecutionResult.Status.PROVER_CONFIRMED.name().equals(exitState);</span>
+    }
+
+    /**
+     * Checks whether this confirmation is still valid for the given candidate
+     * revision and assumptions.
+     *
+     * &lt;p&gt;Returns {@code false} whenever the candidate statement or its
+     * assumptions have changed since this confirmation was recorded, thereby
+     * invalidating any cached proof.&lt;/p&gt;
+     *
+     * @param candidateRevisionHash the current candidate revision hash.
+     * @param assumptionsFingerprint the current assumptions fingerprint.
+     * @return {@code true} iff both the candidate and assumptions are unchanged.
+     */
+    public boolean isValidFor(String candidateRevisionHash, String assumptionsFingerprint) {
+<span class="fc bfc" id="L64" title="All 4 branches covered.">        if (candidateRevisionHash == null || assumptionsFingerprint == null) {</span>
+<span class="fc" id="L65">            return false;</span>
+        }
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        return this.candidateRevisionHash.equals(candidateRevisionHash)</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            &amp;&amp; this.assumptionsFingerprint.equals(assumptionsFingerprint);</span>
+    }
+
+    /**
+     * Builds a containerized reproduction command for this proof attempt.
+     *
+     * &lt;p&gt;The returned string is a {@code docker run} snippet that a developer
+     * can copy-paste to re-run the prover in an isolated environment with the
+     * same artifact and timeout.&lt;/p&gt;
+     *
+     * @param artifactMountPath the host path to the proof artifact directory.
+     * @return a reproducible {@code docker run} command string.
+     */
+    public String containerReproductionCommand(String artifactMountPath) {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        String mount = artifactMountPath == null ? &quot;/proofs&quot; : artifactMountPath;</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        long timeoutSec = timeoutMillis &gt; 0L ? timeoutMillis / 1000L : 30L;</span>
+<span class="fc" id="L84">        return String.format(</span>
+            &quot;docker run --rm -v \&quot;%s:/workspace\&quot; regelsuche/prover-sandbox:%s &quot;
+                + &quot;timeout %d %s /workspace/%s&quot;,
+            mount,
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            proverVersion.isBlank() ? &quot;latest&quot; : proverVersion,</span>
+<span class="fc" id="L89">            timeoutSec,</span>
+            proverName,
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            artifactHash.isBlank() ? &quot;&lt;artifact&gt;&quot; : artifactHash</span>
+        );
+    }
+
+    /**
+     * Convenience factory for a confirmation from a {@link ProverExecutionResult}.
+     *
+     * @param result            the execution result.
+     * @param artifactHash      SHA-256 (or similar) digest of the proof artifact.
+     * @param assumptionsFingerprint sorted assumptions fingerprint.
+     * @param candidateRevisionHash  canonical hash of the candidate statement.
+     * @param invocationCommand the exact command line that was used.
+     * @param timeoutMillis     the configured timeout in milliseconds.
+     * @return a new {@code ProofConfirmation} bound to the given revision.
+     */
+    public static ProofConfirmation of(
+        ProverExecutionResult result,
+        String artifactHash,
+        String assumptionsFingerprint,
+        String candidateRevisionHash,
+        String invocationCommand,
+        long timeoutMillis
+    ) {
+<span class="fc" id="L114">        Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L115">        return new ProofConfirmation(</span>
+<span class="fc" id="L116">            result.tool(),</span>
+            &quot;&quot;,
+            invocationCommand,
+            timeoutMillis,
+<span class="fc" id="L120">            result.status().name(),</span>
+            artifactHash,
+            assumptionsFingerprint,
+            candidateRevisionHash,
+<span class="fc" id="L124">            Instant.now()</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

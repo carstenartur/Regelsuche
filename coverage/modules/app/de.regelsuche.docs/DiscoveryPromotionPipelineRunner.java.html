@@ -66,19 +66,19 @@ import java.util.stream.Stream;
 
 <span class="fc" id="L67">        List&lt;PromotionRecord&gt; promotionRecords = Stream.of(</span>
 <span class="fc" id="L68">                campaignOne.results().stream()</span>
-<span class="fc" id="L69">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignOne(result, campaignOne.id()))),</span>
+<span class="fc" id="L69">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignResult(result, campaignOne.id()))),</span>
 <span class="fc" id="L70">                campaignTwo.results().stream()</span>
-<span class="fc" id="L71">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignTwo(result, campaignTwo.id()))),</span>
+<span class="fc" id="L71">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignResult(result, campaignTwo.id()))),</span>
 <span class="fc" id="L72">                campaignThree.results().stream()</span>
-<span class="fc" id="L73">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignThree(result, campaignThree.id()))),</span>
+<span class="fc" id="L73">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignResult(result, campaignThree.id()))),</span>
 <span class="fc" id="L74">                campaignFive.results().stream()</span>
-<span class="fc" id="L75">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignFive(result, campaignFive.id()))),</span>
+<span class="fc" id="L75">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignResult(result, campaignFive.id()))),</span>
 <span class="fc" id="L76">                campaignSeven.results().stream()</span>
-<span class="fc" id="L77">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignSeven(result, campaignSeven.id()), result.structuredAblation())),</span>
+<span class="fc" id="L77">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignResult(result, campaignSeven.id()), result.structuredAblation())),</span>
 <span class="fc" id="L78">                campaignEight.results().stream()</span>
-<span class="fc" id="L79">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignEight(result, campaignEight.id()))),</span>
+<span class="fc" id="L79">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignResult(result, campaignEight.id()))),</span>
 <span class="fc" id="L80">                campaignNine.results().stream()</span>
-<span class="fc" id="L81">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignNine(result, campaignNine.id()))))</span>
+<span class="fc" id="L81">                    .map(result -&gt; decider.decide(PromotionObservation.fromCampaignResult(result, campaignNine.id()))))</span>
 <span class="fc" id="L82">            .flatMap(Function.identity())</span>
 <span class="fc" id="L83">            .sorted(Comparator.comparing(PromotionRecord::candidateId))</span>
 <span class="fc" id="L84">            .toList();</span>

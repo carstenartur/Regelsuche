@@ -68,7 +68,7 @@ import java.util.stream.Stream;
 <span class="fc" id="L68">            PromotionDecider promotionDecider = new PromotionDecider();</span>
 <span class="fc" id="L69">            List&lt;PromotionRecord&gt; promotionRecords = report.results().stream()</span>
 <span class="fc" id="L70">                .map(result -&gt; promotionDecider.decide(</span>
-<span class="fc" id="L71">                    PromotionObservation.fromCampaignSeven(result, report.id()),</span>
+<span class="fc" id="L71">                    PromotionObservation.fromCampaignResult(result, report.id()),</span>
 <span class="fc" id="L72">                    result.structuredAblation()))</span>
 <span class="fc" id="L73">                .toList();</span>
 <span class="fc" id="L74">            AtomicJsonFile.writeUtf8(</span>
@@ -370,7 +370,7 @@ import java.util.stream.Stream;
         String notes,
         String smallGraphMessage,
         AblationEvidence structuredAblation
-    ) {
+    ) implements CampaignCaseResult {
 <span class="fc" id="L374">        public CaseResult {</span>
 <span class="pc bpc" id="L375" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;&quot; : failureReason;</span>
 <span class="pc bpc" id="L376" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>

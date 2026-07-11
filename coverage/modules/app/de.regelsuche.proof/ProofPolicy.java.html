@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofPolicy.java</span></div><h1>ProofPolicy.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+/**
+ * Configures how external prover confirmation is enforced as a gate for
+ * discovery promotion and public evidence.
+ *
+ * &lt;p&gt;Three levels of strictness are available:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@link #PROOF_OPTIONAL} — no external proof is required; existing
+ *       example-based and symbolic validation gates apply as normal.&lt;/li&gt;
+ *   &lt;li&gt;{@link #PROOF_REQUIRED_FOR_PROMOTION} — a candidate cannot be
+ *       promoted to the inventory unless an external prover has confirmed the
+ *       equivalence ({@code PROVER_CONFIRMED} execution status).&lt;/li&gt;
+ *   &lt;li&gt;{@link #PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE} — in addition to
+ *       promotion, the candidate may not appear in public gallery evidence
+ *       without a confirmed proof.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;Only {@link ProverExecutionResult.Status#PROVER_CONFIRMED} satisfies a
+ * mandatory policy.  {@link ProverExecutionResult.Status#SCRIPT_GENERATED},
+ * {@link ProverExecutionResult.Status#PROVER_NOT_AVAILABLE},
+ * {@link ProverExecutionResult.Status#PROVER_TIMEOUT} and
+ * {@link ProverExecutionResult.Status#PROVER_FAILED} are all distinct
+ * blockers under any non-optional policy.&lt;/p&gt;
+ */
+<span class="fc" id="L26">public enum ProofPolicy {</span>
+
+    /**
+     * No external proof is required; the candidate may be promoted and shown
+     * as public evidence regardless of proof execution status.
+     */
+<span class="fc" id="L32">    PROOF_OPTIONAL,</span>
+
+    /**
+     * An external prover must return {@code PROVER_CONFIRMED} before the
+     * candidate may be promoted to the rule inventory.
+     */
+<span class="fc" id="L38">    PROOF_REQUIRED_FOR_PROMOTION,</span>
+
+    /**
+     * An external prover must return {@code PROVER_CONFIRMED} before the
+     * candidate may be shown as public discovery evidence.  This is the
+     * strictest setting and implies the promotion requirement as well.
+     */
+<span class="fc" id="L45">    PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE;</span>
+
+    /**
+     * Checks whether {@code proverExecutionStatus} satisfies this policy.
+     *
+     * &lt;p&gt;For {@link #PROOF_OPTIONAL}, every status is accepted.
+     * For all other policies only {@code &quot;PROVER_CONFIRMED&quot;} is accepted.&lt;/p&gt;
+     *
+     * @param proverExecutionStatus the {@link ProverExecutionResult.Status}
+     *        name (e.g. {@code &quot;PROVER_CONFIRMED&quot;}, {@code &quot;SCRIPT_GENERATED&quot;});
+     *        {@code null} or blank is treated as {@code &quot;SCRIPT_GENERATED&quot;}.
+     * @return {@code true} if this policy is satisfied by the given status.
+     */
+    public boolean satisfiedBy(String proverExecutionStatus) {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (this == PROOF_OPTIONAL) {</span>
+<span class="fc" id="L60">            return true;</span>
+        }
+<span class="fc" id="L62">        return ProverExecutionResult.Status.PROVER_CONFIRMED.name()</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            .equals(proverExecutionStatus == null ? &quot;&quot; : proverExecutionStatus.trim());</span>
+    }
+
+    /**
+     * Returns whether promotion is gated on external proof confirmation.
+     *
+     * @return {@code true} for {@link #PROOF_REQUIRED_FOR_PROMOTION} and
+     *         {@link #PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE}.
+     */
+    public boolean requiresConfirmedProofForPromotion() {
+<span class="fc bfc" id="L73" title="All 4 branches covered.">        return this == PROOF_REQUIRED_FOR_PROMOTION || this == PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE;</span>
+    }
+
+    /**
+     * Returns whether public evidence display is gated on external proof
+     * confirmation.
+     *
+     * @return {@code true} only for {@link #PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE}.
+     */
+    public boolean requiresConfirmedProofForPublicEvidence() {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        return this == PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE;</span>
+    }
+
+    /**
+     * Normalises an absent or blank execution status to a canonical sentinel.
+     *
+     * @param proverExecutionStatus raw status string, possibly null/blank.
+     * @return {@code &quot;SCRIPT_GENERATED&quot;} when blank, otherwise the trimmed input.
+     */
+    public static String normaliseExecutionStatus(String proverExecutionStatus) {
+<span class="fc bfc" id="L93" title="All 4 branches covered.">        if (proverExecutionStatus == null || proverExecutionStatus.isBlank()) {</span>
+<span class="fc" id="L94">            return ProverExecutionResult.Status.SCRIPT_GENERATED.name();</span>
+        }
+<span class="fc" id="L96">        return proverExecutionStatus.trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

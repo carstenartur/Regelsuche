@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofScriptValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofScriptValidator.java</span></div><h1>ProofScriptValidator.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Validates a proof script for structural completeness before it is submitted
+ * to an external prover.
+ *
+ * &lt;p&gt;The following conditions are detected and reported as violations:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;strong&gt;Admitted statements&lt;/strong&gt; — {@code sorry} (Lean) or
+ *       {@code admit} (Coq/Lean) placeholders that bypass the proof
+ *       obligation. These must never satisfy a required proof policy.&lt;/li&gt;
+ *   &lt;li&gt;&lt;strong&gt;Unsupported placeholders&lt;/strong&gt; — unresolved metavariables
+ *       ({@code _}) or tactic holes ({@code ?goal}) left in the script.&lt;/li&gt;
+ *   &lt;li&gt;&lt;strong&gt;Missing or empty script&lt;/strong&gt; — a blank script cannot
+ *       be sent to any prover.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;Use {@link #validate(String, String)} to obtain a {@link ValidationResult}
+ * before scheduling a proof job.&lt;/p&gt;
+ */
+public final class ProofScriptValidator {
+
+    private ProofScriptValidator() {
+    }
+
+    /**
+     * Validates {@code script} for the given {@code tool}.
+     *
+     * @param script the proof artifact text.
+     * @param tool   the target tool name (e.g. {@code &quot;lean4&quot;}, {@code &quot;smtlib2&quot;}).
+     * @return a {@link ValidationResult} listing any detected violations.
+     */
+    public static ValidationResult validate(String script, String tool) {
+<span class="fc" id="L37">        List&lt;String&gt; violations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L38" title="All 4 branches covered.">        if (script == null || script.isBlank()) {</span>
+<span class="fc" id="L39">            violations.add(&quot;empty-script&quot;);</span>
+<span class="fc" id="L40">            return new ValidationResult(violations);</span>
+        }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        String effectiveTool = tool == null ? &quot;&quot; : tool;</span>
+<span class="fc" id="L43">        boolean foundAdmitted = false;</span>
+<span class="fc" id="L44">        boolean foundPlaceholder = false;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (String line : script.split(&quot;\n&quot;)) {</span>
+<span class="fc" id="L46">            String stripped = line.stripLeading();</span>
+            // Skip comment lines
+<span class="pc bpc" id="L48" title="2 of 6 branches missed.">            if (stripped.startsWith(&quot;--&quot;) || stripped.startsWith(&quot;//&quot;) || stripped.startsWith(&quot;;&quot;)) {</span>
+<span class="nc" id="L49">                continue;</span>
+            }
+<span class="pc bpc" id="L51" title="1 of 6 branches missed.">            if (!foundAdmitted &amp;&amp; (containsWord(stripped, &quot;sorry&quot;) || containsWord(stripped, &quot;admit&quot;))) {</span>
+<span class="fc" id="L52">                violations.add(&quot;admitted-statement&quot;);</span>
+<span class="fc" id="L53">                foundAdmitted = true;</span>
+            }
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            if (!foundPlaceholder</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                    &amp;&amp; (containsWord(stripped, &quot;?goal&quot;)</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">                        || (containsWord(stripped, &quot;_&quot;) &amp;&amp; !&quot;smtlib2&quot;.equals(effectiveTool)))) {</span>
+<span class="fc" id="L58">                violations.add(&quot;unsupported-placeholder&quot;);</span>
+<span class="fc" id="L59">                foundPlaceholder = true;</span>
+            }
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">            if (foundAdmitted &amp;&amp; foundPlaceholder) {</span>
+<span class="nc" id="L62">                break;</span>
+            }
+        }
+<span class="fc" id="L65">        return new ValidationResult(violations);</span>
+    }
+
+    private static boolean containsWord(String text, String word) {
+<span class="fc" id="L69">        int idx = 0;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        while ((idx = text.indexOf(word, idx)) &gt;= 0) {</span>
+<span class="fc bfc" id="L71" title="All 4 branches covered.">            boolean prefixOk = idx == 0 || !Character.isLetterOrDigit(text.charAt(idx - 1));</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            boolean suffixOk = idx + word.length() &gt;= text.length()</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                || !Character.isLetterOrDigit(text.charAt(idx + word.length()))</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                   &amp;&amp; text.charAt(idx + word.length()) != '_';</span>
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">            if (prefixOk &amp;&amp; suffixOk) {</span>
+<span class="fc" id="L76">                return true;</span>
+            }
+<span class="fc" id="L78">            idx++;</span>
+<span class="fc" id="L79">        }</span>
+<span class="fc" id="L80">        return false;</span>
+    }
+
+    /**
+     * Result of a script validation.
+     *
+     * @param violations list of violation codes; empty means the script is valid.
+     */
+    public record ValidationResult(List&lt;String&gt; violations) {
+<span class="fc" id="L89">        public ValidationResult {</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            violations = violations == null ? List.of() : List.copyOf(violations);</span>
+<span class="fc" id="L91">        }</span>
+
+        /** @return {@code true} if no violations were found. */
+        public boolean isValid() {
+<span class="fc" id="L95">            return violations.isEmpty();</span>
+        }
+
+        /**
+         * @return {@code true} if the script contains an admitted statement
+         *         ({@code sorry} or {@code admit}).
+         */
+        public boolean hasAdmittedStatement() {
+<span class="fc" id="L103">            return violations.contains(&quot;admitted-statement&quot;);</span>
+        }
+
+        /**
+         * @return {@code true} if the script contains unsupported placeholders.
+         */
+        public boolean hasUnsupportedPlaceholder() {
+<span class="fc" id="L110">            return violations.contains(&quot;unsupported-placeholder&quot;);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -66,7 +66,7 @@ import java.util.stream.Stream;
 <span class="fc" id="L66">            Files.createDirectories(outputDirectory);</span>
 <span class="fc" id="L67">            List&lt;PromotionRecord&gt; promotionRecords = report.results().stream()</span>
 <span class="fc" id="L68">                .map(result -&gt; new PromotionDecider()</span>
-<span class="fc" id="L69">                    .decide(PromotionObservation.fromCampaignEight(result, report.id())))</span>
+<span class="fc" id="L69">                    .decide(PromotionObservation.fromCampaignResult(result, report.id())))</span>
 <span class="fc" id="L70">                .toList();</span>
 <span class="fc" id="L71">            AtomicJsonFile.writeUtf8(</span>
 <span class="fc" id="L72">                outputDirectory.resolve(&quot;discovery-campaign-8.json&quot;),</span>
@@ -323,7 +323,7 @@ import java.util.stream.Stream;
         List&lt;String&gt; rulePath,
         String notes,
         String smallGraphMessage
-    ) {
+    ) implements CampaignCaseResult {
 <span class="fc" id="L327">        public CaseResult {</span>
 <span class="pc bpc" id="L328" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;&quot; : failureReason;</span>
 <span class="pc bpc" id="L329" title="1 of 2 branches missed.">            oracleStatus = oracleStatus == null ? &quot;UNAVAILABLE&quot; : oracleStatus;</span>
