@@ -1,6 +1,6 @@
 # Complete-square factorization
 
-- generatedBy: `DocsDiscoveryGalleryGenerator`
+- generatedBy: `regelsuche.discovery-gallery`
 - scenarioId: `complete-square-factorization`
 - inputExpression: `x ^ 2 + 6 * x + 5`
 - targetExpression: `(x + 1) * (x + 5)`

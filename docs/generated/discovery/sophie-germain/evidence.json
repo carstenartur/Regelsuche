@@ -1,4 +1,22 @@
 {
+  "ablation" : {
+    "explanation" : "public benchmark macro reuse ablation",
+    "extensions" : { },
+    "improvementRatio" : 0.3333333333333333,
+    "kind" : "ABLATION_STUDY",
+    "outcome" : "CONFIRMED",
+    "status" : "DEGRADED",
+    "withCandidate" : {
+      "pathLength" : 1,
+      "statesExplored" : 2,
+      "success" : true
+    },
+    "withoutCandidate" : {
+      "pathLength" : 2,
+      "statesExplored" : 3,
+      "success" : true
+    }
+  },
   "analytics" : {
     "averageBranchingFactor" : 0.0,
     "convergentStates" : 0,
@@ -19,8 +37,38 @@
     "topSimplificationRules" : { },
     "uniqueCanonicalStates" : 4
   },
+  "artifacts" : [ {
+    "mediaType" : "text/markdown",
+    "name" : "summary",
+    "path" : "summary.md",
+    "sha256" : "sha256:131a6b37ba5bbbc9bcbb256f2a592fecccf7b1cb902ebbea57f6f8aaf6f09792"
+  }, {
+    "mediaType" : "image/svg+xml",
+    "name" : "search-space",
+    "path" : "search-space.svg",
+    "sha256" : "sha256:d63fa380fb8ebb033a8547960b957092136cdcaa89bfdd7c74526ff78e555b5b"
+  } ],
+  "assumptions" : [ ],
   "bridgeRulesUsed" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
+  "canonicalEvidenceHash" : "sha256:ad5a70e80124c9154f03c870b1f1b6d26fe482463eeb991d805f14eef38a1f31",
+  "canonicalEvidenceId" : "regelsuche.discovery-evidence/v1#sha256:ad5a70e80124c9154f03c870b1f1b6d26fe482463eeb991d805f14eef38a1f31",
+  "claims" : [ {
+    "evidenceRefs" : [ "observation-search-trace", "oracle-equivalence", "ablation-macro-reuse" ],
+    "extensions" : { },
+    "id" : "claim-generated-summary",
+    "kind" : "GENERATED_SUMMARY",
+    "outcome" : "SUPPORTED",
+    "statement" : "Sophie-Germain hidden structure reached the target expression through generated search evidence."
+  }, {
+    "evidenceRefs" : [ "observation-search-trace" ],
+    "extensions" : { },
+    "id" : "claim-generalized-hypothesis",
+    "kind" : "GENERALIZED_HYPOTHESIS",
+    "outcome" : "SUPPORTED",
+    "statement" : "hidden_structure transforms `x ^ 4 + 4 * y ^ 4` into `(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)`."
+  } ],
   "convergentStates" : [ "x^4+4*y^4" ],
+  "counterexamples" : [ ],
   "edgeCount" : 113,
   "edges" : [ {
     "assumptions" : [ ],
@@ -4318,10 +4366,33 @@
     "to" : "(x^2+2*y^2)^2-(2*x*y)^2"
   } ],
   "evidenceSchemaVersion" : "1",
+  "extensions" : { },
   "failureReason" : "",
   "foundPaths" : [ [ "x ^ 4 + 4 * y ^ 4", "(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2", "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)" ], [ "x ^ 4 + 4 * y ^ 4", "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)" ] ],
-  "generatedBy" : "DocsDiscoveryGalleryGenerator",
+  "generalizedHypothesis" : {
+    "extensions" : { },
+    "family" : "hidden_structure",
+    "rulePath" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
+    "statement" : "hidden_structure transforms `x ^ 4 + 4 * y ^ 4` into `(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)`.",
+    "status" : "SUPPORTED"
+  },
+  "generatedBy" : "regelsuche.discovery-gallery",
   "generatorVersion" : "1",
+  "holdouts" : [ {
+    "extensions" : { },
+    "id" : "without-macro",
+    "kind" : "REPLAY_RUN",
+    "pathLength" : 2,
+    "statesExplored" : 3,
+    "success" : true
+  }, {
+    "extensions" : { },
+    "id" : "with-macro",
+    "kind" : "REPLAY_RUN",
+    "pathLength" : 1,
+    "statesExplored" : 2,
+    "success" : true
+  } ],
   "inputExpression" : "x ^ 4 + 4 * y ^ 4",
   "learnedMacros" : [ "macro_6bd0496b" ],
   "nodeCount" : 56,
@@ -4662,15 +4733,96 @@
     "label" : "0 - 4 * x * x * y ^ 2 + (x ^ 2 + 2 * y * y) ^ 2",
     "tags" : [ "alternative-branch", "dead-end" ]
   } ],
+  "novelty" : {
+    "extensions" : { },
+    "matchedEvidenceIds" : [ ],
+    "rationale" : "Public discovery benchmark scenario.",
+    "status" : "DOCUMENTED_BENCHMARK"
+  },
+  "observations" : [ {
+    "bridgeRulesUsed" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
+    "edgeCount" : 113,
+    "extensions" : { },
+    "id" : "observation-search-trace",
+    "kind" : "SEARCH_TRACE",
+    "learnedMacros" : [ "macro_6bd0496b" ],
+    "nodeCount" : 56,
+    "outcome" : "OBSERVED",
+    "pathCount" : 2,
+    "reusedMacros" : [ "macro_6bd0496b" ],
+    "sourceFields" : [ "foundPaths", "nodes", "edges", "analytics", "withoutMacroRun", "withMacroRun" ],
+    "validationStatus" : "PASS"
+  } ],
   "oracleEvidence" : "python/sympy runtime unavailable",
+  "oracleResults" : [ {
+    "evidence" : "python/sympy runtime unavailable",
+    "extensions" : { },
+    "id" : "oracle-equivalence",
+    "kind" : "EXTERNAL_VALIDATION",
+    "outcome" : "INCONCLUSIVE",
+    "status" : "UNAVAILABLE"
+  } ],
   "oracleStatus" : "UNAVAILABLE",
+  "producer" : {
+    "extensions" : { },
+    "implementation" : "regelsuche",
+    "producerId" : "regelsuche.discovery-gallery",
+    "producerVersion" : "1",
+    "schemaPath" : "docs/schemas/regelsuche.discovery-evidence-v1.schema.json",
+    "sourceRef" : "generated"
+  },
+  "profiles" : [ "observed", "validated", "promoted", "public" ],
+  "promotion" : {
+    "eligible" : true,
+    "extensions" : { },
+    "gateAccepted" : true,
+    "gateId" : "public-benchmark-evidence-gate",
+    "rejectionReasons" : [ ],
+    "status" : "PUBLIC"
+  },
   "promotionEligible" : true,
+  "proof" : {
+    "confirmations" : [ ],
+    "extensions" : { },
+    "outcome" : "NOT_REQUESTED",
+    "policy" : "OPTIONAL",
+    "required" : false
+  },
+  "provenance" : {
+    "budgets" : {
+      "maxDepth" : 6,
+      "maxStates" : 240,
+      "timeoutMillis" : 5000
+    },
+    "enabledOperators" : [ "sophie_germain_bridge" ],
+    "enabledRulePacks" : [ "sympy-polynomial-basic" ],
+    "extensions" : { },
+    "gallery" : {
+      "generateSvg" : true,
+      "minVisibleNodes" : 8,
+      "preferredPathCount" : 2
+    },
+    "requiredBridgeEffects" : [ "BRIDGING" ],
+    "requiredBridgeRules" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
+    "requiredRuleFamilies" : [ "hidden_structure", "factor" ],
+    "traceSource" : "REGELSUCHE_SEARCH"
+  },
   "reusedMacros" : [ "macro_6bd0496b" ],
+  "revisions" : [ ],
   "ruleFamiliesUsed" : [ ],
   "scenarioId" : "sophie-germain",
   "scenarioVersion" : "1",
+  "schemaId" : "regelsuche.discovery-evidence/v1",
   "smallGraphMessage" : "",
   "sourceRef" : "generated",
+  "subject" : {
+    "extensions" : { },
+    "id" : "sophie-germain",
+    "inputExpression" : "x ^ 4 + 4 * y ^ 4",
+    "kind" : "DISCOVERY_SCENARIO",
+    "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)",
+    "title" : "Sophie-Germain hidden structure"
+  },
   "success" : true,
   "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)",
   "validationStatus" : "PASS",

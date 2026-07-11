@@ -1,0 +1,122 @@
+{
+  "schemaId": "regelsuche.discovery-evidence/v1",
+  "profiles": ["observed", "validated", "promoted"],
+  "producer": {
+    "producerId": "docs-example",
+    "producerVersion": "1",
+    "implementation": "example",
+    "sourceRef": "docs",
+    "schemaPath": "docs/schemas/regelsuche.discovery-evidence-v1.schema.json",
+    "extensions": {}
+  },
+  "subject": {
+    "id": "example-promoted",
+    "kind": "DISCOVERY_SCENARIO",
+    "title": "Promoted example",
+    "inputExpression": "x*(y+1)+z*(y+1)",
+    "targetExpression": "(y+1)*(x+z)",
+    "extensions": {}
+  },
+  "claims": [
+    {
+      "id": "claim-1",
+      "kind": "GENERATED_SUMMARY",
+      "outcome": "SUPPORTED",
+      "statement": "A common-factor candidate improved the search.",
+      "evidenceRefs": ["observation-1", "oracle-1", "ablation-1"],
+      "extensions": {}
+    }
+  ],
+  "observations": [
+    {
+      "id": "observation-1",
+      "kind": "SEARCH_TRACE",
+      "outcome": "OBSERVED",
+      "pathCount": 1,
+      "nodeCount": 4,
+      "edgeCount": 3,
+      "bridgeRulesUsed": ["ast_factor_common_left"],
+      "learnedMacros": ["macro-a"],
+      "reusedMacros": ["macro-a"],
+      "validationStatus": "PASS",
+      "sourceFields": ["nodes", "edges", "analytics"],
+      "extensions": {}
+    }
+  ],
+  "generalizedHypothesis": {
+    "statement": "A shared suffix can be promoted into a factorization macro.",
+    "family": "factorization",
+    "rulePath": ["ast_factor_common_left"],
+    "status": "SUPPORTED",
+    "extensions": {}
+  },
+  "revisions": [],
+  "assumptions": ["y != -1"],
+  "counterexamples": [],
+  "holdouts": [
+    {
+      "id": "without-macro",
+      "kind": "REPLAY_RUN",
+      "success": true,
+      "pathLength": 4,
+      "statesExplored": 30,
+      "extensions": {}
+    }
+  ],
+  "oracleResults": [
+    {
+      "id": "oracle-1",
+      "kind": "EXTERNAL_VALIDATION",
+      "status": "AGREE",
+      "outcome": "CONFIRMED",
+      "evidence": "CAS agrees.",
+      "extensions": {}
+    }
+  ],
+  "provenance": {
+    "traceSource": "REGELSUCHE_SEARCH",
+    "enabledOperators": ["common_factor"],
+    "extensions": {}
+  },
+  "novelty": {
+    "status": "VARIANT",
+    "matchedEvidenceIds": [],
+    "rationale": "Candidate promoted for further review.",
+    "extensions": {}
+  },
+  "ablation": {
+    "kind": "ABLATION_STUDY",
+    "status": "DEGRADED",
+    "outcome": "CONFIRMED",
+    "improvementRatio": 0.75,
+    "withCandidate": {
+      "success": true,
+      "pathLength": 1,
+      "statesExplored": 5
+    },
+    "withoutCandidate": {
+      "success": true,
+      "pathLength": 4,
+      "statesExplored": 30
+    },
+    "explanation": "Candidate shortens the search.",
+    "extensions": {}
+  },
+  "proof": {
+    "required": false,
+    "policy": "OPTIONAL",
+    "outcome": "NOT_REQUESTED",
+    "confirmations": [],
+    "extensions": {}
+  },
+  "promotion": {
+    "status": "PROMOTED",
+    "eligible": true,
+    "gateAccepted": false,
+    "gateId": "promotion-review",
+    "rejectionReasons": [],
+    "extensions": {}
+  },
+  "artifacts": [],
+  "extensions": {}
+}

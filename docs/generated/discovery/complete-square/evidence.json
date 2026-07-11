@@ -1,4 +1,22 @@
 {
+  "ablation" : {
+    "explanation" : "public benchmark macro reuse ablation",
+    "extensions" : { },
+    "improvementRatio" : 0.5,
+    "kind" : "ABLATION_STUDY",
+    "outcome" : "CONFIRMED",
+    "status" : "DEGRADED",
+    "withCandidate" : {
+      "pathLength" : 1,
+      "statesExplored" : 2,
+      "success" : true
+    },
+    "withoutCandidate" : {
+      "pathLength" : 3,
+      "statesExplored" : 4,
+      "success" : true
+    }
+  },
   "analytics" : {
     "averageBranchingFactor" : 0.0,
     "convergentStates" : 0,
@@ -22,8 +40,38 @@
     },
     "uniqueCanonicalStates" : 5
   },
+  "artifacts" : [ {
+    "mediaType" : "text/markdown",
+    "name" : "summary",
+    "path" : "summary.md",
+    "sha256" : "sha256:c35b84409d36679e96012ba945a503e3ec7563f3e83e920619784a8b2ccd8d4b"
+  }, {
+    "mediaType" : "image/svg+xml",
+    "name" : "search-space",
+    "path" : "search-space.svg",
+    "sha256" : "sha256:14f224503026314a47725c7a024bc340816725d14b9577b4036651f57b6ca764"
+  } ],
+  "assumptions" : [ ],
   "bridgeRulesUsed" : [ "complete_square_bridge", "ast_square_difference_factor" ],
+  "canonicalEvidenceHash" : "sha256:98ad53da0459ab21e42d39419b5fd18056dcb6d4aee01f7b904afdb888ba3192",
+  "canonicalEvidenceId" : "regelsuche.discovery-evidence/v1#sha256:98ad53da0459ab21e42d39419b5fd18056dcb6d4aee01f7b904afdb888ba3192",
+  "claims" : [ {
+    "evidenceRefs" : [ "observation-search-trace", "oracle-equivalence", "ablation-macro-reuse" ],
+    "extensions" : { },
+    "id" : "claim-generated-summary",
+    "kind" : "GENERATED_SUMMARY",
+    "outcome" : "SUPPORTED",
+    "statement" : "Complete-square factorization reached the target expression through generated search evidence."
+  }, {
+    "evidenceRefs" : [ "observation-search-trace" ],
+    "extensions" : { },
+    "id" : "claim-generalized-hypothesis",
+    "kind" : "GENERALIZED_HYPOTHESIS",
+    "outcome" : "SUPPORTED",
+    "statement" : "complete_square transforms `x ^ 2 + 6 * x + 5` into `(x + 1) * (x + 5)`."
+  } ],
   "convergentStates" : [ "x^2+6*x+5", "(x+1)*(x+3+2)" ],
+  "counterexamples" : [ ],
   "edgeCount" : 32,
   "edges" : [ {
     "assumptions" : [ ],
@@ -1243,10 +1291,33 @@
     "to" : "x*x+6*x+5"
   } ],
   "evidenceSchemaVersion" : "1",
+  "extensions" : { },
   "failureReason" : "",
   "foundPaths" : [ [ "x ^ 2 + 6 * x + 5", "(x + 3) ^ 2 - 2 ^ 2", "(x + 3 - 2) * (x + 3 + 2)", "(x + 1) * (x + 3 + 2)" ], [ "x ^ 2 + 6 * x + 5", "(x + 1) * (x + 3 + 2)" ] ],
-  "generatedBy" : "DocsDiscoveryGalleryGenerator",
+  "generalizedHypothesis" : {
+    "extensions" : { },
+    "family" : "complete_square",
+    "rulePath" : [ "complete_square_bridge", "ast_square_difference_factor" ],
+    "statement" : "complete_square transforms `x ^ 2 + 6 * x + 5` into `(x + 1) * (x + 5)`.",
+    "status" : "SUPPORTED"
+  },
+  "generatedBy" : "regelsuche.discovery-gallery",
   "generatorVersion" : "1",
+  "holdouts" : [ {
+    "extensions" : { },
+    "id" : "without-macro",
+    "kind" : "REPLAY_RUN",
+    "pathLength" : 3,
+    "statesExplored" : 4,
+    "success" : true
+  }, {
+    "extensions" : { },
+    "id" : "with-macro",
+    "kind" : "REPLAY_RUN",
+    "pathLength" : 1,
+    "statesExplored" : 2,
+    "success" : true
+  } ],
   "inputExpression" : "x ^ 2 + 6 * x + 5",
   "learnedMacros" : [ "macro_3bbfed5b" ],
   "nodeCount" : 13,
@@ -1329,15 +1400,96 @@
     "label" : "(x + 3 - 2) * (x + 5)",
     "tags" : [ "alternative-branch", "target" ]
   } ],
+  "novelty" : {
+    "extensions" : { },
+    "matchedEvidenceIds" : [ ],
+    "rationale" : "Public discovery benchmark scenario.",
+    "status" : "DOCUMENTED_BENCHMARK"
+  },
+  "observations" : [ {
+    "bridgeRulesUsed" : [ "complete_square_bridge", "ast_square_difference_factor" ],
+    "edgeCount" : 32,
+    "extensions" : { },
+    "id" : "observation-search-trace",
+    "kind" : "SEARCH_TRACE",
+    "learnedMacros" : [ "macro_3bbfed5b" ],
+    "nodeCount" : 13,
+    "outcome" : "OBSERVED",
+    "pathCount" : 2,
+    "reusedMacros" : [ "macro_3bbfed5b" ],
+    "sourceFields" : [ "foundPaths", "nodes", "edges", "analytics", "withoutMacroRun", "withMacroRun" ],
+    "validationStatus" : "PASS"
+  } ],
   "oracleEvidence" : "python/sympy runtime unavailable",
+  "oracleResults" : [ {
+    "evidence" : "python/sympy runtime unavailable",
+    "extensions" : { },
+    "id" : "oracle-equivalence",
+    "kind" : "EXTERNAL_VALIDATION",
+    "outcome" : "INCONCLUSIVE",
+    "status" : "UNAVAILABLE"
+  } ],
   "oracleStatus" : "UNAVAILABLE",
+  "producer" : {
+    "extensions" : { },
+    "implementation" : "regelsuche",
+    "producerId" : "regelsuche.discovery-gallery",
+    "producerVersion" : "1",
+    "schemaPath" : "docs/schemas/regelsuche.discovery-evidence-v1.schema.json",
+    "sourceRef" : "generated"
+  },
+  "profiles" : [ "observed", "validated", "promoted", "public" ],
+  "promotion" : {
+    "eligible" : true,
+    "extensions" : { },
+    "gateAccepted" : true,
+    "gateId" : "public-benchmark-evidence-gate",
+    "rejectionReasons" : [ ],
+    "status" : "PUBLIC"
+  },
   "promotionEligible" : true,
+  "proof" : {
+    "confirmations" : [ ],
+    "extensions" : { },
+    "outcome" : "NOT_REQUESTED",
+    "policy" : "OPTIONAL",
+    "required" : false
+  },
+  "provenance" : {
+    "budgets" : {
+      "maxDepth" : 6,
+      "maxStates" : 120,
+      "timeoutMillis" : 5000
+    },
+    "enabledOperators" : [ "complete_square_bridge" ],
+    "enabledRulePacks" : [ "sympy-polynomial-basic" ],
+    "extensions" : { },
+    "gallery" : {
+      "generateSvg" : true,
+      "minVisibleNodes" : 8,
+      "preferredPathCount" : 2
+    },
+    "requiredBridgeEffects" : [ "BRIDGING" ],
+    "requiredBridgeRules" : [ "complete_square_bridge", "ast_square_difference_factor" ],
+    "requiredRuleFamilies" : [ "complete_square", "factor" ],
+    "traceSource" : "REGELSUCHE_SEARCH"
+  },
   "reusedMacros" : [ "macro_3bbfed5b" ],
+  "revisions" : [ ],
   "ruleFamiliesUsed" : [ ],
   "scenarioId" : "complete-square-factorization",
   "scenarioVersion" : "1",
+  "schemaId" : "regelsuche.discovery-evidence/v1",
   "smallGraphMessage" : "",
   "sourceRef" : "generated",
+  "subject" : {
+    "extensions" : { },
+    "id" : "complete-square-factorization",
+    "inputExpression" : "x ^ 2 + 6 * x + 5",
+    "kind" : "DISCOVERY_SCENARIO",
+    "targetExpression" : "(x + 1) * (x + 5)",
+    "title" : "Complete-square factorization"
+  },
   "success" : true,
   "targetExpression" : "(x + 1) * (x + 5)",
   "validationStatus" : "PASS",

@@ -1,0 +1,113 @@
+{
+  "schemaId": "regelsuche.discovery-evidence/v1",
+  "profiles": ["observed", "validated"],
+  "producer": {
+    "producerId": "docs-example",
+    "producerVersion": "1",
+    "implementation": "example",
+    "sourceRef": "docs",
+    "schemaPath": "docs/schemas/regelsuche.discovery-evidence-v1.schema.json",
+    "extensions": {}
+  },
+  "subject": {
+    "id": "example-validated",
+    "kind": "DISCOVERY_SCENARIO",
+    "title": "Validated example",
+    "inputExpression": "x^2+2*x+1",
+    "targetExpression": "(x+1)^2",
+    "extensions": {}
+  },
+  "claims": [
+    {
+      "id": "claim-1",
+      "kind": "GENERATED_SUMMARY",
+      "outcome": "SUPPORTED",
+      "statement": "Validation observed a stable factorization pattern.",
+      "evidenceRefs": ["observation-1", "oracle-1"],
+      "extensions": {}
+    }
+  ],
+  "observations": [
+    {
+      "id": "observation-1",
+      "kind": "SEARCH_TRACE",
+      "outcome": "OBSERVED",
+      "pathCount": 1,
+      "nodeCount": 3,
+      "edgeCount": 2,
+      "bridgeRulesUsed": ["complete_square_bridge"],
+      "learnedMacros": [],
+      "reusedMacros": [],
+      "validationStatus": "PASS",
+      "sourceFields": ["nodes", "edges"],
+      "extensions": {}
+    }
+  ],
+  "generalizedHypothesis": {
+    "statement": "Complete-square reveals a square factor.",
+    "family": "complete_square",
+    "rulePath": ["complete_square_bridge"],
+    "status": "SUPPORTED",
+    "extensions": {}
+  },
+  "revisions": [],
+  "assumptions": ["x in R"],
+  "counterexamples": [],
+  "holdouts": [],
+  "oracleResults": [
+    {
+      "id": "oracle-1",
+      "kind": "EXTERNAL_VALIDATION",
+      "status": "AGREE",
+      "outcome": "CONFIRMED",
+      "evidence": "CAS agrees.",
+      "extensions": {}
+    }
+  ],
+  "provenance": {
+    "traceSource": "REGELSUCHE_SEARCH",
+    "enabledOperators": ["complete_square_bridge"],
+    "extensions": {}
+  },
+  "novelty": {
+    "status": "UNKNOWN",
+    "matchedEvidenceIds": [],
+    "rationale": "Example only.",
+    "extensions": {}
+  },
+  "ablation": {
+    "kind": "ABLATION_STUDY",
+    "status": "N/A",
+    "outcome": "INCONCLUSIVE",
+    "improvementRatio": 0.0,
+    "withCandidate": {
+      "success": null,
+      "pathLength": -1,
+      "statesExplored": -1
+    },
+    "withoutCandidate": {
+      "success": null,
+      "pathLength": -1,
+      "statesExplored": -1
+    },
+    "explanation": "Not promoted yet.",
+    "extensions": {}
+  },
+  "proof": {
+    "required": false,
+    "policy": "OPTIONAL",
+    "outcome": "NOT_REQUESTED",
+    "confirmations": [],
+    "extensions": {}
+  },
+  "promotion": {
+    "status": "VALIDATED",
+    "eligible": false,
+    "gateAccepted": false,
+    "gateId": "none",
+    "rejectionReasons": [],
+    "extensions": {}
+  },
+  "artifacts": [],
+  "extensions": {}
+}

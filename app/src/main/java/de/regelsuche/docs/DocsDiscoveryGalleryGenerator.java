@@ -1,6 +1,5 @@
 package de.regelsuche.docs;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.util.AtomicJsonFile;
@@ -17,11 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 
 public final class DocsDiscoveryGalleryGenerator {
-    public static final String GENERATED_BY = "DocsDiscoveryGalleryGenerator";
-    private static final String SOURCE_REF = "generated";
-    private static final String GENERATOR_VERSION = "1";
-    private static final String SCENARIO_VERSION = "1";
-    private static final String EVIDENCE_SCHEMA_VERSION = "1";
+    public static final String GENERATED_BY = DiscoveryEvidenceSchemaV1.PRODUCER_ID;
     private static final ObjectMapper JSON = new ObjectMapper()
             .findAndRegisterModules()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
@@ -31,6 +26,7 @@ public final class DocsDiscoveryGalleryGenerator {
     private final DiscoveryBenchmarkExecutor executor = new DiscoveryBenchmarkExecutor();
     private final SearchSpaceGallerySvgWriter svgWriter = new SearchSpaceGallerySvgWriter();
     private final PublicBenchmarkEvidenceGate publicGate = new PublicBenchmarkEvidenceGate();
+    private final DiscoveryEvidenceSchemaV1 evidenceSchema = new DiscoveryEvidenceSchemaV1();
 
     public static void main(String[] args) {
         Path repoRoot = args.length == 0 ? Path.of(".").toAbsolutePath().normalize() : Path.of(args[0]).toAbsolutePath().normalize();
@@ -53,7 +49,7 @@ public final class DocsDiscoveryGalleryGenerator {
                 PublicBenchmarkEvidenceGate.GateDecision gateDecision = publicGate.evaluate(scenario, evidence);
                 gateDecisions.add(gateDecision);
                 if (gateDecision.accepted()) {
-                    artifacts.add(writeScenarioArtifacts(generatedRoot, scenario, evidence));
+                    artifacts.add(writeScenarioArtifacts(generatedRoot, scenario, evidence, gateDecision));
                 }
             }
             PublicBenchmarkEvidenceGate.GateReport gateReport = publicGate.write(generatedRoot, gateDecisions);
@@ -73,7 +69,8 @@ public final class DocsDiscoveryGalleryGenerator {
     private PublicScenarioArtifact writeScenarioArtifacts(
             Path generatedRoot,
             DiscoveryBenchmarkScenario scenario,
-            DiscoveryBenchmarkEvidence evidence) throws IOException {
+            DiscoveryBenchmarkEvidence evidence,
+            PublicBenchmarkEvidenceGate.GateDecision gateDecision) throws IOException {
         String slug = slugFor(scenario.id());
         Path scenarioDir = generatedRoot.resolve(slug);
         Files.createDirectories(scenarioDir);
@@ -84,30 +81,31 @@ public final class DocsDiscoveryGalleryGenerator {
         String relativeSvg = slug + "/search-space.svg";
         String relativeSummary = slug + "/summary.md";
 
-        AtomicJsonFile.writeUtf8(evidencePath, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(evidenceDocument(evidence)));
         Files.writeString(svgPath, svgWriter.write(evidence, "evidence.json"), StandardCharsets.UTF_8);
         Files.writeString(summaryPath, renderSummary(scenario, evidence), StandardCharsets.UTF_8);
-        return new PublicScenarioArtifact(scenario, evidence, relativeEvidence, relativeSvg, relativeSummary);
+        List<DiscoveryEvidenceSchemaV1.ArtifactDescriptor> artifacts = List.of(
+            artifact("summary", summaryPath, "summary.md", "text/markdown"),
+            artifact("search-space", svgPath, "search-space.svg", "image/svg+xml")
+        );
+        DiscoveryEvidenceSchemaV1.EvidenceDocument document = evidenceSchema.createDocument(scenario, evidence, gateDecision, artifacts);
+        evidenceSchema.assertValidDocument(document.body(), scenarioDir);
+        AtomicJsonFile.writeUtf8(evidencePath, evidenceSchema.prettyJson(document.body()));
+        return new PublicScenarioArtifact(scenario, evidence, relativeEvidence, relativeSvg, relativeSummary,
+            document.canonicalEvidenceId(), document.canonicalEvidenceHash());
     }
 
-    private Map<String, Object> evidenceDocument(DiscoveryBenchmarkEvidence evidence) {
-        Map<String, Object> document = new LinkedHashMap<>();
-        document.put("generatedBy", GENERATED_BY);
-        document.put("scenarioId", evidence.scenarioId());
-        document.put("inputExpression", evidence.inputExpression());
-        document.put("targetExpression", evidence.targetExpression());
-        document.put("nodeCount", evidence.nodeCount());
-        document.put("edgeCount", evidence.edgeCount());
-        document.put("bridgeRulesUsed", evidence.bridgeRulesUsed());
-        document.put("learnedMacros", evidence.learnedMacros());
-        document.put("reusedMacros", evidence.reusedMacros());
-        document.put("sourceRef", SOURCE_REF);
-        document.put("generatorVersion", GENERATOR_VERSION);
-        document.put("scenarioVersion", SCENARIO_VERSION);
-        document.put("evidenceSchemaVersion", EVIDENCE_SCHEMA_VERSION);
-        Map<String, Object> evidenceFields = JSON.convertValue(evidence, new TypeReference<LinkedHashMap<String, Object>>() { });
-        evidenceFields.forEach(document::putIfAbsent);
-        return document;
+    private DiscoveryEvidenceSchemaV1.ArtifactDescriptor artifact(
+        String name,
+        Path path,
+        String relativePath,
+        String mediaType
+    ) throws IOException {
+        return new DiscoveryEvidenceSchemaV1.ArtifactDescriptor(
+            name,
+            relativePath,
+            mediaType,
+            "sha256:" + sha256(Files.readAllBytes(path))
+        );
     }
 
     private void writeIndex(Path path, List<PublicScenarioArtifact> artifacts) throws IOException {
@@ -122,6 +120,8 @@ public final class DocsDiscoveryGalleryGenerator {
             scenario.put("evidence", artifact.evidencePath());
             scenario.put("svg", artifact.svgPath());
             scenario.put("summary", artifact.summaryPath());
+            scenario.put("canonicalEvidenceId", artifact.canonicalEvidenceId());
+            scenario.put("canonicalEvidenceHash", artifact.canonicalEvidenceHash());
             return scenario;
         }).toList();
         index.put("scenarios", scenarios);
@@ -169,6 +169,7 @@ public final class DocsDiscoveryGalleryGenerator {
                 - Macro reused: ${reused}
                 - Search-space excerpt: [SVG](generated/discovery/${svg})
                 - Evidence JSON link: [evidence.json](generated/discovery/${evidence})
+                - Canonical evidence ID: [`${canonicalEvidenceId}`](generated/discovery/${evidence})
 
                 <img src="generated/discovery/${svg}" alt="Generated evidence search-space for ${scenario}">
                 """
@@ -181,6 +182,7 @@ public final class DocsDiscoveryGalleryGenerator {
                 .replace("${reused}", inlineList(evidence.reusedMacros()))
                 .replace("${svg}", artifact.svgPath())
                 .replace("${evidence}", artifact.evidencePath())
+                .replace("${canonicalEvidenceId}", artifact.canonicalEvidenceId())
                 .replace("${scenario}", escapeMarkdown(evidence.scenarioId()));
     }
 
@@ -200,7 +202,10 @@ public final class DocsDiscoveryGalleryGenerator {
         return rows.toString();
     }
 
-    private String renderSummary(DiscoveryBenchmarkScenario scenario, DiscoveryBenchmarkEvidence evidence) {
+    private String renderSummary(
+        DiscoveryBenchmarkScenario scenario,
+        DiscoveryBenchmarkEvidence evidence
+    ) {
         return """
                 # ${name}
 
@@ -242,7 +247,10 @@ public final class DocsDiscoveryGalleryGenerator {
                 ```
                 ./gradlew :app:generateDiscoveryGallery
                 ```
-                """;
+
+                The generated evidence documents implement `${schemaId}`.
+                """
+            .replace("${schemaId}", DiscoveryEvidenceSchemaV1.SCHEMA_ID);
     }
 
     private PublicScenarioArtifact artifactById(List<PublicScenarioArtifact> artifacts, String scenarioId) {
@@ -302,6 +310,21 @@ public final class DocsDiscoveryGalleryGenerator {
             DiscoveryBenchmarkEvidence evidence,
             String evidencePath,
             String svgPath,
-            String summaryPath) {
+            String summaryPath,
+            String canonicalEvidenceId,
+            String canonicalEvidenceHash) {
+    }
+
+    private String sha256(byte[] bytes) {
+        StringBuilder builder = new StringBuilder(bytes.length * 2);
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            for (byte value : digest.digest(bytes)) {
+                builder.append(String.format("%02x", value));
+            }
+            return builder.toString();
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 }
