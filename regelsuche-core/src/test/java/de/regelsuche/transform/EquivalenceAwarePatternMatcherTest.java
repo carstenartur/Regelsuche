@@ -43,7 +43,7 @@ class EquivalenceAwarePatternMatcherTest {
         PatternRewriteRule rule = completeSquareRule(RecognitionProfile.algebraicAc());
 
         assertTrue(rule.matches(parser.parseTerm("x^2 + 3 * a * x + (9 / 4) * a^2")));
-        assertTrue(rule.matches(parser.parseTerm("x^2 + 2 * x * y + (4 / 9) * y^2")));
+        assertTrue(rule.matches(parser.parseTerm("x^2 + (4 / 3) * x * y + (4 / 9) * y^2")));
     }
 
     @Test
