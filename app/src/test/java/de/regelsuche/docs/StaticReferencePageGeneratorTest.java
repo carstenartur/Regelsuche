@@ -6,18 +6,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class StaticReferencePageGeneratorTest {
 
+    private static ReferenceCampaignRunner.CampaignReport sharedReport;
+
+    @BeforeAll
+    static void generateSharedReport() {
+        sharedReport = new ReferenceCampaignRunner().run();
+    }
+
     @Test
     void generatorWritesIndexHtml(@TempDir Path outputDir) {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        StaticReferencePageGenerator generator = new StaticReferencePageGenerator();
-        generator.generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         assertTrue(Files.exists(outputDir.resolve("index.html")),
@@ -26,10 +30,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void generatorWritesTimelineHtml(@TempDir Path outputDir) {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         assertTrue(Files.exists(outputDir.resolve("timeline.html")),
@@ -38,10 +39,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void generatorWritesObservatoryHtml(@TempDir Path outputDir) {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         assertTrue(Files.exists(outputDir.resolve("observatory.html")),
@@ -50,10 +48,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void generatorWritesMarkdownDigest(@TempDir Path outputDir) {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         assertTrue(Files.exists(outputDir.resolve("timeline.md")),
@@ -62,10 +57,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void generatorWritesVersionFile(@TempDir Path outputDir) {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         assertTrue(Files.exists(outputDir.resolve("version.txt")),
@@ -74,10 +66,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void indexHtmlContainsReproduceSection(@TempDir Path outputDir) throws Exception {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         String html = Files.readString(outputDir.resolve("index.html"), StandardCharsets.UTF_8);
@@ -87,10 +76,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void indexHtmlContainsDockerCommand(@TempDir Path outputDir) throws Exception {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         String html = Files.readString(outputDir.resolve("index.html"), StandardCharsets.UTF_8);
@@ -100,10 +86,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void indexHtmlContainsGradleCommand(@TempDir Path outputDir) throws Exception {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         String html = Files.readString(outputDir.resolve("index.html"), StandardCharsets.UTF_8);
@@ -115,10 +98,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void indexHtmlLabelsPreGeneratedModeUnambiguously(@TempDir Path outputDir) throws Exception {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         String html = Files.readString(outputDir.resolve("index.html"), StandardCharsets.UTF_8);
@@ -128,10 +108,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void indexHtmlLabelsLiveModeUnambiguously(@TempDir Path outputDir) throws Exception {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.LIVE, null);
 
         String html = Files.readString(outputDir.resolve("index.html"), StandardCharsets.UTF_8);
@@ -141,10 +118,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void indexHtmlContainsHonestyDeclaration(@TempDir Path outputDir) throws Exception {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         String html = Files.readString(outputDir.resolve("index.html"), StandardCharsets.UTF_8);
@@ -154,10 +128,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void indexHtmlContainsPageVersionFooter(@TempDir Path outputDir) throws Exception {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         String html = Files.readString(outputDir.resolve("index.html"), StandardCharsets.UTF_8);
@@ -167,17 +138,14 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void markdownAndHtmlContainEquivalentCoreFacts(@TempDir Path outputDir) throws Exception {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         String html = Files.readString(outputDir.resolve("timeline.html"), StandardCharsets.UTF_8);
         String md = Files.readString(outputDir.resolve("timeline.md"), StandardCharsets.UTF_8);
 
-        assertTrue(html.contains("Observe") || html.contains("Observe"), "HTML must mention Observe stage");
-        assertTrue(md.contains("Observe") || md.contains("Observe"), "Markdown must mention Observe stage");
+        assertTrue(html.contains("Observe"), "HTML must mention Observe stage");
+        assertTrue(md.contains("Observe"), "Markdown must mention Observe stage");
 
         assertTrue(html.contains("Validate"), "HTML must mention Validate stage");
         assertTrue(md.contains("Validate"), "Markdown must mention Validate stage");
@@ -185,10 +153,7 @@ class StaticReferencePageGeneratorTest {
 
     @Test
     void versionFileContainsExpectedVersion(@TempDir Path outputDir) throws Exception {
-        ReferenceCampaignRunner runner = new ReferenceCampaignRunner();
-        ReferenceCampaignRunner.CampaignReport report = runner.run();
-
-        new StaticReferencePageGenerator().generate(outputDir, report,
+        new StaticReferencePageGenerator().generate(outputDir, sharedReport,
             DiscoveryStoryTimelineWriter.ResultMode.PRE_GENERATED_REFERENCE, null);
 
         String version = Files.readString(outputDir.resolve("version.txt"), StandardCharsets.UTF_8).strip();

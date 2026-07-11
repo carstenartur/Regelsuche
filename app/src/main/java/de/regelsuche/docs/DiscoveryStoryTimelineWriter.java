@@ -1,7 +1,6 @@
 package de.regelsuche.docs;
 
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Generates HTML and Markdown discovery story timelines from a {@link ReferenceCampaignRunner.CampaignReport}.

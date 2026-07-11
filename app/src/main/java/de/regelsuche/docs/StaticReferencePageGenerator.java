@@ -22,9 +22,11 @@ import java.util.List;
  * {@link DiscoveryStoryTimelineWriter.ResultMode#REPLAYED_FROM_CANONICAL REPLAYED FROM CANONICAL}, or
  * {@link DiscoveryStoryTimelineWriter.ResultMode#PRE_GENERATED_REFERENCE PRE-GENERATED REFERENCE}.</p>
  *
- * <p>The page checks artifact links at generation time: any resolved artifact path that does
- * not exist will cause an {@link IllegalStateException} with a clear diagnostic message.
- * This allows CI to detect broken links before publishing.</p>
+ * <p>Artifact links are resolved at generation time; any path that does not yet exist
+ * is rendered with a {@code NOT_FOUND_AT_BUILD_TIME} badge so that CI can identify which
+ * artifacts still need to be generated (e.g. by running
+ * {@code ./gradlew runReferenceCampaign} or
+ * {@code ./gradlew :app:generateDiscoveryGallery}).</p>
  *
  * <p>Reproduce with:</p>
  * <pre>./gradlew generateStaticReferencePage</pre>
@@ -189,7 +191,8 @@ public final class StaticReferencePageGenerator {
         long successCount = report.training().stream()
             .filter(ReferenceCampaignRunner.TrainingResult::success).count();
         sb.append("<tr><td>Training observations</td><td>")
-            .append(badge(successCount + "/" + report.training().size() + " found path", "badge-green"))
+            .append(badge(successCount + "/" + report.training().size() + " found path",
+                successCount > 0 ? "badge-green" : "badge-yellow"))
             .append("</td><td><em>SEARCH_FOUND_PATH ≠ proof</em></td></tr>\n");
 
         // Refinement

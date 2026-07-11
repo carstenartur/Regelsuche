@@ -1,6 +1,8 @@
 package de.regelsuche.docs;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Generates run-level discovery observatory views as HTML.
@@ -106,18 +108,25 @@ public final class DiscoveryObservatoryWriter {
         sb.append("<table><tr><th>Family</th><th>Total observations</th><th>Success</th><th>Status</th></tr>\n");
 
         ReferenceCampaignRunner.HypothesisEvolution evo = report.hypothesisEvolution();
-        String family = "log-product";
-        long total = report.training().size();
-        long success = report.training().stream()
-            .filter(ReferenceCampaignRunner.TrainingResult::success).count();
-        String statusBadge = (evo != null && evo.isAccepted())
-            ? badge("ACCEPTED", "badge-green")
-            : badge("IN_PROGRESS", "badge-yellow");
+        Map<String, List<ReferenceCampaignRunner.TrainingResult>> byFamily = report.training().stream()
+            .collect(Collectors.groupingBy(ReferenceCampaignRunner.TrainingResult::family));
 
-        sb.append("<tr><td>").append(esc(family)).append("</td>")
-            .append("<td>").append(total).append("</td>")
-            .append("<td>").append(success).append("</td>")
-            .append("<td>").append(statusBadge).append("</td></tr>\n");
+        if (byFamily.isEmpty()) {
+            sb.append("<tr><td colspan=\"4\"><em>No training data.</em></td></tr>\n");
+        } else {
+            for (Map.Entry<String, List<ReferenceCampaignRunner.TrainingResult>> entry : byFamily.entrySet()) {
+                long total = entry.getValue().size();
+                long success = entry.getValue().stream()
+                    .filter(ReferenceCampaignRunner.TrainingResult::success).count();
+                String statusBadge = (evo != null && evo.isAccepted())
+                    ? badge("ACCEPTED", "badge-green")
+                    : badge("IN_PROGRESS", "badge-yellow");
+                sb.append("<tr><td>").append(esc(entry.getKey())).append("</td>")
+                    .append("<td>").append(total).append("</td>")
+                    .append("<td>").append(success).append("</td>")
+                    .append("<td>").append(statusBadge).append("</td></tr>\n");
+            }
+        }
         sb.append("</table>\n");
         return sb.toString();
     }
@@ -135,10 +144,11 @@ public final class DiscoveryObservatoryWriter {
         }
         // Show revisions as candidates (rejected ones remain inspectable)
         if (report.hypothesisEvolution() != null) {
+            String revisionFamily = derivePrimaryFamily(report);
             for (ReferenceCampaignRunner.RevisionSummary rev : report.hypothesisEvolution().revisionHistory()) {
                 if (!"ACCEPTED".equals(rev.status())) {
                     sb.append("<tr><td><code>").append(esc(rev.id())).append("</code></td>")
-                        .append("<td>log-product</td>")
+                        .append("<td>").append(esc(revisionFamily)).append("</td>")
                         .append("<td>").append(badge("REJECTED/REVISED", "badge-red")).append("</td>")
                         .append("<td>N/A</td>")
                         .append("</tr>\n");
@@ -240,6 +250,17 @@ public final class DiscoveryObservatoryWriter {
     // Helpers
     // -----------------------------------------------------------------------
 
+    private String derivePrimaryFamily(ReferenceCampaignRunner.CampaignReport report) {
+        if (report.promotionRecord() != null && !report.promotionRecord().family().isBlank()) {
+            return report.promotionRecord().family();
+        }
+        return report.training().stream()
+            .map(ReferenceCampaignRunner.TrainingResult::family)
+            .filter(f -> f != null && !f.isBlank())
+            .findFirst()
+            .orElse("unknown");
+    }
+
     /** Lightweight projection of a PromotionRecord for observatory rendering. */
     private record PromotionRecordInfo(String candidateId, String family, String stage, String oracleStatus) {}
 
@@ -284,8 +305,10 @@ public final class DiscoveryObservatoryWriter {
         return switch (stage.toUpperCase()) {
             case "PROMOTED" -> "badge-green";
             case "VALIDATED" -> "badge-green";
+            case "REUSED" -> "badge-green";
             case "CANDIDATE" -> "badge-yellow";
             case "REJECTED" -> "badge-red";
+            case "OBSERVED" -> "badge-grey";
             default -> "badge-grey";
         };
     }
