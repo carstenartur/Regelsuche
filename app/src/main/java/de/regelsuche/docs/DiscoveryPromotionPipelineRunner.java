@@ -39,6 +39,7 @@ public final class DiscoveryPromotionPipelineRunner {
     private final DiscoveryCampaignSevenRunner campaignSevenRunner = new DiscoveryCampaignSevenRunner();
     private final DiscoveryCampaignEightRunner campaignEightRunner = new DiscoveryCampaignEightRunner();
     private final DiscoveryCampaignNineRunner campaignNineRunner = new DiscoveryCampaignNineRunner();
+    private final ReferenceCampaignRunner referenceCampaignRunner = new ReferenceCampaignRunner();
     private final DiscoveryExplanationFactory explanationFactory = new DiscoveryExplanationFactory();
     private final MarkdownExplanationRenderer markdownExplanationRenderer = new MarkdownExplanationRenderer();
 
@@ -63,6 +64,8 @@ public final class DiscoveryPromotionPipelineRunner {
         DiscoveryCampaignEightRunner.CampaignReport campaignEight = campaignEightRunner.run();
         // Campaign 9 runs after Campaign 8 so assumption-carrying families (trig, log-exp, power-root, log-product) extend the promotion context.
         DiscoveryCampaignNineRunner.CampaignReport campaignNine = campaignNineRunner.run();
+        // Reference campaign runs after Campaign 9 as the canonical conjecture-to-proof lifecycle demo.
+        ReferenceCampaignRunner.CampaignReport campaignReference = referenceCampaignRunner.run();
 
         List<PromotionRecord> promotionRecords = Stream.of(
                 campaignOne.results().stream()
@@ -78,7 +81,9 @@ public final class DiscoveryPromotionPipelineRunner {
                 campaignEight.results().stream()
                     .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignEight.id()))),
                 campaignNine.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignNine.id()))))
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignNine.id()))),
+                campaignReference.training().stream()
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignReference.id()))))
             .flatMap(Function.identity())
             .sorted(Comparator.comparing(PromotionRecord::candidateId))
             .toList();
@@ -96,7 +101,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 : record)
             .toList();
         PromotionRegistry.Registry promotionRegistry = registry.build(updatedRecords);
-        return new PipelineReport(updatedRecords, promotionRegistry, campaignFive, campaignFour, campaignSeven, campaignEight, campaignNine, campaignMetrics(updatedRecords));
+        return new PipelineReport(updatedRecords, promotionRegistry, campaignFive, campaignFour, campaignSeven, campaignEight, campaignNine, campaignReference, campaignMetrics(updatedRecords));
     }
 
     PipelineReport writeReport(Path outputDirectory) {
@@ -163,6 +168,7 @@ public final class DiscoveryPromotionPipelineRunner {
             campaignSevenRunner.writeReport(outputDirectory.resolve("discovery-campaign-7"), report.campaignSeven());
             campaignEightRunner.writeReport(outputDirectory.resolve("discovery-campaign-8"), report.campaignEight());
             campaignNineRunner.writeReport(outputDirectory.resolve("discovery-campaign-9"), report.campaignNine());
+            referenceCampaignRunner.writeReport(outputDirectory.resolve("reference-campaign"), report.campaignReference());
             return report;
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
@@ -898,6 +904,7 @@ public final class DiscoveryPromotionPipelineRunner {
         DiscoveryCampaignSevenRunner.CampaignReport campaignSeven,
         DiscoveryCampaignEightRunner.CampaignReport campaignEight,
         DiscoveryCampaignNineRunner.CampaignReport campaignNine,
+        ReferenceCampaignRunner.CampaignReport campaignReference,
         List<CampaignMetric> campaignMetrics
     ) {
         PipelineReport {
