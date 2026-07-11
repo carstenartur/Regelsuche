@@ -271,6 +271,9 @@ public final class EquivalenceAwarePatternMatcher {
                 if (left.isEmpty() || right.isEmpty()) {
                     return java.util.Optional.empty();
                 }
+                if (binary.operator() == BinaryOperator.DIV && nearlyEqual(right.get().coefficient, 0.0)) {
+                    return java.util.Optional.empty();
+                }
                 return java.util.Optional.of(binary.operator() == BinaryOperator.MUL
                     ? left.get().multiply(right.get())
                     : left.get().divide(right.get()));
@@ -293,9 +296,6 @@ public final class EquivalenceAwarePatternMatcher {
         }
 
         Monomial divide(Monomial other) {
-            if (nearlyEqual(other.coefficient, 0.0)) {
-                throw new IllegalArgumentException("division by zero in monomial recognition");
-            }
             Map<String, Integer> result = new TreeMap<>(powers);
             other.powers.forEach((name, exponent) -> result.merge(name, -exponent, Integer::sum));
             result.entrySet().removeIf(entry -> entry.getValue() == 0);
