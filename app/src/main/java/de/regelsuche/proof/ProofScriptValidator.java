@@ -55,11 +55,15 @@ public final class ProofScriptValidator {
             }
         }
 
-        // Unsupported placeholders: bare underscore as a standalone expression
+        // Unsupported placeholders: bare underscore or ?goal tactic holes
         for (String line : lines) {
             String stripped = line.stripLeading();
             if (stripped.startsWith("--") || stripped.startsWith("//") || stripped.startsWith(";")) {
                 continue;
+            }
+            if (containsWord(stripped, "?goal")) {
+                violations.add("unsupported-placeholder");
+                break;
             }
             if (containsWord(stripped, "_") && !"smtlib2".equals(effectiveTool)) {
                 violations.add("unsupported-placeholder");

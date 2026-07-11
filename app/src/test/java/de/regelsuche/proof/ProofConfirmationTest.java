@@ -65,6 +65,8 @@ class ProofConfirmationTest {
             result, "artifact-hash", "fp-sorted", "cand-rev", "lean ./proof.lean", 30_000L);
 
         assertEquals("lean4", confirmation.proverName());
+        assertEquals("", confirmation.proverVersion(),
+            "of() should leave proverVersion blank when ProverExecutionResult has no version field");
         assertEquals("PROVER_CONFIRMED", confirmation.exitState());
         assertEquals("artifact-hash", confirmation.artifactHash());
         assertEquals("fp-sorted", confirmation.assumptionsFingerprint());

@@ -55,6 +55,23 @@ class ProofScriptValidatorTest {
     }
 
     @Test
+    void detectsTacticHoleInLean() {
+        String script = "theorem a_eq_b : a = b := by\n  exact ?goal\n";
+        ProofScriptValidator.ValidationResult result = ProofScriptValidator.validate(script, "lean4");
+        assertFalse(result.isValid());
+        assertTrue(result.hasUnsupportedPlaceholder(),
+            "?goal tactic hole should be flagged as an unsupported placeholder");
+    }
+
+    @Test
+    void detectsTacticHoleAtLineStart() {
+        String script = "theorem a_eq_b : a = b := by\n?goal\n";
+        ProofScriptValidator.ValidationResult result = ProofScriptValidator.validate(script, "lean4");
+        assertFalse(result.isValid());
+        assertTrue(result.hasUnsupportedPlaceholder());
+    }
+
+    @Test
     void rejectsEmptyScript() {
         ProofScriptValidator.ValidationResult result = ProofScriptValidator.validate(null, "lean4");
         assertFalse(result.isValid());

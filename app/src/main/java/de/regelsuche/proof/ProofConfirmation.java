@@ -114,7 +114,7 @@ public record ProofConfirmation(
         Objects.requireNonNull(result, "result");
         return new ProofConfirmation(
             result.tool(),
-            result.tool(),
+            "",
             invocationCommand,
             timeoutMillis,
             result.status().name(),
