@@ -67,6 +67,14 @@ class EquivalenceAwarePatternMatcherTest {
         assertFalse(rule.matches(parser.parseTerm("2 * value + 3 * value")));
     }
 
+    @Test
+    void unsupportedNonMonomialExpressionsRemainConservative() {
+        PatternRewriteRule rule = completeSquareRule(RecognitionProfile.algebraicAc());
+
+        assertFalse(rule.matches(parser.parseTerm("x^2 + 2 * x * sin(a) + sin(a)^2")));
+        assertFalse(rule.matches(parser.parseTerm("x^2 + 2 * x * a + 1 / 0 * a^2")));
+    }
+
     private PatternRewriteRule completeSquareRule(RecognitionProfile profile) {
         PatternExpr x = PatternExpr.var("X");
         PatternExpr a = PatternExpr.var("A");
