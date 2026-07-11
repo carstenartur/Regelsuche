@@ -53,12 +53,13 @@ import java.util.regex.Pattern;
     }
 
     private String toSmt(Assumption assumption) {
-<span class="pc bpc" id="L56" title="3 of 4 branches missed.">        return switch (assumption.kind()) {</span>
-<span class="fc" id="L57">            case NON_ZERO -&gt; &quot;(distinct &quot; + renderTerm(assumption) + &quot; 0)&quot;;</span>
+<span class="pc bpc" id="L56" title="4 of 5 branches missed.">        return switch (assumption.kind()) {</span>
+<span class="fc" id="L57">            case NON_ZERO, INVERTIBLE -&gt; &quot;(distinct &quot; + renderTerm(assumption) + &quot; 0)&quot;;</span>
 <span class="nc" id="L58">            case POSITIVE -&gt; &quot;(&gt; &quot; + renderTerm(assumption) + &quot; 0)&quot;;</span>
 <span class="nc" id="L59">            case NON_NEGATIVE -&gt; &quot;(&gt;= &quot; + renderTerm(assumption) + &quot; 0)&quot;;</span>
-            case REAL, INTEGER, RATIONAL, UNKNOWN, DOMAIN, CUSTOM -&gt;
-<span class="nc" id="L61">                &quot;(! true :named &quot; + sanitize(assumption.expression()) + &quot;)&quot;;</span>
+<span class="nc" id="L60">            case NATURAL -&gt; &quot;(&gt;= &quot; + renderTerm(assumption) + &quot; 0)&quot;;</span>
+            case REAL, INTEGER, RATIONAL, UNKNOWN, DOMAIN_MEMBERSHIP, DOMAIN, CUSTOM_PREDICATE, CUSTOM -&gt;
+<span class="nc" id="L62">                &quot;(! true :named &quot; + sanitize(assumption.expression()) + &quot;)&quot;;</span>
         };
     }
 
@@ -69,202 +70,202 @@ import java.util.regex.Pattern;
      * {@code &quot;cos(x) != 0&quot;} → {@code cos(x)}) and parses the remainder.
      */
     private String renderTerm(Assumption assumption) {
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        String raw = assumption.symbols().isEmpty()</span>
-<span class="nc" id="L73">            ? stripComparisonSuffix(assumption.expression())</span>
-<span class="fc" id="L74">            : assumption.symbols().get(0);</span>
-<span class="fc" id="L75">        return toSmtExpr(raw);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        String raw = assumption.symbols().isEmpty()</span>
+<span class="nc" id="L74">            ? stripComparisonSuffix(assumption.expression())</span>
+<span class="fc" id="L75">            : assumption.symbols().get(0);</span>
+<span class="fc" id="L76">        return toSmtExpr(raw);</span>
     }
 
     private String stripComparisonSuffix(String expression) {
-<span class="nc" id="L79">        String text = expression;</span>
-<span class="nc" id="L80">        int idx = indexOfOperator(text, &quot;!=&quot;);</span>
-<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;&gt;=&quot;);</span>
-<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;&lt;=&quot;);</span>
-<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;&gt;&quot;);</span>
-<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;&lt;&quot;);</span>
-<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;=&quot;);</span>
-<span class="nc bnc" id="L86" title="All 2 branches missed.">        return idx &lt; 0 ? text : text.substring(0, idx).trim();</span>
+<span class="nc" id="L80">        String text = expression;</span>
+<span class="nc" id="L81">        int idx = indexOfOperator(text, &quot;!=&quot;);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;&gt;=&quot;);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;&lt;=&quot;);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;&gt;&quot;);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;&lt;&quot;);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (idx &lt; 0) idx = indexOfOperator(text, &quot;=&quot;);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        return idx &lt; 0 ? text : text.substring(0, idx).trim();</span>
     }
 
     private int indexOfOperator(String text, String op) {
-<span class="nc" id="L90">        return text.indexOf(op);</span>
+<span class="nc" id="L91">        return text.indexOf(op);</span>
     }
 
     private String sanitize(String expression) {
-<span class="nc" id="L94">        StringBuilder sanitized = new StringBuilder(expression.length());</span>
-<span class="nc bnc" id="L95" title="All 2 branches missed.">        for (int i = 0; i &lt; expression.length(); i++) {</span>
-<span class="nc" id="L96">            char c = expression.charAt(i);</span>
-<span class="nc bnc" id="L97" title="All 4 branches missed.">            sanitized.append(Character.isLetterOrDigit(c) || c == '_' ? c : '_');</span>
+<span class="nc" id="L95">        StringBuilder sanitized = new StringBuilder(expression.length());</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (int i = 0; i &lt; expression.length(); i++) {</span>
+<span class="nc" id="L97">            char c = expression.charAt(i);</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">            sanitized.append(Character.isLetterOrDigit(c) || c == '_' ? c : '_');</span>
         }
-<span class="nc" id="L99">        return sanitized.toString();</span>
+<span class="nc" id="L100">        return sanitized.toString();</span>
     }
 
     private Set&lt;String&gt; collectIdentifiers(String left, String right, List&lt;Assumption&gt; assumptions) {
-<span class="fc" id="L103">        Set&lt;String&gt; identifiers = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L104">        collectFrom(left, identifiers);</span>
-<span class="fc" id="L105">        collectFrom(right, identifiers);</span>
-<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (Assumption assumption : assumptions) {</span>
-<span class="fc" id="L107">            assumption.symbols().forEach(symbol -&gt; collectFrom(symbol, identifiers));</span>
-<span class="fc" id="L108">        }</span>
-<span class="fc" id="L109">        return identifiers;</span>
+<span class="fc" id="L104">        Set&lt;String&gt; identifiers = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L105">        collectFrom(left, identifiers);</span>
+<span class="fc" id="L106">        collectFrom(right, identifiers);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (Assumption assumption : assumptions) {</span>
+<span class="fc" id="L108">            assumption.symbols().forEach(symbol -&gt; collectFrom(symbol, identifiers));</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        return identifiers;</span>
     }
 
     private void collectFrom(String text, Set&lt;String&gt; identifiers) {
-<span class="fc" id="L113">        Matcher matcher = IDENT.matcher(text);</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">        while (matcher.find()) {</span>
-<span class="fc" id="L115">            String match = matcher.group();</span>
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (!isNumeric(match)) {</span>
-<span class="fc" id="L117">                identifiers.add(match);</span>
+<span class="fc" id="L114">        Matcher matcher = IDENT.matcher(text);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L116">            String match = matcher.group();</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (!isNumeric(match)) {</span>
+<span class="fc" id="L118">                identifiers.add(match);</span>
             }
-<span class="fc" id="L119">        }</span>
-<span class="fc" id="L120">    }</span>
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">    }</span>
 
     private boolean isNumeric(String value) {
-<span class="fc" id="L123">        return value.matches(&quot;\\d+(\\.\\d+)?&quot;);</span>
+<span class="fc" id="L124">        return value.matches(&quot;\\d+(\\.\\d+)?&quot;);</span>
     }
 
     private String toSmtExpr(String expression) {
         // Convert infix arithmetic to SMT prefix expressions using a small
         // recursive descent parser. Supports +, -, *, /, ^ (translated to a
         // dummy &quot;pow&quot; function for SMT-LIB compatibility) and unary minus.
-<span class="fc" id="L130">        return new InfixToSmt(expression).parse();</span>
+<span class="fc" id="L131">        return new InfixToSmt(expression).parse();</span>
     }
 
     private static final class InfixToSmt {
         private final String source;
         private int position;
 
-<span class="fc" id="L137">        private InfixToSmt(String source) {</span>
-<span class="fc" id="L138">            this.source = source;</span>
-<span class="fc" id="L139">            this.position = 0;</span>
-<span class="fc" id="L140">        }</span>
+<span class="fc" id="L138">        private InfixToSmt(String source) {</span>
+<span class="fc" id="L139">            this.source = source;</span>
+<span class="fc" id="L140">            this.position = 0;</span>
+<span class="fc" id="L141">        }</span>
 
         String parse() {
-<span class="fc" id="L143">            String result = parseExpression();</span>
-<span class="fc" id="L144">            skipWhitespace();</span>
-<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (position &lt; source.length()) {</span>
+<span class="fc" id="L144">            String result = parseExpression();</span>
+<span class="fc" id="L145">            skipWhitespace();</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (position &lt; source.length()) {</span>
                 // Bail out: emit the raw expression as a token so the SMT
                 // solver complains visibly instead of silently producing
                 // wrong output.
-<span class="nc" id="L149">                return &quot;|&quot; + source + &quot;|&quot;;</span>
+<span class="nc" id="L150">                return &quot;|&quot; + source + &quot;|&quot;;</span>
             }
-<span class="fc" id="L151">            return result;</span>
+<span class="fc" id="L152">            return result;</span>
         }
 
         private String parseExpression() {
-<span class="fc" id="L155">            String left = parseTerm();</span>
+<span class="fc" id="L156">            String left = parseTerm();</span>
             while (true) {
-<span class="fc" id="L157">                skipWhitespace();</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">                if (position &gt;= source.length()) {</span>
-<span class="fc" id="L159">                    return left;</span>
+<span class="fc" id="L158">                skipWhitespace();</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">                if (position &gt;= source.length()) {</span>
+<span class="fc" id="L160">                    return left;</span>
                 }
-<span class="fc" id="L161">                char c = source.charAt(position);</span>
-<span class="pc bpc" id="L162" title="1 of 4 branches missed.">                if (c == '+' || c == '-') {</span>
-<span class="fc" id="L163">                    position++;</span>
-<span class="fc" id="L164">                    String right = parseTerm();</span>
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                    left = &quot;(&quot; + (c == '+' ? &quot;+&quot; : &quot;-&quot;) + &quot; &quot; + left + &quot; &quot; + right + &quot;)&quot;;</span>
-<span class="fc" id="L166">                } else {</span>
-<span class="fc" id="L167">                    return left;</span>
+<span class="fc" id="L162">                char c = source.charAt(position);</span>
+<span class="pc bpc" id="L163" title="1 of 4 branches missed.">                if (c == '+' || c == '-') {</span>
+<span class="fc" id="L164">                    position++;</span>
+<span class="fc" id="L165">                    String right = parseTerm();</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                    left = &quot;(&quot; + (c == '+' ? &quot;+&quot; : &quot;-&quot;) + &quot; &quot; + left + &quot; &quot; + right + &quot;)&quot;;</span>
+<span class="fc" id="L167">                } else {</span>
+<span class="fc" id="L168">                    return left;</span>
                 }
-<span class="fc" id="L169">            }</span>
+<span class="fc" id="L170">            }</span>
         }
 
         private String parseTerm() {
-<span class="fc" id="L173">            String left = parseFactor();</span>
+<span class="fc" id="L174">            String left = parseFactor();</span>
             while (true) {
-<span class="fc" id="L175">                skipWhitespace();</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">                if (position &gt;= source.length()) {</span>
-<span class="fc" id="L177">                    return left;</span>
+<span class="fc" id="L176">                skipWhitespace();</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                if (position &gt;= source.length()) {</span>
+<span class="fc" id="L178">                    return left;</span>
                 }
-<span class="fc" id="L179">                char c = source.charAt(position);</span>
-<span class="fc bfc" id="L180" title="All 4 branches covered.">                if (c == '*' || c == '/') {</span>
-<span class="fc" id="L181">                    position++;</span>
-<span class="fc" id="L182">                    String right = parseFactor();</span>
-<span class="fc bfc" id="L183" title="All 2 branches covered.">                    left = &quot;(&quot; + (c == '*' ? &quot;*&quot; : &quot;/&quot;) + &quot; &quot; + left + &quot; &quot; + right + &quot;)&quot;;</span>
-<span class="fc" id="L184">                } else {</span>
-<span class="fc" id="L185">                    return left;</span>
+<span class="fc" id="L180">                char c = source.charAt(position);</span>
+<span class="fc bfc" id="L181" title="All 4 branches covered.">                if (c == '*' || c == '/') {</span>
+<span class="fc" id="L182">                    position++;</span>
+<span class="fc" id="L183">                    String right = parseFactor();</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                    left = &quot;(&quot; + (c == '*' ? &quot;*&quot; : &quot;/&quot;) + &quot; &quot; + left + &quot; &quot; + right + &quot;)&quot;;</span>
+<span class="fc" id="L185">                } else {</span>
+<span class="fc" id="L186">                    return left;</span>
                 }
-<span class="fc" id="L187">            }</span>
+<span class="fc" id="L188">            }</span>
         }
 
         private String parseFactor() {
-<span class="fc" id="L191">            skipWhitespace();</span>
-<span class="pc bpc" id="L192" title="2 of 4 branches missed.">            if (position &lt; source.length() &amp;&amp; source.charAt(position) == '-') {</span>
-<span class="nc" id="L193">                position++;</span>
-<span class="nc" id="L194">                String operand = parseFactor();</span>
-<span class="nc" id="L195">                return &quot;(- &quot; + operand + &quot;)&quot;;</span>
+<span class="fc" id="L192">            skipWhitespace();</span>
+<span class="pc bpc" id="L193" title="2 of 4 branches missed.">            if (position &lt; source.length() &amp;&amp; source.charAt(position) == '-') {</span>
+<span class="nc" id="L194">                position++;</span>
+<span class="nc" id="L195">                String operand = parseFactor();</span>
+<span class="nc" id="L196">                return &quot;(- &quot; + operand + &quot;)&quot;;</span>
             }
-<span class="fc" id="L197">            String base = parsePrimary();</span>
-<span class="fc" id="L198">            skipWhitespace();</span>
-<span class="pc bpc" id="L199" title="1 of 4 branches missed.">            if (position &lt; source.length() &amp;&amp; source.charAt(position) == '^') {</span>
-<span class="nc" id="L200">                position++;</span>
-<span class="nc" id="L201">                String exponent = parseFactor();</span>
-<span class="nc" id="L202">                return &quot;(pow &quot; + base + &quot; &quot; + exponent + &quot;)&quot;;</span>
+<span class="fc" id="L198">            String base = parsePrimary();</span>
+<span class="fc" id="L199">            skipWhitespace();</span>
+<span class="pc bpc" id="L200" title="1 of 4 branches missed.">            if (position &lt; source.length() &amp;&amp; source.charAt(position) == '^') {</span>
+<span class="nc" id="L201">                position++;</span>
+<span class="nc" id="L202">                String exponent = parseFactor();</span>
+<span class="nc" id="L203">                return &quot;(pow &quot; + base + &quot; &quot; + exponent + &quot;)&quot;;</span>
             }
-<span class="fc" id="L204">            return base;</span>
+<span class="fc" id="L205">            return base;</span>
         }
 
         private String parsePrimary() {
-<span class="fc" id="L208">            skipWhitespace();</span>
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            if (position &gt;= source.length()) {</span>
-<span class="nc" id="L210">                return &quot;?&quot;;</span>
+<span class="fc" id="L209">            skipWhitespace();</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            if (position &gt;= source.length()) {</span>
+<span class="nc" id="L211">                return &quot;?&quot;;</span>
             }
-<span class="fc" id="L212">            char c = source.charAt(position);</span>
-<span class="fc bfc" id="L213" title="All 2 branches covered.">            if (c == '(') {</span>
-<span class="fc" id="L214">                position++;</span>
-<span class="fc" id="L215">                String inner = parseExpression();</span>
-<span class="fc" id="L216">                skipWhitespace();</span>
-<span class="pc bpc" id="L217" title="2 of 4 branches missed.">                if (position &lt; source.length() &amp;&amp; source.charAt(position) == ')') {</span>
-<span class="fc" id="L218">                    position++;</span>
+<span class="fc" id="L213">            char c = source.charAt(position);</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (c == '(') {</span>
+<span class="fc" id="L215">                position++;</span>
+<span class="fc" id="L216">                String inner = parseExpression();</span>
+<span class="fc" id="L217">                skipWhitespace();</span>
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">                if (position &lt; source.length() &amp;&amp; source.charAt(position) == ')') {</span>
+<span class="fc" id="L219">                    position++;</span>
                 }
-<span class="fc" id="L220">                return inner;</span>
+<span class="fc" id="L221">                return inner;</span>
             }
-<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (Character.isDigit(c)) {</span>
-<span class="fc" id="L223">                int start = position;</span>
-<span class="fc bfc" id="L224" title="All 2 branches covered.">                while (position &lt; source.length()</span>
-<span class="pc bpc" id="L225" title="1 of 4 branches missed.">                    &amp;&amp; (Character.isDigit(source.charAt(position)) || source.charAt(position) == '.')) {</span>
-<span class="fc" id="L226">                    position++;</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (Character.isDigit(c)) {</span>
+<span class="fc" id="L224">                int start = position;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">                while (position &lt; source.length()</span>
+<span class="pc bpc" id="L226" title="1 of 4 branches missed.">                    &amp;&amp; (Character.isDigit(source.charAt(position)) || source.charAt(position) == '.')) {</span>
+<span class="fc" id="L227">                    position++;</span>
                 }
-<span class="fc" id="L228">                return source.substring(start, position);</span>
+<span class="fc" id="L229">                return source.substring(start, position);</span>
             }
-<span class="pc bpc" id="L230" title="3 of 4 branches missed.">            if (Character.isLetter(c) || c == '_') {</span>
-<span class="fc" id="L231">                int start = position;</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">                while (position &lt; source.length()</span>
-<span class="pc bpc" id="L233" title="1 of 4 branches missed.">                    &amp;&amp; (Character.isLetterOrDigit(source.charAt(position)) || source.charAt(position) == '_')) {</span>
-<span class="fc" id="L234">                    position++;</span>
+<span class="pc bpc" id="L231" title="3 of 4 branches missed.">            if (Character.isLetter(c) || c == '_') {</span>
+<span class="fc" id="L232">                int start = position;</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                while (position &lt; source.length()</span>
+<span class="pc bpc" id="L234" title="1 of 4 branches missed.">                    &amp;&amp; (Character.isLetterOrDigit(source.charAt(position)) || source.charAt(position) == '_')) {</span>
+<span class="fc" id="L235">                    position++;</span>
                 }
-<span class="fc" id="L236">                String identifier = source.substring(start, position);</span>
-<span class="fc" id="L237">                skipWhitespace();</span>
-<span class="pc bpc" id="L238" title="1 of 4 branches missed.">                if (position &lt; source.length() &amp;&amp; source.charAt(position) == '(') {</span>
-<span class="nc" id="L239">                    position++;</span>
-<span class="nc" id="L240">                    StringBuilder call = new StringBuilder(&quot;(&quot;).append(identifier);</span>
+<span class="fc" id="L237">                String identifier = source.substring(start, position);</span>
+<span class="fc" id="L238">                skipWhitespace();</span>
+<span class="pc bpc" id="L239" title="1 of 4 branches missed.">                if (position &lt; source.length() &amp;&amp; source.charAt(position) == '(') {</span>
+<span class="nc" id="L240">                    position++;</span>
+<span class="nc" id="L241">                    StringBuilder call = new StringBuilder(&quot;(&quot;).append(identifier);</span>
                     while (true) {
-<span class="nc" id="L242">                        String arg = parseExpression();</span>
-<span class="nc" id="L243">                        call.append(' ').append(arg);</span>
-<span class="nc" id="L244">                        skipWhitespace();</span>
-<span class="nc bnc" id="L245" title="All 4 branches missed.">                        if (position &lt; source.length() &amp;&amp; source.charAt(position) == ',') {</span>
-<span class="nc" id="L246">                            position++;</span>
-<span class="nc" id="L247">                            continue;</span>
+<span class="nc" id="L243">                        String arg = parseExpression();</span>
+<span class="nc" id="L244">                        call.append(' ').append(arg);</span>
+<span class="nc" id="L245">                        skipWhitespace();</span>
+<span class="nc bnc" id="L246" title="All 4 branches missed.">                        if (position &lt; source.length() &amp;&amp; source.charAt(position) == ',') {</span>
+<span class="nc" id="L247">                            position++;</span>
+<span class="nc" id="L248">                            continue;</span>
                         }
                         break;
                     }
-<span class="nc bnc" id="L251" title="All 4 branches missed.">                    if (position &lt; source.length() &amp;&amp; source.charAt(position) == ')') {</span>
-<span class="nc" id="L252">                        position++;</span>
+<span class="nc bnc" id="L252" title="All 4 branches missed.">                    if (position &lt; source.length() &amp;&amp; source.charAt(position) == ')') {</span>
+<span class="nc" id="L253">                        position++;</span>
                     }
-<span class="nc" id="L254">                    call.append(')');</span>
-<span class="nc" id="L255">                    return call.toString();</span>
+<span class="nc" id="L255">                    call.append(')');</span>
+<span class="nc" id="L256">                    return call.toString();</span>
                 }
-<span class="fc" id="L257">                return identifier;</span>
+<span class="fc" id="L258">                return identifier;</span>
             }
-<span class="nc" id="L259">            position++;</span>
-<span class="nc" id="L260">            return Character.toString(c);</span>
+<span class="nc" id="L260">            position++;</span>
+<span class="nc" id="L261">            return Character.toString(c);</span>
         }
 
         private void skipWhitespace() {
-<span class="fc bfc" id="L264" title="All 4 branches covered.">            while (position &lt; source.length() &amp;&amp; Character.isWhitespace(source.charAt(position))) {</span>
-<span class="fc" id="L265">                position++;</span>
+<span class="fc bfc" id="L265" title="All 4 branches covered.">            while (position &lt; source.length() &amp;&amp; Character.isWhitespace(source.charAt(position))) {</span>
+<span class="fc" id="L266">                position++;</span>
             }
-<span class="fc" id="L267">        }</span>
+<span class="fc" id="L268">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

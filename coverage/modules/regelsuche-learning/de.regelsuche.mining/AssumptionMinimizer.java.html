@@ -1,28 +1,104 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssumptionMinimizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">AssumptionMinimizer.java</span></div><h1>AssumptionMinimizer.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
 
+import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-/** Heuristic assumption minimizer; it preserves an assumption when the caller reports instability after removal. */
+/** Leave-one-out assumption minimizer with explicit classification of each challenged assumption. */
 public final class AssumptionMinimizer {
     private AssumptionMinimizer() {
     }
 
     public static HypothesisCandidate minimize(HypothesisCandidate candidate, StabilityOracle oracle) {
-<span class="fc" id="L12">        List&lt;String&gt; minimized = new ArrayList&lt;&gt;(candidate.assumptions());</span>
-<span class="fc bfc" id="L13" title="All 2 branches covered.">        for (String assumption : List.copyOf(minimized)) {</span>
-<span class="fc" id="L14">            List&lt;String&gt; trial = new ArrayList&lt;&gt;(minimized);</span>
-<span class="fc" id="L15">            trial.remove(assumption);</span>
-<span class="pc bpc" id="L16" title="1 of 4 branches missed.">            if (oracle == null || oracle.isStable(candidate.withAssumptions(trial))) {</span>
-<span class="fc" id="L17">                minimized = trial;</span>
+<span class="nc bnc" id="L15" title="All 4 branches missed.">        return analyze(candidate, oracle == null ? null : challengedCandidate -&gt; oracle.isStable(challengedCandidate)</span>
+<span class="nc" id="L16">            ? CounterexampleSearchService.CounterexampleSearchResult.noCounterexample()</span>
+<span class="nc" id="L17">            : CounterexampleSearchService.CounterexampleSearchResult.counterexampleFound(</span>
+<span class="nc" id="L18">                new CounterexampleSearchService.Counterexample(List.of(), &quot;challenge failed&quot;, &quot;challenge failed&quot;),</span>
+<span class="nc" id="L19">                List.of(),</span>
+<span class="nc" id="L20">                List.of(&quot;assumption-minimizer&quot;)</span>
+<span class="nc" id="L21">            )).minimizedCandidate();</span>
+    }
+
+    public static MinimizationResult analyze(HypothesisCandidate candidate, ChallengeOracle oracle) {
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (candidate == null) {</span>
+<span class="nc" id="L26">            throw new IllegalArgumentException(&quot;candidate must not be null&quot;);</span>
+        }
+<span class="fc" id="L28">        List&lt;String&gt; minimized = new ArrayList&lt;&gt;(candidate.assumptions());</span>
+<span class="fc" id="L29">        Map&lt;String, AssumptionJudgement&gt; judgements = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        for (String assumption : List.copyOf(minimized)) {</span>
+<span class="fc" id="L31">            List&lt;String&gt; trial = new ArrayList&lt;&gt;(minimized);</span>
+<span class="fc" id="L32">            trial.remove(assumption);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            if (oracle == null) {</span>
+<span class="nc" id="L34">                judgements.put(assumption, new AssumptionJudgement(</span>
+                    assumption,
+                    CounterexampleSearchService.AssumptionClassification.UNKNOWN,
+<span class="nc" id="L37">                    CounterexampleSearchService.CounterexampleSearchResult.inconclusive(&quot;no challenge oracle configured&quot;)</span>
+                ));
+<span class="nc" id="L39">                continue;</span>
             }
-<span class="fc" id="L19">        }</span>
-<span class="fc" id="L20">        return candidate.withAssumptions(minimized);</span>
+<span class="fc" id="L41">            CounterexampleSearchService.CounterexampleSearchResult challenge = oracle.challenge(candidate.withAssumptions(trial));</span>
+<span class="fc" id="L42">            CounterexampleSearchService.AssumptionClassification classification = classify(challenge);</span>
+<span class="fc" id="L43">            judgements.put(assumption, new AssumptionJudgement(assumption, classification, challenge));</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            if (classification == CounterexampleSearchService.AssumptionClassification.REDUNDANT_WITHIN_TESTED_EVIDENCE) {</span>
+<span class="fc" id="L45">                minimized = trial;</span>
+            }
+<span class="fc" id="L47">        }</span>
+<span class="fc" id="L48">        return new MinimizationResult(candidate.withAssumptions(minimized), List.copyOf(judgements.values()));</span>
+    }
+
+    private static CounterexampleSearchService.AssumptionClassification classify(
+        CounterexampleSearchService.CounterexampleSearchResult challenge
+    ) {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (challenge == null) {</span>
+<span class="nc" id="L55">            return CounterexampleSearchService.AssumptionClassification.UNKNOWN;</span>
+        }
+<span class="pc bpc" id="L57" title="1 of 3 branches missed.">        return switch (challenge.status()) {</span>
+<span class="fc" id="L58">            case COUNTEREXAMPLE_FOUND -&gt; CounterexampleSearchService.AssumptionClassification.REQUIRED;</span>
+<span class="fc" id="L59">            case NO_COUNTEREXAMPLE_FOUND -&gt; CounterexampleSearchService.AssumptionClassification.REDUNDANT_WITHIN_TESTED_EVIDENCE;</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            case INCONCLUSIVE -&gt; challenge.attemptedSources().isEmpty()</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                || challenge.explanation().toLowerCase(java.util.Locale.ROOT).contains(&quot;unsupported&quot;)</span>
+<span class="nc" id="L62">                ? CounterexampleSearchService.AssumptionClassification.UNSUPPORTED</span>
+<span class="nc" id="L63">                : CounterexampleSearchService.AssumptionClassification.UNKNOWN;</span>
+        };
+    }
+
+    public record AssumptionJudgement(
+        String assumption,
+        CounterexampleSearchService.AssumptionClassification classification,
+        CounterexampleSearchService.CounterexampleSearchResult challengeResult
+    ) {
+<span class="fc" id="L72">        public AssumptionJudgement {</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">            if (assumption == null || assumption.isBlank()) {</span>
+<span class="nc" id="L74">                throw new IllegalArgumentException(&quot;assumption must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            classification = classification == null</span>
+<span class="nc" id="L77">                ? CounterexampleSearchService.AssumptionClassification.UNKNOWN</span>
+<span class="fc" id="L78">                : classification;</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            challengeResult = challengeResult == null</span>
+<span class="nc" id="L80">                ? CounterexampleSearchService.CounterexampleSearchResult.inconclusive(&quot;missing challenge result&quot;)</span>
+<span class="fc" id="L81">                : challengeResult;</span>
+<span class="fc" id="L82">        }</span>
+    }
+
+    public record MinimizationResult(HypothesisCandidate minimizedCandidate, List&lt;AssumptionJudgement&gt; judgements) {
+<span class="fc" id="L86">        public MinimizationResult {</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            if (minimizedCandidate == null) {</span>
+<span class="nc" id="L88">                throw new IllegalArgumentException(&quot;minimizedCandidate must not be null&quot;);</span>
+            }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            judgements = judgements == null ? List.of() : List.copyOf(judgements);</span>
+<span class="fc" id="L91">        }</span>
     }
 
     @FunctionalInterface
     public interface StabilityOracle {
         boolean isStable(HypothesisCandidate candidateWithoutOneAssumption);
+    }
+
+    @FunctionalInterface
+    public interface ChallengeOracle {
+        CounterexampleSearchService.CounterexampleSearchResult challenge(HypothesisCandidate candidateWithoutOneAssumption);
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
