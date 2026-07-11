@@ -71,7 +71,7 @@ public final class DiscoveryCampaignNineRunner {
             Files.createDirectories(outputDirectory);
             List<PromotionRecord> promotionRecords = report.results().stream()
                 .map(result -> new PromotionDecider()
-                    .decide(PromotionObservation.fromCampaignNine(result, report.id())))
+                    .decide(PromotionObservation.fromCampaignResult(result, report.id())))
                 .toList();
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("discovery-campaign-9.json"),
@@ -354,7 +354,7 @@ public final class DiscoveryCampaignNineRunner {
         List<String> rulePath,
         String notes,
         String smallGraphMessage
-    ) {
+    ) implements CampaignCaseResult {
         public CaseResult {
             failureReason = failureReason == null ? "" : failureReason;
             oracleStatus = oracleStatus == null ? "UNAVAILABLE" : oracleStatus;

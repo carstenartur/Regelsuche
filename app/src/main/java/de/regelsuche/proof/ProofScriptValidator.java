@@ -55,17 +55,14 @@ public final class ProofScriptValidator {
             }
         }
 
-        // Unsupported placeholders: bare underscore or ?goal tactic holes
+        // Unsupported placeholders: ?goal tactic holes or bare underscore
         for (String line : lines) {
             String stripped = line.stripLeading();
             if (stripped.startsWith("--") || stripped.startsWith("//") || stripped.startsWith(";")) {
                 continue;
             }
-            if (containsWord(stripped, "?goal")) {
-                violations.add("unsupported-placeholder");
-                break;
-            }
-            if (containsWord(stripped, "_") && !"smtlib2".equals(effectiveTool)) {
+            if (containsWord(stripped, "?goal")
+                    || (containsWord(stripped, "_") && !"smtlib2".equals(effectiveTool))) {
                 violations.add("unsupported-placeholder");
                 break;
             }

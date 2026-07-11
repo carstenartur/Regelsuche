@@ -390,7 +390,7 @@ public final class DiscoveryCampaignTwoRunner {
         List<String> rulePath,
         String notes,
         String smallGraphMessage
-    ) {
+    ) implements CampaignCaseResult {
         public CaseResult {
             beforeStatus = beforeStatus == null || beforeStatus.isBlank() ? "N/A" : beforeStatus;
             failureReason = failureReason == null ? "" : failureReason;

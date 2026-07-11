@@ -66,7 +66,7 @@ public final class DiscoveryCampaignEightRunner {
             Files.createDirectories(outputDirectory);
             List<PromotionRecord> promotionRecords = report.results().stream()
                 .map(result -> new PromotionDecider()
-                    .decide(PromotionObservation.fromCampaignEight(result, report.id())))
+                    .decide(PromotionObservation.fromCampaignResult(result, report.id())))
                 .toList();
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("discovery-campaign-8.json"),
@@ -323,7 +323,7 @@ public final class DiscoveryCampaignEightRunner {
         List<String> rulePath,
         String notes,
         String smallGraphMessage
-    ) {
+    ) implements CampaignCaseResult {
         public CaseResult {
             failureReason = failureReason == null ? "" : failureReason;
             oracleStatus = oracleStatus == null ? "UNAVAILABLE" : oracleStatus;

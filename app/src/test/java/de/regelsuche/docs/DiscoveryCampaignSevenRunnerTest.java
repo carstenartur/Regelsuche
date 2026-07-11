@@ -189,7 +189,7 @@ class DiscoveryCampaignSevenRunnerTest {
 
         DiscoveryCampaignSevenRunner.CaseResult result =
             (DiscoveryCampaignSevenRunner.CaseResult) evaluate.invoke(runner, campaignCase);
-        PromotionObservation observation = PromotionObservation.fromCampaignSeven(result, "discovery-campaign-7");
+        PromotionObservation observation = PromotionObservation.fromCampaignResult(result, "discovery-campaign-7");
 
         assertFalse(result.notes().isBlank(), "blank case notes must fall back to ablation notes");
         assertEquals(result.structuredAblation().explanation(), result.notes(),
@@ -216,7 +216,7 @@ class DiscoveryCampaignSevenRunnerTest {
 
         PromotionDecider decider = new PromotionDecider();
         PromotionRecord record = decider.decide(
-            PromotionObservation.fromCampaignSeven(rsfCase, "discovery-campaign-7"),
+            PromotionObservation.fromCampaignResult(rsfCase, "discovery-campaign-7"),
             rsfCase.structuredAblation());
 
         assertTrue(record.ablationEvidence().hasStructuredMetrics(),

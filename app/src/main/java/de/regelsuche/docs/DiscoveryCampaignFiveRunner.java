@@ -513,7 +513,7 @@ public final class DiscoveryCampaignFiveRunner {
         boolean promotionEligible,
         boolean reusedExistingMacro,
         String notes
-    ) {
+    ) implements CampaignCaseResult {
         public CaseResult {
             failureReason = failureReason == null ? "" : failureReason;
             oracleStatus = oracleStatus == null ? "UNAVAILABLE" : oracleStatus;

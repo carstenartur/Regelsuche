@@ -306,7 +306,7 @@ public final class DiscoveryCampaignOneRunner {
         List<String> shortcutAssumptions,
         List<String> rulePath,
         String notes
-    ) {
+    ) implements CampaignCaseResult {
         public CaseResult {
             failureReason = failureReason == null ? "" : failureReason;
             oracleStatus = oracleStatus == null ? "UNAVAILABLE" : oracleStatus;
