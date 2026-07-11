@@ -85,6 +85,10 @@ public final class ReferenceCampaignRunner {
 
     /** Runs the full reference campaign and returns the report without writing files. */
     public CampaignReport run() {
+        return run(null);
+    }
+
+    private CampaignReport run(Path proofDirectory) {
         // Phase 1 + 2: Training observations + search
         List<TrainingResult> training = runTraining();
 
@@ -95,7 +99,7 @@ public final class ReferenceCampaignRunner {
         HoldoutReport holdouts = runHoldoutValidation(evolution.acceptedRevision());
 
         // Phase 6: External prover confirmation
-        SymPyQaHarness.QaSummary proofSummary = runProof(training);
+        SymPyQaHarness.QaSummary proofSummary = runProof(training, proofDirectory);
 
         // Phase 7 + 8: Promotion + reuse ablation
         PromotionRecord promotionRecord = promote(evolution, holdouts);
@@ -129,7 +133,8 @@ public final class ReferenceCampaignRunner {
 
     /** Runs the campaign and writes all artifacts to the given directory. */
     public CampaignReport writeReport(Path outputDirectory) {
-        return writeReport(outputDirectory, run());
+        Path proofDirectory = outputDirectory.resolve("proof");
+        return writeReport(outputDirectory, run(proofDirectory));
     }
 
     /** Writes all artifacts from a completed campaign report. */
@@ -178,12 +183,12 @@ public final class ReferenceCampaignRunner {
                     .writeValueAsString(report.provenanceGraph())
             );
 
-            // proof/ directory with SymPy QA outputs
+            // proof/ directory
             Path proofDirectory = outputDirectory.resolve("proof");
             Files.createDirectories(proofDirectory);
-            runProofToDirectory(
-                report.training().stream().map(TrainingResult::inputExpression).toList(),
-                proofDirectory
+            AtomicJsonFile.writeUtf8(
+                proofDirectory.resolve("qa-summary.json"),
+                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report.proofSummary())
             );
 
             // reference-campaign.md (human-readable story)
@@ -398,9 +403,10 @@ public final class ReferenceCampaignRunner {
 
         if (expectPositive) {
             // For positive holdouts, also run the benchmark
+            String holdoutId = "holdout-" + Integer.toUnsignedString(inputExpression.hashCode());
             DiscoveryBenchmarkScenario scenario = new DiscoveryBenchmarkScenario(
-                "holdout-" + Math.abs(inputExpression.hashCode()),
-                "holdout-" + Math.abs(inputExpression.hashCode()),
+                holdoutId,
+                holdoutId,
                 inputExpression,
                 target,
                 List.of(),
@@ -423,7 +429,7 @@ public final class ReferenceCampaignRunner {
                 new DiscoveryBenchmarkExecutor(loader, withoutRegistry).execute(scenario);
 
             return new HoldoutResult(
-                "holdout-" + Math.abs(inputExpression.hashCode()),
+                holdoutId,
                 inputExpression,
                 target,
                 true,
@@ -441,7 +447,7 @@ public final class ReferenceCampaignRunner {
         } else {
             boolean blocked = !operatorFired;
             return new HoldoutResult(
-                "neg-holdout-" + Math.abs(inputExpression.hashCode()),
+                "neg-holdout-" + Integer.toUnsignedString(inputExpression.hashCode()),
                 inputExpression,
                 target,
                 false,
@@ -468,20 +474,18 @@ public final class ReferenceCampaignRunner {
     // Phase 6: External prover (SymPy QA)
     // -----------------------------------------------------------------------
 
-    private SymPyQaHarness.QaSummary runProof(List<TrainingResult> training) {
+    private SymPyQaHarness.QaSummary runProof(List<TrainingResult> training, Path proofDirectory) {
         try {
-            Path tempDir = Files.createTempDirectory("reference-campaign-proof-");
+            Path targetDirectory = proofDirectory == null
+                ? Files.createTempDirectory("reference-campaign-proof-")
+                : Files.createDirectories(proofDirectory);
             return new SymPyQaHarness().run(
                 training.stream().map(TrainingResult::inputExpression).toList(),
-                tempDir
+                targetDirectory
             );
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
-    }
-
-    private void runProofToDirectory(List<String> expressions, Path proofDirectory) {
-        new SymPyQaHarness().run(expressions, proofDirectory);
     }
 
     // -----------------------------------------------------------------------
@@ -502,13 +506,14 @@ public final class ReferenceCampaignRunner {
             + "; negative-blocked=" + holdouts.negativeBlockedCount()
             + "/" + holdouts.negativeCount();
 
+        List<HoldoutResult> positiveResults = holdouts.positiveResults();
         AblationEvidence ablationEvidence = AblationEvidence.compare(
-            holdouts.positivePassCount() == holdouts.positiveCount(),
-            holdouts.positiveCount(),
-            holdouts.positiveCount() * 3L,
-            false,
-            holdouts.positiveCount() * 5,
-            holdouts.positiveCount() * 15L,
+            !positiveResults.isEmpty() && positiveResults.stream().allMatch(HoldoutResult::withSuccess),
+            positiveResults.stream().mapToInt(HoldoutResult::withPathLength).sum(),
+            positiveResults.stream().mapToLong(HoldoutResult::withStatesExplored).sum(),
+            !positiveResults.isEmpty() && positiveResults.stream().allMatch(HoldoutResult::withoutSuccess),
+            positiveResults.stream().mapToInt(HoldoutResult::withoutPathLength).sum(),
+            positiveResults.stream().mapToLong(HoldoutResult::withoutStatesExplored).sum(),
             "holdout ablation summary for " + CAMPAIGN_ID
         );
 
@@ -616,13 +621,24 @@ public final class ReferenceCampaignRunner {
     ) {
         List<ProvenanceNode> nodes = new ArrayList<>();
         List<ProvenanceEdge> edges = new ArrayList<>();
+        String hypothesisNodeId = evolution.hypothesisId();
+
+        nodes.add(new ProvenanceNode(
+            hypothesisNodeId,
+            "hypothesis",
+            "log-product",
+            Map.of(
+                "leftPattern", evolution.initialLeftPattern(),
+                "rightPattern", evolution.initialRightPattern()
+            )
+        ));
 
         // Training observations
         for (TrainingResult t : training) {
             nodes.add(new ProvenanceNode(t.id(), "training-observation", t.family(),
                 Map.of("input", t.inputExpression(), "target", t.targetExpression(),
                     "success", String.valueOf(t.success()))));
-            edges.add(new ProvenanceEdge(t.id(), "rc-log-product-hypothesis-v0", "supports-hypothesis"));
+            edges.add(new ProvenanceEdge(t.id(), hypothesisNodeId, "supports-hypothesis"));
         }
 
         // Hypothesis revisions
@@ -645,7 +661,7 @@ public final class ReferenceCampaignRunner {
                 "positivePassCount", String.valueOf(holdouts.positivePassCount()),
                 "overallPass", String.valueOf(holdouts.overallPass()))));
         edges.add(new ProvenanceEdge(
-            evolution.terminalRevision() == null ? "rc-log-product-hypothesis-v0" : evolution.terminalRevision().id(),
+            evolution.terminalRevision() == null ? hypothesisNodeId : evolution.terminalRevision().id(),
             "holdout-validation", "validated-by"));
 
         // Promotion node
