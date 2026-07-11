@@ -1,0 +1,602 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryEvidenceSchemaV1.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryEvidenceSchemaV1.java</span></div><h1>DiscoveryEvidenceSchemaV1.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.search.SearchSpaceAnalytics;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/** Stable v1 envelope for mathematical discovery evidence. */
+<span class="fc" id="L26">final class DiscoveryEvidenceSchemaV1 {</span>
+    static final String SCHEMA_ID = &quot;regelsuche.discovery-evidence/v1&quot;;
+    static final String PRODUCER_ID = &quot;regelsuche.discovery-gallery&quot;;
+
+<span class="fc" id="L30">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L31">        .findAndRegisterModules()</span>
+<span class="fc" id="L32">        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);</span>
+<span class="fc" id="L33">    private static final List&lt;String&gt; PROFILE_ORDER = List.of(&quot;observed&quot;, &quot;validated&quot;, &quot;promoted&quot;, &quot;public&quot;);</span>
+
+    EvidenceDocument createDocument(
+        DiscoveryBenchmarkScenario scenario,
+        DiscoveryBenchmarkEvidence evidence,
+        PublicBenchmarkEvidenceGate.GateDecision gateDecision,
+        List&lt;ArtifactDescriptor&gt; artifacts
+    ) {
+<span class="fc" id="L41">        Map&lt;String, Object&gt; document = baseDocument(scenario, evidence, gateDecision, artifacts);</span>
+<span class="fc" id="L42">        String canonicalHash = canonicalEvidenceHash(document);</span>
+<span class="fc" id="L43">        String canonicalId = canonicalEvidenceId(canonicalHash);</span>
+<span class="fc" id="L44">        document.put(&quot;canonicalEvidenceHash&quot;, canonicalHash);</span>
+<span class="fc" id="L45">        document.put(&quot;canonicalEvidenceId&quot;, canonicalId);</span>
+<span class="fc" id="L46">        return new EvidenceDocument(canonicalId, canonicalHash, Map.copyOf(document));</span>
+    }
+
+    String prettyJson(Map&lt;String, Object&gt; document) throws JsonProcessingException {
+<span class="fc" id="L50">        return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(document);</span>
+    }
+
+    JsonNode read(Path path) throws IOException {
+<span class="fc" id="L54">        return JSON.readTree(path.toFile());</span>
+    }
+
+    void assertValidDocument(Map&lt;String, Object&gt; document, Path evidenceDirectory) {
+<span class="fc" id="L58">        JsonNode root = JSON.valueToTree(document);</span>
+<span class="fc" id="L59">        List&lt;String&gt; errors = validate(root, evidenceDirectory);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (!errors.isEmpty()) {</span>
+<span class="nc" id="L61">            throw new IllegalStateException(&quot;Invalid discovery evidence v1:\n - &quot; + String.join(&quot;\n - &quot;, errors));</span>
+        }
+<span class="fc" id="L63">    }</span>
+
+    void assertValidDocument(JsonNode document, Path evidenceDirectory) {
+<span class="fc" id="L66">        List&lt;String&gt; errors = validate(document, evidenceDirectory);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (!errors.isEmpty()) {</span>
+<span class="fc" id="L68">            throw new IllegalStateException(&quot;Invalid discovery evidence v1:\n - &quot; + String.join(&quot;\n - &quot;, errors));</span>
+        }
+<span class="fc" id="L70">    }</span>
+
+    String recomputeCanonicalEvidenceHash(JsonNode document, Path evidenceDirectory) {
+<span class="fc" id="L73">        ObjectNode mutable = document.deepCopy();</span>
+<span class="fc" id="L74">        mutable.remove(&quot;canonicalEvidenceHash&quot;);</span>
+<span class="fc" id="L75">        mutable.remove(&quot;canonicalEvidenceId&quot;);</span>
+<span class="fc" id="L76">        JsonNode artifactsNode = mutable.path(&quot;artifacts&quot;);</span>
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">        if (evidenceDirectory != null &amp;&amp; artifactsNode.isArray()) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (JsonNode artifactNode : artifactsNode) {</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                if (!(artifactNode instanceof ObjectNode objectNode)) {</span>
+                    continue;
+                }
+<span class="fc" id="L82">                String relativePath = objectNode.path(&quot;path&quot;).asText(&quot;&quot;);</span>
+<span class="fc" id="L83">                Path artifactPath = resolveArtifactPath(evidenceDirectory, relativePath);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                if (!Files.isRegularFile(artifactPath)) {</span>
+<span class="nc" id="L85">                    throw new IllegalStateException(&quot;artifact file missing: &quot; + relativePath);</span>
+                }
+<span class="fc" id="L87">                objectNode.put(&quot;sha256&quot;, &quot;sha256:&quot; + sha256(readBytes(artifactPath)));</span>
+<span class="fc" id="L88">            }</span>
+        }
+        try {
+<span class="fc" id="L91">            return &quot;sha256:&quot; + sha256(JSON.writeValueAsBytes(JSON.convertValue(mutable, Object.class)));</span>
+<span class="nc" id="L92">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L93">            throw new IllegalStateException(&quot;Could not canonicalize discovery evidence&quot;, exception);</span>
+        }
+    }
+
+    private Map&lt;String, Object&gt; baseDocument(
+        DiscoveryBenchmarkScenario scenario,
+        DiscoveryBenchmarkEvidence evidence,
+        PublicBenchmarkEvidenceGate.GateDecision gateDecision,
+        List&lt;ArtifactDescriptor&gt; artifacts
+    ) {
+<span class="fc" id="L103">        LinkedHashMap&lt;String, Object&gt; document = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L104">        document.put(&quot;schemaId&quot;, SCHEMA_ID);</span>
+<span class="fc" id="L105">        document.put(&quot;profiles&quot;, profilesFor(gateDecision));</span>
+<span class="fc" id="L106">        document.put(&quot;generatedBy&quot;, PRODUCER_ID);</span>
+<span class="fc" id="L107">        document.put(&quot;scenarioId&quot;, evidence.scenarioId());</span>
+<span class="fc" id="L108">        document.put(&quot;inputExpression&quot;, evidence.inputExpression());</span>
+<span class="fc" id="L109">        document.put(&quot;targetExpression&quot;, evidence.targetExpression());</span>
+<span class="fc" id="L110">        document.put(&quot;nodeCount&quot;, evidence.nodeCount());</span>
+<span class="fc" id="L111">        document.put(&quot;edgeCount&quot;, evidence.edgeCount());</span>
+<span class="fc" id="L112">        document.put(&quot;bridgeRulesUsed&quot;, evidence.bridgeRulesUsed());</span>
+<span class="fc" id="L113">        document.put(&quot;learnedMacros&quot;, evidence.learnedMacros());</span>
+<span class="fc" id="L114">        document.put(&quot;reusedMacros&quot;, evidence.reusedMacros());</span>
+<span class="fc" id="L115">        document.put(&quot;sourceRef&quot;, &quot;generated&quot;);</span>
+<span class="fc" id="L116">        document.put(&quot;generatorVersion&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L117">        document.put(&quot;scenarioVersion&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L118">        document.put(&quot;evidenceSchemaVersion&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L119">        document.put(&quot;producer&quot;, producer());</span>
+<span class="fc" id="L120">        document.put(&quot;subject&quot;, subject(scenario, evidence));</span>
+<span class="fc" id="L121">        document.put(&quot;claims&quot;, claims(scenario, evidence));</span>
+<span class="fc" id="L122">        document.put(&quot;observations&quot;, observations(evidence));</span>
+<span class="fc" id="L123">        document.put(&quot;generalizedHypothesis&quot;, generalizedHypothesis(scenario, evidence));</span>
+<span class="fc" id="L124">        document.put(&quot;revisions&quot;, List.of());</span>
+<span class="fc" id="L125">        document.put(&quot;assumptions&quot;, aggregateAssumptions(evidence));</span>
+<span class="fc" id="L126">        document.put(&quot;counterexamples&quot;, List.of());</span>
+<span class="fc" id="L127">        document.put(&quot;holdouts&quot;, holdouts(evidence));</span>
+<span class="fc" id="L128">        document.put(&quot;oracleResults&quot;, oracleResults(evidence));</span>
+<span class="fc" id="L129">        document.put(&quot;provenance&quot;, provenance(scenario));</span>
+<span class="fc" id="L130">        document.put(&quot;novelty&quot;, novelty());</span>
+<span class="fc" id="L131">        document.put(&quot;ablation&quot;, ablation(evidence));</span>
+<span class="fc" id="L132">        document.put(&quot;proof&quot;, proof());</span>
+<span class="fc" id="L133">        document.put(&quot;promotion&quot;, promotion(evidence, gateDecision));</span>
+<span class="fc" id="L134">        document.put(&quot;artifacts&quot;, artifacts.stream().map(ArtifactDescriptor::toMap).toList());</span>
+<span class="fc" id="L135">        document.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L136">        JSON.convertValue(evidence, new TypeReference&lt;LinkedHashMap&lt;String, Object&gt;&gt;() { })</span>
+<span class="fc" id="L137">            .forEach(document::putIfAbsent);</span>
+<span class="fc" id="L138">        return document;</span>
+    }
+
+    private Map&lt;String, Object&gt; producer() {
+<span class="fc" id="L142">        LinkedHashMap&lt;String, Object&gt; producer = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L143">        producer.put(&quot;producerId&quot;, PRODUCER_ID);</span>
+<span class="fc" id="L144">        producer.put(&quot;producerVersion&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L145">        producer.put(&quot;implementation&quot;, &quot;regelsuche&quot;);</span>
+<span class="fc" id="L146">        producer.put(&quot;sourceRef&quot;, &quot;generated&quot;);</span>
+<span class="fc" id="L147">        producer.put(&quot;schemaPath&quot;, &quot;docs/schemas/regelsuche.discovery-evidence-v1.schema.json&quot;);</span>
+<span class="fc" id="L148">        producer.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L149">        return producer;</span>
+    }
+
+    private Map&lt;String, Object&gt; subject(DiscoveryBenchmarkScenario scenario, DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L153">        LinkedHashMap&lt;String, Object&gt; subject = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L154">        subject.put(&quot;id&quot;, scenario.id());</span>
+<span class="fc" id="L155">        subject.put(&quot;kind&quot;, &quot;DISCOVERY_SCENARIO&quot;);</span>
+<span class="fc" id="L156">        subject.put(&quot;title&quot;, scenario.displayName());</span>
+<span class="fc" id="L157">        subject.put(&quot;inputExpression&quot;, evidence.inputExpression());</span>
+<span class="fc" id="L158">        subject.put(&quot;targetExpression&quot;, evidence.targetExpression());</span>
+<span class="fc" id="L159">        subject.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L160">        return subject;</span>
+    }
+
+    private List&lt;Map&lt;String, Object&gt;&gt; claims(DiscoveryBenchmarkScenario scenario, DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L164">        List&lt;Map&lt;String, Object&gt;&gt; claims = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L166">        LinkedHashMap&lt;String, Object&gt; summary = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L167">        summary.put(&quot;id&quot;, &quot;claim-generated-summary&quot;);</span>
+<span class="fc" id="L168">        summary.put(&quot;kind&quot;, &quot;GENERATED_SUMMARY&quot;);</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        summary.put(&quot;outcome&quot;, evidence.success() ? &quot;SUPPORTED&quot; : &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc" id="L170">        summary.put(&quot;statement&quot;, scenario.displayName() + &quot; reached the target expression through generated search evidence.&quot;);</span>
+<span class="fc" id="L171">        summary.put(&quot;evidenceRefs&quot;, List.of(&quot;observation-search-trace&quot;, &quot;oracle-equivalence&quot;, &quot;ablation-macro-reuse&quot;));</span>
+<span class="fc" id="L172">        summary.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L173">        claims.add(summary);</span>
+
+<span class="fc" id="L175">        LinkedHashMap&lt;String, Object&gt; hypothesis = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L176">        hypothesis.put(&quot;id&quot;, &quot;claim-generalized-hypothesis&quot;);</span>
+<span class="fc" id="L177">        hypothesis.put(&quot;kind&quot;, &quot;GENERALIZED_HYPOTHESIS&quot;);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        hypothesis.put(&quot;outcome&quot;, evidence.success() ? &quot;SUPPORTED&quot; : &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc" id="L179">        hypothesis.put(&quot;statement&quot;, generalizedStatement(scenario, evidence));</span>
+<span class="fc" id="L180">        hypothesis.put(&quot;evidenceRefs&quot;, List.of(&quot;observation-search-trace&quot;));</span>
+<span class="fc" id="L181">        hypothesis.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L182">        claims.add(hypothesis);</span>
+<span class="fc" id="L183">        return claims;</span>
+    }
+
+    private List&lt;Map&lt;String, Object&gt;&gt; observations(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L187">        LinkedHashMap&lt;String, Object&gt; observation = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L188">        observation.put(&quot;id&quot;, &quot;observation-search-trace&quot;);</span>
+<span class="fc" id="L189">        observation.put(&quot;kind&quot;, &quot;SEARCH_TRACE&quot;);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        observation.put(&quot;outcome&quot;, evidence.success() ? &quot;OBSERVED&quot; : &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc" id="L191">        observation.put(&quot;pathCount&quot;, evidence.foundPaths().size());</span>
+<span class="fc" id="L192">        observation.put(&quot;nodeCount&quot;, evidence.nodeCount());</span>
+<span class="fc" id="L193">        observation.put(&quot;edgeCount&quot;, evidence.edgeCount());</span>
+<span class="fc" id="L194">        observation.put(&quot;bridgeRulesUsed&quot;, evidence.bridgeRulesUsed());</span>
+<span class="fc" id="L195">        observation.put(&quot;learnedMacros&quot;, evidence.learnedMacros());</span>
+<span class="fc" id="L196">        observation.put(&quot;reusedMacros&quot;, evidence.reusedMacros());</span>
+<span class="fc" id="L197">        observation.put(&quot;validationStatus&quot;, blankToDefault(evidence.validationStatus(), &quot;UNKNOWN&quot;));</span>
+<span class="fc" id="L198">        observation.put(&quot;sourceFields&quot;, List.of(&quot;foundPaths&quot;, &quot;nodes&quot;, &quot;edges&quot;, &quot;analytics&quot;, &quot;withoutMacroRun&quot;, &quot;withMacroRun&quot;));</span>
+<span class="fc" id="L199">        observation.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L200">        return List.of(observation);</span>
+    }
+
+    private Map&lt;String, Object&gt; generalizedHypothesis(DiscoveryBenchmarkScenario scenario, DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L204">        LinkedHashMap&lt;String, Object&gt; hypothesis = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L205">        hypothesis.put(&quot;statement&quot;, generalizedStatement(scenario, evidence));</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        hypothesis.put(&quot;family&quot;, scenario.requiredRuleFamilies().isEmpty() ? &quot;discovery&quot; : scenario.requiredRuleFamilies().getFirst());</span>
+<span class="fc" id="L207">        hypothesis.put(&quot;rulePath&quot;, evidence.bridgeRulesUsed());</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        hypothesis.put(&quot;status&quot;, evidence.success() ? &quot;SUPPORTED&quot; : &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc" id="L209">        hypothesis.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L210">        return hypothesis;</span>
+    }
+
+    private String generalizedStatement(DiscoveryBenchmarkScenario scenario, DiscoveryBenchmarkEvidence evidence) {
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        String family = scenario.requiredRuleFamilies().isEmpty() ? &quot;discovery&quot; : scenario.requiredRuleFamilies().getFirst();</span>
+<span class="fc" id="L215">        return family + &quot; transforms `&quot; + evidence.inputExpression() + &quot;` into `&quot; + evidence.targetExpression() + &quot;`.&quot;;</span>
+    }
+
+    private List&lt;String&gt; aggregateAssumptions(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L219">        LinkedHashSet&lt;String&gt; assumptions = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (DiscoveryBenchmarkEvidence.EvidenceEdge edge : evidence.edges()) {</span>
+<span class="fc" id="L221">            assumptions.addAll(edge.assumptions());</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (edge.rewriteMove() != null) {</span>
+<span class="fc" id="L223">                assumptions.addAll(edge.rewriteMove().assumptions());</span>
+            }
+<span class="fc" id="L225">        }</span>
+<span class="fc" id="L226">        return List.copyOf(assumptions);</span>
+    }
+
+    private List&lt;Map&lt;String, Object&gt;&gt; holdouts(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L230">        List&lt;Map&lt;String, Object&gt;&gt; holdouts = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (evidence.withoutMacroRun() != null) {</span>
+<span class="fc" id="L232">            holdouts.add(holdout(&quot;without-macro&quot;, evidence.withoutMacroRun()));</span>
+        }
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (evidence.withMacroRun() != null) {</span>
+<span class="fc" id="L235">            holdouts.add(holdout(&quot;with-macro&quot;, evidence.withMacroRun()));</span>
+        }
+<span class="fc" id="L237">        return holdouts;</span>
+    }
+
+    private Map&lt;String, Object&gt; holdout(String id, DiscoveryBenchmarkEvidence.SearchRunEvidence run) {
+<span class="fc" id="L241">        LinkedHashMap&lt;String, Object&gt; holdout = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L242">        holdout.put(&quot;id&quot;, id);</span>
+<span class="fc" id="L243">        holdout.put(&quot;kind&quot;, &quot;REPLAY_RUN&quot;);</span>
+<span class="fc" id="L244">        holdout.put(&quot;success&quot;, run.success());</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        holdout.put(&quot;pathLength&quot;, run.path().isEmpty() ? -1 : Math.max(0, run.path().size() - 1));</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">        holdout.put(&quot;statesExplored&quot;, run.analytics() == null ? -1L : run.analytics().statesExplored());</span>
+<span class="fc" id="L247">        holdout.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L248">        return holdout;</span>
+    }
+
+    private List&lt;Map&lt;String, Object&gt;&gt; oracleResults(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L252">        LinkedHashMap&lt;String, Object&gt; oracle = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L253">        oracle.put(&quot;id&quot;, &quot;oracle-equivalence&quot;);</span>
+<span class="fc" id="L254">        oracle.put(&quot;kind&quot;, &quot;EXTERNAL_VALIDATION&quot;);</span>
+<span class="fc" id="L255">        oracle.put(&quot;status&quot;, blankToDefault(evidence.oracleStatus(), &quot;UNAVAILABLE&quot;));</span>
+<span class="fc" id="L256">        oracle.put(&quot;outcome&quot;, oracleOutcome(evidence.oracleStatus()));</span>
+<span class="fc" id="L257">        oracle.put(&quot;evidence&quot;, blankToDefault(evidence.oracleEvidence(), &quot;&quot;));</span>
+<span class="fc" id="L258">        oracle.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L259">        return List.of(oracle);</span>
+    }
+
+    private String oracleOutcome(String status) {
+<span class="fc" id="L263">        String normalized = blankToDefault(status, &quot;UNAVAILABLE&quot;).toUpperCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L264" title="2 of 3 branches missed.">        return switch (normalized) {</span>
+<span class="nc" id="L265">            case &quot;AGREE&quot;, &quot;PASS&quot;, &quot;CONFIRMED&quot; -&gt; &quot;CONFIRMED&quot;;</span>
+<span class="nc" id="L266">            case &quot;DISAGREE&quot;, &quot;FAIL&quot;, &quot;REFUTED&quot; -&gt; &quot;REFUTED&quot;;</span>
+<span class="fc" id="L267">            default -&gt; &quot;INCONCLUSIVE&quot;;</span>
+        };
+    }
+
+    private Map&lt;String, Object&gt; provenance(DiscoveryBenchmarkScenario scenario) {
+<span class="fc" id="L272">        LinkedHashMap&lt;String, Object&gt; provenance = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L273">        provenance.put(&quot;traceSource&quot;, &quot;REGELSUCHE_SEARCH&quot;);</span>
+<span class="fc" id="L274">        provenance.put(&quot;enabledOperators&quot;, scenario.enabledOperators());</span>
+<span class="fc" id="L275">        provenance.put(&quot;enabledRulePacks&quot;, scenario.enabledRulePacks());</span>
+<span class="fc" id="L276">        provenance.put(&quot;requiredBridgeRules&quot;, scenario.requiredBridgeRules());</span>
+<span class="fc" id="L277">        provenance.put(&quot;requiredRuleFamilies&quot;, scenario.requiredRuleFamilies());</span>
+<span class="fc" id="L278">        provenance.put(&quot;requiredBridgeEffects&quot;, scenario.requiredBridgeEffects().stream().map(Enum::name).toList());</span>
+<span class="fc" id="L279">        provenance.put(&quot;budgets&quot;, Map.of(</span>
+<span class="fc" id="L280">            &quot;maxDepth&quot;, scenario.budgets().maxDepth(),</span>
+<span class="fc" id="L281">            &quot;maxStates&quot;, scenario.budgets().maxStates(),</span>
+<span class="fc" id="L282">            &quot;timeoutMillis&quot;, scenario.budgets().timeoutMillis()</span>
+        ));
+<span class="fc" id="L284">        provenance.put(&quot;gallery&quot;, Map.of(</span>
+<span class="fc" id="L285">            &quot;generateSvg&quot;, scenario.gallery().generateSvg(),</span>
+<span class="fc" id="L286">            &quot;preferredPathCount&quot;, scenario.gallery().preferredPathCount(),</span>
+<span class="fc" id="L287">            &quot;minVisibleNodes&quot;, scenario.gallery().minVisibleNodes()</span>
+        ));
+<span class="fc" id="L289">        provenance.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L290">        return provenance;</span>
+    }
+
+    private Map&lt;String, Object&gt; novelty() {
+<span class="fc" id="L294">        LinkedHashMap&lt;String, Object&gt; novelty = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L295">        novelty.put(&quot;status&quot;, &quot;DOCUMENTED_BENCHMARK&quot;);</span>
+<span class="fc" id="L296">        novelty.put(&quot;matchedEvidenceIds&quot;, List.of());</span>
+<span class="fc" id="L297">        novelty.put(&quot;rationale&quot;, &quot;Public discovery benchmark scenario.&quot;);</span>
+<span class="fc" id="L298">        novelty.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L299">        return novelty;</span>
+    }
+
+    private Map&lt;String, Object&gt; ablation(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L303">        AblationEvidence ablation = ablationEvidence(evidence);</span>
+<span class="fc" id="L304">        LinkedHashMap&lt;String, Object&gt; object = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L305">        object.put(&quot;kind&quot;, &quot;ABLATION_STUDY&quot;);</span>
+<span class="fc" id="L306">        object.put(&quot;status&quot;, ablation.ablationStatus());</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        object.put(&quot;outcome&quot;, ablation.promotionReady() ? &quot;CONFIRMED&quot; : &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc" id="L308">        object.put(&quot;improvementRatio&quot;, ablation.improvementRatio());</span>
+<span class="fc" id="L309">        object.put(&quot;withCandidate&quot;, runEvidence(ablation.withCandidate()));</span>
+<span class="fc" id="L310">        object.put(&quot;withoutCandidate&quot;, runEvidence(ablation.withoutCandidate()));</span>
+<span class="fc" id="L311">        object.put(&quot;explanation&quot;, ablation.explanation());</span>
+<span class="fc" id="L312">        object.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L313">        return object;</span>
+    }
+
+    private Map&lt;String, Object&gt; runEvidence(AblationEvidence.RunEvidence evidence) {
+<span class="fc" id="L317">        LinkedHashMap&lt;String, Object&gt; run = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L318">        run.put(&quot;success&quot;, evidence.success());</span>
+<span class="fc" id="L319">        run.put(&quot;pathLength&quot;, evidence.pathLength());</span>
+<span class="fc" id="L320">        run.put(&quot;statesExplored&quot;, evidence.statesExplored());</span>
+<span class="fc" id="L321">        return run;</span>
+    }
+
+    private Map&lt;String, Object&gt; proof() {
+<span class="fc" id="L325">        LinkedHashMap&lt;String, Object&gt; proof = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L326">        proof.put(&quot;required&quot;, false);</span>
+<span class="fc" id="L327">        proof.put(&quot;policy&quot;, &quot;OPTIONAL&quot;);</span>
+<span class="fc" id="L328">        proof.put(&quot;outcome&quot;, &quot;NOT_REQUESTED&quot;);</span>
+<span class="fc" id="L329">        proof.put(&quot;confirmations&quot;, List.of());</span>
+<span class="fc" id="L330">        proof.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L331">        return proof;</span>
+    }
+
+    private Map&lt;String, Object&gt; promotion(
+        DiscoveryBenchmarkEvidence evidence,
+        PublicBenchmarkEvidenceGate.GateDecision gateDecision
+    ) {
+<span class="fc" id="L338">        LinkedHashMap&lt;String, Object&gt; promotion = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        promotion.put(&quot;status&quot;, gateDecision.accepted() ? &quot;PUBLIC&quot; : &quot;PROMOTED&quot;);</span>
+<span class="fc" id="L340">        promotion.put(&quot;eligible&quot;, evidence.promotionEligible());</span>
+<span class="fc" id="L341">        promotion.put(&quot;gateAccepted&quot;, gateDecision.accepted());</span>
+<span class="fc" id="L342">        promotion.put(&quot;gateId&quot;, &quot;public-benchmark-evidence-gate&quot;);</span>
+<span class="fc" id="L343">        promotion.put(&quot;rejectionReasons&quot;, gateDecision.rejectionReasons());</span>
+<span class="fc" id="L344">        promotion.put(&quot;extensions&quot;, Map.of());</span>
+<span class="fc" id="L345">        return promotion;</span>
+    }
+
+    private List&lt;String&gt; profilesFor(PublicBenchmarkEvidenceGate.GateDecision gateDecision) {
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">        if (gateDecision.accepted()) {</span>
+<span class="fc" id="L350">            return PROFILE_ORDER;</span>
+        }
+<span class="nc" id="L352">        return PROFILE_ORDER.subList(0, 3);</span>
+    }
+
+    private String canonicalEvidenceHash(Map&lt;String, Object&gt; document) {
+        try {
+<span class="fc" id="L357">            return &quot;sha256:&quot; + sha256(JSON.writeValueAsBytes(document));</span>
+<span class="nc" id="L358">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L359">            throw new IllegalStateException(&quot;Could not serialize discovery evidence&quot;, exception);</span>
+        }
+    }
+
+    private String canonicalEvidenceId(String canonicalHash) {
+<span class="fc" id="L364">        return SCHEMA_ID + &quot;#&quot; + canonicalHash;</span>
+    }
+
+    private AblationEvidence ablationEvidence(DiscoveryBenchmarkEvidence evidence) {
+<span class="fc" id="L368">        DiscoveryBenchmarkEvidence.SearchRunEvidence withMacro = evidence.withMacroRun();</span>
+<span class="fc" id="L369">        DiscoveryBenchmarkEvidence.SearchRunEvidence withoutMacro = evidence.withoutMacroRun();</span>
+<span class="pc bpc" id="L370" title="2 of 4 branches missed.">        if (withMacro == null || withoutMacro == null) {</span>
+<span class="nc" id="L371">            return AblationEvidence.statusOnly(&quot;N/A&quot;, &quot;benchmark evidence does not contain both runs&quot;);</span>
+        }
+<span class="fc" id="L373">        return AblationEvidence.compare(</span>
+<span class="fc" id="L374">            withMacro.success(),</span>
+<span class="fc" id="L375">            pathLength(withMacro),</span>
+<span class="fc" id="L376">            statesExplored(withMacro),</span>
+<span class="fc" id="L377">            withoutMacro.success(),</span>
+<span class="fc" id="L378">            pathLength(withoutMacro),</span>
+<span class="fc" id="L379">            statesExplored(withoutMacro),</span>
+            &quot;public benchmark macro reuse ablation&quot;
+        );
+    }
+
+    private int pathLength(DiscoveryBenchmarkEvidence.SearchRunEvidence run) {
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        return run.path().isEmpty() ? -1 : Math.max(0, run.path().size() - 1);</span>
+    }
+
+    private long statesExplored(DiscoveryBenchmarkEvidence.SearchRunEvidence run) {
+<span class="fc" id="L389">        SearchSpaceAnalytics analytics = run.analytics();</span>
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">        return analytics == null ? -1L : analytics.statesExplored();</span>
+    }
+
+    private List&lt;String&gt; validate(JsonNode root, Path evidenceDirectory) {
+<span class="fc" id="L394">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L395">        requireText(root, &quot;schemaId&quot;, errors);</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        if (!SCHEMA_ID.equals(root.path(&quot;schemaId&quot;).asText())) {</span>
+<span class="nc" id="L397">            errors.add(&quot;schemaId must be &quot; + SCHEMA_ID);</span>
+        }
+
+<span class="fc" id="L400">        Set&lt;String&gt; profiles = profiles(root, errors);</span>
+<span class="fc" id="L401">        requireObject(root, &quot;producer&quot;, errors);</span>
+<span class="fc" id="L402">        requireObject(root, &quot;subject&quot;, errors);</span>
+<span class="fc" id="L403">        requireArray(root, &quot;claims&quot;, errors);</span>
+<span class="fc" id="L404">        requireArray(root, &quot;observations&quot;, errors);</span>
+<span class="fc" id="L405">        requireObject(root, &quot;generalizedHypothesis&quot;, errors);</span>
+<span class="fc" id="L406">        requireArray(root, &quot;revisions&quot;, errors);</span>
+<span class="fc" id="L407">        requireArray(root, &quot;assumptions&quot;, errors);</span>
+<span class="fc" id="L408">        requireArray(root, &quot;counterexamples&quot;, errors);</span>
+<span class="fc" id="L409">        requireArray(root, &quot;holdouts&quot;, errors);</span>
+<span class="fc" id="L410">        requireArray(root, &quot;oracleResults&quot;, errors);</span>
+<span class="fc" id="L411">        requireObject(root, &quot;provenance&quot;, errors);</span>
+<span class="fc" id="L412">        requireObject(root, &quot;novelty&quot;, errors);</span>
+<span class="fc" id="L413">        requireObject(root, &quot;ablation&quot;, errors);</span>
+<span class="fc" id="L414">        requireObject(root, &quot;proof&quot;, errors);</span>
+<span class="fc" id="L415">        requireObject(root, &quot;promotion&quot;, errors);</span>
+<span class="fc" id="L416">        requireArray(root, &quot;artifacts&quot;, errors);</span>
+<span class="fc" id="L417">        requireObject(root, &quot;extensions&quot;, errors);</span>
+<span class="fc" id="L418">        requireText(root.path(&quot;producer&quot;), &quot;producerId&quot;, errors);</span>
+<span class="fc" id="L419">        requireText(root.path(&quot;subject&quot;), &quot;id&quot;, errors);</span>
+<span class="fc" id="L420">        requireText(root.path(&quot;subject&quot;), &quot;inputExpression&quot;, errors);</span>
+<span class="fc" id="L421">        requireText(root.path(&quot;subject&quot;), &quot;targetExpression&quot;, errors);</span>
+<span class="fc" id="L422">        requireText(root.path(&quot;generalizedHypothesis&quot;), &quot;statement&quot;, errors);</span>
+<span class="fc" id="L423">        requireText(root.path(&quot;generalizedHypothesis&quot;), &quot;family&quot;, errors);</span>
+
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (profiles.contains(&quot;validated&quot;)) {</span>
+<span class="pc bpc" id="L426" title="1 of 4 branches missed.">            if (root.path(&quot;provenance&quot;).isMissingNode() || root.path(&quot;provenance&quot;).isEmpty()) {</span>
+<span class="fc" id="L427">                errors.add(&quot;validated profile requires provenance&quot;);</span>
+            }
+<span class="pc bpc" id="L429" title="1 of 4 branches missed.">            if (!root.has(&quot;assumptions&quot;) || !root.path(&quot;assumptions&quot;).isArray()) {</span>
+<span class="fc" id="L430">                errors.add(&quot;validated profile requires assumptions&quot;);</span>
+            }
+<span class="pc bpc" id="L432" title="2 of 4 branches missed.">            if (!root.path(&quot;oracleResults&quot;).isArray() || root.path(&quot;oracleResults&quot;).isEmpty()) {</span>
+<span class="nc" id="L433">                errors.add(&quot;validated profile requires oracleResults&quot;);</span>
+            }
+        }
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        if (profiles.contains(&quot;promoted&quot;)) {</span>
+<span class="pc bpc" id="L437" title="1 of 4 branches missed.">            if (root.path(&quot;ablation&quot;).isMissingNode() || blank(root.path(&quot;ablation&quot;).path(&quot;status&quot;))) {</span>
+<span class="fc" id="L438">                errors.add(&quot;promoted profile requires ablation&quot;);</span>
+            }
+        }
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if (profiles.contains(&quot;public&quot;)) {</span>
+<span class="fc" id="L442">            requireText(root, &quot;canonicalEvidenceHash&quot;, errors);</span>
+<span class="fc" id="L443">            requireText(root, &quot;canonicalEvidenceId&quot;, errors);</span>
+<span class="pc bpc" id="L444" title="2 of 4 branches missed.">            if (!root.path(&quot;artifacts&quot;).isArray() || root.path(&quot;artifacts&quot;).isEmpty()) {</span>
+<span class="nc" id="L445">                errors.add(&quot;public profile requires artifacts&quot;);</span>
+            }
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">            if (!&quot;PUBLIC&quot;.equals(root.path(&quot;promotion&quot;).path(&quot;status&quot;).asText())) {</span>
+<span class="nc" id="L448">                errors.add(&quot;public profile requires promotion.status=PUBLIC&quot;);</span>
+            }
+<span class="fc" id="L450">            JsonNode proof = root.path(&quot;proof&quot;);</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            if (proof.path(&quot;required&quot;).asBoolean(false)) {</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">                if (!&quot;CONFIRMED&quot;.equals(proof.path(&quot;outcome&quot;).asText())) {</span>
+<span class="fc" id="L453">                    errors.add(&quot;public profile requires confirmed proof when proof.required=true&quot;);</span>
+                }
+<span class="pc bpc" id="L455" title="2 of 4 branches missed.">                if (!proof.path(&quot;confirmations&quot;).isArray() || proof.path(&quot;confirmations&quot;).isEmpty()) {</span>
+<span class="fc" id="L456">                    errors.add(&quot;public profile requires proof confirmations when proof.required=true&quot;);</span>
+                }
+            }
+<span class="pc bpc" id="L459" title="2 of 4 branches missed.">            if (root.hasNonNull(&quot;canonicalEvidenceHash&quot;) &amp;&amp; root.hasNonNull(&quot;canonicalEvidenceId&quot;)) {</span>
+<span class="fc" id="L460">                String expectedId = canonicalEvidenceId(root.path(&quot;canonicalEvidenceHash&quot;).asText(&quot;&quot;));</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">                if (!expectedId.equals(root.path(&quot;canonicalEvidenceId&quot;).asText())) {</span>
+<span class="fc" id="L462">                    errors.add(&quot;canonicalEvidenceId must match schemaId + canonicalEvidenceHash&quot;);</span>
+                }
+            }
+        }
+
+<span class="pc bpc" id="L467" title="1 of 4 branches missed.">        if (evidenceDirectory != null &amp;&amp; root.path(&quot;artifacts&quot;).isArray()) {</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">            for (JsonNode artifact : root.path(&quot;artifacts&quot;)) {</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">                if (!artifact.isObject()) {</span>
+<span class="nc" id="L470">                    errors.add(&quot;artifact entries must be objects&quot;);</span>
+<span class="nc" id="L471">                    continue;</span>
+                }
+<span class="fc" id="L473">                String relativePath = artifact.path(&quot;path&quot;).asText(&quot;&quot;);</span>
+<span class="fc" id="L474">                String expected = artifact.path(&quot;sha256&quot;).asText(&quot;&quot;);</span>
+                Path artifactPath;
+                try {
+<span class="fc" id="L477">                    artifactPath = resolveArtifactPath(evidenceDirectory, relativePath);</span>
+<span class="nc" id="L478">                } catch (IllegalStateException exception) {</span>
+<span class="nc" id="L479">                    errors.add(exception.getMessage());</span>
+<span class="nc" id="L480">                    continue;</span>
+<span class="fc" id="L481">                }</span>
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">                if (!Files.isRegularFile(artifactPath)) {</span>
+<span class="nc" id="L483">                    errors.add(&quot;artifact file missing: &quot; + relativePath);</span>
+<span class="nc" id="L484">                    continue;</span>
+                }
+<span class="fc" id="L486">                String actual = &quot;sha256:&quot; + sha256(readBytes(artifactPath));</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">                if (!expected.equals(actual)) {</span>
+<span class="fc" id="L488">                    errors.add(&quot;artifact hash mismatch for &quot; + relativePath);</span>
+                }
+<span class="fc" id="L490">            }</span>
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">            if (root.hasNonNull(&quot;canonicalEvidenceHash&quot;)) {</span>
+                try {
+<span class="fc" id="L493">                    String recomputed = recomputeCanonicalEvidenceHash(root, evidenceDirectory);</span>
+<span class="fc bfc" id="L494" title="All 2 branches covered.">                    if (!recomputed.equals(root.path(&quot;canonicalEvidenceHash&quot;).asText())) {</span>
+<span class="fc" id="L495">                        errors.add(&quot;canonicalEvidenceHash does not match canonical artifact state&quot;);</span>
+                    }
+<span class="nc" id="L497">                } catch (IllegalStateException exception) {</span>
+<span class="nc" id="L498">                    errors.add(exception.getMessage());</span>
+<span class="fc" id="L499">                }</span>
+            }
+        }
+<span class="fc" id="L502">        return errors;</span>
+    }
+
+    private Set&lt;String&gt; profiles(JsonNode root, List&lt;String&gt; errors) {
+<span class="fc" id="L506">        JsonNode profilesNode = root.path(&quot;profiles&quot;);</span>
+<span class="fc" id="L507">        LinkedHashSet&lt;String&gt; profiles = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L508" title="2 of 4 branches missed.">        if (!profilesNode.isArray() || profilesNode.isEmpty()) {</span>
+<span class="nc" id="L509">            errors.add(&quot;profiles must be a non-empty array&quot;);</span>
+<span class="nc" id="L510">            return profiles;</span>
+        }
+<span class="fc bfc" id="L512" title="All 2 branches covered.">        for (JsonNode profile : profilesNode) {</span>
+<span class="fc" id="L513">            String value = profile.asText();</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">            if (!PROFILE_ORDER.contains(value)) {</span>
+<span class="nc" id="L515">                errors.add(&quot;unknown profile: &quot; + value);</span>
+            }
+<span class="fc bfc" id="L517" title="All 2 branches covered.">            if (!profiles.add(value)) {</span>
+<span class="fc" id="L518">                errors.add(&quot;duplicate profile: &quot; + value);</span>
+            }
+<span class="fc" id="L520">        }</span>
+<span class="fc" id="L521">        List&lt;String&gt; canonicalOrder = PROFILE_ORDER.stream().filter(profiles::contains).toList();</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">        if (!canonicalOrder.equals(List.copyOf(profiles))) {</span>
+<span class="nc" id="L523">            errors.add(&quot;profiles must use canonical order &quot; + canonicalOrder);</span>
+        }
+<span class="fc" id="L525">        return profiles;</span>
+    }
+
+    private Path resolveArtifactPath(Path evidenceDirectory, String relativePath) {
+<span class="fc" id="L529">        Path normalizedEvidenceDirectory = evidenceDirectory.toAbsolutePath().normalize();</span>
+<span class="fc" id="L530">        Path artifactPath = normalizedEvidenceDirectory.resolve(relativePath).normalize();</span>
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        if (!artifactPath.startsWith(normalizedEvidenceDirectory)) {</span>
+<span class="fc" id="L532">            throw new IllegalStateException(&quot;artifact path escapes evidence directory: &quot; + relativePath);</span>
+        }
+<span class="fc" id="L534">        return artifactPath;</span>
+    }
+
+    private void requireText(JsonNode node, String field, List&lt;String&gt; errors) {
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">        if (blank(node.path(field))) {</span>
+<span class="nc" id="L539">            errors.add(field + &quot; is required&quot;);</span>
+        }
+<span class="fc" id="L541">    }</span>
+
+    private void requireObject(JsonNode node, String field, List&lt;String&gt; errors) {
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        if (!node.path(field).isObject()) {</span>
+<span class="fc" id="L545">            errors.add(field + &quot; must be an object&quot;);</span>
+        }
+<span class="fc" id="L547">    }</span>
+
+    private void requireArray(JsonNode node, String field, List&lt;String&gt; errors) {
+<span class="fc bfc" id="L550" title="All 2 branches covered.">        if (!node.path(field).isArray()) {</span>
+<span class="fc" id="L551">            errors.add(field + &quot; must be an array&quot;);</span>
+        }
+<span class="fc" id="L553">    }</span>
+
+    private boolean blank(JsonNode node) {
+<span class="pc bpc" id="L556" title="2 of 4 branches missed.">        return node.isMissingNode() || node.asText(&quot;&quot;).isBlank();</span>
+    }
+
+    private String blankToDefault(String value, String defaultValue) {
+<span class="pc bpc" id="L560" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? defaultValue : value;</span>
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+<span class="fc" id="L565">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L566">            return bytesToHex(digest.digest(bytes));</span>
+<span class="nc" id="L567">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L568">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static byte[] readBytes(Path path) {
+        try {
+<span class="fc" id="L574">            return Files.readAllBytes(path);</span>
+<span class="nc" id="L575">        } catch (IOException exception) {</span>
+<span class="nc" id="L576">            throw new IllegalStateException(&quot;Could not read artifact &quot; + path, exception);</span>
+        }
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+<span class="fc" id="L581">        StringBuilder builder = new StringBuilder(bytes.length * 2);</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">        for (byte value : bytes) {</span>
+<span class="fc" id="L583">            builder.append(String.format(&quot;%02x&quot;, value));</span>
+        }
+<span class="fc" id="L585">        return builder.toString();</span>
+    }
+
+<span class="fc" id="L588">    record ArtifactDescriptor(String name, String path, String mediaType, String sha256) {</span>
+        Map&lt;String, Object&gt; toMap() {
+<span class="fc" id="L590">            LinkedHashMap&lt;String, Object&gt; artifact = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L591">            artifact.put(&quot;name&quot;, name);</span>
+<span class="fc" id="L592">            artifact.put(&quot;path&quot;, path);</span>
+<span class="fc" id="L593">            artifact.put(&quot;mediaType&quot;, mediaType);</span>
+<span class="fc" id="L594">            artifact.put(&quot;sha256&quot;, sha256);</span>
+<span class="fc" id="L595">            return artifact;</span>
+        }
+    }
+
+<span class="fc" id="L599">    record EvidenceDocument(String canonicalEvidenceId, String canonicalEvidenceHash, Map&lt;String, Object&gt; body) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
