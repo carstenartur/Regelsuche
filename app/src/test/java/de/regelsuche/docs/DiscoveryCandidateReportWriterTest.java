@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -48,7 +49,9 @@ class DiscoveryCandidateReportWriterTest {
             List.of(),
             false,
             "",
-            evidence
+            evidence,
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
 
         new DiscoveryCandidateReportWriter().write(tempDir, "discovery-campaign-test", List.of(record));

@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import java.util.LinkedHashSet;
 import java.util.List;
 
@@ -29,65 +30,10 @@ record PromotionRecord(
     List<String> reusedMacroIds,
     boolean measuredImprovement,
     String reuseCampaign,
-    AblationEvidence ablationEvidence
+    AblationEvidence ablationEvidence,
+    ProofPolicy proofPolicy,
+    String proverExecutionStatus
 ) {
-    PromotionRecord(
-        String candidateId,
-        String sourceCampaign,
-        String discoveryDate,
-        String family,
-        PromotionStage stage,
-        String originalExpression,
-        String discoveredStructure,
-        String oracleStatus,
-        String oracleEvidence,
-        String ablationStatus,
-        String sourceOperator,
-        String sourcePack,
-        List<String> assumptions,
-        String rationale,
-        List<String> rulePath,
-        boolean promotionEligible,
-        List<String> promotionBlockers,
-        boolean evidenceExists,
-        boolean curatedPathPresent,
-        boolean fallbackUsed,
-        boolean macroOpportunity,
-        String generatedMacroId,
-        List<String> reusedMacroIds,
-        boolean measuredImprovement,
-        String reuseCampaign
-    ) {
-        this(
-            candidateId,
-            sourceCampaign,
-            discoveryDate,
-            family,
-            stage,
-            originalExpression,
-            discoveredStructure,
-            oracleStatus,
-            oracleEvidence,
-            ablationStatus,
-            sourceOperator,
-            sourcePack,
-            assumptions,
-            rationale,
-            rulePath,
-            promotionEligible,
-            promotionBlockers,
-            evidenceExists,
-            curatedPathPresent,
-            fallbackUsed,
-            macroOpportunity,
-            generatedMacroId,
-            reusedMacroIds,
-            measuredImprovement,
-            reuseCampaign,
-            AblationEvidence.statusOnly(ablationStatus)
-        );
-    }
-
     PromotionRecord {
         family = family == null ? "" : family;
         stage = stage == null ? PromotionStage.OBSERVED : stage;
@@ -106,6 +52,8 @@ record PromotionRecord(
         generatedMacroId = generatedMacroId == null ? "" : generatedMacroId;
         reusedMacroIds = reusedMacroIds == null ? List.of() : List.copyOf(reusedMacroIds);
         reuseCampaign = reuseCampaign == null ? "" : reuseCampaign;
+        proofPolicy = proofPolicy == null ? ProofPolicy.PROOF_OPTIONAL : proofPolicy;
+        proverExecutionStatus = ProofPolicy.normaliseExecutionStatus(proverExecutionStatus);
     }
 
     boolean unresolved() {
@@ -157,7 +105,9 @@ record PromotionRecord(
             List.copyOf(reused),
             reuse.measuredImprovement(),
             reuse.campaignId(),
-            reuseEvidence
+            reuseEvidence,
+            proofPolicy,
+            proverExecutionStatus
         );
     }
 }

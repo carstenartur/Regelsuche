@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -103,7 +104,9 @@ final class PromotionRegistry {
             uniqueReusedMacroIds,
             left.measuredImprovement() || right.measuredImprovement(),
             choose(left.reuseCampaign(), right.reuseCampaign()),
-            mergedAblationEvidence
+            mergedAblationEvidence,
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 

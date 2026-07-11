@@ -101,6 +101,11 @@ final class PublicEvidenceGate {
         if (!(effectiveNovelty == NoveltyStatus.NEW || effectiveNovelty == NoveltyStatus.VARIANT)) {
             reasons.add("novelty=" + effectiveNovelty.name());
         }
+        de.regelsuche.proof.ProofPolicy policy = record.proofPolicy();
+        if (policy.requiresConfirmedProofForPublicEvidence()
+                && !policy.satisfiedBy(record.proverExecutionStatus())) {
+            reasons.add("proof=" + de.regelsuche.proof.ProofPolicy.normaliseExecutionStatus(record.proverExecutionStatus()));
+        }
         String pathSource = reasons.stream().anyMatch(reason -> reason.equals("pathSource!=REGELSUCHE_SEARCH"))
             ? "UNKNOWN"
             : "REGELSUCHE_SEARCH";

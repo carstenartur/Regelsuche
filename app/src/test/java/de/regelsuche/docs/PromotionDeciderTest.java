@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,7 +32,9 @@ class PromotionDeciderTest {
             true,
             false,
             false,
-            true
+            true,
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         ));
         PromotionRecord blocked = decider.decide(new PromotionObservation(
             "candidate-b",
@@ -52,7 +55,9 @@ class PromotionDeciderTest {
             true,
             false,
             false,
-            false
+            false,
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         ));
 
         assertEquals(PromotionStage.PROMOTED, promoted.stage());

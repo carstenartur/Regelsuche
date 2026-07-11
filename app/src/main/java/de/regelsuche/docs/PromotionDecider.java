@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,7 +40,9 @@ final class PromotionDecider {
             List.of(),
             false,
             "",
-            ablationEvidence
+            ablationEvidence,
+            observation.proofPolicy(),
+            observation.proverExecutionStatus()
         );
     }
 
@@ -63,6 +66,11 @@ final class PromotionDecider {
         if (observation.fallbackUsed()) {
             blockers.add("fallback=true");
         }
+        ProofPolicy policy = observation.proofPolicy();
+        if (policy.requiresConfirmedProofForPromotion()
+                && !policy.satisfiedBy(observation.proverExecutionStatus())) {
+            blockers.add("proof=" + ProofPolicy.normaliseExecutionStatus(observation.proverExecutionStatus()));
+        }
         return List.copyOf(blockers);
     }
 
@@ -79,7 +87,9 @@ final class PromotionDecider {
         }
         if (!ablationEvidence.promotionReady()
             || observation.curatedPathPresent()
-            || observation.fallbackUsed()) {
+            || observation.fallbackUsed()
+            || (observation.proofPolicy().requiresConfirmedProofForPromotion()
+                && !observation.proofPolicy().satisfiedBy(observation.proverExecutionStatus()))) {
             return PromotionStage.VALIDATED;
         }
         return promotionEligible ? PromotionStage.PROMOTED : PromotionStage.VALIDATED;

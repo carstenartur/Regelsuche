@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -148,7 +149,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             List.of("macro.id"),
             true,
             "discovery-campaign-4",
-            AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation")
+            AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation"),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
         PromotionRecord blocked = new PromotionRecord(
             "blocked",
@@ -175,6 +178,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
 
@@ -219,6 +225,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
 
@@ -263,6 +272,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
 
@@ -337,6 +349,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
 
@@ -382,6 +397,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
 
@@ -425,6 +443,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
 
@@ -465,7 +486,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             List.of("m1"),
             true,
             "campaign-4",
-            AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation")
+            AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation"),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
 
         String gallery = runner.renderGallery(List.of(record));
@@ -502,6 +525,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
     }
@@ -550,7 +576,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             List.of("macro.id"),
             true,
             "discovery-campaign-4",
-            AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation")
+            AblationEvidence.compare(true, 1, 5, true, 3, 30, "test ablation"),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
 
         String gallery = runner.renderGallery(List.of(record));
@@ -604,7 +632,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             List.of(),
             false,
             "",
-            AblationEvidence.compare(true, 2, 9, true, 4, 25, "test ablation")
+            AblationEvidence.compare(true, 2, 9, true, 4, 25, "test ablation"),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
 
         String gallery = runner.renderGallery(List.of(record));
@@ -660,6 +690,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             true,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
         PromotionRecord blocked = new PromotionRecord(
@@ -687,6 +720,9 @@ class DiscoveryPromotionPipelineRunnerTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("N/A"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
 

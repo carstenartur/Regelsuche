@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -35,6 +36,9 @@ class PromotionRegistryTest {
             "",
             List.of("macro-left"),
             false,
+            "",
+            AblationEvidence.statusOnly("UNCHANGED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
         PromotionRecord higherStage = new PromotionRecord(
@@ -62,7 +66,10 @@ class PromotionRegistryTest {
             "macro-generated",
             List.of("macro-right"),
             true,
-            "discovery-campaign-4"
+            "discovery-campaign-4",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
 
         PromotionRegistry.Registry merged = registry.build(List.of(higherStage, lowerStage));
@@ -112,6 +119,9 @@ class PromotionRegistryTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
         AblationEvidence structured = AblationEvidence.compare(
@@ -149,7 +159,9 @@ class PromotionRegistryTest {
             List.of(),
             false,
             "",
-            structured
+            structured,
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
 
         PromotionRegistry.Registry merged = registry.build(List.of(higherStageStatusOnly, lowerStageStructured));

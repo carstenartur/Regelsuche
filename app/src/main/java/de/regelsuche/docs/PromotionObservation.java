@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -23,7 +24,9 @@ record PromotionObservation(
     boolean evidenceExists,
     boolean curatedPathPresent,
     boolean fallbackUsed,
-    boolean macroOpportunity
+    boolean macroOpportunity,
+    ProofPolicy proofPolicy,
+    String proverExecutionStatus
 ) {
     PromotionObservation {
         family = family == null ? "" : family;
@@ -37,6 +40,8 @@ record PromotionObservation(
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         rationale = rationale == null ? "" : rationale;
         rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
+        proofPolicy = proofPolicy == null ? ProofPolicy.PROOF_OPTIONAL : proofPolicy;
+        proverExecutionStatus = ProofPolicy.normaliseExecutionStatus(proverExecutionStatus);
     }
 
     AblationEvidence ablationEvidence() {
@@ -63,7 +68,9 @@ record PromotionObservation(
             !result.rulePath().isEmpty(),
             curatedPathPresent(result.shortcutSource()),
             fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
+            macroOpportunity(result.family(), result.rulePath()),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 
@@ -87,7 +94,9 @@ record PromotionObservation(
             !result.rulePath().isEmpty(),
             curatedPathPresent(result.shortcutSource()),
             fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
+            macroOpportunity(result.family(), result.rulePath()),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 
@@ -111,7 +120,9 @@ record PromotionObservation(
             !result.rulePath().isEmpty(),
             curatedPathPresent(result.shortcutSource()),
             fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
+            macroOpportunity(result.family(), result.rulePath()),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 
@@ -135,7 +146,9 @@ record PromotionObservation(
             !result.rulePath().isEmpty(),
             curatedPathPresent(result.shortcutSource()),
             fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
+            macroOpportunity(result.family(), result.rulePath()),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 
@@ -159,7 +172,9 @@ record PromotionObservation(
             !result.rulePath().isEmpty(),
             curatedPathPresent(result.shortcutSource()),
             fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
+            macroOpportunity(result.family(), result.rulePath()),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 
@@ -183,7 +198,9 @@ record PromotionObservation(
             !result.rulePath().isEmpty(),
             curatedPathPresent(result.shortcutSource()),
             fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
+            macroOpportunity(result.family(), result.rulePath()),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 
@@ -207,7 +224,9 @@ record PromotionObservation(
             !result.rulePath().isEmpty(),
             curatedPathPresent(result.shortcutSource()),
             fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
+            macroOpportunity(result.family(), result.rulePath()),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 
