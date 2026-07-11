@@ -96,6 +96,28 @@ jobs:
           env -u GITHUB_SHA ./gradlew :app:generateDiscoveryGallery
           git diff --exit-code -- docs/generated/discovery docs/demo-gallery.md README.md
           if git status --porcelain -- docs/generated/discovery docs/demo-gallery.md README.md | grep -q .; then echo "Untracked generated files detected"; exit 1; fi
+      - name: Generate static reference page and validate
+        run: |
+          ./gradlew :app:generateStaticReferencePage
+          PAGE_DIR=app/build/reports/static-reference-page
+          # Check index.html exists
+          test -f "$PAGE_DIR/index.html" || { echo "index.html missing"; exit 1; }
+          # Check all expected sub-pages exist
+          test -f "$PAGE_DIR/timeline.html" || { echo "timeline.html missing"; exit 1; }
+          test -f "$PAGE_DIR/observatory.html" || { echo "observatory.html missing"; exit 1; }
+          test -f "$PAGE_DIR/timeline.md" || { echo "timeline.md missing"; exit 1; }
+          test -f "$PAGE_DIR/version.txt" || { echo "version.txt missing"; exit 1; }
+          # Check mode label is present (must be unambiguous)
+          grep -q "LIVE EXECUTION\|REPLAYED FROM CANONICAL\|PRE-GENERATED REFERENCE" "$PAGE_DIR/index.html" \
+            || { echo "index.html missing result-mode label"; exit 1; }
+          # Check reproduce section with exact Gradle and Docker commands
+          grep -q "runReferenceCampaign" "$PAGE_DIR/index.html" \
+            || { echo "index.html missing runReferenceCampaign command"; exit 1; }
+          grep -q "generateStaticReferencePage" "$PAGE_DIR/index.html" \
+            || { echo "index.html missing generateStaticReferencePage command"; exit 1; }
+          grep -q "Dockerfile.proof" "$PAGE_DIR/index.html" \
+            || { echo "index.html missing Dockerfile.proof reference"; exit 1; }
+          echo "Static reference page validation passed."
       - name: Generate Pages reports and badge JSON
         if: always()
         run: |
