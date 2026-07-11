@@ -23,7 +23,7 @@ class RecognitionLearningTest {
             pattern,
             List.of(
                 parser.parseTerm("x^2 + 2*x*a + a^2"),
-                parser.parseTerm("a^2 + 2*a*x + x^2")
+                parser.parseTerm("x^2 + a^2 + 2*a*x")
             ),
             List.of(parser.parseTerm("x^2 + 3*x*a + a^2"))
         );
