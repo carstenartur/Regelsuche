@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class RecognitionLearningTest {
@@ -26,7 +27,6 @@ class RecognitionLearningTest {
             ),
             List.of(parser.parseTerm("x^2 + 3*x*a + a^2"))
         );
-
         assertEquals(RecognitionProfile.arithmeticAc(), learned);
     }
 
@@ -41,7 +41,6 @@ class RecognitionLearningTest {
             ),
             List.of(parser.parseTerm("x^2 + 3*x*a + a^2"))
         );
-
         assertEquals(RecognitionProfile.algebraicAc(), learned);
         PatternRewriteRule rule = new PatternRewriteRule("square", pattern,
             PatternExpr.op(POW, PatternExpr.op(ADD, PatternExpr.var("X"), PatternExpr.var("A")), PatternExpr.num(2)),
@@ -53,9 +52,8 @@ class RecognitionLearningTest {
     @Test
     void persistsRecognitionProfileWithoutLosingMeaning() {
         RecognitionProfile original = RecognitionProfile.algebraicAc()
-            .withRecognitionRules(java.util.Set.of("learned-factor", "safe-power"), 2);
+            .withRecognitionRules(Set.of("learned-factor", "safe-power"), 2);
         RecognitionProfileData data = RecognitionProfileData.from(original);
-
         assertEquals(RecognitionProfileData.SCHEMA, data.schema());
         assertEquals(original, data.toProfile());
     }
@@ -69,10 +67,30 @@ class RecognitionLearningTest {
             ),
             RecognitionProfile.algebraicAc()
         );
-
-        RecognitionProfile profile = RecognitionProfile.algebraicAc();
         assertTrue(EquivalenceAwarePatternMatcher.match(generalized,
-            parser.parseTerm("m^2 + 2*m*n + n^2"), new java.util.HashMap<>(), profile));
+            parser.parseTerm("m^2 + 2*m*n + n^2"), new java.util.HashMap<>(),
+            RecognitionProfile.algebraicAc()));
+    }
+
+    @Test
+    void usesAllowListedLearnedRuleAsBoundedRecognitionTheory() {
+        PatternExpr x = PatternExpr.var("X");
+        PatternRewriteRule productToPower = new PatternRewriteRule(
+            "safe-power",
+            PatternExpr.op(MUL, x, x),
+            PatternExpr.op(POW, x, PatternExpr.num(2)),
+            RecognitionProfile.arithmeticAc()
+        );
+        RecognitionProfile profile = RecognitionProfile.exact()
+            .withRecognitionRules(Set.of("safe-power"), 1);
+        EquivalenceClassPatternMatcher.MatchResult result = new EquivalenceClassPatternMatcher().match(
+            PatternExpr.op(POW, PatternExpr.var("A"), PatternExpr.num(2)),
+            parser.parseTerm("z*z"),
+            profile,
+            new RecognitionTheory(List.of(productToPower))
+        );
+        assertTrue(result.matched());
+        assertEquals(parser.parseTerm("z^2"), result.representative());
     }
 
     private static PatternExpr completeSquarePattern() {
