@@ -1,5 +1,7 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
+import de.regelsuche.proof.ProverExecutionResult;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -103,8 +105,29 @@ final class PromotionRegistry {
             uniqueReusedMacroIds,
             left.measuredImprovement() || right.measuredImprovement(),
             choose(left.reuseCampaign(), right.reuseCampaign()),
-            mergedAblationEvidence
+            mergedAblationEvidence,
+            stricterOf(left.proofPolicy(), right.proofPolicy()),
+            chooseExecutionStatus(left.proverExecutionStatus(), right.proverExecutionStatus())
         );
+    }
+
+    private ProofPolicy stricterOf(ProofPolicy a, ProofPolicy b) {
+        return a.ordinal() >= b.ordinal() ? a : b;
+    }
+
+    private String chooseExecutionStatus(String left, String right) {
+        String confirmed = ProverExecutionResult.Status.PROVER_CONFIRMED.name();
+        String scriptGenerated = ProverExecutionResult.Status.SCRIPT_GENERATED.name();
+        if (confirmed.equals(left) || confirmed.equals(right)) {
+            return confirmed;
+        }
+        if (!scriptGenerated.equals(left) && left != null && !left.isBlank()) {
+            return left;
+        }
+        if (!scriptGenerated.equals(right) && right != null && !right.isBlank()) {
+            return right;
+        }
+        return scriptGenerated;
     }
 
     private AblationEvidence preferStructuredAblationEvidence(

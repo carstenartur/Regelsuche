@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -35,6 +36,9 @@ class PromotionRegistryTest {
             "",
             List.of("macro-left"),
             false,
+            "",
+            AblationEvidence.statusOnly("UNCHANGED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
         PromotionRecord higherStage = new PromotionRecord(
@@ -62,7 +66,10 @@ class PromotionRegistryTest {
             "macro-generated",
             List.of("macro-right"),
             true,
-            "discovery-campaign-4"
+            "discovery-campaign-4",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
 
         PromotionRegistry.Registry merged = registry.build(List.of(higherStage, lowerStage));
@@ -112,6 +119,9 @@ class PromotionRegistryTest {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
         AblationEvidence structured = AblationEvidence.compare(
@@ -149,7 +159,9 @@ class PromotionRegistryTest {
             List.of(),
             false,
             "",
-            structured
+            structured,
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
 
         PromotionRegistry.Registry merged = registry.build(List.of(higherStageStatusOnly, lowerStageStructured));
@@ -158,5 +170,151 @@ class PromotionRegistryTest {
         assertTrue(record.ablationEvidence().hasStructuredMetrics());
         assertEquals(structured.ablationStatus(), record.ablationEvidence().ablationStatus());
         assertEquals(record.ablationEvidence().ablationStatus(), record.ablationStatus());
+    }
+
+    @Test
+    void mergePreservesStricterProofPolicyAndCarriesForwardExecutionStatus() {
+        PromotionRegistry registry = new PromotionRegistry();
+        PromotionRecord optional = new PromotionRecord(
+            "candidate-3",
+            "campaign-a",
+            "2026-01-01",
+            "family",
+            PromotionStage.CANDIDATE,
+            "x + y",
+            "(x + y)",
+            "AGREE",
+            "",
+            "UNCHANGED",
+            "",
+            "",
+            List.of(),
+            "",
+            List.of(),
+            false,
+            List.of(),
+            true,
+            false,
+            false,
+            false,
+            "",
+            List.of(),
+            false,
+            "",
+            AblationEvidence.statusOnly("UNCHANGED"),
+            ProofPolicy.PROOF_OPTIONAL,
+            "PROVER_CONFIRMED"
+        );
+        PromotionRecord requiredForPromotion = new PromotionRecord(
+            "candidate-3",
+            "campaign-b",
+            "2026-01-02",
+            "family",
+            PromotionStage.REUSED,
+            "",
+            "",
+            "AGREE",
+            "",
+            "DEGRADED",
+            "",
+            "",
+            List.of(),
+            "",
+            List.of(),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            false,
+            "",
+            List.of(),
+            false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_REQUIRED_FOR_PROMOTION,
+            "SCRIPT_GENERATED"
+        );
+
+        PromotionRegistry.Registry merged = registry.build(List.of(optional, requiredForPromotion));
+        PromotionRecord record = merged.records().getFirst();
+
+        assertEquals(ProofPolicy.PROOF_REQUIRED_FOR_PROMOTION, record.proofPolicy(),
+            "merged record should use the stricter of the two policies");
+        assertEquals("PROVER_CONFIRMED", record.proverExecutionStatus(),
+            "merged record should carry forward PROVER_CONFIRMED over SCRIPT_GENERATED");
+    }
+
+    @Test
+    void mergePreservesStrictestProofPolicyForPublicEvidence() {
+        PromotionRegistry registry = new PromotionRegistry();
+        PromotionRecord requiredForPromotion = new PromotionRecord(
+            "candidate-4",
+            "campaign-a",
+            "2026-01-01",
+            "family",
+            PromotionStage.CANDIDATE,
+            "x + y",
+            "(x + y)",
+            "AGREE",
+            "",
+            "UNCHANGED",
+            "",
+            "",
+            List.of(),
+            "",
+            List.of(),
+            false,
+            List.of(),
+            true,
+            false,
+            false,
+            false,
+            "",
+            List.of(),
+            false,
+            "",
+            AblationEvidence.statusOnly("UNCHANGED"),
+            ProofPolicy.PROOF_REQUIRED_FOR_PROMOTION,
+            "PROVER_FAILED"
+        );
+        PromotionRecord requiredForPublic = new PromotionRecord(
+            "candidate-4",
+            "campaign-b",
+            "2026-01-02",
+            "family",
+            PromotionStage.REUSED,
+            "",
+            "",
+            "AGREE",
+            "",
+            "DEGRADED",
+            "",
+            "",
+            List.of(),
+            "",
+            List.of(),
+            true,
+            List.of(),
+            true,
+            false,
+            false,
+            false,
+            "",
+            List.of(),
+            false,
+            "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE,
+            "PROVER_TIMEOUT"
+        );
+
+        PromotionRegistry.Registry merged = registry.build(List.of(requiredForPromotion, requiredForPublic));
+        PromotionRecord record = merged.records().getFirst();
+
+        assertEquals(ProofPolicy.PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE, record.proofPolicy(),
+            "PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE is stricter than PROOF_REQUIRED_FOR_PROMOTION");
+        assertEquals("PROVER_FAILED", record.proverExecutionStatus(),
+            "when neither is PROVER_CONFIRMED, prefer any non-SCRIPT_GENERATED status (left wins)");
     }
 }

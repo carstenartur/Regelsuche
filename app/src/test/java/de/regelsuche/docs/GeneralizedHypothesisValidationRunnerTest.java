@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -173,7 +174,9 @@ class GeneralizedHypothesisValidationRunnerTest {
             List.of(),
             false,
             "",
-            ablation
+            ablation,
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 }

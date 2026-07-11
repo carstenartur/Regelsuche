@@ -60,7 +60,7 @@ public final class DiscoveryCampaignThreeRunner {
             CampaignReport report = run();
             List<PromotionRecord> promotionRecords = report.results().stream()
                 .map(result -> new PromotionDecider()
-                    .decide(PromotionObservation.fromCampaignThree(result, report.id())))
+                    .decide(PromotionObservation.fromCampaignResult(result, report.id())))
                 .toList();
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("discovery-campaign-3.json"),
@@ -342,7 +342,7 @@ public final class DiscoveryCampaignThreeRunner {
         List<String> rulePath,
         String notes,
         String smallGraphMessage
-    ) {
+    ) implements CampaignCaseResult {
         public CaseResult {
             failureReason = failureReason == null ? "" : failureReason;
             oracleStatus = oracleStatus == null ? "UNAVAILABLE" : oracleStatus;

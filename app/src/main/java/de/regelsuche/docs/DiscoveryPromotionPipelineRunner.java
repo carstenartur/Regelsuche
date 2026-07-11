@@ -66,19 +66,19 @@ public final class DiscoveryPromotionPipelineRunner {
 
         List<PromotionRecord> promotionRecords = Stream.of(
                 campaignOne.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignOne(result, campaignOne.id()))),
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignOne.id()))),
                 campaignTwo.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignTwo(result, campaignTwo.id()))),
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignTwo.id()))),
                 campaignThree.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignThree(result, campaignThree.id()))),
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignThree.id()))),
                 campaignFive.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignFive(result, campaignFive.id()))),
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignFive.id()))),
                 campaignSeven.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignSeven(result, campaignSeven.id()), result.structuredAblation())),
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignSeven.id()), result.structuredAblation())),
                 campaignEight.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignEight(result, campaignEight.id()))),
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignEight.id()))),
                 campaignNine.results().stream()
-                    .map(result -> decider.decide(PromotionObservation.fromCampaignNine(result, campaignNine.id()))))
+                    .map(result -> decider.decide(PromotionObservation.fromCampaignResult(result, campaignNine.id()))))
             .flatMap(Function.identity())
             .sorted(Comparator.comparing(PromotionRecord::candidateId))
             .toList();

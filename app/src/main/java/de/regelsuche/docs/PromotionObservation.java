@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -23,7 +24,9 @@ record PromotionObservation(
     boolean evidenceExists,
     boolean curatedPathPresent,
     boolean fallbackUsed,
-    boolean macroOpportunity
+    boolean macroOpportunity,
+    ProofPolicy proofPolicy,
+    String proverExecutionStatus
 ) {
     PromotionObservation {
         family = family == null ? "" : family;
@@ -37,13 +40,15 @@ record PromotionObservation(
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         rationale = rationale == null ? "" : rationale;
         rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
+        proofPolicy = proofPolicy == null ? ProofPolicy.PROOF_OPTIONAL : proofPolicy;
+        proverExecutionStatus = ProofPolicy.normaliseExecutionStatus(proverExecutionStatus);
     }
 
     AblationEvidence ablationEvidence() {
         return AblationEvidence.statusOnly(ablationStatus, rationale);
     }
 
-    static PromotionObservation fromCampaignOne(DiscoveryCampaignOneRunner.CaseResult result, String campaignId) {
+    static PromotionObservation fromCampaignResult(CampaignCaseResult result, String campaignId) {
         return new PromotionObservation(
             result.id(),
             campaignId,
@@ -63,151 +68,9 @@ record PromotionObservation(
             !result.rulePath().isEmpty(),
             curatedPathPresent(result.shortcutSource()),
             fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
-        );
-    }
-
-    static PromotionObservation fromCampaignTwo(DiscoveryCampaignTwoRunner.CaseResult result, String campaignId) {
-        return new PromotionObservation(
-            result.id(),
-            campaignId,
-            discoveryDateFor(campaignId),
-            result.family(),
-            result.inputExpression(),
-            result.targetExpression(),
-            result.success(),
-            result.oracleStatus(),
-            result.oracleEvidence(),
-            result.ablationStatus(),
-            result.shortcutOperatorId(),
-            result.shortcutPackId(),
-            result.shortcutAssumptions(),
-            rationale(result.notes(), result.failureReason()),
-            result.rulePath(),
-            !result.rulePath().isEmpty(),
-            curatedPathPresent(result.shortcutSource()),
-            fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
-        );
-    }
-
-    static PromotionObservation fromCampaignThree(DiscoveryCampaignThreeRunner.CaseResult result, String campaignId) {
-        return new PromotionObservation(
-            result.id(),
-            campaignId,
-            discoveryDateFor(campaignId),
-            result.family(),
-            result.inputExpression(),
-            result.targetExpression(),
-            result.success(),
-            result.oracleStatus(),
-            result.oracleEvidence(),
-            result.ablationStatus(),
-            result.shortcutOperatorId(),
-            result.shortcutPackId(),
-            result.shortcutAssumptions(),
-            rationale(result.notes(), result.failureReason()),
-            result.rulePath(),
-            !result.rulePath().isEmpty(),
-            curatedPathPresent(result.shortcutSource()),
-            fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
-        );
-    }
-
-    static PromotionObservation fromCampaignFive(DiscoveryCampaignFiveRunner.CaseResult result, String campaignId) {
-        return new PromotionObservation(
-            result.id(),
-            campaignId,
-            discoveryDateFor(campaignId),
-            result.family(),
-            result.inputExpression(),
-            result.targetExpression(),
-            result.success(),
-            result.oracleStatus(),
-            result.oracleEvidence(),
-            result.ablationStatus(),
-            result.shortcutOperatorId(),
-            result.shortcutPackId(),
-            result.shortcutAssumptions(),
-            rationale(result.notes(), result.failureReason()),
-            result.rulePath(),
-            !result.rulePath().isEmpty(),
-            curatedPathPresent(result.shortcutSource()),
-            fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
-        );
-    }
-
-    static PromotionObservation fromCampaignSeven(DiscoveryCampaignSevenRunner.CaseResult result, String campaignId) {
-        return new PromotionObservation(
-            result.id(),
-            campaignId,
-            discoveryDateFor(campaignId),
-            result.family(),
-            result.inputExpression(),
-            result.targetExpression(),
-            result.success(),
-            result.oracleStatus(),
-            result.oracleEvidence(),
-            result.ablationStatus(),
-            result.shortcutOperatorId(),
-            result.shortcutPackId(),
-            result.shortcutAssumptions(),
-            rationale(result.notes(), result.failureReason()),
-            result.rulePath(),
-            !result.rulePath().isEmpty(),
-            curatedPathPresent(result.shortcutSource()),
-            fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
-        );
-    }
-
-    static PromotionObservation fromCampaignEight(DiscoveryCampaignEightRunner.CaseResult result, String campaignId) {
-        return new PromotionObservation(
-            result.id(),
-            campaignId,
-            discoveryDateFor(campaignId),
-            result.family(),
-            result.inputExpression(),
-            result.targetExpression(),
-            result.success(),
-            result.oracleStatus(),
-            result.oracleEvidence(),
-            result.ablationStatus(),
-            result.shortcutOperatorId(),
-            result.shortcutPackId(),
-            result.shortcutAssumptions(),
-            rationale(result.notes(), result.failureReason()),
-            result.rulePath(),
-            !result.rulePath().isEmpty(),
-            curatedPathPresent(result.shortcutSource()),
-            fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
-        );
-    }
-
-    static PromotionObservation fromCampaignNine(DiscoveryCampaignNineRunner.CaseResult result, String campaignId) {
-        return new PromotionObservation(
-            result.id(),
-            campaignId,
-            discoveryDateFor(campaignId),
-            result.family(),
-            result.inputExpression(),
-            result.targetExpression(),
-            result.success(),
-            result.oracleStatus(),
-            result.oracleEvidence(),
-            result.ablationStatus(),
-            result.shortcutOperatorId(),
-            result.shortcutPackId(),
-            result.shortcutAssumptions(),
-            rationale(result.notes(), result.failureReason()),
-            result.rulePath(),
-            !result.rulePath().isEmpty(),
-            curatedPathPresent(result.shortcutSource()),
-            fallbackUsed(result.rulePath()),
-            macroOpportunity(result.family(), result.rulePath())
+            macroOpportunity(result.family(), result.rulePath()),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
     }
 

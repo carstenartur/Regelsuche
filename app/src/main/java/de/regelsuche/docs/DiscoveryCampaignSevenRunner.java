@@ -68,7 +68,7 @@ public final class DiscoveryCampaignSevenRunner {
             PromotionDecider promotionDecider = new PromotionDecider();
             List<PromotionRecord> promotionRecords = report.results().stream()
                 .map(result -> promotionDecider.decide(
-                    PromotionObservation.fromCampaignSeven(result, report.id()),
+                    PromotionObservation.fromCampaignResult(result, report.id()),
                     result.structuredAblation()))
                 .toList();
             AtomicJsonFile.writeUtf8(
@@ -370,7 +370,7 @@ public final class DiscoveryCampaignSevenRunner {
         String notes,
         String smallGraphMessage,
         AblationEvidence structuredAblation
-    ) {
+    ) implements CampaignCaseResult {
         public CaseResult {
             failureReason = failureReason == null ? "" : failureReason;
             oracleStatus = oracleStatus == null ? "UNAVAILABLE" : oracleStatus;

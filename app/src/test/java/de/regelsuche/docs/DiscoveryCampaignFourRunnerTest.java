@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -35,8 +36,11 @@ class DiscoveryCampaignFourRunnerTest {
                 "",
                 List.of(),
                 false,
-                ""
-            ),
+                "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
+        ),
             new PromotionRecord(
                 "sophie-germain-variant",
                 "discovery-campaign-1",
@@ -62,8 +66,11 @@ class DiscoveryCampaignFourRunnerTest {
                 "",
                 List.of(),
                 false,
-                ""
-            )
+                "",
+            AblationEvidence.statusOnly("DEGRADED"),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
+        )
         );
 
         DiscoveryCampaignFourRunner.CampaignReport report = new DiscoveryCampaignFourRunner().run(promotedRecords);

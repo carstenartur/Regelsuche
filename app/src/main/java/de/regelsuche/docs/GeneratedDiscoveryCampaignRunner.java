@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.util.AtomicJsonFile;
@@ -150,6 +151,9 @@ public final class GeneratedDiscoveryCampaignRunner {
             "",
             List.of(),
             false,
+            "",
+            AblationEvidence.statusOnly("N/A"),
+            ProofPolicy.PROOF_OPTIONAL,
             ""
         );
     }

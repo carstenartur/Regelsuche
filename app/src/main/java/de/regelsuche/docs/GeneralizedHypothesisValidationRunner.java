@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.ast.BinaryExpr;
@@ -337,7 +338,9 @@ final class GeneralizedHypothesisValidationRunner {
             !rulePath.isEmpty(),
             false,
             fallbackUsed(rulePath),
-            macroOpportunity(hypothesis.family(), rulePath)
+            macroOpportunity(hypothesis.family(), rulePath),
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
         return decider.decide(observation, ablation);
     }

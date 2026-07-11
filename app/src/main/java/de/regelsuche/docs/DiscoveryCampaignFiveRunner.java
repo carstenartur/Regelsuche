@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.proof.ProofPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.moves.report.MoveTreeReport;
@@ -180,7 +181,9 @@ public final class DiscoveryCampaignFiveRunner {
             !rulePath.isEmpty(),
             curatedPathPresent(shortcutSource),
             fallbackUsed(rulePath),
-            "substitution".equals(campaignCase.family()) || rulePath.size() >= 2
+            "substitution".equals(campaignCase.family()) || rulePath.size() >= 2,
+            ProofPolicy.PROOF_OPTIONAL,
+            ""
         );
         PromotionRecord promotion = decider.decide(observation);
 
@@ -510,7 +513,7 @@ public final class DiscoveryCampaignFiveRunner {
         boolean promotionEligible,
         boolean reusedExistingMacro,
         String notes
-    ) {
+    ) implements CampaignCaseResult {
         public CaseResult {
             failureReason = failureReason == null ? "" : failureReason;
             oracleStatus = oracleStatus == null ? "UNAVAILABLE" : oracleStatus;
