@@ -4,6 +4,8 @@ import de.regelsuche.docs.HiddenRuleHoldoutPartition.SplitAudit;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.Evaluation;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.HiddenReference;
 import de.regelsuche.docs.HiddenRulePilotRunner.AblationEvidence;
+import de.regelsuche.docs.HiddenRulePilotRunner.CandidateValidationEvidence;
+import de.regelsuche.docs.HiddenRulePilotRunner.CounterexampleEvidence;
 import de.regelsuche.docs.HiddenRulePilotRunner.NegativeHoldoutResult;
 import de.regelsuche.docs.HiddenRulePilotRunner.PositiveHoldoutResult;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
@@ -145,6 +147,7 @@ public final class HiddenRulePilotCampaign {
                 .property("searchStatus", runtime.searchStatus().name())
                 .property("candidateRelation", evaluation.candidateRelation().name())
                 .property("candidateFrozen", runtime.frozen())
+                .property("validationPassed", evaluation.validationPassed())
                 .property("splitPassed", report.split().passed())
                 .property("holdoutsPassed", runtime.holdouts().allPassed())
                 .property("materialAblation", evaluation.materialAblation())
@@ -157,6 +160,8 @@ public final class HiddenRulePilotCampaign {
                 .object("metrics", metrics -> writeMetrics(metrics, runtime.searchMetrics()))
                 .object("split", split -> writeSplit(split, report.split()))
                 .object("candidate", candidate -> writeCandidate(candidate, runtime))
+                .object("validation", validation -> writeValidation(
+                    validation, runtime.validationEvidence()))
                 .object("holdouts", holdouts -> writeHoldouts(holdouts, runtime))
                 .array("leakageViolations", leakage -> evaluation.leakageViolations().forEach(
                     violation -> leakage.objectValue(object -> object
@@ -211,6 +216,29 @@ public final class HiddenRulePilotCampaign {
                 .property("dynamicRuleId", runtime.candidate().dynamicRuleId())
                 .property("provenanceHash", runtime.candidate().provenanceHash())
                 .stringArray("assumptions", runtime.candidate().assumptions());
+        }
+
+        private static void writeValidation(
+            JsonWriter json,
+            CandidateValidationEvidence evidence
+        ) {
+            json.property("proofStatus", evidence.proofStatus())
+                .property("generatedValidationExamples", evidence.generatedValidationExamples())
+                .property("failedValidationExamples", evidence.failedValidationExamples())
+                .property("passed", evidence.passed())
+                .array("counterexampleSearches", searches ->
+                    evidence.counterexampleSearches().forEach(search ->
+                        searches.objectValue(object -> writeCounterexample(object, search))));
+        }
+
+        private static void writeCounterexample(
+            JsonWriter json,
+            CounterexampleEvidence evidence
+        ) {
+            json.property("status", evidence.status())
+                .property("counterexamplePresent", evidence.counterexamplePresent())
+                .stringArray("attemptedSources", evidence.attemptedSources())
+                .property("explanation", evidence.explanation());
         }
 
         private static void writeHoldouts(JsonWriter json, RuntimeResult runtime) {
