@@ -3,6 +3,8 @@ package de.regelsuche.docs;
 import de.regelsuche.docs.HiddenRulePilotRunner.NegativeHoldout;
 import de.regelsuche.docs.HiddenRulePilotRunner.PositiveHoldout;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
@@ -68,7 +70,7 @@ public final class HiddenRulePilotRuntimeCatalog {
         return new RuntimeTask(
             "case-002",
             "x^4 + 4*y^4",
-            SearchTarget.valueEquivalent(
+            syntaxTarget(
                 "(x^2 + 2*x*y + 2*y^2) * (x^2 - 2*x*y + 2*y^2)"),
             new HypothesisTransformationEngine(
                 new AstRewriteTransformationEngine(),
@@ -110,10 +112,15 @@ public final class HiddenRulePilotRuntimeCatalog {
         return new RuntimeTask(
             id,
             input,
-            SearchTarget.valueEquivalent(target),
+            syntaxTarget(target),
             new AstRewriteTransformationEngine(rules),
             new SearchHeuristic(4, 80, 1, 8, 40, 20),
             positives,
             negatives);
+    }
+
+    private static SearchTarget syntaxTarget(String expression) {
+        String formatted = ExpressionFormatter.format(new ExpressionParser().parseTerm(expression));
+        return SearchTarget.syntaxExact(formatted);
     }
 }
