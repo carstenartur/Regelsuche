@@ -1,29 +1,25 @@
 package de.regelsuche.docs;
 
-import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.ast.NumberExpr;
-import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.docs.HiddenRuleHoldoutPartition.SplitCollision;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
 import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.mining.RulePatternCanonicalizer;
-import de.regelsuche.parse.ExpressionParser;
-import de.regelsuche.value.ExprValueFactory;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
 /** Post-hoc evaluator; hidden references never enter the runtime runner. */
 public final class HiddenRulePilotEvaluator {
     private final SymPyEquivalenceService equivalence = new SymPyEquivalenceService();
-    private final ExpressionParser parser = new ExpressionParser();
+    private final HiddenRuleHoldoutPartition partition = new HiddenRuleHoldoutPartition();
 
     public Evaluation evaluate(
         RuntimeTask runtimeTask,
@@ -42,16 +38,13 @@ public final class HiddenRulePilotEvaluator {
         CandidateRelation relation = relation(runtimeResult, hiddenReference);
         boolean holdoutsPassed = runtimeResult.holdouts().allPassed();
         boolean material = runtimeResult.holdouts().materialAblations() > 0;
-        boolean rediscovered = relation == CandidateRelation.EXACT
-            || relation == CandidateRelation.ALPHA_EQUIVALENT
-            || relation == CandidateRelation.SEMANTICALLY_EQUIVALENT;
+        boolean rediscovered = relation != CandidateRelation.NONE
+            && relation != CandidateRelation.DIFFERENT;
         boolean accepted = leakage.isEmpty()
             && runtimeResult.frozen()
             && holdoutsPassed
             && material
             && rediscovered;
-        List<String> blockers = blockers(
-            runtimeResult, leakage, relation, material, rediscovered);
         return new Evaluation(
             runtimeTask.opaqueCaseId(),
             hiddenReference.family(),
@@ -61,7 +54,7 @@ public final class HiddenRulePilotEvaluator {
             holdoutsPassed,
             material,
             accepted,
-            blockers);
+            blockers(runtimeResult, leakage, relation, material, rediscovered));
     }
 
     private List<LeakageViolation> leakageViolations(
@@ -72,116 +65,102 @@ public final class HiddenRulePilotEvaluator {
         List<LeakageViolation> violations = new ArrayList<>();
         String observable = normalized(task.observableInput());
         for (String token : reference.forbiddenRuntimeTokens()) {
-            if (containsToken(observable, token)) {
+            if (containsForbidden(observable, token)) {
                 violations.add(new LeakageViolation("RUNTIME_INPUT", fingerprint(token)));
             }
         }
+        inspectPrimitiveRules(task, reference, violations);
         String hiddenId = normalized(reference.hiddenRuleId());
         for (String primitiveRuleId : result.primitiveRuleIds()) {
-            if (!hiddenId.isEmpty() && normalized(primitiveRuleId).contains(hiddenId)) {
-                violations.add(new LeakageViolation("PRIMITIVE_RULE_PATH", fingerprint(hiddenId)));
+            if (!hiddenId.isEmpty() && normalized(primitiveRuleId).equals(hiddenId)) {
+                violations.add(new LeakageViolation(
+                    "PRIMITIVE_RULE_PATH", fingerprint(hiddenId)));
             }
         }
-        violations.addAll(splitLeakage(task));
-        return List.copyOf(violations);
+        for (SplitCollision collision : partition.audit(task).collisions()) {
+            violations.add(new LeakageViolation(
+                collision.kind(), collision.fingerprint()));
+        }
+        return violations.stream().distinct().toList();
     }
 
-    private List<LeakageViolation> splitLeakage(RuntimeTask task) {
-        List<LeakageViolation> violations = new ArrayList<>();
-        String training = pairFingerprint(
-            task.inputExpression(), task.target().targetExpression());
-        Set<String> positiveClasses = new LinkedHashSet<>();
-        for (HiddenRulePilotRunner.PositiveHoldout holdout : task.positiveHoldouts()) {
-            String holdoutClass = pairFingerprint(
-                holdout.inputExpression(), holdout.targetExpression());
-            if (training.equals(holdoutClass)) {
-                violations.add(new LeakageViolation(
-                    "TRAIN_HOLDOUT_ALPHA_CLASS", shortFingerprint(holdout.id())));
-            }
-            if (!positiveClasses.add(holdoutClass)) {
-                violations.add(new LeakageViolation(
-                    "DUPLICATE_POSITIVE_ALPHA_CLASS", shortFingerprint(holdout.id())));
-            }
+    private static void inspectPrimitiveRules(
+        RuntimeTask task,
+        HiddenReference reference,
+        List<LeakageViolation> violations
+    ) {
+        if (!(task.primitiveEngine() instanceof AstRewriteTransformationEngine engine)) {
+            return;
         }
-
-        String trainingInput = expressionFingerprint(task.inputExpression());
-        Set<String> negativeClasses = new LinkedHashSet<>();
-        for (HiddenRulePilotRunner.NegativeHoldout holdout : task.negativeHoldouts()) {
-            String holdoutClass = expressionFingerprint(holdout.inputExpression());
-            if (trainingInput.equals(holdoutClass)) {
+        String hiddenId = normalized(reference.hiddenRuleId());
+        String hiddenPattern = RulePatternCanonicalizer.hash(
+            reference.leftPattern(), reference.rightPattern());
+        for (RewriteRule rule : engine.rules()) {
+            if (normalized(rule.id()).equals(hiddenId)) {
                 violations.add(new LeakageViolation(
-                    "TRAIN_NEGATIVE_ALPHA_CLASS", shortFingerprint(holdout.id())));
+                    "PRIMITIVE_RULE_ID", fingerprint(hiddenId)));
             }
-            if (!negativeClasses.add(holdoutClass)) {
-                violations.add(new LeakageViolation(
-                    "DUPLICATE_NEGATIVE_ALPHA_CLASS", shortFingerprint(holdout.id())));
+            if (rule instanceof PatternRewriteRule patternRule) {
+                String visiblePattern = RulePatternCanonicalizer.hash(
+                    patternText(patternRule.source()), patternText(patternRule.target()));
+                if (visiblePattern.equals(hiddenPattern)) {
+                    violations.add(new LeakageViolation(
+                        "PRIMITIVE_RULE_TEMPLATE", fingerprint(hiddenPattern)));
+                }
             }
         }
-        return violations;
-    }
-
-    private String pairFingerprint(String input, String target) {
-        Map<String, String> variables = new LinkedHashMap<>();
-        Expr normalizedInput = alphaNormalize(parser.parseTerm(input), variables);
-        Expr normalizedTarget = alphaNormalize(parser.parseTerm(target), variables);
-        try (ExprValueFactory factory = new ExprValueFactory()) {
-            return factory.fromExpr(normalizedInput).key()
-                + "->" + factory.fromExpr(normalizedTarget).key();
-        }
-    }
-
-    private String expressionFingerprint(String expression) {
-        Map<String, String> variables = new LinkedHashMap<>();
-        Expr normalizedExpression = alphaNormalize(parser.parseTerm(expression), variables);
-        try (ExprValueFactory factory = new ExprValueFactory()) {
-            return factory.fromExpr(normalizedExpression).key().toString();
-        }
-    }
-
-    private Expr alphaNormalize(Expr expression, Map<String, String> variables) {
-        if (expression instanceof VariableExpr variable) {
-            String replacement = variables.computeIfAbsent(
-                variable.name(), ignored -> "v" + (variables.size() + 1));
-            return new VariableExpr(replacement);
-        }
-        if (expression instanceof NumberExpr) {
-            return expression;
-        }
-        if (expression instanceof FunctionExpr function) {
-            return new FunctionExpr(function.name(), function.arguments().stream()
-                .map(argument -> alphaNormalize(argument, variables))
-                .toList());
-        }
-        BinaryExpr binary = (BinaryExpr) expression;
-        return new BinaryExpr(
-            alphaNormalize(binary.left(), variables),
-            binary.operator(),
-            alphaNormalize(binary.right(), variables));
     }
 
     private CandidateRelation relation(RuntimeResult result, HiddenReference reference) {
         if (result.candidate() == null) {
             return CandidateRelation.NONE;
         }
-        String candidateLeft = result.candidate().leftPattern();
-        String candidateRight = result.candidate().rightPattern();
-        if (compact(candidateLeft).equals(compact(reference.leftPattern()))
-                && compact(candidateRight).equals(compact(reference.rightPattern()))) {
+        CandidateRelation structural = structuralRelation(
+            result.candidate().leftPattern(),
+            result.candidate().rightPattern(),
+            reference.leftPattern(),
+            reference.rightPattern());
+        if (structural == CandidateRelation.DIFFERENT) {
+            return structural;
+        }
+
+        Set<String> candidateAssumptions = normalizedAssumptions(
+            result.candidate().assumptions());
+        Set<String> hiddenAssumptions = normalizedAssumptions(reference.assumptions());
+        if (candidateAssumptions.equals(hiddenAssumptions)) {
+            return structural;
+        }
+        if (candidateAssumptions.containsAll(hiddenAssumptions)) {
+            return CandidateRelation.WEAKER;
+        }
+        if (hiddenAssumptions.containsAll(candidateAssumptions)) {
+            return CandidateRelation.STRONGER;
+        }
+        return CandidateRelation.DIFFERENT;
+    }
+
+    private CandidateRelation structuralRelation(
+        String candidateLeft,
+        String candidateRight,
+        String referenceLeft,
+        String referenceRight
+    ) {
+        if (compact(candidateLeft).equals(compact(referenceLeft))
+                && compact(candidateRight).equals(compact(referenceRight))) {
             return CandidateRelation.EXACT;
         }
         if (RulePatternCanonicalizer.hash(candidateLeft, candidateRight)
-                .equals(RulePatternCanonicalizer.hash(
-                    reference.leftPattern(), reference.rightPattern()))) {
+                .equals(RulePatternCanonicalizer.hash(referenceLeft, referenceRight))) {
             return CandidateRelation.ALPHA_EQUIVALENT;
         }
-        if (equivalence.areEquivalent(candidateLeft, reference.leftPattern())
-                && equivalence.areEquivalent(candidateRight, reference.rightPattern())) {
+        if (equivalence.areEquivalent(candidateLeft, referenceLeft)
+                && equivalence.areEquivalent(candidateRight, referenceRight)) {
             return CandidateRelation.SEMANTICALLY_EQUIVALENT;
         }
         return CandidateRelation.DIFFERENT;
     }
 
-    private List<String> blockers(
+    private static List<String> blockers(
         RuntimeResult result,
         List<LeakageViolation> leakage,
         CandidateRelation relation,
@@ -190,11 +169,13 @@ public final class HiddenRulePilotEvaluator {
     ) {
         List<String> blockers = new ArrayList<>();
         if (leakage.stream().anyMatch(violation ->
-                violation.location().contains("ALPHA_CLASS"))) {
+                violation.location().contains("TRAIN_")
+                    || violation.location().contains("DUPLICATE_"))) {
             blockers.add("train/holdout split leakage detected");
         }
         if (leakage.stream().anyMatch(violation ->
-                !violation.location().contains("ALPHA_CLASS"))) {
+                !violation.location().contains("TRAIN_")
+                    && !violation.location().contains("DUPLICATE_"))) {
             blockers.add("runtime leakage detected");
         }
         if (!result.frozen()) {
@@ -214,25 +195,53 @@ public final class HiddenRulePilotEvaluator {
         return List.copyOf(blockers);
     }
 
-    private static boolean containsToken(String observable, String token) {
+    private static boolean containsForbidden(String observable, String token) {
         String normalizedToken = normalized(token);
-        if (!leakSensitive(normalizedToken)) {
+        if (normalizedToken.isEmpty()) {
             return false;
         }
-        if (looksLikeExpression(normalizedToken)) {
-            String compactToken = compact(normalizedToken);
-            return observable.lines().map(HiddenRulePilotEvaluator::compact)
-                .anyMatch(line -> line.equals(compactToken));
+        boolean identifierLike = normalizedToken.length() >= 4
+            && normalizedToken.matches("[a-z0-9_.:-]+");
+        if (identifierLike) {
+            return observable.contains(normalizedToken);
         }
-        return observable.contains(normalizedToken);
+        String compactToken = compact(normalizedToken);
+        return observable.lines().map(HiddenRulePilotEvaluator::compact)
+            .anyMatch(line -> line.equals(compactToken));
     }
 
-    private static boolean leakSensitive(String token) {
-        return !token.isEmpty() && compact(token).length() >= 4;
+    private static Set<String> normalizedAssumptions(List<String> assumptions) {
+        Set<String> result = new LinkedHashSet<>();
+        if (assumptions != null) {
+            assumptions.stream()
+                .map(HiddenRulePilotEvaluator::normalized)
+                .filter(value -> !value.isEmpty())
+                .forEach(result::add);
+        }
+        return Set.copyOf(result);
     }
 
-    private static boolean looksLikeExpression(String token) {
-        return token.chars().anyMatch(character -> "+-*/^()".indexOf(character) >= 0);
+    private static String patternText(PatternExpr pattern) {
+        if (pattern instanceof PatternExpr.Placeholder placeholder) {
+            return placeholder.name();
+        }
+        if (pattern instanceof PatternExpr.LiteralNumber number) {
+            return number.value() == Math.rint(number.value())
+                ? Long.toString((long) number.value())
+                : Double.toString(number.value());
+        }
+        if (pattern instanceof PatternExpr.LiteralVariable variable) {
+            return variable.name();
+        }
+        if (pattern instanceof PatternExpr.Operation operation) {
+            return "(" + patternText(operation.left()) + " " + operation.operator().symbol()
+                + " " + patternText(operation.right()) + ")";
+        }
+        PatternExpr.Function function = (PatternExpr.Function) pattern;
+        return function.name() + "(" + function.arguments().stream()
+            .map(HiddenRulePilotEvaluator::patternText)
+            .reduce((left, right) -> left + ", " + right)
+            .orElse("") + ")";
     }
 
     private static String normalized(String value) {
@@ -249,15 +258,13 @@ public final class HiddenRulePilotEvaluator {
         return Integer.toHexString(compact(value).hashCode());
     }
 
-    private static String shortFingerprint(String value) {
-        return Integer.toHexString(Objects.requireNonNull(value, "value").hashCode());
-    }
-
     public enum CandidateRelation {
         NONE,
         EXACT,
         ALPHA_EQUIVALENT,
         SEMANTICALLY_EQUIVALENT,
+        STRONGER,
+        WEAKER,
         DIFFERENT
     }
 
@@ -266,6 +273,7 @@ public final class HiddenRulePilotEvaluator {
         String family,
         String leftPattern,
         String rightPattern,
+        List<String> assumptions,
         List<String> forbiddenRuntimeTokens
     ) {
         public HiddenReference {
@@ -273,10 +281,13 @@ public final class HiddenRulePilotEvaluator {
             requireText(family, "family");
             requireText(leftPattern, "leftPattern");
             requireText(rightPattern, "rightPattern");
+            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
             List<String> tokens = new ArrayList<>();
             tokens.add(hiddenRuleId);
+            tokens.add(family);
             tokens.add(leftPattern);
             tokens.add(rightPattern);
+            tokens.addAll(assumptions);
             if (forbiddenRuntimeTokens != null) {
                 tokens.addAll(forbiddenRuntimeTokens);
             }
