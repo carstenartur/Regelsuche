@@ -104,4 +104,55 @@ class TranspositionTableIntegrationTest {
         assertEquals(2, memory.table().size(),
             "same canonical expression under different assumptions must not collide");
     }
+
+    @Test
+    void legacyIdentityMigrationPreservesBestStateAcrossLaterLookups() {
+        SearchMemory memory = new SearchMemory();
+        java.time.Instant firstSeen = java.time.Instant.parse("2026-01-01T00:00:00Z");
+        java.time.Instant lastSeen = java.time.Instant.parse("2026-01-02T00:00:00Z");
+        memory.table().record(new TranspositionEntry(
+            "legacy-hash",
+            "expr",
+            10,
+            2,
+            "legacy-best-path",
+            Set.of("rule_a"),
+            7,
+            firstSeen,
+            lastSeen
+        ));
+
+        SearchState firstRevisit = state("value-v1:new-hash", 5, 20, List.of("rule_a"), "parent");
+        assertEquals(
+            TranspositionGate.Verdict.PRUNE,
+            TranspositionGate.evaluate(
+                memory,
+                firstRevisit,
+                "current-path-1",
+                List.of("legacy-hash")));
+
+        TranspositionEntry migrated = memory.table().lookup("value-v1:new-hash").orElseThrow();
+        assertEquals(10, migrated.bestScore());
+        assertEquals(2, migrated.minDepthSeen());
+        assertEquals("legacy-best-path", migrated.bestKnownPathId());
+        assertEquals(Set.of("rule_a"), migrated.reachedByRuleIds());
+        assertEquals(8, migrated.visitCount());
+        assertEquals(firstSeen, migrated.firstSeen());
+
+        SearchState laterRevisit = state("value-v1:new-hash", 4, 15, List.of("rule_a"), "parent");
+        assertEquals(
+            TranspositionGate.Verdict.PRUNE,
+            TranspositionGate.evaluate(
+                memory,
+                laterRevisit,
+                "current-path-2",
+                List.of("legacy-hash")),
+            "later lookups must still compare against the legacy best score");
+
+        TranspositionEntry afterLaterVisit = memory.table().lookup("value-v1:new-hash").orElseThrow();
+        assertEquals(10, afterLaterVisit.bestScore());
+        assertEquals(2, afterLaterVisit.minDepthSeen());
+        assertEquals("legacy-best-path", afterLaterVisit.bestKnownPathId());
+        assertEquals(9, afterLaterVisit.visitCount());
+    }
 }
