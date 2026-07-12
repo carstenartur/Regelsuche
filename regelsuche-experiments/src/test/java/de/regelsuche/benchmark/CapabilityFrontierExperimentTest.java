@@ -65,6 +65,8 @@ class CapabilityFrontierExperimentTest {
         assertTrue(first.toJson().contains("regelsuche.capability-frontier/v1"));
         assertTrue(first.toJson().contains("FEWER_STATES"));
         assertTrue(first.toJson().contains("CAPABILITY_REQUIRED"));
+        assertTrue(first.toJson().contains("\"exploredStates\""));
+        assertTrue(first.toJson().contains("\"generatedTransformations\""));
 
         Path output = experiment.write(tempDirectory.resolve("capability-frontier.json"), first);
         assertEquals(first.toJson(), Files.readString(output, StandardCharsets.UTF_8));
