@@ -123,7 +123,6 @@ jobs:
           warnings = []
           errors = []
 
-          # Check evidence.json contains useful entries (handles both list and object root)
           evidence_path = ai_dir / 'evidence.json'
           try:
               raw = json.loads(evidence_path.read_text(encoding='utf-8'))
@@ -134,7 +133,6 @@ jobs:
           if not evidence:
               errors.append('evidence.json is empty; expected repository evidence artifacts.')
 
-          # Check class/test facts are linked to method facts
           try:
               classes = json.loads((ai_dir / 'classes.json').read_text(encoding='utf-8')).get('classes', [])
               if not any(c.get('methodFacts') for c in classes):
@@ -142,15 +140,39 @@ jobs:
           except Exception as exc:
               errors.append(f'Could not parse classes.json: {exc}')
 
-          # Check complexity report contains method-level and AI-cost metrics from ai-knowledge-extractor 0.1.4
+          # Extractor 0.1.6 must produce a real linked-capability measurement,
+          # not the fail-closed 100 score used when no capability sample exists.
           try:
               complexity = json.loads((ai_dir / 'complexity.json').read_text(encoding='utf-8'))
               code_complexity = complexity.get('codeComplexity', {})
               cost_drivers = complexity.get('aiCostDrivers', {})
+              footprint = complexity.get('contextFootprint', {})
               if 'maxMethodCognitiveComplexity' not in code_complexity:
                   errors.append('complexity.json lacks codeComplexity.maxMethodCognitiveComplexity.')
               if 'tokenCostDrivers' not in cost_drivers:
                   errors.append('complexity.json lacks aiCostDrivers.tokenCostDrivers.')
+              if footprint.get('schemaVersion') != 2:
+                  errors.append('complexity.json lacks contextFootprint schema v2.')
+              if footprint.get('method') != 'line-weighted-linked-capability-working-set-proxy':
+                  errors.append('complexity.json contains an unexpected context-footprint method.')
+              if footprint.get('measurementStatus') != 'MEASURED':
+                  errors.append('context footprint is not measured from linked capabilities.')
+              capability_count = footprint.get('capabilityCount')
+              sample_count = footprint.get('capabilitySampleCount')
+              if not isinstance(capability_count, int) or capability_count <= 0:
+                  errors.append('context footprint contains no capabilities.')
+              if not isinstance(sample_count, int) or sample_count <= 0:
+                  errors.append('context footprint contains no capability working-set samples.')
+              unresolved = footprint.get('unresolvedCapabilityTypeReferences')
+              if unresolved != 0:
+                  errors.append(f'context footprint has {unresolved!r} unresolved capability type references.')
+              normalized = complexity.get('aiContextDebt')
+              if not isinstance(normalized, (int, float)) or not 0 <= normalized < 100:
+                  errors.append('complexity.json aiContextDebt is not a measured normalized value below 100.')
+              if normalized != footprint.get('normalizedContextDebt'):
+                  errors.append('top-level aiContextDebt differs from contextFootprint.normalizedContextDebt.')
+              if 'legacyAiContextDebt' not in complexity:
+                  errors.append('complexity.json lacks the diagnostic legacyAiContextDebt field.')
           except Exception as exc:
               errors.append(f'Could not parse complexity.json: {exc}')
 
@@ -160,7 +182,7 @@ jobs:
               print(f'ERROR: {error}', file=sys.stderr)
           if errors:
               sys.exit(1)
-          print('AI knowledge artifacts passed basic quality checks.')
+          print('AI knowledge artifacts passed linked-capability context checks.')
           PY
 
       - name: Upload AI knowledge artifacts
