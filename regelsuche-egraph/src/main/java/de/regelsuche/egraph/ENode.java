@@ -87,12 +87,7 @@ public record ENode(String symbol, List<EClassId> children) {
         return Collections.unmodifiableList(children);
     }
 
-    /**
-     * Owner-scoped bridge from immutable mathematical values to e-nodes.
-     *
-     * <p>{@link ValueKey} is only the adapter cache key. Graph identity remains
-     * the independently typed {@link EClassId}.</p>
-     */
+    /** Owner-scoped bridge; ValueKey caches values while EClassId remains graph identity. */
     public static final class ExprValueAdapter {
         private final EGraph graph;
         private final Map<ValueKey, EClassId> classesByValue = new HashMap<>();
@@ -171,6 +166,11 @@ public record ENode(String symbol, List<EClassId> children) {
                 List<Expr> operands = ordered.operands().stream().map(this::toExpression).toList();
                 if (ordered.operator().id().startsWith("fn:")) {
                     return new FunctionExpr(ordered.operator().id().substring(3), operands);
+                }
+                if (operands.size() != 2) {
+                    throw new IllegalArgumentException(
+                        "ordered non-function value must have exactly two operands: "
+                            + ordered.operator().id());
                 }
                 return new BinaryExpr(
                     operands.get(0), binaryOperator(ordered.operator()), operands.get(1));
