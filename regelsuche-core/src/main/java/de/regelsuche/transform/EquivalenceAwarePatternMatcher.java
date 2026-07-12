@@ -108,9 +108,7 @@ public final class EquivalenceAwarePatternMatcher {
         }
         if (profile.isCommutative(operation.operator())) {
             if (patternOperands.size() > MAX_COMMUTATIVE_OPERANDS) {
-                throw new IllegalArgumentException(
-                    "Commutative matching supports at most " + MAX_COMMUTATIVE_OPERANDS + " operands"
-                );
+                return false;
             }
             patternOperands.sort(Comparator.comparingInt(EquivalenceAwarePatternMatcher::bindingPriority).reversed());
             return matchCommutative(patternOperands, expressionOperands, 0, bindings, profile);

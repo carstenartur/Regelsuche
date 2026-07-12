@@ -19,7 +19,8 @@ public final class RecognitionTheory implements EquivalentExpressionProvider {
     public RecognitionTheory(List<? extends RewriteRule> rules) {
         Map<String, RewriteRule> byId = new LinkedHashMap<>();
         if (rules != null) {
-            rules.stream().sorted(java.util.Comparator.comparing(RewriteRule::id))
+            rules.stream().filter(rule -> rule != null)
+                .sorted(java.util.Comparator.comparing(RewriteRule::id))
                 .forEach(rule -> byId.put(rule.id(), rule));
         }
         this.rules = Map.copyOf(byId);
@@ -31,13 +32,14 @@ public final class RecognitionTheory implements EquivalentExpressionProvider {
         ArrayDeque<Expr> queue = new ArrayDeque<>();
         seen.put(expression, 0);
         queue.add(expression);
+        List<String> sortedRuleIds = profile.recognitionRuleIds().stream().sorted().toList();
         while (!queue.isEmpty() && seen.size() < MAX_REPRESENTATIVES) {
             Expr current = queue.removeFirst();
             int depth = seen.get(current);
             if (depth >= profile.maxEquivalenceDepth()) {
                 continue;
             }
-            for (String ruleId : profile.recognitionRuleIds().stream().sorted().toList()) {
+            for (String ruleId : sortedRuleIds) {
                 RewriteRule rule = rules.get(ruleId);
                 if (rule == null || !rule.isEquivalencePreservingByConstruction() || !rule.matches(current)) {
                     continue;
