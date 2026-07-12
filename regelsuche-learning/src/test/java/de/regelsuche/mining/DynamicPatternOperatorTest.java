@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.transform.Transformation;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -38,27 +39,54 @@ class DynamicPatternOperatorTest {
             "A * (B + C)"
         );
 
-        // Different factors: u * x + v * y should not match A * B + A * C (requires A consistent)
         List<Transformation> candidates = op.generateCandidates("u * x + v * y");
 
         assertTrue(candidates.isEmpty(), "Expected no match when factors differ");
     }
 
     @Test
-    void suppressesIdentityRewrite() {
-        // If the rule produces the same expression as input, it should be suppressed
+    void suppressesCanonicalReorderingNoOp() {
         DynamicPatternOperator op = compileOrFail(
             "test-id-guard",
             "A + B",
             "B + A"
         );
 
-        // "a + b" and "b + a" are canonically equivalent; the operator should suppress this
-        List<Transformation> candidates = op.generateCandidates("a + b");
+        assertTrue(op.generateCandidates("a + b").isEmpty());
+    }
 
-        // Either fires (if formatter produces different string) or suppressed (canonical match)
-        // The key assertion is: no exception thrown
-        assertNotNull(candidates);
+    @Test
+    void allowsCanonicalEquivalentStrictSimplification() {
+        DynamicPatternOperator op = compileOrFail(
+            "test-neutral-simplification",
+            "(A + 0) * 1",
+            "A"
+        );
+
+        List<Transformation> candidates = op.generateCandidates("(x + 0) * 1");
+
+        assertEquals(1, candidates.size());
+        assertEquals("x", candidates.getFirst().transformedExpression());
+    }
+
+    @Test
+    void appliesRepeatedPlaceholderMacroAcrossAssociativeGrouping() {
+        DynamicPatternOperator op = compileOrFail(
+            "test-quartic-normalization",
+            "A * A * A * A",
+            "A^4"
+        );
+
+        List<Transformation> candidates = op.generateCandidates(
+            "((x + 1) * (x + 1)) * ((x + 1) * (x + 1))");
+
+        assertEquals(1, candidates.size());
+        ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+        assertEquals(
+            canonicalizer.stableHash("(x + 1)^4"),
+            canonicalizer.stableHash(candidates.getFirst().transformedExpression()));
+        assertTrue(op.generateCandidates(
+            "((x + 1) * (x + 1)) * ((x + 1) * (x + 2))").isEmpty());
     }
 
     @Test
@@ -119,7 +147,6 @@ class DynamicPatternOperatorTest {
 
         List<Transformation> candidates = op.generateCandidates("2 / (n * (n + 1))");
 
-        // The pattern should fire since 2/(n*(n+1)) matches A/(B*(B+1)) with A=2, B=n
         assertFalse(candidates.isEmpty(), "Expected pattern to fire on telescoping expression");
     }
 
