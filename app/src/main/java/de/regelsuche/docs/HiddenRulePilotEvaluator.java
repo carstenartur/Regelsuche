@@ -6,6 +6,8 @@ import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
 import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.mining.RulePatternCanonicalizer;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
@@ -154,9 +156,9 @@ public final class HiddenRulePilotEvaluator {
 
     /**
      * A selected pilot case must require a multi-step primitive path. A single
-     * primitive transformation that reaches a concrete task target is therefore
-     * an observable high-level shortcut, regardless of whether its identifier is
-     * disguised or nested in another engine.
+     * primitive transformation that produces the concrete syntax endpoint is an
+     * observable high-level shortcut. Mere mathematical equivalence is not enough:
+     * every legitimate primitive step is expected to preserve equivalence.
      */
     private void inspectDirectPrimitiveShortcuts(
         RuntimeTask task,
@@ -179,7 +181,7 @@ public final class HiddenRulePilotEvaluator {
             violations));
     }
 
-    private void inspectDirectPrimitiveShortcut(
+    private static void inspectDirectPrimitiveShortcut(
         TransformationEngine engine,
         String input,
         String target,
@@ -188,12 +190,13 @@ public final class HiddenRulePilotEvaluator {
         List<LeakageViolation> violations
     ) {
         String hiddenId = normalized(reference.hiddenRuleId());
+        String endpoint = syntaxForm(target);
         for (Transformation transformation : engine.transform(input)) {
             if (!hiddenId.isEmpty() && normalized(transformation.rule()).equals(hiddenId)) {
                 violations.add(new LeakageViolation(
                     "PRIMITIVE_RULE_ID", fingerprint(hiddenId)));
             }
-            if (equivalence.areEquivalent(transformation.transformedExpression(), target)) {
+            if (syntaxForm(transformation.transformedExpression()).equals(endpoint)) {
                 violations.add(new LeakageViolation(
                     location,
                     fingerprint(transformation.rule() + ":" + input + "->" + target)));
@@ -334,6 +337,14 @@ public final class HiddenRulePilotEvaluator {
             .map(HiddenRulePilotEvaluator::patternText)
             .reduce((left, right) -> left + ", " + right)
             .orElse("") + ")";
+    }
+
+    private static String syntaxForm(String expression) {
+        try {
+            return ExpressionFormatter.format(new ExpressionParser().parseTerm(expression));
+        } catch (IllegalArgumentException exception) {
+            return normalized(expression);
+        }
     }
 
     private static String stripOuterGrouping(String expression) {
