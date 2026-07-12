@@ -11,6 +11,7 @@ import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.TransformationEngine;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -74,15 +75,16 @@ public final class HiddenRulePilotRuntimeCatalog {
         List<RewriteRule> factorRules = rulesById(Set.of(
             "ast_square_difference_factor",
             "ast_canonical_normalize"));
+        TransformationEngine engine = new HypothesisTransformationEngine(
+            new AstRewriteTransformationEngine(factorRules),
+            List.of(new DifferenceOfSquaresPreparationOperator()),
+            8);
         return new RuntimeTask(
             "case-002",
             "x^4 + 4*y^4",
             syntaxTarget(
                 "(x^2 + 2*y^2 - 2*x*y) * (x^2 + 2*y^2 + 2*x*y)"),
-            new HypothesisTransformationEngine(
-                new AstRewriteTransformationEngine(factorRules),
-                List.of(new DifferenceOfSquaresPreparationOperator()),
-                8),
+            TransformationEngine.withTransitionIdentity(engine),
             new SearchHeuristic(5, 320, 1, 12, 320, 320),
             List.of(
                 new PositiveHoldout(
@@ -108,11 +110,13 @@ public final class HiddenRulePilotRuntimeCatalog {
         List<PositiveHoldout> positives,
         List<NegativeHoldout> negatives
     ) {
+        TransformationEngine engine = new AstRewriteTransformationEngine(
+            rulesById(Set.copyOf(primitiveRuleIds)));
         return new RuntimeTask(
             id,
             input,
             syntaxTarget(target),
-            new AstRewriteTransformationEngine(rulesById(Set.copyOf(primitiveRuleIds))),
+            TransformationEngine.withTransitionIdentity(engine),
             new SearchHeuristic(4, 80, 1, 8, 40, 20),
             positives,
             negatives);
