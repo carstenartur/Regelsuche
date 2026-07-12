@@ -4,7 +4,6 @@ import static de.regelsuche.ast.BinaryOperator.ADD;
 import static de.regelsuche.ast.BinaryOperator.MUL;
 import static de.regelsuche.ast.BinaryOperator.POW;
 import static de.regelsuche.ast.BinaryOperator.SUB;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,16 +41,26 @@ class KnownDerivationBenchmarkTest {
         Summary ac = summaries.get(Profile.AC);
         Summary algebraic = summaries.get(Profile.ALGEBRAIC_AC);
 
-        assertEquals(5, exact.solved(), exact.describe());
-        assertEquals(7, ac.solved(), ac.describe());
-        assertEquals(9, algebraic.solved(), algebraic.describe());
-        assertTrue(exact.solved() < ac.solved(), summaries.toString());
-        assertTrue(ac.solved() < algebraic.solved(), summaries.toString());
+        // Broader recognition must never lose a derivation that a narrower
+        // profile found with the same rule inventory and search budget.
+        assertSolvedSuperset(ac, exact);
+        assertSolvedSuperset(algebraic, ac);
 
+        // The benchmark contains explicit witnesses for both capability gains.
         assertCase(exact, "reordered-square", false);
         assertCase(ac, "reordered-square", true);
         assertCase(ac, "scaled-square", false);
         assertCase(algebraic, "scaled-square", true);
+
+        // These witnesses also guarantee strict aggregate improvement without
+        // coupling the gate to guessed totals that may improve legitimately.
+        assertTrue(exact.solved() < ac.solved(), summaries.toString());
+        assertTrue(ac.solved() < algebraic.solved(), summaries.toString());
+
+        // Broader recognition must not turn a mathematically inconsistent near
+        // miss into a derivation.
+        assertCase(exact, "inconsistent-near-miss", false);
+        assertCase(ac, "inconsistent-near-miss", false);
         assertCase(algebraic, "inconsistent-near-miss", false);
     }
 
@@ -178,11 +187,23 @@ class KnownDerivationBenchmarkTest {
         return new PatternRewriteRule("complete-square", source, target, profile);
     }
 
+    private void assertSolvedSuperset(Summary broader, Summary narrower) {
+        for (Result narrowResult : narrower.results()) {
+            if (!narrowResult.solved()) {
+                continue;
+            }
+            Result broadResult = broader.result(narrowResult.id());
+            assertTrue(
+                broadResult.solved(),
+                "Broader recognition lost derivation " + narrowResult.id()
+                    + "; narrower=" + narrower.describe()
+                    + "; broader=" + broader.describe()
+            );
+        }
+    }
+
     private void assertCase(Summary summary, String id, boolean expected) {
-        Result result = summary.results().stream()
-            .filter(candidate -> candidate.id().equals(id))
-            .findFirst()
-            .orElseThrow();
+        Result result = summary.result(id);
         if (expected) {
             assertTrue(result.solved(), summary.describe());
         } else {
@@ -221,6 +242,13 @@ class KnownDerivationBenchmarkTest {
     private record Summary(List<Result> results) {
         private int solved() {
             return (int) results.stream().filter(Result::solved).count();
+        }
+
+        private Result result(String id) {
+            return results.stream()
+                .filter(candidate -> candidate.id().equals(id))
+                .findFirst()
+                .orElseThrow();
         }
 
         private String describe() {
