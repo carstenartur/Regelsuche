@@ -123,7 +123,6 @@ jobs:
           warnings = []
           errors = []
 
-          # Check evidence.json contains useful entries (handles both list and object root)
           evidence_path = ai_dir / 'evidence.json'
           try:
               raw = json.loads(evidence_path.read_text(encoding='utf-8'))
@@ -134,7 +133,6 @@ jobs:
           if not evidence:
               errors.append('evidence.json is empty; expected repository evidence artifacts.')
 
-          # Check class/test facts are linked to method facts
           try:
               classes = json.loads((ai_dir / 'classes.json').read_text(encoding='utf-8')).get('classes', [])
               if not any(c.get('methodFacts') for c in classes):
@@ -142,15 +140,25 @@ jobs:
           except Exception as exc:
               errors.append(f'Could not parse classes.json: {exc}')
 
-          # Check complexity report contains method-level and AI-cost metrics from ai-knowledge-extractor 0.1.4
+          # Extractor 0.1.5 uses normalized capability-working-set context debt.
           try:
               complexity = json.loads((ai_dir / 'complexity.json').read_text(encoding='utf-8'))
               code_complexity = complexity.get('codeComplexity', {})
               cost_drivers = complexity.get('aiCostDrivers', {})
+              footprint = complexity.get('contextFootprint', {})
               if 'maxMethodCognitiveComplexity' not in code_complexity:
                   errors.append('complexity.json lacks codeComplexity.maxMethodCognitiveComplexity.')
               if 'tokenCostDrivers' not in cost_drivers:
                   errors.append('complexity.json lacks aiCostDrivers.tokenCostDrivers.')
+              if footprint.get('schemaVersion') != 1:
+                  errors.append('complexity.json lacks contextFootprint schema v1.')
+              if footprint.get('method') != 'line-weighted-capability-working-set-proxy':
+                  errors.append('complexity.json contains an unexpected context-footprint method.')
+              normalized = complexity.get('aiContextDebt')
+              if not isinstance(normalized, (int, float)) or not 0 <= normalized <= 100:
+                  errors.append('complexity.json aiContextDebt is not a normalized 0..100 value.')
+              if 'legacyAiContextDebt' not in complexity:
+                  errors.append('complexity.json lacks the diagnostic legacyAiContextDebt field.')
           except Exception as exc:
               errors.append(f'Could not parse complexity.json: {exc}')
 
@@ -160,7 +168,7 @@ jobs:
               print(f'ERROR: {error}', file=sys.stderr)
           if errors:
               sys.exit(1)
-          print('AI knowledge artifacts passed basic quality checks.')
+          print('AI knowledge artifacts passed normalized-context quality checks.')
           PY
 
       - name: Upload AI knowledge artifacts
