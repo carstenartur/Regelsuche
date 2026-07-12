@@ -5,6 +5,7 @@ import static de.regelsuche.ast.BinaryOperator.MUL;
 import static de.regelsuche.ast.BinaryOperator.POW;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.Expr;
@@ -70,6 +71,32 @@ class RecognitionLearningTest {
         assertTrue(EquivalenceAwarePatternMatcher.match(generalized,
             parser.parseTerm("m^2 + 2*m*n + n^2"), new java.util.HashMap<>(),
             RecognitionProfile.algebraicAc()));
+    }
+
+    @Test
+    void valueKeyOrderingIsDeterministicAndPreservesMultiplicity() {
+        RecognitionProfile profile = RecognitionProfile.arithmeticAc();
+        Expr first = RecognitionNormalizer.normalize(parser.parseTerm("b + a + a"), profile);
+        Expr second = RecognitionNormalizer.normalize(parser.parseTerm("a + b + a"), profile);
+        Expr withoutDuplicate = RecognitionNormalizer.normalize(parser.parseTerm("a + b"), profile);
+
+        assertEquals(first, second);
+        assertNotEquals(first, withoutDuplicate);
+    }
+
+    @Test
+    void valueKeyTiesStillRespectSyntaxLawsOfTheRecognitionProfile() {
+        RecognitionProfile multiplyOnly = new RecognitionProfile(Set.of(MUL), Set.of(MUL));
+        Expr first = RecognitionNormalizer.normalize(parser.parseTerm("(a + b) * (b + a)"), multiplyOnly);
+        Expr second = RecognitionNormalizer.normalize(parser.parseTerm("(b + a) * (a + b)"), multiplyOnly);
+
+        assertEquals(first, second,
+            "ValueKey ordering needs a structural tie-breaker when nested ADD is not enabled");
+        Expr exact = parser.parseTerm("b + a");
+        assertEquals(exact, RecognitionNormalizer.normalize(exact, RecognitionProfile.exact()));
+        assertNotEquals(
+            RecognitionNormalizer.normalize(parser.parseTerm("a + b"), RecognitionProfile.exact()),
+            RecognitionNormalizer.normalize(parser.parseTerm("b + a"), RecognitionProfile.exact()));
     }
 
     @Test
