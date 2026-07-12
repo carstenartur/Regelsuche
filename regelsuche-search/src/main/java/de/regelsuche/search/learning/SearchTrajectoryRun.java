@@ -20,6 +20,7 @@ public record SearchTrajectoryRun(
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(terminalStatus, "terminalStatus");
+        Objects.requireNonNull(records, "records");
         taskValueFingerprint = safe(taskValueFingerprint);
         taskAlphaFingerprint = safe(taskAlphaFingerprint);
         records = List.copyOf(records);
