@@ -6,13 +6,12 @@ import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.value.ExprValue;
 import de.regelsuche.value.ExprValueFactory;
-import de.regelsuche.value.ExprValueFactory.ExprValue;
-import de.regelsuche.value.ExprValueFactory.Projection;
-import de.regelsuche.value.ExprValueFactory.ValueKey;
+import de.regelsuche.value.ExprValueProjection;
+import de.regelsuche.value.ValueKey;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +59,7 @@ public final class TermOccurrenceIndex implements AutoCloseable {
                     occurrence.role(),
                     legacyPath(occurrence.id())));
         }
-        occurrencesById = Map.copyOf(byId);
+        occurrencesById = Collections.unmodifiableMap(new LinkedHashMap<>(byId));
 
         Map<ValueKey, List<ExpressionOccurrence>> immutableByValue = new LinkedHashMap<>();
         byValue.forEach((key, values) -> immutableByValue.put(key, List.copyOf(values)));
@@ -69,12 +68,11 @@ public final class TermOccurrenceIndex implements AutoCloseable {
         Map<String, Integer> counts = new LinkedHashMap<>();
         compatibilityOccurrences.forEach(
                 occurrence -> counts.merge(occurrence.canonicalValue(), 1, Integer::sum));
-        List<TermOccurrence> enriched = compatibilityOccurrences.stream()
+        occurrences = compatibilityOccurrences.stream()
                 .map(occurrence -> occurrence.withOccurrenceCount(
                         counts.get(occurrence.canonicalValue())))
                 .sorted(TermOccurrence.CANONICAL_ORDER)
                 .toList();
-        occurrences = List.copyOf(enriched);
         countsByCanonical = Map.copyOf(counts);
     }
 
@@ -83,7 +81,7 @@ public final class TermOccurrenceIndex implements AutoCloseable {
         Objects.requireNonNull(root, "root");
         ExprValueFactory factory = new ExprValueFactory();
         try {
-            Projection projection = factory.project(root);
+            ExprValueProjection projection = factory.project(root);
             List<ExpressionOccurrence> raw = new ArrayList<>();
             collect(
                     root,
@@ -106,8 +104,8 @@ public final class TermOccurrenceIndex implements AutoCloseable {
         Objects.requireNonNull(equation, "equation");
         ExprValueFactory factory = new ExprValueFactory();
         try {
-            Projection left = factory.project(equation.left());
-            Projection right = factory.project(equation.right());
+            ExprValueProjection left = factory.project(equation.left());
+            ExprValueProjection right = factory.project(equation.right());
             List<ExpressionOccurrence> raw = new ArrayList<>();
             collect(
                     equation.left(),
@@ -160,6 +158,10 @@ public final class TermOccurrenceIndex implements AutoCloseable {
         return occurrencesOf(key).size();
     }
 
+    public boolean contains(ValueKey key) {
+        return occurrencesByValue.containsKey(Objects.requireNonNull(key, "key"));
+    }
+
     /** One concrete occurrence per mathematical value. */
     public List<ExpressionOccurrence> distinctByValue() {
         return occurrencesByValue.values().stream().map(List::getFirst).toList();
@@ -198,7 +200,7 @@ public final class TermOccurrenceIndex implements AutoCloseable {
 
     private static void collect(
             Expr expr,
-            Projection projection,
+            ExprValueProjection projection,
             String root,
             TermRole role,
             String parentOperator,
@@ -288,114 +290,5 @@ public final class TermOccurrenceIndex implements AutoCloseable {
             return path.isEmpty() ? "R" : "R." + path;
         }
         return path;
-    }
-
-    /** Stable identity of one occurrence inside one owned syntax root. */
-    public record OccurrenceId(String root, List<Integer> path) implements Comparable<OccurrenceId> {
-        public static final String EXPRESSION_ROOT = "expression";
-        public static final String EQUATION_LEFT_ROOT = "equation:L";
-        public static final String EQUATION_RIGHT_ROOT = "equation:R";
-
-        public OccurrenceId {
-            Objects.requireNonNull(root, "root");
-            Objects.requireNonNull(path, "path");
-            root = root.trim();
-            if (root.isEmpty()) {
-                throw new IllegalArgumentException("occurrence root must not be blank");
-            }
-            path = List.copyOf(path);
-            if (path.stream().anyMatch(index -> index == null || index < 0)) {
-                throw new IllegalArgumentException("occurrence path indices must be non-negative");
-            }
-        }
-
-        public static OccurrenceId expression(List<Integer> path) {
-            return new OccurrenceId(EXPRESSION_ROOT, path);
-        }
-
-        public static OccurrenceId equationSide(String side, List<Integer> path) {
-            return switch (Objects.requireNonNull(side, "side")) {
-                case "L" -> new OccurrenceId(EQUATION_LEFT_ROOT, path);
-                case "R" -> new OccurrenceId(EQUATION_RIGHT_ROOT, path);
-                default -> throw new IllegalArgumentException("equation side must be L or R");
-            };
-        }
-
-        public String externalForm() {
-            if (path.isEmpty()) {
-                return root + ":root";
-            }
-            return root + ":" + path.stream()
-                    .map(index -> String.format("%03d", index))
-                    .collect(Collectors.joining("."));
-        }
-
-        @Override
-        public int compareTo(OccurrenceId other) {
-            int rootComparison = root.compareTo(other.root);
-            if (rootComparison != 0) {
-                return rootComparison;
-            }
-            int common = Math.min(path.size(), other.path.size());
-            for (int i = 0; i < common; i++) {
-                int comparison = Integer.compare(path.get(i), other.path.get(i));
-                if (comparison != 0) {
-                    return comparison;
-                }
-            }
-            return Integer.compare(path.size(), other.path.size());
-        }
-
-        @Override
-        public String toString() {
-            return externalForm();
-        }
-    }
-
-    /** One concrete syntax use linked to its shared mathematical value. */
-    public record ExpressionOccurrence(
-            OccurrenceId id,
-            TreePosition position,
-            Expr syntax,
-            ExprValue value,
-            int depth,
-            String parentOperator,
-            TermRole role) implements Comparable<ExpressionOccurrence> {
-        private static final Comparator<ExpressionOccurrence> CANONICAL_ORDER =
-                Comparator.comparing(ExpressionOccurrence::id)
-                        .thenComparingInt(occurrence -> occurrence.role().ordinal())
-                        .thenComparing(occurrence -> occurrence.value().key());
-
-        public ExpressionOccurrence {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(position, "position");
-            Objects.requireNonNull(syntax, "syntax");
-            Objects.requireNonNull(value, "value");
-            Objects.requireNonNull(role, "role");
-            parentOperator = parentOperator == null ? "" : parentOperator;
-            if (depth < 0 || !id.path().equals(position.path())) {
-                throw new IllegalArgumentException("invalid occurrence depth or path");
-            }
-        }
-
-        public ValueKey valueKey() {
-            return value.key();
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            return this == other
-                    || other instanceof ExpressionOccurrence occurrence && id.equals(occurrence.id);
-        }
-
-        @Override
-        public int hashCode() {
-            return id.hashCode();
-        }
-
-        @Override
-        public int compareTo(ExpressionOccurrence other) {
-            return CANONICAL_ORDER.compare(this, other);
-        }
     }
 }
