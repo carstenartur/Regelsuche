@@ -28,9 +28,10 @@
       "type": "object",
       "required": [
         "opaqueCaseId", "family", "runtimeStatus", "searchStatus", "candidateRelation",
-        "candidateFrozen", "splitPassed", "holdoutsPassed", "materialAblation", "accepted",
-        "pathLength", "primitiveRuleIds", "assumptions", "stageEvidence", "blockers",
-        "metrics", "split", "candidate", "holdouts", "leakageViolations"
+        "candidateFrozen", "validationPassed", "splitPassed", "holdoutsPassed",
+        "materialAblation", "accepted", "pathLength", "primitiveRuleIds", "assumptions",
+        "stageEvidence", "blockers", "metrics", "split", "candidate", "validation",
+        "holdouts", "leakageViolations"
       ],
       "properties": {
         "opaqueCaseId": { "type": "string", "minLength": 1 },
@@ -45,6 +46,7 @@
           "enum": ["NONE", "EXACT", "ALPHA_EQUIVALENT", "SEMANTICALLY_EQUIVALENT", "STRONGER", "WEAKER", "DIFFERENT"]
         },
         "candidateFrozen": { "type": "boolean" },
+        "validationPassed": { "type": "boolean" },
         "splitPassed": { "type": "boolean" },
         "holdoutsPassed": { "type": "boolean" },
         "materialAblation": { "type": "boolean" },
@@ -57,6 +59,7 @@
         "metrics": { "$ref": "#/$defs/metrics" },
         "split": { "$ref": "#/$defs/split" },
         "candidate": { "$ref": "#/$defs/candidate" },
+        "validation": { "$ref": "#/$defs/validation" },
         "holdouts": { "$ref": "#/$defs/holdouts" },
         "leakageViolations": {
           "type": "array",
@@ -127,6 +130,37 @@
         "dynamicRuleId": { "type": "string" },
         "provenanceHash": { "type": "string" },
         "assumptions": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "validation": {
+      "type": "object",
+      "required": [
+        "proofStatus", "generatedValidationExamples", "failedValidationExamples",
+        "passed", "counterexampleSearches"
+      ],
+      "properties": {
+        "proofStatus": {
+          "enum": ["NONE", "REJECTED", "OBSERVED", "VALIDATED_BY_EXAMPLES", "SYMBOLICALLY_VERIFIED", "FORMALLY_PROVABLE", "FORMALLY_PROVED"]
+        },
+        "generatedValidationExamples": { "$ref": "#/$defs/nonNegativeInteger" },
+        "failedValidationExamples": { "$ref": "#/$defs/nonNegativeInteger" },
+        "passed": { "type": "boolean" },
+        "counterexampleSearches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/counterexampleSearch" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "counterexampleSearch": {
+      "type": "object",
+      "required": ["status", "counterexamplePresent", "attemptedSources", "explanation"],
+      "properties": {
+        "status": { "enum": ["NO_COUNTEREXAMPLE_FOUND", "COUNTEREXAMPLE_FOUND", "INCONCLUSIVE"] },
+        "counterexamplePresent": { "type": "boolean" },
+        "attemptedSources": { "$ref": "#/$defs/stringArray" },
+        "explanation": { "type": "string" }
       },
       "additionalProperties": false
     },
