@@ -7,7 +7,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -66,6 +65,7 @@ public final class SearchTrajectoryDataset {
 
     /** One compact JSON object per deterministic SearchEvent, ordered by split/run/sequence. */
     public String toJsonLines() {
+        requireLeakageFree();
         StringBuilder result = new StringBuilder();
         for (SearchTrajectoryRun run : runs) {
             for (SearchTrajectoryRecord record : run.records().stream()
@@ -150,13 +150,14 @@ public final class SearchTrajectoryDataset {
 
         Map<DatasetSplit, SplitBalance> immutableBalances = new LinkedHashMap<>();
         splitBalances.forEach((split, value) -> immutableBalances.put(split, value.freeze()));
+        int successfulRuns = (int) runs.stream().filter(SearchTrajectoryRun::success).count();
         return new DatasetSummary(
             runs.size(),
             records,
             decisions,
             selectedDecisions,
-            (int) runs.stream().filter(SearchTrajectoryRun::success).count(),
-            runs.size() - (int) runs.stream().filter(SearchTrajectoryRun::success).count(),
+            successfulRuns,
+            runs.size() - successfulRuns,
             families.size(),
             taskValueClasses.size(),
             taskAlphaClasses.size(),
@@ -211,6 +212,13 @@ public final class SearchTrajectoryDataset {
                     .stringArray("runIds", violation.runIds()))))
             .endObject();
         return json.toString();
+    }
+
+    private void requireLeakageFree() {
+        if (!leakageFree()) {
+            throw new IllegalStateException(
+                "search trajectory export blocked by split leakage: " + leakageViolations);
+        }
     }
 
     private static String toJson(SearchTrajectoryRecord record) {
