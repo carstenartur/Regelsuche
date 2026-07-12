@@ -20,14 +20,17 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class HiddenRulePilotRunnerTest {
+    private static final PilotCase NEUTRAL_CASE = caseById("case-001");
+    private static final RuntimeResult NEUTRAL_RUNTIME =
+        new HiddenRulePilotRunner().run(NEUTRAL_CASE.task());
+
     private final HiddenRulePilotRunner runner = new HiddenRulePilotRunner();
     private final HiddenRulePilotEvaluator evaluator = new HiddenRulePilotEvaluator();
     private final HiddenRuleHoldoutPartition partition = new HiddenRuleHoldoutPartition();
 
     @Test
     void rediscoversAndCompilesANeutralElementMacroFromPrimitiveSearchOnly() {
-        PilotCase pilotCase = caseById("case-001");
-        RuntimeResult runtime = runner.run(pilotCase.task());
+        RuntimeResult runtime = NEUTRAL_RUNTIME;
 
         assertEquals(RuntimeStatus.CANDIDATE_FROZEN, runtime.status(), runtime.toString());
         assertTrue(runtime.primitiveRuleIds().contains("ast_add_zero_right"));
@@ -40,11 +43,11 @@ class HiddenRulePilotRunnerTest {
         assertTrue(runtime.holdouts().allPassed(), runtime.holdouts().toString());
         assertTrue(runtime.holdouts().materialAblations() >= 1,
             "the learned direct macro must shorten at least one primitive holdout path");
-        assertTrue(partition.audit(pilotCase.task()).passed(),
-            partition.audit(pilotCase.task()).collisions().toString());
+        assertTrue(partition.audit(NEUTRAL_CASE.task()).passed(),
+            partition.audit(NEUTRAL_CASE.task()).collisions().toString());
 
         assertRediscovered(evaluator.evaluate(
-            pilotCase.task(), runtime, pilotCase.reference()));
+            NEUTRAL_CASE.task(), runtime, NEUTRAL_CASE.reference()));
     }
 
     @Test
@@ -69,13 +72,11 @@ class HiddenRulePilotRunnerTest {
 
     @Test
     void detectsHiddenIdentifiersInTheRuntimeInputBeforeAnyPublicClaim() {
-        PilotCase pilotCase = caseById("case-001");
         RuntimeTask leakedTask = copyTask(
-            pilotCase.task(), "hidden_neutral_element_macro", pilotCase.task().primitiveEngine());
-        RuntimeResult runtime = runner.run(pilotCase.task());
+            NEUTRAL_CASE.task(), "hidden_neutral_element_macro", NEUTRAL_CASE.task().primitiveEngine());
 
         HiddenRulePilotEvaluator.Evaluation evaluation =
-            evaluator.evaluate(leakedTask, runtime, pilotCase.reference());
+            evaluator.evaluate(leakedTask, NEUTRAL_RUNTIME, NEUTRAL_CASE.reference());
 
         assertFalse(evaluation.leakageViolations().isEmpty());
         assertFalse(evaluation.pilotAccepted());
@@ -84,7 +85,6 @@ class HiddenRulePilotRunnerTest {
 
     @Test
     void detectsHiddenPatternsInsideNestedPrimitiveRuleMetadata() {
-        PilotCase pilotCase = caseById("case-001");
         List<RewriteRule> leakedRules = List.of(new de.regelsuche.transform.PatternRewriteRule(
             "opaque_primitive_rule",
             de.regelsuche.transform.PatternExpr.op(
@@ -97,11 +97,11 @@ class HiddenRulePilotRunnerTest {
             de.regelsuche.transform.PatternExpr.var("A")));
         TransformationEngine nested = new HypothesisTransformationEngine(
             new AstRewriteTransformationEngine(leakedRules), List.of(), 0);
-        RuntimeTask leakedTask = copyTask(pilotCase.task(), pilotCase.task().opaqueCaseId(), nested);
-        RuntimeResult runtime = runner.run(pilotCase.task());
+        RuntimeTask leakedTask = copyTask(
+            NEUTRAL_CASE.task(), NEUTRAL_CASE.task().opaqueCaseId(), nested);
 
         HiddenRulePilotEvaluator.Evaluation evaluation =
-            evaluator.evaluate(leakedTask, runtime, pilotCase.reference());
+            evaluator.evaluate(leakedTask, NEUTRAL_RUNTIME, NEUTRAL_CASE.reference());
 
         assertTrue(evaluation.leakageViolations().stream()
             .anyMatch(violation -> violation.location().equals("PRIMITIVE_RULE_TEMPLATE")));
@@ -111,18 +111,16 @@ class HiddenRulePilotRunnerTest {
 
     @Test
     void rejectsAnOpaquePrimitiveThatSolvesTheTrainingTaskInOneStep() {
-        PilotCase pilotCase = caseById("case-001");
         TransformationEngine hiddenShortcut = expression -> expression.equals("(x + 0) * 1")
             ? List.of(new Transformation(
                 "opaque_primitive", "x", RewriteKind.NORMALIZE,
                 false, 0, true, "opaque-shortcut"))
             : List.of();
         RuntimeTask leakedTask = copyTask(
-            pilotCase.task(), pilotCase.task().opaqueCaseId(), hiddenShortcut);
-        RuntimeResult runtime = runner.run(pilotCase.task());
+            NEUTRAL_CASE.task(), NEUTRAL_CASE.task().opaqueCaseId(), hiddenShortcut);
 
         HiddenRulePilotEvaluator.Evaluation evaluation =
-            evaluator.evaluate(leakedTask, runtime, pilotCase.reference());
+            evaluator.evaluate(leakedTask, NEUTRAL_RUNTIME, NEUTRAL_CASE.reference());
 
         assertTrue(evaluation.leakageViolations().stream()
             .anyMatch(violation -> violation.location().equals("TRAIN_DIRECT_PRIMITIVE")));
