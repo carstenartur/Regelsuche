@@ -4,7 +4,6 @@
 - Date: 2026-07-12
 - Related: PR #241, issue #243, `ExpressionCanonicalizer`, `TreePosition`,
   `TermOccurrenceIndex`, equality saturation
-- Benchmark evidence: `docs/architecture/expression-identity-benchmark-results.md`
 
 ## Context
 
@@ -148,23 +147,37 @@ The mathematical contract, not one Java collection type, is normative.
 The selected design aligns with existing components:
 
 - `TreePosition` already identifies syntax occurrences;
+- `AstVisitorContext` already distinguishes equal syntax nodes by reference;
 - `TermOccurrenceIndex` already stores every path/role while grouping by a
   provisional canonical string;
 - `ExpressionCanonicalizer.stableHash` is the current cross-subsystem value key;
 - `EGraph` already hash-conses e-nodes and separates broader equivalence;
 - PR #241 already separates exact recognition from bounded AC/broader recognition.
 
+Direct construction with `new BinaryExpr(...)` is widespread. Requiring a factory
+for the current syntax type would therefore be a repository-wide migration and is
+not part of this decision.
+
 A full second semantic tree would duplicate structure and add a larger projection
 and synchronization surface. Evolving the existing occurrence index toward typed
 value references is the smaller model.
 
-### Bounded spike
+### Executable characterization and bounded spike
 
-The temporary spike established:
+The maintained characterization tests establish that:
+
+- equal parsed variables are structurally equal but not interned;
+- repeated written variables remain distinct references and can carry different
+  `AstVisitorContext` metadata;
+- grouping/order affect `Expr.equals` but not the bounded canonical AC hash;
+- multiplicity remains significant;
+- a normal set retains two occurrence IDs pointing to one shared value;
+- `BinaryExpr` can already form a DAG when child references are shared, while record
+  equality does not reveal whether sharing occurred.
+
+The temporary competing spike additionally established:
 
 - AC-equivalent syntax maps to one value identity;
-- multiplicity remains significant;
-- a normal set retains two occurrence IDs pointing to one value;
 - one shared value can have several concrete paths;
 - local replacement remains occurrence-based;
 - stable keys preserve equality across factory scopes.
@@ -173,22 +186,33 @@ For three AC forms of `a+b+c`, the syntax had 15 occurrences. A duplicate semant
 projection allocated 15 semantic nodes; scoped interning retained 7 distinct values.
 For `(a+b)*(a+b)`, 7 occurrences referenced 4 distinct values.
 
+The temporary spike code was removed after the decision; its commits and workflow
+artifact remain in PR history. The durable contracts are kept in existing test
+suites rather than as a parallel experimental API.
+
 ### Performance
 
-JMH run 479 measured:
+JMH run 479 at commit `59fefc29aa816031511d3d69560c7a763b12412b`
+used Temurin 21.0.11, one fork, two warm-up iterations and three one-second
+measurement iterations. Lower is better.
 
-| Operation | Mean |
-|---|---:|
-| Non-interned projection | 77.224 µs/op |
-| Interned projection, fresh scope | 115.989 µs/op |
-| Interned projection, warm scope | 110.636 µs/op |
-| Repeated-subexpression tree evaluation | 1.23194 µs/op |
-| Memoized DAG evaluation | 0.178929 µs/op |
+| Operation | Mean | Error |
+|---|---:|---:|
+| Non-interned projection | 77.224 µs/op | 9.688 µs/op |
+| Interned projection, fresh scope | 115.989 µs/op | 47.877 µs/op |
+| Interned projection, warm scope | 110.636 µs/op | 26.546 µs/op |
+| Repeated-subexpression tree evaluation | 1.23194 µs/op | 0.08768 µs/op |
+| Memoized DAG evaluation | 0.178929 µs/op | 0.006203 µs/op |
 
-The prototype's interning construction was about 1.43–1.50× slower than plain
-allocation, while repeated pure-value evaluation was about 6.88× faster. Therefore
-value graphs must be built once per bounded owner and reused; they must not be
-reconstructed inside every rule match.
+The construction point estimates were about 1.43–1.50 times slower with interning,
+but their intervals are broad; the experiment demonstrates no construction-speed
+advantage, not a universal slowdown. The deliberately sharing-heavy pure-value
+evaluation was about 6.88 times faster and also benefited from AC multiplicity
+compression.
+
+Therefore value graphs must be built once per bounded owner and reused; they must
+not be reconstructed inside every rule match. End-to-end search time and retained
+memory remain mandatory measurements for each production migration step.
 
 ## Boundaries
 
@@ -257,8 +281,8 @@ Production migration is tracked in issue #243 and proceeds incrementally:
 
 Required safeguards include AC/multiplicity tests, ordered non-commutative roles,
 occurrence-local replacement, stable cross-scope keys, bounded factory lifecycle,
-no mutable occurrence metadata on shared values, and continued syntax-rule
-compatibility.
+no mutable occurrence metadata on shared values, continued syntax-rule
+compatibility, and measured end-to-end search/memory impact before each rollout.
 
 ## Non-goals
 
