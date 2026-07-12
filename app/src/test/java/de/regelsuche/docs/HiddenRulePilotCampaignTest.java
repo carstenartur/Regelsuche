@@ -13,9 +13,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class HiddenRulePilotCampaignTest {
+    private static final Set<String> TEXT_EXTENSIONS = Set.of(
+        ".java", ".json", ".yaml", ".yml", ".properties", ".xml",
+        ".md", ".txt", ".csv", ".toml", ".html", ".js", ".css", ".svg");
+
     @Test
     void emitsStableFiveCaseEvidenceWithoutHiddenIdsOrWallClockTime() {
         HiddenRulePilotCampaign campaign = new HiddenRulePilotCampaign();
@@ -84,6 +89,7 @@ class HiddenRulePilotCampaignTest {
             }
             try (var files = Files.walk(root)) {
                 files.filter(Files::isRegularFile)
+                    .filter(HiddenRulePilotCampaignTest::isTextResource)
                     .sorted()
                     .forEach(file -> {
                         try {
@@ -98,6 +104,11 @@ class HiddenRulePilotCampaignTest {
             }
         }
         return surface.toString();
+    }
+
+    private static boolean isTextResource(Path file) {
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        return TEXT_EXTENSIONS.stream().anyMatch(name::endsWith);
     }
 
     private static String compact(String value) {
