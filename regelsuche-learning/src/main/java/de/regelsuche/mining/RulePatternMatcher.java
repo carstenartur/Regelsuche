@@ -7,7 +7,9 @@ import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -86,7 +88,74 @@ public class RulePatternMatcher {
                 return true;
             }
         }
-        return false;
+        return isAssociative(binary.op())
+            && matchRepeatedAssociativePlaceholder(binary, value, bindings);
+    }
+
+    private boolean matchRepeatedAssociativePlaceholder(
+        PatternBinary pattern,
+        BinaryExpr expression,
+        Map<String, Expr> bindings
+    ) {
+        List<RulePatternNode> patternOperands = new ArrayList<>();
+        flattenPattern(pattern, pattern.op(), patternOperands);
+        if (patternOperands.size() < 3) {
+            return false;
+        }
+        PatternVariable repeated = null;
+        for (RulePatternNode operand : patternOperands) {
+            if (!(operand instanceof PatternVariable variable)) {
+                return false;
+            }
+            if (repeated == null) {
+                repeated = variable;
+            } else if (!repeated.name().equals(variable.name())) {
+                return false;
+            }
+        }
+
+        List<Expr> expressionOperands = new ArrayList<>();
+        flattenExpression(expression, pattern.op(), expressionOperands);
+        if (expressionOperands.size() != patternOperands.size()) {
+            return false;
+        }
+        Expr repeatedValue = expressionOperands.getFirst();
+        if (expressionOperands.stream().anyMatch(operand -> !operand.equals(repeatedValue))) {
+            return false;
+        }
+
+        Expr existing = bindings.get(repeated.name());
+        if (existing != null && !existing.equals(repeatedValue)) {
+            return false;
+        }
+        bindings.put(repeated.name(), repeatedValue);
+        return true;
+    }
+
+    private void flattenPattern(
+        RulePatternNode node,
+        BinaryOperator operator,
+        List<RulePatternNode> operands
+    ) {
+        if (node instanceof PatternBinary binary && binary.op() == operator) {
+            flattenPattern(binary.left(), operator, operands);
+            flattenPattern(binary.right(), operator, operands);
+        } else {
+            operands.add(node);
+        }
+    }
+
+    private void flattenExpression(Expr expression, BinaryOperator operator, List<Expr> operands) {
+        if (expression instanceof BinaryExpr binary && binary.operator() == operator) {
+            flattenExpression(binary.left(), operator, operands);
+            flattenExpression(binary.right(), operator, operands);
+        } else {
+            operands.add(expression);
+        }
+    }
+
+    private boolean isAssociative(BinaryOperator operator) {
+        return operator == BinaryOperator.ADD || operator == BinaryOperator.MUL;
     }
 
     private boolean isCommutative(BinaryOperator operator) {
