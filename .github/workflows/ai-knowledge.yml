@@ -143,6 +143,7 @@ jobs:
           normalized = None
           legacy = None
           sample_count = None
+          capability_count = None
           try:
               complexity = json.loads((ai_dir / 'complexity.json').read_text(encoding='utf-8'))
               code_complexity = complexity.get('codeComplexity', {})
@@ -151,6 +152,7 @@ jobs:
               normalized = complexity.get('normalizedContextDebt')
               legacy = complexity.get('legacyAiContextDebt')
               sample_count = footprint.get('capabilitySampleCount')
+              capability_count = footprint.get('capabilityCount')
 
               if 'maxMethodCognitiveComplexity' not in code_complexity:
                   errors.append('complexity.json lacks codeComplexity.maxMethodCognitiveComplexity.')
@@ -163,14 +165,25 @@ jobs:
               if not footprint:
                   errors.append('complexity.json lacks contextFootprint.')
               else:
-                  if footprint.get('schemaVersion') != 2:
-                      errors.append(f'contextFootprint.schemaVersion is not 2: {footprint.get("schemaVersion")!r}.')
-                  if footprint.get('method') != 'line-weighted-linked-capability-working-set-proxy':
+                  if footprint.get('schemaVersion') != 3:
+                      errors.append(f'contextFootprint.schemaVersion is not 3: {footprint.get("schemaVersion")!r}.')
+                  if footprint.get('method') != 'line-weighted-prioritized-capability-selector-working-set-proxy':
                       errors.append(f'Unexpected contextFootprint.method: {footprint.get("method")!r}.')
                   if footprint.get('measurementStatus') != 'MEASURED':
                       errors.append(f'Context footprint was not measured: {footprint.get("measurementStatus")!r}.')
                   if not isinstance(sample_count, int) or sample_count <= 0:
                       errors.append(f'capabilitySampleCount must be positive: {sample_count!r}.')
+                  if sample_count != capability_count:
+                      errors.append(
+                          f'Every seeded capability must produce a sample: '
+                          f'{sample_count!r}/{capability_count!r}.')
+                  if footprint.get('capabilitiesWithoutResolvedTypes') != 0:
+                      errors.append(
+                          'Some capabilities have selectors but no resolved production facts: '
+                          f'{footprint.get("capabilitiesWithoutResolvedTypes")!r}.')
+                  working_set_sources = footprint.get('capabilityWorkingSetSources')
+                  if not isinstance(working_set_sources, dict):
+                      errors.append('contextFootprint lacks capabilityWorkingSetSources.')
               if not isinstance(normalized, (int, float)) or not 0 <= normalized <= 100:
                   errors.append(f'normalizedContextDebt is outside the 0–100 scale: {normalized!r}.')
           except Exception as exc:
@@ -182,10 +195,10 @@ jobs:
               print(f'ERROR: {error}', file=sys.stderr)
           if errors:
               sys.exit(1)
-          print('AI knowledge artifacts passed corrected 0.1.6 quality checks.')
+          print('AI knowledge artifacts passed corrected 0.1.7 quality checks.')
           print(f'normalizedContextDebt={normalized}')
           print(f'legacyAiContextDebt={legacy}')
-          print(f'capabilitySampleCount={sample_count}')
+          print(f'capabilitySampleCount={sample_count}/{capability_count}')
           PY
 
       - name: Upload AI knowledge artifacts
