@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EquivalenceAwarePatternMatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">EquivalenceAwarePatternMatcher.java</span></div><h1>EquivalenceAwarePatternMatcher.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * Matches pattern expressions against ASTs modulo a deliberately bounded set
+ * of equivalences.
+ *
+ * &lt;p&gt;The matcher supports associativity and commutativity for selected binary
+ * operators. With algebraic binding inference enabled it additionally solves a
+ * bounded monomial fragment: numeric products/quotients, variables and integer
+ * powers. This permits globally consistent bindings such as
+ * {@code A = 3/2*a} while still rejecting an expression whose remaining terms
+ * contradict that binding.&lt;/p&gt;
+ */
+public final class EquivalenceAwarePatternMatcher {
+    private static final int MAX_COMMUTATIVE_OPERANDS = 8;
+    private static final int MAX_BACKTRACKING_BRANCHES = 10_000;
+    private static final double EPSILON = 1.0e-9;
+
+    private EquivalenceAwarePatternMatcher() {
+    }
+
+    public static boolean match(
+        PatternExpr pattern,
+        Expr expression,
+        Map&lt;String, Expr&gt; bindings,
+        RecognitionProfile profile
+    ) {
+<span class="pc bpc" id="L41" title="4 of 8 branches missed.">        if (pattern == null || expression == null || bindings == null || profile == null) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;pattern, expression, bindings and profile are required&quot;);</span>
+        }
+<span class="fc" id="L44">        return matchInternal(pattern, expression, bindings, profile, new MatchBudget(MAX_BACKTRACKING_BRANCHES));</span>
+    }
+
+    private static boolean matchInternal(
+        PatternExpr pattern,
+        Expr expression,
+        Map&lt;String, Expr&gt; bindings,
+        RecognitionProfile profile,
+        MatchBudget budget
+    ) {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (budget.exhausted()) {</span>
+<span class="nc" id="L55">            return false;</span>
+        }
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L58">            Expr bound = bindings.get(placeholder.name());</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (bound == null) {</span>
+<span class="fc" id="L60">                bindings.put(placeholder.name(), expression);</span>
+<span class="fc" id="L61">                return true;</span>
+            }
+<span class="fc" id="L63">            return equivalent(bound, expression, profile);</span>
+        }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.LiteralNumber number) {</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            if (expression instanceof NumberExpr numberExpr) {</span>
+<span class="fc" id="L67">                return nearlyEqual(numberExpr.value(), number.value());</span>
+            }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            return profile.inferAlgebraicBindings()</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                &amp;&amp; Monomial.from(expression).map(m -&gt; m.isConstant(number.value())).orElse(false);</span>
+        }
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="nc bnc" id="L73" title="All 4 branches missed.">            return expression instanceof VariableExpr variableExpr &amp;&amp; variableExpr.name().equals(variable.name());</span>
+        }
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (!(expression instanceof FunctionExpr functionExpr)</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                || !functionExpr.name().equals(function.name())</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                || functionExpr.arguments().size() != function.arguments().size()) {</span>
+<span class="fc" id="L79">                return false;</span>
+            }
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            for (int i = 0; i &lt; function.arguments().size(); i++) {</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                if (!matchInternal(function.arguments().get(i), functionExpr.arguments().get(i), bindings, profile, budget)) {</span>
+<span class="fc" id="L83">                    return false;</span>
+                }
+            }
+<span class="fc" id="L86">            return true;</span>
+        }
+
+<span class="fc" id="L89">        PatternExpr.Operation operation = (PatternExpr.Operation) pattern;</span>
+<span class="fc bfc" id="L90" title="All 4 branches covered.">        if (profile.inferAlgebraicBindings() &amp;&amp; allPlaceholdersBound(operation, bindings)) {</span>
+<span class="fc" id="L91">            Expr instantiated = operation.instantiate(bindings);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (equivalent(instantiated, expression, profile)) {</span>
+<span class="fc" id="L93">                return true;</span>
+            }
+        }
+<span class="fc bfc" id="L96" title="All 4 branches covered.">        if (profile.inferAlgebraicBindings() &amp;&amp; tryInferPowerBinding(operation, expression, bindings, profile)) {</span>
+<span class="fc" id="L97">            return true;</span>
+        }
+<span class="fc bfc" id="L99" title="All 4 branches covered.">        if (!(expression instanceof BinaryExpr binaryExpr) || binaryExpr.operator() != operation.operator()) {</span>
+<span class="fc" id="L100">            return false;</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (!profile.isAssociative(operation.operator())) {</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            return matchInternal(operation.left(), binaryExpr.left(), bindings, profile, budget)</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                &amp;&amp; matchInternal(operation.right(), binaryExpr.right(), bindings, profile, budget);</span>
+        }
+
+<span class="fc" id="L107">        List&lt;PatternExpr&gt; patternOperands = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L108">        flattenPattern(operation, operation.operator(), patternOperands);</span>
+<span class="fc" id="L109">        List&lt;Expr&gt; expressionOperands = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L110">        flattenExpression(binaryExpr, operation.operator(), expressionOperands);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (patternOperands.size() != expressionOperands.size()) {</span>
+<span class="fc" id="L112">            return false;</span>
+        }
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (profile.isCommutative(operation.operator())) {</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (patternOperands.size() &gt; MAX_COMMUTATIVE_OPERANDS) {</span>
+<span class="fc" id="L116">                return false;</span>
+            }
+<span class="fc" id="L118">            patternOperands.sort(Comparator.comparingInt(EquivalenceAwarePatternMatcher::bindingPriority).reversed());</span>
+<span class="fc" id="L119">            return matchCommutative(patternOperands, expressionOperands, 0, bindings, profile, budget);</span>
+        }
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        for (int i = 0; i &lt; patternOperands.size(); i++) {</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            if (!matchInternal(patternOperands.get(i), expressionOperands.get(i), bindings, profile, budget)) {</span>
+<span class="nc" id="L123">                return false;</span>
+            }
+        }
+<span class="nc" id="L126">        return true;</span>
+    }
+
+    private static boolean tryInferPowerBinding(
+        PatternExpr.Operation operation,
+        Expr expression,
+        Map&lt;String, Expr&gt; bindings,
+        RecognitionProfile profile
+    ) {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (operation.operator() != BinaryOperator.POW</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            || !(operation.left() instanceof PatternExpr.Placeholder placeholder)</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            || !(operation.right() instanceof PatternExpr.LiteralNumber exponentLiteral)) {</span>
+<span class="fc" id="L138">            return false;</span>
+        }
+<span class="fc" id="L140">        int exponent = exactPositiveInteger(exponentLiteral.value());</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (exponent &lt; 1) {</span>
+<span class="nc" id="L142">            return false;</span>
+        }
+<span class="fc" id="L144">        Expr existing = bindings.get(placeholder.name());</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L146">            return equivalent(operation.instantiate(bindings), expression, profile);</span>
+        }
+<span class="fc" id="L148">        var monomial = Monomial.from(expression);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (monomial.isEmpty()) {</span>
+<span class="fc" id="L150">            return false;</span>
+        }
+<span class="fc" id="L152">        var root = monomial.get().exactRoot(exponent);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (root.isEmpty()) {</span>
+<span class="fc" id="L154">            return false;</span>
+        }
+<span class="fc" id="L156">        bindings.put(placeholder.name(), root.get().toExpr());</span>
+<span class="fc" id="L157">        return equivalent(operation.instantiate(bindings), expression, profile);</span>
+    }
+
+    private static int bindingPriority(PatternExpr pattern) {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation operation</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            &amp;&amp; operation.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            &amp;&amp; operation.left() instanceof PatternExpr.Placeholder</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            &amp;&amp; operation.right() instanceof PatternExpr.LiteralNumber) {</span>
+<span class="fc" id="L165">            return 30;</span>
+        }
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.LiteralNumber || pattern instanceof PatternExpr.LiteralVariable) {</span>
+<span class="fc" id="L168">            return 20;</span>
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder) {</span>
+<span class="fc" id="L171">            return 5;</span>
+        }
+<span class="fc" id="L173">        return 10;</span>
+    }
+
+    private static boolean allPlaceholdersBound(PatternExpr pattern, Map&lt;String, Expr&gt; bindings) {
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L178">            return bindings.containsKey(placeholder.name());</span>
+        }
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            return allPlaceholdersBound(operation.left(), bindings)</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                &amp;&amp; allPlaceholdersBound(operation.right(), bindings);</span>
+        }
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="nc" id="L185">            return function.arguments().stream().allMatch(argument -&gt; allPlaceholdersBound(argument, bindings));</span>
+        }
+<span class="fc" id="L187">        return true;</span>
+    }
+
+    private static boolean equivalent(Expr left, Expr right, RecognitionProfile profile) {
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (left.equals(right)) {</span>
+<span class="fc" id="L192">            return true;</span>
+        }
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (!profile.inferAlgebraicBindings()) {</span>
+<span class="fc" id="L195">            return false;</span>
+        }
+<span class="fc" id="L197">        var leftMonomial = Monomial.from(left);</span>
+<span class="fc" id="L198">        var rightMonomial = Monomial.from(right);</span>
+<span class="pc bpc" id="L199" title="2 of 6 branches missed.">        return leftMonomial.isPresent() &amp;&amp; rightMonomial.isPresent() &amp;&amp; leftMonomial.get().equivalentTo(rightMonomial.get());</span>
+    }
+
+    private static boolean matchCommutative(
+        List&lt;PatternExpr&gt; patterns,
+        List&lt;Expr&gt; expressions,
+        int patternIndex,
+        Map&lt;String, Expr&gt; bindings,
+        RecognitionProfile profile,
+        MatchBudget budget
+    ) {
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (patternIndex == patterns.size()) {</span>
+<span class="fc" id="L211">            return expressions.isEmpty();</span>
+        }
+<span class="fc" id="L213">        PatternExpr pattern = patterns.get(patternIndex);</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (int i = 0; i &lt; expressions.size(); i++) {</span>
+<span class="fc" id="L215">            Expr candidate = expressions.get(i);</span>
+<span class="pc bpc" id="L216" title="1 of 4 branches missed.">            if (!couldStructurallyMatch(pattern, candidate, profile) || !budget.tryBranch()) {</span>
+<span class="nc" id="L217">                continue;</span>
+            }
+<span class="fc" id="L219">            Map&lt;String, Expr&gt; candidateBindings = new HashMap&lt;&gt;(bindings);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (!matchInternal(pattern, candidate, candidateBindings, profile, budget)) {</span>
+<span class="fc" id="L221">                continue;</span>
+            }
+<span class="fc" id="L223">            List&lt;Expr&gt; remaining = new ArrayList&lt;&gt;(expressions);</span>
+<span class="fc" id="L224">            remaining.remove(i);</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            if (matchCommutative(patterns, remaining, patternIndex + 1, candidateBindings, profile, budget)) {</span>
+<span class="fc" id="L226">                bindings.clear();</span>
+<span class="fc" id="L227">                bindings.putAll(candidateBindings);</span>
+<span class="fc" id="L228">                return true;</span>
+            }
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (budget.exhausted()) {</span>
+<span class="nc" id="L231">                return false;</span>
+            }
+        }
+<span class="fc" id="L234">        return false;</span>
+    }
+
+    private static boolean couldStructurallyMatch(PatternExpr pattern, Expr expression, RecognitionProfile profile) {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder) {</span>
+<span class="fc" id="L239">            return true;</span>
+        }
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.LiteralNumber) {</span>
+<span class="pc bpc" id="L242" title="1 of 6 branches missed.">            return expression instanceof NumberExpr || profile.inferAlgebraicBindings() &amp;&amp; Monomial.from(expression).isPresent();</span>
+        }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable) {</span>
+<span class="nc" id="L245">            return expression instanceof VariableExpr;</span>
+        }
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="nc" id="L248">            return expression instanceof FunctionExpr candidate</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                &amp;&amp; function.name().equals(candidate.name())</span>
+<span class="nc bnc" id="L250" title="All 4 branches missed.">                &amp;&amp; function.arguments().size() == candidate.arguments().size();</span>
+        }
+<span class="fc" id="L252">        PatternExpr.Operation operation = (PatternExpr.Operation) pattern;</span>
+<span class="fc bfc" id="L253" title="All 4 branches covered.">        if (profile.inferAlgebraicBindings() &amp;&amp; operation.operator() == BinaryOperator.POW) {</span>
+<span class="pc bpc" id="L254" title="1 of 4 branches missed.">            return Monomial.from(expression).isPresent()</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">                || expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.POW;</span>
+        }
+<span class="pc bpc" id="L257" title="1 of 4 branches missed.">        return expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == operation.operator();</span>
+    }
+
+    private static void flattenPattern(PatternExpr pattern, BinaryOperator operator, List&lt;PatternExpr&gt; result) {
+<span class="fc bfc" id="L261" title="All 4 branches covered.">        if (pattern instanceof PatternExpr.Operation operation &amp;&amp; operation.operator() == operator) {</span>
+<span class="fc" id="L262">            flattenPattern(operation.left(), operator, result);</span>
+<span class="fc" id="L263">            flattenPattern(operation.right(), operator, result);</span>
+        } else {
+<span class="fc" id="L265">            result.add(pattern);</span>
+        }
+<span class="fc" id="L267">    }</span>
+
+    private static void flattenExpression(Expr expression, BinaryOperator operator, List&lt;Expr&gt; result) {
+<span class="fc bfc" id="L270" title="All 4 branches covered.">        if (expression instanceof BinaryExpr binaryExpr &amp;&amp; binaryExpr.operator() == operator) {</span>
+<span class="fc" id="L271">            flattenExpression(binaryExpr.left(), operator, result);</span>
+<span class="fc" id="L272">            flattenExpression(binaryExpr.right(), operator, result);</span>
+        } else {
+<span class="fc" id="L274">            result.add(expression);</span>
+        }
+<span class="fc" id="L276">    }</span>
+
+    private static int exactPositiveInteger(double value) {
+<span class="fc" id="L279">        int integer = (int) Math.rint(value);</span>
+<span class="pc bpc" id="L280" title="2 of 4 branches missed.">        return integer &gt; 0 &amp;&amp; nearlyEqual(value, integer) ? integer : -1;</span>
+    }
+
+    private static boolean nearlyEqual(double left, double right) {
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        return Math.abs(left - right) &lt;= EPSILON * Math.max(1.0, Math.max(Math.abs(left), Math.abs(right)));</span>
+    }
+
+    private static final class MatchBudget {
+        private int remainingBranches;
+
+<span class="fc" id="L290">        private MatchBudget(int remainingBranches) {</span>
+<span class="fc" id="L291">            this.remainingBranches = remainingBranches;</span>
+<span class="fc" id="L292">        }</span>
+
+        private boolean tryBranch() {
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            if (remainingBranches &lt;= 0) {</span>
+<span class="nc" id="L296">                return false;</span>
+            }
+<span class="fc" id="L298">            remainingBranches--;</span>
+<span class="fc" id="L299">            return true;</span>
+        }
+
+        private boolean exhausted() {
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            return remainingBranches &lt;= 0;</span>
+        }
+    }
+
+    private record Monomial(double coefficient, Map&lt;String, Integer&gt; powers) {
+<span class="fc" id="L308">        private Monomial {</span>
+<span class="fc" id="L309">            powers = Map.copyOf(new TreeMap&lt;&gt;(powers));</span>
+<span class="fc" id="L310">        }</span>
+
+        static java.util.Optional&lt;Monomial&gt; from(Expr expression) {
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L314">                return java.util.Optional.of(new Monomial(number.value(), Map.of()));</span>
+            }
+<span class="fc bfc" id="L316" title="All 2 branches covered.">            if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L317">                return java.util.Optional.of(new Monomial(1.0, Map.of(variable.name(), 1)));</span>
+            }
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="fc" id="L320">                return java.util.Optional.empty();</span>
+            }
+<span class="fc bfc" id="L322" title="All 4 branches covered.">            if (binary.operator() == BinaryOperator.MUL || binary.operator() == BinaryOperator.DIV) {</span>
+<span class="fc" id="L323">                var left = from(binary.left());</span>
+<span class="fc" id="L324">                var right = from(binary.right());</span>
+<span class="fc bfc" id="L325" title="All 4 branches covered.">                if (left.isEmpty() || right.isEmpty()) {</span>
+<span class="fc" id="L326">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc bfc" id="L328" title="All 4 branches covered.">                if (binary.operator() == BinaryOperator.DIV &amp;&amp; nearlyEqual(right.get().coefficient, 0.0)) {</span>
+<span class="fc" id="L329">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                return java.util.Optional.of(binary.operator() == BinaryOperator.MUL</span>
+<span class="fc" id="L332">                    ? left.get().multiply(right.get())</span>
+<span class="fc" id="L333">                    : left.get().divide(right.get()));</span>
+            }
+<span class="pc bpc" id="L335" title="2 of 4 branches missed.">            if (binary.operator() == BinaryOperator.POW &amp;&amp; binary.right() instanceof NumberExpr exponentExpr) {</span>
+<span class="fc" id="L336">                int exponent = exactPositiveInteger(exponentExpr.value());</span>
+<span class="fc" id="L337">                var base = from(binary.left());</span>
+<span class="pc bpc" id="L338" title="1 of 4 branches missed.">                if (exponent &lt; 1 || base.isEmpty()) {</span>
+<span class="fc" id="L339">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L341">                return java.util.Optional.of(base.get().pow(exponent));</span>
+            }
+<span class="nc" id="L343">            return java.util.Optional.empty();</span>
+        }
+
+        Monomial multiply(Monomial other) {
+<span class="fc" id="L347">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;(powers);</span>
+<span class="fc" id="L348">            other.powers.forEach((name, exponent) -&gt; result.merge(name, exponent, Integer::sum));</span>
+<span class="fc" id="L349">            return new Monomial(coefficient * other.coefficient, result);</span>
+        }
+
+        Monomial divide(Monomial other) {
+<span class="fc" id="L353">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;(powers);</span>
+<span class="pc" id="L354">            other.powers.forEach((name, exponent) -&gt; result.merge(name, -exponent, Integer::sum));</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            result.entrySet().removeIf(entry -&gt; entry.getValue() == 0);</span>
+<span class="fc" id="L356">            return new Monomial(coefficient / other.coefficient, result);</span>
+        }
+
+        Monomial pow(int exponent) {
+<span class="fc" id="L360">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L361">            powers.forEach((name, power) -&gt; result.put(name, power * exponent));</span>
+<span class="fc" id="L362">            return new Monomial(Math.pow(coefficient, exponent), result);</span>
+        }
+
+        java.util.Optional&lt;Monomial&gt; exactRoot(int exponent) {
+<span class="pc bpc" id="L366" title="3 of 4 branches missed.">            if (coefficient &lt; 0.0 &amp;&amp; exponent % 2 == 0) {</span>
+<span class="nc" id="L367">                return java.util.Optional.empty();</span>
+            }
+<span class="fc" id="L369">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">            for (var entry : powers.entrySet()) {</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">                if (entry.getValue() % exponent != 0) {</span>
+<span class="fc" id="L372">                    return java.util.Optional.empty();</span>
+                }
+<span class="fc" id="L374">                result.put(entry.getKey(), entry.getValue() / exponent);</span>
+<span class="fc" id="L375">            }</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">            double rootCoefficient = coefficient &lt; 0.0</span>
+<span class="nc" id="L377">                ? -Math.pow(-coefficient, 1.0 / exponent)</span>
+<span class="fc" id="L378">                : Math.pow(coefficient, 1.0 / exponent);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">            if (!nearlyEqual(Math.pow(rootCoefficient, exponent), coefficient)) {</span>
+<span class="nc" id="L380">                return java.util.Optional.empty();</span>
+            }
+<span class="fc" id="L382">            return java.util.Optional.of(new Monomial(rootCoefficient, result));</span>
+        }
+
+        boolean equivalentTo(Monomial other) {
+<span class="fc bfc" id="L386" title="All 4 branches covered.">            return nearlyEqual(coefficient, other.coefficient) &amp;&amp; powers.equals(other.powers);</span>
+        }
+
+        boolean isConstant(double expected) {
+<span class="pc bpc" id="L390" title="3 of 4 branches missed.">            return powers.isEmpty() &amp;&amp; nearlyEqual(coefficient, expected);</span>
+        }
+
+        Expr toExpr() {
+<span class="fc" id="L394">            Expr result = null;</span>
+<span class="pc bpc" id="L395" title="1 of 4 branches missed.">            if (!nearlyEqual(coefficient, 1.0) || powers.isEmpty()) {</span>
+<span class="fc" id="L396">                result = new NumberExpr(coefficient);</span>
+            }
+<span class="fc bfc" id="L398" title="All 2 branches covered.">            for (var entry : powers.entrySet()) {</span>
+<span class="fc" id="L399">                Expr factor = new VariableExpr(entry.getKey());</span>
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">                if (entry.getValue() != 1) {</span>
+<span class="nc" id="L401">                    factor = new BinaryExpr(factor, BinaryOperator.POW, new NumberExpr(entry.getValue()));</span>
+                }
+<span class="fc bfc" id="L403" title="All 2 branches covered.">                result = result == null ? factor : new BinaryExpr(result, BinaryOperator.MUL, factor);</span>
+<span class="fc" id="L404">            }</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            return result == null ? new NumberExpr(1.0) : result;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

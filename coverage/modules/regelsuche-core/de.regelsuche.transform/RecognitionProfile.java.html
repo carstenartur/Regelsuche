@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RecognitionProfile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RecognitionProfile.java</span></div><h1>RecognitionProfile.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryOperator;
+import java.util.EnumSet;
+import java.util.Set;
+
+/** Controls which equivalences may be used while recognizing a rule. */
+public record RecognitionProfile(
+    Set&lt;BinaryOperator&gt; associativeOperators,
+    Set&lt;BinaryOperator&gt; commutativeOperators,
+    boolean inferAlgebraicBindings,
+    Set&lt;String&gt; recognitionRuleIds,
+    int maxEquivalenceDepth
+) {
+    public RecognitionProfile(Set&lt;BinaryOperator&gt; associativeOperators, Set&lt;BinaryOperator&gt; commutativeOperators) {
+<span class="nc" id="L16">        this(associativeOperators, commutativeOperators, false, Set.of(), 0);</span>
+<span class="nc" id="L17">    }</span>
+
+    public RecognitionProfile(
+        Set&lt;BinaryOperator&gt; associativeOperators,
+        Set&lt;BinaryOperator&gt; commutativeOperators,
+        boolean inferAlgebraicBindings
+    ) {
+<span class="nc" id="L24">        this(associativeOperators, commutativeOperators, inferAlgebraicBindings, Set.of(), 0);</span>
+<span class="nc" id="L25">    }</span>
+
+<span class="fc" id="L27">    public RecognitionProfile {</span>
+<span class="fc" id="L28">        associativeOperators = immutableEnumSet(associativeOperators);</span>
+<span class="fc" id="L29">        commutativeOperators = immutableEnumSet(commutativeOperators);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        recognitionRuleIds = recognitionRuleIds == null ? Set.of() : Set.copyOf(recognitionRuleIds);</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (!associativeOperators.containsAll(commutativeOperators)) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(&quot;commutative matching currently requires associative matching&quot;);</span>
+        }
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (maxEquivalenceDepth &lt; 0) {</span>
+<span class="nc" id="L35">            throw new IllegalArgumentException(&quot;maxEquivalenceDepth must not be negative&quot;);</span>
+        }
+<span class="fc" id="L37">    }</span>
+
+    public static RecognitionProfile exact() {
+<span class="fc" id="L40">        return new RecognitionProfile(Set.of(), Set.of(), false, Set.of(), 0);</span>
+    }
+
+    public static RecognitionProfile arithmeticAc() {
+<span class="fc" id="L44">        Set&lt;BinaryOperator&gt; operators = EnumSet.of(BinaryOperator.ADD, BinaryOperator.MUL);</span>
+<span class="fc" id="L45">        return new RecognitionProfile(operators, operators, false, Set.of(), 0);</span>
+    }
+
+    public static RecognitionProfile algebraicAc() {
+<span class="fc" id="L49">        Set&lt;BinaryOperator&gt; operators = EnumSet.of(BinaryOperator.ADD, BinaryOperator.MUL);</span>
+<span class="fc" id="L50">        return new RecognitionProfile(operators, operators, true, Set.of(), 0);</span>
+    }
+
+    public RecognitionProfile withRecognitionRules(Set&lt;String&gt; ruleIds, int depth) {
+<span class="fc" id="L54">        return new RecognitionProfile(</span>
+            associativeOperators,
+            commutativeOperators,
+            inferAlgebraicBindings,
+            ruleIds,
+            depth
+        );
+    }
+
+    public boolean isAssociative(BinaryOperator operator) {
+<span class="fc" id="L64">        return associativeOperators.contains(operator);</span>
+    }
+
+    public boolean isCommutative(BinaryOperator operator) {
+<span class="fc" id="L68">        return commutativeOperators.contains(operator);</span>
+    }
+
+    private static Set&lt;BinaryOperator&gt; immutableEnumSet(Set&lt;BinaryOperator&gt; operators) {
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">        if (operators == null || operators.isEmpty()) {</span>
+<span class="fc" id="L73">            return Set.of();</span>
+        }
+<span class="fc" id="L75">        return Set.copyOf(EnumSet.copyOf(operators));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

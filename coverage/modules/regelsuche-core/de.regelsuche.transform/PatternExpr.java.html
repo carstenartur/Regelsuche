@@ -23,7 +23,7 @@ public sealed interface PatternExpr
     }
 
     static PatternExpr variable(String name) {
-<span class="nc" id="L26">        return new LiteralVariable(name);</span>
+<span class="fc" id="L26">        return new LiteralVariable(name);</span>
     }
 
     static PatternExpr op(BinaryOperator operator, PatternExpr left, PatternExpr right) {
@@ -47,12 +47,12 @@ public sealed interface PatternExpr
 
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="fc" id="L50">            Expr bound = bindings.get(name);</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (bound == null) {</span>
-<span class="fc" id="L52">                bindings.put(name, expression);</span>
-<span class="fc" id="L53">                return true;</span>
+<span class="nc" id="L50">            Expr bound = bindings.get(name);</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            if (bound == null) {</span>
+<span class="nc" id="L52">                bindings.put(name, expression);</span>
+<span class="nc" id="L53">                return true;</span>
             }
-<span class="fc" id="L55">            return bound.equals(expression);</span>
+<span class="nc" id="L55">            return bound.equals(expression);</span>
         }
 
         @Override
@@ -65,7 +65,7 @@ public sealed interface PatternExpr
 <span class="fc" id="L65">    record LiteralNumber(double value) implements PatternExpr {</span>
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="fc bfc" id="L68" title="All 4 branches covered.">            return expression instanceof NumberExpr numberExpr &amp;&amp; numberExpr.value() == value;</span>
+<span class="nc bnc" id="L68" title="All 4 branches missed.">            return expression instanceof NumberExpr numberExpr &amp;&amp; numberExpr.value() == value;</span>
         }
 
         @Override
@@ -74,7 +74,7 @@ public sealed interface PatternExpr
         }
     }
 
-<span class="nc" id="L77">    record LiteralVariable(String name) implements PatternExpr {</span>
+<span class="fc" id="L77">    record LiteralVariable(String name) implements PatternExpr {</span>
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
 <span class="nc bnc" id="L80" title="All 4 branches missed.">            return expression instanceof VariableExpr variableExpr &amp;&amp; variableExpr.name().equals(name);</span>
@@ -95,10 +95,10 @@ public sealed interface PatternExpr
 
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="fc bfc" id="L98" title="All 4 branches covered.">            if (!(expression instanceof BinaryExpr binaryExpr) || binaryExpr.operator() != operator) {</span>
-<span class="fc" id="L99">                return false;</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">            if (!(expression instanceof BinaryExpr binaryExpr) || binaryExpr.operator() != operator) {</span>
+<span class="nc" id="L99">                return false;</span>
             }
-<span class="fc bfc" id="L101" title="All 4 branches covered.">            return left.match(binaryExpr.left(), bindings) &amp;&amp; right.match(binaryExpr.right(), bindings);</span>
+<span class="nc bnc" id="L101" title="All 4 branches missed.">            return left.match(binaryExpr.left(), bindings) &amp;&amp; right.match(binaryExpr.right(), bindings);</span>
         }
 
         @Override
@@ -124,18 +124,18 @@ public sealed interface PatternExpr
 
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (!(expression instanceof FunctionExpr functionExpr)) {</span>
-<span class="fc" id="L128">                return false;</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (!(expression instanceof FunctionExpr functionExpr)) {</span>
+<span class="nc" id="L128">                return false;</span>
             }
-<span class="pc bpc" id="L130" title="1 of 4 branches missed.">            if (!functionExpr.name().equals(name) || functionExpr.arguments().size() != arguments.size()) {</span>
-<span class="fc" id="L131">                return false;</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">            if (!functionExpr.name().equals(name) || functionExpr.arguments().size() != arguments.size()) {</span>
+<span class="nc" id="L131">                return false;</span>
             }
-<span class="fc bfc" id="L133" title="All 2 branches covered.">            for (int i = 0; i &lt; arguments.size(); i++) {</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">                if (!arguments.get(i).match(functionExpr.arguments().get(i), bindings)) {</span>
-<span class="fc" id="L135">                    return false;</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            for (int i = 0; i &lt; arguments.size(); i++) {</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                if (!arguments.get(i).match(functionExpr.arguments().get(i), bindings)) {</span>
+<span class="nc" id="L135">                    return false;</span>
                 }
             }
-<span class="fc" id="L138">            return true;</span>
+<span class="nc" id="L138">            return true;</span>
         }
 
         @Override

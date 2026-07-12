@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EquivalenceClassPatternMatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">EquivalenceClassPatternMatcher.java</span></div><h1>EquivalenceClassPatternMatcher.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.Expr;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+
+/** Matches a pattern against any bounded representative supplied by an e-class provider. */
+<span class="fc" id="L9">public final class EquivalenceClassPatternMatcher {</span>
+    public MatchResult match(
+        PatternExpr pattern,
+        Expr expression,
+        RecognitionProfile profile,
+        EquivalentExpressionProvider provider
+    ) {
+<span class="fc" id="L16">        Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="fc" id="L17">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L18">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L19">        Objects.requireNonNull(provider, &quot;provider&quot;);</span>
+<span class="fc" id="L20">        int index = 0;</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        for (Expr representative : provider.representatives(expression, profile)) {</span>
+<span class="fc" id="L22">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">            if (EquivalenceAwarePatternMatcher.match(pattern, representative, bindings, profile)) {</span>
+<span class="fc" id="L24">                return new MatchResult(true, representative, Map.copyOf(bindings), index);</span>
+            }
+<span class="fc" id="L26">            index++;</span>
+<span class="fc" id="L27">        }</span>
+<span class="nc" id="L28">        return new MatchResult(false, null, Map.of(), -1);</span>
+    }
+
+<span class="fc" id="L31">    public record MatchResult(</span>
+        boolean matched,
+        Expr representative,
+        Map&lt;String, Expr&gt; bindings,
+        int representativeIndex
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
