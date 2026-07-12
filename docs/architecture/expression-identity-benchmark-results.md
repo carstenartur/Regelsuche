@@ -6,13 +6,16 @@ an architecture decision, not a production performance promise.
 ## Run
 
 - GitHub Actions workflow: **Benchmark**, run **479**
+- Workflow run: https://github.com/carstenartur/Regelsuche/actions/runs/29185051458
 - Branch commit: `59fefc29aa816031511d3d69560c7a763b12412b`
 - JDK: Temurin 21.0.11
 - JMH: 1 fork, 2 warm-up iterations, 3 measurement iterations, 1 second each
 - Mode: average time, microseconds per operation
 
-The benchmark source is
-`app/src/jmh/java/de/regelsuche/benchmark/ExpressionIdentityBenchmarks.java`.
+The temporary benchmark implementation was captured in the referenced commit and
+removed after the measurement so that architecture scaffolding does not permanently
+increase the project's AI-context and maintenance budget. This document preserves
+the inputs, measurements and conclusions needed for the ADR.
 
 ## Results
 
@@ -56,7 +59,7 @@ The spike also established deterministic object-count facts:
 
 ## Limits
 
-- The factory is a minimal `HashMap`-based prototype, not a tuned production pool.
+- The factory was a minimal `HashMap`-based prototype, not a tuned production pool.
 - The evaluator corpus intentionally contains repeated pure subexpressions; other
   expression distributions will produce smaller gains.
 - The benchmark does not measure source-span storage, serialization, e-graph
