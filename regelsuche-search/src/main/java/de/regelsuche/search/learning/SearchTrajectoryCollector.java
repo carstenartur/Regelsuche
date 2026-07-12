@@ -11,8 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -70,21 +68,18 @@ public final class SearchTrajectoryCollector implements SearchObserver {
         String taskAlpha = pairFingerprint(
             root.alphaShapeHash(), target == null ? "" : target.alphaShapeHash(), "task-alpha-v1:");
 
-        Map<String, ExpressionFingerprint> byCanonicalHash = stateFingerprints(canonicalizer);
-        Map<String, Integer> scoreByCanonicalHash = stateScores();
         Map<String, List<String>> applicableByParent = applicableRulesByParent();
-        Set<String> selectedStates = selectedStateHashes(result, canonicalizer);
-        Set<TransitionKey> selectedTransitions = selectedTransitions(result, canonicalizer);
+        Set<String> selectedStates = selectedStateSyntaxHashes(result);
+        Set<TransitionKey> selectedTransitions = selectedTransitions(result);
 
         List<SearchTrajectoryRecord> records = events.stream()
             .map(event -> toRecord(
                 event,
                 context,
+                problem,
                 result,
                 canonicalizer,
                 target,
-                byCanonicalHash,
-                scoreByCanonicalHash,
                 applicableByParent,
                 selectedStates,
                 selectedTransitions))
@@ -103,35 +98,31 @@ public final class SearchTrajectoryCollector implements SearchObserver {
     private SearchTrajectoryRecord toRecord(
         SearchEvent event,
         SearchTrajectoryContext context,
+        SearchProblem problem,
         GoalSearchResult result,
         ExpressionCanonicalizer canonicalizer,
         ExpressionFingerprint target,
-        Map<String, ExpressionFingerprint> byCanonicalHash,
-        Map<String, Integer> scoreByCanonicalHash,
         Map<String, List<String>> applicableByParent,
         Set<String> selectedStates,
         Set<TransitionKey> selectedTransitions
     ) {
         ExpressionFingerprint expression = ExpressionFingerprint.of(
             event.expression(), canonicalizer);
-        ExpressionFingerprint parent = event.parentCanonicalHash().isBlank()
+        ExpressionFingerprint parent = event.parentExpression().isBlank()
             ? null
-            : byCanonicalHash.getOrDefault(
-                event.parentCanonicalHash(),
-                ExpressionFingerprint.unknown(event.parentCanonicalHash()));
-        String parentCanonicalHash = event.parentCanonicalHash();
-        String parentValueHash = parent == null ? "" : parent.valueHash();
+            : ExpressionFingerprint.of(event.parentExpression(), canonicalizer);
         boolean transformation = event.type() == SearchEventType.TRANSFORMATION_GENERATED;
+        String eventSyntax = syntaxIdentity(event.expression());
+        String parentSyntax = syntaxIdentity(event.parentExpression());
         boolean selected = transformation
             ? selectedTransitions.contains(new TransitionKey(
-                parentValueHash, expression.valueHash(), event.ruleId()))
-            : selectedStates.contains(expression.valueHash());
-        List<String> applicable = transformation
-            ? applicableByParent.getOrDefault(parentCanonicalHash, List.of())
-            : applicableByParent.getOrDefault(event.canonicalHash(), List.of());
-        int parentScore = parentCanonicalHash.isBlank()
+                parentSyntax, eventSyntax, event.ruleId(), event.depth()))
+            : selectedStates.contains(eventSyntax);
+        String applicableKey = transformation ? parentSyntax : eventSyntax;
+        List<String> applicable = applicableByParent.getOrDefault(applicableKey, List.of());
+        int parentScore = event.parentExpression().isBlank()
             ? event.score()
-            : scoreByCanonicalHash.getOrDefault(parentCanonicalHash, event.score());
+            : problem.scorer().score(event.parentExpression()).weightedTotal();
 
         return new SearchTrajectoryRecord(
             SearchTrajectoryRecord.SCHEMA,
@@ -162,40 +153,14 @@ public final class SearchTrajectoryCollector implements SearchObserver {
             result.status());
     }
 
-    private Map<String, ExpressionFingerprint> stateFingerprints(
-        ExpressionCanonicalizer canonicalizer
-    ) {
-        Map<String, ExpressionFingerprint> result = new LinkedHashMap<>();
-        for (SearchEvent event : events) {
-            if (event.type() != SearchEventType.TRANSFORMATION_GENERATED
-                    && !event.canonicalHash().isBlank()) {
-                result.putIfAbsent(
-                    event.canonicalHash(),
-                    ExpressionFingerprint.of(event.expression(), canonicalizer));
-            }
-        }
-        return Map.copyOf(result);
-    }
-
-    private Map<String, Integer> stateScores() {
-        Map<String, Integer> result = new LinkedHashMap<>();
-        for (SearchEvent event : events) {
-            if (event.type() != SearchEventType.TRANSFORMATION_GENERATED
-                    && !event.canonicalHash().isBlank()) {
-                result.putIfAbsent(event.canonicalHash(), event.score());
-            }
-        }
-        return Map.copyOf(result);
-    }
-
     private Map<String, List<String>> applicableRulesByParent() {
         Map<String, Set<String>> mutable = new LinkedHashMap<>();
         for (SearchEvent event : events) {
             if (event.type() == SearchEventType.TRANSFORMATION_GENERATED
-                    && !event.parentCanonicalHash().isBlank()
+                    && !event.parentExpression().isBlank()
                     && !event.ruleId().isBlank()) {
                 mutable.computeIfAbsent(
-                    event.parentCanonicalHash(), ignored -> new LinkedHashSet<>())
+                    syntaxIdentity(event.parentExpression()), ignored -> new LinkedHashSet<>())
                     .add(event.ruleId());
             }
         }
@@ -205,24 +170,17 @@ public final class SearchTrajectoryCollector implements SearchObserver {
         return Map.copyOf(result);
     }
 
-    private Set<String> selectedStateHashes(
-        GoalSearchResult result,
-        ExpressionCanonicalizer canonicalizer
-    ) {
+    private Set<String> selectedStateSyntaxHashes(GoalSearchResult result) {
         SearchState selected = result.reachedState();
         if (selected == null) {
             return Set.of();
         }
         Set<String> hashes = new LinkedHashSet<>();
-        selected.path().forEach(expression -> hashes.add(
-            ExpressionFingerprint.of(expression, canonicalizer).valueHash()));
+        selected.path().forEach(expression -> hashes.add(syntaxIdentity(expression)));
         return Set.copyOf(hashes);
     }
 
-    private Set<TransitionKey> selectedTransitions(
-        GoalSearchResult result,
-        ExpressionCanonicalizer canonicalizer
-    ) {
+    private Set<TransitionKey> selectedTransitions(GoalSearchResult result) {
         SearchState selected = result.reachedState();
         if (selected == null || selected.path().size() < 2) {
             return Set.of();
@@ -232,14 +190,21 @@ public final class SearchTrajectoryCollector implements SearchObserver {
             selected.appliedRuleIds().size(),
             selected.path().size() - 1);
         for (int index = 0; index < count; index++) {
-            String parent = ExpressionFingerprint.of(
-                selected.path().get(index), canonicalizer).valueHash();
-            String child = ExpressionFingerprint.of(
-                selected.path().get(index + 1), canonicalizer).valueHash();
             transitions.add(new TransitionKey(
-                parent, child, selected.appliedRuleIds().get(index)));
+                syntaxIdentity(selected.path().get(index)),
+                syntaxIdentity(selected.path().get(index + 1)),
+                selected.appliedRuleIds().get(index),
+                index + 1));
         }
         return Set.copyOf(transitions);
+    }
+
+    private static String syntaxIdentity(String expression) {
+        return "syntax-transition-v1:" + sha256(normalize(expression));
+    }
+
+    private static String normalize(String expression) {
+        return expression == null ? "" : expression.trim().replaceAll("\\s+", " ");
     }
 
     private static String pairFingerprint(
@@ -260,6 +225,11 @@ public final class SearchTrajectoryCollector implements SearchObserver {
         }
     }
 
-    private record TransitionKey(String parentValueHash, String childValueHash, String ruleId) {
+    private record TransitionKey(
+        String parentSyntaxHash,
+        String childSyntaxHash,
+        String ruleId,
+        int depth
+    ) {
     }
 }
