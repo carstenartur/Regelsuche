@@ -2,6 +2,7 @@ package de.regelsuche.search.strategy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
@@ -44,6 +45,8 @@ class BestFirstSearchTelemetryTest {
         assertTrue(observer.events().stream().anyMatch(event -> event.type() == SearchEventType.STATE_ENQUEUED));
         assertTrue(observer.events().stream().anyMatch(event -> event.type() == SearchEventType.STATE_PRUNED_DEPTH));
         assertTrue(observer.events().stream().anyMatch(event -> event.type() == SearchEventType.STATE_PRUNED_BUDGET));
+        assertTrue(states.stream().allMatch(
+            state -> state.canonicalHash().startsWith(BestFirstSearchStrategy.ValueIdentitySession.HASH_PREFIX)));
         SearchEvent budgetEvent = observer.events().stream()
             .filter(event -> event.type() == SearchEventType.STATE_PRUNED_BUDGET)
             .findFirst()
@@ -68,6 +71,49 @@ class BestFirstSearchTelemetryTest {
     }
 
     @Test
+    void valueIdentitySessionCollapsesCanonicalVariantsAndCachesRepeatedInput() {
+        ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+        try (BestFirstSearchStrategy.ValueIdentitySession identity =
+                new BestFirstSearchStrategy.ValueIdentitySession(canonicalizer)) {
+            String first = identity.valueHash("(a + b) + c");
+            String equivalent = identity.valueHash("c + a + b");
+
+            assertEquals(first, equivalent);
+            assertTrue(first.startsWith(BestFirstSearchStrategy.ValueIdentitySession.HASH_PREFIX));
+            assertNotEquals(canonicalizer.stableHash("(a + b) + c"), first);
+            assertEquals(2, identity.cacheMisses());
+            assertEquals(0, identity.cacheHits());
+            assertEquals(2, identity.cachedExpressionCount());
+            assertTrue(identity.internedValueCount() >= 4);
+
+            assertEquals(equivalent, identity.valueHash("c + a + b"));
+            assertEquals(1, identity.cacheHits());
+            assertEquals(2, identity.cacheMisses());
+        }
+    }
+
+    @Test
+    void searchWithoutMemoryDoesNotComputeLegacyHashes() {
+        ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer() {
+            @Override
+            public String stableHash(String expression) {
+                throw new AssertionError("legacy hashing must be skipped when search memory is disabled");
+            }
+        };
+        SearchProblem problem = new SearchProblem(
+            "x",
+            new KnownStateTransformationEngine(),
+            new ExpressionScorer(),
+            canonicalizer,
+            new SearchHeuristic(1, 8, 1, 2, 4, 8)
+        );
+
+        List<SearchState> states = new BestFirstSearchStrategy().search(problem);
+
+        assertEquals(List.of("x", "a"), states.stream().map(SearchState::expression).toList());
+    }
+
+    @Test
     void transpositionPrunedStatesAreNotReportedAsExploredResults() {
         RecordingObserver observer = new RecordingObserver();
         ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
@@ -86,10 +132,19 @@ class BestFirstSearchTelemetryTest {
 
         assertEquals(List.of("x"), states.stream().map(SearchState::expression).toList());
         assertFalse(memory.decisions().isEmpty());
-        assertTrue(observer.events().stream().anyMatch(event -> event.type() == SearchEventType.STATE_PRUNED_TRANSPOSITION));
+        assertTrue(observer.events().stream().anyMatch(
+            event -> event.type() == SearchEventType.STATE_PRUNED_TRANSPOSITION));
+        try (BestFirstSearchStrategy.ValueIdentitySession identity =
+                new BestFirstSearchStrategy.ValueIdentitySession(canonicalizer)) {
+            assertTrue(memory.table().lookup(identity.valueHash("a")).isPresent(),
+                "legacy entry must be lazily recorded under the ValueKey-derived identity");
+        }
     }
 
-    private void rememberKnownAState(SearchMemory memory, ExpressionCanonicalizer canonicalizer, ExpressionScorer scorer) {
+    private void rememberKnownAState(
+            SearchMemory memory,
+            ExpressionCanonicalizer canonicalizer,
+            ExpressionScorer scorer) {
         String expression = "a";
         String hash = canonicalizer.stableHash(expression);
         memory.table().record(new TranspositionEntry(

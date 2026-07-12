@@ -1,40 +1,58 @@
 package de.regelsuche.search.strategy;
 
+import de.regelsuche.ast.Expr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.value.ExprValueFactory;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Set;
 
 public class BestFirstSearchStrategy implements SearchStrategy {
     @Override
     public List<SearchState> search(SearchProblem problem) {
-        SearchState rootState = createRootState(problem);
-        SearchFrame frame = createFrame(problem);
-        frame.frontier().add(rootState);
-        frame.telemetry().searchStarted(rootState, frame.frontier().size(), frame.visited().size());
+        try (ValueIdentitySession identity = new ValueIdentitySession(problem.canonicalizer())) {
+            SearchState rootState = createRootState(problem, identity);
+            SearchFrame frame = createFrame(problem, identity);
+            frame.frontier().add(rootState);
+            frame.telemetry().searchStarted(rootState, frame.frontier().size(), frame.visited().size());
 
-        while (shouldContinue(problem, frame)) {
-            processNextState(problem, frame);
+            while (shouldContinue(problem, frame)) {
+                processNextState(problem, frame);
+            }
+            frame.telemetry().searchFinished(
+                rootState,
+                frame.frontier().size(),
+                frame.visited().size(),
+                frame.explored().size());
+            return frame.explored();
         }
-        frame.telemetry().searchFinished(rootState, frame.frontier().size(), frame.visited().size(), frame.explored().size());
-        return frame.explored();
     }
 
-    private SearchFrame createFrame(SearchProblem problem) {
+    private SearchFrame createFrame(SearchProblem problem, ValueIdentitySession identity) {
         return new SearchFrame(
             new PriorityQueue<>(priorityComparator(problem)),
             new ArrayList<>(),
             new HashSet<>(),
-            SearchTelemetry.forProblem(problem)
+            SearchTelemetry.forProblem(problem),
+            identity
         );
     }
 
-    private SearchState createRootState(SearchProblem problem) {
+    private SearchState createRootState(SearchProblem problem, ValueIdentitySession identity) {
         String root = problem.rootExpression().trim().replaceAll("\\s+", " ");
         ExpressionScore rootScore = problem.scorer().score(root);
         return new SearchState(
@@ -45,7 +63,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             List.of(),
             Set.of(),
             0,
-            problem.canonicalizer().stableHash(root),
+            identity.valueHash(root),
             null,
             null,
             RewriteKind.NORMALIZE,
@@ -94,8 +112,15 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     }
 
     private boolean pruneByTransposition(SearchProblem problem, SearchState current, SearchFrame frame) {
-        if (current.depth() == 0 || TranspositionGate.evaluate(problem.memory(), current,
-            current.canonicalHash() + "#" + current.depth()) != TranspositionGate.Verdict.PRUNE) {
+        if (current.depth() == 0 || problem.memory() == null) {
+            return false;
+        }
+        if (TranspositionGate.evaluate(
+                problem.memory(),
+                current,
+                current.canonicalHash() + "#" + current.depth(),
+                List.of(frame.identity().legacyHash(current.expression())))
+                != TranspositionGate.Verdict.PRUNE) {
             return false;
         }
         frame.telemetry().statePrunedTransposition(current, frame.frontier().size(), frame.visited().size());
@@ -112,7 +137,11 @@ public class BestFirstSearchStrategy implements SearchStrategy {
 
     private void expandState(SearchProblem problem, SearchState current, SearchFrame frame) {
         List<Transformation> transformations = sortedTransformations(problem, current);
-        frame.telemetry().stateExpanded(current, frame.frontier().size(), frame.visited().size(), transformations.size());
+        frame.telemetry().stateExpanded(
+            current,
+            frame.frontier().size(),
+            frame.visited().size(),
+            transformations.size());
         int generated = 0;
         for (Transformation transformation : transformations) {
             if (candidateBudgetReached(problem, current, frame, generated)) {
@@ -142,7 +171,11 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         if (generated < problem.heuristic().maxCandidatesPerState()) {
             return false;
         }
-        frame.telemetry().statePrunedBudget(current, frame.frontier().size(), frame.visited().size(), generated);
+        frame.telemetry().statePrunedBudget(
+            current,
+            frame.frontier().size(),
+            frame.visited().size(),
+            generated);
         return true;
     }
 
@@ -153,20 +186,38 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         SearchFrame frame,
         int generated
     ) {
-        frame.telemetry().transformationGenerated(current, transformation, frame.frontier().size(), frame.visited().size(), generated);
+        frame.telemetry().transformationGenerated(
+            current,
+            transformation,
+            frame.frontier().size(),
+            frame.visited().size(),
+            generated);
         String skipReason = skipReason(problem, current, transformation);
         if (!skipReason.isBlank()) {
-            frame.telemetry().transformationSkipped(current, transformation, frame.frontier().size(), frame.visited().size(), generated,
+            frame.telemetry().transformationSkipped(
+                current,
+                transformation,
+                frame.frontier().size(),
+                frame.visited().size(),
+                generated,
                 skipReason);
             return false;
         }
-        SearchState nextState = createNextState(problem, current, transformation);
+        SearchState nextState = createNextState(problem, current, transformation, frame.identity());
         if (frame.visited().contains(stateKey(nextState))) {
-            frame.telemetry().statePrunedDuplicate(nextState, frame.frontier().size(), frame.visited().size(), generated);
+            frame.telemetry().statePrunedDuplicate(
+                nextState,
+                frame.frontier().size(),
+                frame.visited().size(),
+                generated);
             return false;
         }
         frame.frontier().add(nextState);
-        frame.telemetry().stateEnqueued(nextState, frame.frontier().size(), frame.visited().size(), generated + 1);
+        frame.telemetry().stateEnqueued(
+            nextState,
+            frame.frontier().size(),
+            frame.visited().size(),
+            generated + 1);
         return true;
     }
 
@@ -184,7 +235,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return "";
     }
 
-    private SearchState createNextState(SearchProblem problem, SearchState current, Transformation transformation) {
+    private SearchState createNextState(
+        SearchProblem problem,
+        SearchState current,
+        Transformation transformation,
+        ValueIdentitySession identity
+    ) {
         String nextExpression = transformation.transformedExpression();
         ExpressionScore nextScore = problem.scorer().score(nextExpression);
         int improvement = current.score().weightedTotal() - nextScore.weightedTotal();
@@ -196,7 +252,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             appliedRuleIdsWith(current.appliedRuleIds(), transformation.rule()),
             appliedApplicationsWith(current.appliedRuleApplications(), transformation.applicationKey()),
             expandedSteps(current, transformation),
-            problem.canonicalizer().stableHash(nextExpression),
+            identity.valueHash(nextExpression),
             current.expression(),
             transformation.rule(),
             transformation.kind(),
@@ -205,7 +261,9 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             transformation.equivalencePreservingByConstruction(),
             improvement,
             rewriteKindsWith(current.appliedRuleKinds(), transformation.kind()),
-            equivalenceFlagsWith(current.equivalencePreservingFlags(), transformation.equivalencePreservingByConstruction()),
+            equivalenceFlagsWith(
+                current.equivalencePreservingFlags(),
+                transformation.equivalencePreservingByConstruction()),
             assumptionsWith(current.assumptions(), transformation.assumptions())
         );
     }
@@ -291,7 +349,90 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         PriorityQueue<SearchState> frontier,
         List<SearchState> explored,
         Set<String> visited,
-        SearchTelemetry telemetry
+        SearchTelemetry telemetry,
+        ValueIdentitySession identity
     ) {
+    }
+
+    /** One bounded owner for all mathematical values encountered by one search. */
+    static final class ValueIdentitySession implements AutoCloseable {
+        static final String HASH_PREFIX = "value-v1:";
+        static final String LEGACY_FALLBACK_PREFIX = "legacy-v1:";
+
+        private final ExpressionCanonicalizer canonicalizer;
+        private final ExpressionParser parser = new ExpressionParser();
+        private final ExprValueFactory factory = new ExprValueFactory();
+        private final Map<String, String> valueHashesByExpression = new LinkedHashMap<>();
+        private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>();
+        private int cacheHits;
+        private int cacheMisses;
+
+        ValueIdentitySession(ExpressionCanonicalizer canonicalizer) {
+            this.canonicalizer = Objects.requireNonNull(canonicalizer, "canonicalizer");
+        }
+
+        String valueHash(String expression) {
+            String normalized = normalize(expression);
+            String existing = valueHashesByExpression.get(normalized);
+            if (existing != null) {
+                cacheHits++;
+                return existing;
+            }
+            cacheMisses++;
+            String hash;
+            try {
+                Expr parsed = parser.parseTerm(normalized);
+                Expr canonical = canonicalizer.canonicalize(parsed);
+                String encodedValueKey = factory.fromExpr(canonical).key().encoded();
+                hash = HASH_PREFIX + sha256(encodedValueKey);
+            } catch (IllegalArgumentException exception) {
+                hash = LEGACY_FALLBACK_PREFIX + legacyHash(normalized);
+            }
+            valueHashesByExpression.put(normalized, hash);
+            return hash;
+        }
+
+        String legacyHash(String expression) {
+            String normalized = normalize(expression);
+            return legacyHashesByExpression.computeIfAbsent(normalized, canonicalizer::stableHash);
+        }
+
+        int cacheHits() {
+            return cacheHits;
+        }
+
+        int cacheMisses() {
+            return cacheMisses;
+        }
+
+        int cachedExpressionCount() {
+            return valueHashesByExpression.size();
+        }
+
+        int internedValueCount() {
+            return factory.size();
+        }
+
+        @Override
+        public void close() {
+            valueHashesByExpression.clear();
+            legacyHashesByExpression.clear();
+            factory.close();
+        }
+
+        private static String normalize(String expression) {
+            return Objects.requireNonNull(expression, "expression")
+                .trim()
+                .replaceAll("\\s+", " ");
+        }
+
+        private static String sha256(String value) {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+            } catch (NoSuchAlgorithmException exception) {
+                throw new IllegalStateException("SHA-256 unavailable", exception);
+            }
+        }
     }
 }
