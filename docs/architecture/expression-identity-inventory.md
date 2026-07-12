@@ -1,7 +1,7 @@
 # Expression identity inventory
 
-This inventory supports the decision process in ADR #242. It classifies current
-identity mechanisms without treating any of them as the final architecture.
+This inventory records the current identity mechanisms and the migration constraints
+used to accept ADR #242.
 
 ## Current baseline
 
@@ -90,14 +90,14 @@ retaining each concrete occurrence.
 
 The current implementation uses formatted text for both `canonicalValue` and
 `originalValue`; therefore the split is not yet backed by a mathematical value
-object. Nevertheless, its shape closely matches the proposed use graph:
+object. Nevertheless, its shape closely matches the selected occurrence index:
 
 - `TermOccurrence` is an occurrence record;
 - `canonicalValue` is a provisional value key;
 - `countsByCanonical` is a multiplicity/index view;
 - `path` preserves local-rewrite addressability.
 
-Architectural implication: the chosen architecture can evolve this existing
+Architectural implication: the accepted architecture can evolve this existing
 concept rather than introducing an unrelated projection subsystem.
 
 Classification: **occurrence index keyed by provisional string value identity**.
@@ -199,35 +199,30 @@ Classification: **rule-specific matching equivalence**.
   occurrence records.
 - Evolve `TermOccurrenceIndex` toward a typed use index instead of creating an
   unrelated, manually synchronized projection graph.
-- Compare scoped interning with no interning; do not begin with an unbounded global
-  pool.
+- Do not begin with an unbounded global pool.
 - Require stable structural value keys even if `==` becomes a factory-scoped fast
   path.
 - Keep e-classes as a broader equivalence layer above ordinary value identity.
 
-## Executable characterization and spikes
+## Executable characterization and completed spike
 
-`ExpressionIdentityCharacterizationTest` records the current behaviour:
+`ExpressionIdentityCharacterizationTest` records the baseline and the central set
+semantics:
 
 - equal variables are structurally equal but not interned;
 - repeated written variables are distinct allocations;
 - plugin metadata distinguishes those allocations by reference;
+- a normal `Set<Use>` retains two occurrence IDs that reference one equal value;
 - grouping and order affect `Expr.equals`;
 - canonical hashes remove AC differences while retaining multiplicity;
-- `BinaryExpr` permits a manually shared child, proving that the Java object graph
-  can be a DAG even though the parser currently creates a tree;
+- `BinaryExpr` permits a manually shared child;
 - record equality cannot distinguish one shared child from two equal occurrences.
 
-`ExpressionIdentitySpikeTest` compares the candidate architectures and establishes:
+A bounded temporary spike compared a dual semantic tree with scoped hash-consing.
+Its conclusions and JMH measurements are retained in
+`expression-identity-benchmark-results.md`; the large temporary test implementation
+was removed after the decision to avoid turning architecture scaffolding into a
+permanent test API.
 
-- both can implement AC equality;
-- only scoped interning gives equal values one reference identity;
-- a normal `Set<Occurrence>` preserves duplicate uses of one shared value;
-- the value layer still needs multiplicity semantics independent of occurrence IDs;
-- an interned DAG shares repeated subexpressions and supports occurrence-local
-  replacement;
-- stable structural keys preserve cross-scope and persistence identity;
-- DAG evaluation can compute one repeated pure value once.
-
-These tests are characterization and architecture evidence. They do not yet migrate
-production rules.
+The maintained JMH benchmark continues to cover projection cost and repeated pure
+subexpression evaluation. Production migration has not begun in this ADR.
