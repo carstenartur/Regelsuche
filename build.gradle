@@ -17,7 +17,7 @@ buildscript {
 
     dependencies {
         if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
-            classpath 'org.aiknowledge:ai-knowledge-gradle-plugin:0.1.5'
+            classpath 'org.aiknowledge:ai-knowledge-gradle-plugin:0.1.6'
         }
     }
 }
@@ -32,14 +32,12 @@ if (aiKnowledgeEnabled) {
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
 
-        // Extractor 0.1.5 replaces the legacy repository-size debt with a
-        // normalized 0–100 capability-working-set metric. Keep the first run
-        // permissive so CI records the new baseline; this value is tightened in
-        // the same PR after inspecting normalizedContextDebt and contextFootprint.
+        // Extractor 0.1.6 measures a normalized 0–100 linked-capability working
+        // set. Keep this probe permissive for one run, then replace it in this PR
+        // with a narrow margin above the measured Regelsuche baseline.
         maxCognitiveDebt = 100.0d
 
-        // Method-level gates are independent of the repository context metric.
-        // Retain the established bounds while the normalized footprint is calibrated.
+        // Method-level gates remain independent of the repository context metric.
         maxMethodCognitiveComplexity = 65
         maxMethodCyclomaticComplexity = 35
         maxAverageMethodCognitiveComplexity = 4.0d
