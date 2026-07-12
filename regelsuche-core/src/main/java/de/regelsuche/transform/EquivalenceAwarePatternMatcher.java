@@ -26,6 +26,7 @@ import java.util.TreeMap;
  */
 public final class EquivalenceAwarePatternMatcher {
     private static final int MAX_COMMUTATIVE_OPERANDS = 8;
+    private static final int MAX_BACKTRACKING_BRANCHES = 10_000;
     private static final double EPSILON = 1.0e-9;
 
     private EquivalenceAwarePatternMatcher() {
@@ -40,15 +41,19 @@ public final class EquivalenceAwarePatternMatcher {
         if (pattern == null || expression == null || bindings == null || profile == null) {
             throw new IllegalArgumentException("pattern, expression, bindings and profile are required");
         }
-        return matchInternal(pattern, expression, bindings, profile);
+        return matchInternal(pattern, expression, bindings, profile, new MatchBudget(MAX_BACKTRACKING_BRANCHES));
     }
 
     private static boolean matchInternal(
         PatternExpr pattern,
         Expr expression,
         Map<String, Expr> bindings,
-        RecognitionProfile profile
+        RecognitionProfile profile,
+        MatchBudget budget
     ) {
+        if (budget.exhausted()) {
+            return false;
+        }
         if (pattern instanceof PatternExpr.Placeholder placeholder) {
             Expr bound = bindings.get(placeholder.name());
             if (bound == null) {
@@ -74,7 +79,7 @@ public final class EquivalenceAwarePatternMatcher {
                 return false;
             }
             for (int i = 0; i < function.arguments().size(); i++) {
-                if (!matchInternal(function.arguments().get(i), functionExpr.arguments().get(i), bindings, profile)) {
+                if (!matchInternal(function.arguments().get(i), functionExpr.arguments().get(i), bindings, profile, budget)) {
                     return false;
                 }
             }
@@ -95,8 +100,8 @@ public final class EquivalenceAwarePatternMatcher {
             return false;
         }
         if (!profile.isAssociative(operation.operator())) {
-            return matchInternal(operation.left(), binaryExpr.left(), bindings, profile)
-                && matchInternal(operation.right(), binaryExpr.right(), bindings, profile);
+            return matchInternal(operation.left(), binaryExpr.left(), bindings, profile, budget)
+                && matchInternal(operation.right(), binaryExpr.right(), bindings, profile, budget);
         }
 
         List<PatternExpr> patternOperands = new ArrayList<>();
@@ -111,10 +116,10 @@ public final class EquivalenceAwarePatternMatcher {
                 return false;
             }
             patternOperands.sort(Comparator.comparingInt(EquivalenceAwarePatternMatcher::bindingPriority).reversed());
-            return matchCommutative(patternOperands, expressionOperands, 0, bindings, profile);
+            return matchCommutative(patternOperands, expressionOperands, 0, bindings, profile, budget);
         }
         for (int i = 0; i < patternOperands.size(); i++) {
-            if (!matchInternal(patternOperands.get(i), expressionOperands.get(i), bindings, profile)) {
+            if (!matchInternal(patternOperands.get(i), expressionOperands.get(i), bindings, profile, budget)) {
                 return false;
             }
         }
@@ -199,26 +204,56 @@ public final class EquivalenceAwarePatternMatcher {
         List<Expr> expressions,
         int patternIndex,
         Map<String, Expr> bindings,
-        RecognitionProfile profile
+        RecognitionProfile profile,
+        MatchBudget budget
     ) {
         if (patternIndex == patterns.size()) {
             return expressions.isEmpty();
         }
         PatternExpr pattern = patterns.get(patternIndex);
         for (int i = 0; i < expressions.size(); i++) {
+            Expr candidate = expressions.get(i);
+            if (!couldStructurallyMatch(pattern, candidate, profile) || !budget.tryBranch()) {
+                continue;
+            }
             Map<String, Expr> candidateBindings = new HashMap<>(bindings);
-            if (!matchInternal(pattern, expressions.get(i), candidateBindings, profile)) {
+            if (!matchInternal(pattern, candidate, candidateBindings, profile, budget)) {
                 continue;
             }
             List<Expr> remaining = new ArrayList<>(expressions);
             remaining.remove(i);
-            if (matchCommutative(patterns, remaining, patternIndex + 1, candidateBindings, profile)) {
+            if (matchCommutative(patterns, remaining, patternIndex + 1, candidateBindings, profile, budget)) {
                 bindings.clear();
                 bindings.putAll(candidateBindings);
                 return true;
             }
+            if (budget.exhausted()) {
+                return false;
+            }
         }
         return false;
+    }
+
+    private static boolean couldStructurallyMatch(PatternExpr pattern, Expr expression, RecognitionProfile profile) {
+        if (pattern instanceof PatternExpr.Placeholder) {
+            return true;
+        }
+        if (pattern instanceof PatternExpr.LiteralNumber) {
+            return expression instanceof NumberExpr || profile.inferAlgebraicBindings() && Monomial.from(expression).isPresent();
+        }
+        if (pattern instanceof PatternExpr.LiteralVariable) {
+            return expression instanceof VariableExpr;
+        }
+        if (pattern instanceof PatternExpr.Function function) {
+            return expression instanceof FunctionExpr candidate
+                && function.name().equals(candidate.name())
+                && function.arguments().size() == candidate.arguments().size();
+        }
+        PatternExpr.Operation operation = (PatternExpr.Operation) pattern;
+        if (profile.inferAlgebraicBindings() && operation.operator() == BinaryOperator.POW) {
+            return Monomial.from(expression).isPresent();
+        }
+        return expression instanceof BinaryExpr binary && binary.operator() == operation.operator();
     }
 
     private static void flattenPattern(PatternExpr pattern, BinaryOperator operator, List<PatternExpr> result) {
@@ -246,6 +281,26 @@ public final class EquivalenceAwarePatternMatcher {
 
     private static boolean nearlyEqual(double left, double right) {
         return Math.abs(left - right) <= EPSILON * Math.max(1.0, Math.max(Math.abs(left), Math.abs(right)));
+    }
+
+    private static final class MatchBudget {
+        private int remainingBranches;
+
+        private MatchBudget(int remainingBranches) {
+            this.remainingBranches = remainingBranches;
+        }
+
+        private boolean tryBranch() {
+            if (remainingBranches <= 0) {
+                return false;
+            }
+            remainingBranches--;
+            return true;
+        }
+
+        private boolean exhausted() {
+            return remainingBranches <= 0;
+        }
     }
 
     private record Monomial(double coefficient, Map<String, Integer> powers) {
