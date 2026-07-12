@@ -84,13 +84,13 @@ public final class HiddenRulePilotRuntimeCatalog {
                 new PositiveHoldout(
                     "p-003",
                     "(m + 1)^4 + 4*n^4",
-                    "((m + 1)^2 + 2*n^2 - 2*(m + 1)*n)"
-                        + " * ((m + 1)^2 + 2*n^2 + 2*(m + 1)*n)"),
+                    "((m + 1)^2 + 2*(m + 1)*n + 2*n^2)"
+                        + " * ((m + 1)^2 - 2*(m + 1)*n + 2*n^2)"),
                 new PositiveHoldout(
                     "p-004",
                     "sin(t)^4 + 4*z^4",
-                    "(sin(t)^2 + 2*z^2 - 2*sin(t)*z)"
-                        + " * (sin(t)^2 + 2*z^2 + 2*sin(t)*z)")),
+                    "(sin(t)^2 + 2*sin(t)*z + 2*z^2)"
+                        + " * (sin(t)^2 - 2*sin(t)*z + 2*z^2)")),
             List.of(
                 new NegativeHoldout("n-003", "x^4 + 3*y^4"),
                 new NegativeHoldout("n-004", "x^4 + 4*y^3")));
