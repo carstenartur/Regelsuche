@@ -9,6 +9,7 @@ import de.regelsuche.search.memory.SearchMemory;
 import de.regelsuche.search.telemetry.NoOpSearchObserver;
 import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.transform.TransformationEngine;
+import java.util.Objects;
 
 public record SearchProblem(
     String rootExpression,
@@ -18,11 +19,27 @@ public record SearchProblem(
     SearchHeuristic heuristic,
     SearchMemory memory,
     CostModel costModel,
-    SearchObserver observer
+    SearchObserver observer,
+    SearchTarget target
 ) {
-<span class="fc" id="L23">    public SearchProblem {</span>
-<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        observer = observer == null ? NoOpSearchObserver.INSTANCE : observer;</span>
-<span class="fc" id="L25">    }</span>
+<span class="fc" id="L25">    public SearchProblem {</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        observer = observer == null ? NoOpSearchObserver.INSTANCE : observer;</span>
+<span class="fc" id="L27">    }</span>
+
+    /** Backwards-compatible canonical constructor without a target. */
+    public SearchProblem(
+        String rootExpression,
+        TransformationEngine engine,
+        ExpressionScorer scorer,
+        ExpressionCanonicalizer canonicalizer,
+        SearchHeuristic heuristic,
+        SearchMemory memory,
+        CostModel costModel,
+        SearchObserver observer
+    ) {
+<span class="nc" id="L40">        this(rootExpression, engine, scorer, canonicalizer, heuristic,</span>
+            memory, costModel, observer, null);
+<span class="nc" id="L42">    }</span>
 
     /**
      * Backwards-compatible constructor without a search memory – the strategy
@@ -36,8 +53,9 @@ public record SearchProblem(
         ExpressionCanonicalizer canonicalizer,
         SearchHeuristic heuristic
     ) {
-<span class="fc" id="L39">        this(rootExpression, engine, scorer, canonicalizer, heuristic, null, null, NoOpSearchObserver.INSTANCE);</span>
-<span class="fc" id="L40">    }</span>
+<span class="fc" id="L56">        this(rootExpression, engine, scorer, canonicalizer, heuristic,</span>
+            null, null, NoOpSearchObserver.INSTANCE, null);
+<span class="fc" id="L58">    }</span>
 
     /**
      * Backwards-compatible constructor that preserves the pre-PR-3 API
@@ -53,8 +71,9 @@ public record SearchProblem(
         SearchHeuristic heuristic,
         SearchMemory memory
     ) {
-<span class="nc" id="L56">        this(rootExpression, engine, scorer, canonicalizer, heuristic, memory, null, NoOpSearchObserver.INSTANCE);</span>
-<span class="nc" id="L57">    }</span>
+<span class="nc" id="L74">        this(rootExpression, engine, scorer, canonicalizer, heuristic,</span>
+            memory, null, NoOpSearchObserver.INSTANCE, null);
+<span class="nc" id="L76">    }</span>
 
     /** Backwards-compatible constructor without runtime search telemetry. */
     public SearchProblem(
@@ -66,12 +85,14 @@ public record SearchProblem(
         SearchMemory memory,
         CostModel costModel
     ) {
-<span class="nc" id="L69">        this(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel, NoOpSearchObserver.INSTANCE);</span>
-<span class="nc" id="L70">    }</span>
+<span class="nc" id="L88">        this(rootExpression, engine, scorer, canonicalizer, heuristic,</span>
+            memory, costModel, NoOpSearchObserver.INSTANCE, null);
+<span class="nc" id="L90">    }</span>
 
     /** Returns this problem with {@code memory} attached. */
     public SearchProblem withMemory(SearchMemory memory) {
-<span class="fc" id="L74">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel, observer);</span>
+<span class="fc" id="L94">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer,</span>
+            heuristic, memory, costModel, observer, target);
     }
 
     /**
@@ -80,17 +101,88 @@ public record SearchProblem(
      * {@link de.regelsuche.scoring.ExpressionScore#weightedTotal()}.
      */
     public SearchProblem withCostModel(CostModel costModel) {
-<span class="fc" id="L83">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel, observer);</span>
+<span class="fc" id="L104">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer,</span>
+            heuristic, memory, costModel, observer, target);
     }
 
     /** Returns this problem with a runtime telemetry observer attached. */
     public SearchProblem withObserver(SearchObserver observer) {
-<span class="fc" id="L88">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer, heuristic, memory, costModel, observer);</span>
+<span class="fc" id="L110">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer,</span>
+            heuristic, memory, costModel, observer, target);
     }
 
-    /** Convenience: derive the cost model from the goal. */
+    /** Convenience: derive the cost model from the transformation objective. */
     public SearchProblem withGoal(TransformationGoal goal) {
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        return withCostModel(goal == null ? null : goal.defaultCostModel());</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        return withCostModel(goal == null ? null : goal.defaultCostModel());</span>
+    }
+
+    /** Adds a value-equivalent target with early termination enabled. */
+    public SearchProblem withTarget(String targetExpression) {
+<span class="fc" id="L121">        return withTarget(SearchTarget.valueEquivalent(targetExpression));</span>
+    }
+
+    /** Adds an explicit target specification. */
+    public SearchProblem withTarget(SearchTarget target) {
+<span class="fc" id="L126">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer,</span>
+<span class="fc" id="L127">            heuristic, memory, costModel, observer, Objects.requireNonNull(target, &quot;target&quot;));</span>
+    }
+
+    /** Removes target guidance while retaining all other settings. */
+    public SearchProblem withoutTarget() {
+<span class="nc" id="L132">        return new SearchProblem(rootExpression, engine, scorer, canonicalizer,</span>
+            heuristic, memory, costModel, observer, null);
+    }
+
+<span class="fc" id="L136">    public enum TargetRelation {</span>
+        /** Match the scoped canonical mathematical value, including AC laws. */
+<span class="fc" id="L138">        VALUE_EQUIVALENT,</span>
+        /** Match the whitespace-normalized syntax string exactly. */
+<span class="fc" id="L140">        SYNTAX_EXACT</span>
+    }
+
+    /**
+     * Optional target guidance. The distance weight influences ordering only;
+     * it is not mathematical evidence and never changes rule applicability.
+     */
+    public record SearchTarget(
+        String targetExpression,
+        TargetRelation relation,
+        int distanceWeight,
+        boolean stopWhenReached
+    ) {
+        public static final int DEFAULT_DISTANCE_WEIGHT = 8;
+
+<span class="fc" id="L155">        public SearchTarget {</span>
+<span class="fc" id="L156">            Objects.requireNonNull(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc" id="L157">            Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc" id="L158">            targetExpression = targetExpression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            if (targetExpression.isEmpty()) {</span>
+<span class="nc" id="L160">                throw new IllegalArgumentException(&quot;targetExpression must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (distanceWeight &lt; 0) {</span>
+<span class="nc" id="L163">                throw new IllegalArgumentException(&quot;distanceWeight must not be negative&quot;);</span>
+            }
+<span class="fc" id="L165">        }</span>
+
+        public static SearchTarget valueEquivalent(String expression) {
+<span class="fc" id="L168">            return new SearchTarget(</span>
+                expression, TargetRelation.VALUE_EQUIVALENT,
+                DEFAULT_DISTANCE_WEIGHT, true);
+        }
+
+        public static SearchTarget syntaxExact(String expression) {
+<span class="fc" id="L174">            return new SearchTarget(</span>
+                expression, TargetRelation.SYNTAX_EXACT,
+                DEFAULT_DISTANCE_WEIGHT, true);
+        }
+
+        public SearchTarget continueAfterReached() {
+<span class="nc" id="L180">            return new SearchTarget(targetExpression, relation, distanceWeight, false);</span>
+        }
+
+        public SearchTarget withDistanceWeight(int weight) {
+<span class="fc" id="L184">            return new SearchTarget(targetExpression, relation, weight, stopWhenReached);</span>
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

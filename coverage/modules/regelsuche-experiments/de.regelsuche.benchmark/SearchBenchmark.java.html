@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchBenchmark.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">SearchBenchmark.java</span></div><h1>SearchBenchmark.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
 
-import de.regelsuche.validation.CandidateProofStatus;
-
+import de.regelsuche.ast.Expr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
@@ -11,13 +10,22 @@ import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.search.strategy.SearchStrategy;
 import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.value.ExprValueFactory;
+import de.regelsuche.value.ExprValueFactory.AssociativeCommutativeValue;
+import de.regelsuche.value.ExprValueFactory.ExprValue;
+import de.regelsuche.value.ExprValueFactory.NumberValue;
+import de.regelsuche.value.ExprValueFactory.OrderedValue;
+import de.regelsuche.value.ExprValueFactory.ValueKey;
+import de.regelsuche.value.ExprValueFactory.VariableValue;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class SearchBenchmark {
-<span class="fc" id="L20">    private static final Map&lt;String, String&gt; EXPECTED_RESULTS = Map.of(</span>
+<span class="fc" id="L28">    private static final Map&lt;String, String&gt; EXPECTED_RESULTS = Map.of(</span>
         &quot;x + 0&quot;, &quot;x&quot;,
         &quot;x * 1&quot;, &quot;x&quot;,
         &quot;x * 0&quot;, &quot;0&quot;
@@ -28,123 +36,329 @@ public class SearchBenchmark {
     private final ExpressionCanonicalizer canonicalizer;
     private final SearchHeuristic heuristic;
 
-<span class="fc" id="L31">    public SearchBenchmark(TransformationEngine engine, SearchHeuristic heuristic) {</span>
-<span class="fc" id="L32">        this.engine = engine;</span>
-<span class="fc" id="L33">        this.heuristic = heuristic;</span>
-<span class="fc" id="L34">        this.scorer = new ExpressionScorer();</span>
-<span class="fc" id="L35">        this.canonicalizer = new ExpressionCanonicalizer();</span>
-<span class="fc" id="L36">    }</span>
+<span class="fc" id="L39">    public SearchBenchmark(TransformationEngine engine, SearchHeuristic heuristic) {</span>
+<span class="fc" id="L40">        this.engine = engine;</span>
+<span class="fc" id="L41">        this.heuristic = heuristic;</span>
+<span class="fc" id="L42">        this.scorer = new ExpressionScorer();</span>
+<span class="fc" id="L43">        this.canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L44">    }</span>
 
     public List&lt;SearchBenchmarkResult&gt; run(List&lt;String&gt; expressions, List&lt;NamedSearchStrategy&gt; strategies) {
-<span class="fc" id="L39">        List&lt;SearchBenchmarkResult&gt; results = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (String expression : expressions) {</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">            for (NamedSearchStrategy strategy : strategies) {</span>
-<span class="fc" id="L42">                long startedNanos = System.nanoTime();</span>
-<span class="fc" id="L43">                SearchMemory memory = new SearchMemory();</span>
-<span class="fc" id="L44">                List&lt;SearchState&gt; states = strategy.strategy().search(new SearchProblem(</span>
+<span class="fc" id="L47">        List&lt;SearchBenchmarkResult&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (String expression : expressions) {</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            for (NamedSearchStrategy strategy : strategies) {</span>
+<span class="fc" id="L50">                long startedNanos = System.nanoTime();</span>
+<span class="fc" id="L51">                SearchMemory memory = new SearchMemory();</span>
+<span class="fc" id="L52">                List&lt;SearchState&gt; states = strategy.strategy().search(new SearchProblem(</span>
                     expression,
                     engine,
                     scorer,
                     canonicalizer,
                     heuristic
-<span class="fc" id="L50">                ).withMemory(memory));</span>
-<span class="fc" id="L51">                long elapsedMillis = (System.nanoTime() - startedNanos) / 1_000_000L;</span>
-<span class="fc" id="L52">                int bestImprovement = states.stream().mapToInt(SearchState::improvement).max().orElse(0);</span>
-<span class="fc" id="L53">                SearchState bestState = states.stream()</span>
-<span class="fc" id="L54">                    .max(Comparator.comparingInt(SearchState::improvement))</span>
-<span class="fc" id="L55">                    .orElse(null);</span>
-<span class="fc" id="L56">                int shortestImprovingDepth = states.stream()</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">                    .filter(state -&gt; state.improvement() &gt; 0)</span>
-<span class="fc" id="L58">                    .map(SearchState::depth)</span>
-<span class="fc" id="L59">                    .min(Comparator.naturalOrder())</span>
-<span class="fc" id="L60">                    .orElse(-1);</span>
-<span class="fc" id="L61">                int expandedSteps = states.stream().mapToInt(SearchState::expandedStepCount).max().orElse(0);</span>
-<span class="fc" id="L62">                int distinctRules = (int) states.stream()</span>
-<span class="fc" id="L63">                    .flatMap(state -&gt; state.appliedRuleIds().stream())</span>
-<span class="fc" id="L64">                    .distinct()</span>
-<span class="fc" id="L65">                    .count();</span>
-                // The bare benchmark only runs the search; it does not validate
-                // identities formally. An improving path corresponds to a
-                // concrete equivalent expression -&gt; VALIDATED_BY_EXAMPLES.
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                de.regelsuche.validation.CandidateProofStatus proofStatus = bestImprovement &gt; 0</span>
-<span class="fc" id="L70">                    ? de.regelsuche.validation.CandidateProofStatus.VALIDATED_BY_EXAMPLES</span>
-<span class="pc" id="L71">                    : de.regelsuche.validation.CandidateProofStatus.OBSERVED;</span>
-                // Quality metrics — derived from the same `states` traversal
-                // so adding them carries no extra search cost.
-<span class="fc" id="L74">                boolean learnedRuleUsed = states.stream()</span>
-<span class="fc" id="L75">                    .flatMap(state -&gt; state.appliedRuleIds().stream())</span>
-<span class="pc bpc" id="L76" title="3 of 6 branches missed.">                    .anyMatch(id -&gt; id != null &amp;&amp; (id.startsWith(&quot;learned-&quot;) || id.startsWith(&quot;macro-&quot;)));</span>
-<span class="fc" id="L77">                int eGraphClasses = 0;</span>
-<span class="fc" id="L78">                int eGraphNodes = 0;</span>
-<span class="fc" id="L79">                double saturationSavings = 0.0;</span>
-<span class="fc" id="L80">                long classesScanned = 0L;</span>
-<span class="fc" id="L81">                long nodesScanned = 0L;</span>
-<span class="fc" id="L82">                long candidateClassesSkipped = 0L;</span>
-<span class="fc" id="L83">                long matchesFound = 0L;</span>
-<span class="fc" id="L84">                long matcherCacheHits = 0L;</span>
-<span class="fc" id="L85">                long matcherCacheMisses = 0L;</span>
-<span class="fc" id="L86">                int saturationIterations = 0;</span>
-<span class="fc" id="L87">                int rulesFired = 0;</span>
-<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (strategy.strategy() instanceof de.regelsuche.search.strategy.EqualitySaturationStrategy es</span>
-<span class="nc bnc" id="L89" title="All 2 branches missed.">                        &amp;&amp; es.lastStats() != null) {</span>
-<span class="nc" id="L90">                    var stats = es.lastStats();</span>
-<span class="nc" id="L91">                    eGraphClasses = stats.eclasses();</span>
-<span class="nc" id="L92">                    eGraphNodes = stats.enodes();</span>
-<span class="nc" id="L93">                    int applications = stats.totalApplications();</span>
-<span class="nc bnc" id="L94" title="All 2 branches missed.">                    saturationSavings = applications == 0</span>
-<span class="nc" id="L95">                        ? 0.0</span>
-<span class="nc" id="L96">                        : stats.merges() / (double) applications;</span>
-<span class="nc" id="L97">                    classesScanned = stats.classesScanned();</span>
-<span class="nc" id="L98">                    nodesScanned = stats.nodesScanned();</span>
-<span class="nc" id="L99">                    candidateClassesSkipped = stats.candidateClassesSkipped();</span>
-<span class="nc" id="L100">                    matchesFound = stats.matchesFound();</span>
-<span class="nc" id="L101">                    matcherCacheHits = stats.matcherCacheHits();</span>
-<span class="nc" id="L102">                    matcherCacheMisses = stats.matcherCacheMisses();</span>
-<span class="nc" id="L103">                    saturationIterations = stats.saturationIterations();</span>
-<span class="nc" id="L104">                    rulesFired = stats.rulesFired();</span>
+<span class="fc" id="L58">                ).withMemory(memory));</span>
+<span class="fc" id="L59">                long elapsedMillis = (System.nanoTime() - startedNanos) / 1_000_000L;</span>
+<span class="fc" id="L60">                int bestImprovement = states.stream().mapToInt(SearchState::improvement).max().orElse(0);</span>
+<span class="fc" id="L61">                SearchState bestState = states.stream()</span>
+<span class="fc" id="L62">                    .max(Comparator.comparingInt(SearchState::improvement))</span>
+<span class="fc" id="L63">                    .orElse(null);</span>
+<span class="fc" id="L64">                int shortestImprovingDepth = states.stream()</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                    .filter(state -&gt; state.improvement() &gt; 0)</span>
+<span class="fc" id="L66">                    .map(SearchState::depth)</span>
+<span class="fc" id="L67">                    .min(Comparator.naturalOrder())</span>
+<span class="fc" id="L68">                    .orElse(-1);</span>
+<span class="fc" id="L69">                int expandedSteps = states.stream().mapToInt(SearchState::expandedStepCount).max().orElse(0);</span>
+<span class="fc" id="L70">                int distinctRules = (int) states.stream()</span>
+<span class="fc" id="L71">                    .flatMap(state -&gt; state.appliedRuleIds().stream())</span>
+<span class="fc" id="L72">                    .distinct()</span>
+<span class="fc" id="L73">                    .count();</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                de.regelsuche.validation.CandidateProofStatus proofStatus = bestImprovement &gt; 0</span>
+<span class="fc" id="L75">                    ? de.regelsuche.validation.CandidateProofStatus.VALIDATED_BY_EXAMPLES</span>
+<span class="pc" id="L76">                    : de.regelsuche.validation.CandidateProofStatus.OBSERVED;</span>
+<span class="fc" id="L77">                boolean learnedRuleUsed = states.stream()</span>
+<span class="fc" id="L78">                    .flatMap(state -&gt; state.appliedRuleIds().stream())</span>
+<span class="pc bpc" id="L79" title="3 of 6 branches missed.">                    .anyMatch(id -&gt; id != null &amp;&amp; (id.startsWith(&quot;learned-&quot;) || id.startsWith(&quot;macro-&quot;)));</span>
+<span class="fc" id="L80">                int eGraphClasses = 0;</span>
+<span class="fc" id="L81">                int eGraphNodes = 0;</span>
+<span class="fc" id="L82">                double saturationSavings = 0.0;</span>
+<span class="fc" id="L83">                long classesScanned = 0L;</span>
+<span class="fc" id="L84">                long nodesScanned = 0L;</span>
+<span class="fc" id="L85">                long candidateClassesSkipped = 0L;</span>
+<span class="fc" id="L86">                long matchesFound = 0L;</span>
+<span class="fc" id="L87">                long matcherCacheHits = 0L;</span>
+<span class="fc" id="L88">                long matcherCacheMisses = 0L;</span>
+<span class="fc" id="L89">                int saturationIterations = 0;</span>
+<span class="fc" id="L90">                int rulesFired = 0;</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                if (strategy.strategy() instanceof de.regelsuche.search.strategy.EqualitySaturationStrategy es</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                        &amp;&amp; es.lastStats() != null) {</span>
+<span class="nc" id="L93">                    var stats = es.lastStats();</span>
+<span class="nc" id="L94">                    eGraphClasses = stats.eclasses();</span>
+<span class="nc" id="L95">                    eGraphNodes = stats.enodes();</span>
+<span class="nc" id="L96">                    int applications = stats.totalApplications();</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                    saturationSavings = applications == 0</span>
+<span class="nc" id="L98">                        ? 0.0</span>
+<span class="nc" id="L99">                        : stats.merges() / (double) applications;</span>
+<span class="nc" id="L100">                    classesScanned = stats.classesScanned();</span>
+<span class="nc" id="L101">                    nodesScanned = stats.nodesScanned();</span>
+<span class="nc" id="L102">                    candidateClassesSkipped = stats.candidateClassesSkipped();</span>
+<span class="nc" id="L103">                    matchesFound = stats.matchesFound();</span>
+<span class="nc" id="L104">                    matcherCacheHits = stats.matcherCacheHits();</span>
+<span class="nc" id="L105">                    matcherCacheMisses = stats.matcherCacheMisses();</span>
+<span class="nc" id="L106">                    saturationIterations = stats.saturationIterations();</span>
+<span class="nc" id="L107">                    rulesFired = stats.rulesFired();</span>
                 }
-<span class="fc" id="L106">                String expected = EXPECTED_RESULTS.get(expression);</span>
-<span class="pc bpc" id="L107" title="2 of 4 branches missed.">                Boolean expectedResultMatched = expected == null || bestState == null</span>
-<span class="nc" id="L108">                    ? null</span>
-<span class="fc" id="L109">                    : canonicalizer.stableHash(expected)</span>
-<span class="fc" id="L110">                        .equals(canonicalizer.stableHash(bestState.expression()));</span>
-<span class="fc" id="L111">                int prunedStates = (int) memory.decisions().stream()</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                    .filter(d -&gt; d.reason() == PruningReason.ALREADY_KNOWN_BETTER</span>
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                        || d.reason() == PruningReason.ALREADY_KNOWN_EQUAL</span>
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                        || d.reason() == PruningReason.BUDGET_EXCEEDED)</span>
-<span class="fc" id="L115">                    .count();</span>
-<span class="fc" id="L116">                results.add(new SearchBenchmarkResult(</span>
-<span class="fc" id="L117">                    strategy.name(),</span>
-                    expression,
-<span class="fc" id="L119">                    states.size(),</span>
-                    bestImprovement,
-                    shortestImprovingDepth,
-                    expandedSteps,
-                    distinctRules,
-                    elapsedMillis,
-                    proofStatus,
-                    expectedResultMatched,
-                    prunedStates,
-                    eGraphClasses,
-                    eGraphNodes,
-                    saturationSavings,
-                    classesScanned,
-                    nodesScanned,
-                    candidateClassesSkipped,
-                    matchesFound,
-                    matcherCacheHits,
-                    matcherCacheMisses,
-                    saturationIterations,
-                    rulesFired,
-                    learnedRuleUsed,
-                    /* exportBundleValid     */ true
+<span class="fc" id="L109">                String expected = EXPECTED_RESULTS.get(expression);</span>
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">                Boolean expectedResultMatched = expected == null || bestState == null</span>
+<span class="nc" id="L111">                    ? null</span>
+<span class="fc" id="L112">                    : canonicalizer.stableHash(expected)</span>
+<span class="fc" id="L113">                        .equals(canonicalizer.stableHash(bestState.expression()));</span>
+<span class="fc" id="L114">                int prunedStates = (int) memory.decisions().stream()</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                    .filter(d -&gt; d.reason() == PruningReason.ALREADY_KNOWN_BETTER</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                        || d.reason() == PruningReason.ALREADY_KNOWN_EQUAL</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                        || d.reason() == PruningReason.BUDGET_EXCEEDED)</span>
+<span class="fc" id="L118">                    .count();</span>
+<span class="fc" id="L119">                results.add(new SearchBenchmarkResult(</span>
+<span class="fc" id="L120">                    strategy.name(), expression, states.size(), bestImprovement,</span>
+                    shortestImprovingDepth, expandedSteps, distinctRules, elapsedMillis,
+                    proofStatus, expectedResultMatched, prunedStates, eGraphClasses,
+                    eGraphNodes, saturationSavings, classesScanned, nodesScanned,
+                    candidateClassesSkipped, matchesFound, matcherCacheHits,
+                    matcherCacheMisses, saturationIterations, rulesFired,
+                    learnedRuleUsed, true
                 ));
-<span class="fc" id="L142">            }</span>
-<span class="fc" id="L143">        }</span>
-<span class="fc" id="L144">        return results;</span>
+<span class="fc" id="L128">            }</span>
+<span class="fc" id="L129">        }</span>
+<span class="fc" id="L130">        return results;</span>
     }
 
-<span class="fc" id="L147">    public record NamedSearchStrategy(String name, SearchStrategy strategy) {</span>
+<span class="fc" id="L133">    public record NamedSearchStrategy(String name, SearchStrategy strategy) {</span>
+    }
+
+    /** Bounded value-DAG evaluator and plan-cache experiment for issue #251. */
+    public static final class ValueDagEvaluationExperiment implements AutoCloseable {
+        private final ExprValueFactory values;
+        private final int maximumPlans;
+<span class="fc" id="L140">        private final LinkedHashMap&lt;ValueKey, Plan&gt; plans = new LinkedHashMap&lt;&gt;(16, 0.75f, true);</span>
+        private long hits;
+        private long misses;
+        private long evictions;
+        private boolean closed;
+
+<span class="fc" id="L146">        public ValueDagEvaluationExperiment(int maximumValues, int maximumPlans) {</span>
+<span class="fc" id="L147">            values = new ExprValueFactory(maximumValues);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (maximumPlans &lt; 1) {</span>
+<span class="nc" id="L149">                throw new IllegalArgumentException(&quot;maximumPlans must be positive&quot;);</span>
+            }
+<span class="fc" id="L151">            this.maximumPlans = maximumPlans;</span>
+<span class="fc" id="L152">        }</span>
+
+        public synchronized Result evaluate(Expr syntax, Map&lt;String, Double&gt; variables) {
+<span class="fc" id="L155">            ensureOpen();</span>
+<span class="fc" id="L156">            Objects.requireNonNull(syntax, &quot;syntax&quot;);</span>
+<span class="fc" id="L157">            Map&lt;String, Double&gt; bindings = Map.copyOf(Objects.requireNonNull(variables, &quot;variables&quot;));</span>
+<span class="fc" id="L158">            long started = System.nanoTime();</span>
+<span class="fc" id="L159">            ExprValue root = values.project(syntax).valueRoot();</span>
+<span class="fc" id="L160">            long projectionNanos = System.nanoTime() - started;</span>
+
+<span class="fc" id="L162">            Plan plan = plans.get(root.key());</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            boolean cacheHit = plan != null;</span>
+<span class="fc" id="L164">            long constructionNanos = 0L;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            if (cacheHit) {</span>
+<span class="fc" id="L166">                hits++;</span>
+            } else {
+<span class="fc" id="L168">                misses++;</span>
+<span class="fc" id="L169">                started = System.nanoTime();</span>
+<span class="fc" id="L170">                plan = compile(root);</span>
+<span class="fc" id="L171">                constructionNanos = System.nanoTime() - started;</span>
+<span class="fc" id="L172">                cache(root.key(), plan);</span>
+            }
+<span class="fc" id="L174">            started = System.nanoTime();</span>
+<span class="fc" id="L175">            double result = execute(plan, bindings);</span>
+<span class="fc" id="L176">            long executionNanos = System.nanoTime() - started;</span>
+<span class="fc" id="L177">            return new Result(</span>
+<span class="fc" id="L178">                    result, plan.steps().size(), projectionNanos, constructionNanos,</span>
+                    executionNanos, cacheHit, hits, misses, evictions,
+<span class="fc" id="L180">                    plans.size(), values.size());</span>
+        }
+
+        public synchronized int cachedPlanCount() {
+<span class="nc" id="L184">            ensureOpen();</span>
+<span class="nc" id="L185">            return plans.size();</span>
+        }
+
+        @Override
+        public synchronized void close() {
+<span class="fc" id="L190">            plans.clear();</span>
+<span class="fc" id="L191">            values.close();</span>
+<span class="fc" id="L192">            closed = true;</span>
+<span class="fc" id="L193">        }</span>
+
+        private void cache(ValueKey key, Plan plan) {
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">            if (!plans.containsKey(key) &amp;&amp; plans.size() &gt;= maximumPlans) {</span>
+<span class="fc" id="L197">                plans.remove(plans.keySet().iterator().next());</span>
+<span class="fc" id="L198">                evictions++;</span>
+            }
+<span class="fc" id="L200">            plans.put(key, plan);</span>
+<span class="fc" id="L201">        }</span>
+
+        private static Plan compile(ExprValue root) {
+<span class="fc" id="L204">            Map&lt;ValueKey, Integer&gt; slots = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L205">            List&lt;Step&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L206">            int rootSlot = compile(root, slots, steps);</span>
+<span class="fc" id="L207">            return new Plan(List.copyOf(steps), rootSlot);</span>
+        }
+
+        private static int compile(ExprValue value, Map&lt;ValueKey, Integer&gt; slots, List&lt;Step&gt; steps) {
+<span class="fc" id="L211">            Integer existing = slots.get(value.key());</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (existing != null) {</span>
+<span class="fc" id="L213">                return existing;</span>
+            }
+            Step step;
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            if (value instanceof NumberValue number) {</span>
+<span class="fc" id="L217">                step = Step.number(number.value());</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            } else if (value instanceof VariableValue variable) {</span>
+<span class="fc" id="L219">                step = Step.variable(variable.name());</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            } else if (value instanceof OrderedValue ordered) {</span>
+<span class="fc" id="L221">                List&lt;Integer&gt; operands = ordered.operands().stream()</span>
+<span class="fc" id="L222">                        .map(operand -&gt; compile(operand, slots, steps))</span>
+<span class="fc" id="L223">                        .toList();</span>
+<span class="fc" id="L224">                step = Step.operation(ordered.operator().id(), operands, List.of());</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            } else if (value instanceof AssociativeCommutativeValue ac) {</span>
+<span class="fc" id="L226">                List&lt;Map.Entry&lt;ExprValue, Integer&gt;&gt; entries = new ArrayList&lt;&gt;(ac.multiplicities().entrySet());</span>
+<span class="fc" id="L227">                entries.sort(Comparator.comparing(entry -&gt; entry.getKey().key()));</span>
+<span class="fc" id="L228">                List&lt;Integer&gt; operands = new ArrayList&lt;&gt;(entries.size());</span>
+<span class="fc" id="L229">                List&lt;Integer&gt; counts = new ArrayList&lt;&gt;(entries.size());</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                for (Map.Entry&lt;ExprValue, Integer&gt; entry : entries) {</span>
+<span class="fc" id="L231">                    operands.add(compile(entry.getKey(), slots, steps));</span>
+<span class="fc" id="L232">                    counts.add(entry.getValue());</span>
+<span class="fc" id="L233">                }</span>
+<span class="fc" id="L234">                step = Step.operation(ac.operator().id(), operands, counts);</span>
+<span class="fc" id="L235">            } else {</span>
+<span class="nc" id="L236">                throw new IllegalArgumentException(&quot;unsupported value type: &quot; + value.getClass());</span>
+            }
+<span class="fc" id="L238">            int slot = steps.size();</span>
+<span class="fc" id="L239">            steps.add(step);</span>
+<span class="fc" id="L240">            slots.put(value.key(), slot);</span>
+<span class="fc" id="L241">            return slot;</span>
+        }
+
+        private static double execute(Plan plan, Map&lt;String, Double&gt; variables) {
+<span class="fc" id="L245">            List&lt;Step&gt; steps = plan.steps();</span>
+<span class="fc" id="L246">            int size = steps.size();</span>
+<span class="fc" id="L247">            double[] results = new double[size];</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            for (int slot = 0; slot &lt; size; slot++) {</span>
+<span class="fc" id="L249">                Step step = steps.get(slot);</span>
+<span class="fc bfc" id="L250" title="All 3 branches covered.">                results[slot] = switch (step.kind()) {</span>
+<span class="fc" id="L251">                    case NUMBER -&gt; step.number();</span>
+<span class="fc" id="L252">                    case VARIABLE -&gt; requireVariable(variables, step.variable());</span>
+<span class="fc" id="L253">                    case OPERATION -&gt; operation(step, results);</span>
+                };
+            }
+<span class="fc" id="L256">            return results[plan.rootSlot()];</span>
+        }
+
+        private static double operation(Step step, double[] results) {
+<span class="fc" id="L260">            List&lt;Integer&gt; operands = step.operands();</span>
+<span class="pc bpc" id="L261" title="1 of 6 branches missed.">            return switch (step.operator()) {</span>
+<span class="fc" id="L262">                case &quot;add&quot; -&gt; aggregate(step, results, 0.0, true);</span>
+<span class="fc" id="L263">                case &quot;mul&quot; -&gt; aggregate(step, results, 1.0, false);</span>
+<span class="fc" id="L264">                case &quot;sub&quot; -&gt; results[operands.get(0)] - results[operands.get(1)];</span>
+<span class="fc" id="L265">                case &quot;div&quot; -&gt; divide(results[operands.get(0)], results[operands.get(1)]);</span>
+<span class="nc" id="L266">                case &quot;pow&quot; -&gt; Math.pow(results[operands.get(0)], results[operands.get(1)]);</span>
+<span class="fc" id="L267">                default -&gt; function(step.operator(), results[operands.getFirst()]);</span>
+            };
+        }
+
+        private static double aggregate(Step step, double[] results, double initial, boolean sum) {
+<span class="fc" id="L272">            double value = initial;</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            for (int i = 0; i &lt; step.operands().size(); i++) {</span>
+<span class="fc" id="L274">                double operand = results[step.operands().get(i)];</span>
+<span class="fc" id="L275">                int multiplicity = step.multiplicity(i);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                double factor = multiplicity == 1 ? operand : Math.pow(operand, multiplicity);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">                value = sum ? value + operand * multiplicity : value * factor;</span>
+            }
+<span class="fc" id="L279">            return value;</span>
+        }
+
+        private static double function(String operator, double argument) {
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">            if (!operator.startsWith(&quot;fn:&quot;)) {</span>
+<span class="nc" id="L284">                throw new IllegalArgumentException(&quot;unsupported function operator: &quot; + operator);</span>
+            }
+<span class="pc bpc" id="L286" title="8 of 9 branches missed.">            return switch (operator.substring(3)) {</span>
+<span class="fc" id="L287">                case &quot;sin&quot; -&gt; Math.sin(argument);</span>
+<span class="nc" id="L288">                case &quot;cos&quot; -&gt; Math.cos(argument);</span>
+<span class="nc" id="L289">                case &quot;tan&quot; -&gt; Math.tan(argument);</span>
+<span class="nc bnc" id="L290" title="All 2 branches missed.">                case &quot;log&quot; -&gt; argument &lt;= 0 ? Double.NaN : Math.log10(argument);</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">                case &quot;ln&quot; -&gt; argument &lt;= 0 ? Double.NaN : Math.log(argument);</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">                case &quot;sqrt&quot; -&gt; argument &lt; 0 ? Double.NaN : Math.sqrt(argument);</span>
+<span class="nc" id="L293">                case &quot;exp&quot; -&gt; Math.exp(argument);</span>
+<span class="nc" id="L294">                case &quot;abs&quot; -&gt; Math.abs(argument);</span>
+<span class="nc" id="L295">                default -&gt; throw new IllegalArgumentException(&quot;unsupported function: &quot; + operator);</span>
+            };
+        }
+
+        private static double divide(double numerator, double denominator) {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            return Math.abs(denominator) &lt; 1e-12 ? Double.NaN : numerator / denominator;</span>
+        }
+
+        private static double requireVariable(Map&lt;String, Double&gt; variables, String name) {
+<span class="fc" id="L304">            Double value = variables.get(name);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (value == null) {</span>
+<span class="fc" id="L306">                throw new IllegalArgumentException(&quot;missing variable binding: &quot; + name);</span>
+            }
+<span class="fc" id="L308">            return value;</span>
+        }
+
+        private void ensureOpen() {
+<span class="fc bfc" id="L312" title="All 2 branches covered.">            if (closed) {</span>
+<span class="fc" id="L313">                throw new IllegalStateException(&quot;value-DAG evaluation experiment is closed&quot;);</span>
+            }
+<span class="fc" id="L315">        }</span>
+
+<span class="fc" id="L317">        public record Result(</span>
+                double value,
+                int evaluationCount,
+                long projectionNanos,
+                long planConstructionNanos,
+                long executionNanos,
+                boolean planCacheHit,
+                long totalPlanCacheHits,
+                long totalPlanCacheMisses,
+                long totalPlanCacheEvictions,
+                int cachedPlans,
+                int internedValues) {
+            public int distinctValues() {
+<span class="fc" id="L330">                return evaluationCount;</span>
+            }
+        }
+
+<span class="fc" id="L334">        private enum Kind { NUMBER, VARIABLE, OPERATION }</span>
+
+<span class="fc" id="L336">        private record Step(</span>
+                Kind kind,
+                double number,
+                String variable,
+                String operator,
+                List&lt;Integer&gt; operands,
+                List&lt;Integer&gt; multiplicities) {
+            private static Step number(double value) {
+<span class="fc" id="L344">                return new Step(Kind.NUMBER, value, &quot;&quot;, &quot;&quot;, List.of(), List.of());</span>
+            }
+
+            private static Step variable(String name) {
+<span class="fc" id="L348">                return new Step(Kind.VARIABLE, 0.0, name, &quot;&quot;, List.of(), List.of());</span>
+            }
+
+            private static Step operation(String operator, List&lt;Integer&gt; operands, List&lt;Integer&gt; counts) {
+<span class="fc" id="L352">                return new Step(Kind.OPERATION, 0.0, &quot;&quot;, operator, List.copyOf(operands), List.copyOf(counts));</span>
+            }
+
+            private int multiplicity(int index) {
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">                return multiplicities.isEmpty() ? 1 : multiplicities.get(index);</span>
+            }
+        }
+
+<span class="fc" id="L360">        private record Plan(List&lt;Step&gt; steps, int rootSlot) {</span>
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
