@@ -108,7 +108,7 @@ class SearchTrajectoryDatasetTest {
     @Test
     void attachingACollectorDoesNotChangeSearchSemantics() {
         Map<String, List<Transformation>> graph = neutralGraph();
-        TransformationEngine engine = graph::getOrDefault;
+        TransformationEngine engine = expression -> graph.getOrDefault(expression, List.of());
         SearchProblem plain = problem("(x + 0) * 1", "x", engine, null);
         SearchTrajectoryCollector collector = new SearchTrajectoryCollector();
         SearchProblem observed = problem("(x + 0) * 1", "x", engine, collector);
