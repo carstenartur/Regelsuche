@@ -142,15 +142,27 @@ jobs:
           except Exception as exc:
               errors.append(f'Could not parse classes.json: {exc}')
 
-          # Check complexity report contains method-level and AI-cost metrics from ai-knowledge-extractor 0.1.4
+          # Check method-level metrics and the normalized context footprint introduced in 0.1.5.
           try:
               complexity = json.loads((ai_dir / 'complexity.json').read_text(encoding='utf-8'))
               code_complexity = complexity.get('codeComplexity', {})
               cost_drivers = complexity.get('aiCostDrivers', {})
+              footprint = complexity.get('contextFootprint', {})
               if 'maxMethodCognitiveComplexity' not in code_complexity:
                   errors.append('complexity.json lacks codeComplexity.maxMethodCognitiveComplexity.')
               if 'tokenCostDrivers' not in cost_drivers:
                   errors.append('complexity.json lacks aiCostDrivers.tokenCostDrivers.')
+              if 'normalizedContextDebt' not in complexity:
+                  errors.append('complexity.json lacks normalizedContextDebt from extractor 0.1.5.')
+              if 'legacyAiContextDebt' not in complexity:
+                  errors.append('complexity.json lacks legacyAiContextDebt for migration comparison.')
+              if not footprint:
+                  errors.append('complexity.json lacks contextFootprint from extractor 0.1.5.')
+              elif footprint.get('method') != 'line-weighted-capability-working-set-proxy':
+                  errors.append('contextFootprint.method is not the expected 0.1.5 metric.')
+              normalized = complexity.get('normalizedContextDebt')
+              if not isinstance(normalized, (int, float)) or not 0 <= normalized <= 100:
+                  errors.append(f'normalizedContextDebt is outside the 0–100 scale: {normalized!r}.')
           except Exception as exc:
               errors.append(f'Could not parse complexity.json: {exc}')
 
@@ -160,7 +172,7 @@ jobs:
               print(f'ERROR: {error}', file=sys.stderr)
           if errors:
               sys.exit(1)
-          print('AI knowledge artifacts passed basic quality checks.')
+          print('AI knowledge artifacts passed normalized 0.1.5 quality checks.')
           PY
 
       - name: Upload AI knowledge artifacts
@@ -192,4 +204,4 @@ jobs:
           find Regelsuche/build/ai-knowledge -maxdepth 1 -type f -printf '- `%f`\n' | sort >> "$GITHUB_STEP_SUMMARY" || true
           echo '' >> "$GITHUB_STEP_SUMMARY"
           check_exit="$(cat Regelsuche/build/ai-knowledge/check.exit 2>/dev/null || echo 'n/a')"
-          echo "**checkAiKnowledgeIndex exit code**: \`${check_exit}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**checkAiKnowledgeIndex exit code**: \`$check_exit\`" >> "$GITHUB_STEP_SUMMARY"
