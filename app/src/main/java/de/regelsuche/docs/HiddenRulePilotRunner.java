@@ -25,6 +25,7 @@ import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,10 +62,14 @@ public final class HiddenRulePilotRunner {
         MacroLearningResult learning = learn(path);
         if (learning.newlyActivated().isEmpty()) {
             return RuntimeResult.learningFailure(
-                task.opaqueCaseId(), discovery, reached, learning.stageEvidence());
+                task.opaqueCaseId(), discovery, reached,
+                CandidateValidationEvidence.from(learning, null),
+                learning.stageEvidence());
         }
 
         ReusableRule learned = learning.newlyActivated().getFirst();
+        CandidateValidationEvidence validation =
+            CandidateValidationEvidence.from(learning, learned);
         DynamicOperatorCompiler.CompilationResult compilation = compiler.compile(
             "pilot-" + task.opaqueCaseId(),
             "frozen-v1",
@@ -72,7 +77,7 @@ public final class HiddenRulePilotRunner {
             learned.rightPattern());
         if (!compilation.isSuccess()) {
             return RuntimeResult.compilationFailure(
-                task.opaqueCaseId(), discovery, reached, learned,
+                task.opaqueCaseId(), discovery, reached, learned, validation,
                 learning.stageEvidence(), compilation.rejectionReason());
         }
 
@@ -85,10 +90,14 @@ public final class HiddenRulePilotRunner {
             learned.confidenceScore(),
             operator.ruleId(),
             operator.provenanceHash());
-        RuntimeStatus status = holdouts.allPassed()
+        RuntimeStatus status = holdouts.allPassed() && validation.passed()
             ? RuntimeStatus.CANDIDATE_FROZEN
             : RuntimeStatus.HOLDOUT_FAILED;
-        String failure = holdouts.allPassed() ? "" : "one or more holdouts failed";
+        String failure = status == RuntimeStatus.CANDIDATE_FROZEN
+            ? ""
+            : validation.passed()
+                ? "one or more holdouts failed"
+                : "candidate validation evidence failed";
         return new RuntimeResult(
             task.opaqueCaseId(),
             status,
@@ -98,6 +107,7 @@ public final class HiddenRulePilotRunner {
             reached.appliedRuleIds(),
             reached.assumptions(),
             candidate,
+            validation,
             holdouts,
             learning.stageEvidence(),
             failure);
@@ -274,6 +284,83 @@ public final class HiddenRulePilotRunner {
         }
     }
 
+    /** Structured validation evidence, independent of post-hoc hidden-rule similarity. */
+    public record CandidateValidationEvidence(
+        String proofStatus,
+        int generatedValidationExamples,
+        int failedValidationExamples,
+        List<CounterexampleEvidence> counterexampleSearches
+    ) {
+        public CandidateValidationEvidence {
+            proofStatus = proofStatus == null || proofStatus.isBlank() ? "NONE" : proofStatus;
+            if (generatedValidationExamples < 0 || failedValidationExamples < 0
+                    || failedValidationExamples > generatedValidationExamples) {
+                throw new IllegalArgumentException("invalid validation example counts");
+            }
+            counterexampleSearches = counterexampleSearches == null
+                ? List.of()
+                : List.copyOf(counterexampleSearches);
+        }
+
+        static CandidateValidationEvidence empty() {
+            return new CandidateValidationEvidence("NONE", 0, 0, List.of());
+        }
+
+        static CandidateValidationEvidence from(
+            MacroLearningResult learning,
+            ReusableRule learned
+        ) {
+            int generated = learning.validationExamples().size();
+            int failed = (int) learning.validationExamples().stream()
+                .filter(example -> !example.equivalent())
+                .count();
+            List<CounterexampleEvidence> searches = learning.counterexampleSearches().stream()
+                .map(CounterexampleEvidence::from)
+                .toList();
+            return new CandidateValidationEvidence(
+                learned == null ? "NONE" : learned.proofStatus().name(),
+                generated,
+                failed,
+                searches);
+        }
+
+        public boolean passed() {
+            boolean positiveProof = !proofStatus.equals("NONE") && !proofStatus.equals("REJECTED");
+            boolean noCounterexample = counterexampleSearches.stream()
+                .noneMatch(search -> search.counterexamplePresent()
+                    || search.status().equals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND.name()));
+            return positiveProof
+                && generatedValidationExamples > 0
+                && failedValidationExamples == 0
+                && noCounterexample;
+        }
+    }
+
+    public record CounterexampleEvidence(
+        String status,
+        boolean counterexamplePresent,
+        List<String> attemptedSources,
+        String explanation
+    ) {
+        public CounterexampleEvidence {
+            status = status == null || status.isBlank() ? "INCONCLUSIVE" : status;
+            attemptedSources = attemptedSources == null
+                ? List.of()
+                : attemptedSources.stream().distinct().sorted().toList();
+            explanation = explanation == null ? "" : explanation;
+        }
+
+        static CounterexampleEvidence from(
+            CounterexampleSearchService.CounterexampleSearchResult result
+        ) {
+            return new CounterexampleEvidence(
+                result.status().name(),
+                result.counterexample().isPresent(),
+                result.attemptedSources(),
+                result.explanation());
+        }
+    }
+
     public record RuntimeResult(
         String opaqueCaseId,
         RuntimeStatus status,
@@ -283,6 +370,7 @@ public final class HiddenRulePilotRunner {
         List<String> primitiveRuleIds,
         List<String> assumptions,
         CandidateSnapshot candidate,
+        CandidateValidationEvidence validationEvidence,
         HoldoutSummary holdouts,
         List<String> stageEvidence,
         String failureReason
@@ -291,6 +379,9 @@ public final class HiddenRulePilotRunner {
             path = path == null ? List.of() : List.copyOf(path);
             primitiveRuleIds = primitiveRuleIds == null ? List.of() : List.copyOf(primitiveRuleIds);
             assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
+            validationEvidence = validationEvidence == null
+                ? CandidateValidationEvidence.empty()
+                : validationEvidence;
             holdouts = holdouts == null ? HoldoutSummary.empty() : holdouts;
             stageEvidence = stageEvidence == null ? List.of() : List.copyOf(stageEvidence);
             failureReason = failureReason == null ? "" : failureReason;
@@ -300,7 +391,8 @@ public final class HiddenRulePilotRunner {
             return new RuntimeResult(
                 id, RuntimeStatus.SEARCH_FAILED, search.status(), search.metrics(),
                 search.states().stream().map(SearchState::expression).toList(),
-                List.of(), List.of(), null, HoldoutSummary.empty(), List.of(),
+                List.of(), List.of(), null, CandidateValidationEvidence.empty(),
+                HoldoutSummary.empty(), List.of(),
                 "primitive search did not reach the concrete task target");
         }
 
@@ -308,12 +400,14 @@ public final class HiddenRulePilotRunner {
             String id,
             GoalSearchResult search,
             SearchState reached,
+            CandidateValidationEvidence validation,
             List<String> stages
         ) {
             return new RuntimeResult(
                 id, RuntimeStatus.LEARNING_REJECTED, search.status(), search.metrics(),
                 reached.path(), reached.appliedRuleIds(), reached.assumptions(), null,
-                HoldoutSummary.empty(), stages, "macro learning rejected the path");
+                validation, HoldoutSummary.empty(), stages,
+                "macro learning rejected the path");
         }
 
         static RuntimeResult compilationFailure(
@@ -321,6 +415,7 @@ public final class HiddenRulePilotRunner {
             GoalSearchResult search,
             SearchState reached,
             ReusableRule learned,
+            CandidateValidationEvidence validation,
             List<String> stages,
             String reason
         ) {
@@ -330,7 +425,7 @@ public final class HiddenRulePilotRunner {
             return new RuntimeResult(
                 id, RuntimeStatus.COMPILATION_REJECTED, search.status(), search.metrics(),
                 reached.path(), reached.appliedRuleIds(), reached.assumptions(), candidate,
-                HoldoutSummary.empty(), stages, reason);
+                validation, HoldoutSummary.empty(), stages, reason);
         }
 
         public boolean frozen() {
