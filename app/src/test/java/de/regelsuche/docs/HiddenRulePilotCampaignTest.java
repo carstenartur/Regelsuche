@@ -19,8 +19,7 @@ class HiddenRulePilotCampaignTest {
     @Test
     void emitsStableFiveCaseEvidenceWithoutHiddenIdsOrWallClockTime() {
         HiddenRulePilotCampaign campaign = new HiddenRulePilotCampaign();
-        HiddenRulePilotCampaign.PilotReport report =
-            campaign.run(HiddenRulePilotCatalog.cases());
+        HiddenRulePilotCampaign.PilotReport report = HiddenRulePilotTestEvidence.report();
         String json = report.toJson();
         Path output = Path.of("build", "reports", "hidden-rule-pilot", "report.json");
         campaign.write(output, report);
