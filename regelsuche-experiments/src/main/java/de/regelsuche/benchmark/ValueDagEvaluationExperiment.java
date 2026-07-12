@@ -1,11 +1,6 @@
 package de.regelsuche.benchmark;
 
-import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.ast.NumberExpr;
-import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.value.ExprValueFactory;
 import de.regelsuche.value.ExprValueFactory.AssociativeCommutativeValue;
 import de.regelsuche.value.ExprValueFactory.ExprValue;
@@ -15,203 +10,166 @@ import de.regelsuche.value.ExprValueFactory.ValueKey;
 import de.regelsuche.value.ExprValueFactory.VariableValue;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Bounded experiment comparing syntax-tree evaluation with a cached value-DAG plan.
- *
- * <p>The owner keeps one scoped {@link ExprValueFactory} and a bounded LRU cache of
- * evaluation plans keyed by {@link ValueKey}. A plan contains one instruction per
- * distinct mathematical value, so repeated pure subexpressions are evaluated once
- * per invocation. No occurrence-specific trace data is stored on shared values.</p>
- */
+/** Bounded value-DAG evaluator and plan-cache experiment for issue #251. */
 public final class ValueDagEvaluationExperiment implements AutoCloseable {
-    private final ExprValueFactory valueFactory;
-    private final BoundedValueCache<EvaluationPlan> planCache;
-    private long planCacheHits;
-    private long planCacheMisses;
+    private final ExprValueFactory values;
+    private final int maximumPlans;
+    private final LinkedHashMap<ValueKey, Plan> plans = new LinkedHashMap<>(16, 0.75f, true);
+    private long hits;
+    private long misses;
+    private long evictions;
     private boolean closed;
 
     public ValueDagEvaluationExperiment(int maximumValues, int maximumPlans) {
-        valueFactory = new ExprValueFactory(maximumValues);
-        planCache = new BoundedValueCache<>(maximumPlans);
+        values = new ExprValueFactory(maximumValues);
+        if (maximumPlans < 1) {
+            throw new IllegalArgumentException("maximumPlans must be positive");
+        }
+        this.maximumPlans = maximumPlans;
     }
 
-    /** Runs both evaluators and returns operation counts plus timing observations. */
-    public synchronized Comparison compare(Expr syntax, Map<String, Double> variables) {
+    public synchronized Result evaluate(Expr syntax, Map<String, Double> variables) {
         ensureOpen();
         Objects.requireNonNull(syntax, "syntax");
         Map<String, Double> bindings = Map.copyOf(Objects.requireNonNull(variables, "variables"));
 
-        long treeStarted = System.nanoTime();
-        TreeExecution tree = evaluateTree(syntax, bindings);
-        long treeNanos = System.nanoTime() - treeStarted;
-
         long projectionStarted = System.nanoTime();
-        ExprValue root = valueFactory.project(syntax).valueRoot();
+        ExprValue root = values.project(syntax).valueRoot();
         long projectionNanos = System.nanoTime() - projectionStarted;
 
-        EvaluationRun dag = evaluateValue(root, bindings);
-        return new Comparison(
-                tree.value(),
-                dag.value(),
-                tree.evaluations(),
-                dag.evaluations(),
-                dag.distinctValues(),
+        Plan plan = plans.get(root.key());
+        boolean cacheHit = plan != null;
+        long constructionNanos = 0L;
+        if (cacheHit) {
+            hits++;
+        } else {
+            misses++;
+            long started = System.nanoTime();
+            plan = compile(root);
+            constructionNanos = System.nanoTime() - started;
+            cache(root.key(), plan);
+        }
+
+        long executionStarted = System.nanoTime();
+        double result = execute(plan, bindings);
+        long executionNanos = System.nanoTime() - executionStarted;
+        return new Result(
+                result,
+                plan.steps().size(),
                 projectionNanos,
-                dag.planConstructionNanos(),
-                treeNanos,
-                dag.executionNanos(),
-                dag.planCacheHit(),
-                planCacheHits,
-                planCacheMisses,
-                planCache.evictions(),
-                planCache.size(),
-                valueFactory.size());
+                constructionNanos,
+                executionNanos,
+                cacheHit,
+                hits,
+                misses,
+                evictions,
+                plans.size(),
+                values.size());
     }
 
     public synchronized int cachedPlanCount() {
         ensureOpen();
-        return planCache.size();
-    }
-
-    public synchronized int internedValueCount() {
-        ensureOpen();
-        return valueFactory.size();
+        return plans.size();
     }
 
     @Override
     public synchronized void close() {
-        planCache.clear();
-        valueFactory.close();
+        plans.clear();
+        values.close();
         closed = true;
     }
 
-    private EvaluationRun evaluateValue(ExprValue root, Map<String, Double> variables) {
-        EvaluationPlan plan = planCache.get(root.key());
-        boolean cacheHit = plan != null;
-        long constructionNanos = 0L;
-        if (cacheHit) {
-            planCacheHits++;
-        } else {
-            planCacheMisses++;
-            long constructionStarted = System.nanoTime();
-            plan = compile(root);
-            constructionNanos = System.nanoTime() - constructionStarted;
-            planCache.put(root.key(), plan);
+    private void cache(ValueKey key, Plan plan) {
+        if (!plans.containsKey(key) && plans.size() >= maximumPlans) {
+            plans.remove(plans.keySet().iterator().next());
+            evictions++;
         }
-
-        long executionStarted = System.nanoTime();
-        Execution execution = execute(plan, variables);
-        long executionNanos = System.nanoTime() - executionStarted;
-        return new EvaluationRun(
-                execution.value(),
-                execution.evaluations(),
-                plan.instructions().size(),
-                constructionNanos,
-                executionNanos,
-                cacheHit);
+        plans.put(key, plan);
     }
 
-    private static EvaluationPlan compile(ExprValue root) {
-        Map<ValueKey, Integer> slotsByValue = new LinkedHashMap<>();
-        List<Instruction> instructions = new ArrayList<>();
-        int rootSlot = compile(root, slotsByValue, instructions);
-        return new EvaluationPlan(List.copyOf(instructions), rootSlot);
+    private static Plan compile(ExprValue root) {
+        Map<ValueKey, Integer> slots = new LinkedHashMap<>();
+        List<Step> steps = new ArrayList<>();
+        return new Plan(List.copyOf(steps), compile(root, slots, steps));
     }
 
-    private static int compile(
-            ExprValue value,
-            Map<ValueKey, Integer> slotsByValue,
-            List<Instruction> instructions) {
-        Integer existing = slotsByValue.get(value.key());
+    private static int compile(ExprValue value, Map<ValueKey, Integer> slots, List<Step> steps) {
+        Integer existing = slots.get(value.key());
         if (existing != null) {
             return existing;
         }
-
-        Instruction instruction;
+        Step step;
         if (value instanceof NumberValue number) {
-            instruction = Instruction.number(number.value());
+            step = Step.number(number.value());
         } else if (value instanceof VariableValue variable) {
-            instruction = Instruction.variable(variable.name());
+            step = Step.variable(variable.name());
         } else if (value instanceof OrderedValue ordered) {
             List<Integer> operands = ordered.operands().stream()
-                    .map(operand -> compile(operand, slotsByValue, instructions))
+                    .map(operand -> compile(operand, slots, steps))
                     .toList();
-            instruction = Instruction.operation(ordered.operator().id(), operands, List.of());
+            step = Step.operation(ordered.operator().id(), operands, List.of());
         } else if (value instanceof AssociativeCommutativeValue ac) {
             List<Map.Entry<ExprValue, Integer>> entries = new ArrayList<>(ac.multiplicities().entrySet());
             entries.sort(Comparator.comparing(entry -> entry.getKey().key()));
             List<Integer> operands = new ArrayList<>(entries.size());
-            List<Integer> multiplicities = new ArrayList<>(entries.size());
+            List<Integer> counts = new ArrayList<>(entries.size());
             for (Map.Entry<ExprValue, Integer> entry : entries) {
-                operands.add(compile(entry.getKey(), slotsByValue, instructions));
-                multiplicities.add(entry.getValue());
+                operands.add(compile(entry.getKey(), slots, steps));
+                counts.add(entry.getValue());
             }
-            instruction = Instruction.operation(ac.operator().id(), operands, multiplicities);
+            step = Step.operation(ac.operator().id(), operands, counts);
         } else {
             throw new IllegalArgumentException("unsupported value type: " + value.getClass());
         }
-
-        int slot = instructions.size();
-        instructions.add(instruction);
-        slotsByValue.put(value.key(), slot);
+        int slot = steps.size();
+        steps.add(step);
+        slots.put(value.key(), slot);
         return slot;
     }
 
-    private static Execution execute(EvaluationPlan plan, Map<String, Double> variables) {
-        double[] values = new double[plan.instructions().size()];
-        int evaluations = 0;
-        for (int slot = 0; slot < plan.instructions().size(); slot++) {
-            Instruction instruction = plan.instructions().get(slot);
-            values[slot] = switch (instruction.kind()) {
-                case NUMBER -> instruction.number();
-                case VARIABLE -> requireVariable(variables, instruction.variable());
-                case OPERATION -> evaluateOperation(instruction, values);
+    private static double execute(Plan plan, Map<String, Double> variables) {
+        double[] results = new double[plan.steps().size()];
+        for (int slot = 0; slot < plan.steps().size(); slot++) {
+            Step step = plan.steps().get(slot);
+            results[slot] = switch (step.kind()) {
+                case NUMBER -> step.number();
+                case VARIABLE -> requireVariable(variables, step.variable());
+                case OPERATION -> operation(step, results);
             };
-            evaluations++;
         }
-        return new Execution(values[plan.rootSlot()], evaluations);
+        return results[plan.rootSlot()];
     }
 
-    private static double evaluateOperation(Instruction instruction, double[] values) {
-        String operator = instruction.operator();
-        List<Integer> operands = instruction.operands();
-        return switch (operator) {
-            case "add" -> evaluateSum(instruction, values);
-            case "mul" -> evaluateProduct(instruction, values);
-            case "sub" -> values[operands.get(0)] - values[operands.get(1)];
-            case "div" -> divide(values[operands.get(0)], values[operands.get(1)]);
-            case "pow" -> Math.pow(values[operands.get(0)], values[operands.get(1)]);
-            default -> evaluateFunction(operator, operands, values);
+    private static double operation(Step step, double[] results) {
+        List<Integer> operands = step.operands();
+        return switch (step.operator()) {
+            case "add" -> aggregate(step, results, 0.0, true);
+            case "mul" -> aggregate(step, results, 1.0, false);
+            case "sub" -> results[operands.get(0)] - results[operands.get(1)];
+            case "div" -> divide(results[operands.get(0)], results[operands.get(1)]);
+            case "pow" -> Math.pow(results[operands.get(0)], results[operands.get(1)]);
+            default -> function(step.operator(), results[operands.getFirst()]);
         };
     }
 
-    private static double evaluateSum(Instruction instruction, double[] values) {
-        double result = 0.0;
-        for (int i = 0; i < instruction.operands().size(); i++) {
-            result += values[instruction.operands().get(i)] * instruction.multiplicity(i);
+    private static double aggregate(Step step, double[] results, double initial, boolean sum) {
+        double value = initial;
+        for (int i = 0; i < step.operands().size(); i++) {
+            double term = Math.pow(results[step.operands().get(i)], step.multiplicity(i));
+            value = sum ? value + term * (step.multiplicity(i) == 1 ? 1 : 1) : value * term;
         }
-        return result;
+        return value;
     }
 
-    private static double evaluateProduct(Instruction instruction, double[] values) {
-        double result = 1.0;
-        for (int i = 0; i < instruction.operands().size(); i++) {
-            result *= Math.pow(values[instruction.operands().get(i)], instruction.multiplicity(i));
+    private static double function(String operator, double argument) {
+        if (!operator.startsWith("fn:")) {
+            throw new IllegalArgumentException("unsupported operator: " + operator);
         }
-        return result;
-    }
-
-    private static double evaluateFunction(String operator, List<Integer> operands, double[] values) {
-        if (!operator.startsWith("fn:") || operands.size() != 1) {
-            throw new IllegalArgumentException("unsupported ordered operator: " + operator);
-        }
-        double argument = values[operands.get(0)];
         return switch (operator.substring(3)) {
             case "sin" -> Math.sin(argument);
             case "cos" -> Math.cos(argument);
@@ -222,44 +180,6 @@ public final class ValueDagEvaluationExperiment implements AutoCloseable {
             case "exp" -> Math.exp(argument);
             case "abs" -> Math.abs(argument);
             default -> throw new IllegalArgumentException("unsupported function: " + operator);
-        };
-    }
-
-    private static TreeExecution evaluateTree(Expr expression, Map<String, Double> variables) {
-        if (expression instanceof NumberExpr number) {
-            return new TreeExecution(number.value(), 1);
-        }
-        if (expression instanceof VariableExpr variable) {
-            return new TreeExecution(requireVariable(variables, variable.name()), 1);
-        }
-        if (expression instanceof FunctionExpr function) {
-            if (function.arguments().size() != 1) {
-                throw new IllegalArgumentException("only unary functions are supported");
-            }
-            TreeExecution argument = evaluateTree(function.arguments().getFirst(), variables);
-            Instruction call = Instruction.operation(
-                    "fn:" + function.name(), List.of(0), List.of());
-            return new TreeExecution(
-                    evaluateFunction(call.operator(), call.operands(), new double[] {argument.value()}),
-                    argument.evaluations() + 1);
-        }
-        if (expression instanceof BinaryExpr binary) {
-            TreeExecution left = evaluateTree(binary.left(), variables);
-            TreeExecution right = evaluateTree(binary.right(), variables);
-            return new TreeExecution(
-                    evaluateBinary(binary.operator(), left.value(), right.value()),
-                    left.evaluations() + right.evaluations() + 1);
-        }
-        throw new IllegalArgumentException("unsupported syntax type: " + expression.getClass());
-    }
-
-    private static double evaluateBinary(BinaryOperator operator, double left, double right) {
-        return switch (operator) {
-            case ADD -> left + right;
-            case SUB -> left - right;
-            case MUL -> left * right;
-            case DIV -> divide(left, right);
-            case POW -> Math.pow(left, right);
         };
     }
 
@@ -281,52 +201,42 @@ public final class ValueDagEvaluationExperiment implements AutoCloseable {
         }
     }
 
-    public record Comparison(
-            double treeValue,
-            double dagValue,
-            int treeNodeEvaluations,
-            int dagValueEvaluations,
-            int distinctValues,
+    public record Result(
+            double value,
+            int evaluationCount,
             long projectionNanos,
             long planConstructionNanos,
-            long treeExecutionNanos,
-            long dagExecutionNanos,
+            long executionNanos,
             boolean planCacheHit,
             long totalPlanCacheHits,
             long totalPlanCacheMisses,
             long totalPlanCacheEvictions,
             int cachedPlans,
             int internedValues) {
+        public int distinctValues() {
+            return evaluationCount;
+        }
     }
 
-    private enum InstructionKind { NUMBER, VARIABLE, OPERATION }
+    private enum Kind { NUMBER, VARIABLE, OPERATION }
 
-    private record Instruction(
-            InstructionKind kind,
+    private record Step(
+            Kind kind,
             double number,
             String variable,
             String operator,
             List<Integer> operands,
             List<Integer> multiplicities) {
-        private static Instruction number(double value) {
-            return new Instruction(InstructionKind.NUMBER, value, "", "", List.of(), List.of());
+        private static Step number(double value) {
+            return new Step(Kind.NUMBER, value, "", "", List.of(), List.of());
         }
 
-        private static Instruction variable(String name) {
-            return new Instruction(InstructionKind.VARIABLE, 0.0, name, "", List.of(), List.of());
+        private static Step variable(String name) {
+            return new Step(Kind.VARIABLE, 0.0, name, "", List.of(), List.of());
         }
 
-        private static Instruction operation(
-                String operator,
-                List<Integer> operands,
-                List<Integer> multiplicities) {
-            return new Instruction(
-                    InstructionKind.OPERATION,
-                    0.0,
-                    "",
-                    operator,
-                    List.copyOf(operands),
-                    List.copyOf(multiplicities));
+        private static Step operation(String operator, List<Integer> operands, List<Integer> counts) {
+            return new Step(Kind.OPERATION, 0.0, "", operator, List.copyOf(operands), List.copyOf(counts));
         }
 
         private int multiplicity(int index) {
@@ -334,60 +244,6 @@ public final class ValueDagEvaluationExperiment implements AutoCloseable {
         }
     }
 
-    private record EvaluationPlan(List<Instruction> instructions, int rootSlot) {
-    }
-
-    private record EvaluationRun(
-            double value,
-            int evaluations,
-            int distinctValues,
-            long planConstructionNanos,
-            long executionNanos,
-            boolean planCacheHit) {
-    }
-
-    private record Execution(double value, int evaluations) {
-    }
-
-    private record TreeExecution(double value, int evaluations) {
-    }
-
-    /** Small access-ordered cache reusable by later evaluator or matcher experiments. */
-    static final class BoundedValueCache<V> {
-        private final int maximumEntries;
-        private final LinkedHashMap<ValueKey, V> entries = new LinkedHashMap<>(16, 0.75f, true);
-        private long evictions;
-
-        private BoundedValueCache(int maximumEntries) {
-            if (maximumEntries < 1) {
-                throw new IllegalArgumentException("maximumEntries must be positive");
-            }
-            this.maximumEntries = maximumEntries;
-        }
-
-        private V get(ValueKey key) {
-            return entries.get(key);
-        }
-
-        private void put(ValueKey key, V value) {
-            if (!entries.containsKey(key) && entries.size() >= maximumEntries) {
-                ValueKey eldest = entries.keySet().iterator().next();
-                entries.remove(eldest);
-                evictions++;
-            }
-            entries.put(key, value);
-        }
-
-        private int size() {
-            return entries.size();
-        }
-
-        private long evictions() {
-            return evictions;
-        }
-
-        private void clear() {
-            entries.clear();
-        }
+    private record Plan(List<Step> steps, int rootSlot) {
     }
 }
