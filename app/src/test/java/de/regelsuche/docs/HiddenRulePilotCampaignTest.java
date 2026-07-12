@@ -31,9 +31,24 @@ class HiddenRulePilotCampaignTest {
         assertEquals(5, report.frozenCandidates());
         assertEquals(5, report.materialAblations());
         assertEquals(5, report.acceptedCases());
+        assertTrue(report.cases().stream()
+            .allMatch(caseReport -> caseReport.evaluation().validationPassed()));
+        assertTrue(report.cases().stream()
+            .allMatch(caseReport -> caseReport.runtime()
+                .validationEvidence().generatedValidationExamples() > 0));
+        assertTrue(report.cases().stream()
+            .allMatch(caseReport -> caseReport.runtime()
+                .validationEvidence().failedValidationExamples() == 0));
+        assertTrue(report.cases().stream()
+            .flatMap(caseReport -> caseReport.runtime()
+                .validationEvidence().counterexampleSearches().stream())
+            .noneMatch(search -> search.counterexamplePresent()
+                || search.status().equals("COUNTEREXAMPLE_FOUND")));
         assertEquals(json, report.toJson());
         assertTrue(Files.isRegularFile(output));
         assertTrue(json.contains("\"schema\":\"regelsuche.hidden-rule-pilot/v1\""));
+        assertTrue(json.contains("\"validationPassed\":true"));
+        assertTrue(json.contains("\"proofStatus\":\"SYMBOLICALLY_VERIFIED\""));
         assertTrue(json.contains("\"splitPassed\":true"));
         assertTrue(json.contains("\"materialBenefit\":true"));
         assertTrue(json.indexOf("case-001") < json.indexOf("case-005"));
