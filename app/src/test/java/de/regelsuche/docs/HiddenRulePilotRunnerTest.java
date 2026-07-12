@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.docs.HiddenRulePilotCampaign.CaseReport;
 import de.regelsuche.docs.HiddenRulePilotCampaign.PilotCase;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.CandidateRelation;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
@@ -21,16 +22,15 @@ import org.junit.jupiter.api.Test;
 
 class HiddenRulePilotRunnerTest {
     private static final PilotCase NEUTRAL_CASE = caseById("case-001");
-    private static final RuntimeResult NEUTRAL_RUNTIME =
-        new HiddenRulePilotRunner().run(NEUTRAL_CASE.task());
+    private static final CaseReport NEUTRAL_REPORT =
+        HiddenRulePilotTestEvidence.caseReport("case-001");
 
-    private final HiddenRulePilotRunner runner = new HiddenRulePilotRunner();
     private final HiddenRulePilotEvaluator evaluator = new HiddenRulePilotEvaluator();
     private final HiddenRuleHoldoutPartition partition = new HiddenRuleHoldoutPartition();
 
     @Test
     void rediscoversAndCompilesANeutralElementMacroFromPrimitiveSearchOnly() {
-        RuntimeResult runtime = NEUTRAL_RUNTIME;
+        RuntimeResult runtime = NEUTRAL_REPORT.runtime();
 
         assertEquals(RuntimeStatus.CANDIDATE_FROZEN, runtime.status(), runtime.toString());
         assertTrue(runtime.primitiveRuleIds().contains("ast_add_zero_right"));
@@ -46,14 +46,14 @@ class HiddenRulePilotRunnerTest {
         assertTrue(partition.audit(NEUTRAL_CASE.task()).passed(),
             partition.audit(NEUTRAL_CASE.task()).collisions().toString());
 
-        assertRediscovered(evaluator.evaluate(
-            NEUTRAL_CASE.task(), runtime, NEUTRAL_CASE.reference()));
+        assertRediscovered(NEUTRAL_REPORT.evaluation());
     }
 
     @Test
     void rediscoversSophieGermainAsASecondFamilyFromBridgeAndFactorPrimitives() {
         PilotCase pilotCase = caseById("case-002");
-        RuntimeResult runtime = runner.run(pilotCase.task());
+        CaseReport report = HiddenRulePilotTestEvidence.caseReport("case-002");
+        RuntimeResult runtime = report.runtime();
 
         assertEquals(RuntimeStatus.CANDIDATE_FROZEN, runtime.status(), runtime.toString());
         assertTrue(runtime.primitiveRuleIds().contains(
@@ -66,8 +66,7 @@ class HiddenRulePilotRunnerTest {
         assertTrue(partition.audit(pilotCase.task()).passed(),
             partition.audit(pilotCase.task()).collisions().toString());
 
-        assertRediscovered(evaluator.evaluate(
-            pilotCase.task(), runtime, pilotCase.reference()));
+        assertRediscovered(report.evaluation());
     }
 
     @Test
@@ -75,8 +74,8 @@ class HiddenRulePilotRunnerTest {
         RuntimeTask leakedTask = copyTask(
             NEUTRAL_CASE.task(), "hidden_neutral_element_macro", NEUTRAL_CASE.task().primitiveEngine());
 
-        HiddenRulePilotEvaluator.Evaluation evaluation =
-            evaluator.evaluate(leakedTask, NEUTRAL_RUNTIME, NEUTRAL_CASE.reference());
+        HiddenRulePilotEvaluator.Evaluation evaluation = evaluator.evaluate(
+            leakedTask, NEUTRAL_REPORT.runtime(), NEUTRAL_CASE.reference());
 
         assertFalse(evaluation.leakageViolations().isEmpty());
         assertFalse(evaluation.pilotAccepted());
@@ -100,8 +99,8 @@ class HiddenRulePilotRunnerTest {
         RuntimeTask leakedTask = copyTask(
             NEUTRAL_CASE.task(), NEUTRAL_CASE.task().opaqueCaseId(), nested);
 
-        HiddenRulePilotEvaluator.Evaluation evaluation =
-            evaluator.evaluate(leakedTask, NEUTRAL_RUNTIME, NEUTRAL_CASE.reference());
+        HiddenRulePilotEvaluator.Evaluation evaluation = evaluator.evaluate(
+            leakedTask, NEUTRAL_REPORT.runtime(), NEUTRAL_CASE.reference());
 
         assertTrue(evaluation.leakageViolations().stream()
             .anyMatch(violation -> violation.location().equals("PRIMITIVE_RULE_TEMPLATE")));
@@ -119,8 +118,8 @@ class HiddenRulePilotRunnerTest {
         RuntimeTask leakedTask = copyTask(
             NEUTRAL_CASE.task(), NEUTRAL_CASE.task().opaqueCaseId(), hiddenShortcut);
 
-        HiddenRulePilotEvaluator.Evaluation evaluation =
-            evaluator.evaluate(leakedTask, NEUTRAL_RUNTIME, NEUTRAL_CASE.reference());
+        HiddenRulePilotEvaluator.Evaluation evaluation = evaluator.evaluate(
+            leakedTask, NEUTRAL_REPORT.runtime(), NEUTRAL_CASE.reference());
 
         assertTrue(evaluation.leakageViolations().stream()
             .anyMatch(violation -> violation.location().equals("TRAIN_DIRECT_PRIMITIVE")));
