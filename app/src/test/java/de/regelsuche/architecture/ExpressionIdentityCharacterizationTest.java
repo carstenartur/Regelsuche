@@ -12,13 +12,15 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.plugin.AstVisitorContext;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * Characterizes the identity notions that coexist before ADR #242 is decided.
+ * Characterizes the identity notions that coexist before ADR #242 is migrated.
  *
- * <p>These tests intentionally describe the current implementation. They are not
- * the contract of the future expression model.</p>
+ * <p>These tests intentionally describe the current implementation and the
+ * minimum occurrence/value distinction required by the accepted ADR.</p>
  */
 class ExpressionIdentityCharacterizationTest {
     private final ExpressionParser parser = new ExpressionParser();
@@ -54,6 +56,20 @@ class ExpressionIdentityCharacterizationTest {
         assertEquals("right", context.metadata(sum.right()).get("side"));
         assertNotSame(sum.left(), sum.right(),
             "interning the current Expr objects directly would collapse occurrence metadata");
+    }
+
+    @Test
+    void aNormalSetPreservesDistinctOccurrencesOfOneEqualValue() {
+        Expr value = new VariableExpr("a");
+        Set<Use> uses = new LinkedHashSet<>();
+
+        uses.add(new Use(1, value));
+        uses.add(new Use(2, value));
+
+        assertEquals(2, uses.size(),
+            "Set is valid for unordered occurrences when occurrence identity is explicit");
+        assertSame(uses.stream().toList().get(0).value(), uses.stream().toList().get(1).value(),
+            "both occurrences may reference the same mathematical value object");
     }
 
     @Test
@@ -95,5 +111,8 @@ class ExpressionIdentityCharacterizationTest {
             "BinaryExpr permits shared child references even though the parser does not create them");
         assertEquals(parser.parseTerm("a + a"), sum,
             "record equality cannot distinguish a shared value from two equal occurrences");
+    }
+
+    private record Use(long id, Expr value) {
     }
 }
