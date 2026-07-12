@@ -355,8 +355,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L355">        String profileName = stringValue(body, &quot;profile&quot;, SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);</span>
 <span class="fc" id="L356">        String goalName = stringValue(body, &quot;goal&quot;, &quot;&quot;).toUpperCase(Locale.ROOT);</span>
 <span class="fc bfc" id="L357" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="nc" id="L358">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
-<span class="nc" id="L359">            return;</span>
+<span class="fc" id="L358">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
+<span class="fc" id="L359">            return;</span>
         }
         InputType type;
         SearchProfile profile;
@@ -368,8 +368,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L368">                ? profile.defaultGoal()</span>
 <span class="fc" id="L369">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L370">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="fc" id="L372">            return;</span>
+<span class="nc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="nc" id="L372">            return;</span>
 <span class="fc" id="L373">        }</span>
 <span class="fc" id="L374">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1389,8 +1389,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1389">            return;</span>
         }
 <span class="fc bfc" id="L1391" title="All 2 branches covered.">        if (!&quot;tree&quot;.equals(suffix)) {</span>
-<span class="nc" id="L1392">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
-<span class="nc" id="L1393">            return;</span>
+<span class="fc" id="L1392">            sendStatus(exchange, 404, &quot;expected /api/inspect/tree?expression=...&quot;);</span>
+<span class="fc" id="L1393">            return;</span>
         }
 <span class="fc bfc" id="L1395" title="All 2 branches covered.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
 <span class="fc" id="L1396">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
