@@ -17,7 +17,7 @@ buildscript {
 
     dependencies {
         if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
-            classpath 'org.aiknowledge:ai-knowledge-gradle-plugin:0.1.4'
+            classpath 'org.aiknowledge:ai-knowledge-gradle-plugin:0.1.7'
         }
     }
 }
@@ -32,22 +32,12 @@ if (aiKnowledgeEnabled) {
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
 
-        // Context-size gate: this measures AI context footprint, not local method complexity.
-        // Keep it slightly above the observed 0.1.4 baseline so normal code-structure improvements
-        // are judged by the method-level gates below rather than by repository context size alone.
-        // Threshold raised from 360.0 → 362.0 to accommodate the DynamicPatternOperator /
-        // DynamicOperatorCompiler / DynamicCandidateRegistry additions (observed debt: 360.65).
-        // Threshold raised from 362.0 → 363.0 to accommodate current codebase state (observed debt: 362.85).
-        // Threshold raised from 364.0 → 365.0 to keep the quality gate aligned with the current observed debt (364.255).
-        // Threshold raised from 365.0 → 366.0 to accommodate DiscoveryStoryTimelineWriter /
-        // DiscoveryObservatoryWriter / StaticReferencePageGenerator additions (observed debt: 365.905).
-        // Temporary 0.1.4 baseline raised from 366.0 → 371.0 for equivalence-aware rule recognition
-        // (observed debt: 369.70). Recalibrate after adopting the improved extractor release.
-        maxCognitiveDebt = 371.0d
+        // Extractor 0.1.7 schema v3 measured normalized context debt 20.28:
+        // p90 capability working set 220,496 of 1,087,416 context tokens,
+        // all 8 capabilities sampled through precise type/package selectors.
+        // The 21.0 limit leaves a 0.72-point regression margin.
+        maxCognitiveDebt = 21.0d
 
-        // Method-level gates from ai-knowledge-extractor 0.1.4. The current baseline is
-        // max cognitive complexity 64 and max cyclomatic complexity 33; keep the gate just
-        // above that baseline so future regressions fail while existing hotspots remain visible.
         maxMethodCognitiveComplexity = 65
         maxMethodCyclomaticComplexity = 35
         maxAverageMethodCognitiveComplexity = 4.0d
