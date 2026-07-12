@@ -7,6 +7,10 @@ import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,25 +19,9 @@ import java.util.Optional;
  * A quarantined, dynamically compiled hypothesis operator that executes an
  * AST rewrite rule specified entirely by a left-hand pattern and a right-hand
  * template, without requiring a hand-written Java operator class.
- *
- * <p>Safety invariants enforced at execution time:
- * <ul>
- *   <li>Identity rewrites (output == input) are suppressed.</li>
- *   <li>Structural cycle guards prevent the operator from reproducing itself:
- *       the rule ID is a hypothesis-specific prefix, not a global rule name.</li>
- *   <li>Operators in CANDIDATE state are not eligible for global activation; only
- *       VALIDATED operators may be promoted by {@link DynamicCandidateRegistry}.</li>
- *   <li>Every emitted transformation carries the hypothesis revision in its
- *       {@code applicationKey}, satisfying edge provenance requirements.</li>
- * </ul>
- * </p>
- *
- * <p>The operator is deterministic: given the same input expression it always
- * produces the same candidate set.</p>
  */
 public final class DynamicPatternOperator implements HypothesisOperator {
 
-    /** Prefix used to distinguish dynamically compiled operator IDs from static ones. */
     public static final String RULE_ID_PREFIX = "dynamic_hypothesis_";
 
     private final String ruleId;
@@ -82,49 +70,30 @@ public final class DynamicPatternOperator implements HypothesisOperator {
         this.maxCandidates = maxCandidates < 1 ? 1 : maxCandidates;
     }
 
-    /** The unique rule ID for this dynamic operator (includes hypothesis ID). */
     public String ruleId() {
         return ruleId;
     }
 
-    /** The hypothesis ID this operator was compiled from. */
     public String hypothesisId() {
         return hypothesisId;
     }
 
-    /** The hypothesis revision tag attached to every emitted transformation. */
     public String hypothesisRevision() {
         return hypothesisRevision;
     }
 
-    /** A deterministic hash of the compiled patterns, for reproducibility checks. */
     public String provenanceHash() {
         return provenanceHash;
     }
 
-    /** The left (source) pattern as a string, for serialisation and audit. */
     public String leftPatternText() {
         return leftPatternText;
     }
 
-    /** The right (target) template as a string, for serialisation and audit. */
     public String rightPatternText() {
         return rightPatternText;
     }
 
-    /**
-     * Attempts to match the left pattern against {@code expression} and, on
-     * success, instantiates the right template from the captured bindings.
-     *
-     * <p>Returns an empty list when:
-     * <ul>
-     *   <li>the expression cannot be parsed,</li>
-     *   <li>the left pattern does not match,</li>
-     *   <li>template instantiation fails, or</li>
-     *   <li>the resulting expression is identical to the input (identity rewrite).</li>
-     * </ul>
-     * </p>
-     */
     @Override
     public List<Transformation> generateCandidates(String expression) {
         if (expression == null || expression.isBlank()) {
@@ -141,13 +110,14 @@ public final class DynamicPatternOperator implements HypothesisOperator {
             return List.of();
         }
         String formattedOutput = ExpressionFormatter.format(outputExpr);
-        String formattedInput = normalizeWhitespace(expression);
-        // Suppress identity rewrites
-        if (canonicalKey(formattedOutput).equals(canonicalKey(formattedInput))) {
+        String formattedInput = formatted(expression);
+        // A rewrite is an identity only when its parsed syntax is unchanged. Mathematical
+        // canonical equality must not suppress useful simplifications such as (A + 0) * 1 -> A.
+        if (formattedOutput.equals(formattedInput)) {
             return List.of();
         }
         String applicationKey = ruleId + ":" + hypothesisRevision + ":"
-            + canonicalizer.stableHash(formattedInput) + "->" + canonicalizer.stableHash(formattedOutput);
+            + syntaxHash(formattedInput) + "->" + syntaxHash(formattedOutput);
         Transformation transformation = new Transformation(
             ruleId,
             formattedOutput,
@@ -162,15 +132,21 @@ public final class DynamicPatternOperator implements HypothesisOperator {
             .toList();
     }
 
-    private String canonicalKey(String expression) {
+    private String formatted(String expression) {
         try {
-            return canonicalizer.stableHash(expression);
+            return ExpressionFormatter.format(parser.parseTerm(expression));
         } catch (IllegalArgumentException ignored) {
-            return expression;
+            return expression.trim().replaceAll("\\s+", " ");
         }
     }
 
-    private static String normalizeWhitespace(String expression) {
-        return expression.trim();
+    private static String syntaxHash(String expression) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(expression.getBytes(StandardCharsets.UTF_8));
+            return "syntax-v1:" + HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
     }
 }
