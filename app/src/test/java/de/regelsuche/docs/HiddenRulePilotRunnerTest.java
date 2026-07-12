@@ -106,7 +106,7 @@ class HiddenRulePilotRunnerTest {
     void detectsHiddenPatternsInsideInspectablePrimitiveRuleMetadata() {
         PilotFixture fixture = neutralElementFixture("case-leak-check");
         List<RewriteRule> leakedRules = List.of(new de.regelsuche.transform.PatternRewriteRule(
-            fixture.reference().hiddenRuleId(),
+            "opaque_primitive_rule",
             de.regelsuche.transform.PatternExpr.op(
                 de.regelsuche.ast.BinaryOperator.MUL,
                 de.regelsuche.transform.PatternExpr.op(
@@ -129,6 +129,8 @@ class HiddenRulePilotRunnerTest {
             evaluator.evaluate(leakedTask, runtime, fixture.reference());
 
         assertFalse(evaluation.leakageViolations().isEmpty());
+        assertTrue(evaluation.leakageViolations().stream()
+            .anyMatch(violation -> violation.location().equals("PRIMITIVE_RULE_TEMPLATE")));
         assertFalse(evaluation.pilotAccepted());
     }
 
