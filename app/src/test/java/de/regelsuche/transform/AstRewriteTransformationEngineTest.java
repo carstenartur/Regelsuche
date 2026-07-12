@@ -82,8 +82,10 @@ class AstRewriteTransformationEngineTest {
         List<Transformation> firstSteps = occurrenceAware.transform("(x * x) * (x * x)").stream()
             .filter(transformation -> transformation.rule().equals("ast_product_to_power_two"))
             .toList();
-        assertEquals(2, firstSteps.size());
-        assertEquals(2, firstSteps.stream().map(Transformation::applicationKey).distinct().count());
+        assertTrue(firstSteps.size() >= 2,
+            "left and right occurrences must both remain available; a whole-root match is also valid");
+        assertEquals((long) firstSteps.size(),
+            firstSteps.stream().map(Transformation::applicationKey).distinct().count());
         assertTrue(firstSteps.stream().allMatch(transformation ->
             transformation.applicationKey().length() < 180
                 && !transformation.applicationKey().contains(transformation.transformedExpression())));
