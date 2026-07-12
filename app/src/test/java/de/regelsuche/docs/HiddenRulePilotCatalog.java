@@ -45,9 +45,9 @@ final class HiddenRulePilotCatalog {
             "neutral-element-simplification",
             "(A - 0) / 1", "A"));
         references.put("case-005", reference(
-            "hidden_cube_normalization_macro",
+            "hidden_quartic_normalization_macro",
             "power-normalization",
-            "(A * A) * A", "A^3"));
+            "(A * A) * (A * A)", "A^4"));
         return Map.copyOf(references);
     }
 
