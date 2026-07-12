@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.docs.HiddenRulePilotCampaign.CaseReport;
 import de.regelsuche.docs.HiddenRulePilotCampaign.PilotCase;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.CandidateRelation;
+import de.regelsuche.docs.HiddenRulePilotRunner.NegativeHoldout;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeStatus;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
@@ -17,6 +18,7 @@ import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -71,8 +73,18 @@ class HiddenRulePilotRunnerTest {
 
     @Test
     void detectsHiddenIdentifiersInTheRuntimeInputBeforeAnyPublicClaim() {
-        RuntimeTask leakedTask = copyTask(
-            NEUTRAL_CASE.task(), "hidden_neutral_element_macro", NEUTRAL_CASE.task().primitiveEngine());
+        List<NegativeHoldout> leakedNegatives = new ArrayList<>(
+            NEUTRAL_CASE.task().negativeHoldouts());
+        leakedNegatives.add(new NegativeHoldout(
+            "hidden_neutral_element_macro", "u + 1"));
+        RuntimeTask leakedTask = new RuntimeTask(
+            NEUTRAL_CASE.task().opaqueCaseId(),
+            NEUTRAL_CASE.task().inputExpression(),
+            NEUTRAL_CASE.task().target(),
+            NEUTRAL_CASE.task().primitiveEngine(),
+            NEUTRAL_CASE.task().heuristic(),
+            NEUTRAL_CASE.task().positiveHoldouts(),
+            leakedNegatives);
 
         HiddenRulePilotEvaluator.Evaluation evaluation = evaluator.evaluate(
             leakedTask, NEUTRAL_REPORT.runtime(), NEUTRAL_CASE.reference());
