@@ -13,6 +13,8 @@ import de.regelsuche.mining.KnownRuleRepository;
 import de.regelsuche.mining.PatternGeneralizer;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.mining.SuccessfulTransformationPath;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
@@ -21,10 +23,12 @@ import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.search.strategy.SearchProblem.TargetRelation;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
 import java.util.ArrayList;
@@ -42,6 +46,7 @@ import java.util.Objects;
 public final class HiddenRulePilotRunner {
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+    private final ExpressionParser parser = new ExpressionParser();
     private final SymPyEquivalenceService equivalence = new SymPyEquivalenceService();
     private final DynamicOperatorCompiler compiler = new DynamicOperatorCompiler();
 
@@ -90,14 +95,18 @@ public final class HiddenRulePilotRunner {
             learned.confidenceScore(),
             operator.ruleId(),
             operator.provenanceHash());
-        RuntimeStatus status = holdouts.allPassed() && validation.passed()
-            ? RuntimeStatus.CANDIDATE_FROZEN
-            : RuntimeStatus.HOLDOUT_FAILED;
-        String failure = status == RuntimeStatus.CANDIDATE_FROZEN
-            ? ""
-            : validation.passed()
-                ? "one or more holdouts failed"
-                : "candidate validation evidence failed";
+        RuntimeStatus status;
+        String failure;
+        if (!validation.passed()) {
+            status = RuntimeStatus.VALIDATION_FAILED;
+            failure = "candidate validation evidence failed";
+        } else if (!holdouts.allPassed()) {
+            status = RuntimeStatus.HOLDOUT_FAILED;
+            failure = "one or more holdouts failed";
+        } else {
+            status = RuntimeStatus.CANDIDATE_FROZEN;
+            failure = "";
+        }
         return new RuntimeResult(
             task.opaqueCaseId(),
             status,
@@ -161,18 +170,19 @@ public final class HiddenRulePilotRunner {
         List<Transformation> direct = operator.generateCandidates(holdout.inputExpression());
         boolean applies = direct.stream().anyMatch(candidate ->
             equivalence.areEquivalent(candidate.transformedExpression(), holdout.targetExpression()));
+        SearchTarget target = syntaxTarget(holdout.targetExpression());
 
         GoalSearchResult baseline = search(
             task.primitiveEngine(),
             holdout.inputExpression(),
-            SearchTarget.valueEquivalent(holdout.targetExpression()),
+            target,
             holdout.heuristicOr(task.heuristic()));
         TransformationEngine augmented = new HypothesisTransformationEngine(
             task.primitiveEngine(), List.of(operator), 4);
         GoalSearchResult withCandidate = search(
             augmented,
             holdout.inputExpression(),
-            SearchTarget.valueEquivalent(holdout.targetExpression()),
+            target,
             holdout.heuristicOr(task.heuristic()));
         AblationEvidence ablation = AblationEvidence.from(baseline, withCandidate);
         return new PositiveHoldoutResult(
@@ -198,10 +208,15 @@ public final class HiddenRulePilotRunner {
         return new BestFirstSearchStrategy().searchWithDiagnostics(problem);
     }
 
+    private SearchTarget syntaxTarget(String expression) {
+        return SearchTarget.syntaxExact(ExpressionFormatter.format(parser.parseTerm(expression)));
+    }
+
     public enum RuntimeStatus {
         SEARCH_FAILED,
         LEARNING_REJECTED,
         COMPILATION_REJECTED,
+        VALIDATION_FAILED,
         HOLDOUT_FAILED,
         CANDIDATE_FROZEN
     }
@@ -219,6 +234,10 @@ public final class HiddenRulePilotRunner {
             requireText(opaqueCaseId, "opaqueCaseId");
             requireText(inputExpression, "inputExpression");
             Objects.requireNonNull(target, "target");
+            if (target.relation() != TargetRelation.SYNTAX_EXACT) {
+                throw new IllegalArgumentException(
+                    "hidden-rule tasks require an observable SYNTAX_EXACT endpoint");
+            }
             Objects.requireNonNull(primitiveEngine, "primitiveEngine");
             Objects.requireNonNull(heuristic, "heuristic");
             positiveHoldouts = positiveHoldouts == null ? List.of() : List.copyOf(positiveHoldouts);
@@ -325,10 +344,21 @@ public final class HiddenRulePilotRunner {
         }
 
         public boolean passed() {
-            boolean positiveProof = !proofStatus.equals("NONE") && !proofStatus.equals("REJECTED");
+            CandidateProofStatus status;
+            try {
+                status = CandidateProofStatus.valueOf(proofStatus);
+            } catch (IllegalArgumentException exception) {
+                return false;
+            }
+            boolean positiveProof = switch (status) {
+                case VALIDATED_BY_EXAMPLES, SYMBOLICALLY_VERIFIED,
+                    FORMALLY_PROVABLE, FORMALLY_PROVED -> true;
+                default -> false;
+            };
             boolean noCounterexample = counterexampleSearches.stream()
                 .noneMatch(search -> search.counterexamplePresent()
-                    || search.status().equals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND.name()));
+                    || search.status().equals(
+                        CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND.name()));
             return positiveProof
                 && generatedValidationExamples > 0
                 && failedValidationExamples == 0
