@@ -9,7 +9,9 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.value.ExprValueFactory;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /** Bounded canonicalization used only for recognition and anti-unification. */
@@ -62,8 +64,11 @@ public final class RecognitionNormalizer {
                 flatten(left, operator, operands);
                 flatten(right, operator, operands);
                 if (profile.isCommutative(operator)) {
+                    Map<Expr, ExprValueFactory.ValueKey> keys = new HashMap<>();
+                    operands.forEach(operand ->
+                        keys.computeIfAbsent(operand, value -> values.fromExpr(value).key()));
                     operands.sort(Comparator
-                        .comparing((Expr operand) -> values.fromExpr(operand).key())
+                        .comparing((Expr operand) -> keys.get(operand))
                         .thenComparing(ExpressionFormatter::format));
                 }
                 return rebuild(operands, operator);
