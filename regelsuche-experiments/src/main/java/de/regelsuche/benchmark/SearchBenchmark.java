@@ -242,9 +242,11 @@ public class SearchBenchmark {
         }
 
         private static double execute(Plan plan, Map<String, Double> variables) {
-            double[] results = new double[plan.steps().size()];
-            for (int slot = 0; slot < plan.steps().size(); slot++) {
-                Step step = plan.steps().get(slot);
+            List<Step> steps = plan.steps();
+            int size = steps.size();
+            double[] results = new double[size];
+            for (int slot = 0; slot < size; slot++) {
+                Step step = steps.get(slot);
                 results[slot] = switch (step.kind()) {
                     case NUMBER -> step.number();
                     case VARIABLE -> requireVariable(variables, step.variable());
@@ -271,14 +273,15 @@ public class SearchBenchmark {
             for (int i = 0; i < step.operands().size(); i++) {
                 double operand = results[step.operands().get(i)];
                 int multiplicity = step.multiplicity(i);
-                value = sum ? value + operand * multiplicity : value * Math.pow(operand, multiplicity);
+                double factor = multiplicity == 1 ? operand : Math.pow(operand, multiplicity);
+                value = sum ? value + operand * multiplicity : value * factor;
             }
             return value;
         }
 
         private static double function(String operator, double argument) {
             if (!operator.startsWith("fn:")) {
-                throw new IllegalArgumentException("unsupported operator: " + operator);
+                throw new IllegalArgumentException("unsupported function operator: " + operator);
             }
             return switch (operator.substring(3)) {
                 case "sin" -> Math.sin(argument);
