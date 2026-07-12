@@ -95,7 +95,8 @@ public final class ValueDagEvaluationExperiment implements AutoCloseable {
     private static Plan compile(ExprValue root) {
         Map<ValueKey, Integer> slots = new LinkedHashMap<>();
         List<Step> steps = new ArrayList<>();
-        return new Plan(List.copyOf(steps), compile(root, slots, steps));
+        int rootSlot = compile(root, slots, steps);
+        return new Plan(List.copyOf(steps), rootSlot);
     }
 
     private static int compile(ExprValue value, Map<ValueKey, Integer> slots, List<Step> steps) {
@@ -160,8 +161,9 @@ public final class ValueDagEvaluationExperiment implements AutoCloseable {
     private static double aggregate(Step step, double[] results, double initial, boolean sum) {
         double value = initial;
         for (int i = 0; i < step.operands().size(); i++) {
-            double term = Math.pow(results[step.operands().get(i)], step.multiplicity(i));
-            value = sum ? value + term * (step.multiplicity(i) == 1 ? 1 : 1) : value * term;
+            double operand = results[step.operands().get(i)];
+            int multiplicity = step.multiplicity(i);
+            value = sum ? value + operand * multiplicity : value * Math.pow(operand, multiplicity);
         }
         return value;
     }
