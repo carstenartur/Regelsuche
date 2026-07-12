@@ -30,12 +30,16 @@ public final class HiddenRulePilotEvaluator {
         CandidateRelation relation = relation(runtimeResult, hiddenReference);
         boolean holdoutsPassed = runtimeResult.holdouts().allPassed();
         boolean material = runtimeResult.holdouts().materialAblations() > 0;
-        boolean eligible = leakage.isEmpty()
+        boolean rediscovered = relation == CandidateRelation.EXACT
+            || relation == CandidateRelation.ALPHA_EQUIVALENT
+            || relation == CandidateRelation.SEMANTICALLY_EQUIVALENT;
+        boolean accepted = leakage.isEmpty()
             && runtimeResult.frozen()
             && holdoutsPassed
             && material
-            && relation != CandidateRelation.NONE;
-        List<String> blockers = blockers(runtimeResult, leakage, relation, material);
+            && rediscovered;
+        List<String> blockers = blockers(
+            runtimeResult, leakage, relation, material, rediscovered);
         return new Evaluation(
             runtimeTask.opaqueCaseId(),
             hiddenReference.family(),
@@ -44,7 +48,7 @@ public final class HiddenRulePilotEvaluator {
             runtimeResult.frozen(),
             holdoutsPassed,
             material,
-            eligible,
+            accepted,
             blockers);
     }
 
@@ -95,7 +99,8 @@ public final class HiddenRulePilotEvaluator {
         RuntimeResult result,
         List<LeakageViolation> leakage,
         CandidateRelation relation,
-        boolean material
+        boolean material,
+        boolean rediscovered
     ) {
         List<String> blockers = new ArrayList<>();
         if (!leakage.isEmpty()) {
@@ -112,17 +117,31 @@ public final class HiddenRulePilotEvaluator {
         }
         if (relation == CandidateRelation.NONE) {
             blockers.add("no candidate was produced");
+        } else if (!rediscovered) {
+            blockers.add("candidate differs from hidden reference");
         }
         return List.copyOf(blockers);
     }
 
     private static boolean containsToken(String observable, String token) {
         String normalizedToken = normalized(token);
-        if (normalizedToken.isEmpty()) {
+        if (!leakSensitive(normalizedToken)) {
             return false;
         }
-        return observable.contains(normalizedToken)
-            || compact(observable).contains(compact(normalizedToken));
+        if (looksLikeExpression(normalizedToken)) {
+            String compactToken = compact(normalizedToken);
+            return observable.lines().map(HiddenRulePilotEvaluator::compact)
+                .anyMatch(line -> line.equals(compactToken));
+        }
+        return observable.contains(normalizedToken);
+    }
+
+    private static boolean leakSensitive(String token) {
+        return !token.isEmpty() && compact(token).length() >= 4;
+    }
+
+    private static boolean looksLikeExpression(String token) {
+        return token.chars().anyMatch(character -> "+-*/^()".indexOf(character) >= 0);
     }
 
     private static String normalized(String value) {
@@ -184,7 +203,7 @@ public final class HiddenRulePilotEvaluator {
         boolean candidateFrozen,
         boolean holdoutsPassed,
         boolean materialAblation,
-        boolean galleryEvidenceEligible,
+        boolean pilotAccepted,
         List<String> blockers
     ) {
         public Evaluation {
