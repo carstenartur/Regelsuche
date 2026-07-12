@@ -123,7 +123,6 @@ jobs:
           warnings = []
           errors = []
 
-          # Check evidence.json contains useful entries (handles both list and object root)
           evidence_path = ai_dir / 'evidence.json'
           try:
               raw = json.loads(evidence_path.read_text(encoding='utf-8'))
@@ -134,7 +133,6 @@ jobs:
           if not evidence:
               errors.append('evidence.json is empty; expected repository evidence artifacts.')
 
-          # Check class/test facts are linked to method facts
           try:
               classes = json.loads((ai_dir / 'classes.json').read_text(encoding='utf-8')).get('classes', [])
               if not any(c.get('methodFacts') for c in classes):
@@ -142,25 +140,37 @@ jobs:
           except Exception as exc:
               errors.append(f'Could not parse classes.json: {exc}')
 
-          # Check method-level metrics and the normalized context footprint introduced in 0.1.5.
+          normalized = None
+          legacy = None
+          sample_count = None
           try:
               complexity = json.loads((ai_dir / 'complexity.json').read_text(encoding='utf-8'))
               code_complexity = complexity.get('codeComplexity', {})
               cost_drivers = complexity.get('aiCostDrivers', {})
               footprint = complexity.get('contextFootprint', {})
+              normalized = complexity.get('normalizedContextDebt')
+              legacy = complexity.get('legacyAiContextDebt')
+              sample_count = footprint.get('capabilitySampleCount')
+
               if 'maxMethodCognitiveComplexity' not in code_complexity:
                   errors.append('complexity.json lacks codeComplexity.maxMethodCognitiveComplexity.')
               if 'tokenCostDrivers' not in cost_drivers:
                   errors.append('complexity.json lacks aiCostDrivers.tokenCostDrivers.')
               if 'normalizedContextDebt' not in complexity:
-                  errors.append('complexity.json lacks normalizedContextDebt from extractor 0.1.5.')
+                  errors.append('complexity.json lacks normalizedContextDebt.')
               if 'legacyAiContextDebt' not in complexity:
                   errors.append('complexity.json lacks legacyAiContextDebt for migration comparison.')
               if not footprint:
-                  errors.append('complexity.json lacks contextFootprint from extractor 0.1.5.')
-              elif footprint.get('method') != 'line-weighted-capability-working-set-proxy':
-                  errors.append('contextFootprint.method is not the expected 0.1.5 metric.')
-              normalized = complexity.get('normalizedContextDebt')
+                  errors.append('complexity.json lacks contextFootprint.')
+              else:
+                  if footprint.get('schemaVersion') != 2:
+                      errors.append(f'contextFootprint.schemaVersion is not 2: {footprint.get("schemaVersion")!r}.')
+                  if footprint.get('method') != 'line-weighted-linked-capability-working-set-proxy':
+                      errors.append(f'Unexpected contextFootprint.method: {footprint.get("method")!r}.')
+                  if footprint.get('measurementStatus') != 'MEASURED':
+                      errors.append(f'Context footprint was not measured: {footprint.get("measurementStatus")!r}.')
+                  if not isinstance(sample_count, int) or sample_count <= 0:
+                      errors.append(f'capabilitySampleCount must be positive: {sample_count!r}.')
               if not isinstance(normalized, (int, float)) or not 0 <= normalized <= 100:
                   errors.append(f'normalizedContextDebt is outside the 0–100 scale: {normalized!r}.')
           except Exception as exc:
@@ -172,7 +182,10 @@ jobs:
               print(f'ERROR: {error}', file=sys.stderr)
           if errors:
               sys.exit(1)
-          print('AI knowledge artifacts passed normalized 0.1.5 quality checks.')
+          print('AI knowledge artifacts passed corrected 0.1.6 quality checks.')
+          print(f'normalizedContextDebt={normalized}')
+          print(f'legacyAiContextDebt={legacy}')
+          print(f'capabilitySampleCount={sample_count}')
           PY
 
       - name: Upload AI knowledge artifacts
