@@ -481,7 +481,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         GoalStatus status,
         GoalMetrics metrics
     ) {
-        private GoalSearchResult {
+        public GoalSearchResult {
             states = List.copyOf(states);
         }
 
