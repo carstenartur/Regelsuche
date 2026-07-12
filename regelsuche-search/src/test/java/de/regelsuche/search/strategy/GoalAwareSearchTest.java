@@ -1,6 +1,7 @@
 package de.regelsuche.search.strategy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
@@ -9,24 +10,17 @@ import de.regelsuche.scoring.cost.OperatorCountCost;
 import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * Verifies that attaching a {@link
- * de.regelsuche.scoring.cost.CostModel} via {@link
- * SearchProblem#withGoal(TransformationGoal)} actually changes the
- * {@link BestFirstSearchStrategy} expansion order — i.e. the cost model is
- * really consulted, it's not a stale field on {@code SearchProblem}.
- */
+/** Covers transformation objectives and typed target guidance independently. */
 class GoalAwareSearchTest {
 
     @Test
     void searchProblemWithoutCostModelRetainsLegacyBehaviour() {
-        // Two SearchProblems differing only in whether a CostModel is set
-        // must produce identical state sequences when the CostModel is the
-        // explicit OperatorCountCost (since OperatorCountCost matches the
-        // historical default).
         SearchProblem legacy = new SearchProblem(
             "(x + 0) * 1",
             new AstRewriteTransformationEngine(),
@@ -48,7 +42,6 @@ class GoalAwareSearchTest {
             new SearchHeuristic(4, 80, 1, 2, 40, 8)
         ).withCostModel(new OperatorCountCost());
 
-        // The goal-driven search must still reduce the trivial expression.
         List<SearchState> states = new BestFirstSearchStrategy().search(problem);
         assertTrue(states.stream().anyMatch(state -> state.expression().equals("x")),
             "BestFirst with OperatorCountCost must still reach 'x'");
@@ -56,9 +49,6 @@ class GoalAwareSearchTest {
 
     @Test
     void everyTransformationGoalCanDriveSearch() {
-        // Smoke test: every goal must yield at least one explored state on
-        // a trivial input — guards against future cost-model implementations
-        // throwing or producing pathological orderings.
         for (TransformationGoal goal : TransformationGoal.values()) {
             SearchProblem problem = new SearchProblem(
                 "x + 0",
@@ -84,5 +74,118 @@ class GoalAwareSearchTest {
         SearchProblem viaGoal = base.withGoal(TransformationGoal.SIMPLIFY);
         SearchProblem viaModel = base.withCostModel(TransformationGoal.SIMPLIFY.defaultCostModel());
         assertEquals(viaGoal.costModel().id(), viaModel.costModel().id());
+    }
+
+    @Test
+    void valueEquivalentTargetRecognizesAcRootIndependentOfGroupingAndOrder() {
+        SearchProblem problem = baseProblem(
+            "(a + b) + c",
+            expression -> List.of(),
+            2,
+            8,
+            4
+        ).withTarget("c + a + b");
+
+        BestFirstSearchStrategy.GoalSearchResult result =
+            new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+
+        assertTrue(result.reached());
+        assertEquals(BestFirstSearchStrategy.GoalStatus.ROOT_ALREADY_TARGET, result.status());
+        assertEquals(0, result.bestDistance());
+        assertEquals(List.of("(a + b) + c"),
+            result.states().stream().map(SearchState::expression).toList());
+    }
+
+    @Test
+    void targetDistanceOrdersUsefulCandidateBeforeRuleNameBudget() {
+        SearchProblem unguided = baseProblem(
+            "x",
+            new TargetAndDecoyEngine(),
+            1,
+            8,
+            1
+        );
+        SearchProblem guided = unguided.withTarget(
+            SearchProblem.SearchTarget.syntaxExact("a").withDistanceWeight(20));
+
+        List<String> legacyOrder = new BestFirstSearchStrategy().search(unguided).stream()
+            .map(SearchState::expression)
+            .toList();
+        BestFirstSearchStrategy.GoalSearchResult guidedResult =
+            new BestFirstSearchStrategy().searchWithDiagnostics(guided);
+
+        assertEquals(List.of("x", "z"), legacyOrder,
+            "without a target, deterministic rule ordering remains unchanged");
+        assertEquals(List.of("x", "a"),
+            guidedResult.states().stream().map(SearchState::expression).toList());
+        assertEquals(BestFirstSearchStrategy.GoalStatus.REACHED, guidedResult.status());
+        assertNotNull(guidedResult.reachedState());
+        assertEquals("a", guidedResult.reachedState().expression());
+        assertTrue(guidedResult.metrics().candidateBudgetPrunes() >= 1);
+    }
+
+    @Test
+    void diagnosticsDistinguishNoTransformationsFromGenericExhaustion() {
+        SearchProblem problem = baseProblem(
+            "x",
+            expression -> List.of(),
+            2,
+            8,
+            4
+        ).withTarget("y");
+
+        BestFirstSearchStrategy.GoalSearchResult result =
+            new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+
+        assertEquals(BestFirstSearchStrategy.GoalStatus.NO_TRANSFORMATIONS, result.status());
+        assertEquals(1, result.metrics().statesWithoutTransformations());
+        assertEquals(0, result.metrics().generatedTransformations());
+    }
+
+    @Test
+    void malformedValueTargetIsReportedExplicitly() {
+        SearchProblem problem = baseProblem(
+            "x",
+            expression -> List.of(),
+            1,
+            4,
+            2
+        ).withTarget("a +");
+
+        BestFirstSearchStrategy.GoalSearchResult result =
+            new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+
+        assertEquals(BestFirstSearchStrategy.GoalStatus.UNPARSEABLE_TARGET, result.status());
+    }
+
+    private static SearchProblem baseProblem(
+        String root,
+        TransformationEngine engine,
+        int maxDepth,
+        int maxStates,
+        int maxCandidates
+    ) {
+        return new SearchProblem(
+            root,
+            engine,
+            new ExpressionScorer(),
+            new ExpressionCanonicalizer(),
+            new SearchHeuristic(maxDepth, maxStates, 1, 2, maxCandidates, 8)
+        );
+    }
+
+    private static final class TargetAndDecoyEngine implements TransformationEngine {
+        @Override
+        public List<Transformation> transform(String expression) {
+            if (!"x".equals(expression)) {
+                return List.of();
+            }
+            return List.of(
+                new Transformation("rule_a_decoy", "z", RewriteKind.NORMALIZE,
+                    false, 0, true, "rule_a_decoy:z"),
+                new Transformation("rule_z_target", "a", RewriteKind.NORMALIZE,
+                    false, 0, true, "rule_z_target:a")
+            );
+        }
     }
 }

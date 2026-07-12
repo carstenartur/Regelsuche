@@ -4,9 +4,15 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.search.strategy.SearchProblem.TargetRelation;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.value.ExprValueFactory;
+import de.regelsuche.value.ExprValueFactory.AssociativeCommutativeValue;
+import de.regelsuche.value.ExprValueFactory.ExprValue;
+import de.regelsuche.value.ExprValueFactory.OrderedValue;
+import de.regelsuche.value.ExprValueFactory.ValueKey;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -18,15 +24,26 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
 
 public class BestFirstSearchStrategy implements SearchStrategy {
     @Override
     public List<SearchState> search(SearchProblem problem) {
+        return searchWithDiagnostics(problem).states();
+    }
+
+    /**
+     * Executes the same search as {@link #search(SearchProblem)} and additionally
+     * returns deterministic target/failure diagnostics when a target is attached.
+     */
+    public GoalSearchResult searchWithDiagnostics(SearchProblem problem) {
+        Objects.requireNonNull(problem, "problem");
         try (ValueIdentitySession identity = new ValueIdentitySession(problem.canonicalizer())) {
+            TargetSession target = new TargetSession(problem.target(), identity);
             SearchState rootState = createRootState(problem, identity);
-            SearchFrame frame = createFrame(problem, identity);
+            SearchFrame frame = createFrame(problem, identity, target);
             frame.frontier().add(rootState);
             frame.telemetry().searchStarted(rootState, frame.frontier().size(), frame.visited().size());
 
@@ -38,22 +55,28 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 frame.frontier().size(),
                 frame.visited().size(),
                 frame.explored().size());
-            return frame.explored();
+            return GoalSearchResult.from(problem, frame, rootState);
         }
     }
 
-    private SearchFrame createFrame(SearchProblem problem, ValueIdentitySession identity) {
+    private SearchFrame createFrame(
+        SearchProblem problem,
+        ValueIdentitySession identity,
+        TargetSession target
+    ) {
         return new SearchFrame(
-            new PriorityQueue<>(priorityComparator(problem)),
+            new PriorityQueue<>(priorityComparator(problem, target)),
             new ArrayList<>(),
             new HashSet<>(),
             SearchTelemetry.forProblem(problem),
-            identity
+            identity,
+            target,
+            new GoalProgress()
         );
     }
 
     private SearchState createRootState(SearchProblem problem, ValueIdentitySession identity) {
-        String root = problem.rootExpression().trim().replaceAll("\\s+", " ");
+        String root = normalize(problem.rootExpression());
         ExpressionScore rootScore = problem.scorer().score(root);
         return new SearchState(
             root,
@@ -74,9 +97,9 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         );
     }
 
-    private Comparator<SearchState> priorityComparator(SearchProblem problem) {
+    private Comparator<SearchState> priorityComparator(SearchProblem problem, TargetSession target) {
         return Comparator
-            .comparingInt((SearchState state) -> priority(state, problem))
+            .comparingInt((SearchState state) -> target.adjustedPriority(priority(state, problem), state.expression()))
             .thenComparingInt(SearchState::depth)
             .thenComparing(SearchState::canonicalHash)
             .thenComparing(SearchState::expression)
@@ -87,7 +110,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
 
     private boolean shouldContinue(SearchProblem problem, SearchFrame frame) {
         return !frame.frontier().isEmpty()
-            && frame.explored().size() < problem.heuristic().maxVisitedExpressions();
+            && frame.explored().size() < problem.heuristic().maxVisitedExpressions()
+            && !(frame.target().stopWhenReached() && frame.progress().reachedState != null);
     }
 
     private void processNextState(SearchProblem problem, SearchFrame frame) {
@@ -97,6 +121,13 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             return;
         }
         frame.explored().add(current);
+        frame.progress().record(current, frame.target().distance(current.expression()));
+        if (frame.target().reached(current.expression())) {
+            frame.progress().reachedState = current;
+            if (frame.target().stopWhenReached()) {
+                return;
+            }
+        }
         if (!pruneByDepth(problem, current, frame)) {
             expandState(problem, current, frame);
         }
@@ -107,6 +138,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             frame.telemetry().stateVisited(current, frame.frontier().size(), frame.visited().size());
             return true;
         }
+        frame.progress().duplicatePrunes++;
         frame.telemetry().statePrunedDuplicate(current, frame.frontier().size(), frame.visited().size(), 0);
         return false;
     }
@@ -123,6 +155,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 != TranspositionGate.Verdict.PRUNE) {
             return false;
         }
+        frame.progress().transpositionPrunes++;
         frame.telemetry().statePrunedTransposition(current, frame.frontier().size(), frame.visited().size());
         return true;
     }
@@ -131,12 +164,18 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         if (current.depth() < problem.heuristic().maxDepth()) {
             return false;
         }
+        frame.progress().depthPrunes++;
         frame.telemetry().statePrunedDepth(current, frame.frontier().size(), frame.visited().size());
         return true;
     }
 
     private void expandState(SearchProblem problem, SearchState current, SearchFrame frame) {
-        List<Transformation> transformations = sortedTransformations(problem, current);
+        List<Transformation> transformations = sortedTransformations(problem, current, frame.target());
+        frame.progress().expandedStates++;
+        frame.progress().generatedTransformations += transformations.size();
+        if (transformations.isEmpty()) {
+            frame.progress().statesWithoutTransformations++;
+        }
         frame.telemetry().stateExpanded(
             current,
             frame.frontier().size(),
@@ -153,12 +192,24 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         }
     }
 
-    private List<Transformation> sortedTransformations(SearchProblem problem, SearchState current) {
+    private List<Transformation> sortedTransformations(
+        SearchProblem problem,
+        SearchState current,
+        TargetSession target
+    ) {
         List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));
-        transformations.sort(Comparator
+        Comparator<Transformation> deterministic = Comparator
             .comparing(Transformation::rule)
             .thenComparing(Transformation::transformedExpression)
-            .thenComparing(Transformation::applicationKey));
+            .thenComparing(Transformation::applicationKey);
+        if (target.enabled()) {
+            transformations.sort(Comparator
+                .comparingInt((Transformation transformation) ->
+                    target.distance(transformation.transformedExpression()))
+                .thenComparing(deterministic));
+        } else {
+            transformations.sort(deterministic);
+        }
         return transformations;
     }
 
@@ -171,6 +222,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         if (generated < problem.heuristic().maxCandidatesPerState()) {
             return false;
         }
+        frame.progress().candidateBudgetPrunes++;
         frame.telemetry().statePrunedBudget(
             current,
             frame.frontier().size(),
@@ -194,6 +246,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             generated);
         String skipReason = skipReason(problem, current, transformation);
         if (!skipReason.isBlank()) {
+            frame.progress().skippedTransformations++;
             frame.telemetry().transformationSkipped(
                 current,
                 transformation,
@@ -205,6 +258,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         }
         SearchState nextState = createNextState(problem, current, transformation, frame.identity());
         if (frame.visited().contains(stateKey(nextState))) {
+            frame.progress().duplicatePrunes++;
             frame.telemetry().statePrunedDuplicate(
                 nextState,
                 frame.frontier().size(),
@@ -213,6 +267,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             return false;
         }
         frame.frontier().add(nextState);
+        frame.progress().enqueuedStates++;
         frame.telemetry().stateEnqueued(
             nextState,
             frame.frontier().size(),
@@ -316,11 +371,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     }
 
     /**
-     * Goal-aware priority. When the {@link SearchProblem} carries a
-     * {@link de.regelsuche.scoring.cost.CostModel} the model replaces the
-     * raw {@code weightedTotal()} term — every other component (depth and
-     * expansion penalties, no-improvement penalty) stays the same so
-     * existing tuning is preserved.
+     * Transformation-objective-aware priority. Target distance is applied by
+     * the queue wrapper so subclasses such as A* inherit the same target signal.
      */
     protected int priority(SearchState state, SearchProblem problem) {
         if (problem.costModel() == null) {
@@ -331,7 +383,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
         int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());
         if (modelCost == Integer.MAX_VALUE) {
-            // Unparseable candidate: treat as worst possible without overflow.
             return Integer.MAX_VALUE / 2;
         }
         return modelCost + depthPenalty + expansionPenalty + noImprovementPenalty;
@@ -345,13 +396,284 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return values.stream().sorted().toList();
     }
 
+    private static String normalize(String expression) {
+        return Objects.requireNonNull(expression, "expression").trim().replaceAll("\\s+", " ");
+    }
+
     private record SearchFrame(
         PriorityQueue<SearchState> frontier,
         List<SearchState> explored,
         Set<String> visited,
         SearchTelemetry telemetry,
-        ValueIdentitySession identity
+        ValueIdentitySession identity,
+        TargetSession target,
+        GoalProgress progress
     ) {
+    }
+
+    private static final class GoalProgress {
+        private SearchState reachedState;
+        private SearchState bestState;
+        private int bestDistance = Integer.MAX_VALUE;
+        private int expandedStates;
+        private int generatedTransformations;
+        private int enqueuedStates;
+        private int skippedTransformations;
+        private int duplicatePrunes;
+        private int transpositionPrunes;
+        private int depthPrunes;
+        private int candidateBudgetPrunes;
+        private int statesWithoutTransformations;
+
+        private void record(SearchState state, int distance) {
+            if (distance < bestDistance
+                    || distance == bestDistance && betterTieBreak(state, bestState)) {
+                bestDistance = distance;
+                bestState = state;
+            }
+        }
+
+        private static boolean betterTieBreak(SearchState candidate, SearchState current) {
+            return current == null
+                || candidate.depth() < current.depth()
+                || candidate.depth() == current.depth()
+                    && candidate.expression().compareTo(current.expression()) < 0;
+        }
+    }
+
+    /** Search terminal status; it is diagnostic telemetry, not proof evidence. */
+    public enum GoalStatus {
+        UNTARGETED,
+        ROOT_ALREADY_TARGET,
+        REACHED,
+        STATE_BUDGET,
+        DEPTH_BUDGET,
+        CANDIDATE_BUDGET,
+        NO_TRANSFORMATIONS,
+        FRONTIER_EXHAUSTED,
+        UNPARSEABLE_TARGET
+    }
+
+    public record GoalMetrics(
+        int exploredStates,
+        int expandedStates,
+        int generatedTransformations,
+        int enqueuedStates,
+        int skippedTransformations,
+        int duplicatePrunes,
+        int transpositionPrunes,
+        int depthPrunes,
+        int candidateBudgetPrunes,
+        int statesWithoutTransformations,
+        int identityCacheHits,
+        int identityCacheMisses,
+        int cachedExpressions,
+        int internedValues
+    ) {
+    }
+
+    /** Deterministic target outcome alongside the ordinary explored-state list. */
+    public record GoalSearchResult(
+        List<SearchState> states,
+        SearchState reachedState,
+        SearchState bestState,
+        int bestDistance,
+        GoalStatus status,
+        GoalMetrics metrics
+    ) {
+        public GoalSearchResult {
+            states = List.copyOf(states);
+        }
+
+        public boolean reached() {
+            return status == GoalStatus.REACHED || status == GoalStatus.ROOT_ALREADY_TARGET;
+        }
+
+        private static GoalSearchResult from(
+            SearchProblem problem,
+            SearchFrame frame,
+            SearchState rootState
+        ) {
+            GoalProgress progress = frame.progress();
+            GoalStatus status;
+            if (!frame.target().enabled()) {
+                status = GoalStatus.UNTARGETED;
+            } else if (!frame.target().parseable()) {
+                status = GoalStatus.UNPARSEABLE_TARGET;
+            } else if (progress.reachedState != null) {
+                status = progress.reachedState.depth() == 0
+                    ? GoalStatus.ROOT_ALREADY_TARGET
+                    : GoalStatus.REACHED;
+            } else if (frame.explored().size() >= problem.heuristic().maxVisitedExpressions()) {
+                status = GoalStatus.STATE_BUDGET;
+            } else if (progress.candidateBudgetPrunes > 0) {
+                status = GoalStatus.CANDIDATE_BUDGET;
+            } else if (progress.depthPrunes > 0) {
+                status = GoalStatus.DEPTH_BUDGET;
+            } else if (progress.expandedStates > 0 && progress.generatedTransformations == 0) {
+                status = GoalStatus.NO_TRANSFORMATIONS;
+            } else {
+                status = GoalStatus.FRONTIER_EXHAUSTED;
+            }
+            SearchState best = progress.bestState == null ? rootState : progress.bestState;
+            int distance = frame.target().enabled() ? progress.bestDistance : -1;
+            return new GoalSearchResult(
+                frame.explored(),
+                progress.reachedState,
+                best,
+                distance,
+                status,
+                new GoalMetrics(
+                    frame.explored().size(),
+                    progress.expandedStates,
+                    progress.generatedTransformations,
+                    progress.enqueuedStates,
+                    progress.skippedTransformations,
+                    progress.duplicatePrunes,
+                    progress.transpositionPrunes,
+                    progress.depthPrunes,
+                    progress.candidateBudgetPrunes,
+                    progress.statesWithoutTransformations,
+                    frame.identity().cacheHits(),
+                    frame.identity().cacheMisses(),
+                    frame.identity().cachedExpressionCount(),
+                    frame.identity().internedValueCount()
+                )
+            );
+        }
+    }
+
+    /** Scoped target identity and structural multiset distance. */
+    private static final class TargetSession {
+        private static final int UNPARSEABLE_DISTANCE = 100_000;
+
+        private final SearchTarget target;
+        private final ValueIdentitySession identity;
+        private final String normalizedTarget;
+        private final ExprValue targetValue;
+        private final Map<ValueKey, Integer> targetOccurrences;
+        private final Map<String, Integer> distanceCache = new LinkedHashMap<>();
+
+        private TargetSession(SearchTarget target, ValueIdentitySession identity) {
+            this.target = target;
+            this.identity = identity;
+            normalizedTarget = target == null ? "" : normalize(target.targetExpression());
+            targetValue = target == null
+                ? null
+                : identity.value(normalizedTarget).orElse(null);
+            targetOccurrences = targetValue == null
+                ? Map.of()
+                : occurrenceMultiset(targetValue);
+        }
+
+        private boolean enabled() {
+            return target != null;
+        }
+
+        private boolean parseable() {
+            return !enabled()
+                || target.relation() == TargetRelation.SYNTAX_EXACT
+                || targetValue != null;
+        }
+
+        private boolean stopWhenReached() {
+            return enabled() && target.stopWhenReached();
+        }
+
+        private boolean reached(String expression) {
+            if (!enabled()) {
+                return false;
+            }
+            if (target.relation() == TargetRelation.SYNTAX_EXACT) {
+                return normalize(expression).equals(normalizedTarget);
+            }
+            return identity.value(expression)
+                .map(value -> value.sameValue(targetValue))
+                .orElse(false);
+        }
+
+        private int distance(String expression) {
+            if (!enabled()) {
+                return 0;
+            }
+            String normalized = normalize(expression);
+            return distanceCache.computeIfAbsent(normalized, ignored -> computeDistance(normalized));
+        }
+
+        private int computeDistance(String expression) {
+            if (target.relation() == TargetRelation.SYNTAX_EXACT
+                    && expression.equals(normalizedTarget)) {
+                return 0;
+            }
+            if (targetValue == null) {
+                return UNPARSEABLE_DISTANCE;
+            }
+            return identity.value(expression)
+                .map(value -> semanticDistance(value, targetValue, targetOccurrences))
+                .orElse(UNPARSEABLE_DISTANCE);
+        }
+
+        private int adjustedPriority(int basePriority, String expression) {
+            if (!enabled() || target.distanceWeight() == 0) {
+                return basePriority;
+            }
+            long adjusted = (long) basePriority
+                + (long) target.distanceWeight() * distance(expression);
+            return adjusted >= Integer.MAX_VALUE / 2
+                ? Integer.MAX_VALUE / 2
+                : (int) adjusted;
+        }
+
+        private static int semanticDistance(
+            ExprValue candidate,
+            ExprValue target,
+            Map<ValueKey, Integer> targetOccurrences
+        ) {
+            if (candidate.sameValue(target)) {
+                return 0;
+            }
+            Map<ValueKey, Integer> candidateOccurrences = occurrenceMultiset(candidate);
+            Set<ValueKey> keys = new HashSet<>(candidateOccurrences.keySet());
+            keys.addAll(targetOccurrences.keySet());
+            long difference = 0;
+            for (ValueKey key : keys) {
+                difference += Math.abs(
+                    candidateOccurrences.getOrDefault(key, 0)
+                        - targetOccurrences.getOrDefault(key, 0));
+            }
+            if (!rootSignature(candidate).equals(rootSignature(target))) {
+                difference += 2;
+            }
+            return difference >= UNPARSEABLE_DISTANCE
+                ? UNPARSEABLE_DISTANCE - 1
+                : (int) difference;
+        }
+
+        private static Map<ValueKey, Integer> occurrenceMultiset(ExprValue root) {
+            Map<ValueKey, Integer> counts = new LinkedHashMap<>();
+            collect(root, 1, counts);
+            return Map.copyOf(counts);
+        }
+
+        private static void collect(ExprValue value, int multiplicity, Map<ValueKey, Integer> counts) {
+            counts.merge(value.key(), multiplicity, Math::addExact);
+            if (value instanceof OrderedValue ordered) {
+                ordered.operands().forEach(operand -> collect(operand, multiplicity, counts));
+            } else if (value instanceof AssociativeCommutativeValue ac) {
+                ac.multiplicities().forEach((operand, count) ->
+                    collect(operand, Math.multiplyExact(multiplicity, count), counts));
+            }
+        }
+
+        private static String rootSignature(ExprValue value) {
+            if (value instanceof OrderedValue ordered) {
+                return "ordered:" + ordered.operator().id();
+            }
+            if (value instanceof AssociativeCommutativeValue ac) {
+                return "ac:" + ac.operator().id();
+            }
+            return value.getClass().getSimpleName();
+        }
     }
 
     /** One bounded owner for all mathematical values encountered by one search. */
@@ -363,6 +685,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         private final ExpressionParser parser = new ExpressionParser();
         private final ExprValueFactory factory = new ExprValueFactory();
         private final Map<String, String> valueHashesByExpression = new LinkedHashMap<>();
+        private final Map<String, ExprValue> valuesByExpression = new LinkedHashMap<>();
+        private final Set<String> unparseableExpressions = new HashSet<>();
         private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>();
         private int cacheHits;
         private int cacheMisses;
@@ -379,17 +703,32 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 return existing;
             }
             cacheMisses++;
-            String hash;
+            String hash = value(normalized)
+                .map(value -> HASH_PREFIX + sha256(value.key().encoded()))
+                .orElseGet(() -> LEGACY_FALLBACK_PREFIX + legacyHash(normalized));
+            valueHashesByExpression.put(normalized, hash);
+            return hash;
+        }
+
+        Optional<ExprValue> value(String expression) {
+            String normalized = normalize(expression);
+            ExprValue existing = valuesByExpression.get(normalized);
+            if (existing != null) {
+                return Optional.of(existing);
+            }
+            if (unparseableExpressions.contains(normalized)) {
+                return Optional.empty();
+            }
             try {
                 Expr parsed = parser.parseTerm(normalized);
                 Expr canonical = canonicalizer.canonicalize(parsed);
-                String encodedValueKey = factory.fromExpr(canonical).key().encoded();
-                hash = HASH_PREFIX + sha256(encodedValueKey);
+                ExprValue value = factory.fromExpr(canonical);
+                valuesByExpression.put(normalized, value);
+                return Optional.of(value);
             } catch (IllegalArgumentException exception) {
-                hash = LEGACY_FALLBACK_PREFIX + legacyHash(normalized);
+                unparseableExpressions.add(normalized);
+                return Optional.empty();
             }
-            valueHashesByExpression.put(normalized, hash);
-            return hash;
         }
 
         String legacyHash(String expression) {
@@ -416,14 +755,10 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         @Override
         public void close() {
             valueHashesByExpression.clear();
+            valuesByExpression.clear();
+            unparseableExpressions.clear();
             legacyHashesByExpression.clear();
             factory.close();
-        }
-
-        private static String normalize(String expression) {
-            return Objects.requireNonNull(expression, "expression")
-                .trim()
-                .replaceAll("\\s+", " ");
         }
 
         private static String sha256(String value) {
