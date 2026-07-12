@@ -1,5 +1,9 @@
 package de.regelsuche.transform;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 
 /**
@@ -7,10 +11,11 @@ import java.util.List;
  * the resulting whole-expression transition.
  *
  * <p>Two equal occurrences can share the same subtree hash. Rewriting the left or
- * right occurrence generally produces different root expressions, so appending
- * the result state allows both local applications while still collapsing truly
- * duplicate transitions. The class extends {@link AstRewriteTransformationEngine}
- * so rule inventories remain visible to audit and leakage inspection.</p>
+ * right occurrence generally produces different root expressions, so a compact
+ * syntax-sensitive digest of the result allows both local applications while still
+ * collapsing truly duplicate transitions. The class extends
+ * {@link AstRewriteTransformationEngine} so rule inventories remain visible to
+ * audit and leakage inspection.</p>
  */
 public final class OccurrenceAwareAstRewriteTransformationEngine
         extends AstRewriteTransformationEngine {
@@ -36,7 +41,7 @@ public final class OccurrenceAwareAstRewriteTransformationEngine
 
     private static Transformation withOccurrenceTransition(Transformation transformation) {
         String key = transformation.applicationKey()
-            + "->" + transformation.transformedExpression();
+            + "->syntax-v1:" + syntaxDigest(transformation.transformedExpression());
         return new Transformation(
             transformation.rule(),
             transformation.transformedExpression(),
@@ -48,5 +53,15 @@ public final class OccurrenceAwareAstRewriteTransformationEngine
             transformation.assumptions(),
             transformation.packId(),
             transformation.license());
+    }
+
+    private static String syntaxDigest(String expression) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                .digest(expression.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash, 0, 12);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
     }
 }
