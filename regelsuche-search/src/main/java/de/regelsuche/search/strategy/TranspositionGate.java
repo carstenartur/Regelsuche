@@ -7,7 +7,6 @@ import de.regelsuche.search.memory.TranspositionEntry;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -67,21 +66,13 @@ public final class TranspositionGate {
             return Verdict.KEEP;
         }
         String identityHash = identityHash(state.canonicalHash(), state);
-        Optional<TranspositionEntry> existingOpt = memory.table().lookup(identityHash);
-        if (existingOpt.isEmpty()) {
-            for (String compatibleHash : compatibleIdentityHashes) {
-                if (compatibleHash == null || compatibleHash.isBlank()) {
-                    continue;
-                }
-                String composed = identityHash(compatibleHash, state);
-                if (composed.equals(identityHash)) {
-                    continue;
-                }
-                existingOpt = memory.table().lookup(composed);
-                if (existingOpt.isPresent()) {
-                    break;
-                }
-            }
+        TranspositionEntry existing = memory.table().lookup(identityHash).orElse(null);
+        if (existing == null) {
+            existing = migrateCompatibleEntry(
+                    memory,
+                    state,
+                    identityHash,
+                    compatibleIdentityHashes == null ? List.of() : compatibleIdentityHashes);
         }
 
         Set<String> ruleIds = new LinkedHashSet<>(state.appliedRuleIds());
@@ -99,11 +90,10 @@ public final class TranspositionGate {
             now
         );
 
-        if (existingOpt.isEmpty()) {
+        if (existing == null) {
             memory.table().record(candidate);
             return Verdict.KEEP;
         }
-        TranspositionEntry existing = existingOpt.get();
         // Better score wins.
         if (score < existing.bestScore()) {
             memory.table().record(candidate);
@@ -137,6 +127,43 @@ public final class TranspositionGate {
         memory.recordDecision(new PruningDecision(
             state.expression(), identityHash, reason));
         return Verdict.PRUNE;
+    }
+
+    private static TranspositionEntry migrateCompatibleEntry(
+            SearchMemory memory,
+            SearchState state,
+            String identityHash,
+            List<String> compatibleIdentityHashes) {
+        for (String compatibleHash : compatibleIdentityHashes) {
+            if (compatibleHash == null || compatibleHash.isBlank()) {
+                continue;
+            }
+            String composed = identityHash(compatibleHash, state);
+            if (composed.equals(identityHash)) {
+                continue;
+            }
+            TranspositionEntry compatible = memory.table().lookup(composed).orElse(null);
+            if (compatible != null) {
+                return memory.table().record(rekey(compatible, identityHash, state.expression()));
+            }
+        }
+        return null;
+    }
+
+    private static TranspositionEntry rekey(
+            TranspositionEntry existing,
+            String identityHash,
+            String expression) {
+        return new TranspositionEntry(
+                identityHash,
+                expression,
+                existing.bestScore(),
+                existing.minDepthSeen(),
+                existing.bestKnownPathId(),
+                existing.reachedByRuleIds(),
+                existing.visitCount(),
+                existing.firstSeen(),
+                existing.lastSeen());
     }
 
     private static String identityHash(String baseHash, SearchState state) {
