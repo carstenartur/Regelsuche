@@ -1,4 +1,4 @@
-# ADR: Separate syntactic and semantic expression models
+# ADR: Choose the long-term expression identity and occurrence model
 
 - Status: Proposed
 - Date: 2026-07-12
@@ -15,74 +15,158 @@ Regelsuche currently represents mathematical expressions primarily with the bina
 a + (b + c)
 ```
 
-are different trees even though ordinary addition is associative, and permutations
-such as `a + b + c` and `c + a + b` are equal because addition is commutative.
+These are different trees even though ordinary addition is associative. Likewise,
+`a + b + c` and `c + a + b` differ structurally although addition is commutative.
 
 The current `ExpressionCanonicalizer` already flattens additions and
 multiplications internally, groups equal terms or factors, orders them for stable
-output and finally reconstructs a binary tree. This is useful for hashing and
-state deduplication, but it forces semantic information back into a syntax-shaped
-model and does not retain an explicit relation to the original occurrences.
+output and reconstructs a binary tree. This is useful for hashing and state
+reduction, but it forces semantic information back into a syntax-shaped model and
+does not retain an explicit relation to written occurrences.
 
-Regelsuche needs both perspectives:
+The discussion leading to this ADR exposed a deeper decision than merely choosing
+between one AST and two ASTs. Regelsuche must distinguish at least three concepts:
 
-- the entered or generated notation, including grouping, order and source positions;
-- the mathematical value structure, excluding information that is irrelevant under
-  the applicable algebraic laws;
-- traceability between both perspectives for explanations, highlighting, local
-  rewrites, misconception detection and learned rule recognition.
+1. **expression value** — what mathematical expression an object denotes;
+2. **occurrence or use** — where and in which parent context that value occurs;
+3. **notation** — how the occurrence was written, grouped and positioned in source.
 
-For an associative and commutative operation, a sorted list is not the semantic
-model: order is not part of the operation's information content. A normal Java
-`Set` is also insufficient because it loses multiplicities such as the two
-occurrences in `a + a + b`. The corresponding semantic structure is a multiset.
+For example, in
+
+```text
+(a + b) * (a + b)
+```
+
+the subexpression `a + b` may be one shared expression value with two uses. In
+
+```text
+a + a + b
+```
+
+the value `a` may likewise be one interned object with two distinct uses.
+
+This means that a normal Java `Set` is not automatically wrong for representing
+unordered operands. It loses multiplicity only when its elements are expression
+values whose `equals` relation identifies both uses. A set of distinct use or edge
+objects can preserve both occurrences while remaining unordered. Conversely, a
+multiset directly models multiplicity of values but does not by itself identify
+which written occurrence contributed which copy.
+
+The architecture therefore must decide not only whether addition is represented by
+an unordered collection, but also where multiplicity, identity and provenance live.
 
 ## Decision question
 
-Should Regelsuche maintain:
+Which expression architecture should Regelsuche adopt long term?
 
-1. only the existing binary expression tree;
-2. one replacement semantic AST;
-3. a syntactic AST and a semantic AST with explicit many-to-many provenance links;
-4. no second AST, using only canonical keys or e-classes beside the syntax tree?
+1. keep the existing binary `Expr` tree and external canonicalization;
+2. replace it with one semantic-only AST;
+3. maintain a syntax AST and a separate semantic AST connected by provenance;
+4. keep the syntax AST and use only canonical keys or e-classes;
+5. introduce an **interned semantic expression DAG** with separate occurrence/use
+   and notation structures;
+6. make the e-graph itself the primary semantic identity layer.
+
+The decision must also determine whether equal mathematical expressions should be
+represented by the same Java object through a factory or hash-consing mechanism.
 
 ## Decision drivers
 
-The decision must be based on observable effects rather than elegance alone.
+### 1. Mathematical faithfulness
 
-1. **Mathematical faithfulness**
-   - Associative and commutative operators must not encode grouping or order as
-     semantic information.
-   - Repeated operands must retain their multiplicity.
+- Associative and commutative operators must not encode grouping or order as
+  semantic information.
+- Repeated operands must retain their multiplicity.
+- Deterministic display order must not become semantic order.
 
-2. **Didactic traceability**
-   - Regelsuche must still explain which written occurrences participated in a
-     transformation.
-   - Original grouping and order must remain available where they are pedagogically
-     relevant.
+### 2. Stable and explicit identity
 
-3. **Search-space reduction**
-   - Equivalent permutations and regroupings should not create redundant semantic
-     states unless the search intentionally studies those syntactic moves.
+- The design must distinguish value identity from occurrence identity.
+- Copying, parsing and deserialization must not silently change mathematical
+  identity semantics.
+- If object identity is used as a fast equality path, it must be guaranteed by a
+  central factory rather than assumed informally.
 
-4. **Rule-system compatibility**
-   - Existing exact AST rules must remain usable during migration.
-   - PR #241's bounded associative/commutative recognition must not be invalidated
-     or duplicated without a clear replacement.
+### 3. Didactic traceability
 
-5. **Cognitive and implementation cost**
-   - Most rule authors should not need to reason about two ASTs or maintain links
-     manually.
-   - Projection and provenance updates must be centralized and testable.
+- Regelsuche must explain which written occurrences participated in a rewrite.
+- Original grouping, order and source spans must remain available where relevant.
+- The architecture must support replacing one occurrence without unintentionally
+  replacing every use of the same shared value.
 
-6. **Identity stability**
-   - Semantic equality must not depend on occurrence IDs, iteration order, display
-     order or source positions.
-   - Occurrence IDs may exist only in the projection/provenance layer.
+### 4. Search and rule performance
 
-7. **Incremental migration**
-   - The architecture must permit an experiment without replacing the public `Expr`
-     hierarchy in one step.
+- Equivalent permutations and regroupings should not inflate the semantic search
+  space.
+- Matching and rule analysis should be cacheable per expression value where safe.
+- Common subexpressions should not be re-analysed unnecessarily.
+
+### 5. Rule-system compatibility
+
+- Existing exact AST rules must remain usable during migration.
+- PR #241's bounded associative/commutative recognition must not be invalidated or
+  duplicated without a clear replacement.
+- Rule authors should not manually maintain identity or provenance indices.
+
+### 6. Compilation potential
+
+The architecture should not require bytecode compilation now, but it should permit:
+
+- caching compiled evaluators per expression value;
+- common-subexpression elimination;
+- shared compiled fragments for repeated subexpressions;
+- compiled rule predicates or matchers;
+- method-handle, hidden-class or generated-bytecode implementations without making
+  compilation semantics depend on source occurrence identity.
+
+### 7. Cognitive and implementation cost
+
+- Most rule authors should interact with one clear abstraction at a time.
+- Parent/use indices and provenance must be maintained centrally.
+- Debugging and serialization must remain comprehensible.
+
+### 8. Incremental migration
+
+The architecture must be testable without replacing the public `Expr` hierarchy in
+one repository-wide change.
+
+## Required conceptual distinction
+
+Any accepted design must represent these concepts separately, even if some are
+implemented as views rather than permanent graphs.
+
+### Expression value
+
+Answers:
+
+> What expression is this?
+
+Its equality excludes source position and occurrence identity.
+
+### Occurrence or use
+
+Answers:
+
+> Where is this expression used in this concrete expression graph?
+
+A use may contain:
+
+- parent identity;
+- operand role or edge label;
+- occurrence ID;
+- source span;
+- projection/provenance metadata.
+
+### Notation
+
+Answers:
+
+> How was this occurrence written?
+
+It preserves grouping, operand order and formatting-relevant information.
+
+An `Expr` value must not expose a single `parent()` or single tree position if the
+same value can have several uses.
 
 ## Alternatives considered
 
@@ -94,105 +178,261 @@ variants.
 **Advantages**
 
 - lowest immediate implementation cost;
-- no dual-model synchronization;
+- no new identity layer;
 - current rules and local tree positions remain unchanged.
 
 **Disadvantages**
 
 - semantic equality remains external to the model;
-- every subsystem may implement its own flattening and AC handling;
-- regroupings and permutations continue to inflate or complicate search;
-- provenance is accidental rather than explicit.
+- subsystems may repeat flattening and AC handling;
+- equivalent groupings and permutations complicate search;
+- common subexpressions are represented repeatedly;
+- object identity has no useful semantic guarantee.
 
-### B. Replace `Expr` with a semantic AST
+### B. Replace `Expr` with a semantic-only AST
 
-Addition and multiplication become n-ary multiset nodes; syntax is reconstructed
-only for display.
+Addition and multiplication become operation-specific n-ary nodes and syntax is
+reconstructed for display.
 
 **Advantages**
 
 - mathematically direct model;
-- smallest semantic search space;
-- no synchronization between two primary models.
+- small semantic search space;
+- one primary representation.
 
 **Disadvantages**
 
-- loses original grouping and ordering unless separately captured;
-- high migration risk for local rewrites, didactic explanations and exact rules;
-- a pretty printer cannot reconstruct the user's original notation;
-- unsuitable as an immediate replacement.
+- original notation cannot be reconstructed reliably;
+- high migration risk for local rewrites and didactic explanations;
+- concrete occurrence identity still has to be added somewhere;
+- rejected as an immediate replacement.
 
-### C. Maintain a syntax AST and a semantic AST with a projection graph
+### C. Syntax AST plus semantic AST and projection graph
 
-The syntax AST preserves occurrences, grouping, order and positions. The semantic
-AST uses operation-specific mathematical structures. A separate immutable
-projection records many-to-many relations.
+The syntax AST preserves occurrences, grouping, order and positions. A semantic AST
+uses operation-specific mathematical structures. A separate graph maps between
+both.
+
+**Advantages**
+
+- explicit separation of notation and meaning;
+- bidirectional highlighting and explanations;
+- semantic deduplication while retaining syntax evidence;
+- natural place for rewrite provenance.
+
+**Disadvantages**
+
+- two full node hierarchies may duplicate structure;
+- synchronization, serialization and debugging are complex;
+- equal subexpressions may still be duplicated inside the semantic AST;
+- rule authors face a larger conceptual surface if APIs are not carefully layered.
+
+### D. Syntax AST plus canonical keys or e-classes only
+
+No permanent semantic AST is introduced. Canonicalization or equality saturation
+provides equivalence information.
+
+**Advantages**
+
+- lower implementation cost than two full models;
+- fits transposition tables and existing e-graph work;
+- avoids synchronizing two trees.
+
+**Disadvantages**
+
+- canonical keys do not expose internal semantic substructure;
+- e-classes alone do not identify written uses;
+- provenance from syntax occurrences to semantic operands remains underspecified;
+- compilation caches need another stable unit of identity.
+
+### E. Interned semantic expression DAG plus separate uses and notation
+
+A central `ExprFactory` interns expression values. Structurally and semantically
+identical values return the same object where the selected operator laws permit it.
+Concrete occurrences are represented separately as edges or use objects.
 
 Example:
 
 ```text
-Syntax AST                         Semantic AST
+Notation / occurrence graph             Interned value DAG
 
-       +                              Sum
-      / \                         {a:1, b:1, c:1}
-     +   c                              ^
-    / \                                 |
-   a   b                         ProjectionGraph
+(a + b) * (a + b)                            Product
+       \       /                              /    \
+        two uses --------------------------> Sum  Sum
+                                                \  /
+                                           same Sum object
 ```
 
+A possible boundary is:
+
+```java
+interface Expr {}
+
+record ExprUse(
+    UseId id,
+    Expr parent,
+    Expr child,
+    OperandRole role,
+    SourceSpan sourceSpan
+) {}
+```
+
+The concrete API need not use these exact records.
+
+For an associative and commutative sum, the factory may build an operation-specific
+key whose equality ignores operand order and grouping while retaining multiplicity.
+The underlying node may use:
+
+- a multiset of expression values;
+- a coefficient map;
+- an unordered set of use/edge objects;
+- another immutable representation with the same public semantics.
+
+The ADR deliberately does not equate mathematical semantics with one Java
+collection type.
+
 **Advantages**
 
-- preserves notation and mathematical meaning without conflating them;
-- enables bidirectional highlighting and explanations;
-- permits semantic deduplication while retaining syntactic evidence;
-- provides a foundation for transformation provenance.
+- `==` can become a valid fast path for equal interned values;
+- common subexpressions are shared;
+- rule results, analyses and compiled evaluators can be cached per value;
+- reverse-use indices support pattern search from a value toward parent contexts;
+- expression identity and occurrence identity become explicit;
+- naturally supports DAG-based evaluation and common-subexpression elimination.
 
 **Disadvantages**
 
-- highest conceptual and implementation cost;
-- many-to-many links cannot be maintained correctly by ad hoc rule code;
-- duplicate semantic values still require occurrence references in the projection;
-- caching, serialization and debugging become more complex.
+- all construction must go through a trusted factory;
+- direct `new BinaryExpr(...)` construction must eventually be restricted;
+- weak-reference, lifecycle or pool-size policy is required;
+- global interning can create memory retention and concurrency concerns;
+- replacing one use versus all uses must be explicit;
+- semantic normalization policy becomes part of factory correctness.
 
-### D. Keep the syntax AST and add only canonical keys or e-classes
+### F. E-graph-centred semantic identity
 
-No permanent semantic AST is introduced. Canonicalization or equality saturation
-supplies semantic equivalence classes and stable keys.
+Expression values are represented primarily as e-nodes and e-classes, with syntax
+occurrences projected into the e-graph.
 
 **Advantages**
 
-- lower cost than a complete second AST;
-- integrates naturally with transposition tables and the existing e-graph module;
-- avoids permanent synchronization of two trees.
+- equivalence is first-class;
+- naturally supports equality saturation;
+- can share many equivalent representations.
 
 **Disadvantages**
 
-- a canonical key cannot represent internal semantic substructure or provenance;
-- e-classes express equivalence but not necessarily the operation-specific
-  information model needed by explanations and selection;
-- mappings from written occurrences to semantic operands remain underspecified.
+- e-class identity is not identical to one expression value;
+- extraction policy affects which representation is compiled or displayed;
+- occurrence provenance still requires a separate layer;
+- may be too heavyweight for every parsed expression and ordinary rule operation.
+
+## Factory and interning invariants
+
+If alternative E is selected, the following must hold:
+
+```java
+Expr a1 = factory.variable("a");
+Expr a2 = factory.variable("a");
+assert a1 == a2;
+```
+
+For operators declared associative and commutative in the active domain:
+
+```java
+assert factory.sum(a, b, c) == factory.sum(c, a, b);
+assert factory.sum(factory.sum(a, b), c) == factory.sum(a, factory.sum(b, c));
+```
+
+Multiplicity must remain observable:
+
+```java
+assert factory.sum(a, a, b) != factory.sum(a, b);
+```
+
+These guarantees must survive parser entry points and controlled deserialization.
+They must not rely on incidental JVM allocation behaviour.
+
+## Parent and use navigation
+
+An interned value can have several parents and several occurrences. Parent-oriented
+search therefore requires a separate index, for example conceptually:
+
+```java
+Map<Expr, Set<ExprUse>> usesByChild;
+```
+
+This can support:
+
+- finding all contexts in which a value participates;
+- matching patterns upward from a selected expression;
+- applying one discovered rule result at several uses;
+- incremental invalidation;
+- impact analysis;
+- identifying shared subexpressions before compilation.
+
+The index must not be stored as mutable parent collections inside an immutable
+`Expr` value unless ownership, lifecycle and concurrency are rigorously defined.
+
+## Bytecode and compiled execution implications
+
+No decision in this ADR requires runtime bytecode generation. The spike must,
+however, evaluate whether the chosen value identity is a suitable compilation key.
+
+An interned DAG could permit:
+
+```text
+(a + b)^2 + sin(a + b)
+```
+
+to compile conceptually as:
+
+```java
+double t0 = a + b;
+return t0 * t0 + Math.sin(t0);
+```
+
+Potential caches include:
+
+```java
+Map<Expr, CompiledExpression> compiledExpressions;
+Map<RuleAndExpr, MatchProgram> compiledMatchers;
+```
+
+The evaluation must distinguish:
+
+- compile once per expression value;
+- execute once per value where common-subexpression semantics permit it;
+- preserve occurrence-specific behaviour for explanations, tracing or
+  non-pure operations.
+
+Only pure mathematical expression values are candidates for this optimisation.
 
 ## Proposed decision process
 
 This ADR does not authorize a repository-wide AST migration. The decision is made
-through the following gated process.
+through the following gates.
 
-### Gate 1: Define invariants and representative cases
+### Gate 1: Executable invariants
 
-Create executable tests for at least these cases:
+Create tests covering at least:
 
-- `(a + b) + c`, `a + (b + c)` and `c + a + b` share one semantic sum;
-- `a + a + b` retains multiplicity two for `a`;
-- subtraction is represented without incorrectly declaring it commutative;
-- syntax source spans and grouping remain available;
-- forward and reverse projection identify all contributing occurrences;
-- semantic equality and hash codes ignore occurrence IDs and iteration order;
-- formatting is deterministic but formatting order is not semantic identity.
+- AC-equivalent additions share semantic identity;
+- `a + a + b` retains multiplicity two;
+- subtraction is not made commutative;
+- source grouping and spans remain available;
+- one value may have several uses;
+- replacing one use does not replace all uses accidentally;
+- semantic equality ignores use IDs and display order;
+- factory interning, if enabled, makes equal values reference-identical;
+- formatting remains deterministic without defining equality.
 
-### Gate 2: Implement a bounded vertical spike
+### Gate 2: Bounded competing spikes
 
-Implement the dual representation only for parsed additions in an internal,
-experimental package. The spike must contain:
+Implement two internal spikes for parsed addition without replacing existing rule
+APIs.
+
+#### Spike C: dual AST plus projection
 
 ```java
 record ParsedExpression(
@@ -202,147 +442,194 @@ record ParsedExpression(
 ) {}
 ```
 
-and a semantic sum whose public contract is multiset semantics. No existing rule
-API is replaced in this gate.
+#### Spike E: interned value DAG plus uses
 
-The projection must be produced centrally by one projector. Rule implementations
-must not mutate links directly.
+```java
+record ParsedExpressionGraph(
+    SyntaxView syntax,
+    Expr semanticRoot,
+    UseGraph uses
+) {}
+```
 
-### Gate 3: Measure effects
+Both spikes must be produced centrally. Ordinary rules must not mutate projection
+or use links manually.
 
-Run the same bounded search and recognition corpus with and without the semantic
-projection. Record:
+### Gate 3: Search and recognition measurements
 
-- number of distinct states before and after semantic deduplication;
-- runtime and memory;
+Run the same bounded corpus with the baseline and both spikes. Record:
+
+- distinct semantic states;
+- parse and construction time;
+- matching and search runtime;
+- memory use and retained-object counts;
+- number of shared subexpressions;
+- rule-analysis cache hit rates;
 - number of rules requiring adaptation;
-- amount of additional code in parser, formatter, matcher and explanation layers;
-- whether provenance supports a concrete explanation such as combining the two
-  occurrences in `a + a + b -> 2*a + b`;
-- overlap or conflict with PR #241's AC-aware recognition.
+- overlap with PR #241's AC-aware recognition;
+- explanation quality for `a + a + b -> 2*a + b`;
+- ability to select and rewrite exactly one occurrence.
 
-### Gate 4: Review against acceptance criteria
+### Gate 4: Compilation-oriented experiment
 
-Choose option C only if the spike demonstrates all of the following:
+Without committing to a production compiler, build a minimal evaluator or
+method-handle prototype for a small pure expression corpus. Compare:
 
-- semantic state reduction or substantially simpler AC rule logic;
-- reliable bidirectional provenance for duplicate operands;
-- no manual projection maintenance in ordinary rules;
-- an incremental compatibility path for existing `Expr` rules;
-- bounded memory and acceptable serialization complexity;
-- a clear division of responsibility between semantic AST and e-graph.
+- tree evaluation versus DAG evaluation;
+- compile/cache reuse for repeated subexpressions;
+- construction overhead of interning;
+- whether stable value identity materially simplifies the compiler cache.
 
-Choose option D if semantic deduplication helps but durable subexpression
-provenance does not justify a complete second AST.
+This gate may use an interpreter with explicit common-subexpression caching if
+bytecode generation would distract from the architecture question.
 
-Keep option A if the measured benefit is small compared with the migration and
-cognitive cost.
+### Gate 5: Cognitive-cost review
 
-Option B is rejected for the current project because preserving entered notation
-and didactic steps is a core requirement.
+Review representative code paths:
 
-### Gate 5: Record the final decision
+- parser;
+- one exact syntactic rule;
+- one AC-aware rule;
+- local rewrite selection;
+- explanation/highlighting;
+- serialization;
+- one search cache;
+- optional compiled evaluator.
 
-After the spike, update this ADR in a dedicated PR:
+Count new concepts and mandatory API decisions for ordinary rule authors. An
+architecture that performs well but requires every rule to reason about values,
+uses, syntax nodes, e-classes and projection links is not acceptable.
 
-- set `Status` to `Accepted` or `Rejected`;
-- state the selected alternative;
-- include measured results;
-- list superseded components and migration stages;
-- link follow-up implementation issues.
+### Gate 6: Final selection
 
-No production-wide migration may begin while this ADR remains `Proposed`.
+Select alternative E if it demonstrates:
+
+- reliable factory-enforced value identity;
+- meaningful common-subexpression sharing or cache reuse;
+- precise occurrence-level rewriting and provenance;
+- bounded memory and manageable pool lifecycle;
+- simpler or faster rule/search/compiler paths than the alternatives.
+
+Select alternative C if explicit semantic structure and projection prove valuable
+but global interning does not justify its lifecycle and implementation cost.
+
+Select alternative D if semantic deduplication helps but neither durable semantic
+nodes nor use/provenance graphs justify their cost.
+
+Keep alternative A if measured benefits are minor.
+
+Alternative B remains rejected for the current project because original notation
+and didactic steps are core requirements.
+
+Alternative F should be selected only if the e-graph can serve normal expression
+identity and occurrence mapping without forcing equality-saturation complexity into
+ordinary operations.
+
+### Gate 7: Record the decision
+
+Update this ADR with:
+
+- `Status: Accepted` or `Rejected`;
+- the selected alternative;
+- measurements and rejected alternatives;
+- identity and lifecycle invariants;
+- migration stages;
+- follow-up implementation issues.
+
+No repository-wide migration may begin while this ADR remains `Proposed`.
 
 ## Preliminary recommendation
 
-Proceed with the bounded spike for option C, while treating option D as the
-fallback. Do not yet make two ASTs part of every public API.
+The leading experiment is now **alternative E: an interned semantic expression DAG
+plus a separate use/notation graph**. Alternative C remains the primary fallback.
 
-The spike should prove that the projection layer earns its cost. In particular,
-it must demonstrate something a canonical string or e-class alone cannot provide:
-precise, bidirectional provenance between written occurrences and unordered
-semantic operands.
+This is not yet the decision. Alternative E earns preference for the spike because
+it may unify several concerns that otherwise require separate mechanisms:
 
-## Proposed model boundaries
+- mathematical value identity;
+- common-subexpression sharing;
+- AC state reduction;
+- reverse context search;
+- rule and analysis caching;
+- occurrence-level provenance;
+- future compiled execution.
 
-If option C is accepted, responsibilities are divided as follows.
+The spike must disprove the risk that this apparent unification merely moves
+complexity into factory invariants, pool lifecycle and use-graph maintenance.
 
-### Syntax model
+## Provisional model boundaries
 
-Owns:
-
-- grouping and operand order;
-- source spans and occurrence identity;
-- entered notation;
-- local tree positions;
-- exact syntactic rewrite presentation.
-
-### Semantic model
+### Syntax or notation layer
 
 Owns:
 
-- mathematical operators and operands;
-- operation-specific laws explicitly declared by the domain;
-- unordered multisets for associative and commutative operations;
-- semantic equality and hashing;
-- no source spans, display ordering or occurrence identity.
+- entered grouping and order;
+- source spans;
+- concrete occurrence identity;
+- exact rewrite presentation.
 
-### Projection and provenance
+### Interned expression value layer
 
 Owns:
 
-- many-to-many links between syntax occurrences and semantic references;
-- link kinds such as `EXACT`, `CONTRIBUTES_TO`, `NORMALIZED_TO`, `ELIMINATED`
-  and `INTRODUCED`;
-- reverse lookup for highlighting and explanations;
-- transformation provenance between old and new semantic states.
+- immutable mathematical operators and operands;
+- operator-specific equality laws;
+- stable hashing;
+- optional object-identity guarantee through the factory;
+- no source spans and no single-parent relation.
+
+### Use and provenance layer
+
+Owns:
+
+- parent-child uses and operand roles;
+- multiple uses of one value;
+- reverse lookup from value to contexts;
+- syntax-to-value mapping;
+- transformation provenance;
+- occurrence-specific selection and replacement.
 
 ### Formatter
 
-May choose a deterministic order for output. That order is a serialization and
-presentation concern and must not participate in semantic equality.
+Chooses a deterministic representation. Its ordering is not semantic identity.
 
 ### E-graph
 
-Owns equivalence classes between semantic expressions or representations. It does
-not replace syntax-to-semantics provenance. The spike must establish whether the
-semantic AST is stored independently or represented as a typed view over e-nodes.
+Owns equivalence among expression values or representations. It does not by itself
+replace concrete use identity or syntax provenance.
 
-## Consequences if accepted
+### Compiler/cache layer
 
-- `BinaryExpr` remains initially as the syntax representation.
-- `ExpressionCanonicalizer` is no longer the long-term semantic data model; its
-  flattening and bucket logic can inform the projector and deterministic formatter.
-- canonical strings remain useful for persistence and diagnostics but cease to be
-  the definition of semantic identity.
-- rule APIs require an explicit classification: syntax rule, semantic rule or
-  equivalence rule.
-- ordinary rules receive framework-generated projection/provenance rather than
-  constructing it themselves.
-- migration proceeds operator by operator, starting with addition and only later
-  multiplication.
+Uses immutable expression values as candidate keys. It must not attach mutable
+runtime state directly to globally interned values.
 
 ## Risks and mitigations
 
 | Risk | Mitigation |
 |------|------------|
-| Two models double the concepts rule authors must learn | Keep current `Expr` APIs during the spike; expose semantic APIs only to rules that need them |
-| Projection links become stale | Use immutable expressions and recreate projection atomically; no public mutators |
-| Duplicate operands cannot be traced | Keep occurrence references only in the projection, excluded from semantic equality |
-| Semantic and e-graph layers overlap | Define semantic structure versus equivalence-class responsibilities in Gate 4 |
-| PR #241 duplicates AC behavior | Measure and document whether recognition profiles remain needed for syntax matching |
-| Stable output accidentally becomes semantic ordering | Test equality across different construction and iteration orders |
-| Migration becomes repository-wide too early | No production migration before this ADR is accepted |
+| Intern pool retains all expressions forever | Compare scoped factories, weak interning and repository/search-session lifetimes |
+| Direct constructors violate identity guarantees | Keep spike internal; route construction through one factory before considering API restrictions |
+| Shared values make local replacement ambiguous | Require explicit `UseId` or path when replacing one occurrence |
+| Parent links make immutable values mutable | Store reverse links in a separate owned index |
+| Value equality and occurrence equality are confused | Separate types and tests; exclude occurrence IDs from value equality |
+| AC factory normalization becomes too aggressive | Declare operator laws by domain and preserve non-AC operators unchanged |
+| PR #241 duplicates factory-level AC identity | Measure whether recognition profiles remain necessary for syntax patterns and non-canonical inputs |
+| Bytecode goals distort the core model | Use compilation only as one measured decision driver, not as a mandatory feature |
+| Two or three layers overwhelm rule authors | Provide syntax-rule and value-rule facades; ordinary rules must not manage use graphs |
+| Serialization destroys interning | Re-intern through the factory during load and serialize value structure separately from uses |
 
 ## Non-goals
 
 This ADR does not decide:
 
 - that every operator is associative or commutative;
-- that subtraction should be stored as an unordered operation;
-- a concrete third-party multiset implementation;
-- a repository-wide rewrite of existing rules;
+- that subtraction is unordered;
+- a specific Java collection implementation for sums;
+- a specific bytecode library;
+- that runtime compilation must be implemented;
+- global versus scoped interning before measurement;
 - replacement of equality saturation;
+- a repository-wide rewrite of rules;
 - the final persistence format.
 
-Those decisions require separate evidence or follow-up ADRs.
+These require evidence from the spikes or follow-up ADRs.
