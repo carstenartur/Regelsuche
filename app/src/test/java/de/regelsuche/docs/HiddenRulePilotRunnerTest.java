@@ -18,6 +18,7 @@ import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteRule;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class HiddenRulePilotRunnerTest {
@@ -37,17 +38,14 @@ class HiddenRulePilotRunnerTest {
         assertTrue(runtime.holdouts().materialAblations() >= 1,
             "the learned direct macro must shorten at least one primitive holdout path");
 
-        HiddenRulePilotEvaluator.Evaluation evaluation = evaluator.evaluate(
+        assertRediscovered(evaluator.evaluate(
             task,
             runtime,
-            new HiddenReference(
+            reference(
                 "hidden_neutral_element_macro",
                 "neutral-element-simplification",
                 "(A + 0) * 1",
-                "A",
-                List.of("neutral-element-simplification", "neutral element macro")));
-
-        assertRediscovered(evaluation);
+                "A")));
     }
 
     @Test
@@ -63,29 +61,84 @@ class HiddenRulePilotRunnerTest {
         assertTrue(runtime.holdouts().allPassed(), runtime.holdouts().toString());
         assertTrue(runtime.holdouts().materialAblations() >= 1, runtime.holdouts().toString());
 
-        HiddenRulePilotEvaluator.Evaluation evaluation = evaluator.evaluate(
+        assertRediscovered(evaluator.evaluate(
             task,
             runtime,
-            new HiddenReference(
+            reference(
                 "hidden_sophie_germain_macro",
                 "quartic-factorization",
                 "A^4 + 4*B^4",
-                "(A^2 + 2*A*B + 2*B^2) * (A^2 - 2*A*B + 2*B^2)",
-                List.of("sophie-germain", "quartic-factorization")));
+                "(A^2 + 2*A*B + 2*B^2) * (A^2 - 2*A*B + 2*B^2)")));
+    }
 
-        assertRediscovered(evaluation);
+    @Test
+    void completesFiveRulePilotAcrossThreeFamilies() {
+        List<PilotFixture> fixtures = List.of(
+            new PilotFixture(
+                simpleTask(
+                    "case-003", "(x * 1) + 0", "x",
+                    List.of("ast_multiply_one_right", "ast_add_zero_right"),
+                    List.of(
+                        new PositiveHoldout("p-005", "(y * 1) + 0", "y"),
+                        new PositiveHoldout("p-006", "(z * 1) + 0", "z")),
+                    List.of(
+                        new NegativeHoldout("n-005", "(y * 2) + 0"),
+                        new NegativeHoldout("n-006", "(y * 1) + 1"))),
+                reference(
+                    "hidden_multiply_then_add_neutral_macro",
+                    "neutral-element-simplification",
+                    "(A * 1) + 0", "A")),
+            new PilotFixture(
+                simpleTask(
+                    "case-004", "(x - 0) / 1", "x",
+                    List.of("ast_subtract_zero", "ast_divide_one"),
+                    List.of(
+                        new PositiveHoldout("p-007", "(y - 0) / 1", "y"),
+                        new PositiveHoldout("p-008", "(z - 0) / 1", "z")),
+                    List.of(
+                        new NegativeHoldout("n-007", "(y - 1) / 1"),
+                        new NegativeHoldout("n-008", "(y - 0) / 2"))),
+                reference(
+                    "hidden_subtract_then_divide_neutral_macro",
+                    "neutral-element-simplification",
+                    "(A - 0) / 1", "A")),
+            new PilotFixture(
+                simpleTask(
+                    "case-005", "(x * x) * x", "x^3",
+                    List.of("ast_product_to_power_two", "ast_combine_powers"),
+                    List.of(
+                        new PositiveHoldout("p-009", "(y * y) * y", "y^3"),
+                        new PositiveHoldout("p-010", "(z * z) * z", "z^3")),
+                    List.of(
+                        new NegativeHoldout("n-009", "(y * y) * z"),
+                        new NegativeHoldout("n-010", "(y * y) + y"))),
+                reference(
+                    "hidden_cube_normalization_macro",
+                    "power-normalization",
+                    "(A * A) * A", "A^3")));
+
+        Set<String> families = fixtures.stream()
+            .map(fixture -> fixture.reference().family())
+            .collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of("neutral-element-simplification", "power-normalization"), families);
+
+        for (PilotFixture fixture : fixtures) {
+            RuntimeResult runtime = runner.run(fixture.task());
+            assertEquals(RuntimeStatus.CANDIDATE_FROZEN, runtime.status(), runtime.toString());
+            assertTrue(runtime.holdouts().allPassed(), runtime.holdouts().toString());
+            assertRediscovered(evaluator.evaluate(fixture.task(), runtime, fixture.reference()));
+        }
     }
 
     @Test
     void detectsHiddenIdentifiersInTheRuntimeInputBeforeAnyPublicClaim() {
         RuntimeTask leaking = neutralElementTask("hidden_neutral_element_macro");
         RuntimeResult runtime = runner.run(leaking);
-        HiddenReference hidden = new HiddenReference(
+        HiddenReference hidden = reference(
             "hidden_neutral_element_macro",
             "neutral-element-simplification",
             "(A + 0) * 1",
-            "A",
-            List.of());
+            "A");
 
         HiddenRulePilotEvaluator.Evaluation evaluation = evaluator.evaluate(leaking, runtime, hidden);
 
@@ -104,25 +157,51 @@ class HiddenRulePilotRunnerTest {
         assertTrue(evaluation.pilotAccepted(), evaluation.blockers().toString());
     }
 
+    private static HiddenReference reference(
+        String id,
+        String family,
+        String left,
+        String right
+    ) {
+        return new HiddenReference(id, family, left, right, List.of(family));
+    }
+
     private static RuntimeTask neutralElementTask(String opaqueId) {
-        List<RewriteRule> primitives = AstRewriteTransformationEngine.defaultRules().stream()
-            .filter(rule -> rule.id().equals("ast_add_zero_right")
-                || rule.id().equals("ast_multiply_one_right"))
-            .toList();
-        assertEquals(2, primitives.size());
-        SearchHeuristic heuristic = new SearchHeuristic(4, 80, 1, 8, 40, 20);
-        return new RuntimeTask(
+        return simpleTask(
             opaqueId,
             "(x + 0) * 1",
-            SearchTarget.valueEquivalent("x"),
-            new AstRewriteTransformationEngine(primitives),
-            heuristic,
+            "x",
+            List.of("ast_add_zero_right", "ast_multiply_one_right"),
             List.of(
                 new PositiveHoldout("p-001", "(y + 0) * 1", "y"),
                 new PositiveHoldout("p-002", "(z + 0) * 1", "z")),
             List.of(
                 new NegativeHoldout("n-001", "(y + 1) * 1"),
                 new NegativeHoldout("n-002", "(y + 0) * 2")));
+    }
+
+    private static RuntimeTask simpleTask(
+        String opaqueId,
+        String input,
+        String target,
+        List<String> primitiveRuleIds,
+        List<PositiveHoldout> positives,
+        List<NegativeHoldout> negatives
+    ) {
+        List<RewriteRule> primitives = AstRewriteTransformationEngine.defaultRules().stream()
+            .filter(rule -> primitiveRuleIds.contains(rule.id()))
+            .toList();
+        assertEquals(Set.copyOf(primitiveRuleIds),
+            primitives.stream().map(RewriteRule::id).collect(java.util.stream.Collectors.toSet()));
+        SearchHeuristic heuristic = new SearchHeuristic(4, 80, 1, 8, 40, 20);
+        return new RuntimeTask(
+            opaqueId,
+            input,
+            SearchTarget.valueEquivalent(target),
+            new AstRewriteTransformationEngine(primitives),
+            heuristic,
+            positives,
+            negatives);
     }
 
     private static RuntimeTask sophieGermainTask() {
@@ -151,5 +230,8 @@ class HiddenRulePilotRunnerTest {
             List.of(
                 new NegativeHoldout("n-003", "x^4 + 3*y^4"),
                 new NegativeHoldout("n-004", "x^4 + 4*y^3")));
+    }
+
+    private record PilotFixture(RuntimeTask task, HiddenReference reference) {
     }
 }
