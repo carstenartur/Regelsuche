@@ -32,10 +32,11 @@ if (aiKnowledgeEnabled) {
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
 
-        // Extractor 0.1.6 fixes capability seed linking and reports a normalized
-        // 0..100 capability-working-set metric. This temporary calibration ceiling
-        // is replaced by the measured baseline plus a small explicit margin before merge.
-        maxCognitiveDebt = 100.0d
+        // Extractor 0.1.6 measured all eight capability working sets on 2026-07-12:
+        // normalized debt 18.98, p90 working set 206,440 of 1,087,416 context tokens,
+        // 693 linked type references and zero unresolved references. The 20.0 gate
+        // leaves a 1.02-point margin while replacing the obsolete 371 class-count gate.
+        maxCognitiveDebt = 20.0d
 
         maxMethodCognitiveComplexity = 65
         maxMethodCyclomaticComplexity = 35
