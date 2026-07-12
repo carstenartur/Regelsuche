@@ -15,7 +15,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -83,6 +82,7 @@ public final class HiddenRulePilotCampaign {
         }
     }
 
+    /** elapsedNanos is intentionally not serialized into the canonical report. */
     public record CaseReport(
         String opaqueCaseId,
         String family,
@@ -149,7 +149,6 @@ public final class HiddenRulePilotCampaign {
                 .property("holdoutsPassed", runtime.holdouts().allPassed())
                 .property("materialAblation", evaluation.materialAblation())
                 .property("accepted", report.accepted())
-                .property("elapsedNanos", report.elapsedNanos())
                 .property("pathLength", Math.max(0, runtime.path().size() - 1))
                 .stringArray("primitiveRuleIds", runtime.primitiveRuleIds())
                 .stringArray("assumptions", runtime.assumptions())
