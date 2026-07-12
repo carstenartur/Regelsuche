@@ -5,7 +5,7 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
-import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.value.ExprValueFactory;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -23,10 +23,6 @@ public final class RecognitionNormalizer {
         }
     }
 
-    /**
-     * Creates one bounded value-identity owner for a batch of recognition
-     * normalizations, for example all examples of one anti-unification run.
-     */
     public static Session session(RecognitionProfile profile) {
         return new Session(profile);
     }
@@ -68,7 +64,7 @@ public final class RecognitionNormalizer {
                 if (profile.isCommutative(operator)) {
                     operands.sort(Comparator
                         .comparing((Expr operand) -> values.fromExpr(operand).key())
-                        .thenComparing(RecognitionNormalizer::syntaxKey));
+                        .thenComparing(ExpressionFormatter::format));
                 }
                 return rebuild(operands, operator);
             }
@@ -108,32 +104,5 @@ public final class RecognitionNormalizer {
             result = new BinaryExpr(result, operator, operands.get(i));
         }
         return result;
-    }
-
-    /** Structural tie-breaker for values equal under broader factory laws. */
-    private static String syntaxKey(Expr expression) {
-        if (expression instanceof NumberExpr number) {
-            return "N" + Long.toUnsignedString(Double.doubleToLongBits(number.value()), 16);
-        }
-        if (expression instanceof VariableExpr variable) {
-            return "V" + segment(variable.name());
-        }
-        if (expression instanceof BinaryExpr binary) {
-            return "B" + binary.operator().name()
-                + segment(syntaxKey(binary.left()))
-                + segment(syntaxKey(binary.right()));
-        }
-        if (expression instanceof FunctionExpr function) {
-            StringBuilder key = new StringBuilder("F").append(segment(function.name()));
-            for (Expr argument : function.arguments()) {
-                key.append(segment(syntaxKey(argument)));
-            }
-            return key.toString();
-        }
-        throw new IllegalArgumentException("unsupported expression type: " + expression.getClass().getName());
-    }
-
-    private static String segment(String value) {
-        return value.length() + ":" + value;
     }
 }
