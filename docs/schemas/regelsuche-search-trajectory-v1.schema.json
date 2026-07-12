@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.search-trajectory/v1",
+  "title": "Regelsuche search trajectory event v1",
+  "type": "object",
+  "required": [
+    "schema", "producerVersion", "runId", "family", "split", "ruleInventoryHash",
+    "sequence", "eventType", "expression", "parent", "target", "features", "depth",
+    "score", "parentScore", "frontierSize", "visitedCount", "generatedCount", "ruleId",
+    "rewriteKind", "applicableRuleIds", "assumptions", "pruningReason", "eventualSuccess",
+    "selectedPath", "terminalStatus"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.search-trajectory/v1" },
+    "producerVersion": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "family": { "type": "string", "minLength": 1 },
+    "split": { "enum": ["UNASSIGNED", "TRAIN", "VALIDATION", "TEST"] },
+    "ruleInventoryHash": { "type": "string", "minLength": 1 },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "eventType": {
+      "enum": [
+        "SEARCH_STARTED", "STATE_DEQUEUED", "STATE_VISITED", "STATE_PRUNED_DUPLICATE",
+        "STATE_PRUNED_TRANSPOSITION", "STATE_PRUNED_DEPTH", "STATE_PRUNED_BUDGET",
+        "STATE_EXPANDED", "TRANSFORMATION_GENERATED", "STATE_ENQUEUED", "SEARCH_FINISHED"
+      ]
+    },
+    "expression": { "$ref": "#/$defs/fingerprint" },
+    "parent": { "oneOf": [{ "$ref": "#/$defs/fingerprint" }, { "type": "null" }] },
+    "target": { "oneOf": [{ "$ref": "#/$defs/fingerprint" }, { "type": "null" }] },
+    "features": { "$ref": "#/$defs/features" },
+    "depth": { "type": "integer", "minimum": 0 },
+    "score": { "type": "integer" },
+    "parentScore": { "type": "integer" },
+    "frontierSize": { "type": "integer", "minimum": 0 },
+    "visitedCount": { "type": "integer", "minimum": 0 },
+    "generatedCount": { "type": "integer", "minimum": 0 },
+    "ruleId": { "type": "string" },
+    "rewriteKind": { "type": "string" },
+    "applicableRuleIds": { "$ref": "#/$defs/stringArray" },
+    "assumptions": { "$ref": "#/$defs/stringArray" },
+    "pruningReason": { "type": "string" },
+    "eventualSuccess": { "type": "boolean" },
+    "selectedPath": { "type": "boolean" },
+    "terminalStatus": {
+      "enum": [
+        "UNTARGETED", "ROOT_ALREADY_TARGET", "REACHED", "STATE_BUDGET", "DEPTH_BUDGET",
+        "CANDIDATE_BUDGET", "NO_TRANSFORMATIONS", "FRONTIER_EXHAUSTED", "UNPARSEABLE_TARGET"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "fingerprint": {
+      "type": "object",
+      "required": ["valueHash", "alphaShapeHash", "parseable"],
+      "properties": {
+        "valueHash": { "type": "string", "minLength": 1 },
+        "alphaShapeHash": { "type": "string", "minLength": 1 },
+        "parseable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "features": {
+      "type": "object",
+      "required": [
+        "nodeCount", "maxDepth", "variableOccurrences", "distinctVariables", "numericLiterals",
+        "additions", "subtractions", "multiplications", "divisions", "powers", "functions", "parseable"
+      ],
+      "properties": {
+        "nodeCount": { "type": "integer", "minimum": 0 },
+        "maxDepth": { "type": "integer", "minimum": 0 },
+        "variableOccurrences": { "type": "integer", "minimum": 0 },
+        "distinctVariables": { "type": "integer", "minimum": 0 },
+        "numericLiterals": { "type": "integer", "minimum": 0 },
+        "additions": { "type": "integer", "minimum": 0 },
+        "subtractions": { "type": "integer", "minimum": 0 },
+        "multiplications": { "type": "integer", "minimum": 0 },
+        "divisions": { "type": "integer", "minimum": 0 },
+        "powers": { "type": "integer", "minimum": 0 },
+        "functions": { "type": "integer", "minimum": 0 },
+        "parseable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
