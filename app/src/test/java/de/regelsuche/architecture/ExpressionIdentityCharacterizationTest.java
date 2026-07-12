@@ -11,6 +11,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.plugin.AstVisitorContext;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,6 +40,20 @@ class ExpressionIdentityCharacterizationTest {
         assertEquals(sum.left(), sum.right());
         assertNotSame(sum.left(), sum.right(),
             "the two written occurrences currently allocate distinct Expr objects");
+    }
+
+    @Test
+    void pluginMetadataCurrentlyUsesExprReferenceAsOccurrenceIdentity() {
+        BinaryExpr sum = (BinaryExpr) parser.parseTerm("a + a");
+        AstVisitorContext context = new AstVisitorContext();
+
+        context.putMetadata(sum.left(), "side", "left");
+        context.putMetadata(sum.right(), "side", "right");
+
+        assertEquals("left", context.metadata(sum.left()).get("side"));
+        assertEquals("right", context.metadata(sum.right()).get("side"));
+        assertNotSame(sum.left(), sum.right(),
+            "interning the current Expr objects directly would collapse occurrence metadata");
     }
 
     @Test
