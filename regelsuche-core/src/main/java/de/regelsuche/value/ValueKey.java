@@ -14,6 +14,9 @@ import java.util.Objects;
  * multiplicity map; it is not exposed as operand semantics.</p>
  */
 public record ValueKey(String encoded) implements Comparable<ValueKey> {
+    public static final String FORMAT_VERSION = "regelsuche.expr-value/v1";
+    private static final String PREFIX = FORMAT_VERSION + ":";
+
     public ValueKey {
         Objects.requireNonNull(encoded, "encoded");
         if (encoded.isEmpty()) {
@@ -22,17 +25,21 @@ public record ValueKey(String encoded) implements Comparable<ValueKey> {
     }
 
     static ValueKey variable(String name) {
-        return new ValueKey("V" + segment(name));
+        return new ValueKey(PREFIX + "V" + segment(name));
     }
 
     static ValueKey number(double value) {
         double normalized = value == 0.0d ? 0.0d : value;
-        return new ValueKey("N" + Long.toUnsignedString(Double.doubleToLongBits(normalized), 16));
+        return new ValueKey(
+                PREFIX + "N" + Long.toUnsignedString(Double.doubleToLongBits(normalized), 16));
     }
 
     static ValueKey ordered(ValueOperator operator, List<ExprValue> operands) {
-        StringBuilder encoded = new StringBuilder("O").append(segment(operator.id()));
-        encoded.append(operands.size()).append(':');
+        StringBuilder encoded = new StringBuilder(PREFIX)
+                .append('O')
+                .append(segment(operator.identityToken()))
+                .append(operands.size())
+                .append(':');
         for (ExprValue operand : operands) {
             encoded.append(segment(operand.key().encoded()));
         }
@@ -45,8 +52,11 @@ public record ValueKey(String encoded) implements Comparable<ValueKey> {
         List<Map.Entry<ExprValue, Integer>> entries = new ArrayList<>(multiplicities.entrySet());
         entries.sort(Comparator.comparing(entry -> entry.getKey().key()));
 
-        StringBuilder encoded = new StringBuilder("A").append(segment(operator.id()));
-        encoded.append(entries.size()).append(':');
+        StringBuilder encoded = new StringBuilder(PREFIX)
+                .append('A')
+                .append(segment(operator.identityToken()))
+                .append(entries.size())
+                .append(':');
         for (Map.Entry<ExprValue, Integer> entry : entries) {
             encoded.append(entry.getValue()).append('*')
                     .append(segment(entry.getKey().key().encoded()));
