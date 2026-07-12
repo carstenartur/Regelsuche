@@ -29,8 +29,8 @@
       "required": [
         "opaqueCaseId", "family", "runtimeStatus", "searchStatus", "candidateRelation",
         "candidateFrozen", "splitPassed", "holdoutsPassed", "materialAblation", "accepted",
-        "elapsedNanos", "pathLength", "primitiveRuleIds", "assumptions", "stageEvidence",
-        "blockers", "metrics", "split", "candidate", "holdouts", "leakageViolations"
+        "pathLength", "primitiveRuleIds", "assumptions", "stageEvidence", "blockers",
+        "metrics", "split", "candidate", "holdouts", "leakageViolations"
       ],
       "properties": {
         "opaqueCaseId": { "type": "string", "minLength": 1 },
@@ -49,7 +49,6 @@
         "holdoutsPassed": { "type": "boolean" },
         "materialAblation": { "type": "boolean" },
         "accepted": { "type": "boolean" },
-        "elapsedNanos": { "$ref": "#/$defs/nonNegativeInteger" },
         "pathLength": { "$ref": "#/$defs/nonNegativeInteger" },
         "primitiveRuleIds": { "$ref": "#/$defs/stringArray" },
         "assumptions": { "$ref": "#/$defs/stringArray" },
@@ -108,14 +107,14 @@
       "additionalProperties": false
     },
     "identifiedFingerprint": {
-      "allOf": [
-        { "$ref": "#/$defs/fingerprint" },
-        {
-          "type": "object",
-          "required": ["id"],
-          "properties": { "id": { "type": "string", "minLength": 1 } }
-        }
-      ]
+      "type": "object",
+      "required": ["id", "valueFingerprint", "alphaFingerprint"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "valueFingerprint": { "type": "string", "minLength": 1 },
+        "alphaFingerprint": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
     },
     "candidate": {
       "type": "object",
