@@ -334,7 +334,7 @@ public final class DiscoveryBenchmarkExecutor {
                 new SearchHeuristic(maxDepth, maxStates, 1, 4, 80, 12))
             .withObserver(observer);
         String normalizedTarget = normalizeExpression(scenario.targetExpression());
-        List<SearchState> explored = new BestFirstSearchStrategy().search(problem.withGoal(TransformationGoal.FACTORIZE));
+        List<SearchState> explored = new BestFirstSearchStrategy().search(problem.withObjective(TransformationGoal.FACTORIZE));
         return explored.stream()
                 .filter(state -> state.depth() > 0 && normalizeExpression(state.expression()).equals(normalizedTarget))
                 .sorted(Comparator.comparingInt(state -> pathPreference(state.appliedRuleIds())))
