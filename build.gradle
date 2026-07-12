@@ -32,10 +32,11 @@ if (aiKnowledgeEnabled) {
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
 
-        // Extractor 0.1.7 introduces schema-v3 prioritized capability selectors.
-        // This permissive ceiling is used only for the calibration run. Before
-        // merge it is replaced by a narrow margin above the measured baseline.
-        maxCognitiveDebt = 100.0d
+        // Extractor 0.1.7 schema v3 measured normalized context debt 20.28:
+        // p90 capability working set 220,496 of 1,087,416 context tokens,
+        // all 8 capabilities sampled through precise type/package selectors.
+        // The 21.0 limit leaves a 0.72-point regression margin.
+        maxCognitiveDebt = 21.0d
 
         maxMethodCognitiveComplexity = 65
         maxMethodCyclomaticComplexity = 35
