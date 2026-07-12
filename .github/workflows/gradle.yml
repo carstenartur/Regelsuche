@@ -50,11 +50,12 @@ jobs:
         if-no-files-found: warn
 
     - name: Upload hidden-rule pilot evidence
+      if: always()
       uses: actions/upload-artifact@v7
       with:
         name: hidden-rule-pilot-evidence
         path: app/build/reports/hidden-rule-pilot/report.json
-        if-no-files-found: error
+        if-no-files-found: warn
 
   dependency-submission:
 
