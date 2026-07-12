@@ -17,7 +17,7 @@ buildscript {
 
     dependencies {
         if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
-            classpath 'org.aiknowledge:ai-knowledge-gradle-plugin:0.1.6'
+            classpath 'org.aiknowledge:ai-knowledge-gradle-plugin:0.1.7'
         }
     }
 }
@@ -32,9 +32,9 @@ if (aiKnowledgeEnabled) {
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
 
-        // Extractor 0.1.6 measures a normalized 0–100 linked-capability working
-        // set. Keep this probe permissive for one run, then replace it in this PR
-        // with a narrow margin above the measured Regelsuche baseline.
+        // Extractor 0.1.7 measures a normalized 0–100 prioritized capability
+        // working set. Keep this probe permissive for one run, then replace it
+        // in this PR with a narrow margin above the measured baseline.
         maxCognitiveDebt = 100.0d
 
         // Method-level gates remain independent of the repository context metric.
