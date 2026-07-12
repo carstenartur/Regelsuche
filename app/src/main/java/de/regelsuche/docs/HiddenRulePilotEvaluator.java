@@ -7,9 +7,13 @@ import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
 import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.mining.RulePatternCanonicalizer;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -70,7 +74,8 @@ public final class HiddenRulePilotEvaluator {
                 violations.add(new LeakageViolation("RUNTIME_INPUT", fingerprint(token)));
             }
         }
-        inspectPrimitiveRules(task, reference, violations);
+        inspectPrimitiveEngine(task.primitiveEngine(), reference, violations);
+        inspectDirectPrimitiveShortcuts(task, reference, violations);
         String hiddenId = normalized(reference.hiddenRuleId());
         for (String primitiveRuleId : result.primitiveRuleIds()) {
             if (!hiddenId.isEmpty() && normalized(primitiveRuleId).equals(hiddenId)) {
@@ -85,14 +90,26 @@ public final class HiddenRulePilotEvaluator {
         return violations.stream().distinct().toList();
     }
 
-    private static void inspectPrimitiveRules(
-        RuntimeTask task,
+    /** Recursively inspects every engine layer whose inventory is explicitly exposed. */
+    private static void inspectPrimitiveEngine(
+        TransformationEngine engine,
         HiddenReference reference,
         List<LeakageViolation> violations
     ) {
-        if (!(task.primitiveEngine() instanceof AstRewriteTransformationEngine engine)) {
-            return;
+        if (engine instanceof AstRewriteTransformationEngine astEngine) {
+            inspectAstRules(astEngine, reference, violations);
         }
+        if (engine instanceof HypothesisTransformationEngine hypothesisEngine) {
+            inspectPrimitiveEngine(hypothesisEngine.baseEngine(), reference, violations);
+            inspectHypothesisOperators(hypothesisEngine.operators(), reference, violations);
+        }
+    }
+
+    private static void inspectAstRules(
+        AstRewriteTransformationEngine engine,
+        HiddenReference reference,
+        List<LeakageViolation> violations
+    ) {
         String hiddenId = normalized(reference.hiddenRuleId());
         String hiddenPattern = RulePatternCanonicalizer.hash(
             stripOuterGrouping(reference.leftPattern()),
@@ -110,6 +127,72 @@ public final class HiddenRulePilotEvaluator {
                     violations.add(new LeakageViolation(
                         "PRIMITIVE_RULE_TEMPLATE", fingerprint(hiddenPattern)));
                 }
+            }
+        }
+    }
+
+    private static void inspectHypothesisOperators(
+        List<HypothesisOperator> operators,
+        HiddenReference reference,
+        List<LeakageViolation> violations
+    ) {
+        for (HypothesisOperator operator : operators) {
+            String className = normalized(operator.getClass().getName());
+            for (String token : reference.forbiddenRuntimeTokens()) {
+                String normalizedToken = normalized(token);
+                if (normalizedToken.length() >= 4 && className.contains(normalizedToken)) {
+                    violations.add(new LeakageViolation(
+                        "PRIMITIVE_OPERATOR_CLASS", fingerprint(token)));
+                }
+            }
+        }
+    }
+
+    /**
+     * A selected pilot case must require a multi-step primitive path. A single
+     * primitive transformation that reaches a concrete task target is therefore
+     * an observable high-level shortcut, regardless of whether its identifier is
+     * disguised or nested in another engine.
+     */
+    private void inspectDirectPrimitiveShortcuts(
+        RuntimeTask task,
+        HiddenReference reference,
+        List<LeakageViolation> violations
+    ) {
+        inspectDirectPrimitiveShortcut(
+            task.primitiveEngine(),
+            task.inputExpression(),
+            task.target().targetExpression(),
+            "TRAIN_DIRECT_PRIMITIVE",
+            reference,
+            violations);
+        task.positiveHoldouts().forEach(holdout -> inspectDirectPrimitiveShortcut(
+            task.primitiveEngine(),
+            holdout.inputExpression(),
+            holdout.targetExpression(),
+            "HOLDOUT_DIRECT_PRIMITIVE",
+            reference,
+            violations));
+    }
+
+    private void inspectDirectPrimitiveShortcut(
+        TransformationEngine engine,
+        String input,
+        String target,
+        String location,
+        HiddenReference reference,
+        List<LeakageViolation> violations
+    ) {
+        String hiddenId = normalized(reference.hiddenRuleId());
+        for (Transformation transformation : engine.transform(input)) {
+            if (!hiddenId.isEmpty() && normalized(transformation.ruleId()).equals(hiddenId)) {
+                violations.add(new LeakageViolation(
+                    "PRIMITIVE_RULE_ID", fingerprint(hiddenId)));
+            }
+            if (equivalence.areEquivalent(transformation.transformedExpression(), target)) {
+                violations.add(new LeakageViolation(
+                    location,
+                    fingerprint(transformation.ruleId() + ":" + input + "->" + target)));
             }
         }
     }
