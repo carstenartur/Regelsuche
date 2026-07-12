@@ -34,7 +34,7 @@ class CuratedDerivationIntegrationTest {
         );
 
         assertTrue(result.found());
-        assertEquals("complete-square", result.rules().getLast());
+        assertEquals("complete-square", lastRule(result));
         assertTrue(result.rules().stream().filter("product-to-square"::equals).count() >= 2);
     }
 
@@ -55,7 +55,7 @@ class CuratedDerivationIntegrationTest {
 
         assertFalse(exact.found());
         assertTrue(ac.found());
-        assertEquals("complete-square", ac.rules().getLast());
+        assertEquals("complete-square", lastRule(ac));
     }
 
     @Test
@@ -144,6 +144,10 @@ class CuratedDerivationIntegrationTest {
 
     private String format(String expression) {
         return ExpressionFormatter.format(parser.parseTerm(expression));
+    }
+
+    private static String lastRule(Derivation derivation) {
+        return derivation.rules().get(derivation.rules().size() - 1);
     }
 
     private record SearchNode(String expression, List<String> expressions, List<String> rules) {
